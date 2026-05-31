@@ -103,7 +103,7 @@ final readonly class WbFinanceSalesReportClient
         $this->rateLimiter->setSalesReportsCooldownUntil($sellerBucketId, $cooldownUntil);
     }
 
-    public function cooldownUntilAfterRemote429(?int $retryAfterSeconds, int $defaultSeconds = 900): \DateTimeImmutable
+    public function cooldownUntilAfterRemote429(?int $retryAfterSeconds, int $defaultSeconds = 70): \DateTimeImmutable
     {
         return $this->rateLimiter->cooldownUntilAfterRemote429($retryAfterSeconds, $defaultSeconds);
     }
@@ -183,8 +183,7 @@ final readonly class WbFinanceSalesReportClient
         }
 
         if (429 === $statusCode) {
-            $retryAfter = $this->extractRetryAfter($headers);
-            $this->setSalesReportsCooldownUntil($sellerBucketId, $this->cooldownUntilAfterRemote429($retryAfter));
+            $retryAfter = $this->handleRemote429($sellerBucketId, $headers, $statusCode, $dateFrom, $dateTo, $rrdId, $limit, $excerpt, 'wildberries::finance-sales-reports-detailed');
 
             throw new MarketplaceRateLimitException($statusCode, $excerpt, $dateFrom, $dateTo, $retryAfter);
         }
@@ -294,8 +293,7 @@ final readonly class WbFinanceSalesReportClient
             return false;
         }
         if (429 === $statusCode) {
-            $retryAfter = $this->extractRetryAfter($headers);
-            $this->setSalesReportsCooldownUntil($sellerBucketId, $this->cooldownUntilAfterRemote429($retryAfter));
+            $retryAfter = $this->handleRemote429($sellerBucketId, $headers, $statusCode, '', '', null, null, $excerpt, 'wildberries::finance-ping');
 
             throw new MarketplaceRateLimitException($statusCode, $excerpt, '', '', $retryAfter);
         }
@@ -358,8 +356,7 @@ final readonly class WbFinanceSalesReportClient
             return false;
         }
         if (429 === $statusCode) {
-            $retryAfter = $this->extractRetryAfter($headers);
-            $this->setSalesReportsCooldownUntil($sellerBucketId, $this->cooldownUntilAfterRemote429($retryAfter));
+            $retryAfter = $this->handleRemote429($sellerBucketId, $headers, $statusCode, $dateFrom, $dateTo, 0, 1, $excerpt, 'wildberries::finance-sales-reports-detailed');
 
             throw new MarketplaceRateLimitException($statusCode, $excerpt, $dateFrom, $dateTo, $retryAfter);
         }
@@ -433,33 +430,164 @@ final readonly class WbFinanceSalesReportClient
         return mb_substr($trimmed, 0, 500);
     }
 
-    private function extractRetryAfter(array $headers): ?int
+    private function handleRemote429(
+        string $sellerBucketId,
+        array $headers,
+        int $statusCode,
+        string $dateFrom,
+        string $dateTo,
+        ?int $rrdId,
+        ?int $limit,
+        string $excerpt,
+        string $endpoint,
+    ): ?int {
+        $cooldown = $this->calculateRemote429Cooldown($headers);
+        $this->setSalesReportsCooldownUntil($sellerBucketId, $cooldown['cooldown_until']);
+
+        $this->logger->warning('WB finance remote rate limit response.', [
+            'endpoint' => $endpoint,
+            'status_code' => $statusCode,
+            'dateFrom' => $dateFrom,
+            'dateTo' => $dateTo,
+            'rrdId' => $rrdId,
+            'limit' => $limit,
+            'seller_bucket_id' => $sellerBucketId,
+            'server_time' => $cooldown['server_time']->format(\DateTimeInterface::ATOM),
+            'calculated_cooldown_until' => $cooldown['cooldown_until']->format(\DateTimeInterface::ATOM),
+            'calculated_retry_after_seconds' => $cooldown['retry_after_seconds'],
+            'cooldown_source_header' => $cooldown['source_header'],
+            'cooldown_source_value' => $cooldown['source_value'],
+            'retry_after' => $this->extractHeaderFirstValue($headers, 'retry-after'),
+            'x_ratelimit_retry' => $this->extractHeaderFirstValue($headers, self::WB_HEADER_RETRY),
+            'x_ratelimit_reset' => $this->extractHeaderFirstValue($headers, self::WB_HEADER_RESET),
+            'x_ratelimit_limit' => $this->extractHeaderFirstValue($headers, 'x-ratelimit-limit'),
+            'x_ratelimit_remaining' => $this->extractHeaderFirstValue($headers, 'x-ratelimit-remaining'),
+            'response_headers_json' => $this->encodeSafeHeadersJson($headers),
+            'response_excerpt' => $excerpt,
+        ]);
+
+        return $cooldown['retry_after_seconds'];
+    }
+
+    /**
+     * @return array{cooldown_until: \DateTimeImmutable, retry_after_seconds: ?int, server_time: \DateTimeImmutable, source_header: ?string, source_value: ?string}
+     */
+    private function calculateRemote429Cooldown(array $headers): array
     {
-        $retryAfter = $this->extractHeaderInt($headers, self::WB_HEADER_RETRY);
-        if (null !== $retryAfter) {
-            return $retryAfter;
+        $now = $this->rateLimiter->now();
+        $candidates = [
+            'retry-after' => true,
+            self::WB_HEADER_RETRY => true,
+            self::WB_HEADER_RESET => false,
+        ];
+
+        foreach ($candidates as $headerName => $allowRelativeSeconds) {
+            $value = $this->extractHeaderFirstValue($headers, $headerName);
+            if (null === $value) {
+                continue;
+            }
+
+            $cooldownUntil = $this->parseRetryCooldownHeader($value, $now, $allowRelativeSeconds);
+
+            if (null === $cooldownUntil) {
+                continue;
+            }
+
+            return [
+                'cooldown_until' => $cooldownUntil,
+                'retry_after_seconds' => max(1, $cooldownUntil->getTimestamp() - $now->getTimestamp()),
+                'server_time' => $now,
+                'source_header' => $headerName,
+                'source_value' => $value,
+            ];
         }
 
-        $reset = $this->extractHeaderInt($headers, self::WB_HEADER_RESET);
-        if (null === $reset) {
+        $fallbackUntil = $this->cooldownUntilAfterRemote429(null);
+
+        return [
+            'cooldown_until' => $fallbackUntil,
+            'retry_after_seconds' => null,
+            'server_time' => $now,
+            'source_header' => null,
+            'source_value' => null,
+        ];
+    }
+
+    private function parseRetryCooldownHeader(string $value, \DateTimeImmutable $now, bool $allowRelativeSeconds): ?\DateTimeImmutable
+    {
+        $trimmed = trim($value);
+        if ('' === $trimmed) {
             return null;
         }
 
-        $now = (new \DateTimeImmutable())->getTimestamp();
+        if (ctype_digit($trimmed)) {
+            $numericValue = (int) $trimmed;
+            if ($allowRelativeSeconds && $numericValue <= 86400) {
+                return $now->modify(sprintf('+%d seconds', max(1, $numericValue)));
+            }
 
-        return $reset > $now ? max(0, $reset - $now) : $reset;
+            if ($numericValue > $now->getTimestamp()) {
+                return (new \DateTimeImmutable('@'.$numericValue))->setTimezone($now->getTimezone());
+            }
+
+            return null;
+        }
+
+        return $this->parseDateTimeHeader($trimmed, $now);
+    }
+
+    private function parseDateTimeHeader(string $value, \DateTimeImmutable $now): ?\DateTimeImmutable
+    {
+        if ('' === $value) {
+            return null;
+        }
+
+        try {
+            $parsed = new \DateTimeImmutable($value, $now->getTimezone());
+        } catch (\Exception) {
+            return null;
+        }
+
+        if ($parsed->getTimestamp() <= $now->getTimestamp()) {
+            return null;
+        }
+
+        return $parsed->setTimezone($now->getTimezone());
+    }
+
+    private function extractRetryAfter(array $headers): ?int
+    {
+        return $this->calculateRemote429Cooldown($headers)['retry_after_seconds'];
     }
 
     private function extractHeaderInt(array $headers, string $name): ?int
+    {
+        $value = $this->extractHeaderFirstValue($headers, $name);
+
+        return null !== $value && ctype_digit(trim($value)) ? (int) trim($value) : null;
+    }
+
+    private function extractHeaderFirstValue(array $headers, string $name): ?string
     {
         $values = $headers[$name] ?? $headers[strtolower($name)] ?? null;
         if (!is_array($values) || [] === $values) {
             return null;
         }
 
-        $value = trim((string) $values[0]);
+        return trim((string) $values[0]);
+    }
 
-        return ctype_digit($value) ? (int) $value : null;
+    private function encodeSafeHeadersJson(array $headers): string
+    {
+        $normalized = [];
+        foreach ($headers as $name => $values) {
+            $normalized[(string) $name] = array_map(
+                static fn (mixed $value): string => mb_substr((string) $value, 0, 1000),
+                is_array($values) ? $values : [$values],
+            );
+        }
+
+        return json_encode($normalized, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}';
     }
 
     private function logWbResponse(

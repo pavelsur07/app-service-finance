@@ -13,6 +13,7 @@ use App\Marketplace\Exception\MarketplaceRateLimitException;
 use App\Marketplace\Exception\MarketplaceTemporaryApiException;
 use App\Marketplace\Infrastructure\Api\Wildberries\WbFinanceSalesReportClient;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\HttpClient\Exception\TransportException;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -205,7 +206,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
             ++$requestCount;
 
-            return new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['x-ratelimit-retry: 17']]);
+            return new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['retry-after: 17']]);
         });
         $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter(null, $storage));
 
@@ -230,7 +231,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $storage = new InMemoryWbFinanceCooldownStorage();
         $connectionId = '6eada2b7-b453-4c33-a92a-e7dce52e291c';
         $client = new WbFinanceSalesReportClient(
-            new MockHttpClient(new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['x-ratelimit-retry: 17']])),
+            new MockHttpClient(new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['retry-after: 17']])),
             $this->createRateLimiter(new MockClock('2026-01-01T00:00:00Z'), $storage),
         );
 
@@ -252,7 +253,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
             ++$requestCount;
 
-            return new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['x-ratelimit-retry: 17']]);
+            return new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['retry-after: 17']]);
         });
         $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter(new MockClock('2026-01-01T00:00:00Z'), $storage));
 
@@ -277,7 +278,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
     {
         $storage = new InMemoryWbFinanceCooldownStorage();
         $client = new WbFinanceSalesReportClient(
-            new MockHttpClient(new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['x-ratelimit-retry: 17']])),
+            new MockHttpClient(new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['retry-after: 17']])),
             $this->createRateLimiter(new MockClock('2026-01-01T00:00:00Z'), $storage),
         );
 
@@ -293,7 +294,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
     {
         $storage = new InMemoryWbFinanceCooldownStorage();
         $client = new WbFinanceSalesReportClient(
-            new MockHttpClient(new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['x-ratelimit-retry: 17']])),
+            new MockHttpClient(new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['retry-after: 17']])),
             $this->createRateLimiter(new MockClock('2026-01-01T00:00:00Z'), $storage),
         );
 
@@ -327,7 +328,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $client = new WbFinanceSalesReportClient(new MockHttpClient(new MockResponse('{"error":"rate"}', [
             'http_code' => 429,
             'response_headers' => [
-                'x-ratelimit-retry: 17',
+                'retry-after: 17',
             ],
         ])), $this->createRateLimiter());
 
@@ -337,6 +338,169 @@ final class WbFinanceSalesReportClientTest extends TestCase
         } catch (MarketplaceRateLimitException $e) {
             self::assertSame(17, $e->getRetryAfter());
         }
+    }
+
+
+    public function testRemote429RetryAfterSecondsSetsCooldownFromNow(): void
+    {
+        $storage = new InMemoryWbFinanceCooldownStorage();
+        $clock = new MockClock('2026-01-01T12:00:00Z');
+        $client = new WbFinanceSalesReportClient(
+            new MockHttpClient(new MockResponse('{"error":"rate"}', [
+                'http_code' => 429,
+                'response_headers' => ['retry-after: 60'],
+            ])),
+            $this->createRateLimiter($clock, $storage),
+        );
+
+        try {
+            $client->fetchDetailedForConnection('connection-id', 'token', '2026-01-01', '2026-01-01');
+            self::fail('Expected MarketplaceRateLimitException');
+        } catch (MarketplaceRateLimitException $e) {
+            self::assertSame(60, $e->getRetryAfter());
+        }
+
+        self::assertSame(
+            $clock->now()->modify('+60 seconds')->getTimestamp(),
+            $storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:connection:connection-id'),
+        );
+    }
+
+    public function testRemote429XRateLimitRetryRelativeSecondsSetsCooldownFromNow(): void
+    {
+        $storage = new InMemoryWbFinanceCooldownStorage();
+        $clock = new MockClock('2026-01-01T12:00:00Z');
+        $client = new WbFinanceSalesReportClient(
+            new MockHttpClient(new MockResponse('{"error":"rate"}', [
+                'http_code' => 429,
+                'response_headers' => ['x-ratelimit-retry: 60'],
+            ])),
+            $this->createRateLimiter($clock, $storage),
+        );
+
+        try {
+            $client->fetchDetailedForConnection('connection-id', 'token', '2026-01-01', '2026-01-01');
+            self::fail('Expected MarketplaceRateLimitException');
+        } catch (MarketplaceRateLimitException $e) {
+            self::assertSame(60, $e->getRetryAfter());
+        }
+
+        self::assertSame(
+            $clock->now()->modify('+60 seconds')->getTimestamp(),
+            $storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:connection:connection-id'),
+        );
+    }
+
+    public function testRemote429XRateLimitRetryUnixTimestampSetsCooldownToTimestamp(): void
+    {
+        $storage = new InMemoryWbFinanceCooldownStorage();
+        $clock = new MockClock('2026-01-01T12:00:00Z');
+        $retryAt = $clock->now()->modify('+75 seconds')->getTimestamp();
+        $client = new WbFinanceSalesReportClient(
+            new MockHttpClient(new MockResponse('{"error":"rate"}', [
+                'http_code' => 429,
+                'response_headers' => ['x-ratelimit-retry: '.$retryAt],
+            ])),
+            $this->createRateLimiter($clock, $storage),
+        );
+
+        try {
+            $client->fetchDetailedForConnection('connection-id', 'token', '2026-01-01', '2026-01-01');
+            self::fail('Expected MarketplaceRateLimitException');
+        } catch (MarketplaceRateLimitException $e) {
+            self::assertSame(75, $e->getRetryAfter());
+        }
+
+        self::assertSame($retryAt, $storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:connection:connection-id'));
+    }
+
+    public function testRemote429InvalidRateLimitHeaderUsesShortFallback(): void
+    {
+        $storage = new InMemoryWbFinanceCooldownStorage();
+        $clock = new MockClock('2026-01-01T12:00:00Z');
+        $client = new WbFinanceSalesReportClient(
+            new MockHttpClient(new MockResponse('{"error":"rate"}', [
+                'http_code' => 429,
+                'response_headers' => ['x-ratelimit-retry: not-a-date'],
+            ])),
+            $this->createRateLimiter($clock, $storage),
+        );
+
+        try {
+            $client->fetchDetailedForConnection('connection-id', 'token', '2026-01-01', '2026-01-01');
+            self::fail('Expected MarketplaceRateLimitException');
+        } catch (MarketplaceRateLimitException $e) {
+            self::assertNull($e->getRetryAfter());
+        }
+
+        self::assertSame(
+            $clock->now()->modify('+85 seconds')->getTimestamp(),
+            $storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:connection:connection-id'),
+        );
+    }
+
+
+    public function testRemote429RetryAfterTakesPriorityOverLongResetTimestamp(): void
+    {
+        $storage = new InMemoryWbFinanceCooldownStorage();
+        $clock = new MockClock('2026-01-01T12:00:00Z');
+        $longResetAt = $clock->now()->setTime(21, 15)->getTimestamp();
+        $client = new WbFinanceSalesReportClient(
+            new MockHttpClient(new MockResponse('{"error":"rate"}', [
+                'http_code' => 429,
+                'response_headers' => [
+                    'retry-after: 60',
+                    'x-ratelimit-reset: '.$longResetAt,
+                ],
+            ])),
+            $this->createRateLimiter($clock, $storage),
+        );
+
+        try {
+            $client->fetchDetailedForConnection('connection-id', 'token', '2026-01-01', '2026-01-01');
+            self::fail('Expected MarketplaceRateLimitException');
+        } catch (MarketplaceRateLimitException $e) {
+            self::assertSame(60, $e->getRetryAfter());
+        }
+
+        self::assertSame(
+            $clock->now()->modify('+60 seconds')->getTimestamp(),
+            $storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:connection:connection-id'),
+        );
+    }
+
+    public function testRemote429LogsRawRateLimitHeadersAndCalculatedCooldown(): void
+    {
+        $storage = new InMemoryWbFinanceCooldownStorage();
+        $clock = new MockClock('2026-01-01T12:00:00Z');
+        $logger = new InMemoryLogger();
+        $client = new WbFinanceSalesReportClient(
+            new MockHttpClient(new MockResponse('{"error":"rate"}', [
+                'http_code' => 429,
+                'response_headers' => [
+                    'retry-after: 60',
+                    'x-ratelimit-limit: 1',
+                    'x-ratelimit-remaining: 0',
+                ],
+            ])),
+            $this->createRateLimiter($clock, $storage),
+            $logger,
+        );
+
+        try {
+            $client->fetchDetailedForConnection('connection-id', 'token', '2026-01-01', '2026-01-01');
+            self::fail('Expected MarketplaceRateLimitException');
+        } catch (MarketplaceRateLimitException) {
+        }
+
+        $record = $logger->firstRecordByMessage('WB finance remote rate limit response.');
+        self::assertNotNull($record);
+        self::assertSame('60', $record['context']['retry_after'] ?? null);
+        self::assertSame('1', $record['context']['x_ratelimit_limit'] ?? null);
+        self::assertSame('0', $record['context']['x_ratelimit_remaining'] ?? null);
+        self::assertSame('2026-01-01T12:00:00+00:00', $record['context']['server_time'] ?? null);
+        self::assertSame('2026-01-01T12:01:00+00:00', $record['context']['calculated_cooldown_until'] ?? null);
+        self::assertJson((string) ($record['context']['response_headers_json'] ?? ''));
     }
 
     public function test401And403MappedToAuthException(): void
@@ -475,7 +639,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
             ++$requestCount;
 
-            return new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['x-ratelimit-retry: 17']]);
+            return new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['retry-after: 17']]);
         });
         $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter(new MockClock('2026-01-01T00:00:00Z'), $storage));
 
@@ -499,7 +663,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
     {
         $storage = new InMemoryWbFinanceCooldownStorage();
         $client = new WbFinanceSalesReportClient(
-            new MockHttpClient(new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['x-ratelimit-retry: 17']])),
+            new MockHttpClient(new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['retry-after: 17']])),
             $this->createRateLimiter(new MockClock('2026-01-01T00:00:00Z'), $storage),
         );
 
@@ -541,6 +705,31 @@ final class WbFinanceSalesReportClientTest extends TestCase
         );
 
         return new WbFinanceRateLimiter($factory, $clock ?? new MockClock(), null, $storage);
+    }
+}
+
+
+final class InMemoryLogger extends AbstractLogger
+{
+    /** @var list<array{level: mixed, message: string, context: array<string, mixed>}> */
+    private array $records = [];
+
+    /** @param array<string, mixed> $context */
+    public function log($level, string|\Stringable $message, array $context = []): void
+    {
+        $this->records[] = ['level' => $level, 'message' => (string) $message, 'context' => $context];
+    }
+
+    /** @return array{level: mixed, message: string, context: array<string, mixed>}|null */
+    public function firstRecordByMessage(string $message): ?array
+    {
+        foreach ($this->records as $record) {
+            if ($message === $record['message']) {
+                return $record;
+            }
+        }
+
+        return null;
     }
 }
 
