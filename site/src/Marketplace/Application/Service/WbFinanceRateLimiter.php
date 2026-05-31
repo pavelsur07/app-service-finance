@@ -107,13 +107,18 @@ final class WbFinanceRateLimiter
         return max(1, $retryAfter->getTimestamp() - $this->clock->now()->getTimestamp());
     }
 
-    public function cooldownUntilAfterRemote429(?int $retryAfterSeconds, int $defaultSeconds = 900): \DateTimeImmutable
+    public function cooldownUntilAfterRemote429(?int $retryAfterSeconds, int $defaultSeconds = 70): \DateTimeImmutable
     {
         $seconds = null !== $retryAfterSeconds
-            ? max(1, $retryAfterSeconds) + self::REMOTE_429_COOLDOWN_BUFFER_SECONDS
-            : max(1, $defaultSeconds);
+            ? max(1, $retryAfterSeconds)
+            : max(1, $defaultSeconds) + self::REMOTE_429_COOLDOWN_BUFFER_SECONDS;
 
         return $this->clock->now()->modify(sprintf('+%d seconds', $seconds));
+    }
+
+    public function now(): \DateTimeImmutable
+    {
+        return $this->clock->now();
     }
 
     public function getActiveSalesReportsCooldownUntil(string $sellerBucketId): ?\DateTimeImmutable
