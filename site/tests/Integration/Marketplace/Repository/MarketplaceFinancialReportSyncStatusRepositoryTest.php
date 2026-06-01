@@ -59,7 +59,8 @@ final class MarketplaceFinancialReportSyncStatusRepositoryTest extends Integrati
             2,
         );
 
-        self::assertSame(['2026-01-01', '2026-01-02'], array_map(static fn (\DateTimeImmutable $d): string => $d->format('Y-m-d'), $days));
+        self::assertSame(['2026-01-01', '2026-01-02'], array_map(static fn (array $item): string => $item['business_date']->format('Y-m-d'), $days));
+        self::assertSame([FinancialReportSyncMode::MISSING, FinancialReportSyncMode::MISSING], array_map(static fn (array $item): FinancialReportSyncMode => $item['mode'], $days));
     }
 
 

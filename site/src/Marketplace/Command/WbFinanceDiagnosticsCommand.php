@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Command;
 
+use App\Marketplace\Application\Service\WbFinanceRateLimiter;
+use App\Marketplace\Application\Service\WbFinancialReportPeriodResolver;
+use App\Marketplace\Exception\MarketplaceRateLimitException;
+use App\Marketplace\Infrastructure\Query\ActiveWbConnectionsQuery;
+use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -30,6 +35,10 @@ final class WbFinanceDiagnosticsCommand extends Command
         #[Autowire(service: 'limiter.wb_finance')]
         private readonly object $wbFinanceLimiter,
         private readonly Connection $connection,
+        private readonly ActiveWbConnectionsQuery $activeWbConnectionsQuery,
+        private readonly MarketplaceConnectionRepository $marketplaceConnectionRepository,
+        private readonly WbFinanceRateLimiter $rateLimiter,
+        private readonly WbFinancialReportPeriodResolver $periodResolver,
     ) {
         parent::__construct();
     }
@@ -44,6 +53,8 @@ final class WbFinanceDiagnosticsCommand extends Command
         $this->renderQueueSizes($io);
         $this->renderStatusCounts($io);
         $this->renderRetryAndErrorDiagnostics($io);
+        $this->renderConnectionDiagnostics($io);
+        $this->renderAlertDiagnostics($io);
         $this->renderRawDiagnostics($io);
 
         $io->success('Diagnostics completed. Command is read-only.');
@@ -167,6 +178,241 @@ final class WbFinanceDiagnosticsCommand extends Command
         }
 
         $io->table(['metric', 'value'], $rows);
+    }
+
+
+    private function renderConnectionDiagnostics(SymfonyStyle $io): void
+    {
+        $io->section('Per-connection recovery diagnostics');
+
+        $rows = [];
+        foreach ($this->activeWbConnectionsQuery->execute() as $activeConnection) {
+            $companyId = (string) $activeConnection['company_id'];
+            $connectionId = (string) $activeConnection['connection_id'];
+            $cooldownUntil = null;
+            $marketplaceConnection = $this->marketplaceConnectionRepository->find($connectionId);
+            if (null !== $marketplaceConnection) {
+                $cooldownUntil = $this->rateLimiter->getActiveSalesReportsCooldownUntil(
+                    $this->rateLimiter->resolveSalesReportsBucketId($marketplaceConnection),
+                );
+            }
+
+            $rows[] = [
+                'company_id' => $companyId,
+                'connection_id' => $connectionId,
+                'cooldown_until' => $this->formatDateTime($cooldownUntil),
+                'due_retry_count' => (string) $this->countDueRetry($companyId, $connectionId),
+                'queued_count' => (string) $this->countQueued($companyId, $connectionId),
+                'last_success_date' => $this->formatScalar($this->lastSuccessDate($companyId, $connectionId)),
+                'missing_days_count' => (string) $this->missingDaysCount($companyId, $connectionId),
+                'last_429_time' => $this->formatScalar($this->last429Time($companyId, $connectionId)),
+            ];
+        }
+
+        $this->renderRows($io, [
+            'company_id',
+            'connection_id',
+            'cooldown_until',
+            'due_retry_count',
+            'queued_count',
+            'last_success_date',
+            'missing_days_count',
+            'last_429_time',
+        ], $rows);
+    }
+
+    private function renderAlertDiagnostics(SymfonyStyle $io): void
+    {
+        $io->section('Recovery alerts');
+        $alerts = [];
+        $now = new \DateTimeImmutable();
+        $yesterday = $this->periodResolver->yesterday();
+        $globalCooldownUntil = $this->rateLimiter->getActiveSalesReportsCooldownUntil('global');
+        if (null !== $globalCooldownUntil) {
+            $alerts[] = ['alert' => 'global_cooldown', 'scope' => 'global', 'value' => $globalCooldownUntil->format(\DateTimeInterface::ATOM)];
+        }
+
+        foreach ($this->activeWbConnectionsQuery->execute() as $activeConnection) {
+            $companyId = (string) $activeConnection['company_id'];
+            $connectionId = (string) $activeConnection['connection_id'];
+            $daily = $this->dailyStatusRow($companyId, $connectionId, $yesterday);
+            $dailyStatus = $daily['status'] ?? null;
+            $dailyUpdatedAt = $this->parseNullableDateTime($daily['updated_at'] ?? null);
+            if (!\in_array($dailyStatus, ['success', 'empty'], true)
+                && (null === $dailyUpdatedAt || ($now->getTimestamp() - $dailyUpdatedAt->getTimestamp()) >= 86400)
+            ) {
+                $alerts[] = ['alert' => 'daily_yesterday_late', 'scope' => $connectionId, 'value' => $yesterday->format('Y-m-d').' status='.($dailyStatus ?? 'missing')];
+            }
+
+            $marketplaceConnection = $this->marketplaceConnectionRepository->find($connectionId);
+            if (null !== $marketplaceConnection) {
+                $cooldownUntil = $this->rateLimiter->getActiveSalesReportsCooldownUntil(
+                    $this->rateLimiter->resolveSalesReportsBucketId($marketplaceConnection),
+                );
+                if (null !== $cooldownUntil && ($cooldownUntil->getTimestamp() - $now->getTimestamp()) > 21600) {
+                    $alerts[] = ['alert' => 'cooldown_over_6h', 'scope' => $connectionId, 'value' => $cooldownUntil->format(\DateTimeInterface::ATOM)];
+                }
+            }
+
+            $dueRetryCount = $this->countDueRetry($companyId, $connectionId);
+            if ($dueRetryCount > 0) {
+                $alerts[] = ['alert' => 'due_retry_backlog_present', 'scope' => $connectionId, 'value' => (string) $dueRetryCount];
+            }
+        }
+
+        $this->renderRows($io, ['alert', 'scope', 'value'], $alerts);
+    }
+
+    private function countDueRetry(string $companyId, string $connectionId): int
+    {
+        return (int) $this->connection->fetchOne(
+            "SELECT COUNT(*)
+             FROM marketplace_financial_report_sync_statuses
+             WHERE company_id = :companyId
+               AND connection_id = :connectionId
+               AND marketplace = 'wildberries'
+               AND report_type = 'sales_report'
+               AND business_date BETWEEN :fromDate AND :toDate
+               AND (
+                    (status IN ('queued', 'failed') AND next_retry_at IS NOT NULL AND next_retry_at <= NOW())
+                    OR (status = 'failed' AND next_retry_at IS NULL AND last_error_status_code = 429 AND last_error_class = :rateLimitErrorClass)
+               )",
+            [
+                'companyId' => $companyId,
+                'connectionId' => $connectionId,
+                'fromDate' => $this->periodResolver->currentYearStart()->format('Y-m-d'),
+                'toDate' => $this->periodResolver->yesterday()->format('Y-m-d'),
+                'rateLimitErrorClass' => MarketplaceRateLimitException::class,
+            ],
+        );
+    }
+
+    private function countQueued(string $companyId, string $connectionId): int
+    {
+        return (int) $this->connection->fetchOne(
+            "SELECT COUNT(*)
+             FROM marketplace_financial_report_sync_statuses
+             WHERE company_id = :companyId
+               AND connection_id = :connectionId
+               AND marketplace = 'wildberries'
+               AND report_type = 'sales_report'
+               AND status = 'queued'",
+            ['companyId' => $companyId, 'connectionId' => $connectionId],
+        );
+    }
+
+    private function lastSuccessDate(string $companyId, string $connectionId): ?string
+    {
+        $value = $this->connection->fetchOne(
+            "SELECT MAX(business_date)
+             FROM marketplace_financial_report_sync_statuses
+             WHERE company_id = :companyId
+               AND connection_id = :connectionId
+               AND marketplace = 'wildberries'
+               AND report_type = 'sales_report'
+               AND status IN ('success', 'empty')",
+            ['companyId' => $companyId, 'connectionId' => $connectionId],
+        );
+
+        return false === $value || null === $value ? null : (string) $value;
+    }
+
+    private function last429Time(string $companyId, string $connectionId): ?string
+    {
+        $value = $this->connection->fetchOne(
+            'SELECT MAX(created_at)
+             FROM marketplace_financial_report_sync_errors
+             WHERE company_id = :companyId
+               AND connection_id = :connectionId
+               AND status_code = 429',
+            ['companyId' => $companyId, 'connectionId' => $connectionId],
+        );
+
+        return false === $value || null === $value ? null : (string) $value;
+    }
+
+    private function missingDaysCount(string $companyId, string $connectionId): int
+    {
+        $from = $this->periodResolver->currentYearStart();
+        $to = $this->periodResolver->yesterday();
+        $knownRows = $this->connection->fetchFirstColumn(
+            "SELECT business_date
+             FROM marketplace_financial_report_sync_statuses
+             WHERE company_id = :companyId
+               AND connection_id = :connectionId
+               AND marketplace = 'wildberries'
+               AND report_type = 'sales_report'
+               AND business_date BETWEEN :fromDate AND :toDate",
+            [
+                'companyId' => $companyId,
+                'connectionId' => $connectionId,
+                'fromDate' => $from->format('Y-m-d'),
+                'toDate' => $to->format('Y-m-d'),
+            ],
+        );
+        $known = array_flip(array_map('strval', $knownRows));
+        $missing = 0;
+        foreach ($this->periodResolver->daysBetween($from, $to) as $day) {
+            if (!isset($known[$day->format('Y-m-d')])) {
+                ++$missing;
+            }
+        }
+
+        return $missing;
+    }
+
+    /** @return array<string,mixed> */
+    private function dailyStatusRow(string $companyId, string $connectionId, \DateTimeImmutable $businessDate): array
+    {
+        $row = $this->connection->fetchAssociative(
+            "SELECT status, updated_at
+             FROM marketplace_financial_report_sync_statuses
+             WHERE company_id = :companyId
+               AND connection_id = :connectionId
+               AND marketplace = 'wildberries'
+               AND report_type = 'sales_report'
+               AND business_date = :businessDate
+               AND mode = 'daily'
+             LIMIT 1",
+            [
+                'companyId' => $companyId,
+                'connectionId' => $connectionId,
+                'businessDate' => $businessDate->format('Y-m-d'),
+            ],
+        );
+
+        return false === $row ? [] : $row;
+    }
+
+    private function formatDateTime(?\DateTimeImmutable $dateTime): string
+    {
+        return null === $dateTime ? 'n/a' : $dateTime->format(\DateTimeInterface::ATOM);
+    }
+
+    private function formatScalar(?string $value): string
+    {
+        return null === $value || '' === $value ? 'n/a' : $value;
+    }
+
+    private function parseNullableDateTime(mixed $value): ?\DateTimeImmutable
+    {
+        if (null === $value || '' === $value) {
+            return null;
+        }
+
+        if ($value instanceof \DateTimeImmutable) {
+            return $value;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return \DateTimeImmutable::createFromInterface($value);
+        }
+
+        try {
+            return new \DateTimeImmutable((string) $value);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function renderRawDiagnostics(SymfonyStyle $io): void

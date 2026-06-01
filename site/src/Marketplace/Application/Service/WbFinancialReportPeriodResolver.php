@@ -37,8 +37,20 @@ final class WbFinancialReportPeriodResolver
      */
     public function last14Days(): array
     {
+        return $this->lastDays(14);
+    }
+
+    /**
+     * @return list<DateTimeImmutable>
+     */
+    public function lastDays(int $daysBack): array
+    {
+        if ($daysBack <= 0) {
+            throw new DomainException('Days back must be a positive integer.');
+        }
+
         $to = $this->yesterday();
-        $from = $to->modify('-13 days');
+        $from = $to->modify(sprintf('-%d days', $daysBack - 1));
 
         return $this->daysBetween($from, $to);
     }

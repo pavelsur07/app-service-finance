@@ -118,7 +118,7 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
     }
 
     /**
-     * @return list<\DateTimeImmutable>
+     * @return list<array{business_date: \DateTimeImmutable, mode: FinancialReportSyncMode}>
      */
     public function findRetryDueDays(
         string $companyId,
@@ -137,7 +137,7 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
         }
 
         $rows = $this->createQueryBuilder('s')
-            ->select('s.businessDate')
+            ->select('s.businessDate', 's.mode')
             ->where('s.companyId = :companyId')
             ->andWhere('s.connectionId = :connectionId')
             ->andWhere('s.reportType = :reportType')
@@ -162,15 +162,25 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
             ->getQuery()
             ->getArrayResult();
 
-        $days = [];
+        $retryItems = [];
         foreach ($rows as $row) {
             $date = $row['businessDate'] ?? null;
-            if ($date instanceof \DateTimeImmutable) {
-                $days[] = $date;
+            if (!$date instanceof \DateTimeImmutable) {
+                continue;
             }
+
+            $mode = $row['mode'] ?? null;
+            if (!$mode instanceof FinancialReportSyncMode) {
+                $mode = is_string($mode) ? FinancialReportSyncMode::tryFrom($mode) : null;
+            }
+
+            $retryItems[] = [
+                'business_date' => $date,
+                'mode' => $mode ?? FinancialReportSyncMode::MISSING,
+            ];
         }
 
-        return $days;
+        return $retryItems;
     }
 
     public function claimForQueue(

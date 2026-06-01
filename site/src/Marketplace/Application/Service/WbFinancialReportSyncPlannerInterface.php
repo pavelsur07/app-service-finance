@@ -13,6 +13,10 @@ interface WbFinancialReportSyncPlannerInterface
 
     public function planRefresh14Days(?string $companyId = null, ?string $connectionId = null, int $maxDays = 1): int;
 
+    public function planRefreshRecentDays(?string $companyId = null, ?string $connectionId = null, int $daysBack = 2, int $maxDays = 1): int;
+
+    public function planDueRetry(?string $companyId = null, ?string $connectionId = null, int $maxDays = 1): int;
+
     public function planRange(
         DateTimeImmutable $from,
         DateTimeImmutable $to,

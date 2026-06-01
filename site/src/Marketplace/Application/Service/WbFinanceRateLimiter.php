@@ -59,28 +59,6 @@ final class WbFinanceRateLimiter
     /** @return array{bucket_id: string, bucket_source: string} */
     public function resolveSalesReportsBucket(MarketplaceConnection $connection): array
     {
-        $settings = $connection->getSettings() ?? [];
-        $settingSources = [
-            'sellerId' => 'seller_id',
-            'seller_id' => 'seller_id',
-            'accountId' => 'account_id',
-            'account_id' => 'account_id',
-            'supplierId' => 'supplier_id',
-            'supplier_id' => 'supplier_id',
-            'wbSellerId' => 'wb_seller_id',
-            'wb_seller_id' => 'wb_seller_id',
-        ];
-
-        foreach ($settingSources as $key => $source) {
-            $value = $settings[$key] ?? null;
-            if (is_scalar($value)) {
-                $normalized = $this->normalizeBucketPart((string) $value);
-                if ('' !== $normalized) {
-                    return ['bucket_id' => $normalized, 'bucket_source' => $source];
-                }
-            }
-        }
-
         return [
             'bucket_id' => 'connection:'.$this->normalizeBucketPart($connection->getId()),
             'bucket_source' => 'connection',

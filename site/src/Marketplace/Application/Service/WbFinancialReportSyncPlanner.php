@@ -41,12 +41,17 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
 
     public function planRefresh14Days(?string $companyId = null, ?string $connectionId = null, int $maxDays = 1): int
     {
-        if ($maxDays <= 0) {
+        return $this->planRefreshRecentDays($companyId, $connectionId, 14, $maxDays);
+    }
+
+    public function planRefreshRecentDays(?string $companyId = null, ?string $connectionId = null, int $daysBack = 2, int $maxDays = 1): int
+    {
+        if ($maxDays <= 0 || $daysBack <= 0) {
             return 0;
         }
 
         $dispatched = 0;
-        $days = $this->periodResolver->last14Days();
+        $days = $this->periodResolver->lastDays($daysBack);
         $from = $days[0];
         $to = $days[array_key_last($days)];
         $now = $this->clock->now();
@@ -59,51 +64,59 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
                 $from,
                 $to,
             );
-            $statusByDay = [];
+            $statusByDayAndMode = [];
             foreach ($statuses as $statusEntity) {
-                $statusByDay[$statusEntity->getBusinessDate()->format('Y-m-d')] = $statusEntity;
+                $mode = $statusEntity->getMode();
+                if (null === $mode) {
+                    continue;
+                }
+
+                $statusByDayAndMode[$statusEntity->getBusinessDate()->format('Y-m-d')][$mode->value] = $statusEntity;
             }
 
             $retryDue = [];
             $success = [];
-            $unknown = [];
+            $dailyCompletedWithoutRefresh = [];
 
             foreach ($days as $day) {
-                $statusEntity = $statusByDay[$day->format('Y-m-d')] ?? null;
-                $status = $statusEntity?->getStatus();
+                $dayKey = $day->format('Y-m-d');
+                $dailyStatus = ($statusByDayAndMode[$dayKey][FinancialReportSyncMode::DAILY->value] ?? null)?->getStatus();
+                $dailyCompleted = \in_array($dailyStatus, [FinancialReportSyncStatus::SUCCESS, FinancialReportSyncStatus::EMPTY], true);
+                $refreshStatusEntity = $statusByDayAndMode[$dayKey][FinancialReportSyncMode::REFRESH_14D->value] ?? null;
+                $refreshStatus = $refreshStatusEntity?->getStatus();
 
-                if (\in_array($status, [FinancialReportSyncStatus::LOADING, FinancialReportSyncStatus::PROCESSING], true)) {
-                    continue;
-                }
-
-                if (\in_array($status, [FinancialReportSyncStatus::QUEUED, FinancialReportSyncStatus::FAILED], true)) {
-                    if (null !== $statusEntity?->getNextRetryAt() && $statusEntity->getNextRetryAt() > $now) {
+                if (null !== $refreshStatusEntity) {
+                    if (\in_array($refreshStatus, [FinancialReportSyncStatus::LOADING, FinancialReportSyncStatus::PROCESSING], true)) {
                         continue;
                     }
 
-                    if (FinancialReportSyncStatus::QUEUED === $status && null === $statusEntity?->getNextRetryAt()) {
+                    if (\in_array($refreshStatus, [FinancialReportSyncStatus::QUEUED, FinancialReportSyncStatus::FAILED], true)) {
+                        if (null !== $refreshStatusEntity->getNextRetryAt() && $refreshStatusEntity->getNextRetryAt() > $now) {
+                            continue;
+                        }
+
+                        if (FinancialReportSyncStatus::QUEUED === $refreshStatus && null === $refreshStatusEntity->getNextRetryAt()) {
+                            continue;
+                        }
+
+                        $retryDue[] = $day;
                         continue;
                     }
 
-                    $retryDue[] = $day;
-                    continue;
-                }
+                    if (\in_array($refreshStatus, [FinancialReportSyncStatus::SUCCESS, FinancialReportSyncStatus::EMPTY], true)) {
+                        if ($dailyCompleted) {
+                            $success[] = [
+                                'day' => $day,
+                                'updated_at' => $refreshStatusEntity->getUpdatedAt() ?? new DateTimeImmutable('9999-12-31T00:00:00+00:00'),
+                            ];
+                        }
 
-                if (\in_array($status, [FinancialReportSyncStatus::SUCCESS, FinancialReportSyncStatus::EMPTY], true)) {
-                    $updatedAt = $statusEntity?->getUpdatedAt();
-                    if (null === $updatedAt) {
-                        $updatedAt = new DateTimeImmutable('9999-12-31T00:00:00+00:00');
+                        continue;
                     }
-
-                    $success[] = [
-                        'day' => $day,
-                        'updated_at' => $updatedAt,
-                    ];
-                    continue;
                 }
 
-                if (null === $status) {
-                    $unknown[] = $day;
+                if ($dailyCompleted) {
+                    $dailyCompletedWithoutRefresh[] = $day;
                 }
             }
 
@@ -119,12 +132,58 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
             $successDays = array_map(static fn (array $item): DateTimeImmutable => $item['day'], $success);
 
             $scheduledForConnection = 0;
-            foreach (array_merge($retryDue, $successDays, $unknown) as $day) {
+            foreach (array_merge($retryDue, $successDays, $dailyCompletedWithoutRefresh) as $day) {
                 if ($scheduledForConnection >= $maxDays) {
                     break;
                 }
 
                 if (!$this->claimAndDispatch($connection['company_id'], $connection['connection_id'], $day, FinancialReportSyncMode::REFRESH_14D, true)) {
+                    continue;
+                }
+
+                ++$dispatched;
+                ++$scheduledForConnection;
+            }
+        }
+
+        return $dispatched;
+    }
+
+    public function planDueRetry(?string $companyId = null, ?string $connectionId = null, int $maxDays = 1): int
+    {
+        if ($maxDays <= 0) {
+            return 0;
+        }
+
+        $dispatched = 0;
+        $from = $this->periodResolver->currentYearStart();
+        $to = $this->periodResolver->yesterday();
+        $now = $this->clock->now();
+
+        foreach ($this->activeWbConnectionsQuery->execute($companyId, $connectionId) as $connection) {
+            $retryItems = $this->syncStatusRepository->findRetryDueDays(
+                $connection['company_id'],
+                $connection['connection_id'],
+                self::REPORT_TYPE,
+                $from,
+                $to,
+                $now,
+                $maxDays,
+            );
+
+            $scheduledForConnection = 0;
+            foreach ($retryItems as $retryItem) {
+                if ($scheduledForConnection >= $maxDays) {
+                    break;
+                }
+
+                if (!$this->claimAndDispatch(
+                    $connection['company_id'],
+                    $connection['connection_id'],
+                    $retryItem['business_date'],
+                    $retryItem['mode'],
+                    false,
+                )) {
                     continue;
                 }
 
@@ -179,7 +238,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
                 $knownDays[$status->getBusinessDate()->format('Y-m-d')] = true;
             }
 
-            $retryDueDays = $this->syncStatusRepository->findRetryDueDays(
+            $retryDueItems = $this->syncStatusRepository->findRetryDueDays(
                 $connection['company_id'],
                 $connection['connection_id'],
                 self::REPORT_TYPE,
@@ -190,8 +249,9 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
             );
 
             $scheduledDays = [];
-            foreach ($retryDueDays as $day) {
-                $scheduledDays[$day->format('Y-m-d')] = $day;
+            foreach ($retryDueItems as $retryItem) {
+                $day = $retryItem['business_date'];
+                $scheduledDays[$day->format('Y-m-d')] = $retryItem;
             }
 
             if (count($scheduledDays) < $maxDays) {
@@ -201,7 +261,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
                         continue;
                     }
 
-                    $scheduledDays[$dayKey] = $day;
+                    $scheduledDays[$dayKey] = ['business_date' => $day, 'mode' => FinancialReportSyncMode::MISSING];
                     if (count($scheduledDays) >= $maxDays) {
                         break;
                     }
@@ -209,8 +269,14 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
             }
 
             ksort($scheduledDays);
-            foreach ($scheduledDays as $day) {
-                if (!$this->claimAndDispatch($connection['company_id'], $connection['connection_id'], $day, FinancialReportSyncMode::MISSING, false)) {
+            foreach ($scheduledDays as $retryItem) {
+                if (!$this->claimAndDispatch(
+                    $connection['company_id'],
+                    $connection['connection_id'],
+                    $retryItem['business_date'],
+                    $retryItem['mode'],
+                    false,
+                )) {
                     continue;
                 }
 
