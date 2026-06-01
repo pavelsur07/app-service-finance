@@ -115,11 +115,12 @@ class MarketplaceController extends AbstractController
         $this->em->persist($connection);
         $this->em->flush();
 
-        $this->messageBus->dispatch(new TriggerInitialSyncMessage(
+        /* Временная блокировка Тригера для первичной загрузки */
+        /*$this->messageBus->dispatch(new TriggerInitialSyncMessage(
             companyId:    (string) $company->getId(),
             connectionId: $connection->getId(),
             marketplace:  $marketplace->value,
-        ));
+        ));*/
 
         $this->addFlash('success', 'Подключение к ' . $marketplace->getDisplayName() . ' создано');
 
