@@ -122,7 +122,8 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
         $handler(new SyncWbFinancialReportDayMessage($company->getId(), $connection->getId(), '2026-05-20', FinancialReportSyncMode::DAILY->value, false));
 
         self::assertSame(1, $requestCount);
-        self::assertNotNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:seller-9291'));
+        self::assertNotNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:connection:'.$connection->getId()));
+        self::assertNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:seller-9291'));
 
         $firstStatus = $this->findStatus($connection->getId(), $company->getId(), '2026-05-19');
         $secondStatus = $this->findStatus($connection->getId(), $company->getId(), '2026-05-20');

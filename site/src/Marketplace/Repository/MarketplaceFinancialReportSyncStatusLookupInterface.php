@@ -45,7 +45,7 @@ interface MarketplaceFinancialReportSyncStatusLookupInterface
     ): array;
 
     /**
-     * @return list<\DateTimeImmutable>
+     * @return list<array{business_date: \DateTimeImmutable, mode: FinancialReportSyncMode}>
      */
     public function findRetryDueDays(
         string $companyId,

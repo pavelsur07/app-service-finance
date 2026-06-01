@@ -20,7 +20,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 #[AsCommand(
     name: 'app:marketplace:wb-financial-reports:sync',
-    description: 'Планировщик синхронизации финансовых отчётов WB (daily/initial/refresh14/missing)',
+    description: 'Планировщик синхронизации финансовых отчётов WB (daily/initial/refresh/refresh14/missing)',
 )]
 final class WbFinancialReportsSyncCommand extends Command
 {
@@ -37,7 +37,7 @@ final class WbFinancialReportsSyncCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addOption('mode', null, InputOption::VALUE_REQUIRED, 'all|initial|daily|refresh14|missing', 'daily')
+            ->addOption('mode', null, InputOption::VALUE_REQUIRED, 'all|initial|daily|refresh|refresh14|missing', 'daily')
             ->addOption('allow-all', null, InputOption::VALUE_NONE)
             ->addOption('company-id', null, InputOption::VALUE_OPTIONAL)
             ->addOption('connection-id', null, InputOption::VALUE_OPTIONAL)
@@ -45,7 +45,9 @@ final class WbFinancialReportsSyncCommand extends Command
             ->addOption('from', null, InputOption::VALUE_OPTIONAL, 'Начало диапазона (Y-m-d)')
             ->addOption('to', null, InputOption::VALUE_OPTIONAL, 'Конец диапазона (Y-m-d)')
             ->addOption('force', null, InputOption::VALUE_NONE)
-            ->addOption('max-days', null, InputOption::VALUE_OPTIONAL, 'Лимит задач initial/refresh14/missing на connection', '1');
+            ->addOption('max-days', null, InputOption::VALUE_OPTIONAL, 'Лимит задач initial/refresh/refresh14/missing на connection', '1')
+            ->addOption('days-back', null, InputOption::VALUE_OPTIONAL, 'Окно последних N дней для --mode=refresh', '2')
+            ->addOption('window-days', null, InputOption::VALUE_OPTIONAL, 'Окно последних N дней для --mode=refresh14', null);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -68,6 +70,8 @@ final class WbFinancialReportsSyncCommand extends Command
             $connectionId = $this->normalizeOptional((string) $input->getOption('connection-id'));
             $force = (bool) $input->getOption('force');
             $maxDays = $this->parseMaxDays((string) $input->getOption('max-days'));
+            $daysBack = $this->parsePositiveInt((string) $input->getOption('days-back'), '--days-back');
+            $windowDays = null !== $input->getOption('window-days') ? $this->parsePositiveInt((string) $input->getOption('window-days'), '--window-days') : null;
             [$from, $to] = $this->resolveRange($input);
 
             if ('all' === $mode && null !== $from) {
@@ -87,7 +91,7 @@ final class WbFinancialReportsSyncCommand extends Command
 
             foreach ($modesToRun as $modeName) {
                 try {
-                    $dispatched = $this->runMode($modeName, $companyId, $connectionId, $force, $maxDays, $from, $to);
+                    $dispatched = $this->runMode($modeName, $companyId, $connectionId, $force, $maxDays, $daysBack, $windowDays, $from, $to);
                     $totalDispatched += $dispatched;
                     $io->writeln(sprintf('Mode <info>%s</info>: dispatched <comment>%d</comment>', $modeName, $dispatched));
                 } catch (\Throwable $e) {
@@ -123,7 +127,7 @@ final class WbFinancialReportsSyncCommand extends Command
         }
     }
 
-    private function runMode(string $mode, ?string $companyId, ?string $connectionId, bool $force, int $maxDays, ?DateTimeImmutable $from, ?DateTimeImmutable $to): int
+    private function runMode(string $mode, ?string $companyId, ?string $connectionId, bool $force, int $maxDays, int $daysBack, ?int $windowDays, ?DateTimeImmutable $from, ?DateTimeImmutable $to): int
     {
         return match ($mode) {
             'daily' => null !== $from
@@ -132,10 +136,15 @@ final class WbFinancialReportsSyncCommand extends Command
             'initial' => null !== $from
                 ? $this->planner->planRange($from, $to ?? $from, FinancialReportSyncMode::INITIAL, $companyId, $connectionId, $force)
                 : $this->planner->planInitial($companyId, $connectionId, null, $maxDays),
-            'refresh14' => null !== $from
-                // Explicit --from/--to is treated as manual force refresh mode; --max-days applies only to automatic refresh14 planning.
+            'refresh' => null !== $from
                 ? $this->planner->planRange($from, $to ?? $from, FinancialReportSyncMode::REFRESH_14D, $companyId, $connectionId, true)
-                : $this->planner->planRefresh14Days($companyId, $connectionId, $maxDays),
+                : $this->planner->planRefreshRecentDays($companyId, $connectionId, $daysBack, $maxDays),
+            'refresh14' => null !== $from
+                // Explicit --from/--to is treated as manual force refresh mode; --max-days applies only to automatic refresh planning.
+                ? $this->planner->planRange($from, $to ?? $from, FinancialReportSyncMode::REFRESH_14D, $companyId, $connectionId, true)
+                : (null !== $windowDays
+                    ? $this->planner->planRefreshRecentDays($companyId, $connectionId, $windowDays, $maxDays)
+                    : $this->planner->planRefresh14Days($companyId, $connectionId, $maxDays)),
             'missing' => $this->planner->planMissing($companyId, $connectionId, $maxDays),
             default => throw new DomainException(sprintf('Unsupported mode: %s', $mode)),
         };
@@ -144,8 +153,8 @@ final class WbFinancialReportsSyncCommand extends Command
     private function resolveMode(string $mode): string
     {
         $normalized = strtolower(trim($mode));
-        if (!\in_array($normalized, ['all', 'initial', 'daily', 'refresh14', 'missing'], true)) {
-            throw new DomainException('Invalid --mode. Allowed: all|initial|daily|refresh14|missing');
+        if (!\in_array($normalized, ['all', 'initial', 'daily', 'refresh', 'refresh14', 'missing'], true)) {
+            throw new DomainException('Invalid --mode. Allowed: all|initial|daily|refresh|refresh14|missing');
         }
 
         return $normalized;
@@ -153,12 +162,17 @@ final class WbFinancialReportsSyncCommand extends Command
 
     private function parseMaxDays(string $raw): int
     {
-        $maxDays = (int) $raw;
-        if ($maxDays <= 0) {
-            throw new DomainException('Option --max-days must be a positive integer.');
+        return $this->parsePositiveInt($raw, '--max-days');
+    }
+
+    private function parsePositiveInt(string $raw, string $optionName): int
+    {
+        $value = (int) $raw;
+        if ($value <= 0) {
+            throw new DomainException(sprintf('Option %s must be a positive integer.', $optionName));
         }
 
-        return $maxDays;
+        return $value;
     }
 
     private function resolveRange(InputInterface $input): array

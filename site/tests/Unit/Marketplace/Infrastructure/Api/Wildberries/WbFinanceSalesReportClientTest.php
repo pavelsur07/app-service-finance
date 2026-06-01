@@ -101,7 +101,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         self::assertSame($startTimestamp, $clock->now()->getTimestamp());
     }
 
-    public function testFetchDetailedDayUsesDifferentLimiterBucketsForDifferentSellerBuckets(): void
+    public function testFetchDetailedDayUsesConnectionBucketsEvenWhenSellerBucketsAreProvided(): void
     {
         $requestCount = 0;
         $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
@@ -222,7 +222,8 @@ final class WbFinanceSalesReportClientTest extends TestCase
             $client->hasAnyDataForConnection('connection-id', 'token', '2026-02-01', '2026-02-03', 'seller-has-any');
         } finally {
             self::assertSame(1, $requestCount);
-            self::assertNotNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:seller-has-any'));
+            self::assertNotNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:connection:connection-id'));
+            self::assertNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:seller-has-any'));
         }
     }
 

@@ -61,7 +61,7 @@ final class WbFinanceRateLimiterTest extends TestCase
         self::assertSame('wb_finance:sales_reports:cooldown:connection:'.$connectionId, $limiter->buildSalesReportsCooldownKey($limiter->resolveSalesReportsBucketId($connection)));
     }
 
-    public function testResolveSalesReportsBucketIdUsesSellerSettingsBeforeConnectionFallback(): void
+    public function testResolveSalesReportsBucketIdUsesConnectionEvenWhenSellerSettingsExist(): void
     {
         $connection = new MarketplaceConnection(
             '6eada2b7-b453-4c33-a92a-e7dce52e291c',
@@ -73,8 +73,8 @@ final class WbFinanceRateLimiterTest extends TestCase
 
         $limiter = $this->createLimiter();
 
-        self::assertSame('account-42', $limiter->resolveSalesReportsBucketId($connection));
-        self::assertSame('account_id', $limiter->resolveSalesReportsBucketSource($connection));
+        self::assertSame('connection:'.$connection->getId(), $limiter->resolveSalesReportsBucketId($connection));
+        self::assertSame('connection', $limiter->resolveSalesReportsBucketSource($connection));
     }
 
     private function createLimiter(?MockClock $clock = null): WbFinanceRateLimiter

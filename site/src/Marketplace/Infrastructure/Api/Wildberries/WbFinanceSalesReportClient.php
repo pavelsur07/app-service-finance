@@ -404,12 +404,12 @@ final readonly class WbFinanceSalesReportClient
 
     private function normalizeSellerBucketId(?string $sellerBucketId, ?string $connectionId = null): string
     {
-        if (null !== $sellerBucketId && '' !== trim($sellerBucketId)) {
-            return $sellerBucketId;
-        }
-
         if (null !== $connectionId && '' !== trim($connectionId)) {
             return 'connection:'.trim($connectionId);
+        }
+
+        if (null !== $sellerBucketId && '' !== trim($sellerBucketId)) {
+            return $sellerBucketId;
         }
 
         return self::GLOBAL_SELLER_BUCKET;
