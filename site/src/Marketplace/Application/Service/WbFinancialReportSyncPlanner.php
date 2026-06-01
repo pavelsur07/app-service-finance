@@ -149,15 +149,15 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         return $dispatched;
     }
 
-    public function planDueRetry(?string $companyId = null, ?string $connectionId = null, int $maxDays = 1): int
+    public function planDueRetry(?string $companyId = null, ?string $connectionId = null, int $maxDays = 1, ?DateTimeImmutable $from = null, ?DateTimeImmutable $to = null): int
     {
         if ($maxDays <= 0) {
             return 0;
         }
 
         $dispatched = 0;
-        $from = $this->periodResolver->currentYearStart();
-        $to = $this->periodResolver->yesterday();
+        $from ??= $this->periodResolver->currentYearStart();
+        $to ??= $this->periodResolver->yesterday();
         $now = $this->clock->now();
 
         foreach ($this->activeWbConnectionsQuery->execute($companyId, $connectionId) as $connection) {
@@ -212,15 +212,15 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         );
     }
 
-    public function planMissing(?string $companyId = null, ?string $connectionId = null, int $maxDays = 14): int
+    public function planMissing(?string $companyId = null, ?string $connectionId = null, int $maxDays = 14, ?DateTimeImmutable $from = null, ?DateTimeImmutable $to = null): int
     {
         if ($maxDays <= 0) {
             return 0;
         }
 
         $dispatched = 0;
-        $from = $this->periodResolver->currentYearStart();
-        $to = $this->periodResolver->yesterday();
+        $from ??= $this->periodResolver->currentYearStart();
+        $to ??= $this->periodResolver->yesterday();
         $allDays = $this->periodResolver->daysBetween($from, $to);
         $now = $this->clock->now();
 

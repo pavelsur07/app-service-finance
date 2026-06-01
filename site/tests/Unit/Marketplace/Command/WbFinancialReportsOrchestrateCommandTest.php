@@ -94,7 +94,13 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
             ['company-a:conn-a' => 'success'],
             ['company-a:conn-a' => 1],
         ));
-        $this->planner->expects(self::once())->method('planDueRetry')->with('company-a', 'conn-a', 1)->willReturn(1);
+        $this->planner->expects(self::once())->method('planDueRetry')->with(
+            'company-a',
+            'conn-a',
+            1,
+            self::isInstanceOf(\DateTimeImmutable::class),
+            self::isInstanceOf(\DateTimeImmutable::class),
+        )->willReturn(1);
         $this->planner->expects(self::never())->method('planRefreshRecentDays');
         $this->planner->expects(self::never())->method('planMissing');
 
@@ -126,10 +132,144 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
         $this->planner->expects(self::once())->method('planRefreshRecentDays')->with('company-a', 'conn-a', 2, 1)->willReturn(1);
 
         self::assertSame(Command::SUCCESS, $this->execute($this->rateLimiter()));
-        self::assertSame(1, $dueRetrySqlAssertions);
+        self::assertSame(2, $dueRetrySqlAssertions);
     }
 
-    private function execute(WbFinanceRateLimiter $rateLimiter): int
+    public function testOldDueRetryOutsideDefaultWindowFallsThroughToRefresh(): void
+    {
+        $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
+        $this->db->method('fetchOne')->willReturnCallback($this->dbFetchOneCallback(
+            ['company-a:conn-a' => 'success'],
+            ['company-a:conn-a:2026-05-07:2026-05-20' => 0, 'company-a:conn-a:2026-01-01:2026-05-06' => 1],
+        ));
+        $this->planner->expects(self::never())->method('planDueRetry');
+        $this->planner->expects(self::once())->method('planRefreshRecentDays')->with('company-a', 'conn-a', 2, 1)->willReturn(1);
+        $this->planner->expects(self::never())->method('planMissing');
+
+        self::assertSame(Command::SUCCESS, $this->execute($this->rateLimiter()));
+    }
+
+    public function testRecentDueRetryInsideWindowRunsBeforeRefresh(): void
+    {
+        $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
+        $this->db->method('fetchOne')->willReturnCallback($this->dbFetchOneCallback(
+            ['company-a:conn-a' => 'success'],
+            ['company-a:conn-a:2026-05-07:2026-05-20' => 1],
+        ));
+        $this->planner->expects(self::once())->method('planDueRetry')->with(
+            'company-a',
+            'conn-a',
+            1,
+            self::callback(static fn (\DateTimeImmutable $date): bool => '2026-05-07' === $date->format('Y-m-d')),
+            self::callback(static fn (\DateTimeImmutable $date): bool => '2026-05-20' === $date->format('Y-m-d')),
+        )->willReturn(1);
+        $this->planner->expects(self::never())->method('planRefreshRecentDays');
+        $this->planner->expects(self::never())->method('planMissing');
+
+        self::assertSame(Command::SUCCESS, $this->execute($this->rateLimiter()));
+    }
+
+    public function testIncludeHistoricalRetryAllowsOnlyConfiguredHistoricalBatch(): void
+    {
+        $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
+        $this->db->method('fetchOne')->willReturnCallback($this->dbFetchOneCallback(
+            ['company-a:conn-a' => 'success'],
+            ['company-a:conn-a:2026-05-07:2026-05-20' => 0, 'company-a:conn-a:2026-01-01:2026-05-06' => 1],
+        ));
+        $this->planner->expects(self::once())->method('planRefreshRecentDays')->with('company-a', 'conn-a', 2, 1)->willReturn(0);
+        $this->planner->expects(self::once())->method('planDueRetry')->with(
+            'company-a',
+            'conn-a',
+            1,
+            self::callback(static fn (\DateTimeImmutable $date): bool => '2026-01-01' === $date->format('Y-m-d')),
+            self::callback(static fn (\DateTimeImmutable $date): bool => '2026-05-06' === $date->format('Y-m-d')),
+        )->willReturn(1);
+        $this->planner->expects(self::never())->method('planMissing');
+
+        self::assertSame(Command::SUCCESS, $this->execute($this->rateLimiter(), ['--include-historical-retry' => true]));
+    }
+
+    public function testRefreshDaysBackDoesNotEnableHistoricalRetry(): void
+    {
+        $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
+        $this->db->method('fetchOne')->willReturnCallback($this->dbFetchOneCallback(
+            ['company-a:conn-a' => 'success'],
+            ['company-a:conn-a:2026-05-07:2026-05-20' => 0, 'company-a:conn-a:2026-01-01:2026-05-06' => 1],
+        ));
+        $this->planner->expects(self::never())->method('planDueRetry');
+        $this->planner->expects(self::once())->method('planRefreshRecentDays')->with('company-a', 'conn-a', 2, 1)->willReturn(1);
+        $this->planner->expects(self::never())->method('planMissing');
+
+        self::assertSame(Command::SUCCESS, $this->execute($this->rateLimiter(), ['--refresh-days-back' => '2']));
+    }
+
+    public function testRecentMissingIsNotPlannedWhenRecentDueRetryCannotBeClaimed(): void
+    {
+        $tester = null;
+        $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
+        $this->db->method('fetchOne')->willReturnCallback($this->dbFetchOneCallback(
+            ['company-a:conn-a' => 'success'],
+            ['company-a:conn-a:2026-05-07:2026-05-20' => 1],
+            [],
+            ['company-a:conn-a:2026-05-07:2026-05-20' => 13],
+        ));
+        $this->planner->expects(self::once())->method('planDueRetry')->willReturn(0);
+        $this->planner->expects(self::never())->method('planRefreshRecentDays');
+        $this->planner->expects(self::never())->method('planMissing');
+
+        self::assertSame(Command::SUCCESS, $this->execute($this->rateLimiter(), [], $tester));
+        self::assertStringContainsString('recent due retry skipped by claim', $tester->getDisplay());
+        self::assertStringContainsString('Dispatched 0 task(s).', $tester->getDisplay());
+    }
+
+    public function testHistoricalMissingIsNotPlannedWhenHistoricalDueRetryCannotBeClaimed(): void
+    {
+        $tester = null;
+        $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
+        $this->db->method('fetchOne')->willReturnCallback($this->dbFetchOneCallback(
+            ['company-a:conn-a' => 'success'],
+            ['company-a:conn-a:2026-05-07:2026-05-20' => 0, 'company-a:conn-a:2026-01-01:2026-05-06' => 1],
+            [],
+            ['company-a:conn-a:2026-01-01:2026-05-06' => 0],
+        ));
+        $this->planner->expects(self::once())->method('planRefreshRecentDays')->with('company-a', 'conn-a', 2, 1)->willReturn(0);
+        $this->planner->expects(self::once())->method('planDueRetry')->with(
+            'company-a',
+            'conn-a',
+            1,
+            self::callback(static fn (\DateTimeImmutable $date): bool => '2026-01-01' === $date->format('Y-m-d')),
+            self::callback(static fn (\DateTimeImmutable $date): bool => '2026-05-06' === $date->format('Y-m-d')),
+        )->willReturn(0);
+        $this->planner->expects(self::never())->method('planMissing');
+
+        self::assertSame(Command::SUCCESS, $this->execute($this->rateLimiter(), ['--include-historical-retry' => true], $tester));
+        self::assertStringContainsString('historical due retry skipped by claim', $tester->getDisplay());
+        self::assertStringContainsString('Dispatched 0 task(s).', $tester->getDisplay());
+    }
+
+    public function testRecentMissingIsPlannedWhenNoRecentDueRetryExists(): void
+    {
+        $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
+        $this->db->method('fetchOne')->willReturnCallback($this->dbFetchOneCallback(
+            ['company-a:conn-a' => 'success'],
+            ['company-a:conn-a:2026-05-07:2026-05-20' => 0],
+            [],
+            ['company-a:conn-a:2026-05-07:2026-05-20' => 13],
+        ));
+        $this->planner->expects(self::never())->method('planDueRetry');
+        $this->planner->expects(self::once())->method('planRefreshRecentDays')->with('company-a', 'conn-a', 2, 1)->willReturn(0);
+        $this->planner->expects(self::once())->method('planMissing')->with(
+            'company-a',
+            'conn-a',
+            1,
+            self::callback(static fn (\DateTimeImmutable $date): bool => '2026-05-07' === $date->format('Y-m-d')),
+            self::callback(static fn (\DateTimeImmutable $date): bool => '2026-05-20' === $date->format('Y-m-d')),
+        )->willReturn(1);
+
+        self::assertSame(Command::SUCCESS, $this->execute($this->rateLimiter()));
+    }
+
+    private function execute(WbFinanceRateLimiter $rateLimiter, array $input = [], ?CommandTester &$tester = null): int
     {
         $command = new WbFinancialReportsOrchestrateCommand(
             $this->connections,
@@ -140,23 +280,37 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
             $this->logger,
         );
 
-        return (new CommandTester($command))->execute([]);
+        $tester = new CommandTester($command);
+
+        return $tester->execute($input);
     }
 
     /**
      * @param array<string, string|null> $dailyStatuses
-     * @param array<string, int> $dueRetryCounts
+     * @param array<string, int> $dueRetryCounts keyed by company:connection or company:connection:from:to
      * @param array<string, int> $futureQueuedCounts
+     * @param array<string, int> $knownDayCounts keyed by company:connection or company:connection:from:to
      */
-    private function dbFetchOneCallback(array $dailyStatuses, array $dueRetryCounts = [], array $futureQueuedCounts = []): \Closure
+    private function dbFetchOneCallback(array $dailyStatuses, array $dueRetryCounts = [], array $futureQueuedCounts = [], array $knownDayCounts = []): \Closure
     {
-        return static function (string $sql, array $params = []) use ($dailyStatuses, $dueRetryCounts, $futureQueuedCounts): mixed {
+        return static function (string $sql, array $params = []) use ($dailyStatuses, $dueRetryCounts, $futureQueuedCounts, $knownDayCounts): mixed {
             $key = ($params['companyId'] ?? '').':'.($params['connectionId'] ?? '');
+            $rangeKey = $key.':'.($params['fromDate'] ?? '').':'.($params['toDate'] ?? '');
+            if (str_contains($sql, 'COUNT(DISTINCT business_date)')) {
+                if (array_key_exists($rangeKey, $knownDayCounts) || array_key_exists($key, $knownDayCounts)) {
+                    return $knownDayCounts[$rangeKey] ?? $knownDayCounts[$key];
+                }
+
+                $from = new \DateTimeImmutable((string) $params['fromDate']);
+                $to = new \DateTimeImmutable((string) $params['toDate']);
+
+                return $from->diff($to)->days + 1;
+            }
             if (str_contains($sql, "status = 'queued'") && str_contains($sql, 'next_retry_at > NOW()')) {
-                return $futureQueuedCounts[$key] ?? 0;
+                return $futureQueuedCounts[$rangeKey] ?? $futureQueuedCounts[$key] ?? 0;
             }
             if (str_contains($sql, "status IN ('queued', 'failed')")) {
-                return $dueRetryCounts[$key] ?? 0;
+                return $dueRetryCounts[$rangeKey] ?? $dueRetryCounts[$key] ?? 0;
             }
             if (str_contains($sql, 'AND business_date = :businessDate')) {
                 return $dailyStatuses[$key] ?? null;

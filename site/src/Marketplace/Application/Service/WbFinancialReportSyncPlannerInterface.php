@@ -15,7 +15,7 @@ interface WbFinancialReportSyncPlannerInterface
 
     public function planRefreshRecentDays(?string $companyId = null, ?string $connectionId = null, int $daysBack = 2, int $maxDays = 1): int;
 
-    public function planDueRetry(?string $companyId = null, ?string $connectionId = null, int $maxDays = 1): int;
+    public function planDueRetry(?string $companyId = null, ?string $connectionId = null, int $maxDays = 1, ?DateTimeImmutable $from = null, ?DateTimeImmutable $to = null): int;
 
     public function planRange(
         DateTimeImmutable $from,
@@ -26,7 +26,7 @@ interface WbFinancialReportSyncPlannerInterface
         bool $forceRefresh = false,
     ): int;
 
-    public function planMissing(?string $companyId = null, ?string $connectionId = null, int $maxDays = 14): int;
+    public function planMissing(?string $companyId = null, ?string $connectionId = null, int $maxDays = 14, ?DateTimeImmutable $from = null, ?DateTimeImmutable $to = null): int;
 
     public function planInitial(?string $companyId = null, ?string $connectionId = null, ?DateTimeImmutable $startFrom = null, int $maxDays = 1): int;
 }
