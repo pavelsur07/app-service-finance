@@ -17,6 +17,12 @@ final readonly class ProcessDayReportMessage
         public string $companyId,
         public string $rawDocumentId,
         public bool $forceRefresh = false,
+        public ?string $syncStatusId = null,
+        public ?string $connectionId = null,
+        public ?string $marketplace = null,
+        public ?string $reportType = null,
+        public ?string $mode = null,
+        public ?string $businessDate = null,
     ) {
     }
 }

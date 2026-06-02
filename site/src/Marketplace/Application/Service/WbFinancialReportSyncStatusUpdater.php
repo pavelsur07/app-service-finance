@@ -145,13 +145,25 @@ final readonly class WbFinancialReportSyncStatusUpdater implements WbFinancialRe
     }
 
 
-    public function syncByRawPipelineResult(MarketplaceRawDocument $rawDocument, ?\Throwable $failure = null): void
+    /** @param array{sync_status_id?: string|null, company_id?: string|null, connection_id?: string|null, marketplace?: string|null, report_type?: string|null, mode?: string|null, business_date?: string|null, raw_document_id?: string|null}|null $context */
+    public function syncByRawPipelineResult(MarketplaceRawDocument $rawDocument, ?\Throwable $failure = null, ?array $context = null): void
     {
         if ($rawDocument->getMarketplace() !== MarketplaceType::WILDBERRIES || $rawDocument->getDocumentType() !== 'sales_report') {
             return;
         }
 
-        $status = $this->statusRepository->findByRawDocumentId((string) $rawDocument->getCompany()->getId(), $rawDocument->getId());
+        $companyId = (string) $rawDocument->getCompany()->getId();
+        $rawDocumentId = $rawDocument->getId();
+        $statuses = $this->statusRepository->findAllByRawDocumentId($companyId, $rawDocumentId);
+        if (count($statuses) > 1) {
+            $this->logger->warning('Multiple WB sync statuses reference one raw document; exact context is required to finalize safely.', [
+                'company_id' => $companyId,
+                'raw_document_id' => $rawDocumentId,
+                'sync_status_ids' => array_map(static fn (MarketplaceFinancialReportSyncStatus $status): string => $status->getId(), $statuses),
+            ]);
+        }
+
+        $status = $this->resolveStatusForRawPipelineResult($rawDocument, $context);
         if ($status === null) {
             return;
         }
@@ -184,6 +196,96 @@ final readonly class WbFinancialReportSyncStatusUpdater implements WbFinancialRe
             'to' => $status->getStatus()->value,
             'pipelineStatus' => $rawDocument->getProcessingStatus()?->value,
         ]);
+    }
+
+    /** @param array{sync_status_id?: string|null, company_id?: string|null, connection_id?: string|null, marketplace?: string|null, report_type?: string|null, mode?: string|null, business_date?: string|null, raw_document_id?: string|null}|null $context */
+    private function resolveStatusForRawPipelineResult(MarketplaceRawDocument $rawDocument, ?array $context): ?MarketplaceFinancialReportSyncStatus
+    {
+        $companyId = (string) $rawDocument->getCompany()->getId();
+        $rawDocumentId = $rawDocument->getId();
+
+        if (null === $context || null === ($context['connection_id'] ?? null)) {
+            $statuses = $this->statusRepository->findAllByRawDocumentId($companyId, $rawDocumentId);
+            if (count($statuses) > 1) {
+                $this->logger->warning('WB sync status finalization skipped because raw document is linked to multiple statuses and no exact context was provided.', [
+                    'company_id' => $companyId,
+                    'raw_document_id' => $rawDocumentId,
+                    'sync_status_ids' => array_map(static fn (MarketplaceFinancialReportSyncStatus $status): string => $status->getId(), $statuses),
+                ]);
+
+                return null;
+            }
+
+            return $statuses[0] ?? null;
+        }
+
+        if (isset($context['company_id']) && $context['company_id'] !== $companyId) {
+            $this->logger->warning('WB sync status finalization skipped because context company does not match raw document company.', [
+                'company_id' => $companyId,
+                'raw_document_id' => $rawDocumentId,
+                'context' => $context,
+            ]);
+
+            return null;
+        }
+
+        $marketplace = MarketplaceType::tryFrom((string) ($context['marketplace'] ?? MarketplaceType::WILDBERRIES->value));
+        $mode = FinancialReportSyncMode::tryFrom((string) ($context['mode'] ?? ''));
+        $businessDate = $this->parseBusinessDate($context['business_date'] ?? null);
+        $reportType = $context['report_type'] ?? null;
+        $contextRawDocumentId = $context['raw_document_id'] ?? $rawDocumentId;
+
+        if ($marketplace === null || $mode === null || $businessDate === null || !is_string($reportType) || $reportType === '' || $contextRawDocumentId !== $rawDocumentId) {
+            $this->logger->warning('WB sync status finalization skipped because exact context is incomplete or mismatched.', [
+                'company_id' => $companyId,
+                'raw_document_id' => $rawDocumentId,
+                'context' => $context,
+            ]);
+
+            return null;
+        }
+
+        $status = $this->statusRepository->findByRawPipelineContext(
+            $context['sync_status_id'] ?? null,
+            $companyId,
+            (string) $context['connection_id'],
+            $marketplace,
+            $reportType,
+            $mode,
+            $businessDate,
+            $rawDocumentId,
+        );
+
+        if ($status === null) {
+            $this->logger->warning('WB sync status finalization skipped: no status matches exact raw pipeline context.', [
+                'company_id' => $companyId,
+                'raw_document_id' => $rawDocumentId,
+                'context' => $context,
+            ]);
+        }
+
+        return $status;
+    }
+
+    private function parseBusinessDate(mixed $value): ?\DateTimeImmutable
+    {
+        if ($value instanceof \DateTimeImmutable) {
+            return $value->setTime(0, 0);
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return \DateTimeImmutable::createFromInterface($value)->setTime(0, 0);
+        }
+
+        if (!is_string($value) || '' === $value) {
+            return null;
+        }
+
+        try {
+            return (new \DateTimeImmutable($value))->setTime(0, 0);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /** @param array<string,mixed>|null $requestPayload */

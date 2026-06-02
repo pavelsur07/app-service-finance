@@ -249,6 +249,70 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
         self::assertSame(FinancialReportSyncStatus::PROCESSING, $persisted->getStatus());
     }
 
+
+    public function testSyncByRawPipelineResultUsesExactContextWhenRawDocumentIsSharedByConnections(): void
+    {
+        $rawId = $this->rawId();
+        $otherConnectionId = '00000000-0000-0000-0000-000000000222';
+        $targetConnectionId = '00000000-0000-0000-0000-000000000333';
+
+        $otherStatus = $this->updater->startLoading(
+            $otherConnectionId,
+            $this->companyId(),
+            'sales_report',
+            'wildberries::finance-sales-reports-detailed',
+            $this->businessDate(),
+            FinancialReportSyncMode::INITIAL,
+        );
+        $this->updater->markRawLoaded($otherStatus, $rawId, 10, 'same-raw');
+        $this->updater->markProcessing($otherStatus);
+
+        $targetStatus = $this->updater->startLoading(
+            $targetConnectionId,
+            $this->companyId(),
+            'sales_report',
+            'wildberries::finance-sales-reports-detailed',
+            $this->businessDate(),
+            FinancialReportSyncMode::INITIAL,
+        );
+        $this->updater->markRawLoaded($targetStatus, $rawId, 10, 'same-raw');
+        $this->updater->markProcessing($targetStatus);
+        $this->em->flush();
+
+        $company = $this->em->getReference(
+            \App\Company\Entity\Company::class,
+            $this->companyId(),
+        );
+        $raw = new \App\Marketplace\Entity\MarketplaceRawDocument(
+            $rawId,
+            $company,
+            \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
+            'sales_report',
+        );
+        $raw->markCompleted();
+
+        $this->updater->syncByRawPipelineResult($raw, null, [
+            'sync_status_id' => $targetStatus->getId(),
+            'company_id' => $this->companyId(),
+            'connection_id' => $targetConnectionId,
+            'marketplace' => \App\Marketplace\Enum\MarketplaceType::WILDBERRIES->value,
+            'report_type' => 'sales_report',
+            'mode' => FinancialReportSyncMode::INITIAL->value,
+            'business_date' => $this->businessDate()->format('Y-m-d'),
+            'raw_document_id' => $rawId,
+        ]);
+        $this->em->flush();
+        $this->em->clear();
+
+        $otherPersisted = $this->statusRepository->findByConnectionAndDate($otherConnectionId, $this->companyId(), $this->businessDate(), 'sales_report');
+        $targetPersisted = $this->statusRepository->findByConnectionAndDate($targetConnectionId, $this->companyId(), $this->businessDate(), 'sales_report');
+
+        self::assertNotNull($otherPersisted);
+        self::assertNotNull($targetPersisted);
+        self::assertSame(FinancialReportSyncStatus::PROCESSING, $otherPersisted->getStatus());
+        self::assertSame(FinancialReportSyncStatus::SUCCESS, $targetPersisted->getStatus());
+    }
+
     private function startLoadingStatus(): MarketplaceFinancialReportSyncStatus
     {
         return $this->updater->startLoading(

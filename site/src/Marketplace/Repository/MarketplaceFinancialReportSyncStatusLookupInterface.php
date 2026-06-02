@@ -26,6 +26,20 @@ interface MarketplaceFinancialReportSyncStatusLookupInterface
 
     public function findByRawDocumentId(string $companyId, string $rawDocumentId): ?MarketplaceFinancialReportSyncStatus;
 
+    /** @return list<MarketplaceFinancialReportSyncStatus> */
+    public function findAllByRawDocumentId(string $companyId, string $rawDocumentId): array;
+
+    public function findByRawPipelineContext(
+        ?string $syncStatusId,
+        string $companyId,
+        string $connectionId,
+        MarketplaceType $marketplace,
+        string $reportType,
+        FinancialReportSyncMode $mode,
+        \DateTimeImmutable $businessDate,
+        string $rawDocumentId,
+    ): ?MarketplaceFinancialReportSyncStatus;
+
     public function findStatusEnumByDay(
         string $connectionId,
         string $companyId,

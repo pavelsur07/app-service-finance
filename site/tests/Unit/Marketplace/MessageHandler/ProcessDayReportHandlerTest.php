@@ -9,6 +9,7 @@ use App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdaterInterf
 use App\Marketplace\Application\Service\WbGeneratedRowsSafeReplaceServiceInterface;
 use App\Marketplace\Entity\MarketplaceFinancialReportSyncStatus;
 use App\Marketplace\Entity\MarketplaceRawDocument;
+use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Exception\WbGeneratedRowsConflictException;
 use App\Marketplace\Message\ProcessDayReportMessage;
@@ -37,9 +38,23 @@ final class ProcessDayReportHandlerTest extends TestCase
         $safe = $this->createMock(WbGeneratedRowsSafeReplaceServiceInterface::class);
         $safe->expects(self::once())->method('cleanupForRawDocument')->willThrowException(new WbGeneratedRowsConflictException('conflict'));
 
+        $syncStatusId = '33333333-3333-4333-8333-333333333333';
+        $connectionId = '44444444-4444-4444-8444-444444444444';
         $status = $this->createMock(MarketplaceFinancialReportSyncStatus::class);
         $statusRepo = $this->createMock(MarketplaceFinancialReportSyncStatusLookupInterface::class);
-        $statusRepo->method('findByRawDocumentId')->willReturn($status);
+        $statusRepo->expects(self::once())
+            ->method('findByRawPipelineContext')
+            ->with(
+                $syncStatusId,
+                (string) $company->getId(),
+                $connectionId,
+                MarketplaceType::WILDBERRIES,
+                'sales_report',
+                FinancialReportSyncMode::INITIAL,
+                self::callback(static fn (\DateTimeImmutable $date): bool => '2026-05-10' === $date->format('Y-m-d')),
+                $doc->getId(),
+            )
+            ->willReturn($status);
 
         $updater = $this->createMock(WbFinancialReportSyncStatusUpdaterInterface::class);
         $updater->expects(self::once())->method('markConflict')->with($status, WbGeneratedRowsConflictException::class, 'conflict');
@@ -55,7 +70,17 @@ final class ProcessDayReportHandlerTest extends TestCase
 
         $this->expectException(UnrecoverableMessageHandlingException::class);
         try {
-            $handler(new ProcessDayReportMessage((string)$company->getId(), $doc->getId(), true));
+            $handler(new ProcessDayReportMessage(
+                companyId: (string) $company->getId(),
+                rawDocumentId: $doc->getId(),
+                forceRefresh: true,
+                syncStatusId: $syncStatusId,
+                connectionId: $connectionId,
+                marketplace: MarketplaceType::WILDBERRIES->value,
+                reportType: 'sales_report',
+                mode: FinancialReportSyncMode::INITIAL->value,
+                businessDate: '2026-05-10',
+            ));
         } finally {
             self::assertSame(1, $flushes);
         }
