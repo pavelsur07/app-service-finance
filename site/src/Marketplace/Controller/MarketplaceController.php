@@ -14,6 +14,7 @@ use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\OzonRealizationStatusQuery;
 use App\Marketplace\Infrastructure\Query\RawDocumentsListQuery;
+use App\Marketplace\Message\ReprocessCostsMessage;
 use App\Marketplace\Message\SyncOzonRealizationMessage;
 use App\Marketplace\Message\TriggerInitialSyncMessage;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
@@ -375,6 +376,54 @@ class MarketplaceController extends AbstractController
         }
 
         return $this->redirectToRoute('marketplace_index');
+    }
+
+    #[Route('/raw/{id}/process-costs', name: 'marketplace_raw_process_costs', methods: ['POST'])]
+    public function processCosts(string $id, Request $request): Response
+    {
+        $company = $this->companyService->getActiveCompany();
+
+        $rawDoc = $this->rawDocumentRepository->find($id);
+
+        if (!$rawDoc || (string) $rawDoc->getCompany()->getId() !== (string) $company->getId()) {
+            throw $this->createNotFoundException();
+        }
+
+        if (!$this->isCsrfTokenValid('marketplace_raw_process_costs' . $id, (string) $request->request->get('_token', ''))) {
+            throw $this->createAccessDeniedException('Недействительный CSRF токен.');
+        }
+
+        if ($rawDoc->getDocumentType() !== 'sales_report') {
+            $this->addFlash('error', 'Документ не является отчетом продаж с затратами.');
+
+            return $this->redirectToMarketplaceIndexFromRequest($request);
+        }
+
+        $this->messageBus->dispatch(new ReprocessCostsMessage(
+            companyId: (string) $company->getId(),
+            rawDocumentId: (string) $rawDoc->getId(),
+        ));
+
+        $this->addFlash('success', 'Повторная обработка затрат поставлена в очередь.');
+
+        return $this->redirectToMarketplaceIndexFromRequest($request);
+    }
+
+    private function redirectToMarketplaceIndexFromRequest(Request $request): Response
+    {
+        $query = [];
+
+        $marketplace = (string) $request->request->get('marketplace', '');
+        if (MarketplaceType::tryFrom($marketplace) !== null) {
+            $query['marketplace'] = $marketplace;
+        }
+
+        $page = max(1, $request->request->getInt('page', 1));
+        if ($page > 1) {
+            $query['page'] = $page;
+        }
+
+        return $this->redirectToRoute('marketplace_index', $query);
     }
 
     #[Route('/reprocess', name: 'marketplace_reprocess', methods: ['POST'])]
