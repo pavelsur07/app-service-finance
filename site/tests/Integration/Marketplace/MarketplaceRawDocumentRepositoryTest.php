@@ -143,5 +143,67 @@ final class MarketplaceRawDocumentRepositoryTest extends IntegrationTestCase
         self::assertSame('22222222-2222-2222-2222-000000000002', $single->getId());
     }
 
+    public function testFindActiveExactDayDocumentsIgnoresEndpointAndOrdersCompletedCanonicalFirst(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $this->em->persist($company);
+        $day = new \DateTimeImmutable('2026-04-02');
+
+        $pendingNewest = MarketplaceRawDocumentBuilder::aDocument()
+            ->forCompany($company)
+            ->withMarketplace(MarketplaceType::WILDBERRIES)
+            ->withPeriod($day, $day)
+            ->withApiEndpoint('wildberries::new-endpoint')
+            ->withIndex(10)
+            ->build();
+        $pendingNewest->resetProcessingStatus();
+        $this->forceDateTime($pendingNewest, 'syncedAt', new \DateTimeImmutable('2026-04-02 12:00:00'));
+        $this->em->persist($pendingNewest);
+
+        $completedOlder = MarketplaceRawDocumentBuilder::aDocument()
+            ->forCompany($company)
+            ->withMarketplace(MarketplaceType::WILDBERRIES)
+            ->withPeriod($day, $day)
+            ->withApiEndpoint('wildberries::old-endpoint')
+            ->withIndex(11)
+            ->build();
+        $completedOlder->markCompleted();
+        $this->forceDateTime($completedOlder, 'processedAt', new \DateTimeImmutable('2026-04-02 10:00:00'));
+        $this->forceDateTime($completedOlder, 'syncedAt', new \DateTimeImmutable('2026-04-02 10:00:00'));
+        $this->em->persist($completedOlder);
+
+        $failed = MarketplaceRawDocumentBuilder::aDocument()
+            ->forCompany($company)
+            ->withMarketplace(MarketplaceType::WILDBERRIES)
+            ->withPeriod($day, $day)
+            ->withApiEndpoint('wildberries::failed-endpoint')
+            ->withIndex(12)
+            ->build();
+        $failed->markFailed();
+        $this->em->persist($failed);
+
+        $this->em->flush();
+
+        /** @var MarketplaceRawDocumentRepository $repository */
+        $repository = self::getContainer()->get(MarketplaceRawDocumentRepository::class);
+        $documents = $repository->findActiveExactDayDocuments(
+            $company,
+            MarketplaceType::WILDBERRIES,
+            'sales_report',
+            $day,
+        );
+
+        self::assertCount(2, $documents);
+        self::assertSame($completedOlder->getId(), $documents[0]->getId());
+        self::assertSame($pendingNewest->getId(), $documents[1]->getId());
+    }
+
+    private function forceDateTime(object $object, string $property, \DateTimeImmutable $value): void
+    {
+        $reflection = new \ReflectionProperty($object, $property);
+        $reflection->setAccessible(true);
+        $reflection->setValue($object, $value);
+    }
+
 }
 

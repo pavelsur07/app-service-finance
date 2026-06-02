@@ -118,7 +118,7 @@ final class WbFinancialReportsReconcileLegacyCommand extends Command
             $created = 0;
             foreach ($connections as $conn) {
                 foreach ($days as $day) {
-                    $existing = $this->syncStatusRepository->findByConnectionAndDate($conn['connection_id'], $conn['company_id'], $day, self::REPORT_TYPE);
+                    $existing = $this->syncStatusRepository->findByConnectionAndDate($conn['connection_id'], $conn['company_id'], MarketplaceType::WILDBERRIES, $day, self::REPORT_TYPE);
                     if ($existing instanceof MarketplaceFinancialReportSyncStatus) {
                         ++$stats['already_status'];
 

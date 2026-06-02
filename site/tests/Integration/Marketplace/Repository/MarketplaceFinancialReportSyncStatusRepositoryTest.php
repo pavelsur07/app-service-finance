@@ -52,6 +52,7 @@ final class MarketplaceFinancialReportSyncStatusRepositoryTest extends Integrati
         $days = $this->repository->findRetryDueDays(
             $companyId,
             $connectionId,
+            MarketplaceType::WILDBERRIES,
             self::REPORT_TYPE,
             new \DateTimeImmutable('2026-01-01 00:00:00'),
             new \DateTimeImmutable('2026-01-10 00:00:00'),
@@ -85,6 +86,7 @@ final class MarketplaceFinancialReportSyncStatusRepositoryTest extends Integrati
         $statuses = $this->repository->findStatusesForDateRange(
             $companyId,
             $connectionId,
+            MarketplaceType::WILDBERRIES,
             self::REPORT_TYPE,
             new \DateTimeImmutable('2026-01-01 00:00:00'),
             new \DateTimeImmutable('2026-01-03 23:59:59'),

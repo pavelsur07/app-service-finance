@@ -31,6 +31,7 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
     public function findByConnectionAndDate(
         string $connectionId,
         string $companyId,
+        MarketplaceType $marketplace,
         \DateTimeImmutable $businessDate,
         string $reportType,
     ): ?MarketplaceFinancialReportSyncStatus {
@@ -38,12 +39,12 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
         Assert::uuid($companyId);
 
         return $this->createQueryBuilder('s')
-            ->where('s.connectionId = :connectionId')
-            ->andWhere('s.companyId = :companyId')
+            ->where('s.companyId = :companyId')
+            ->andWhere('s.marketplace = :marketplace')
             ->andWhere('s.businessDate = :businessDate')
             ->andWhere('s.reportType = :reportType')
-            ->setParameter('connectionId', $connectionId)
             ->setParameter('companyId', $companyId)
+            ->setParameter('marketplace', $marketplace)
             ->setParameter('businessDate', $businessDate)
             ->setParameter('reportType', $reportType)
             ->setMaxResults(1)
@@ -54,6 +55,7 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
     public function findStatusEnumByDay(
         string $connectionId,
         string $companyId,
+        MarketplaceType $marketplace,
         \DateTimeImmutable $businessDate,
         string $reportType,
     ): ?FinancialReportSyncStatus {
@@ -62,12 +64,12 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
 
         $status = $this->createQueryBuilder('s')
             ->select('s.status')
-            ->where('s.connectionId = :connectionId')
-            ->andWhere('s.companyId = :companyId')
+            ->where('s.companyId = :companyId')
+            ->andWhere('s.marketplace = :marketplace')
             ->andWhere('s.businessDate = :businessDate')
             ->andWhere('s.reportType = :reportType')
-            ->setParameter('connectionId', $connectionId)
             ->setParameter('companyId', $companyId)
+            ->setParameter('marketplace', $marketplace)
             ->setParameter('businessDate', $businessDate)
             ->setParameter('reportType', $reportType)
             ->setMaxResults(1)
@@ -95,6 +97,7 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
     public function findStatusesForDateRange(
         string $companyId,
         string $connectionId,
+        MarketplaceType $marketplace,
         string $reportType,
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
@@ -104,11 +107,11 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
 
         return $this->createQueryBuilder('s')
             ->where('s.companyId = :companyId')
-            ->andWhere('s.connectionId = :connectionId')
+            ->andWhere('s.marketplace = :marketplace')
             ->andWhere('s.reportType = :reportType')
             ->andWhere('s.businessDate BETWEEN :from AND :to')
             ->setParameter('companyId', $companyId)
-            ->setParameter('connectionId', $connectionId)
+            ->setParameter('marketplace', $marketplace)
             ->setParameter('reportType', $reportType)
             ->setParameter('from', $from)
             ->setParameter('to', $to)
@@ -123,6 +126,7 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
     public function findRetryDueDays(
         string $companyId,
         string $connectionId,
+        MarketplaceType $marketplace,
         string $reportType,
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
@@ -139,7 +143,7 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
         $rows = $this->createQueryBuilder('s')
             ->select('s.businessDate', 's.mode')
             ->where('s.companyId = :companyId')
-            ->andWhere('s.connectionId = :connectionId')
+            ->andWhere('s.marketplace = :marketplace')
             ->andWhere('s.reportType = :reportType')
             ->andWhere('s.businessDate BETWEEN :from AND :to')
             ->andWhere('(
@@ -148,7 +152,7 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
                 OR (s.status = :failedStatus AND s.nextRetryAt IS NULL AND s.lastErrorStatusCode = :rateLimitStatusCode AND s.lastErrorClass = :rateLimitErrorClass)
             )')
             ->setParameter('companyId', $companyId)
-            ->setParameter('connectionId', $connectionId)
+            ->setParameter('marketplace', $marketplace)
             ->setParameter('reportType', $reportType)
             ->setParameter('from', $from)
             ->setParameter('to', $to)
@@ -201,12 +205,26 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
 
         try {
             $em->beginTransaction();
+            $em->getConnection()->executeStatement(
+                'SELECT pg_advisory_xact_lock(hashtext(:lock_key))',
+                [
+                    'lock_key' => sprintf(
+                        'marketplace_financial_report_sync:%s:%s:%s:%s',
+                        $companyId,
+                        $marketplace->value,
+                        $reportType,
+                        $businessDate->format('Y-m-d'),
+                    ),
+                ],
+            );
 
             $syncStatus = $this->createQueryBuilder('s')
-                ->where('s.connectionId = :connectionId')
+                ->where('s.companyId = :companyId')
+                ->andWhere('s.marketplace = :marketplace')
                 ->andWhere('s.businessDate = :businessDate')
                 ->andWhere('s.reportType = :reportType')
-                ->setParameter('connectionId', $connectionId)
+                ->setParameter('companyId', $companyId)
+                ->setParameter('marketplace', $marketplace)
                 ->setParameter('businessDate', $businessDate)
                 ->setParameter('reportType', $reportType)
                 ->setMaxResults(1)
@@ -226,10 +244,15 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
                 );
 
                 $em->persist($syncStatus);
-            } elseif (!$this->canClaimForQueue($syncStatus, $mode, $forceRefresh, $now)) {
-                $em->commit();
+            } else {
+                $syncStatus->updateTechnicalContext($connectionId, $apiEndpoint);
 
-                return null;
+                if (!$this->canClaimForQueue($syncStatus, $mode, $forceRefresh, $now)) {
+                    $em->flush();
+                    $em->commit();
+
+                    return null;
+                }
             }
 
             $syncStatus->markQueued($mode, $forceRefresh);
@@ -352,7 +375,6 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
             return $this->createQueryBuilder('s')
                 ->where('s.id = :syncStatusId')
                 ->andWhere('s.companyId = :companyId')
-                ->andWhere('s.connectionId = :connectionId')
                 ->andWhere('s.marketplace = :marketplace')
                 ->andWhere('s.reportType = :reportType')
                 ->andWhere('s.mode = :mode')
@@ -360,7 +382,6 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
                 ->andWhere('s.rawDocumentId = :rawDocumentId')
                 ->setParameter('syncStatusId', $syncStatusId)
                 ->setParameter('companyId', $companyId)
-                ->setParameter('connectionId', $connectionId)
                 ->setParameter('marketplace', $marketplace)
                 ->setParameter('reportType', $reportType)
                 ->setParameter('mode', $mode)
@@ -373,14 +394,12 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
 
         return $this->createQueryBuilder('s')
             ->where('s.companyId = :companyId')
-            ->andWhere('s.connectionId = :connectionId')
             ->andWhere('s.marketplace = :marketplace')
             ->andWhere('s.reportType = :reportType')
             ->andWhere('s.mode = :mode')
             ->andWhere('s.businessDate = :businessDate')
             ->andWhere('s.rawDocumentId = :rawDocumentId')
             ->setParameter('companyId', $companyId)
-            ->setParameter('connectionId', $connectionId)
             ->setParameter('marketplace', $marketplace)
             ->setParameter('reportType', $reportType)
             ->setParameter('mode', $mode)
@@ -403,12 +422,12 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
         Assert::uuid($companyId);
 
         $syncStatus = $this->createQueryBuilder('s')
-            ->where('s.connectionId = :connectionId')
-            ->andWhere('s.companyId = :companyId')
+            ->where('s.companyId = :companyId')
+            ->andWhere('s.marketplace = :marketplace')
             ->andWhere('s.businessDate = :businessDate')
             ->andWhere('s.reportType = :reportType')
-            ->setParameter('connectionId', $connectionId)
             ->setParameter('companyId', $companyId)
+            ->setParameter('marketplace', $marketplace)
             ->setParameter('businessDate', $businessDate)
             ->setParameter('reportType', $reportType)
             ->setMaxResults(1)
@@ -416,6 +435,8 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
             ->getOneOrNullResult();
 
         if ($syncStatus instanceof MarketplaceFinancialReportSyncStatus) {
+            $syncStatus->updateTechnicalContext($connectionId, $apiEndpoint);
+
             return $syncStatus;
         }
 

@@ -60,6 +60,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
             $statuses = $this->syncStatusRepository->findStatusesForDateRange(
                 $connection['company_id'],
                 $connection['connection_id'],
+                MarketplaceType::WILDBERRIES,
                 self::REPORT_TYPE,
                 $from,
                 $to,
@@ -164,6 +165,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
             $retryItems = $this->syncStatusRepository->findRetryDueDays(
                 $connection['company_id'],
                 $connection['connection_id'],
+                MarketplaceType::WILDBERRIES,
                 self::REPORT_TYPE,
                 $from,
                 $to,
@@ -228,6 +230,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
             $statuses = $this->syncStatusRepository->findStatusesForDateRange(
                 $connection['company_id'],
                 $connection['connection_id'],
+                MarketplaceType::WILDBERRIES,
                 self::REPORT_TYPE,
                 $from,
                 $to,
@@ -241,6 +244,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
             $retryDueItems = $this->syncStatusRepository->findRetryDueDays(
                 $connection['company_id'],
                 $connection['connection_id'],
+                MarketplaceType::WILDBERRIES,
                 self::REPORT_TYPE,
                 $from,
                 $to,

@@ -32,6 +32,8 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
         \DateTimeImmutable $day,
     ): array {
         return $this->createQueryBuilder('d')
+            ->addSelect('CASE WHEN d.processingStatus = :completed THEN 0 ELSE 1 END AS HIDDEN completed_rank')
+            ->addSelect('COALESCE(d.processedAt, d.syncedAt) AS HIDDEN canonical_at')
             ->where('d.company = :company')
             ->andWhere('d.marketplace = :marketplace')
             ->andWhere('d.documentType = :documentType')
@@ -43,7 +45,9 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
             ->setParameter('documentType', $documentType)
             ->setParameter('day', $day)
             ->setParameter('failed', PipelineStatus::FAILED)
-            ->orderBy('d.syncedAt', 'DESC')
+            ->setParameter('completed', PipelineStatus::COMPLETED)
+            ->orderBy('completed_rank', 'ASC')
+            ->addOrderBy('canonical_at', 'DESC')
             ->addOrderBy('d.id', 'DESC')
             ->getQuery()
             ->getResult();

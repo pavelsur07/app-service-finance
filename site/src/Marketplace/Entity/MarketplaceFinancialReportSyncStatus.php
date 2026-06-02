@@ -13,8 +13,9 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: MarketplaceFinancialReportSyncStatusRepository::class)]
 #[ORM\Table(name: 'marketplace_financial_report_sync_statuses')]
-#[ORM\UniqueConstraint(name: 'uniq_mfrss_connection_report_day', columns: ['connection_id', 'report_type', 'business_date'])]
+#[ORM\UniqueConstraint(name: 'uniq_mfrss_company_marketplace_report_day', columns: ['company_id', 'marketplace', 'report_type', 'business_date'])]
 #[ORM\Index(name: 'idx_mfrss_company_connection_date', columns: ['company_id', 'connection_id', 'business_date'])]
+#[ORM\Index(name: 'idx_mfrss_company_marketplace_date', columns: ['company_id', 'marketplace', 'business_date'])]
 class MarketplaceFinancialReportSyncStatus
 {
     #[ORM\Id]
@@ -154,6 +155,19 @@ class MarketplaceFinancialReportSyncStatus
     public function getLastErrorResponseExcerpt(): ?string { return $this->lastErrorResponseExcerpt; }
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
     public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
+
+    public function updateTechnicalContext(string $connectionId, string $apiEndpoint): void
+    {
+        Assert::uuid($connectionId);
+
+        if ($this->connectionId === $connectionId && $this->apiEndpoint === $apiEndpoint) {
+            return;
+        }
+
+        $this->connectionId = $connectionId;
+        $this->apiEndpoint = $apiEndpoint;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
 
     public function markQueued(FinancialReportSyncMode $mode, bool $forceRefresh): void
     {

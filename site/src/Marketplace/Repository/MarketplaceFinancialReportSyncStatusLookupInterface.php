@@ -43,6 +43,7 @@ interface MarketplaceFinancialReportSyncStatusLookupInterface
     public function findStatusEnumByDay(
         string $connectionId,
         string $companyId,
+        MarketplaceType $marketplace,
         \DateTimeImmutable $businessDate,
         string $reportType,
     ): ?FinancialReportSyncStatus;
@@ -53,6 +54,7 @@ interface MarketplaceFinancialReportSyncStatusLookupInterface
     public function findStatusesForDateRange(
         string $companyId,
         string $connectionId,
+        MarketplaceType $marketplace,
         string $reportType,
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
@@ -64,6 +66,7 @@ interface MarketplaceFinancialReportSyncStatusLookupInterface
     public function findRetryDueDays(
         string $companyId,
         string $connectionId,
+        MarketplaceType $marketplace,
         string $reportType,
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
