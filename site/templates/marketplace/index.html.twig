@@ -225,9 +225,16 @@
                                                 </div>
                                             </div>
                                             <div class="ms-auto">
-                                                <a href="{{ path('marketplace_raw_process_costs', {id: doc.id}) }}" class="btn btn-sm btn-warning">
-                                                    Обработать повторно
-                                                </a>
+                                                <form method="post" action="{{ path('marketplace_raw_process_costs', {id: doc.id}) }}" class="m-0">
+                                                    <input type="hidden" name="_token" value="{{ csrf_token('marketplace_raw_process_costs' ~ doc.id) }}">
+                                                    {% if selectedMarketplace is not null %}
+                                                        <input type="hidden" name="marketplace" value="{{ selectedMarketplace.value }}">
+                                                    {% endif %}
+                                                    <input type="hidden" name="page" value="{{ rawDocumentsPager.currentPage }}">
+                                                    <button type="submit" class="btn btn-sm btn-warning">
+                                                        Обработать повторно
+                                                    </button>
+                                                </form>
                                             </div>
                                         </div>
                                     </td>
