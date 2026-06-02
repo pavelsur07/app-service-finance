@@ -6,6 +6,8 @@ namespace App\Marketplace\MessageHandler;
 
 use App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdaterInterface;
 use App\Marketplace\Application\Service\WbGeneratedRowsSafeReplaceServiceInterface;
+use App\Marketplace\Entity\MarketplaceFinancialReportSyncStatus;
+use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PipelineStep;
 use App\Marketplace\Message\ProcessDayReportMessage;
@@ -62,7 +64,7 @@ final class ProcessDayReportHandler
             try {
                 $this->safeReplaceService->cleanupForRawDocument($doc->getCompany(), $doc->getId(), $doc->getPeriodFrom());
             } catch (WbGeneratedRowsConflictException $e) {
-                $status = $this->syncStatusRepository->findByRawDocumentId($message->companyId, $message->rawDocumentId);
+                $status = $this->findExactSyncStatusForMessage($message);
                 if ($status !== null) {
                     $this->syncStatusUpdater->markConflict($status, $e::class, $e->getMessage());
                     $this->entityManager->flush();
@@ -86,6 +88,12 @@ final class ProcessDayReportHandler
                 rawDocumentId: $doc->getId(),
                 step: $step->value,
                 companyId: $message->companyId,
+                syncStatusId: $message->syncStatusId,
+                connectionId: $message->connectionId,
+                marketplace: $message->marketplace,
+                reportType: $message->reportType,
+                mode: $message->mode,
+                businessDate: $message->businessDate,
             ));
         }
 
@@ -94,5 +102,76 @@ final class ProcessDayReportHandler
             'raw_document_id' => $message->rawDocumentId,
             'marketplace'     => $doc->getMarketplace()->value,
         ]);
+    }
+
+    private function findExactSyncStatusForMessage(ProcessDayReportMessage $message): ?MarketplaceFinancialReportSyncStatus
+    {
+        if (null === $message->connectionId) {
+            $this->logger->warning('WB day processing conflict: cannot mark sync status without exact connection context', [
+                'company_id' => $message->companyId,
+                'raw_document_id' => $message->rawDocumentId,
+                'sync_status_id' => $message->syncStatusId,
+            ]);
+
+            return null;
+        }
+
+        $marketplace = MarketplaceType::tryFrom((string) ($message->marketplace ?? MarketplaceType::WILDBERRIES->value));
+        $mode = null === $message->mode ? null : FinancialReportSyncMode::tryFrom($message->mode);
+        $businessDate = $this->parseBusinessDate($message->businessDate);
+
+        if ($marketplace === null || $mode === null || $businessDate === null || null === $message->reportType) {
+            $this->logger->warning('WB day processing conflict: cannot mark sync status because exact context is incomplete', [
+                'company_id' => $message->companyId,
+                'connection_id' => $message->connectionId,
+                'raw_document_id' => $message->rawDocumentId,
+                'sync_status_id' => $message->syncStatusId,
+                'marketplace' => $message->marketplace,
+                'report_type' => $message->reportType,
+                'mode' => $message->mode,
+                'business_date' => $message->businessDate,
+            ]);
+
+            return null;
+        }
+
+        $status = $this->syncStatusRepository->findByRawPipelineContext(
+            $message->syncStatusId,
+            $message->companyId,
+            $message->connectionId,
+            $marketplace,
+            $message->reportType,
+            $mode,
+            $businessDate,
+            $message->rawDocumentId,
+        );
+
+        if ($status === null) {
+            $this->logger->warning('WB day processing conflict: no sync status matches exact raw document context', [
+                'company_id' => $message->companyId,
+                'connection_id' => $message->connectionId,
+                'raw_document_id' => $message->rawDocumentId,
+                'sync_status_id' => $message->syncStatusId,
+                'marketplace' => $marketplace->value,
+                'report_type' => $message->reportType,
+                'mode' => $mode->value,
+                'business_date' => $businessDate->format('Y-m-d'),
+            ]);
+        }
+
+        return $status;
+    }
+
+    private function parseBusinessDate(?string $value): ?\DateTimeImmutable
+    {
+        if (null === $value || '' === $value) {
+            return null;
+        }
+
+        try {
+            return (new \DateTimeImmutable($value))->setTime(0, 0);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

@@ -311,7 +311,17 @@ final class SyncWbFinancialReportDayHandler
             $connection->markSyncSuccess();
             $this->em->flush();
 
-            $this->messageBus->dispatch(new ProcessDayReportMessage($message->companyId, $rawDocument->getId(), $message->forceRefresh));
+            $this->messageBus->dispatch(new ProcessDayReportMessage(
+                companyId: $message->companyId,
+                rawDocumentId: $rawDocument->getId(),
+                forceRefresh: $message->forceRefresh,
+                syncStatusId: $status->getId(),
+                connectionId: $message->connectionId,
+                marketplace: MarketplaceType::WILDBERRIES->value,
+                reportType: self::REPORT_TYPE,
+                mode: $mode->value,
+                businessDate: $businessDate->format('Y-m-d'),
+            ));
 
             $this->logger->info('WB day sync finished and processing dispatched.', [
                 'company_id' => $message->companyId,

@@ -77,12 +77,17 @@ final class ProcessRawDocumentStepMessageHandler
             }
             $doc->markStepSucceeded($step);
         } catch (\Throwable $e) {
-            $this->recordStepFailure($message->rawDocumentId, $step, $e);
+            $this->recordStepFailure($message->rawDocumentId, $step, $e, $this->buildSyncStatusContext($message));
             throw $e;
         }
 
         try {
-            $this->statusUpdater->syncByRawPipelineResult($doc);
+            $context = $this->buildSyncStatusContext($message);
+            if ($context === null) {
+                $this->statusUpdater->syncByRawPipelineResult($doc);
+            } else {
+                $this->statusUpdater->syncByRawPipelineResult($doc, null, $context);
+            }
         } catch (\Throwable $updaterException) {
             $this->logger->error('Failed to sync WB status after successful pipeline step', [
                 'rawDocumentId' => $message->rawDocumentId,
@@ -94,10 +99,30 @@ final class ProcessRawDocumentStepMessageHandler
         $this->entityManager->flush();
     }
 
+    /** @return array{sync_status_id?: string|null, company_id: string, connection_id?: string|null, marketplace?: string|null, report_type?: string|null, mode?: string|null, business_date?: string|null, raw_document_id: string}|null */
+    private function buildSyncStatusContext(ProcessRawDocumentStepMessage $message): ?array
+    {
+        if (null === $message->syncStatusId && null === $message->connectionId) {
+            return null;
+        }
+
+        return [
+            'sync_status_id' => $message->syncStatusId,
+            'company_id' => $message->companyId,
+            'connection_id' => $message->connectionId,
+            'marketplace' => $message->marketplace,
+            'report_type' => $message->reportType,
+            'mode' => $message->mode,
+            'business_date' => $message->businessDate,
+            'raw_document_id' => $message->rawDocumentId,
+        ];
+    }
+
     private function recordStepFailure(
         string $rawDocumentId,
         PipelineStep $step,
         \Throwable $originalException,
+        ?array $context = null,
     ): void {
         try {
             $em = $this->entityManager;
@@ -122,7 +147,13 @@ final class ProcessRawDocumentStepMessageHandler
             $doc->markStepFailed($step);
 
             try {
-                $this->statusUpdater->syncByRawPipelineResult($doc, $originalException);
+                // Failure recording may run after the original EntityManager was reset; keep this
+                // path backward-compatible for legacy messages that do not carry exact status context.
+                if ($context === null) {
+                    $this->statusUpdater->syncByRawPipelineResult($doc, $originalException);
+                } else {
+                    $this->statusUpdater->syncByRawPipelineResult($doc, $originalException, $context);
+                }
             } catch (\Throwable $updaterException) {
                 $this->logger->error('Failed to sync WB status after pipeline failure', [
                     'rawDocumentId' => $rawDocumentId,

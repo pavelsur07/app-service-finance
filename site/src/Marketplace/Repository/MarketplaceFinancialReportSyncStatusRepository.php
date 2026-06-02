@@ -314,6 +314,83 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
             ->getOneOrNullResult();
     }
 
+    /**
+     * @return list<MarketplaceFinancialReportSyncStatus>
+     */
+    public function findAllByRawDocumentId(string $companyId, string $rawDocumentId): array
+    {
+        Assert::uuid($companyId);
+        Assert::uuid($rawDocumentId);
+
+        return $this->createQueryBuilder('s')
+            ->where('s.companyId = :companyId')
+            ->andWhere('s.rawDocumentId = :rawDocumentId')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('rawDocumentId', $rawDocumentId)
+            ->orderBy('s.updatedAt', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    public function findByRawPipelineContext(
+        ?string $syncStatusId,
+        string $companyId,
+        string $connectionId,
+        MarketplaceType $marketplace,
+        string $reportType,
+        FinancialReportSyncMode $mode,
+        \DateTimeImmutable $businessDate,
+        string $rawDocumentId,
+    ): ?MarketplaceFinancialReportSyncStatus {
+        Assert::uuid($companyId);
+        Assert::uuid($connectionId);
+        Assert::uuid($rawDocumentId);
+
+        if (null !== $syncStatusId) {
+            Assert::uuid($syncStatusId);
+
+            return $this->createQueryBuilder('s')
+                ->where('s.id = :syncStatusId')
+                ->andWhere('s.companyId = :companyId')
+                ->andWhere('s.connectionId = :connectionId')
+                ->andWhere('s.marketplace = :marketplace')
+                ->andWhere('s.reportType = :reportType')
+                ->andWhere('s.mode = :mode')
+                ->andWhere('s.businessDate = :businessDate')
+                ->andWhere('s.rawDocumentId = :rawDocumentId')
+                ->setParameter('syncStatusId', $syncStatusId)
+                ->setParameter('companyId', $companyId)
+                ->setParameter('connectionId', $connectionId)
+                ->setParameter('marketplace', $marketplace)
+                ->setParameter('reportType', $reportType)
+                ->setParameter('mode', $mode)
+                ->setParameter('businessDate', $businessDate)
+                ->setParameter('rawDocumentId', $rawDocumentId)
+                ->setMaxResults(1)
+                ->getQuery()
+                ->getOneOrNullResult();
+        }
+
+        return $this->createQueryBuilder('s')
+            ->where('s.companyId = :companyId')
+            ->andWhere('s.connectionId = :connectionId')
+            ->andWhere('s.marketplace = :marketplace')
+            ->andWhere('s.reportType = :reportType')
+            ->andWhere('s.mode = :mode')
+            ->andWhere('s.businessDate = :businessDate')
+            ->andWhere('s.rawDocumentId = :rawDocumentId')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('connectionId', $connectionId)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('reportType', $reportType)
+            ->setParameter('mode', $mode)
+            ->setParameter('businessDate', $businessDate)
+            ->setParameter('rawDocumentId', $rawDocumentId)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     public function findOrCreateForDay(
         string $connectionId,
         string $companyId,

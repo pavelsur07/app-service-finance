@@ -186,7 +186,7 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
         $updater = $this->createMock(WbFinancialReportSyncStatusUpdaterInterface::class);
         $updater->expects(self::exactly(count(PipelineStep::cases())))
             ->method('syncByRawPipelineResult')
-            ->with($doc, null);
+            ->with($doc);
 
         $handler = new ProcessRawDocumentStepMessageHandler(
             $repo,
