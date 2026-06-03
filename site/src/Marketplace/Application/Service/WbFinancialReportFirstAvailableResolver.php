@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Application\Service;
 
 use App\Marketplace\Enum\FinancialReportSyncStatus;
+use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Exception\MarketplaceRateLimitException;
 use App\Marketplace\Infrastructure\Api\Wildberries\WbFinanceSalesReportClient;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusRepository;
@@ -164,7 +165,7 @@ final class WbFinancialReportFirstAvailableResolver
         $positiveStatuses = [FinancialReportSyncStatus::SUCCESS, FinancialReportSyncStatus::RAW_LOADED, FinancialReportSyncStatus::PROCESSING];
 
         for ($day = $from; $day <= $to; $day = $day->modify('+1 day')->setTime(0, 0, 0)) {
-            $status = $this->syncStatusRepository->findStatusEnumByDay($connectionId, $companyId, $day, self::REPORT_TYPE);
+            $status = $this->syncStatusRepository->findStatusEnumByDay($connectionId, $companyId, MarketplaceType::WILDBERRIES, $day, self::REPORT_TYPE);
             if (\in_array($status, $positiveStatuses, true)) {
                 return $day;
             }
