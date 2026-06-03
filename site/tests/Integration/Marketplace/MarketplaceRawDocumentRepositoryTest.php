@@ -198,6 +198,37 @@ final class MarketplaceRawDocumentRepositoryTest extends IntegrationTestCase
         self::assertSame($pendingNewest->getId(), $documents[1]->getId());
     }
 
+
+    public function testActiveCompletedExactDaySalesReportRawDuplicatesAreRejectedByDatabase(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $this->em->persist($company);
+        $day = new \DateTimeImmutable('2026-04-03');
+
+        $first = MarketplaceRawDocumentBuilder::aDocument()
+            ->forCompany($company)
+            ->withMarketplace(MarketplaceType::WILDBERRIES)
+            ->withPeriod($day, $day)
+            ->withApiEndpoint('wildberries::first')
+            ->withIndex(20)
+            ->build();
+        $first->markCompleted();
+        $this->em->persist($first);
+
+        $second = MarketplaceRawDocumentBuilder::aDocument()
+            ->forCompany($company)
+            ->withMarketplace(MarketplaceType::WILDBERRIES)
+            ->withPeriod($day, $day)
+            ->withApiEndpoint('wildberries::second')
+            ->withIndex(21)
+            ->build();
+        $second->markCompleted();
+        $this->em->persist($second);
+
+        $this->expectException(\Doctrine\DBAL\Exception\UniqueConstraintViolationException::class);
+        $this->em->flush();
+    }
+
     private function forceDateTime(object $object, string $property, \DateTimeImmutable $value): void
     {
         $reflection = new \ReflectionProperty($object, $property);

@@ -18,6 +18,8 @@ use Webmozart\Assert\Assert;
 
 final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntityRepository implements MarketplaceFinancialReportSyncStatusLookupInterface
 {
+    private const ADVISORY_LOCK_NAMESPACE = 'marketplace_financial_report_sync';
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, MarketplaceFinancialReportSyncStatus::class);
@@ -28,14 +30,12 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
         $this->getEntityManager()->persist($syncStatus);
     }
 
-    public function findByConnectionAndDate(
-        string $connectionId,
+    public function findByBusinessDay(
         string $companyId,
         MarketplaceType $marketplace,
-        \DateTimeImmutable $businessDate,
         string $reportType,
+        \DateTimeImmutable $businessDate,
     ): ?MarketplaceFinancialReportSyncStatus {
-        Assert::uuid($connectionId);
         Assert::uuid($companyId);
 
         return $this->createQueryBuilder('s')
@@ -205,18 +205,7 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
 
         try {
             $em->beginTransaction();
-            $em->getConnection()->executeStatement(
-                'SELECT pg_advisory_xact_lock(hashtext(:lock_key))',
-                [
-                    'lock_key' => sprintf(
-                        'marketplace_financial_report_sync:%s:%s:%s:%s',
-                        $companyId,
-                        $marketplace->value,
-                        $reportType,
-                        $businessDate->format('Y-m-d'),
-                    ),
-                ],
-            );
+            $this->acquireBusinessDayAdvisoryLock($companyId, $marketplace, $reportType, $businessDate);
 
             $syncStatus = $this->createQueryBuilder('s')
                 ->where('s.companyId = :companyId')
@@ -245,14 +234,13 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
 
                 $em->persist($syncStatus);
             } else {
-                $syncStatus->updateTechnicalContext($connectionId, $apiEndpoint);
-
                 if (!$this->canClaimForQueue($syncStatus, $mode, $forceRefresh, $now)) {
-                    $em->flush();
                     $em->commit();
 
                     return null;
                 }
+
+                $syncStatus->updateTechnicalContext($connectionId, $apiEndpoint);
             }
 
             $syncStatus->markQueued($mode, $forceRefresh);
@@ -421,37 +409,78 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
         Assert::uuid($connectionId);
         Assert::uuid($companyId);
 
-        $syncStatus = $this->createQueryBuilder('s')
-            ->where('s.companyId = :companyId')
-            ->andWhere('s.marketplace = :marketplace')
-            ->andWhere('s.businessDate = :businessDate')
-            ->andWhere('s.reportType = :reportType')
-            ->setParameter('companyId', $companyId)
-            ->setParameter('marketplace', $marketplace)
-            ->setParameter('businessDate', $businessDate)
-            ->setParameter('reportType', $reportType)
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
+        $em = $this->getEntityManager();
 
-        if ($syncStatus instanceof MarketplaceFinancialReportSyncStatus) {
-            $syncStatus->updateTechnicalContext($connectionId, $apiEndpoint);
+        try {
+            $em->beginTransaction();
+            $this->acquireBusinessDayAdvisoryLock($companyId, $marketplace, $reportType, $businessDate);
+
+            $syncStatus = $this->findByBusinessDay($companyId, $marketplace, $reportType, $businessDate);
+            if ($syncStatus instanceof MarketplaceFinancialReportSyncStatus) {
+                $syncStatus->updateTechnicalContext($connectionId, $apiEndpoint);
+                $em->persist($syncStatus);
+                $em->flush();
+                $em->commit();
+
+                return $syncStatus;
+            }
+
+            $syncStatus = new MarketplaceFinancialReportSyncStatus(
+                Uuid::uuid7()->toString(),
+                $companyId,
+                $connectionId,
+                $marketplace,
+                $reportType,
+                $apiEndpoint,
+                $businessDate,
+            );
+
+            $em->persist($syncStatus);
+            $em->flush();
+            $em->commit();
 
             return $syncStatus;
+        } catch (UniqueConstraintViolationException $e) {
+            if ($em->getConnection()->isTransactionActive()) {
+                $em->rollback();
+            }
+
+            $syncStatus = $this->findByBusinessDay($companyId, $marketplace, $reportType, $businessDate);
+            if ($syncStatus instanceof MarketplaceFinancialReportSyncStatus) {
+                $syncStatus->updateTechnicalContext($connectionId, $apiEndpoint);
+                $this->save($syncStatus);
+
+                return $syncStatus;
+            }
+
+            throw $e;
+        } catch (\Throwable $e) {
+            if ($em->getConnection()->isTransactionActive()) {
+                $em->rollback();
+            }
+
+            throw $e;
         }
+    }
 
-        $syncStatus = new MarketplaceFinancialReportSyncStatus(
-            Uuid::uuid7()->toString(),
-            $companyId,
-            $connectionId,
-            $marketplace,
-            $reportType,
-            $apiEndpoint,
-            $businessDate,
+    private function acquireBusinessDayAdvisoryLock(
+        string $companyId,
+        MarketplaceType $marketplace,
+        string $reportType,
+        \DateTimeImmutable $businessDate,
+    ): void {
+        $this->getEntityManager()->getConnection()->executeStatement(
+            'SELECT pg_advisory_xact_lock(hashtext(:namespace), hashtext(:business_key))',
+            [
+                'namespace' => self::ADVISORY_LOCK_NAMESPACE,
+                'business_key' => sprintf(
+                    '%s:%s:%s:%s',
+                    $companyId,
+                    $marketplace->value,
+                    $reportType,
+                    $businessDate->format('Y-m-d'),
+                ),
+            ],
         );
-
-        $this->save($syncStatus);
-
-        return $syncStatus;
     }
 }

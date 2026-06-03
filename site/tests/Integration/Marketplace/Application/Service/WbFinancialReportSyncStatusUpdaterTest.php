@@ -294,7 +294,7 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
         $this->em->flush();
         $this->em->clear();
 
-        $persisted = $this->statusRepository->findByConnectionAndDate($newConnectionId, $this->companyId(), MarketplaceType::WILDBERRIES, $this->businessDate(), 'sales_report');
+        $persisted = $this->statusRepository->findByBusinessDay($this->companyId(), MarketplaceType::WILDBERRIES, 'sales_report', $this->businessDate());
 
         self::assertNotNull($persisted);
         self::assertSame($status->getId(), $persisted->getId());
@@ -316,12 +316,11 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
 
     private function findStatus(): ?MarketplaceFinancialReportSyncStatus
     {
-        return $this->statusRepository->findByConnectionAndDate(
-            $this->connectionId(),
+        return $this->statusRepository->findByBusinessDay(
             $this->companyId(),
             MarketplaceType::WILDBERRIES,
-            $this->businessDate(),
             'sales',
+            $this->businessDate(),
         );
     }
 

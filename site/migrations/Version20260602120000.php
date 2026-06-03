@@ -11,7 +11,7 @@ final class Version20260602120000 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'Enforce WB financial report business idempotency by company/marketplace/report day and exact-day raw document';
+        return 'Enforce WB financial report business idempotency and one active exact-day sales_report raw per company/marketplace/date for all marketplaces';
     }
 
     public function up(Schema $schema): void
@@ -37,6 +37,8 @@ final class Version20260602120000 extends AbstractMigration
             'Cannot create uniq_mfrss_company_marketplace_report_day: duplicate sync statuses exist for company/marketplace/report_type/business_date. Resolve them manually before migration.'
         );
 
+        // Architecture decision: exact-day sales_report raw idempotency is shared by WB/Ozon
+        // and future marketplaces; marketplace remains part of the unique key.
         $duplicateRawGroups = (int) $this->connection->fetchOne(<<<'SQL'
             SELECT COUNT(*)
             FROM (

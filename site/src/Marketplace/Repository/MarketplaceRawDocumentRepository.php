@@ -21,7 +21,8 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
 
     /**
      * Deterministic lookup for daily sync: returns all exact-day active documents
-     * (processingStatus is null or not FAILED) sorted by newest first.
+     * (processingStatus is null or not FAILED) in canonical order:
+     * completed first, then COALESCE(processedAt, syncedAt) DESC, then id DESC.
      *
      * @return list<MarketplaceRawDocument>
      */
