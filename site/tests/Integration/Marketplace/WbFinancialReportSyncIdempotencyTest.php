@@ -204,6 +204,90 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
         self::assertSame('success', $this->statusValue($company->getId(), $connection->getId(), '2026-05-19'));
     }
 
+
+    public function testClaimExistingBusinessDayUpdatesConnectionWithoutCreatingDuplicateStatus(): void
+    {
+        [$company, $oldConnection] = $this->createCompanyAndConnection(309);
+        $newConnectionId = 'bbbbbbbb-bbbb-4bbb-8bbb-000000000310';
+
+        $repo = self::getContainer()->get(MarketplaceFinancialReportSyncStatusRepository::class);
+        $existing = $this->newStatus($company->getId(), $oldConnection->getId(), '2026-05-31');
+        $existing->markSuccess();
+        $repo->save($existing);
+        $this->em->flush();
+
+        $claimed = $repo->claimForQueue(
+            $newConnectionId,
+            $company->getId(),
+            MarketplaceType::WILDBERRIES,
+            'sales_report',
+            'wildberries::finance-sales-reports-detailed',
+            new \DateTimeImmutable('2026-05-31'),
+            FinancialReportSyncMode::REFRESH_14D,
+            true,
+            new \DateTimeImmutable('2026-06-01 12:00:00'),
+        );
+        $this->em->flush();
+
+        self::assertNotNull($claimed);
+        self::assertSame($existing->getId(), $claimed->getId());
+        self::assertSame(1, $this->countStatusesByBusinessDay($company->getId(), '2026-05-31'));
+        self::assertSame($newConnectionId, $claimed->getConnectionId());
+    }
+
+    public function testSequentialClaimsWithDifferentConnectionsReuseCanonicalBusinessStatus(): void
+    {
+        [$company, $firstConnection] = $this->createCompanyAndConnection(311);
+        $secondConnectionId = 'bbbbbbbb-bbbb-4bbb-8bbb-000000000312';
+
+        $repo = self::getContainer()->get(MarketplaceFinancialReportSyncStatusRepository::class);
+        $firstClaim = $repo->claimForQueue(
+            $firstConnection->getId(),
+            $company->getId(),
+            MarketplaceType::WILDBERRIES,
+            'sales_report',
+            'wildberries::finance-sales-reports-detailed',
+            new \DateTimeImmutable('2026-05-30'),
+            FinancialReportSyncMode::REFRESH_14D,
+            true,
+            new \DateTimeImmutable('2026-06-01 12:00:00'),
+        );
+        self::assertNotNull($firstClaim);
+        $firstClaim->markSuccess();
+        $this->em->flush();
+
+        $secondClaim = $repo->claimForQueue(
+            $secondConnectionId,
+            $company->getId(),
+            MarketplaceType::WILDBERRIES,
+            'sales_report',
+            'wildberries::finance-sales-reports-detailed',
+            new \DateTimeImmutable('2026-05-30'),
+            FinancialReportSyncMode::REFRESH_14D,
+            true,
+            new \DateTimeImmutable('2026-06-01 12:01:00'),
+        );
+        $this->em->flush();
+
+        self::assertNotNull($secondClaim);
+        self::assertSame($firstClaim->getId(), $secondClaim->getId());
+        self::assertSame(1, $this->countStatusesByBusinessDay($company->getId(), '2026-05-30'));
+        self::assertSame($secondConnectionId, $secondClaim->getConnectionId());
+    }
+
+    public function testDatabaseRejectsDuplicateSyncStatusByBusinessKeyAcrossConnections(): void
+    {
+        [$company, $firstConnection] = $this->createCompanyAndConnection(313);
+        $secondConnectionId = 'bbbbbbbb-bbbb-4bbb-8bbb-000000000314';
+
+        $repo = self::getContainer()->get(MarketplaceFinancialReportSyncStatusRepository::class);
+        $repo->save($this->newStatus($company->getId(), $firstConnection->getId(), '2026-05-29'));
+        $repo->save($this->newStatus($company->getId(), $secondConnectionId, '2026-05-29'));
+
+        $this->expectException(\Doctrine\DBAL\Exception\UniqueConstraintViolationException::class);
+        $this->em->flush();
+    }
+
     private function planner(\DateTimeImmutable $now, ?MessageBusInterface $bus = null): WbFinancialReportSyncPlanner
     {
         return new WbFinancialReportSyncPlanner(
@@ -241,7 +325,12 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
 
     private function countStatuses(string $companyId, string $connectionId, string $day): int
     {
-        return (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_financial_report_sync_statuses WHERE company_id=:c AND connection_id=:n AND business_date=:d', ['c'=>$companyId, 'n'=>$connectionId, 'd'=>$day.' 00:00:00']);
+        return (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_financial_report_sync_statuses WHERE company_id=:c AND business_date=:d', ['c'=>$companyId, 'd'=>$day.' 00:00:00']);
+    }
+
+    private function countStatusesByBusinessDay(string $companyId, string $day): int
+    {
+        return (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_financial_report_sync_statuses WHERE company_id=:c AND marketplace=:m AND report_type=:t AND business_date=:d', ['c'=>$companyId, 'm'=>'wildberries', 't'=>'sales_report', 'd'=>$day.' 00:00:00']);
     }
 
     private function countStatusesInRange(string $companyId, string $connectionId, string $from, string $to): int

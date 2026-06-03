@@ -61,7 +61,7 @@ final class SyncWbFinancialReportDayHandler
         $mode = FinancialReportSyncMode::from($message->mode);
 
         $lock = $this->lockFactory->createLock(
-            sprintf('marketplace_wb_day_sync:%s:%s:%s', $message->companyId, $message->connectionId, $businessDate->format('Y-m-d')),
+            sprintf('marketplace_financial_report_sync:%s:%s:%s:%s', $message->companyId, MarketplaceType::WILDBERRIES->value, self::REPORT_TYPE, $businessDate->format('Y-m-d')),
             self::LOCK_TTL_SECONDS,
         );
 

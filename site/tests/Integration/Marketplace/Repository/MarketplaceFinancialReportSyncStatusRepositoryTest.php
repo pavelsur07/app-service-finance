@@ -46,12 +46,12 @@ final class MarketplaceFinancialReportSyncStatusRepositoryTest extends Integrati
         $otherConnectionId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
         $this->seedActiveConnection($otherCompanyId, $otherConnectionId);
         $this->persistStatus($otherCompanyId, $connectionId, '2026-01-01', FinancialReportSyncStatus::FAILED, null);
-        $this->persistStatus($companyId, $otherConnectionId, '2026-01-01', FinancialReportSyncStatus::FAILED, null);
         $this->persistStatus($companyId, $connectionId, '2026-01-08', FinancialReportSyncStatus::FAILED, null, 'another_report');
 
         $days = $this->repository->findRetryDueDays(
             $companyId,
             $connectionId,
+            MarketplaceType::WILDBERRIES,
             self::REPORT_TYPE,
             new \DateTimeImmutable('2026-01-01 00:00:00'),
             new \DateTimeImmutable('2026-01-10 00:00:00'),
@@ -80,11 +80,11 @@ final class MarketplaceFinancialReportSyncStatusRepositoryTest extends Integrati
         $otherConnectionId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
         $this->seedActiveConnection($otherCompanyId, $otherConnectionId);
         $this->persistStatus($otherCompanyId, $connectionId, '2026-01-02', FinancialReportSyncStatus::FAILED);
-        $this->persistStatus($companyId, $otherConnectionId, '2026-01-02', FinancialReportSyncStatus::FAILED);
 
         $statuses = $this->repository->findStatusesForDateRange(
             $companyId,
             $connectionId,
+            MarketplaceType::WILDBERRIES,
             self::REPORT_TYPE,
             new \DateTimeImmutable('2026-01-01 00:00:00'),
             new \DateTimeImmutable('2026-01-03 23:59:59'),
@@ -168,7 +168,7 @@ final class MarketplaceFinancialReportSyncStatusRepositoryTest extends Integrati
         $now = new \DateTimeImmutable('2026-01-05 12:00:00');
 
         $this->persistStatus($companyId, $retryConnectionId, '2026-01-01', FinancialReportSyncStatus::FAILED, new \DateTimeImmutable('2026-01-05 13:00:00'));
-        $this->persistStatus($companyId, $terminalConnectionId, '2026-01-01', FinancialReportSyncStatus::AUTH_FAILED);
+        $this->persistStatus($companyId, $terminalConnectionId, '2026-01-02', FinancialReportSyncStatus::AUTH_FAILED);
 
         self::assertNull($this->repository->claimForQueue(
             $retryConnectionId,
@@ -187,7 +187,7 @@ final class MarketplaceFinancialReportSyncStatusRepositoryTest extends Integrati
             MarketplaceType::WILDBERRIES,
             self::REPORT_TYPE,
             'endpoint',
-            new \DateTimeImmutable('2026-01-01 00:00:00'),
+            new \DateTimeImmutable('2026-01-02 00:00:00'),
             FinancialReportSyncMode::DAILY,
             true,
             $now,
@@ -199,7 +199,7 @@ final class MarketplaceFinancialReportSyncStatusRepositoryTest extends Integrati
             MarketplaceType::WILDBERRIES,
             self::REPORT_TYPE,
             'endpoint',
-            new \DateTimeImmutable('2026-01-01 00:00:00'),
+            new \DateTimeImmutable('2026-01-02 00:00:00'),
             FinancialReportSyncMode::MANUAL,
             true,
             $now,
@@ -208,6 +208,134 @@ final class MarketplaceFinancialReportSyncStatusRepositoryTest extends Integrati
         self::assertInstanceOf(MarketplaceFinancialReportSyncStatus::class, $status);
         self::assertSame(FinancialReportSyncStatus::QUEUED, $status->getStatus());
         self::assertSame(FinancialReportSyncMode::MANUAL, $status->getMode());
+    }
+
+
+    public function testFindByBusinessDayIgnoresConnectionAndReturnsCanonicalStatus(): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $oldConnectionId = '22222222-2222-4222-8222-222222222222';
+        $this->seedActiveConnection($companyId, $oldConnectionId);
+        $this->persistStatus($companyId, $oldConnectionId, '2026-01-09', FinancialReportSyncStatus::SUCCESS);
+
+        $status = $this->repository->findByBusinessDay(
+            $companyId,
+            MarketplaceType::WILDBERRIES,
+            self::REPORT_TYPE,
+            new \DateTimeImmutable('2026-01-09 00:00:00'),
+        );
+
+        self::assertNotNull($status);
+        self::assertSame($oldConnectionId, $status->getConnectionId());
+        self::assertSame('2026-01-09', $status->getBusinessDate()->format('Y-m-d'));
+    }
+
+    public function testRejectedClaimDoesNotMutateConnectionId(): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $oldConnectionId = '22222222-2222-4222-8222-222222222222';
+        $newConnectionId = '33333333-3333-4333-8333-333333333333';
+        $this->seedActiveConnection($companyId, $oldConnectionId);
+        $this->seedConnectionForExistingCompany($companyId, $newConnectionId);
+        $this->persistStatus($companyId, $oldConnectionId, '2026-01-10', FinancialReportSyncStatus::PROCESSING);
+
+        $claimed = $this->repository->claimForQueue(
+            $newConnectionId,
+            $companyId,
+            MarketplaceType::WILDBERRIES,
+            self::REPORT_TYPE,
+            'new-endpoint',
+            new \DateTimeImmutable('2026-01-10 00:00:00'),
+            FinancialReportSyncMode::REFRESH_14D,
+            true,
+            new \DateTimeImmutable('2026-01-10 12:00:00'),
+        );
+        $this->em->clear();
+
+        $status = $this->repository->findByBusinessDay(
+            $companyId,
+            MarketplaceType::WILDBERRIES,
+            self::REPORT_TYPE,
+            new \DateTimeImmutable('2026-01-10 00:00:00'),
+        );
+
+        self::assertNull($claimed);
+        self::assertNotNull($status);
+        self::assertSame($oldConnectionId, $status->getConnectionId());
+        self::assertSame(FinancialReportSyncStatus::PROCESSING, $status->getStatus());
+    }
+
+    public function testRefreshClaimReusesDailySuccessBusinessStatus(): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $oldConnectionId = '22222222-2222-4222-8222-222222222222';
+        $newConnectionId = '33333333-3333-4333-8333-333333333333';
+        $this->seedActiveConnection($companyId, $oldConnectionId);
+        $this->seedConnectionForExistingCompany($companyId, $newConnectionId);
+        $this->persistStatus($companyId, $oldConnectionId, '2026-01-11', FinancialReportSyncStatus::SUCCESS);
+
+        $claimed = $this->repository->claimForQueue(
+            $newConnectionId,
+            $companyId,
+            MarketplaceType::WILDBERRIES,
+            self::REPORT_TYPE,
+            'new-endpoint',
+            new \DateTimeImmutable('2026-01-11 00:00:00'),
+            FinancialReportSyncMode::REFRESH_14D,
+            true,
+            new \DateTimeImmutable('2026-01-11 12:00:00'),
+        );
+        $this->em->flush();
+
+        self::assertNotNull($claimed);
+        self::assertSame($newConnectionId, $claimed->getConnectionId());
+        self::assertSame(FinancialReportSyncMode::REFRESH_14D, $claimed->getMode());
+
+        $count = (int) $this->em->getConnection()->fetchOne(
+            'SELECT COUNT(*) FROM marketplace_financial_report_sync_statuses WHERE company_id = :companyId AND marketplace = :marketplace AND report_type = :reportType AND business_date = :businessDate',
+            [
+                'companyId' => $companyId,
+                'marketplace' => MarketplaceType::WILDBERRIES->value,
+                'reportType' => self::REPORT_TYPE,
+                'businessDate' => '2026-01-11',
+            ],
+        );
+        self::assertSame(1, $count);
+    }
+
+
+    public function testFindOrCreateForDayReusesCanonicalBusinessStatusWithNewConnection(): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $oldConnectionId = '22222222-2222-4222-8222-222222222222';
+        $newConnectionId = '33333333-3333-4333-8333-333333333333';
+        $this->seedActiveConnection($companyId, $oldConnectionId);
+        $this->seedConnectionForExistingCompany($companyId, $newConnectionId);
+        $this->persistStatus($companyId, $oldConnectionId, '2026-01-12', FinancialReportSyncStatus::SUCCESS);
+
+        $status = $this->repository->findOrCreateForDay(
+            $newConnectionId,
+            $companyId,
+            MarketplaceType::WILDBERRIES,
+            self::REPORT_TYPE,
+            'new-endpoint',
+            new \DateTimeImmutable('2026-01-12 00:00:00'),
+        );
+        $this->em->flush();
+
+        self::assertSame($newConnectionId, $status->getConnectionId());
+        self::assertSame('new-endpoint', $status->getApiEndpoint());
+
+        $count = (int) $this->em->getConnection()->fetchOne(
+            'SELECT COUNT(*) FROM marketplace_financial_report_sync_statuses WHERE company_id = :companyId AND marketplace = :marketplace AND report_type = :reportType AND business_date = :businessDate',
+            [
+                'companyId' => $companyId,
+                'marketplace' => MarketplaceType::WILDBERRIES->value,
+                'reportType' => self::REPORT_TYPE,
+                'businessDate' => '2026-01-12',
+            ],
+        );
+        self::assertSame(1, $count);
     }
 
     private function persistStatus(

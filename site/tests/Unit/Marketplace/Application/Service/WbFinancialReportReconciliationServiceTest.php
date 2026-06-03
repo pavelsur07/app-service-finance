@@ -26,7 +26,7 @@ final class WbFinancialReportReconciliationServiceTest extends TestCase
 
         $repository = $this->createMock(MarketplaceRawDocumentRepository::class);
         $repository->expects(self::once())
-            ->method('findActiveExactPeriodDocuments')
+            ->method('findActiveExactDayDocuments')
             ->willReturn([]);
 
         $service = new WbFinancialReportReconciliationService($repository, $this->createMock(LoggerInterface::class));
@@ -50,7 +50,7 @@ final class WbFinancialReportReconciliationServiceTest extends TestCase
         $existing = $this->buildRawDocument($company, $businessDate);
         $existing->markCompleted();
         $repository = $this->createMock(MarketplaceRawDocumentRepository::class);
-        $repository->method('findActiveExactPeriodDocuments')->willReturn([$existing]);
+        $repository->method('findActiveExactDayDocuments')->willReturn([$existing]);
 
         $service = new WbFinancialReportReconciliationService($repository, $this->createMock(LoggerInterface::class));
         $rows = [['fresh' => true]];
@@ -73,7 +73,7 @@ final class WbFinancialReportReconciliationServiceTest extends TestCase
         $existing->setRawData([['old' => true]]);
 
         $repository = $this->createMock(MarketplaceRawDocumentRepository::class);
-        $repository->method('findActiveExactPeriodDocuments')->willReturn([$existing]);
+        $repository->method('findActiveExactDayDocuments')->willReturn([$existing]);
 
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects(self::once())->method('info');
@@ -95,7 +95,7 @@ final class WbFinancialReportReconciliationServiceTest extends TestCase
         $this->forceProcessingStatus($existing, PipelineStatus::RUNNING);
 
         $repository = $this->createMock(MarketplaceRawDocumentRepository::class);
-        $repository->method('findActiveExactPeriodDocuments')->willReturn([$existing]);
+        $repository->method('findActiveExactDayDocuments')->willReturn([$existing]);
 
         $service = new WbFinancialReportReconciliationService($repository, $this->createMock(LoggerInterface::class));
 
@@ -114,7 +114,7 @@ final class WbFinancialReportReconciliationServiceTest extends TestCase
         $duplicate->markCompleted();
 
         $repository = $this->createMock(MarketplaceRawDocumentRepository::class);
-        $repository->method('findActiveExactPeriodDocuments')->willReturn([$canonical, $duplicate]);
+        $repository->method('findActiveExactDayDocuments')->willReturn([$canonical, $duplicate]);
 
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects(self::once())->method('warning');

@@ -35,12 +35,10 @@ final class WbFinancialReportReconciliationService
         array $rows,
         bool $forceRefresh,
     ): MarketplaceRawDocument {
-        $existingDocuments = $this->rawDocumentRepository->findActiveExactPeriodDocuments(
+        $existingDocuments = $this->rawDocumentRepository->findActiveExactDayDocuments(
             $company,
             MarketplaceType::WILDBERRIES,
             self::DOCUMENT_TYPE,
-            self::API_ENDPOINT,
-            $businessDate,
             $businessDate,
         );
 
