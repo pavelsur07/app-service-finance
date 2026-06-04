@@ -96,7 +96,6 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
         self::assertCount(3, $this->dispatchedMessages);
     }
 
-
     public function testQueuedWithFutureRetryAtIsNotDispatched(): void
     {
         $planner = $this->planner();
@@ -316,6 +315,200 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
         self::assertSame(['2026-05-19'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->businessDate, $this->dispatchedMessages));
     }
 
+    public function testPlanRangeLimitedKeepsTryingWhenFirstCandidateIsNotClaimable(): void
+    {
+        $planner = $this->planner();
+        $this->connections->method('execute')->willReturn([$this->conn('c1', 'co1')]);
+        $this->claimForQueueCallback = function (
+            string $connectionId,
+            string $companyId,
+            MarketplaceType $marketplace,
+            string $reportType,
+            string $apiEndpoint,
+            \DateTimeImmutable $businessDate,
+            FinancialReportSyncMode $mode,
+            bool $forceRefresh,
+            \DateTimeImmutable $now,
+        ): ?MarketplaceFinancialReportSyncStatus {
+            if ('2026-05-18' === $businessDate->format('Y-m-d')) {
+                return null;
+            }
+
+            return $this->statusEntity(
+                $businessDate->format('Y-m-d'),
+                FinancialReportSyncStatus::QUEUED,
+                null,
+                $now->format(DATE_ATOM),
+            );
+        };
+
+        $result = $planner->planRangeLimited(
+            new \DateTimeImmutable('2026-05-18 00:00:00 Europe/Moscow'),
+            new \DateTimeImmutable('2026-05-20 00:00:00 Europe/Moscow'),
+            FinancialReportSyncMode::INITIAL,
+            1,
+        );
+
+        self::assertSame(3, $result->candidatesCount);
+        self::assertSame(2, $result->attemptedCount);
+        self::assertSame(1, $result->dispatchedCount);
+        self::assertSame(1, $result->skippedByLimitCount);
+        self::assertSame(['2026-05-19'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->businessDate, $this->dispatchedMessages));
+    }
+
+    public function testPlanRangeLimitedKeepsTryingWhenFirstTwoCandidatesAreNotClaimable(): void
+    {
+        $planner = $this->planner();
+        $this->connections->method('execute')->willReturn([$this->conn('c1', 'co1')]);
+        $this->claimForQueueCallback = function (
+            string $connectionId,
+            string $companyId,
+            MarketplaceType $marketplace,
+            string $reportType,
+            string $apiEndpoint,
+            \DateTimeImmutable $businessDate,
+            FinancialReportSyncMode $mode,
+            bool $forceRefresh,
+            \DateTimeImmutable $now,
+        ): ?MarketplaceFinancialReportSyncStatus {
+            if (\in_array($businessDate->format('Y-m-d'), ['2026-05-18', '2026-05-19'], true)) {
+                return null;
+            }
+
+            return $this->statusEntity(
+                $businessDate->format('Y-m-d'),
+                FinancialReportSyncStatus::QUEUED,
+                null,
+                $now->format(DATE_ATOM),
+            );
+        };
+
+        $result = $planner->planRangeLimited(
+            new \DateTimeImmutable('2026-05-18 00:00:00 Europe/Moscow'),
+            new \DateTimeImmutable('2026-05-20 00:00:00 Europe/Moscow'),
+            FinancialReportSyncMode::INITIAL,
+            1,
+        );
+
+        self::assertSame(3, $result->candidatesCount);
+        self::assertSame(3, $result->attemptedCount);
+        self::assertSame(1, $result->dispatchedCount);
+        self::assertSame(0, $result->skippedByLimitCount);
+        self::assertSame(['2026-05-20'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->businessDate, $this->dispatchedMessages));
+    }
+
+    public function testPlanRangeLimitedInitialFromToDispatchesOneWithConnectionAndCompanyFilter(): void
+    {
+        $planner = $this->planner();
+        $this->connections
+            ->expects(self::once())
+            ->method('execute')
+            ->with('co1', 'c1')
+            ->willReturn([$this->conn('c1', 'co1')]);
+
+        $result = $planner->planRangeLimited(
+            new \DateTimeImmutable('2026-05-18 00:00:00 Europe/Moscow'),
+            new \DateTimeImmutable('2026-05-20 00:00:00 Europe/Moscow'),
+            FinancialReportSyncMode::INITIAL,
+            1,
+            'co1',
+            'c1',
+            true,
+        );
+
+        self::assertSame(3, $result->candidatesCount);
+        self::assertSame(1, $result->dispatchLimit);
+        self::assertSame(1, $result->attemptedCount);
+        self::assertSame(1, $result->dispatchedCount);
+        self::assertSame(2, $result->skippedByLimitCount);
+        self::assertSame(['2026-05-18'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->businessDate, $this->dispatchedMessages));
+        self::assertSame(['c1'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->connectionId, $this->dispatchedMessages));
+    }
+
+    public function testPlanRangeLimitedInitialFromToDispatchesThreeInAscendingDateOrder(): void
+    {
+        $planner = $this->planner();
+        $this->connections->method('execute')->willReturn([$this->conn('c1', 'co1')]);
+
+        $result = $planner->planRangeLimited(
+            new \DateTimeImmutable('2026-05-18 00:00:00 Europe/Moscow'),
+            new \DateTimeImmutable('2026-05-20 00:00:00 Europe/Moscow'),
+            FinancialReportSyncMode::INITIAL,
+            3,
+            'co1',
+            'c1',
+            true,
+        );
+
+        self::assertSame(3, $result->candidatesCount);
+        self::assertSame(3, $result->dispatchLimit);
+        self::assertSame(3, $result->attemptedCount);
+        self::assertSame(3, $result->dispatchedCount);
+        self::assertSame(0, $result->skippedByLimitCount);
+        self::assertSame(['2026-05-18', '2026-05-19', '2026-05-20'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->businessDate, $this->dispatchedMessages));
+    }
+
+    public function testPlanRangeLimitedInitialDateDispatchesOneGlobally(): void
+    {
+        $planner = $this->planner();
+        $this->connections->method('execute')->willReturn([$this->conn('c1', 'co1'), $this->conn('c2', 'co2')]);
+
+        $result = $planner->planRangeLimited(
+            new \DateTimeImmutable('2026-05-19 00:00:00 Europe/Moscow'),
+            new \DateTimeImmutable('2026-05-19 00:00:00 Europe/Moscow'),
+            FinancialReportSyncMode::INITIAL,
+            1,
+        );
+
+        self::assertSame(2, $result->candidatesCount);
+        self::assertSame(1, $result->dispatchLimit);
+        self::assertSame(1, $result->attemptedCount);
+        self::assertSame(1, $result->dispatchedCount);
+        self::assertSame(1, $result->skippedByLimitCount);
+        self::assertSame(['c1'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->connectionId, $this->dispatchedMessages));
+    }
+
+    public function testPlanRangeLimitedInitialDateWithConnectionIdDispatchesOnlyThatConnection(): void
+    {
+        $planner = $this->planner();
+        $this->connections->method('execute')->willReturn([$this->conn('c1', 'co1'), $this->conn('c2', 'co2')]);
+
+        $result = $planner->planRangeLimited(
+            new \DateTimeImmutable('2026-05-19 00:00:00 Europe/Moscow'),
+            new \DateTimeImmutable('2026-05-19 00:00:00 Europe/Moscow'),
+            FinancialReportSyncMode::INITIAL,
+            1,
+            null,
+            'c2',
+        );
+
+        self::assertSame(1, $result->candidatesCount);
+        self::assertSame(1, $result->attemptedCount);
+        self::assertSame(1, $result->dispatchedCount);
+        self::assertSame(0, $result->skippedByLimitCount);
+        self::assertSame(['c2'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->connectionId, $this->dispatchedMessages));
+    }
+
+    public function testPlanRangeLimitedConnectionIdDoesNotPlanOtherConnections(): void
+    {
+        $planner = $this->planner();
+        $this->connections->method('execute')->willReturn([$this->conn('c1', 'co1'), $this->conn('c2', 'co1')]);
+
+        $result = $planner->planRangeLimited(
+            new \DateTimeImmutable('2026-05-18 00:00:00 Europe/Moscow'),
+            new \DateTimeImmutable('2026-05-20 00:00:00 Europe/Moscow'),
+            FinancialReportSyncMode::INITIAL,
+            10,
+            'co1',
+            'c1',
+        );
+
+        self::assertSame(3, $result->candidatesCount);
+        self::assertSame(3, $result->attemptedCount);
+        self::assertSame(3, $result->dispatchedCount);
+        self::assertSame(['c1', 'c1', 'c1'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->connectionId, $this->dispatchedMessages));
+    }
+
     public function testPlanMissingRespectsMaxDays(): void
     {
         $planner = $this->planner();
@@ -325,9 +518,6 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
 
         self::assertSame(2, $planner->planMissing(null, null, 2));
     }
-
-
-
 
     public function testPlanMissingRecoversDueQueuedContinuationWithCursor(): void
     {
