@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Marketplace\Command;
 
 use App\Marketplace\Application\Service\WbFinancialReportPeriodResolver;
 use App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface;
+use App\Marketplace\Application\Service\WbFinancialReportSyncPlanResult;
 use App\Marketplace\Command\WbFinancialReportsSyncCommand;
 use App\Marketplace\Enum\FinancialReportSyncMode;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -76,6 +77,23 @@ final class WbFinancialReportsSyncCommandTest extends TestCase
         $code = $tester->execute([]);
 
         self::assertSame(Command::SUCCESS, $code);
+    }
+
+    public function testAutoDailyOutputDoesNotShowDispatchLimit(): void
+    {
+        $this->planner
+            ->expects(self::once())
+            ->method('planDaily')
+            ->with(null, null, false)
+            ->willReturn(2);
+
+        $tester = $this->tester();
+        $code = $tester->execute(['--mode' => 'daily']);
+
+        self::assertSame(Command::SUCCESS, $code);
+        $output = preg_replace('/\s+/', ' ', $tester->getDisplay());
+        self::assertStringContainsString('Mode daily: dispatched_count=2', $output);
+        self::assertStringNotContainsString('dispatch_limit=1', $output);
     }
 
     public function testAllWithoutAllowAllReturnsFailureAndWarns(): void
@@ -151,16 +169,17 @@ final class WbFinancialReportsSyncCommandTest extends TestCase
     {
         $this->planner
             ->expects(self::once())
-            ->method('planRange')
+            ->method('planRangeLimited')
             ->with(
                 self::callback(static fn (\DateTimeImmutable $d): bool => '2026-05-19' === $d->format('Y-m-d')),
                 self::callback(static fn (\DateTimeImmutable $d): bool => '2026-05-19' === $d->format('Y-m-d')),
                 FinancialReportSyncMode::DAILY,
+                1,
                 null,
                 null,
                 false,
             )
-            ->willReturn(1);
+            ->willReturn(new WbFinancialReportSyncPlanResult(1, 1, 1, 1, 0));
 
         $this->planner->expects(self::never())->method('planDaily');
 
@@ -178,7 +197,7 @@ final class WbFinancialReportsSyncCommandTest extends TestCase
             ->with(null, null, null, 3)
             ->willReturn(3);
 
-        $this->planner->expects(self::never())->method('planRange');
+        $this->planner->expects(self::never())->method('planRangeLimited');
 
         $tester = $this->tester();
         $code = $tester->execute(['--mode' => 'initial', '--max-days' => '3']);
@@ -186,20 +205,21 @@ final class WbFinancialReportsSyncCommandTest extends TestCase
         self::assertSame(Command::SUCCESS, $code);
     }
 
-    public function testInitialExplicitRangeUsesPlanRangeAndIgnoresMaxDaysLimit(): void
+    public function testInitialExplicitRangeUsesPlanRangeLimitedAndHonorsMaxDaysLimit(): void
     {
         $this->planner
             ->expects(self::once())
-            ->method('planRange')
+            ->method('planRangeLimited')
             ->with(
                 self::callback(static fn (\DateTimeImmutable $d): bool => '2026-05-18' === $d->format('Y-m-d')),
                 self::callback(static fn (\DateTimeImmutable $d): bool => '2026-05-20' === $d->format('Y-m-d')),
                 FinancialReportSyncMode::INITIAL,
+                1,
                 null,
                 null,
                 false,
             )
-            ->willReturn(3);
+            ->willReturn(new WbFinancialReportSyncPlanResult(3, 1, 1, 1, 2));
 
         $this->planner->expects(self::never())->method('planInitial');
 
@@ -212,22 +232,25 @@ final class WbFinancialReportsSyncCommandTest extends TestCase
         ]);
 
         self::assertSame(Command::SUCCESS, $code);
+        $output = preg_replace('/\s+/', ' ', $tester->getDisplay());
+        self::assertStringContainsString('candidates_count=3 dispatch_limit=1 attempted_count=1 dispatched_count=1 skipped_by_limit_count=2', $output);
     }
 
-    public function testInitialDateCallsPlanRangeAndNotPlanInitial(): void
+    public function testInitialDateCallsPlanRangeLimitedAndNotPlanInitial(): void
     {
         $this->planner
             ->expects(self::once())
-            ->method('planRange')
+            ->method('planRangeLimited')
             ->with(
                 self::callback(static fn (\DateTimeImmutable $d): bool => '2026-05-19' === $d->format('Y-m-d')),
                 self::callback(static fn (\DateTimeImmutable $d): bool => '2026-05-19' === $d->format('Y-m-d')),
                 FinancialReportSyncMode::INITIAL,
+                1,
                 null,
                 null,
                 false,
             )
-            ->willReturn(1);
+            ->willReturn(new WbFinancialReportSyncPlanResult(1, 1, 1, 1, 0));
 
         $this->planner->expects(self::never())->method('planInitial');
 

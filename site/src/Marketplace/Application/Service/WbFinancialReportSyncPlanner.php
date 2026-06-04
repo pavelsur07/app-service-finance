@@ -32,7 +32,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         $day = $this->periodResolver->yesterday();
 
         return $this->planForDays(
-            $this->activeWbConnectionsQuery->execute($companyId, $connectionId),
+            $this->activeConnections($companyId, $connectionId),
             [$day],
             FinancialReportSyncMode::DAILY,
             $force,
@@ -56,7 +56,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         $to = $days[array_key_last($days)];
         $now = $this->clock->now();
 
-        foreach ($this->activeWbConnectionsQuery->execute($companyId, $connectionId) as $connection) {
+        foreach ($this->activeConnections($companyId, $connectionId) as $connection) {
             $statuses = $this->syncStatusRepository->findStatusesForDateRange(
                 $connection['company_id'],
                 $connection['connection_id'],
@@ -161,7 +161,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         $to ??= $this->periodResolver->yesterday();
         $now = $this->clock->now();
 
-        foreach ($this->activeWbConnectionsQuery->execute($companyId, $connectionId) as $connection) {
+        foreach ($this->activeConnections($companyId, $connectionId) as $connection) {
             $retryItems = $this->syncStatusRepository->findRetryDueDays(
                 $connection['company_id'],
                 $connection['connection_id'],
@@ -198,6 +198,9 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
     }
 
 
+    /**
+     * @deprecated Use planRangeLimited() from console commands. planRange() schedules full explicit range without dispatch limit.
+     */
     public function planRange(
         DateTimeImmutable $from,
         DateTimeImmutable $to,
@@ -207,10 +210,59 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         bool $forceRefresh = false,
     ): int {
         return $this->planForDays(
-            $this->activeWbConnectionsQuery->execute($companyId, $connectionId),
+            $this->activeConnections($companyId, $connectionId),
             $this->periodResolver->daysBetween($from, $to),
             $mode,
             $forceRefresh,
+        );
+    }
+
+    public function planRangeLimited(
+        DateTimeImmutable $from,
+        DateTimeImmutable $to,
+        FinancialReportSyncMode $mode,
+        int $maxDays,
+        ?string $companyId = null,
+        ?string $connectionId = null,
+        bool $forceRefresh = false,
+    ): WbFinancialReportSyncPlanResult {
+        if ($maxDays <= 0) {
+            return new WbFinancialReportSyncPlanResult(0, 0, 0, 0, 0);
+        }
+
+        $candidates = $this->buildRangeCandidates(
+            $this->activeConnections($companyId, $connectionId),
+            $this->periodResolver->daysBetween($from, $to),
+        );
+        $candidatesCount = count($candidates);
+        $attempted = 0;
+        $dispatched = 0;
+
+        foreach ($candidates as $candidate) {
+            ++$attempted;
+
+            if (!$this->claimAndDispatch(
+                $candidate['company_id'],
+                $candidate['connection_id'],
+                $candidate['day'],
+                $mode,
+                $forceRefresh,
+            )) {
+                continue;
+            }
+
+            ++$dispatched;
+            if ($dispatched >= $maxDays) {
+                break;
+            }
+        }
+
+        return new WbFinancialReportSyncPlanResult(
+            $candidatesCount,
+            $maxDays,
+            $attempted,
+            $dispatched,
+            $dispatched >= $maxDays ? max(0, $candidatesCount - $attempted) : 0,
         );
     }
 
@@ -226,7 +278,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         $allDays = $this->periodResolver->daysBetween($from, $to);
         $now = $this->clock->now();
 
-        foreach ($this->activeWbConnectionsQuery->execute($companyId, $connectionId) as $connection) {
+        foreach ($this->activeConnections($companyId, $connectionId) as $connection) {
             $statuses = $this->syncStatusRepository->findStatusesForDateRange(
                 $connection['company_id'],
                 $connection['connection_id'],
@@ -300,12 +352,61 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         $start = $startFrom ?? $this->periodResolver->currentYearStart();
 
         return $this->planForDays(
-            $this->activeWbConnectionsQuery->execute($companyId, $connectionId),
+            $this->activeConnections($companyId, $connectionId),
             $this->periodResolver->daysBetween($start, $this->periodResolver->yesterday()),
             FinancialReportSyncMode::INITIAL,
             false,
             $maxDays,
         );
+    }
+
+    /**
+     * @return list<array{id: string, company_id: string, connection_id: string}>
+     */
+    private function activeConnections(?string $companyId, ?string $connectionId): array
+    {
+        $connections = $this->activeWbConnectionsQuery->execute($companyId, $connectionId);
+
+        return array_values(array_filter(
+            $connections,
+            static fn (array $connection): bool => (null === $companyId || $connection['company_id'] === $companyId)
+                && (null === $connectionId || $connection['connection_id'] === $connectionId),
+        ));
+    }
+
+    /** @param list<array{id: string, company_id: string, connection_id: string}> $connections
+     * @param list<DateTimeImmutable> $days
+     *
+     * @return list<array{company_id: string, connection_id: string, day: DateTimeImmutable}>
+     */
+    private function buildRangeCandidates(array $connections, array $days): array
+    {
+        $candidates = [];
+        foreach ($days as $day) {
+            foreach ($connections as $connection) {
+                $candidates[] = [
+                    'company_id' => $connection['company_id'],
+                    'connection_id' => $connection['connection_id'],
+                    'day' => $day,
+                ];
+            }
+        }
+
+        usort($candidates, static function (array $a, array $b): int {
+            $dateCompare = $a['day']->getTimestamp() <=> $b['day']->getTimestamp();
+            if (0 !== $dateCompare) {
+                return $dateCompare;
+            }
+
+            $companyCompare = $a['company_id'] <=> $b['company_id'];
+            if (0 !== $companyCompare) {
+                return $companyCompare;
+            }
+
+            return $a['connection_id'] <=> $b['connection_id'];
+        });
+
+        return $candidates;
     }
 
     /** @param list<array{id: string, company_id: string, connection_id: string}> $connections

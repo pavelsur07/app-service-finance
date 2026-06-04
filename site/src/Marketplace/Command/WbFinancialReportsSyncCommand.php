@@ -6,6 +6,7 @@ namespace App\Marketplace\Command;
 
 use App\Marketplace\Application\Service\WbFinancialReportPeriodResolver;
 use App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface;
+use App\Marketplace\Application\Service\WbFinancialReportSyncPlanResult;
 use App\Marketplace\Enum\FinancialReportSyncMode;
 use DateTimeImmutable;
 use DomainException;
@@ -91,9 +92,23 @@ final class WbFinancialReportsSyncCommand extends Command
 
             foreach ($modesToRun as $modeName) {
                 try {
-                    $dispatched = $this->runMode($modeName, $companyId, $connectionId, $force, $maxDays, $daysBack, $windowDays, $from, $to);
+                    $result = $this->runMode($modeName, $companyId, $connectionId, $force, $maxDays, $daysBack, $windowDays, $from, $to);
+                    $dispatched = $result instanceof WbFinancialReportSyncPlanResult ? $result->dispatchedCount : $result;
                     $totalDispatched += $dispatched;
-                    $io->writeln(sprintf('Mode <info>%s</info>: dispatched <comment>%d</comment>', $modeName, $dispatched));
+
+                    if ($result instanceof WbFinancialReportSyncPlanResult) {
+                        $io->writeln(sprintf(
+                            'Mode <info>%s</info>: candidates_count=<comment>%d</comment> dispatch_limit=<comment>%d</comment> attempted_count=<comment>%d</comment> dispatched_count=<comment>%d</comment> skipped_by_limit_count=<comment>%d</comment>',
+                            $modeName,
+                            $result->candidatesCount,
+                            $result->dispatchLimit,
+                            $result->attemptedCount,
+                            $result->dispatchedCount,
+                            $result->skippedByLimitCount,
+                        ));
+                    } else {
+                        $io->writeln(sprintf('Mode <info>%s</info>: dispatched_count=<comment>%d</comment>', $modeName, $dispatched));
+                    }
                 } catch (\Throwable $e) {
                     $criticalErrors[] = sprintf('%s: %s', $modeName, $e->getMessage());
                     $this->logger->error('WB financial report planning mode failed.', [
@@ -127,21 +142,20 @@ final class WbFinancialReportsSyncCommand extends Command
         }
     }
 
-    private function runMode(string $mode, ?string $companyId, ?string $connectionId, bool $force, int $maxDays, int $daysBack, ?int $windowDays, ?DateTimeImmutable $from, ?DateTimeImmutable $to): int
+    private function runMode(string $mode, ?string $companyId, ?string $connectionId, bool $force, int $maxDays, int $daysBack, ?int $windowDays, ?DateTimeImmutable $from, ?DateTimeImmutable $to): int|WbFinancialReportSyncPlanResult
     {
         return match ($mode) {
             'daily' => null !== $from
-                ? $this->planner->planRange($from, $to ?? $from, FinancialReportSyncMode::DAILY, $companyId, $connectionId, $force)
+                ? $this->planner->planRangeLimited($from, $to ?? $from, FinancialReportSyncMode::DAILY, $maxDays, $companyId, $connectionId, $force)
                 : $this->planner->planDaily($companyId, $connectionId, $force),
             'initial' => null !== $from
-                ? $this->planner->planRange($from, $to ?? $from, FinancialReportSyncMode::INITIAL, $companyId, $connectionId, $force)
+                ? $this->planner->planRangeLimited($from, $to ?? $from, FinancialReportSyncMode::INITIAL, $maxDays, $companyId, $connectionId, $force)
                 : $this->planner->planInitial($companyId, $connectionId, null, $maxDays),
             'refresh' => null !== $from
-                ? $this->planner->planRange($from, $to ?? $from, FinancialReportSyncMode::REFRESH_14D, $companyId, $connectionId, true)
+                ? $this->planner->planRangeLimited($from, $to ?? $from, FinancialReportSyncMode::REFRESH_14D, $maxDays, $companyId, $connectionId, true)
                 : $this->planner->planRefreshRecentDays($companyId, $connectionId, $daysBack, $maxDays),
             'refresh14' => null !== $from
-                // Explicit --from/--to is treated as manual force refresh mode; --max-days applies only to automatic refresh planning.
-                ? $this->planner->planRange($from, $to ?? $from, FinancialReportSyncMode::REFRESH_14D, $companyId, $connectionId, true)
+                ? $this->planner->planRangeLimited($from, $to ?? $from, FinancialReportSyncMode::REFRESH_14D, $maxDays, $companyId, $connectionId, true)
                 : (null !== $windowDays
                     ? $this->planner->planRefreshRecentDays($companyId, $connectionId, $windowDays, $maxDays)
                     : $this->planner->planRefresh14Days($companyId, $connectionId, $maxDays)),
