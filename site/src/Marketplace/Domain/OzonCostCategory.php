@@ -440,7 +440,10 @@ final readonly class OzonCostCategory
                 name: 'Упаковочные материалы Ozon',
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Услуги FBO',
-                serviceNames: ['MarketplaceServiceItemPackageMaterialsProvision'],
+                serviceNames: [
+                    'MarketplaceServiceItemPackageMaterialsProvision',
+                    'OperationMarketplaceItemAdditionalPackagingAtWarehouse',
+                ],
             ),
             new self(
                 code: 'ozon_disposal',
