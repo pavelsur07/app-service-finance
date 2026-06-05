@@ -67,6 +67,26 @@ marketplaces:
         include_in_pl: true
         confidence: low
         note: "Гипотеза до финальной сверки с фин.методологией"
+      - cost_code: ozon_fines_shipment_delay_rated
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: low
+        note: "Гипотеза: штраф Ozon за просрочку отгрузки относится к удержаниям/штрафам маркетплейса до финальной сверки с фин.методологией"
+      - cost_code: ozon_fines_cancellation
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: low
+        note: "Гипотеза: штраф Ozon за отмену относится к удержаниям/штрафам маркетплейса до финальной сверки с фин.методологией"
+      - cost_code: ozon_service_fee_rfbs
+        pl_code: COGS_DELIVERY
+        include_in_pl: true
+        confidence: medium
+        note: "Гипотеза: RFBS service fee отнесён к доставочным/операционным расходам до финальной сверки с фин.методологией"
+      - cost_code: ozon_fines_shipment_delay
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: low
+        note: "Гипотеза: штраф Ozon за просрочку отгрузки относится к удержаниям/штрафам маркетплейса до финальной сверки с фин.методологией"
 
   wildberries:
     cost_mappings: []

@@ -18,6 +18,13 @@ use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 
 final class CostPLMappingDefaultSetupControllerTest extends WebTestCaseBase
 {
+    private const NEW_OZON_COST_MAPPINGS = [
+        'ozon_fines_shipment_delay_rated' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_fines_cancellation' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_service_fee_rfbs' => 'COGS_DELIVERY',
+        'ozon_fines_shipment_delay' => 'OPEX_WH_MP_DEDUCTIONS',
+    ];
+
     public function testPreviewReturnsOkAndIsReadOnly(): void
     {
         $this->resetDb();
@@ -36,9 +43,8 @@ final class CostPLMappingDefaultSetupControllerTest extends WebTestCaseBase
         self::assertTrue($payload['ok']);
         self::assertArrayHasKey('summary', $payload);
         self::assertSame($before, $this->countMappings());
+        $this->assertNewOzonCostMappingsArePreviewedForCreation($payload);
     }
-
-
 
     public function testPreviewAcceptsJsonBody(): void
     {
@@ -78,6 +84,9 @@ final class CostPLMappingDefaultSetupControllerTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         $first = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
         self::assertTrue($first['ok']);
+        foreach (array_keys(self::NEW_OZON_COST_MAPPINGS) as $costCode) {
+            self::assertContains($costCode, $first['createdCostCodes']);
+        }
 
         $createdAfterFirst = $this->countMappings();
         self::assertGreaterThan(0, $createdAfterFirst);
@@ -129,6 +138,26 @@ final class CostPLMappingDefaultSetupControllerTest extends WebTestCaseBase
         self::assertResponseStatusCodeSame(403);
     }
 
+    /** @param array<string, mixed> $payload */
+    private function assertNewOzonCostMappingsArePreviewedForCreation(array $payload): void
+    {
+        self::assertArrayHasKey('items', $payload);
+        self::assertIsArray($payload['items']);
+
+        $itemsByCostCode = [];
+        foreach ($payload['items'] as $item) {
+            self::assertIsArray($item);
+            $itemsByCostCode[$item['costCode']] = $item;
+        }
+
+        foreach (self::NEW_OZON_COST_MAPPINGS as $costCode => $plCode) {
+            self::assertArrayHasKey($costCode, $itemsByCostCode);
+            self::assertSame('will_create', $itemsByCostCode[$costCode]['status']);
+            self::assertSame($plCode, $itemsByCostCode[$costCode]['plCode']);
+            self::assertNotNull($itemsByCostCode[$costCode]['plCategoryId']);
+        }
+    }
+
     private function csrf(KernelBrowser $client): string
     {
         return $client->getContainer()->get('security.csrf.token_manager')->getToken('marketplace_default_cost_mapping')->getValue();
@@ -155,14 +184,14 @@ final class CostPLMappingDefaultSetupControllerTest extends WebTestCaseBase
         $em->persist($user);
         $em->persist($company);
 
-        $codes = ['ozon_sale_commission', 'ozon_logistic_direct'];
+        $codes = ['ozon_sale_commission', 'ozon_logistic_direct', ...array_keys(self::NEW_OZON_COST_MAPPINGS)];
         foreach ($codes as $i => $code) {
             $cost = new MarketplaceCostCategory(Uuid::uuid4()->toString(), $company, MarketplaceType::OZON);
             $cost->setName('Cost '.$i)->setCode($code);
             $em->persist($cost);
         }
 
-        $plCodes = $withAllPlCodes ? ['COGS_MP_COMMISSION', 'COGS_DELIVERY'] : ['COGS_MP_COMMISSION'];
+        $plCodes = $withAllPlCodes ? ['COGS_MP_COMMISSION', 'COGS_DELIVERY', 'OPEX_WH_MP_DEDUCTIONS'] : ['COGS_MP_COMMISSION'];
         foreach ($plCodes as $code) {
             $pl = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName($code)->build();
             $pl->setCode($code);
