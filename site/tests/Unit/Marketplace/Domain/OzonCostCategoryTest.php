@@ -260,6 +260,10 @@ final class OzonCostCategoryTest extends TestCase
             OzonCostCategory::findByServiceName('MarketplaceServiceItemServiceFeeRFBS')?->code,
         );
         $this->assertSame(
+            'ozon_package_materials',
+            OzonCostCategory::findByServiceName('OperationMarketplaceItemAdditionalPackagingAtWarehouse')?->code,
+        );
+        $this->assertSame(
             'ozon_fines_shipment_delay',
             OzonCostCategory::findByOperationType('DefectFineShipmentDelay')?->code,
         );

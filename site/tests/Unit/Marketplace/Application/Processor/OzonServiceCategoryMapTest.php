@@ -173,6 +173,7 @@ final class OzonServiceCategoryMapTest extends TestCase
             'DefectFineShipmentDelayRated' => 'ozon_fines_shipment_delay_rated',
             'DefectFineCancellation' => 'ozon_fines_cancellation',
             'MarketplaceServiceItemServiceFeeRFBS' => 'ozon_service_fee_rfbs',
+            'OperationMarketplaceItemAdditionalPackagingAtWarehouse' => 'ozon_package_materials',
             'DefectFineShipmentDelay' => 'ozon_fines_shipment_delay',
         ];
 
