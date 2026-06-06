@@ -7,10 +7,8 @@ namespace App\Marketplace\Infrastructure\Api\Wildberries;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Api\Contract\MarketplaceFetcherInterface;
 use App\Marketplace\Infrastructure\Query\MarketplaceCredentialsQuery;
-use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
-#[AutoconfigureTag('marketplace.fetcher')]
 /**
  * @deprecated Legacy Wildberries fetcher pipeline based on GET /api/v5/supplier/reportDetailByPeriod.
  *
@@ -30,6 +28,7 @@ final readonly class WbFetcher implements MarketplaceFetcherInterface
 
     public function supports(MarketplaceType $type): bool
     {
+        // Legacy WB fetcher must stay out of the MarketplaceFetcherRegistry selection path.
         return false;
     }
 
