@@ -60,6 +60,12 @@ class MarketplaceSyncCommand extends Command
             return Command::FAILURE;
         }
 
+        if (MarketplaceType::WILDBERRIES === $marketplace) {
+            $io->error('Legacy WB sync отключён. Используйте новую команду: app:marketplace:wb-financial-reports:sync');
+
+            return Command::FAILURE;
+        }
+
         $io->title('Синхронизация с '.$marketplace->getDisplayName());
 
         // Получить компании для синхронизации
