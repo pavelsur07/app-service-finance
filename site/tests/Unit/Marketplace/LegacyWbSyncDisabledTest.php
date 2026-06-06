@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Marketplace;
 
 use App\Company\Facade\CompanyFacade;
+use App\Marketplace\Application\Command\FetchMarketplaceDataCommand;
+use App\Marketplace\Application\FetchMarketplaceDataAction;
 use App\Marketplace\Application\ProcessRawDocumentAction;
 use App\Marketplace\Command\MarketplaceSyncCommand;
 use App\Marketplace\Enum\MarketplaceType;
@@ -12,11 +14,14 @@ use App\Marketplace\Facade\MarketplaceSyncFacade;
 use App\Marketplace\Infrastructure\Api\MarketplaceFetcherRegistry;
 use App\Marketplace\Infrastructure\Api\Wildberries\WbFetcher;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
+use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
+use Doctrine\ORM\EntityManagerInterface;
 use DomainException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 final class LegacyWbSyncDisabledTest extends TestCase
@@ -70,6 +75,13 @@ final class LegacyWbSyncDisabledTest extends TestCase
         yield 'returns' => ['methodName' => 'syncReturns'];
     }
 
+    public function testWbFetcherDoesNotParticipateInMarketplaceFetcherTaggedRegistry(): void
+    {
+        $attributes = (new \ReflectionClass(WbFetcher::class))->getAttributes(AutoconfigureTag::class);
+
+        self::assertSame([], $attributes);
+    }
+
     public function testFetcherRegistryDoesNotReturnWbFetcherForWildberries(): void
     {
         $wbFetcher = self::uninitialized(WbFetcher::class);
@@ -81,6 +93,33 @@ final class LegacyWbSyncDisabledTest extends TestCase
         $this->expectExceptionMessage('Marketplace fetcher is not configured for type "wildberries".');
 
         $registry->get(MarketplaceType::WILDBERRIES);
+    }
+
+    public function testFetchMarketplaceDataActionCannotSelectWbFetcher(): void
+    {
+        $wbFetcher = self::uninitialized(WbFetcher::class);
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::never())->method('getReference');
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $action = new FetchMarketplaceDataAction(
+            new MarketplaceFetcherRegistry([$wbFetcher]),
+            self::uninitialized(MarketplaceRawDocumentRepository::class),
+            $entityManager,
+            $messageBus,
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Marketplace fetcher is not configured for type "wildberries".');
+
+        $action(new FetchMarketplaceDataCommand(
+            companyId: 'company-id',
+            type: MarketplaceType::WILDBERRIES,
+            dateFrom: new \DateTimeImmutable('2026-01-01'),
+            documentType: 'sales',
+            processKind: 'sales',
+        ));
     }
 
     /**
