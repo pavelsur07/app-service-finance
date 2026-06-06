@@ -13,6 +13,9 @@ use Symfony\Component\Messenger\MessageBusInterface;
 
 final readonly class MarketplaceSyncFacade
 {
+    private const WB_FINANCIAL_REPORTS_SYNC_PLANNER = 'WbFinancialReportSyncPlanner';
+    private const WB_FINANCIAL_REPORTS_SYNC_COMMAND = 'app:marketplace:wb-financial-reports:sync';
+
     public function __construct(
         private ProcessRawDocumentAction $processRawDocumentAction,
         private MessageBusInterface $messageBus,
@@ -82,7 +85,11 @@ final readonly class MarketplaceSyncFacade
     private function guardLegacyWbSync(MarketplaceType $marketplace): void
     {
         if (MarketplaceType::WILDBERRIES === $marketplace) {
-            throw new DomainException('Legacy WB sync отключён. Используйте app:marketplace:wb-financial-reports:sync.');
+            throw new DomainException(sprintf(
+                'Legacy WB sync отключён. Используйте %s или новую команду %s.',
+                self::WB_FINANCIAL_REPORTS_SYNC_PLANNER,
+                self::WB_FINANCIAL_REPORTS_SYNC_COMMAND,
+            ));
         }
     }
 

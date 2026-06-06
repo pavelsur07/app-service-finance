@@ -22,6 +22,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
+use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 final class LegacyWbSyncDisabledTest extends TestCase
@@ -56,6 +57,8 @@ final class LegacyWbSyncDisabledTest extends TestCase
 
         $this->expectException(DomainException::class);
         $this->expectExceptionMessage('Legacy WB sync отключён');
+        $this->expectExceptionMessage('WbFinancialReportSyncPlanner');
+        $this->expectExceptionMessage('app:marketplace:wb-financial-reports:sync');
 
         $facade->{$methodName}(
             'company-id',
@@ -73,6 +76,64 @@ final class LegacyWbSyncDisabledTest extends TestCase
         yield 'sales' => ['methodName' => 'syncSales'];
         yield 'costs' => ['methodName' => 'syncCosts'];
         yield 'returns' => ['methodName' => 'syncReturns'];
+    }
+
+    #[DataProvider('nonWbSyncMethodsProvider')]
+    public function testFacadeNonWbSyncMethodsDispatchFetchCommand(
+        string $methodName,
+        string $expectedProcessKind,
+        MarketplaceType $marketplace,
+    ): void
+    {
+        $fromDate = new \DateTimeImmutable('2026-01-01');
+        $toDate = new \DateTimeImmutable('2026-01-02');
+
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::once())
+            ->method('dispatch')
+            ->with(self::callback(static function (object $message) use ($expectedProcessKind, $fromDate, $marketplace): bool {
+                self::assertInstanceOf(FetchMarketplaceDataCommand::class, $message);
+                self::assertSame('company-id', $message->companyId);
+                self::assertSame($marketplace, $message->type);
+                self::assertSame($fromDate, $message->dateFrom);
+                self::assertSame('sales_report', $message->documentType);
+                self::assertSame($expectedProcessKind, $message->processKind);
+
+                return true;
+            }))
+            ->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
+
+        $facade = new MarketplaceSyncFacade(self::uninitialized(ProcessRawDocumentAction::class), $bus);
+
+        self::assertSame(0, $facade->{$methodName}('company-id', $marketplace, $fromDate, $toDate));
+    }
+
+    /**
+     * @return iterable<string, array{methodName: string, expectedProcessKind: string, marketplace: MarketplaceType}>
+     */
+    public static function nonWbSyncMethodsProvider(): iterable
+    {
+        foreach ([
+            'ozon' => MarketplaceType::OZON,
+            'yandex_market' => MarketplaceType::YANDEX_MARKET,
+            'sber_megamarket' => MarketplaceType::SBER_MEGAMARKET,
+        ] as $marketplaceName => $marketplace) {
+            yield $marketplaceName.' sales' => [
+                'methodName' => 'syncSales',
+                'expectedProcessKind' => 'sales',
+                'marketplace' => $marketplace,
+            ];
+            yield $marketplaceName.' costs' => [
+                'methodName' => 'syncCosts',
+                'expectedProcessKind' => 'costs',
+                'marketplace' => $marketplace,
+            ];
+            yield $marketplaceName.' returns' => [
+                'methodName' => 'syncReturns',
+                'expectedProcessKind' => 'returns',
+                'marketplace' => $marketplace,
+            ];
+        }
     }
 
     public function testWbFetcherDoesNotParticipateInMarketplaceFetcherTaggedRegistry(): void
