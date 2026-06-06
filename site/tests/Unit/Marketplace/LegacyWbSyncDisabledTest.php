@@ -31,6 +31,8 @@ final class LegacyWbSyncDisabledTest extends TestCase
             new MarketplaceSyncFacade(self::uninitialized(ProcessRawDocumentAction::class), $bus),
             self::uninitialized(CompanyFacade::class),
         );
+        self::assertSame('marketplace:sync', $command->getName());
+
         $tester = new CommandTester($command);
 
         $exitCode = $tester->execute(['marketplace' => MarketplaceType::WILDBERRIES->value]);
