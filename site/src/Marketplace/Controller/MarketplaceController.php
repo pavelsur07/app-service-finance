@@ -200,11 +200,18 @@ class MarketplaceController extends AbstractController
             $count = ($this->syncConnectionAction)($cmd);
 
             $connection = $this->connectionRepository->find($id);
-            $this->addFlash('success', sprintf(
-                'Загружено %d записей от %s.',
-                $count,
-                $connection?->getMarketplace()->getDisplayName() ?? 'маркетплейса',
-            ));
+            if ($connection?->getMarketplace() === MarketplaceType::WILDBERRIES) {
+                $this->addFlash('success', sprintf(
+                    'Запланировано %d задач синхронизации WB.',
+                    $count,
+                ));
+            } else {
+                $this->addFlash('success', sprintf(
+                    'Загружено %d записей от %s.',
+                    $count,
+                    $connection?->getMarketplace()->getDisplayName() ?? 'маркетплейса',
+                ));
+            }
         } catch (\DomainException $e) {
             throw $this->createNotFoundException($e->getMessage());
         } catch (\Exception $e) {
@@ -257,13 +264,22 @@ class MarketplaceController extends AbstractController
             );
             $count = ($this->syncConnectionAction)($cmd);
 
-            $this->addFlash('success', sprintf(
-                'Загружено %d записей от %s за период %s — %s.',
-                $count,
-                $connection->getMarketplace()->getDisplayName(),
-                $fromDate->format('d.m.Y'),
-                $toDate->format('d.m.Y'),
-            ));
+            if ($connection->getMarketplace() === MarketplaceType::WILDBERRIES) {
+                $this->addFlash('success', sprintf(
+                    'Запланировано %d задач синхронизации WB за период %s — %s.',
+                    $count,
+                    $fromDate->format('d.m.Y'),
+                    $toDate->format('d.m.Y'),
+                ));
+            } else {
+                $this->addFlash('success', sprintf(
+                    'Загружено %d записей от %s за период %s — %s.',
+                    $count,
+                    $connection->getMarketplace()->getDisplayName(),
+                    $fromDate->format('d.m.Y'),
+                    $toDate->format('d.m.Y'),
+                ));
+            }
         } catch (\Exception $e) {
             $this->addFlash('error', 'Ошибка загрузки: ' . $e->getMessage());
         }
