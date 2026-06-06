@@ -28,6 +28,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  */
 class MarketplaceSyncCommand extends Command
 {
+    private const WB_FINANCIAL_REPORTS_SYNC_COMMAND = 'app:marketplace:wb-financial-reports:sync';
+
     public function __construct(
         private readonly MarketplaceConnectionRepository $connectionRepository,
         private readonly MarketplaceSyncFacade $syncFacade,
@@ -61,7 +63,10 @@ class MarketplaceSyncCommand extends Command
         }
 
         if (MarketplaceType::WILDBERRIES === $marketplace) {
-            $io->error('Legacy WB sync отключён. Используйте новую команду: app:marketplace:wb-financial-reports:sync');
+            $io->error(sprintf(
+                'Legacy WB sync отключён. Используйте новую команду: %s',
+                self::WB_FINANCIAL_REPORTS_SYNC_COMMAND,
+            ));
 
             return Command::FAILURE;
         }
