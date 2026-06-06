@@ -10,7 +10,7 @@ Symfony application is located in `site/`.
 - Redis
 - Symfony Messenger
 - Twig
-- React
+- React + Vite
 - Docker Compose
 
 Перед выполнением всегда читай CLAUDE.md ARCHITECTURE.md PATTERNS.md CLAUDE.frontend.md
