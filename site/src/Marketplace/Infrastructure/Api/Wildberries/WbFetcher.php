@@ -30,7 +30,7 @@ final readonly class WbFetcher implements MarketplaceFetcherInterface
 
     public function supports(MarketplaceType $type): bool
     {
-        return MarketplaceType::WILDBERRIES === $type;
+        return false;
     }
 
     /**

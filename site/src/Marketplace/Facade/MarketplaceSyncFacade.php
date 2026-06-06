@@ -8,6 +8,7 @@ use App\Marketplace\Application\Command\FetchMarketplaceDataCommand;
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\ProcessRawDocumentAction;
 use App\Marketplace\Enum\MarketplaceType;
+use DomainException;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 final readonly class MarketplaceSyncFacade
@@ -24,6 +25,8 @@ final readonly class MarketplaceSyncFacade
         \DateTimeInterface $fromDate,
         \DateTimeInterface $toDate,
     ): int {
+        $this->guardLegacyWbSync($marketplace);
+
         $immutableFrom = $fromDate instanceof \DateTimeImmutable ? $fromDate : \DateTimeImmutable::createFromInterface($fromDate);
         $this->messageBus->dispatch(new FetchMarketplaceDataCommand(
             $companyId,
@@ -42,6 +45,8 @@ final readonly class MarketplaceSyncFacade
         \DateTimeInterface $fromDate,
         \DateTimeInterface $toDate,
     ): int {
+        $this->guardLegacyWbSync($marketplace);
+
         $immutableFrom = $fromDate instanceof \DateTimeImmutable ? $fromDate : \DateTimeImmutable::createFromInterface($fromDate);
         $this->messageBus->dispatch(new FetchMarketplaceDataCommand(
             $companyId,
@@ -60,6 +65,8 @@ final readonly class MarketplaceSyncFacade
         \DateTimeInterface $fromDate,
         \DateTimeInterface $toDate,
     ): int {
+        $this->guardLegacyWbSync($marketplace);
+
         $immutableFrom = $fromDate instanceof \DateTimeImmutable ? $fromDate : \DateTimeImmutable::createFromInterface($fromDate);
         $this->messageBus->dispatch(new FetchMarketplaceDataCommand(
             $companyId,
@@ -70,6 +77,13 @@ final readonly class MarketplaceSyncFacade
         ));
 
         return 0;
+    }
+
+    private function guardLegacyWbSync(MarketplaceType $marketplace): void
+    {
+        if (MarketplaceType::WILDBERRIES === $marketplace) {
+            throw new DomainException('Legacy WB sync отключён. Используйте app:marketplace:wb-financial-reports:sync.');
+        }
     }
 
     /**
