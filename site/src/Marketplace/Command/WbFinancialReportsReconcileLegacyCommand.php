@@ -21,6 +21,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 #[AsCommand(
     name: 'app:marketplace:wb-financial-reports:reconcile-legacy',
@@ -34,12 +35,15 @@ final class WbFinancialReportsReconcileLegacyCommand extends Command
     private const API_ENDPOINT = 'wildberries::finance-sales-reports-detailed';
     private const LEGACY_GENERATED_ENDPOINT = 'legacy_generated_rows';
     private const FLUSH_BATCH_SIZE = 500;
+    private const FEATURE_FLAG_ENV = 'WB_LEGACY_RECONCILE_ENABLED';
 
     public function __construct(
         private readonly Connection $connection,
         private readonly WbFinancialReportPeriodResolver $periodResolver,
         private readonly MarketplaceFinancialReportSyncStatusRepository $syncStatusRepository,
         private readonly EntityManagerInterface $entityManager,
+        #[Autowire('%env(bool:WB_LEGACY_RECONCILE_ENABLED)%')]
+        private readonly bool $legacyReconcileEnabled,
     ) {
         parent::__construct();
     }
@@ -47,17 +51,40 @@ final class WbFinancialReportsReconcileLegacyCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addOption('company-id', null, InputOption::VALUE_OPTIONAL)
-            ->addOption('connection-id', null, InputOption::VALUE_OPTIONAL)
+            ->addOption('company-id', null, InputOption::VALUE_OPTIONAL, 'Target company UUID; required together with enabled '.self::FEATURE_FLAG_ENV.' for writes/diagnostics')
+            ->addOption('connection-id', null, InputOption::VALUE_OPTIONAL, 'Target marketplace connection UUID; required together with enabled '.self::FEATURE_FLAG_ENV.' for writes/diagnostics')
             ->addOption('from', null, InputOption::VALUE_OPTIONAL, 'Y-m-d; default current year start')
             ->addOption('to', null, InputOption::VALUE_OPTIONAL, 'Y-m-d; default yesterday')
-            ->addOption('dry-run', null, InputOption::VALUE_NONE)
-            ->addOption('limit', null, InputOption::VALUE_OPTIONAL, 'Limit active connections');
+            ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Diagnostic mode: calculate reconciliation stats without persisting statuses')
+            ->addOption('limit', null, InputOption::VALUE_OPTIONAL, 'Limit active connections after explicit company/connection targeting')
+            ->setHelp(sprintf(
+                'Transition-only command. Set %s=true and pass --company-id or --connection-id explicitly; use --dry-run for diagnostics. After the transition period, remove this command or convert it to read-only diagnostics.',
+                self::FEATURE_FLAG_ENV,
+            ));
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
+
+        $companyId = $this->normalizeOptional((string) $input->getOption('company-id'));
+        $connectionId = $this->normalizeOptional((string) $input->getOption('connection-id'));
+        $fromOption = $this->normalizeOptional((string) $input->getOption('from'));
+        $toOption = $this->normalizeOptional((string) $input->getOption('to'));
+        $dryRun = (bool) $input->getOption('dry-run');
+        $limit = (int) ((string) $input->getOption('limit') ?: '0');
+
+        if (!$this->isLegacyReconcileEnabled()) {
+            $io->error(sprintf('Legacy WB reconciliation is disabled. Set %s=true and pass --company-id or --connection-id to run this transition-only command.', self::FEATURE_FLAG_ENV));
+
+            return Command::FAILURE;
+        }
+
+        if (null === $companyId && null === $connectionId) {
+            $io->error('Legacy WB reconciliation requires explicit targeting via --company-id or --connection-id. Use --dry-run with the same targeting for diagnostics.');
+
+            return Command::FAILURE;
+        }
 
         if (!$this->lock()) {
             $io->note('Command is already running.');
@@ -66,13 +93,6 @@ final class WbFinancialReportsReconcileLegacyCommand extends Command
         }
 
         try {
-            $companyId = $this->normalizeOptional((string) $input->getOption('company-id'));
-            $connectionId = $this->normalizeOptional((string) $input->getOption('connection-id'));
-            $fromOption = $this->normalizeOptional((string) $input->getOption('from'));
-            $toOption = $this->normalizeOptional((string) $input->getOption('to'));
-            $dryRun = (bool) $input->getOption('dry-run');
-            $limit = (int) ((string) $input->getOption('limit') ?: '0');
-
             if ($limit < 0) {
                 $io->error('Option --limit must be greater than or equal to 0.');
 
@@ -265,6 +285,11 @@ final class WbFinancialReportsReconcileLegacyCommand extends Command
         if (0 === $created % self::FLUSH_BATCH_SIZE) {
             $this->entityManager->flush();
         }
+    }
+
+    private function isLegacyReconcileEnabled(): bool
+    {
+        return $this->legacyReconcileEnabled;
     }
 
     private function normalizeOptional(string $value): ?string
