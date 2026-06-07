@@ -99,6 +99,18 @@ final class InitialSyncHandler
         }
 
         $marketplace = MarketplaceType::from($message->marketplace);
+
+        if (MarketplaceType::WILDBERRIES === $marketplace || MarketplaceType::WILDBERRIES === $connection->getMarketplace()) {
+            $this->logger->warning('InitialSync: skipped WB legacy batch; use status-based WB financial report planner', [
+                'company_id' => $message->companyId,
+                'connection_id' => $message->connectionId,
+                'message_marketplace' => $message->marketplace,
+                'connection_marketplace' => $connection->getMarketplace()->value,
+            ]);
+
+            return;
+        }
+
         $fromDate    = new \DateTimeImmutable($message->dateFrom);
         $toDate      = new \DateTimeImmutable($message->dateTo);
 

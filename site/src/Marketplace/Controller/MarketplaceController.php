@@ -6,6 +6,8 @@ namespace App\Marketplace\Controller;
 
 use App\Marketplace\Application\ProcessOzonRealizationAction;
 use App\Marketplace\Application\ReprocessMarketplacePeriodAction;
+use App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface;
+use App\Marketplace\Application\Service\WbInitialSyncStartDateResolver;
 use App\Marketplace\Application\SyncConnectionAction;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceListing;
@@ -50,6 +52,8 @@ class MarketplaceController extends AbstractController
         private readonly MessageBusInterface              $messageBus,
         private readonly ReprocessMarketplacePeriodAction $reprocessAction,
         private readonly SyncConnectionAction             $syncConnectionAction,
+        private readonly WbInitialSyncStartDateResolver   $wbInitialSyncStartDateResolver,
+        private readonly WbFinancialReportSyncPlannerInterface $wbFinancialReportSyncPlanner,
     ) {
     }
 
@@ -116,12 +120,19 @@ class MarketplaceController extends AbstractController
         $this->em->persist($connection);
         $this->em->flush();
 
-        /* Временная блокировка Тригера для первичной загрузки */
-        /*$this->messageBus->dispatch(new TriggerInitialSyncMessage(
-            companyId:    (string) $company->getId(),
-            connectionId: $connection->getId(),
-            marketplace:  $marketplace->value,
-        ));*/
+        if (MarketplaceType::WILDBERRIES === $marketplace) {
+            $this->wbFinancialReportSyncPlanner->planInitial(
+                companyId: (string) $company->getId(),
+                connectionId: $connection->getId(),
+                startFrom: $this->wbInitialSyncStartDateResolver->resolve($company, $connection),
+            );
+        } else {
+            $this->messageBus->dispatch(new TriggerInitialSyncMessage(
+                companyId:    (string) $company->getId(),
+                connectionId: $connection->getId(),
+                marketplace:  $marketplace->value,
+            ));
+        }
 
         $this->addFlash('success', 'Подключение к ' . $marketplace->getDisplayName() . ' создано');
 

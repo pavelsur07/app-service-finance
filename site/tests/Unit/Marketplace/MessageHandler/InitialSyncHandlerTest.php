@@ -321,6 +321,27 @@ final class InitialSyncHandlerTest extends TestCase
         self::assertNull($captured->message);
     }
 
+    public function testWildberriesLegacyInitialBatchIsSkipped(): void
+    {
+        [$handler, $captured] = $this->createHandler(
+            new MockClock('2026-04-10 12:00:00'),
+            expectedFetchCalls: 0,
+            connectionMarketplace: MarketplaceType::WILDBERRIES,
+        );
+
+        $handler(new InitialSyncMessage(
+            companyId: self::COMPANY_ID,
+            connectionId: self::CONNECTION_ID,
+            marketplace: MarketplaceType::WILDBERRIES->value,
+            dateFrom: '2026-03-23 00:00:00',
+            dateTo: '2026-03-29 23:59:59',
+            nextDateFrom: '2026-03-30 00:00:00',
+            nextDateTo: '2026-03-31 23:59:59',
+        ));
+
+        self::assertNull($captured->message);
+    }
+
     /**
      * @return array{0: InitialSyncHandler, 1: \stdClass, 2: EntityManagerInterface, 3: MarketplaceAdapterInterface} captured->message хранит последнее задиспатченное сообщение
      */
@@ -333,13 +354,14 @@ final class InitialSyncHandlerTest extends TestCase
         ?int $expectedFetchCalls = null,
         ?\Throwable $flushException = null,
         bool $entityManagerOpenAfterFlushException = true,
+        MarketplaceType $connectionMarketplace = MarketplaceType::OZON,
     ): array
     {
         $company    = CompanyBuilder::aCompany()->withId(self::COMPANY_ID)->build();
         $connection = new MarketplaceConnection(
             self::CONNECTION_ID,
             $company,
-            MarketplaceType::OZON,
+            $connectionMarketplace,
         );
 
         $em = $this->createMock(EntityManagerInterface::class);
