@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Marketplace\Command;
 
 use App\Company\Entity\Company;
+use App\Marketplace\Application\Service\WbFinancialReportPeriodResolver;
+use App\Marketplace\Command\WbFinancialReportsReconcileLegacyCommand;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceFinancialReportSyncStatus;
@@ -13,22 +15,46 @@ use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PipelineStatus;
+use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Doctrine\DBAL\Connection;
 use Ramsey\Uuid\Uuid;
-use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 
 final class WbFinancialReportsReconcileLegacyCommandTest extends IntegrationTestCase
 {
+    public function testDisabledByDefaultReturnsFailure(): void
+    {
+        [$company, $connection] = $this->seedWbConnection();
+        $this->seedRaw($company, '2026-01-02', PipelineStatus::COMPLETED, 3, 'legacy::wb-endpoint');
+
+        $exit = $this->tester(false)->execute([
+            '--company-id' => $company->getId(),
+            '--from' => '2026-01-02',
+            '--to' => '2026-01-02',
+            '--dry-run' => true,
+        ]);
+
+        self::assertSame(Command::FAILURE, $exit);
+        self::assertSame(0, $this->countStatuses($company->getId(), $connection->getId()));
+    }
+
+    public function testEnabledCommandRequiresExplicitTarget(): void
+    {
+        $exit = $this->tester()->execute(['--from' => '2026-01-02', '--to' => '2026-01-02', '--dry-run' => true]);
+
+        self::assertSame(Command::FAILURE, $exit);
+    }
+
     public function testDryRunDoesNotPersistStatuses(): void
     {
         [$company, $connection] = $this->seedWbConnection();
         $this->seedRaw($company, '2026-01-02', PipelineStatus::COMPLETED, 3, 'legacy::wb-endpoint');
 
-        $exit = $this->tester()->execute(['--from' => '2026-01-02', '--to' => '2026-01-02', '--dry-run' => true]);
+        $exit = $this->tester()->execute(['--company-id' => $company->getId(), '--from' => '2026-01-02', '--to' => '2026-01-02', '--dry-run' => true]);
 
         self::assertSame(Command::SUCCESS, $exit);
         self::assertSame(0, $this->countStatuses($company->getId(), $connection->getId()));
@@ -39,7 +65,7 @@ final class WbFinancialReportsReconcileLegacyCommandTest extends IntegrationTest
         [$company, $connection] = $this->seedWbConnection();
         $raw = $this->seedRaw($company, '2026-01-03', PipelineStatus::COMPLETED, 2, 'legacy::old-api');
 
-        $exit = $this->tester()->execute(['--from' => '2026-01-03', '--to' => '2026-01-03']);
+        $exit = $this->tester()->execute(['--company-id' => $company->getId(), '--from' => '2026-01-03', '--to' => '2026-01-03']);
 
         self::assertSame(Command::SUCCESS, $exit);
         $status = $this->findStatus($company->getId(), $connection->getId(), '2026-01-03');
@@ -54,7 +80,7 @@ final class WbFinancialReportsReconcileLegacyCommandTest extends IntegrationTest
         [$company, $connection] = $this->seedWbConnection();
         $raw = $this->seedRaw($company, '2026-01-08', PipelineStatus::FAILED, 3, 'legacy::failed-api');
 
-        $exit = $this->tester()->execute(['--from' => '2026-01-08', '--to' => '2026-01-08']);
+        $exit = $this->tester()->execute(['--company-id' => $company->getId(), '--from' => '2026-01-08', '--to' => '2026-01-08']);
 
         self::assertSame(Command::SUCCESS, $exit);
         $status = $this->findStatus($company->getId(), $connection->getId(), '2026-01-08');
@@ -68,7 +94,7 @@ final class WbFinancialReportsReconcileLegacyCommandTest extends IntegrationTest
         [$company, $connection] = $this->seedWbConnection();
         $this->seedRaw($company, '2026-01-04', PipelineStatus::PENDING, 1, 'legacy::old-api');
 
-        $exit = $this->tester()->execute(['--from' => '2026-01-04', '--to' => '2026-01-04']);
+        $exit = $this->tester()->execute(['--company-id' => $company->getId(), '--from' => '2026-01-04', '--to' => '2026-01-04']);
 
         self::assertSame(Command::SUCCESS, $exit);
         $status = $this->findStatus($company->getId(), $connection->getId(), '2026-01-04');
@@ -81,7 +107,7 @@ final class WbFinancialReportsReconcileLegacyCommandTest extends IntegrationTest
         [$company, $connection] = $this->seedWbConnection();
         $this->seedCost($company, new \DateTimeImmutable('2026-01-06 12:34:00'));
 
-        $exit = $this->tester()->execute(['--from' => '2026-01-06', '--to' => '2026-01-06']);
+        $exit = $this->tester()->execute(['--company-id' => $company->getId(), '--from' => '2026-01-06', '--to' => '2026-01-06']);
 
         self::assertSame(Command::SUCCESS, $exit);
         $status = $this->findStatus($company->getId(), $connection->getId(), '2026-01-06');
@@ -94,7 +120,7 @@ final class WbFinancialReportsReconcileLegacyCommandTest extends IntegrationTest
     {
         [$company, $connection] = $this->seedWbConnection();
 
-        $exit = $this->tester()->execute(['--from' => '2026-01-07', '--to' => '2026-01-07']);
+        $exit = $this->tester()->execute(['--company-id' => $company->getId(), '--from' => '2026-01-07', '--to' => '2026-01-07']);
 
         self::assertSame(Command::SUCCESS, $exit);
         self::assertNull($this->findStatus($company->getId(), $connection->getId(), '2026-01-07'));
@@ -102,7 +128,7 @@ final class WbFinancialReportsReconcileLegacyCommandTest extends IntegrationTest
 
     public function testFromGreaterThanToReturnsFailure(): void
     {
-        $exit = $this->tester()->execute(['--from' => '2026-01-10', '--to' => '2026-01-01']);
+        $exit = $this->tester()->execute(['--company-id' => Uuid::uuid7()->toString(), '--from' => '2026-01-10', '--to' => '2026-01-01']);
 
         self::assertSame(Command::FAILURE, $exit);
     }
@@ -123,7 +149,7 @@ final class WbFinancialReportsReconcileLegacyCommandTest extends IntegrationTest
 
     public function testNegativeLimitReturnsFailure(): void
     {
-        $exit = $this->tester()->execute(['--limit' => '-1']);
+        $exit = $this->tester()->execute(['--company-id' => Uuid::uuid7()->toString(), '--limit' => '-1']);
 
         self::assertSame(Command::FAILURE, $exit);
     }
@@ -133,8 +159,8 @@ final class WbFinancialReportsReconcileLegacyCommandTest extends IntegrationTest
         [$company, $connection] = $this->seedWbConnection();
         $this->seedRaw($company, '2026-01-05', PipelineStatus::COMPLETED, 1, 'legacy::old-api');
 
-        $this->tester()->execute(['--from' => '2026-01-05', '--to' => '2026-01-05']);
-        $this->tester()->execute(['--from' => '2026-01-05', '--to' => '2026-01-05']);
+        $this->tester()->execute(['--company-id' => $company->getId(), '--from' => '2026-01-05', '--to' => '2026-01-05']);
+        $this->tester()->execute(['--company-id' => $company->getId(), '--from' => '2026-01-05', '--to' => '2026-01-05']);
 
         self::assertSame(1, $this->countStatuses($company->getId(), $connection->getId()));
     }
@@ -205,10 +231,16 @@ final class WbFinancialReportsReconcileLegacyCommandTest extends IntegrationTest
         ]);
     }
 
-    private function tester(): CommandTester
+    private function tester(bool $legacyEnabled = true): CommandTester
     {
-        $app = new Application(self::bootKernel());
+        $command = new WbFinancialReportsReconcileLegacyCommand(
+            self::getContainer()->get(Connection::class),
+            self::getContainer()->get(WbFinancialReportPeriodResolver::class),
+            self::getContainer()->get(MarketplaceFinancialReportSyncStatusRepository::class),
+            $this->em,
+            $legacyEnabled,
+        );
 
-        return new CommandTester($app->find('app:marketplace:wb-financial-reports:reconcile-legacy'));
+        return new CommandTester($command);
     }
 }
