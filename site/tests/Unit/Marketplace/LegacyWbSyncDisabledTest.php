@@ -8,7 +8,9 @@ use App\Company\Facade\CompanyFacade;
 use App\Marketplace\Application\Command\FetchMarketplaceDataCommand;
 use App\Marketplace\Application\FetchMarketplaceDataAction;
 use App\Marketplace\Application\ProcessRawDocumentAction;
+use App\Marketplace\Application\Service\WbFinancialReportSyncPlanner;
 use App\Marketplace\Command\MarketplaceSyncCommand;
+use App\Marketplace\Command\WbFinancialReportsSyncCommand;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Facade\MarketplaceSyncFacade;
 use App\Marketplace\Infrastructure\Api\MarketplaceFetcherRegistry;
@@ -16,9 +18,9 @@ use App\Marketplace\Infrastructure\Api\Wildberries\WbFetcher;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Doctrine\ORM\EntityManagerInterface;
-use DomainException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
@@ -32,10 +34,32 @@ final class LegacyWbSyncDisabledTest extends TestCase
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
 
+        $facadeLogger = $this->createMock(LoggerInterface::class);
+        $facadeLogger->expects(self::never())->method('error');
+
+        $commandLogger = $this->createMock(LoggerInterface::class);
+        $commandLogger->expects(self::once())
+            ->method('error')
+            ->with(
+                'Legacy WB sync fail-fast triggered.',
+                self::callback(static function (array $context): bool {
+                    self::assertSame('legacy_wb_sync_fail_fast', $context['legacy_event']);
+                    self::assertNull($context['company_id']);
+                    self::assertNull($context['connection_id']);
+                    self::assertSame(MarketplaceSyncCommand::class, $context['command_class']);
+                    self::assertNull($context['message_class']);
+                    self::assertStringContainsString(WbFinancialReportsSyncCommand::class, $context['recommended_replacement']);
+                    self::assertStringContainsString('app:marketplace:wb-financial-reports:sync', $context['recommended_replacement']);
+
+                    return true;
+                }),
+            );
+
         $command = new MarketplaceSyncCommand(
             self::uninitialized(MarketplaceConnectionRepository::class),
-            new MarketplaceSyncFacade(self::uninitialized(ProcessRawDocumentAction::class), $bus),
+            new MarketplaceSyncFacade(self::uninitialized(ProcessRawDocumentAction::class), $bus, $facadeLogger),
             self::uninitialized(CompanyFacade::class),
+            $commandLogger,
         );
         self::assertSame('marketplace:sync', $command->getName());
 
@@ -53,9 +77,29 @@ final class LegacyWbSyncDisabledTest extends TestCase
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
 
-        $facade = new MarketplaceSyncFacade(self::uninitialized(ProcessRawDocumentAction::class), $bus);
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('error')
+            ->with(
+                'Legacy WB sync facade fail-fast triggered.',
+                self::callback(static function (array $context): bool {
+                    self::assertSame('legacy_wb_sync_fail_fast', $context['legacy_event']);
+                    self::assertSame('company-id', $context['company_id']);
+                    self::assertNull($context['connection_id']);
+                    self::assertNull($context['command_class']);
+                    self::assertSame(MarketplaceSyncFacade::class, $context['entrypoint_class']);
+                    self::assertIsString($context['entrypoint_method']);
+                    self::assertNull($context['message_class']);
+                    self::assertStringContainsString(WbFinancialReportSyncPlanner::class, $context['recommended_replacement']);
+                    self::assertStringContainsString('app:marketplace:wb-financial-reports:sync', $context['recommended_replacement']);
 
-        $this->expectException(DomainException::class);
+                    return true;
+                }),
+            );
+
+        $facade = new MarketplaceSyncFacade(self::uninitialized(ProcessRawDocumentAction::class), $bus, $logger);
+
+        $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('Legacy WB sync отключён');
         $this->expectExceptionMessage('WbFinancialReportSyncPlanner');
         $this->expectExceptionMessage('app:marketplace:wb-financial-reports:sync');
@@ -83,8 +127,7 @@ final class LegacyWbSyncDisabledTest extends TestCase
         string $methodName,
         string $expectedProcessKind,
         MarketplaceType $marketplace,
-    ): void
-    {
+    ): void {
         $fromDate = new \DateTimeImmutable('2026-01-01');
         $toDate = new \DateTimeImmutable('2026-01-02');
 
@@ -103,7 +146,10 @@ final class LegacyWbSyncDisabledTest extends TestCase
             }))
             ->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
 
-        $facade = new MarketplaceSyncFacade(self::uninitialized(ProcessRawDocumentAction::class), $bus);
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::never())->method('error');
+
+        $facade = new MarketplaceSyncFacade(self::uninitialized(ProcessRawDocumentAction::class), $bus, $logger);
 
         self::assertSame(0, $facade->{$methodName}('company-id', $marketplace, $fromDate, $toDate));
     }
