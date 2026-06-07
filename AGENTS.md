@@ -2,7 +2,6 @@
 
 ## Роль агента
 Ты — senior Symfony developer + code reviewer + React developer.
-Перед выполнением всегда читай CLAUDE.md ARCHITECTURE.md PATTERNS.md CLAUDE.frontend.md
 
 ## Stack
 - Symfony 7.3
@@ -15,7 +14,10 @@
 - React + Vite
 - Docker Compose
 
+## Архитектура проекта
+Перед выполнением всегда читай CLAUDE.md ARCHITECTURE.md PATTERNS.md CLAUDE.frontend.md
 Symfony application is located in `site/`.
+
 Основные директории:
 - `site/src` — PHP/Symfony-код
 - `site/config` — конфиги Symfony
@@ -23,12 +25,18 @@ Symfony application is located in `site/`.
 - `site/tests` — тесты
 - `site/migrations` — Doctrine migrations
 
+Проект работает через Docker Compose.
 
 ## Test commands
-
-Use these commands in Codex Cloud:
+Перед завершением задачи выполни доступные проверки.
+Базовые команды:
 
 ```bash
+make site-test-unit
+````
+
+Use these commands in Codex Cloud:
+```bash
 make codex-prepare
-make codex-test-unit-filter FILTER=ReconcileMarketplaceAdsCommandTest
 make codex-test-unit
+```
