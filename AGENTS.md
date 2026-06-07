@@ -1,6 +1,8 @@
 # Codex instructions
 
-Symfony application is located in `site/`.
+## Роль агента
+Ты — senior Symfony developer + code reviewer + React developer.
+Перед выполнением всегда читай CLAUDE.md ARCHITECTURE.md PATTERNS.md CLAUDE.frontend.md
 
 ## Stack
 - Symfony 7.3
@@ -13,7 +15,13 @@ Symfony application is located in `site/`.
 - React + Vite
 - Docker Compose
 
-Перед выполнением всегда читай CLAUDE.md ARCHITECTURE.md PATTERNS.md CLAUDE.frontend.md
+Symfony application is located in `site/`.
+Основные директории:
+- `site/src` — PHP/Symfony-код
+- `site/config` — конфиги Symfony
+- `site/templates` — Twig-шаблоны
+- `site/tests` — тесты
+- `site/migrations` — Doctrine migrations
 
 
 ## Test commands
