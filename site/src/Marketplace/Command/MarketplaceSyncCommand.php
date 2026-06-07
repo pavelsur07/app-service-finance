@@ -1,13 +1,16 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Marketplace\Command;
 
 use App\Company\Entity\Company;
-use App\Marketplace\Facade\MarketplaceSyncFacade;
+use App\Company\Facade\CompanyFacade;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Facade\MarketplaceSyncFacade;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
-use App\Company\Facade\CompanyFacade;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -15,6 +18,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 #[AsCommand(
     name: 'marketplace:sync',
@@ -34,6 +38,8 @@ class MarketplaceSyncCommand extends Command
         private readonly MarketplaceConnectionRepository $connectionRepository,
         private readonly MarketplaceSyncFacade $syncFacade,
         private readonly CompanyFacade $companyFacade,
+        #[Autowire(service: 'monolog.logger.legacy_wb_sync')]
+        private readonly LoggerInterface $logger,
     ) {
         parent::__construct();
     }
@@ -63,6 +69,15 @@ class MarketplaceSyncCommand extends Command
         }
 
         if (MarketplaceType::WILDBERRIES === $marketplace) {
+            $this->logger->error('Legacy WB sync fail-fast triggered.', [
+                'legacy_event' => 'legacy_wb_sync_fail_fast',
+                'company_id' => is_string($companyId) && '' !== $companyId ? $companyId : null,
+                'connection_id' => null,
+                'command_class' => self::class,
+                'message_class' => null,
+                'recommended_replacement' => sprintf('%s (%s)', WbFinancialReportsSyncCommand::class, self::WB_FINANCIAL_REPORTS_SYNC_COMMAND),
+            ]);
+
             $io->error(sprintf(
                 'Legacy WB sync отключён. Используйте новую команду: %s',
                 self::WB_FINANCIAL_REPORTS_SYNC_COMMAND,
