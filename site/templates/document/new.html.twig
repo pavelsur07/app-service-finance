@@ -123,6 +123,7 @@
                 collectionHolder.appendChild(card);
                 prefillOperationCounterparty(card);
                 prefillOperationProject(card);
+                card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             });
 
             collectionHolder.addEventListener('click', function(e){

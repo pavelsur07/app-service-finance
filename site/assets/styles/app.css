@@ -217,3 +217,16 @@ aside.navbar .navbar-brand {
 .vf-sidebar-company-name {
     word-break: break-word;
 }
+
+/* В layout-fluid-vertical основной контент должен расти по высоте и прокручиваться
+   вместе со страницей, иначе динамически добавленные блоки формы могут оказаться
+   ниже viewport без доступной прокрутки. */
+body.layout-fluid-vertical {
+    overflow-y: auto;
+}
+
+body.layout-fluid-vertical .page,
+body.layout-fluid-vertical .page-wrapper {
+    min-height: 100vh;
+    height: auto;
+}
