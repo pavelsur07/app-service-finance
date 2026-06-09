@@ -47,6 +47,16 @@
     </div>
     <div class="mt-3">
         <div class="card">
+            <div class="card-header">
+                <button type="button"
+                        class="btn"
+                        data-bs-toggle="offcanvas"
+                        data-bs-target="#document-filters-offcanvas"
+                        aria-controls="document-filters-offcanvas">
+                    <i class="ti ti-filter"></i>
+                    Фильтр
+                </button>
+            </div>
             <div class="table-responsive">
                 <table class="table card-table align-middle">
                     <thead>
@@ -151,6 +161,61 @@
                     {% include 'partials/_pagerfanta.html.twig' with { pager: pager, route: 'document_index', params: app.request.query.all|merge({'limit': limit}) } %}
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="document-filters-offcanvas" aria-labelledby="document-filters-offcanvas-label">
+        <div class="offcanvas-header">
+            <h2 class="offcanvas-title" id="document-filters-offcanvas-label">Фильтры</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Закрыть"></button>
+        </div>
+        <div class="offcanvas-body">
+            <form method="get" class="d-flex flex-column gap-4">
+                <input type="hidden" name="page" value="1">
+                <input type="hidden" name="limit" value="{{ limit }}">
+
+                <div class="row g-3">
+                    <div class="col-12 col-sm-6">
+                        <label class="form-label" for="document-filter-date-from">Дата с</label>
+                        <input type="date" id="document-filter-date-from" name="dateFrom" value="{{ app.request.query.get('dateFrom') }}" class="form-control" />
+                    </div>
+                    <div class="col-12 col-sm-6">
+                        <label class="form-label" for="document-filter-date-to">Дата по</label>
+                        <input type="date" id="document-filter-date-to" name="dateTo" value="{{ app.request.query.get('dateTo') }}" class="form-control" />
+                    </div>
+                    <div class="col-12 col-sm-6">
+                        <label class="form-label" for="document-filter-type">Тип</label>
+                        <select id="document-filter-type" name="type" class="form-select">
+                            <option value="">Все</option>
+                            {% for value, label in typeShortLabels %}
+                                <option value="{{ value }}" {% if app.request.query.get('type') == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12 col-sm-6">
+                        <label class="form-label" for="document-filter-status">Статус</label>
+                        <select id="document-filter-status" name="status" class="form-select">
+                            <option value="">Все</option>
+                            {% for value, label in statusLabels %}
+                                <option value="{{ value }}" {% if app.request.query.get('status') == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12 col-sm-6">
+                        <label class="form-label" for="document-filter-number">Номер документа</label>
+                        <input type="text" id="document-filter-number" name="number" value="{{ app.request.query.get('number') }}" class="form-control" />
+                    </div>
+                    <div class="col-12 col-sm-6">
+                        <label class="form-label" for="document-filter-counterparty">Контрагент</label>
+                        <input type="text" id="document-filter-counterparty" name="counterparty" value="{{ app.request.query.get('counterparty') }}" class="form-control" />
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary">Применить</button>
+                    <a href="{{ path('document_index', {'limit': limit}) }}" class="btn btn-outline-secondary">Сбросить</a>
+                </div>
+            </form>
         </div>
     </div>
 {% endblock %}
