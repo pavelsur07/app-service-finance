@@ -64,6 +64,7 @@
                             <th class="text-nowrap">Дата</th>
                             <th>Тип</th>
                             <th class="text-nowrap">Н док.</th>
+                            <th>Проект</th>
                             <th>Контрагент</th>
                             <th class="text-end text-nowrap">Доход, ₽</th>
                             <th class="text-end text-nowrap">Расход, ₽</th>
@@ -106,6 +107,7 @@
                                     <div class="text-muted small">{{ item.description }}</div>
                                 </td>
                                 <td class="text-nowrap">{{ item.number ?: '—' }}</td>
+                                <td>{{ item.projectDirection ? item.projectDirection.name : '-' }}</td>
                                 <td>{{ item.counterparty ? item.counterparty.name : '—' }}</td>
                                 <td class="text-end text-success text-nowrap">{{ income ? income|number_format(0, ',', ' ') : '—' }}</td>
                                 <td class="text-end text-danger text-nowrap">{{ expense ? expense|number_format(0, ',', ' ') : '—' }}</td>
@@ -142,7 +144,7 @@
                                 </td>
                             </tr>
                         {% else %}
-                            <tr><td colspan="8" class="text-center">Нет данных</td></tr>
+                            <tr><td colspan="9" class="text-center">Нет данных</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>

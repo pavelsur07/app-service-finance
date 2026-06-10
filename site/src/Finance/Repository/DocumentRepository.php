@@ -28,6 +28,8 @@ class DocumentRepository extends ServiceEntityRepository
         $page = max(1, $dto->page);
 
         $queryBuilder = $this->createQueryBuilder('d')
+            ->addSelect('pd')
+            ->leftJoin('d.projectDirection', 'pd')
             ->andWhere('d.company = :company')
             ->setParameter('company', $dto->company)
             ->orderBy('d.date', 'DESC');
