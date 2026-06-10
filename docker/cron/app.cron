@@ -17,6 +17,11 @@
 # Временно отключено: восстановление пропущенных дней
 #10 * * * * cd /app && php bin/console app:marketplace:wb-financial-reports:sync --mode=missing --max-days=1 --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# Оркестрация WB financial reports: каждый час проверяет последние 7 дней.
+# Команда сама учитывает cooldown/LockableTrait и ставит не больше одной задачи на подключение;
+# при отсутствии sync-status за день планирует загрузку как recent missing.
+20 * * * * cd /app && php bin/console app:marketplace:wb-financial-reports:orchestrate --retry-window-days=7 --refresh-days-back=2 --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Ночная синхронизация отчётов Ozon по реализации.
 0 4 * * * php bin/console app:marketplace:ozon-daily-sync --no-interaction
 
