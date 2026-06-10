@@ -63,8 +63,6 @@
                     <th>Marketplace/source</th>
                     <th>SKU</th>
                     <th>Offer ID</th>
-                    <th>Листинг</th>
-                    <th>Product</th>
                     <th>fulfillmentType</th>
                     <th>Остаток</th>
                     <th>Зарезервировано</th>
@@ -79,8 +77,6 @@
                         <td><span class="badge bg-azure-lt">{{ row.source|upper }}</span></td>
                         <td>{{ row.source_sku ?: '—' }}</td>
                         <td>{{ row.source_offer_id ?: '—' }}</td>
-                        <td>{{ row.listing_id ?: '—' }}</td>
-                        <td>{{ row.product_id ?: '—' }}</td>
                         <td>{{ row.fulfillment_type ?: '—' }}</td>
                         <td>{{ row.quantity }}</td>
                         <td>{{ row.reserved_quantity }}</td>
@@ -96,7 +92,7 @@
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="11" class="text-center text-muted py-4">Нет нормализованных остатков по выбранным фильтрам.</td>
+                        <td colspan="9" class="text-center text-muted py-4">Нет нормализованных остатков по выбранным фильтрам.</td>
                     </tr>
                 {% endfor %}
                 </tbody>

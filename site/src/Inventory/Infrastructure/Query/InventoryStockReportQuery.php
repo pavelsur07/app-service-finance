@@ -90,8 +90,6 @@ final class InventoryStockReportQuery
                 's.source',
                 's.source_sku',
                 's.source_offer_id',
-                's.listing_id',
-                's.product_id',
                 's.fulfillment_type',
                 's.quantity',
                 's.reserved_quantity',
