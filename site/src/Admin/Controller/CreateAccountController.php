@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace App\Admin\Controller;
 
 use App\Admin\Application\CreateAccountAction;
+use App\Admin\Form\AdminAccountCreateType;
 use App\Company\Entity\User;
-use App\Company\Form\RegistrationFormType;
 use App\Repository\UserRepository;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\Form\FormError;
 use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -21,22 +20,14 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted('ROLE_ADMIN')]
 final class CreateAccountController extends AbstractController
 {
-    private const GENERIC_ACCOUNT_ERROR = 'Не удалось создать аккаунт. Попробуйте позже.';
-
     public function __invoke(
         Request $request,
         UserRepository $userRepository,
         CreateAccountAction $createAccount,
     ): Response {
         $account = new User(id: Uuid::uuid7()->toString());
-        $accountForm = $this->createForm(RegistrationFormType::class, $account, [
-            'is_invite' => false,
-        ]);
+        $accountForm = $this->createForm(AdminAccountCreateType::class, $account);
         $accountForm->handleRequest($request);
-
-        if ($accountForm->isSubmitted() && $accountForm->get('website')->getData()) {
-            $accountForm->addError(new FormError(self::GENERIC_ACCOUNT_ERROR));
-        }
 
         if (!$accountForm->isSubmitted() || !$accountForm->isValid()) {
             return $this->renderUserIndex($request, $userRepository, $accountForm);
