@@ -105,7 +105,7 @@
   <div class="modal modal-blur fade" id="account-create-modal" tabindex="-1" aria-labelledby="account-create-modal-title" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
       <div class="modal-content">
-        {{ form_start(accountForm, { action: path('admin_user_index'), method: 'POST' }) }}
+        {{ form_start(accountForm, { action: path('admin_user_create_account'), method: 'POST' }) }}
           <div class="modal-header">
             <h5 class="modal-title" id="account-create-modal-title">Добавить аккаунт</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
