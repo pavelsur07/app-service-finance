@@ -8,6 +8,17 @@
       <div class="col">
         <h2 class="page-title">{{ title }}</h2>
       </div>
+      <div class="col-auto ms-auto">
+        <button
+          type="button"
+          class="btn btn-primary"
+          data-bs-toggle="modal"
+          data-bs-target="#account-create-modal"
+        >
+          <i class="ti ti-plus me-1"></i>
+          Добавить аккаунт
+        </button>
+      </div>
     </div>
   </div>
 
@@ -90,4 +101,85 @@
       {% include 'partials/_pagerfanta.html.twig' with { pager: pager } %}
     </div>
   </div>
+
+  <div class="modal modal-blur fade" id="account-create-modal" tabindex="-1" aria-labelledby="account-create-modal-title" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+      <div class="modal-content">
+        {{ form_start(accountForm, { action: path('admin_user_index'), method: 'POST' }) }}
+          <div class="modal-header">
+            <h5 class="modal-title" id="account-create-modal-title">Добавить аккаунт</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+          </div>
+          <div class="modal-body">
+            {% if accountForm.vars.errors|length > 0 %}
+              <div class="alert alert-danger" role="alert">
+                {{ form_errors(accountForm) }}
+              </div>
+            {% endif %}
+
+            <div class="row g-3">
+              <div class="col-12">
+                {{ form_label(accountForm.email, 'Email', { label_attr: { class: 'form-label' } }) }}
+                {{ form_widget(accountForm.email, {
+                  attr: { class: 'form-control', placeholder: 'user@example.com', autocomplete: 'email' }
+                }) }}
+                {{ form_errors(accountForm.email) }}
+              </div>
+
+              <div class="col-12">
+                {{ form_label(accountForm.plainPassword, 'Пароль', { label_attr: { class: 'form-label' } }) }}
+                {{ form_widget(accountForm.plainPassword, {
+                  attr: { class: 'form-control', placeholder: '••••••••', autocomplete: 'new-password' }
+                }) }}
+                {{ form_errors(accountForm.plainPassword) }}
+              </div>
+
+              <div class="col-12">
+                {{ form_label(accountForm.companyName, 'Название компании', { label_attr: { class: 'form-label' } }) }}
+                {{ form_widget(accountForm.companyName, {
+                  attr: { class: 'form-control', placeholder: 'ООО Ромашка' }
+                }) }}
+                {{ form_errors(accountForm.companyName) }}
+              </div>
+
+              <div class="col-12">
+                <label class="form-check">
+                  {{ form_widget(accountForm.agreeTerms, { attr: { class: 'form-check-input' } }) }}
+                  <span class="form-check-label">{{ accountForm.agreeTerms.vars.label }}</span>
+                </label>
+                {{ form_errors(accountForm.agreeTerms) }}
+              </div>
+
+              <div class="d-none" aria-hidden="true">
+                {{ form_widget(accountForm.website) }}
+                {{ form_errors(accountForm.website) }}
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Отмена</button>
+            <button type="submit" class="btn btn-primary ms-auto">
+              <i class="ti ti-plus me-1"></i>
+              Создать аккаунт
+            </button>
+          </div>
+        {{ form_end(accountForm) }}
+      </div>
+    </div>
+  </div>
+
+{% endblock %}
+
+{% block admin_scripts %}
+  {{ parent() }}
+  {% if showAccountModal %}
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const modalElement = document.getElementById('account-create-modal');
+        if (modalElement && window.bootstrap) {
+          window.bootstrap.Modal.getOrCreateInstance(modalElement).show();
+        }
+      });
+    </script>
+  {% endif %}
 {% endblock %}
