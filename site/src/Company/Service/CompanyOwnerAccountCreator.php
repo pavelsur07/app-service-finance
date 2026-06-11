@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Company\Service;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\CompanyMember;
 use App\Company\Entity\User;
+use App\Company\Repository\CompanyMemberRepository;
 use App\Message\SendRegistrationEmailMessage;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -18,6 +20,7 @@ final readonly class CompanyOwnerAccountCreator
         private UserPasswordHasherInterface $userPasswordHasher,
         private EntityManagerInterface $entityManager,
         private MessageBusInterface $bus,
+        private CompanyMemberRepository $companyMemberRepository,
     ) {
     }
 
@@ -36,6 +39,17 @@ final readonly class CompanyOwnerAccountCreator
 
         $this->entityManager->persist($user);
         $this->entityManager->persist($company);
+
+        if (null === $this->companyMemberRepository->findOneByCompanyAndUser($company, $user)) {
+            $companyMember = new CompanyMember(
+                id: Uuid::uuid4()->toString(),
+                company: $company,
+                user: $user,
+                role: CompanyMember::ROLE_OWNER,
+            );
+            $this->entityManager->persist($companyMember);
+        }
+
         $this->entityManager->flush();
 
         if ($sendRegistrationEmail) {
