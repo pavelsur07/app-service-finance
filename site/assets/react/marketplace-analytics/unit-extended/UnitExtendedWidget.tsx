@@ -4,6 +4,8 @@ import { useWidgets } from './widgets/useWidgets';
 import WidgetsGrid from './widgets/WidgetsGrid';
 import { ErrorBoundary } from '../../shared/ui/ErrorBoundary';
 import { getMonthRange } from '../utils/utils';
+import { getMonthPeriodKey, getPeriodKeyForRange, getPeriodRange, normalizePeriod } from '../components/PeriodPresets';
+import type { PeriodKey } from '../components/PeriodPresets';
 import type { MarketplaceOption } from '../types/analytics.types';
 import UnitExtendedFilters from './UnitExtendedFilters';
 import UnitExtendedTable from './UnitExtendedTable';
@@ -17,23 +19,52 @@ interface Filters {
     marketplace: string;
     dateFrom: string;
     dateTo: string;
+    period: PeriodKey;
 }
 
 function getFiltersFromUrl(): Filters {
     const params = new URLSearchParams(window.location.search);
     const currentMonth = getMonthRange(0);
+    const currentMonthPeriod = getMonthPeriodKey(new Date());
+    const urlDateFrom = params.get('dateFrom') ?? params.get('from');
+    const urlDateTo = params.get('dateTo') ?? params.get('to');
+
+    if (params.has('period')) {
+        const requestedPeriod = normalizePeriod(params.get('period'));
+        const requestedRange = getPeriodRange(requestedPeriod);
+
+        return {
+            marketplace: params.get('marketplace') ?? 'ozon',
+            dateFrom: requestedPeriod === 'custom'
+                ? (urlDateFrom ?? currentMonth.from)
+                : (requestedRange?.from ?? currentMonth.from),
+            dateTo: requestedPeriod === 'custom'
+                ? (urlDateTo ?? currentMonth.to)
+                : (requestedRange?.to ?? currentMonth.to),
+            period: requestedRange === null && requestedPeriod !== 'custom' ? 'custom' : requestedPeriod,
+        };
+    }
+
+    const hasAnyDateParam = Boolean(urlDateFrom || urlDateTo);
+    const inferredPeriod = urlDateFrom && urlDateTo
+        ? getPeriodKeyForRange(urlDateFrom, urlDateTo)
+        : (hasAnyDateParam ? 'custom' : currentMonthPeriod);
+    const inferredRange = getPeriodRange(inferredPeriod);
+
     return {
         marketplace: params.get('marketplace') ?? 'ozon',
-        dateFrom: params.get('from') ?? currentMonth.from,
-        dateTo: params.get('to') ?? currentMonth.to,
+        dateFrom: urlDateFrom ?? inferredRange?.from ?? currentMonth.from,
+        dateTo: urlDateTo ?? inferredRange?.to ?? currentMonth.to,
+        period: inferredPeriod,
     };
 }
 
 function setFiltersToUrl(filters: Filters): void {
     const params = new URLSearchParams();
     if (filters.marketplace) params.set('marketplace', filters.marketplace);
-    if (filters.dateFrom) params.set('from', filters.dateFrom);
-    if (filters.dateTo) params.set('to', filters.dateTo);
+    if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
+    if (filters.dateTo) params.set('dateTo', filters.dateTo);
+    params.set('period', filters.period);
     const search = params.toString();
     window.history.replaceState(null, '', window.location.pathname + (search ? `?${search}` : ''));
 }
@@ -62,15 +93,15 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces })
     }, []);
 
     const handleDateFromChange = useCallback((date: string) => {
-        setFilters((prev) => ({ ...prev, dateFrom: date }));
+        setFilters((prev) => ({ ...prev, dateFrom: date, period: 'custom' }));
     }, []);
 
     const handleDateToChange = useCallback((date: string) => {
-        setFilters((prev) => ({ ...prev, dateTo: date }));
+        setFilters((prev) => ({ ...prev, dateTo: date, period: 'custom' }));
     }, []);
 
-    const handleDateRangeChange = useCallback((from: string, to: string) => {
-        setFilters((prev) => ({ ...prev, dateFrom: from, dateTo: to }));
+    const handleDateRangeChange = useCallback((from: string, to: string, period: PeriodKey) => {
+        setFilters((prev) => ({ ...prev, dateFrom: from, dateTo: to, period }));
     }, []);
 
     return (
@@ -88,6 +119,7 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces })
                 marketplace={filters.marketplace}
                 dateFrom={filters.dateFrom}
                 dateTo={filters.dateTo}
+                period={filters.period}
                 onMarketplaceChange={handleMarketplaceChange}
                 onDateFromChange={handleDateFromChange}
                 onDateToChange={handleDateToChange}

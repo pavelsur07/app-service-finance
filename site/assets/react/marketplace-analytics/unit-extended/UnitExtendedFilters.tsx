@@ -1,5 +1,6 @@
 import React from 'react';
 import PeriodPresets from '../components/PeriodPresets';
+import type { PeriodKey } from '../components/PeriodPresets';
 import type { MarketplaceOption } from '../types/analytics.types';
 
 interface UnitExtendedFiltersProps {
@@ -7,10 +8,11 @@ interface UnitExtendedFiltersProps {
     marketplace: string;
     dateFrom: string;
     dateTo: string;
+    period: PeriodKey;
     onMarketplaceChange: (mp: string) => void;
     onDateFromChange: (date: string) => void;
     onDateToChange: (date: string) => void;
-    onDateRangeChange: (from: string, to: string) => void;
+    onDateRangeChange: (from: string, to: string, period: PeriodKey) => void;
 }
 
 const UnitExtendedFilters: React.FC<UnitExtendedFiltersProps> = ({
@@ -18,6 +20,7 @@ const UnitExtendedFilters: React.FC<UnitExtendedFiltersProps> = ({
     marketplace,
     dateFrom,
     dateTo,
+    period,
     onMarketplaceChange,
     onDateFromChange,
     onDateToChange,
@@ -26,8 +29,7 @@ const UnitExtendedFilters: React.FC<UnitExtendedFiltersProps> = ({
     <>
         <PeriodPresets
             onSelect={onDateRangeChange}
-            currentFrom={dateFrom}
-            currentTo={dateTo}
+            currentPeriod={period}
         />
 
         <div className="row g-2 mb-3">
@@ -49,6 +51,7 @@ const UnitExtendedFilters: React.FC<UnitExtendedFiltersProps> = ({
                     type="date"
                     className="form-control"
                     value={dateFrom}
+                    aria-label="Дата с"
                     onChange={(e) => onDateFromChange(e.target.value)}
                 />
             </div>
@@ -57,6 +60,7 @@ const UnitExtendedFilters: React.FC<UnitExtendedFiltersProps> = ({
                     type="date"
                     className="form-control"
                     value={dateTo}
+                    aria-label="Дата по"
                     onChange={(e) => onDateToChange(e.target.value)}
                 />
             </div>
