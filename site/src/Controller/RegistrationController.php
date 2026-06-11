@@ -1,14 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Controller;
 
-use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\Company\Form\RegistrationFormType;
 use App\Company\Repository\CompanyInviteRepository;
 use App\Company\Service\CompanyInviteManager;
+use App\Company\Service\CompanyOwnerAccountCreator;
 use App\Company\Service\InviteTokenService;
-use App\Message\SendRegistrationEmailMessage;
 use App\Shared\Service\RateLimiter\RegistrationRateLimiter;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -17,11 +18,10 @@ use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
-class RegistrationController extends AbstractController
+final class RegistrationController extends AbstractController
 {
     private const GENERIC_REG_ERROR = 'Не удалось создать аккаунт. Попробуйте позже.';
 
@@ -31,11 +31,11 @@ class RegistrationController extends AbstractController
         UserPasswordHasherInterface $userPasswordHasher,
         Security $security,
         EntityManagerInterface $entityManager,
-        MessageBusInterface $bus,
         RegistrationRateLimiter $registrationRateLimiter,
         CompanyInviteManager $inviteManager,
         CompanyInviteRepository $inviteRepository,
         InviteTokenService $tokenService,
+        CompanyOwnerAccountCreator $companyOwnerAccountCreator,
     ): Response {
         $user = new User(id: Uuid::uuid4()->toString());
         $inviteToken = $request->query->get('invite');
@@ -70,16 +70,11 @@ class RegistrationController extends AbstractController
             /** @var string $plainPassword */
             $plainPassword = (string) $form->get('plainPassword')->getData();
 
-            $user->setPassword($userPasswordHasher->hashPassword($user, $plainPassword));
             if ($isInvite) {
+                $user->setPassword($userPasswordHasher->hashPassword($user, $plainPassword));
                 $user->setRoles(['ROLE_COMPANY_USER']);
-            } else {
-                $user->setRoles(['ROLE_COMPANY_OWNER']);
-            }
+                $entityManager->persist($user);
 
-            $entityManager->persist($user);
-
-            if ($isInvite) {
                 $tokenHash = $tokenService->hashToken($inviteToken);
                 $invite = $inviteRepository->findOneByTokenHash($tokenHash);
                 if (!$invite) {
@@ -90,19 +85,12 @@ class RegistrationController extends AbstractController
                 $inviteManager->acceptInvite($inviteToken, $user);
                 $request->getSession()->set('active_company_id', $companyId);
             } else {
-                $company = new Company(Uuid::uuid4()->toString(), $user);
-                $companyName = trim((string) $form->get('companyName')->getData());
-                $company->setName($companyName);
-                $user->addCompany($company);
-                $entityManager->persist($company);
-
-                $entityManager->flush();
-                $createdAt = new \DateTimeImmutable();
-                $bus->dispatch(new SendRegistrationEmailMessage(
-                    userId: $user->getId(),
-                    companyId: $company->getId(),
-                    createdAt: $createdAt,
-                ));
+                $companyOwnerAccountCreator->create(
+                    user: $user,
+                    plainPassword: $plainPassword,
+                    companyName: (string) $form->get('companyName')->getData(),
+                    sendRegistrationEmail: true,
+                );
             }
 
             // Мгновенный логин
