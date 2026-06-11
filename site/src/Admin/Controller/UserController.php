@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Admin\Controller;
 
-use App\Admin\Application\CreateAccountAction;
 use App\Admin\Service\UserDeletionService;
 use App\Company\Entity\User;
 use App\Company\Form\RegistrationFormType;
@@ -12,16 +11,16 @@ use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\Form\FormError;
+use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/admin/users', name: 'admin_user_')]
+#[IsGranted('ROLE_ADMIN')]
 final class UserController extends AbstractController
 {
-    private const GENERIC_ACCOUNT_ERROR = 'Не удалось создать аккаунт. Попробуйте позже.';
-
     /**
      * @var array<string, string>
      */
@@ -31,34 +30,30 @@ final class UserController extends AbstractController
         'ROLE_COMPANY_USER' => 'Сотрудник компании',
     ];
 
-    #[Route('', name: 'index', methods: ['GET', 'POST'])]
+    #[Route('', name: 'index', methods: ['GET'])]
     public function index(
         Request $request,
         UserRepository $userRepository,
-        CreateAccountAction $createAccount,
     ): Response {
         $account = new User(id: Uuid::uuid7()->toString());
-        $accountForm = $this->createForm(RegistrationFormType::class, $account, [
+        $accountForm = $this->createAccountForm($account);
+
+        return $this->renderUserIndex($request, $userRepository, $accountForm, false);
+    }
+
+    private function createAccountForm(User $account): FormInterface
+    {
+        return $this->createForm(RegistrationFormType::class, $account, [
             'is_invite' => false,
         ]);
-        $accountForm->handleRequest($request);
+    }
 
-        if ($accountForm->isSubmitted() && $accountForm->get('website')->getData()) {
-            $accountForm->addError(new FormError(self::GENERIC_ACCOUNT_ERROR));
-        }
-
-        if ($accountForm->isSubmitted() && $accountForm->isValid()) {
-            /** @var string $plainPassword */
-            $plainPassword = (string) $accountForm->get('plainPassword')->getData();
-            $companyName = (string) $accountForm->get('companyName')->getData();
-
-            $createAccount($account, $plainPassword, $companyName);
-
-            $this->addFlash('success', sprintf('Аккаунт %s успешно создан.', $account->getEmail()));
-
-            return $this->redirectToRoute('admin_user_index');
-        }
-
+    private function renderUserIndex(
+        Request $request,
+        UserRepository $userRepository,
+        FormInterface $accountForm,
+        bool $showAccountModal,
+    ): Response {
         $lastWeek = new \DateTimeImmutable('-7 days');
         $page = max(1, (int) $request->query->get('page', 1));
         $pager = $userRepository->getRegisteredUsers($page);
@@ -71,7 +66,7 @@ final class UserController extends AbstractController
             'totalUsers' => $userRepository->countRegisteredUsers(),
             'recentUsers' => $userRepository->countRegisteredUsersSince($lastWeek),
             'accountForm' => $accountForm,
-            'showAccountModal' => $accountForm->isSubmitted() && !$accountForm->isValid(),
+            'showAccountModal' => $showAccountModal,
         ]);
     }
 
