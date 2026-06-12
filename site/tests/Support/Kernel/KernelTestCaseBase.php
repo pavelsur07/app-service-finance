@@ -21,6 +21,12 @@ abstract class KernelTestCaseBase extends KernelTestCase
 
     protected function resetDb(): void
     {
+        if (class_exists(\DAMA\DoctrineTestBundle\PHPUnit\PHPUnitExtension::class)
+            && \DAMA\DoctrineTestBundle\PHPUnit\PHPUnitExtension::$transactionStarted
+        ) {
+            return;
+        }
+
         (new DbReset())->reset($this->em());
     }
 }

@@ -17,7 +17,7 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\MarketplaceAds\AdLoadJobBuilder;
 use App\Tests\Builders\MarketplaceAds\AdScheduledBatchBuilder;
-use App\Tests\Support\Kernel\IntegrationTestCase;
+use App\Tests\Support\Kernel\PostgresResetTestCase;
 use Doctrine\DBAL\DriverManager;
 use PHPUnit\Framework\MockObject\MockObject;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -37,7 +37,7 @@ use Symfony\Component\Console\Tester\CommandTester;
  *  - FOR UPDATE SKIP LOCKED → параллельный worker при заблокированном row
  *    видит null и не перехватывает тот же батч.
  */
-final class AdBatchSchedulerCommandTest extends IntegrationTestCase
+final class AdBatchSchedulerCommandTest extends PostgresResetTestCase
 {
     private const COMPANY_ID = '11111111-1111-1111-1111-000000000001';
     private const OWNER_ID = '22222222-2222-2222-2222-000000000001';

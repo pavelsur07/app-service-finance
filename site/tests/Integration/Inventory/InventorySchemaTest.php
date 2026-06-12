@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Inventory;
 
-use App\Tests\Support\Kernel\IntegrationTestCase;
+use App\Tests\Support\Kernel\PostgresResetTestCase;
 
-final class InventorySchemaTest extends IntegrationTestCase
+final class InventorySchemaTest extends PostgresResetTestCase
 {
     public function testInventoryTablesColumnsAndIndexesExistWithExpectedDefinitions(): void
     {
