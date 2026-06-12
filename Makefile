@@ -39,6 +39,66 @@ site-cs-fix:
     #docker-compose run --rm site-php-cli composer cs:phpcs   # Проверка через phpcs (PSR-12)
     #docker-compose run --rm site-php-cli composer cs:twig    # Линт Twig-шаблонов
 
+# ===== LOCAL CI / QUALITY =====
+
+.PHONY: site-ci site-ci-php site-ci-frontend site-ci-full site-ci-php-advisory site-ci-frontend-advisory site-ci-unit site-ci-api-types-check site-composer-validate site-lint-container site-lint-yaml site-lint-twig site-phpstan site-frontend-install-ci site-frontend-typecheck site-frontend-build site-ci-migrations-empty-db
+
+# Быстрый локальный CI-набор перед PR: backend quality + frontend build + unit tests.
+site-ci: site-ci-php site-ci-frontend site-ci-unit
+
+# Расширенный локальный CI-набор для изменений в БД/API.
+site-ci-full: site-ci site-ci-migrations-empty-db site-ci-api-types-check
+
+# PHP quality gate. PHP style и PHPStan пока вынесены отдельно, потому что текущий код требует отдельной стабилизации.
+site-ci-php: site-composer-validate site-lint-yaml site-lint-twig site-lint-container
+
+# Advisory checks: включать в обязательный gate после отдельной стабилизации.
+site-ci-php-advisory: site-cs-check site-phpstan
+
+site-composer-validate:
+	docker compose run --rm -T site-php-cli composer validate --no-check-publish
+
+site-lint-container:
+	docker compose run --rm -T -e APP_ENV=test -e APP_DEBUG=0 -e APP_SECRET=test -e DATABASE_URL='pgsql://app:app@site-postgres:5432/app_test?serverVersion=15&charset=utf8' -e REDIS_DSN='redis://site-redis:6379' -e MESSENGER_TRANSPORT_DSN='redis://site-redis:6379/messages' site-php-cli php bin/console lint:container --env=test
+
+site-lint-yaml:
+	docker compose run --rm -T site-php-cli php bin/console lint:yaml --parse-tags config
+
+site-lint-twig:
+	docker compose run --rm -T site-php-cli php bin/console lint:twig templates
+
+site-phpstan:
+	docker compose run --rm -T -e APP_ENV=test -e APP_DEBUG=0 -e APP_SECRET=test -e DATABASE_URL='pgsql://app:app@site-postgres:5432/app_test?serverVersion=15&charset=utf8' -e REDIS_DSN='redis://site-redis:6379' -e MESSENGER_TRANSPORT_DSN='redis://site-redis:6379/messages' site-php-cli composer analyse
+
+site-frontend-install-ci:
+	docker compose run --rm -T site-frontend yarn install --frozen-lockfile
+
+site-frontend-typecheck: site-frontend-install-ci
+	docker compose run --rm -T site-frontend yarn typecheck
+
+site-frontend-build: site-frontend-install-ci
+	docker compose run --rm -T site-frontend yarn build
+
+site-ci-frontend: site-frontend-build
+
+# Advisory frontend check: включать в обязательный gate после исправления текущих TS-ошибок.
+site-ci-frontend-advisory: site-frontend-typecheck
+
+site-ci-unit:
+	docker compose run --rm -T site-php-cli composer test:unit
+
+# Проверка миграций на test-БД через уже существующую подготовку окружения.
+site-ci-migrations-empty-db:
+	docker compose up -d site-postgres site-redis
+	until docker compose exec -T site-postgres pg_isready --timeout=0 --dbname=app ; do sleep 1 ; done
+	docker compose run --rm -T -e APP_ENV=test site-php-cli php bin/console doctrine:database:create --if-not-exists --env=test
+	docker compose run --rm -T -e APP_ENV=test site-php-cli php bin/console doctrine:migrations:migrate --no-interaction --env=test
+
+site-ci-api-types-check:
+	docker compose up -d site-postgres site-redis
+	docker compose run --rm -T -e APP_ENV=dev -e APP_DEBUG=0 -e DATABASE_URL='pgsql://app:secret@site-postgres:5432/app?serverVersion=15&charset=utf8' -e REDIS_DSN='redis://site-redis:6379' -e MESSENGER_TRANSPORT_DSN='redis://site-redis:6379/messages' site-php-cli sh -c "php bin/console nelmio:apidoc:dump --format=json > var/openapi.json"
+	docker compose run --rm -T site-frontend sh -c "npx openapi-typescript var/openapi.json -o /tmp/schema.check.d.ts && diff /tmp/schema.check.d.ts assets/api/schema.d.ts"
+
 # ===== TESTS =====
 
 site-test-telegram:
