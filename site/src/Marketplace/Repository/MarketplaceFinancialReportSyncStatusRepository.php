@@ -20,6 +20,14 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
 {
     private const ADVISORY_LOCK_NAMESPACE = 'marketplace_financial_report_sync';
 
+    /**
+     * Статусы QUEUED (без next_retry_at — сообщение потеряно после claim) и LOADING
+     * (worker убит после markLoading) без этого порога зависают навсегда: они не
+     * переоткрываются claim'ом, не попадают в retry-выборку и не считаются missing.
+     * Порог должен быть заметно больше lock TTL handler'а (600 c) и окна redelivery Messenger.
+     */
+    public const STUCK_RECLAIM_INTERVAL = 'PT2H';
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, MarketplaceFinancialReportSyncStatus::class);
@@ -150,6 +158,8 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
                 (s.status = :queuedStatus AND s.nextRetryAt IS NOT NULL AND s.nextRetryAt <= :now)
                 OR (s.status = :failedStatus AND s.nextRetryAt IS NOT NULL AND s.nextRetryAt <= :now)
                 OR (s.status = :failedStatus AND s.nextRetryAt IS NULL AND s.lastErrorStatusCode = :rateLimitStatusCode AND s.lastErrorClass = :rateLimitErrorClass)
+                OR (s.status = :queuedStatus AND s.nextRetryAt IS NULL AND s.updatedAt <= :stuckBefore)
+                OR (s.status = :loadingStatus AND s.updatedAt <= :stuckBefore)
             )')
             ->setParameter('companyId', $companyId)
             ->setParameter('marketplace', $marketplace)
@@ -158,7 +168,9 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
             ->setParameter('to', $to)
             ->setParameter('queuedStatus', FinancialReportSyncStatus::QUEUED)
             ->setParameter('failedStatus', FinancialReportSyncStatus::FAILED)
+            ->setParameter('loadingStatus', FinancialReportSyncStatus::LOADING)
             ->setParameter('now', $now)
+            ->setParameter('stuckBefore', $now->sub(new \DateInterval(self::STUCK_RECLAIM_INTERVAL)))
             ->setParameter('rateLimitStatusCode', 429)
             ->setParameter('rateLimitErrorClass', MarketplaceRateLimitException::class)
             ->orderBy('s.businessDate', 'ASC')
@@ -271,9 +283,13 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
         \DateTimeImmutable $now,
     ): bool {
         $status = $syncStatus->getStatus();
+        $stuckBefore = $now->sub(new \DateInterval(self::STUCK_RECLAIM_INTERVAL));
+
+        if (FinancialReportSyncStatus::LOADING === $status) {
+            return $syncStatus->getUpdatedAt() <= $stuckBefore;
+        }
 
         if (\in_array($status, [
-            FinancialReportSyncStatus::LOADING,
             FinancialReportSyncStatus::RAW_LOADED,
             FinancialReportSyncStatus::PROCESSING,
         ], true)) {
@@ -288,7 +304,11 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
         }
 
         if (FinancialReportSyncStatus::QUEUED === $status) {
-            return null !== $syncStatus->getNextRetryAt() && $syncStatus->getNextRetryAt() <= $now;
+            if (null === $syncStatus->getNextRetryAt()) {
+                return $syncStatus->getUpdatedAt() <= $stuckBefore;
+            }
+
+            return $syncStatus->getNextRetryAt() <= $now;
         }
 
         if (!$forceRefresh

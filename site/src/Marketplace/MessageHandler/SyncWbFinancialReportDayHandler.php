@@ -8,6 +8,8 @@ use App\Company\Entity\Company;
 use App\Marketplace\Application\Service\WbFinancialReportPeriodResolver;
 use App\Marketplace\Application\Service\WbFinancialReportReconciliationService;
 use App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdater;
+use App\Marketplace\Entity\MarketplaceConnection;
+use App\Marketplace\Entity\MarketplaceFinancialReportSyncStatus;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\FinancialReportSyncStatus;
@@ -386,6 +388,8 @@ final class SyncWbFinancialReportDayHandler
                 'connection_id' => $message->connectionId,
                 'business_date' => $businessDate->format('Y-m-d'),
                 'mode' => $mode->value,
+                'http_status' => $e->getStatusCode(),
+                'error_message' => $e->getMessage(),
             ]);
 
             throw new UnrecoverableMessageHandlingException($e->getMessage(), 0, $e);
@@ -408,6 +412,8 @@ final class SyncWbFinancialReportDayHandler
                 'connection_id' => $message->connectionId,
                 'business_date' => $businessDate->format('Y-m-d'),
                 'mode' => $mode->value,
+                'http_status' => $e->getStatusCode(),
+                'error_message' => $e->getMessage(),
             ]);
 
             throw new RecoverableMessageHandlingException($e->getMessage(), 0, $e);
@@ -434,9 +440,56 @@ final class SyncWbFinancialReportDayHandler
                 'connection_id' => $message->connectionId,
                 'business_date' => $businessDate->format('Y-m-d'),
                 'mode' => $mode->value,
+                'http_status' => $e->getStatusCode(),
+                'error_message' => $e->getMessage(),
             ]);
 
             throw new UnrecoverableMessageHandlingException($e->getMessage(), 0, $e);
+        } catch (\Throwable $e) {
+            // Без этого блока неожиданное исключение оставляет статус в LOADING навсегда:
+            // такой день не попадает ни в retry-выборку, ни в missing (строка уже существует).
+            $this->recordUnexpectedFailure($status, $connection, $e, $effectiveRawDocumentId, $effectiveRrdId);
+
+            $this->logger->error('WB day sync failed with unexpected error.', [
+                'company_id' => $message->companyId,
+                'connection_id' => $message->connectionId,
+                'business_date' => $businessDate->format('Y-m-d'),
+                'mode' => $mode->value,
+                'error_class' => $e::class,
+                'error_message' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
+    }
+
+    private function recordUnexpectedFailure(
+        MarketplaceFinancialReportSyncStatus $status,
+        MarketplaceConnection $connection,
+        \Throwable $e,
+        ?string $effectiveRawDocumentId,
+        ?int $effectiveRrdId,
+    ): void {
+        try {
+            $this->syncStatusUpdater->markFailedRetryablePreservingCursor(
+                $status,
+                $e::class,
+                $e->getMessage(),
+                null,
+                null,
+                null,
+                $this->retryAfterFromNow(15 * 60),
+                $effectiveRawDocumentId,
+                $effectiveRrdId,
+            );
+            $connection->markSyncFailed($e->getMessage());
+            $this->em->flush();
+        } catch (\Throwable $persistError) {
+            $this->logger->error('WB day sync could not persist failure status, status may stay stale until stuck-reclaim.', [
+                'company_id' => $status->getCompanyId(),
+                'business_date' => $status->getBusinessDate()->format('Y-m-d'),
+                'persist_error' => $persistError->getMessage(),
+            ]);
         }
     }
 

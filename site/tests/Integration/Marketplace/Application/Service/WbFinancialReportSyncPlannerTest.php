@@ -16,6 +16,7 @@ use App\Marketplace\Infrastructure\Query\ActiveWbConnectionsQuery;
 use App\Marketplace\Message\SyncWbFinancialReportDayMessage;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Clock\MockClock;
@@ -308,8 +309,13 @@ final class WbFinancialReportSyncPlannerTest extends IntegrationTestCase
 
         $existing = $this->em->find(Company::class, $cid);
         if (!$existing instanceof Company) {
-            $company = CompanyBuilder::aCompany()->withId($cid)->build();
-            $this->em->persist($company->getOwner());
+            $ownerId = Uuid::uuid7()->toString();
+            $owner = UserBuilder::aUser()
+                ->withId($ownerId)
+                ->withEmail(sprintf('owner+%s@example.test', $ownerId))
+                ->build();
+            $company = CompanyBuilder::aCompany()->withId($cid)->withOwner($owner)->build();
+            $this->em->persist($owner);
             $this->em->persist($company);
             $this->em->flush();
         }

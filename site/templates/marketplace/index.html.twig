@@ -130,6 +130,75 @@
             </div>
         </div>
 
+        {# Статус загрузки финансовых отчётов WB по дням #}
+        {% if wbFinanceSyncDays is not empty %}
+            {% set wbSyncBadgeClass = {
+                'success': 'bg-success',
+                'empty': 'bg-secondary',
+                'queued': 'bg-secondary',
+                'loading': 'bg-info',
+                'raw_loaded': 'bg-info',
+                'processing': 'bg-info',
+                'failed': 'bg-danger',
+                'failed_final': 'bg-danger',
+                'auth_failed': 'bg-danger',
+                'conflict': 'bg-warning',
+            } %}
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title mb-0">Загрузка отчётов WB (последние 14 дней)</h3>
+                </div>
+                <div class="table-responsive">
+                    <table class="table card-table table-vcenter">
+                        <thead>
+                        <tr>
+                            <th>Дата</th>
+                            <th>Режим</th>
+                            <th>Статус</th>
+                            <th>Записей</th>
+                            <th>Попыток</th>
+                            <th>Обновлено</th>
+                            <th>Ошибка</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for day in wbFinanceSyncDays %}
+                            <tr>
+                                <td>{{ day.business_date|date('d.m.Y') }}</td>
+                                <td><small class="text-muted">{{ day.mode ?? '—' }}</small></td>
+                                <td>
+                                    <span class="badge {{ wbSyncBadgeClass[day.status] ?? 'bg-secondary' }}"
+                                          {% if day.last_error_message %}title="{{ day.last_error_message }}"{% endif %}>
+                                        {{ day.status_enum.label }}
+                                    </span>
+                                </td>
+                                <td>{{ day.records_count }}</td>
+                                <td>{{ day.attempts }}</td>
+                                <td><small>{{ day.updated_at|date('d.m.Y H:i') }}</small></td>
+                                <td>
+                                    {% if day.last_error_message %}
+                                        <details>
+                                            <summary class="text-danger small" title="{{ day.last_error_message }}">
+                                                {{ day.last_error_message|length > 60 ? day.last_error_message|slice(0, 60) ~ '…' : day.last_error_message }}
+                                            </summary>
+                                            <div class="small text-muted mt-1">
+                                                {% if day.last_error_status_code %}HTTP {{ day.last_error_status_code }} · {% endif %}
+                                                {{ day.last_error_class }}<br>
+                                                {{ day.last_error_message }}
+                                            </div>
+                                        </details>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+
         {# История синхронизаций #}
         <div class="card">
             <div class="card-header d-flex align-items-center justify-content-between gap-3">

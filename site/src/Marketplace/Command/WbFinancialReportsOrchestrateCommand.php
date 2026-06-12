@@ -9,6 +9,7 @@ use App\Marketplace\Application\Service\WbFinancialReportPeriodResolver;
 use App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface;
 use App\Marketplace\Exception\MarketplaceRateLimitException;
 use App\Marketplace\Infrastructure\Query\ActiveWbConnectionsQuery;
+use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusRepository;
 use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -207,6 +208,8 @@ final class WbFinancialReportsOrchestrateCommand extends Command
                AND (
                     (status IN ('queued', 'failed') AND next_retry_at IS NOT NULL AND next_retry_at <= NOW())
                     OR (status = 'failed' AND next_retry_at IS NULL AND last_error_status_code = 429 AND last_error_class = :rateLimitErrorClass)
+                    OR (status = 'queued' AND next_retry_at IS NULL AND updated_at <= :stuckBefore)
+                    OR (status = 'loading' AND updated_at <= :stuckBefore)
                )",
             [
                 'companyId' => $companyId,
@@ -215,6 +218,9 @@ final class WbFinancialReportsOrchestrateCommand extends Command
                 'fromDate' => $from->format('Y-m-d'),
                 'toDate' => $to->format('Y-m-d'),
                 'rateLimitErrorClass' => MarketplaceRateLimitException::class,
+                'stuckBefore' => (new \DateTimeImmutable())
+                    ->sub(new \DateInterval(MarketplaceFinancialReportSyncStatusRepository::STUCK_RECLAIM_INTERVAL))
+                    ->format('Y-m-d H:i:s'),
             ],
         );
     }
