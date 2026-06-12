@@ -149,11 +149,14 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
             $sale->setSaleDate($saleDate);
             $quantity = abs($this->normalizer->quantity($item));
             $retailPriceWithDisc = $this->normalizer->retailPriceWithDisc($item);
-            $pricePerUnit = $quantity > 0 ? $retailPriceWithDisc / $quantity : 0.0;
+            // Деньги считаем через bcmath с фиксированной точностью 2 знака,
+            // иначе float-деление давало бы хвост вида "333.33333333" в decimal-поле.
+            $totalRevenue = number_format($retailPriceWithDisc, 2, '.', '');
+            $pricePerUnit = $quantity > 0 ? bcdiv($totalRevenue, (string) $quantity, 2) : '0.00';
 
             $sale->setQuantity($quantity);
-            $sale->setPricePerUnit((string) $pricePerUnit);
-            $sale->setTotalRevenue((string) $retailPriceWithDisc);
+            $sale->setPricePerUnit($pricePerUnit);
+            $sale->setTotalRevenue($totalRevenue);
             $sale->setCostPrice($this->costPriceResolver->resolveForSale($listing, $saleDate));
             $sale->setRawData($item);
             if ($rawDocId !== null) {

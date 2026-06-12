@@ -76,6 +76,15 @@ final readonly class OzonTransactionTotalsClient
             ],
         ]);
 
+        $statusCode = $response->getStatusCode();
+
+        if ($statusCode < 200 || $statusCode >= 300) {
+            // getContent(false) не бросает на 4xx/5xx и отдаёт сырое тело — статус
+            // всплывёт даже если тело ошибки не является валидным JSON.
+            $preview = mb_substr($response->getContent(false), 0, 300);
+            throw new \RuntimeException(sprintf('Ozon transaction totals вернул HTTP %d. preview=%s', $statusCode, $preview));
+        }
+
         $payload = $response->toArray(false);
         $result = $payload['result'] ?? null;
 

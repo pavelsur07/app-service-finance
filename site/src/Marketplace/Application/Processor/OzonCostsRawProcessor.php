@@ -423,32 +423,35 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
 
             $categoryCode = $this->resolveServiceCategoryCode($serviceName);
 
+            // Деньги через bcmath с точностью 2 знака, чтобы не накапливать float-погрешность.
+            $serviceAmountStr = number_format($serviceAmount, 2, '.', '');
+
             if ($itemCount === 1) {
                 $entries[] = [
                     'external_id'    => $operationId . '_svc_' . $svcIdx,
                     'category_code'  => $categoryCode,
                     'category_name'  => $this->resolveCategoryName($categoryCode),
-                    'amount'         => (string) $serviceAmount,
+                    'amount'         => $serviceAmountStr,
                     'cost_date'      => $operationDate,
                     'description'    => $serviceName,
                     'operation_type' => $serviceOpType,
                     '_item_idx'      => 0,
                 ];
             } else {
-                // Multi-SKU: делим поровну
-                $perItem     = round($serviceAmount / $itemCount, 2);
-                $distributed = 0.0;
+                // Multi-SKU: делим поровну, остаток (копейки) добиваем на последнем SKU.
+                $perItem     = bcdiv($serviceAmountStr, (string) $itemCount, 2);
+                $distributed = '0.00';
 
                 foreach ($items as $itemIdx => $item) {
-                    $isLast  = ($itemIdx === $itemCount - 1);
-                    $amount  = $isLast ? round($serviceAmount - $distributed, 2) : $perItem;
-                    $distributed += $perItem;
+                    $isLast = ($itemIdx === $itemCount - 1);
+                    $amount = $isLast ? bcsub($serviceAmountStr, $distributed, 2) : $perItem;
+                    $distributed = bcadd($distributed, $perItem, 2);
 
                     $entries[] = [
                         'external_id'    => $operationId . '_svc_' . $svcIdx . '_item_' . $itemIdx,
                         'category_code'  => $categoryCode,
                         'category_name'  => $this->resolveCategoryName($categoryCode),
-                        'amount'         => (string) $amount,
+                        'amount'         => $amount,
                         'cost_date'      => $operationDate,
                         'description'    => $serviceName,
                         'operation_type' => $serviceOpType,
