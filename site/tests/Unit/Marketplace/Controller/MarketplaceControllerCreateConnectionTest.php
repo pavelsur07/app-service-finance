@@ -14,6 +14,7 @@ use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\OzonRealizationStatusQuery;
 use App\Marketplace\Infrastructure\Query\RawDocumentsListQuery;
+use App\Marketplace\Infrastructure\Query\WbFinanceSyncStatusListQuery;
 use App\Marketplace\Message\TriggerInitialSyncMessage;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
@@ -202,6 +203,7 @@ final class MarketplaceControllerCreateConnectionTest extends TestCase
             self::uninitialized(SyncConnectionAction::class),
             $startDateResolver,
             $planner,
+            self::uninitialized(WbFinanceSyncStatusListQuery::class),
         ) extends MarketplaceController {
             protected function addFlash(string $type, mixed $message): void
             {
