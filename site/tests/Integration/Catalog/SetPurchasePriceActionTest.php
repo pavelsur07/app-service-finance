@@ -25,7 +25,7 @@ final class SetPurchasePriceActionTest extends IntegrationTestCase
         $command = $this->makeCommand($companyId, $productId, '2026-04-01', 10000, 'Первая цена');
         $priceId = $this->action()($command);
 
-        $loaded = $this->em()->getRepository(ProductPurchasePrice::class)->find($priceId);
+        $loaded = $this->em->getRepository(ProductPurchasePrice::class)->find($priceId);
         self::assertInstanceOf(ProductPurchasePrice::class, $loaded);
         self::assertSame('2026-04-01', $loaded->getEffectiveFrom()->format('Y-m-d'));
         self::assertNull($loaded->getEffectiveTo());
@@ -42,7 +42,7 @@ final class SetPurchasePriceActionTest extends IntegrationTestCase
         $this->action()($this->makeCommand($companyId, $productId, '2026-04-01', 10000, 'Начальная цена'));
         $this->action()($this->makeCommand($companyId, $productId, '2026-04-15', 12000, 'Новая цена'));
 
-        $prices = $this->em()->getRepository(ProductPurchasePrice::class)->findBy([], ['effectiveFrom' => 'ASC']);
+        $prices = $this->em->getRepository(ProductPurchasePrice::class)->findBy([], ['effectiveFrom' => 'ASC']);
         self::assertCount(2, $prices);
         self::assertSame('2026-04-14', $prices[0]->getEffectiveTo()?->format('Y-m-d'));
         self::assertNull($prices[1]->getEffectiveTo());
@@ -91,10 +91,10 @@ final class SetPurchasePriceActionTest extends IntegrationTestCase
             ->setSku('SKU-'.$productId)
             ->setPurchasePrice('100.00');
 
-        $this->em()->persist($owner);
-        $this->em()->persist($company);
-        $this->em()->persist($product);
-        $this->em()->flush();
+        $this->em->persist($owner);
+        $this->em->persist($company);
+        $this->em->persist($product);
+        $this->em->flush();
 
         return [$companyId, $productId];
     }

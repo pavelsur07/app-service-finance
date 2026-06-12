@@ -48,14 +48,14 @@ site-test-telegram:
 site-test-unit:
 	docker-compose run --rm site-php-cli composer test:unit
 
-# Интеграционные (готовим среду + БД)
+# Интеграционные (только запуск; подготовка БД отдельно через site-test-prepare)
 site-test-int: site-test-integration
 
-site-test-integration: site-test-init
+site-test-integration: site-test-wait-db
 	docker-compose run --rm site-php-cli composer test:integration
 
 # Все тесты
-site-test: site-test-init
+site-test: site-test-prepare
 	docker-compose run --rm site-php-cli composer test
 
 # ---- подготовка окружения тестов (smoke) ----
@@ -65,11 +65,13 @@ site-test-smoke: site-test-smoke-init
 	docker-compose run --rm -T site-php-cli php bin/phpunit -c phpunit.xml --testsuite=integration --filter SmokePersistenceTest
 
 # Покрытие (нужен xdebug или pcov в CLI-образе)
-site-test-cov: site-test-init
+site-test-cov: site-test-prepare
 	docker-compose run --rm -e XDEBUG_MODE=coverage site-php-cli ./vendor/bin/phpunit -c phpunit.xml --coverage-html var/coverage --coverage-text
 
 # ---- подготовка окружения тестов ----
-site-test-init: site-composer-install site-test-env site-test-wait-db site-test-db site-test-migrations site-test-fixtures
+site-test-init: site-test-prepare
+
+site-test-prepare: site-composer-install site-test-env site-test-wait-db site-test-db site-test-migrations
 
 site-test-env:
 	# .env.test (если нет — скопируем из .env)
