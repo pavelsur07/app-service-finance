@@ -39,11 +39,11 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
     public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = ''): bool
     {
         if ($type instanceof StagingRecordType) {
-            return $type === StagingRecordType::RETURN
-                && $marketplace === MarketplaceType::WILDBERRIES;
+            return StagingRecordType::RETURN === $type
+                && MarketplaceType::WILDBERRIES === $marketplace;
         }
 
-        return $type === MarketplaceType::WILDBERRIES->value && $kind === 'returns';
+        return $type === MarketplaceType::WILDBERRIES->value && 'returns' === $kind;
     }
 
     public function process(string $companyId, string $rawDocId): int
@@ -66,7 +66,7 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
 
         $company = $this->em->find(Company::class, $companyId);
         if (!$company instanceof Company) {
-            throw new \RuntimeException('Company not found: ' . $companyId);
+            throw new \RuntimeException('Company not found: '.$companyId);
         }
 
         $returnsData = array_filter($rawRows, function (array $item): bool {
@@ -95,8 +95,8 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
         foreach ($returnsData as $item) {
             $nmId = $this->normalizer->nmId($item);
             $tsName = $this->normalizer->techSize($item);
-            $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
-            $cacheKey = $nmId . '_' . $size;
+            $size = '' !== trim((string) $tsName) ? trim((string) $tsName) : 'UNKNOWN';
+            $cacheKey = $nmId.'_'.$size;
 
             if (isset($listingsCache[$cacheKey])) {
                 continue;
@@ -104,13 +104,13 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
 
             $barcode = (string) ($this->normalizer->barcode($item) ?? '');
             $listing = $this->listingResolver->resolve($company, $nmId, $tsName, [
-                'sa_name'      => $this->normalizer->vendorCode($item),
-                'brand_name'   => $this->normalizer->brandName($item),
+                'sa_name' => $this->normalizer->vendorCode($item),
+                'brand_name' => $this->normalizer->brandName($item),
                 'subject_name' => $this->normalizer->subjectName($item),
                 'retail_price' => (string) $this->normalizer->retailPrice($item),
             ], $barcode);
             $listingsCache[$cacheKey] = $listing;
-            $newListings++;
+            ++$newListings;
         }
 
         if ($newListings > 0) {
@@ -121,29 +121,30 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
 
         $allSrids = array_values(array_filter(array_map(fn (array $item): ?string => $this->normalizer->srid($item), $returnsData)));
         $existingMap = $this->returnRepository->getExistingExternalIds($companyId, $allSrids);
+        $salesBySrid = $this->saleRepository->findByMarketplaceOrdersIndexed(
+            $company,
+            MarketplaceType::WILDBERRIES,
+            $allSrids,
+        );
 
         foreach ($returnsData as $item) {
             $srid = (string) ($this->normalizer->srid($item) ?? '');
-            if ($srid === '' || isset($existingMap[$srid])) {
+            if ('' === $srid || isset($existingMap[$srid])) {
                 continue;
             }
 
             $nmId = $this->normalizer->nmId($item);
             $tsName = $this->normalizer->techSize($item);
-            $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
-            $listing = $listingsCache[$nmId . '_' . $size] ?? null;
+            $size = '' !== trim((string) $tsName) ? trim((string) $tsName) : 'UNKNOWN';
+            $listing = $listingsCache[$nmId.'_'.$size] ?? null;
 
             if (!$listing) {
                 $this->logger->warning('[WB] processBatch returns: listing not found', ['nm_id' => $nmId]);
                 continue;
             }
 
-            // Ищем связанную продажу по srid для получения себестоимости
-            $sale = $this->saleRepository->findByMarketplaceOrder(
-                $company,
-                MarketplaceType::WILDBERRIES,
-                $srid,
-            );
+            // Связанная продажа по srid (предзагружена батчем выше) — для себестоимости
+            $sale = $salesBySrid[$srid] ?? null;
 
             $return = new MarketplaceReturn(
                 Uuid::uuid4()->toString(),
@@ -159,11 +160,11 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
             $return->setReturnReason($this->normalizer->sellerOperName($item));
             $return->setCostPrice($this->costPriceResolver->resolveForReturn($listing, $sale, $item));
             $return->setRawData($item);
-            if ($rawDocId !== null) {
+            if (null !== $rawDocId) {
                 $return->setRawDocumentId($rawDocId);
             }
 
-            if ($sale !== null) {
+            if (null !== $sale) {
                 $return->setSale($sale);
             }
 
