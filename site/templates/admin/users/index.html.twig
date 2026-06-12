@@ -141,19 +141,6 @@
                 }) }}
                 {{ form_errors(accountForm.companyName) }}
               </div>
-
-              <div class="col-12">
-                <label class="form-check">
-                  {{ form_widget(accountForm.agreeTerms, { attr: { class: 'form-check-input' } }) }}
-                  <span class="form-check-label">{{ accountForm.agreeTerms.vars.label }}</span>
-                </label>
-                {{ form_errors(accountForm.agreeTerms) }}
-              </div>
-
-              <div class="d-none" aria-hidden="true">
-                {{ form_widget(accountForm.website) }}
-                {{ form_errors(accountForm.website) }}
-              </div>
             </div>
           </div>
           <div class="modal-footer">

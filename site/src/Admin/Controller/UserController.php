@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Admin\Controller;
 
+use App\Admin\Form\AdminAccountCreateType;
 use App\Admin\Service\UserDeletionService;
 use App\Company\Entity\User;
-use App\Company\Form\RegistrationFormType;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -43,9 +43,7 @@ final class UserController extends AbstractController
 
     private function createAccountForm(User $account): FormInterface
     {
-        return $this->createForm(RegistrationFormType::class, $account, [
-            'is_invite' => false,
-        ]);
+        return $this->createForm(AdminAccountCreateType::class, $account);
     }
 
     private function renderUserIndex(

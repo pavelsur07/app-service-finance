@@ -30,10 +30,9 @@ final class UserCreateAccountControllerTest extends WebTestCaseBase
         $crawler = $client->request('GET', '/admin/users');
 
         $form = $crawler->selectButton('Создать аккаунт')->form([
-            'registration_form[email]' => 'owner@example.test',
-            'registration_form[plainPassword]' => 'secret-password',
-            'registration_form[companyName]' => 'ООО Новая компания',
-            'registration_form[agreeTerms]' => '1',
+            'admin_account_create[email]' => 'owner@example.test',
+            'admin_account_create[plainPassword]' => 'secret-password',
+            'admin_account_create[companyName]' => 'ООО Новая компания',
         ]);
 
         $client->submit($form);
@@ -80,11 +79,9 @@ final class UserCreateAccountControllerTest extends WebTestCaseBase
         $crawler = $client->request('GET', '/admin/users');
 
         $form = $crawler->selectButton('Создать аккаунт')->form([
-            'registration_form[email]' => 'owner@example.test',
-            'registration_form[plainPassword]' => 'secret-password',
-            'registration_form[companyName]' => 'ООО Новая компания',
-            'registration_form[agreeTerms]' => '1',
-            'registration_form[website]' => 'spam.example',
+            'admin_account_create[email]' => 'existing@example.test',
+            'admin_account_create[plainPassword]' => 'secret-password',
+            'admin_account_create[companyName]' => 'ООО Новая компания',
         ]);
 
         $client->submit($form);
@@ -92,7 +89,7 @@ final class UserCreateAccountControllerTest extends WebTestCaseBase
         self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
         self::assertSelectorTextContains('h2.page-title', 'Зарегистрированные пользователи');
         self::assertStringContainsString('existing@example.test', $client->getResponse()->getContent());
-        self::assertSelectorTextContains('.alert-danger', 'Не удалось создать аккаунт. Попробуйте позже.');
+        self::assertSelectorTextContains('.invalid-feedback', 'There is already an account with this email');
         self::assertStringContainsString(
             'window.bootstrap.Modal.getOrCreateInstance(modalElement).show();',
             $client->getResponse()->getContent()

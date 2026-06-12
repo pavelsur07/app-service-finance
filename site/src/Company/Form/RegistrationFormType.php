@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Company\Form;
 
 use App\Company\Entity\User;
@@ -25,11 +27,7 @@ class RegistrationFormType extends AbstractType
                 'attr' => [
                     'placeholder' => 'ООО Ромашка',
                 ],
-                'constraints' => [
-                    new NotBlank([
-                        'message' => 'Введите имя компании',
-                    ]),
-                ],
+                'constraints' => self::companyNameConstraints(),
             ]);
         }
 
@@ -49,17 +47,7 @@ class RegistrationFormType extends AbstractType
                 // this is read and encoded in the controller
                 'mapped' => false,
                 'attr' => ['autocomplete' => 'new-password'],
-                'constraints' => [
-                    new NotBlank([
-                        'message' => 'Please enter a password',
-                    ]),
-                    new Length([
-                        'min' => 6,
-                        'minMessage' => 'Your password should be at least {{ limit }} characters',
-                        // max length allowed by Symfony for security reasons
-                        'max' => 4096,
-                    ]),
-                ],
+                'constraints' => self::plainPasswordConstraints(),
             ])
             ->add('website', TextType::class, [
                 'label' => false,
@@ -72,6 +60,36 @@ class RegistrationFormType extends AbstractType
                 ],
             ])
         ;
+    }
+
+    /**
+     * @return list<NotBlank>
+     */
+    public static function companyNameConstraints(): array
+    {
+        return [
+            new NotBlank([
+                'message' => 'Введите имя компании',
+            ]),
+        ];
+    }
+
+    /**
+     * @return list<NotBlank|Length>
+     */
+    public static function plainPasswordConstraints(): array
+    {
+        return [
+            new NotBlank([
+                'message' => 'Please enter a password',
+            ]),
+            new Length([
+                'min' => 6,
+                'minMessage' => 'Your password should be at least {{ limit }} characters',
+                // max length allowed by Symfony for security reasons
+                'max' => 4096,
+            ]),
+        ];
     }
 
     public function configureOptions(OptionsResolver $resolver): void
