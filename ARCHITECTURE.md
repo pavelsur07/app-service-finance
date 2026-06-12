@@ -326,6 +326,25 @@ Dead code на Task-11.2: Repository ещё никем не вызывается
 > Используй **только** эти методы. Не выдумывай новые без обновления этого файла.
 > Нет нужного метода — спроси, не создавай самостоятельно.
 
+### `CompanyFacade` (`src/Company/Facade/CompanyFacade.php`)
+```php
+// Создать пользователя-владельца, компанию и активного CompanyMember OWNER.
+// Используется внешними модулями, включая Admin, вместо прямого вызова Company Service/Application.
+createOwnerAccount(string $email, string $plainPassword, string $companyName): Company
+
+// Найти компанию по ID
+findById(string $companyId): ?Company
+
+// ID всех активных компаний
+// @return list<string>
+getAllActiveCompanyIds(): array
+
+// Компании по списку ID как простые DTO-массивы
+// @param list<string> $companyIds
+// @return list<array{id: string, name: string}>
+getCompaniesByIds(array $companyIds): array
+```
+
 ### `CounterpartyFacade` (`src/Company/Facade/CounterpartyFacade.php`)
 ```php
 // Список контрагентов для ChoiceType в формах
@@ -1973,6 +1992,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.49 | 2026-06-12 | Company: добавлен публичный контракт `CompanyFacade::createOwnerAccount()` для создания owner-аккаунта через фасад из Admin |
 | 1.48 | 2026-05-22 | Marketplace: зафиксирован контракт WB financial sync (entities статуса/ошибок, enum mode/status, message `SyncWbFinancialReportDayMessage` на `async_sync`, команда `app:marketplace:wb-financial-reports:sync`, pipeline, TZ `Europe/Moscow`, правило empty day и rate limit 1 request/min) |
 | 1.47 | 2026-05-11 | Inventory: задокументирован первый этап Ozon stock normalization — raw `/v4/product/info/stocks` → `StockSnapshot`, `reservedQuantity`, `StockSnapshotMappingStatus`, async normalization и UI `/inventory/stocks` |
 | 1.46 | 2026-05-11 | Cash/Telegram: добавлен публичный контракт `CashFacade::createTransaction()` и зафиксировано идемпотентное создание Telegram-транзакций через `importSource`/`externalId` |

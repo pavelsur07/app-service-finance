@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Company\Facade;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\User;
 use App\Company\Infrastructure\Repository\CompanyRepository;
-use Doctrine\DBAL\Connection;
+use App\Company\Service\CompanyOwnerAccountCreator;
+use Ramsey\Uuid\Uuid;
 
 /**
  * Публичный контракт модуля Company для других модулей.
@@ -14,13 +16,25 @@ use Doctrine\DBAL\Connection;
 final class CompanyFacade
 {
     public function __construct(
-        private CompanyRepository $repository
-    ) {}
-
+        private readonly CompanyRepository $repository,
+        private readonly CompanyOwnerAccountCreator $accountCreator,
+    ) {
+    }
 
     public function findById(string $companyId): ?Company
     {
         return $this->repository->findById($companyId);
+    }
+
+    /**
+     * Создаёт пользователя-владельца, компанию и активного CompanyMember OWNER.
+     */
+    public function createOwnerAccount(string $email, string $plainPassword, string $companyName): Company
+    {
+        $user = new User(Uuid::uuid7()->toString());
+        $user->setEmail($email);
+
+        return $this->accountCreator->create($user, $plainPassword, $companyName);
     }
 
     /**
