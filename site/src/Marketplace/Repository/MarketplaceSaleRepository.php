@@ -26,10 +26,10 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
      * SKU хранится в marketplace_listings.marketplace_sku.
      */
     public function findByMarketplaceOrderAndSku(
-        Company         $company,
+        Company $company,
         MarketplaceType $marketplace,
-        string          $externalOrderId,
-        string          $marketplaceSku,
+        string $externalOrderId,
+        string $marketplaceSku,
     ): ?MarketplaceSale {
         return $this->createQueryBuilder('s')
             ->join('s.listing', 'l')
@@ -67,6 +67,40 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
             ->setParameter('orderId', $externalOrderId)
             ->getQuery()
             ->getOneOrNullResult();
+    }
+
+    /**
+     * Массовая загрузка продаж по списку externalOrderId (srid) для bulk-обработки.
+     *
+     * @param string[] $externalOrderIds
+     *
+     * @return array<string, MarketplaceSale> ключ — externalOrderId
+     */
+    public function findByMarketplaceOrdersIndexed(
+        Company $company,
+        MarketplaceType $marketplace,
+        array $externalOrderIds,
+    ): array {
+        if (empty($externalOrderIds)) {
+            return [];
+        }
+
+        $sales = $this->createQueryBuilder('s')
+            ->where('s.company = :company')
+            ->andWhere('s.marketplace = :marketplace')
+            ->andWhere('s.externalOrderId IN (:orderIds)')
+            ->setParameter('company', $company)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('orderIds', $externalOrderIds)
+            ->getQuery()
+            ->getResult();
+
+        $map = [];
+        foreach ($sales as $sale) {
+            $map[$sale->getExternalOrderId()] = $sale;
+        }
+
+        return $map;
     }
 
     /**
@@ -113,9 +147,10 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
     }
 
     /**
-     * Массовая проверка существующих SRID (для bulk import)
+     * Массовая проверка существующих SRID (для bulk import).
      *
      * @param string[] $srids
+     *
      * @return array<string, true>
      */
     public function getExistingExternalIds(string $companyId, array $srids): array
@@ -166,7 +201,6 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
 
         return $qb->getQuery()->getResult();
     }
-
 
     public function countDocumentLinkedByRawDocument(
         Company $company,

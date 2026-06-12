@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Marketplace\Application\Processor;
 
 use App\Company\Entity\Company;
-use App\Marketplace\Application\ProcessWbReturnsAction;
 use App\Marketplace\Application\Processor\WbReturnsRawProcessor;
+use App\Marketplace\Application\ProcessWbReturnsAction;
 use App\Marketplace\Application\Service\MarketplaceBarcodeCatalogService;
 use App\Marketplace\Application\Service\MarketplaceCostPriceResolver;
 use App\Marketplace\Application\Service\WbListingResolverService;
@@ -88,7 +88,92 @@ final class WbReturnsRawProcessorRefundAmountTest extends TestCase
     }
 
     /**
+     * Регрессия H1: связанные продажи должны грузиться одним батч-запросом
+     * (findByMarketplaceOrdersIndexed), а не по строке в цикле (findByMarketplaceOrder).
+     */
+    public function testSalesArePreloadedInSingleBatchQueryNotPerRow(): void
+    {
+        $company = $this->createMock(Company::class);
+        $company->method('getId')->willReturn('company-1');
+        $listing = $this->createMock(MarketplaceListing::class);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('find')->willReturnMap([
+            [Company::class, 'company-1', $company],
+        ]);
+
+        $returnRepository = $this->createMock(MarketplaceReturnRepository::class);
+        $returnRepository->method('getExistingExternalIds')->willReturn([]);
+
+        $listingRepository = $this->createMock(MarketplaceListingRepository::class);
+        $listingRepository->method('findListingsByNmIdsIndexed')->willReturn([
+            '123_XL' => $listing,
+            '456_XL' => $listing,
+        ]);
+        $listingRepository->method('findByNmIdAndSize')->willReturn(null);
+
+        $saleRepository = $this->createMock(MarketplaceSaleRepository::class);
+        $saleRepository->expects(self::once())
+            ->method('findByMarketplaceOrdersIndexed')
+            ->with(
+                $company,
+                MarketplaceType::WILDBERRIES,
+                self::callback(static fn (array $srids): bool => 2 === count($srids)),
+            )
+            ->willReturn([]);
+        $saleRepository->expects(self::never())->method('findByMarketplaceOrder');
+
+        $barcodeRepository = $this->createMock(MarketplaceListingBarcodeRepository::class);
+        $barcodeRepository->method('findByBarcode')->willReturn(null);
+        $connection = $this->createMock(Connection::class);
+        $resolver = new WbListingResolverService(
+            $listingRepository,
+            $barcodeRepository,
+            new WbBarcodeUpsertQuery($connection),
+            $em,
+        );
+
+        $barcodeCatalogRepository = $this->createMock(MarketplaceBarcodeCatalogRepository::class);
+        $barcodeCatalogRepository->method('findByBarcode')->willReturn(null);
+        $barcodeCatalogRepository->method('findByBarcodesIndexed')->willReturn([]);
+        $barcodeCatalog = new MarketplaceBarcodeCatalogService($barcodeCatalogRepository);
+
+        $innerCostPriceResolver = $this->createMock(CostPriceResolverInterface::class);
+        $innerCostPriceResolver->method('resolve')->willReturn('0.00');
+        $costPriceResolver = new MarketplaceCostPriceResolver($innerCostPriceResolver);
+
+        $processor = new WbReturnsRawProcessor(
+            $this->makeProcessWbReturnsActionStub(),
+            $em,
+            $returnRepository,
+            $saleRepository,
+            $listingRepository,
+            $resolver,
+            $barcodeCatalog,
+            $costPriceResolver,
+            new WbSalesReportRowNormalizer(),
+            new NullLogger(),
+        );
+
+        $baseRow = [
+            'doc_type_name' => 'Возврат',
+            'retail_price_withdisc_rub' => 1000,
+            'retail_price' => 1500,
+            'quantity' => 1,
+            'ts_name' => 'XL',
+            'supplier_oper_name' => 'Возврат покупателем',
+            'rr_dt' => '2026-01-10 10:00:00',
+        ];
+
+        $processor->processBatch('company-1', MarketplaceType::WILDBERRIES, [
+            ['nm_id' => '123', 'srid' => 'WB-RETURN-1'] + $baseRow,
+            ['nm_id' => '456', 'srid' => 'WB-RETURN-2'] + $baseRow,
+        ]);
+    }
+
+    /**
      * @param array<string, mixed> $row
+     *
      * @return array{returns: list<MarketplaceReturn>, createdListings: list<MarketplaceListing>, nmIdsCalls: list<list<string>>}
      */
     private function runProcessorWithRow(array $row, bool $forceResolve = false): array
