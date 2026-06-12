@@ -18,6 +18,13 @@ class OzonAdapter implements MarketplaceAdapterInterface
     private const BASE_URL = 'https://api-seller.ozon.ru';
     private const TRANSACTION_ENDPOINT = '/v3/finance/transaction/list';
     private const PAGE_SIZE = 1000;
+    private const REQUEST_TIMEOUT = 120;
+
+    /**
+     * Защитный предел числа страниц пагинации: backstop против runaway-цикла,
+     * если API вернёт некорректный page_count. В штатной работе не достигается.
+     */
+    private const MAX_PAGES = 1000;
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
@@ -50,6 +57,7 @@ class OzonAdapter implements MarketplaceAdapterInterface
                     'page' => 1,
                     'page_size' => 1,
                 ],
+                'timeout' => self::REQUEST_TIMEOUT,
             ]);
 
             return 200 === $response->getStatusCode();
@@ -88,6 +96,7 @@ class OzonAdapter implements MarketplaceAdapterInterface
 
         $allOperations = [];
         $page = 1;
+        $pageCount = 1;
 
         do {
             $response = $this->httpClient->request('POST', self::BASE_URL . self::TRANSACTION_ENDPOINT, [
@@ -105,13 +114,17 @@ class OzonAdapter implements MarketplaceAdapterInterface
                     'page' => $page,
                     'page_size' => self::PAGE_SIZE,
                 ],
+                'timeout' => self::REQUEST_TIMEOUT,
             ]);
 
             $data = $response->toArray();
             $operations = $data['result']['operations'] ?? [];
-            $pageCount = $data['result']['page_count'] ?? 1;
+            $pageCount = (int) ($data['result']['page_count'] ?? 1);
 
-            $allOperations = array_merge($allOperations, $operations);
+            // In-place append: array_merge в цикле переписывал бы весь аккумулятор каждую итерацию.
+            if ($operations !== []) {
+                array_push($allOperations, ...$operations);
+            }
 
             $this->logger->info('Ozon transactions fetched', [
                 'page' => $page,
@@ -119,7 +132,16 @@ class OzonAdapter implements MarketplaceAdapterInterface
                 'operations_on_page' => count($operations),
             ]);
 
-            $page++;
+            ++$page;
+
+            if ($page > self::MAX_PAGES && $page <= $pageCount) {
+                $this->logger->warning('Ozon transaction pagination cap reached; remaining pages skipped', [
+                    'company_id' => (string) $company->getId(),
+                    'fetched_pages' => self::MAX_PAGES,
+                    'reported_page_count' => $pageCount,
+                ]);
+                break;
+            }
         } while ($page <= $pageCount);
 
         return $allOperations;
