@@ -1,15 +1,17 @@
+DOCKER_COMPOSE ?= $(shell if docker compose version >/dev/null 2>&1; then printf 'docker compose'; elif docker-compose version >/dev/null 2>&1; then printf 'docker-compose'; else printf 'docker compose'; fi)
+
 init: docker-down-clear site-clear docker-up site-init
 
 docker-up:
-	docker-compose up -d
+	$(DOCKER_COMPOSE) up -d
 down:
-	docker-compose down --remove-orphans
+	$(DOCKER_COMPOSE) down --remove-orphans
 docker-down-clear:
-	docker-compose down -v --remove-orphans
+	$(DOCKER_COMPOSE) down -v --remove-orphans
 docker-pull:
-	docker-compose pull
+	$(DOCKER_COMPOSE) pull
 docker-build:
-	docker-compose build --pull
+	$(DOCKER_COMPOSE) build --pull
 
 site-clear:
 	docker run --rm -v ${PWD}/site:/app -w /app alpine sh -c 'rm -rf  .ready var/cache/* var/log/* var/test/*'
@@ -17,56 +19,56 @@ site-clear:
 site-init: site-composer-install site-wait-db site-migrations site-fixtures site-frontend-install
 
 site-composer-install:
-	docker-compose run --rm site-php-cli composer install
+	$(DOCKER_COMPOSE) run --rm site-php-cli composer install
 
 site-frontend-install:
-	docker-compose run --rm site-frontend npm run build
+	$(DOCKER_COMPOSE) run --rm site-frontend npm run build
 
 site-wait-db:
-	until docker-compose exec -T site-postgres pg_isready --timeout=0 --dbname=app ; do sleep 1 ; done
+	until $(DOCKER_COMPOSE) exec -T site-postgres pg_isready --timeout=0 --dbname=app ; do sleep 1 ; done
 
 site-migrations:
-	docker-compose run --rm site-php-cli php bin/console doctrine:migrations:migrate --no-interaction
+	$(DOCKER_COMPOSE) run --rm site-php-cli php bin/console doctrine:migrations:migrate --no-interaction
 
 site-fixtures:
-	docker-compose run --rm site-php-cli php bin/console doctrine:fixtures:load --no-interaction
+	$(DOCKER_COMPOSE) run --rm site-php-cli php bin/console doctrine:fixtures:load --no-interaction
 
 site-cs-check:
-	docker-compose run --rm site-php-cli composer cs:check   # Проверка PHP-стиля
+	$(DOCKER_COMPOSE) run --rm site-php-cli composer cs:check   # Проверка PHP-стиля
 
 site-cs-fix:
-	docker-compose run --rm site-php-cli composer cs:fix # Автопочинка PHP-стиля
-    #docker-compose run --rm site-php-cli composer cs:phpcs   # Проверка через phpcs (PSR-12)
-    #docker-compose run --rm site-php-cli composer cs:twig    # Линт Twig-шаблонов
+	$(DOCKER_COMPOSE) run --rm site-php-cli composer cs:fix # Автопочинка PHP-стиля
+    #$(DOCKER_COMPOSE) run --rm site-php-cli composer cs:phpcs   # Проверка через phpcs (PSR-12)
+    #$(DOCKER_COMPOSE) run --rm site-php-cli composer cs:twig    # Линт Twig-шаблонов
 
 # ===== TESTS =====
 
 site-test-telegram:
-	 docker-compose run --rm site-php-cli composer test -- --testsuite telegram
+	 $(DOCKER_COMPOSE) run --rm site-php-cli composer test -- --testsuite telegram
 
 # Быстрые юнит-тесты (без БД)
 site-test-unit:
-	docker-compose run --rm site-php-cli composer test:unit
+	$(DOCKER_COMPOSE) run --rm site-php-cli composer test:unit
 
 # Интеграционные (только запуск; подготовка БД отдельно через site-test-prepare)
 site-test-int: site-test-integration
 
 site-test-integration: site-test-wait-db
-	docker-compose run --rm site-php-cli composer test:integration
+	$(DOCKER_COMPOSE) run --rm site-php-cli composer test:integration
 
 # Все тесты
 site-test: site-test-prepare
-	docker-compose run --rm site-php-cli composer test
+	$(DOCKER_COMPOSE) run --rm site-php-cli composer test
 
 # ---- подготовка окружения тестов (smoke) ----
 site-test-smoke-init: site-test-env site-test-wait-db site-test-db site-test-migrations
 
 site-test-smoke: site-test-smoke-init
-	docker-compose run --rm -T site-php-cli php bin/phpunit -c phpunit.xml --testsuite=integration --filter SmokePersistenceTest
+	$(DOCKER_COMPOSE) run --rm -T site-php-cli php bin/phpunit -c phpunit.xml --testsuite=integration --filter SmokePersistenceTest
 
 # Покрытие (нужен xdebug или pcov в CLI-образе)
 site-test-cov: site-test-prepare
-	docker-compose run --rm -e XDEBUG_MODE=coverage site-php-cli ./vendor/bin/phpunit -c phpunit.xml --coverage-html var/coverage --coverage-text
+	$(DOCKER_COMPOSE) run --rm -e XDEBUG_MODE=coverage site-php-cli ./vendor/bin/phpunit -c phpunit.xml --coverage-html var/coverage --coverage-text
 
 # ---- подготовка окружения тестов ----
 site-test-init: site-test-prepare
@@ -75,29 +77,29 @@ site-test-prepare: site-composer-install site-test-env site-test-wait-db site-te
 
 site-test-env:
 	# .env.test (если нет — скопируем из .env)
-	docker-compose run --rm -T site-php-cli sh -lc 'test -f .env.test || cp .env .env.test'
-	docker-compose run --rm site-php-cli php bin/console cache:clear --env=test
+	$(DOCKER_COMPOSE) run --rm -T site-php-cli sh -lc 'test -f .env.test || cp .env .env.test'
+	$(DOCKER_COMPOSE) run --rm site-php-cli php bin/console cache:clear --env=test
 
 site-test-wait-db:
 	# Ждём Postgres
-	until docker-compose exec -T site-postgres pg_isready --timeout=0 --dbname=app ; do sleep 1 ; done
+	until $(DOCKER_COMPOSE) exec -T site-postgres pg_isready --timeout=0 --dbname=app ; do sleep 1 ; done
 
 site-test-db:
-	docker-compose run --rm -T site-php-cli php bin/console doctrine:database:create --if-not-exists --env=test
+	$(DOCKER_COMPOSE) run --rm -T site-php-cli php bin/console doctrine:database:create --if-not-exists --env=test
 
 site-test-migrations:
-	docker-compose run --rm site-php-cli php bin/console doctrine:migrations:migrate --no-interaction --env=test
+	$(DOCKER_COMPOSE) run --rm site-php-cli php bin/console doctrine:migrations:migrate --no-interaction --env=test
 
 site-test-fixtures:
 	# Если для интеграционных нужны данные — загружаем минимальные фикстуры
-	docker-compose run --rm site-php-cli php bin/console doctrine:fixtures:load --no-interaction --env=test
+	$(DOCKER_COMPOSE) run --rm site-php-cli php bin/console doctrine:fixtures:load --no-interaction --env=test
 
 # Полный пересоздатeль test-БД (на случай поломанных фикстур)
 site-test-db-rebuild: site-test-wait-db
-	docker-compose run --rm site-php-cli php bin/console doctrine:database:drop --force --env=test
-	docker-compose run --rm site-php-cli php bin/console doctrine:database:create --env=test
-	docker-compose run --rm site-php-cli php bin/console doctrine:migrations:migrate --no-interaction --env=test
-	docker-compose run --rm site-php-cli php bin/console doctrine:fixtures:load --no-interaction --env=test
+	$(DOCKER_COMPOSE) run --rm site-php-cli php bin/console doctrine:database:drop --force --env=test
+	$(DOCKER_COMPOSE) run --rm site-php-cli php bin/console doctrine:database:create --env=test
+	$(DOCKER_COMPOSE) run --rm site-php-cli php bin/console doctrine:migrations:migrate --no-interaction --env=test
+	$(DOCKER_COMPOSE) run --rm site-php-cli php bin/console doctrine:fixtures:load --no-interaction --env=test
 
 # ===== CODEX TESTS =====
 
@@ -131,24 +133,24 @@ codex-test-unit-filter: codex-prepare
 
 # Экспорт OpenAPI-спеки в JSON-файл (через PHP CLI — не требует HTTP и auth)
 api-doc-export:
-	docker compose exec -T site-php-cli sh -c "php bin/console nelmio:apidoc:dump --format=json > var/openapi.json"
+	$(DOCKER_COMPOSE) exec -T site-php-cli sh -c "php bin/console nelmio:apidoc:dump --format=json > var/openapi.json"
 	@echo "✓ OpenAPI spec exported to site/var/openapi.json"
 
 # Lint спеки через Spectral (опционально, нужен сконфигурированный контейнер с node)
 api-doc-lint: api-doc-export
-	docker compose exec -T site-frontend sh -c "npx -y @stoplight/spectral-cli lint var/openapi.json"
+	$(DOCKER_COMPOSE) exec -T site-frontend sh -c "npx -y @stoplight/spectral-cli lint var/openapi.json"
 
 # Основная команда разработчика: сгенерировать TS-типы из экспортированной спеки
 api-types:
-	docker compose exec -T site-php-cli sh -c "php bin/console nelmio:apidoc:dump --format=json > var/openapi.json"
-	docker compose exec -T site-frontend sh -c "npx openapi-typescript var/openapi.json -o assets/api/schema.d.ts"
+	$(DOCKER_COMPOSE) exec -T site-php-cli sh -c "php bin/console nelmio:apidoc:dump --format=json > var/openapi.json"
+	$(DOCKER_COMPOSE) exec -T site-frontend sh -c "npx openapi-typescript var/openapi.json -o assets/api/schema.d.ts"
 	@echo "✓ TS types regenerated at site/assets/api/schema.d.ts"
 	@echo "Don't forget to commit the updated schema.d.ts"
 
 # Проверка что закоммиченные типы соответствуют спеке (используется в CI)
 api-types-check:
-	docker compose exec -T site-php-cli sh -c "php bin/console nelmio:apidoc:dump --format=json > var/openapi.json"
-	docker compose exec -T site-frontend sh -c "npx openapi-typescript var/openapi.json -o /tmp/schema.check.d.ts && diff /tmp/schema.check.d.ts assets/api/schema.d.ts"
+	$(DOCKER_COMPOSE) exec -T site-php-cli sh -c "php bin/console nelmio:apidoc:dump --format=json > var/openapi.json"
+	$(DOCKER_COMPOSE) exec -T site-frontend sh -c "npx openapi-typescript var/openapi.json -o /tmp/schema.check.d.ts && diff /tmp/schema.check.d.ts assets/api/schema.d.ts"
 
 build: build-site
 
@@ -161,13 +163,13 @@ try-build:
 	REGISTRY=localhost IMAGE_TAG=0 make build
 
 sched-up:
-	docker compose up -d scheduler
+	$(DOCKER_COMPOSE) up -d scheduler
 
 sched-logs:
-	docker compose logs -f scheduler
+	$(DOCKER_COMPOSE) logs -f scheduler
 
 sched-test:
-	docker compose exec scheduler supercronic -test /etc/crontabs/app.cron
+	$(DOCKER_COMPOSE) exec scheduler supercronic -test /etc/crontabs/app.cron
 
 sched-down:
-	docker compose stop scheduler
+	$(DOCKER_COMPOSE) stop scheduler
