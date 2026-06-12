@@ -14,10 +14,10 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\MarketplaceAds\AdLoadJobBuilder;
 use App\Tests\Builders\MarketplaceAds\AdScheduledBatchBuilder;
-use App\Tests\Support\Kernel\IntegrationTestCase;
+use App\Tests\Support\Kernel\PostgresResetTestCase;
 use Doctrine\DBAL\DriverManager;
 
-final class AdScheduledBatchRepositoryTest extends IntegrationTestCase
+final class AdScheduledBatchRepositoryTest extends PostgresResetTestCase
 {
     private const COMPANY_ID = '11111111-1111-1111-1111-000000000001';
     private const OWNER_ID = '22222222-2222-2222-2222-000000000001';

@@ -16,7 +16,7 @@ final class ProductPurchasePricePersistenceTest extends IntegrationTestCase
     {
         $this->resetDb();
 
-        $em = $this->em();
+        $em = $this->em;
         $owner = UserBuilder::aUser()->withEmail('owner-product-purchase-price@example.test')->build();
         $company = CompanyBuilder::aCompany()
             ->withId('11111111-1111-1111-1111-111111111190')
@@ -46,7 +46,7 @@ final class ProductPurchasePricePersistenceTest extends IntegrationTestCase
         $em->flush();
         $em->clear();
 
-        $loaded = $this->em()->getRepository(ProductPurchasePrice::class)->find('44444444-4444-4444-4444-444444444490');
+        $loaded = $this->em->getRepository(ProductPurchasePrice::class)->find('44444444-4444-4444-4444-444444444490');
 
         self::assertInstanceOf(ProductPurchasePrice::class, $loaded);
         self::assertSame('11111111-1111-1111-1111-111111111190', $loaded->getCompany()->getId());

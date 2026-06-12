@@ -18,4 +18,5 @@ return [
     Sentry\SentryBundle\SentryBundle::class => ['all' => true],
     Pentatrion\ViteBundle\PentatrionViteBundle::class => ['all' => true],
     Nelmio\ApiDocBundle\NelmioApiDocBundle::class => ['all' => true],
+    DAMA\DoctrineTestBundle\DAMADoctrineTestBundle::class => ['test' => true],
 ];
