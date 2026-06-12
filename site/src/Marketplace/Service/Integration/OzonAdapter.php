@@ -142,8 +142,13 @@ class OzonAdapter implements MarketplaceAdapterInterface
                 continue;
             }
 
+            $operationDate = $this->parseOperationDate($op['operation_date'] ?? null);
+            if (null === $operationDate) {
+                $this->logger->warning('Ozon operation skipped: invalid operation_date', ['operation_id' => $op['operation_id'] ?? null]);
+                continue;
+            }
+
             $postingNumber = $op['posting']['posting_number'] ?? '';
-            $operationDate = new \DateTimeImmutable($op['operation_date']);
             $items = $op['items'] ?? [];
 
             // SKU первого товара в операции
@@ -174,7 +179,11 @@ class OzonAdapter implements MarketplaceAdapterInterface
 
         foreach ($operations as $op) {
             $operationId = (string)($op['operation_id'] ?? '');
-            $operationDate = new \DateTimeImmutable($op['operation_date']);
+            $operationDate = $this->parseOperationDate($op['operation_date'] ?? null);
+            if (null === $operationDate) {
+                $this->logger->warning('Ozon operation skipped: invalid operation_date', ['operation_id' => $op['operation_id'] ?? null]);
+                continue;
+            }
             $postingNumber = $op['posting']['posting_number'] ?? '';
             $items = $op['items'] ?? [];
             $sku = !empty($items) ? (string)$items[0]['sku'] : null;
@@ -267,8 +276,13 @@ class OzonAdapter implements MarketplaceAdapterInterface
                 continue;
             }
 
+            $operationDate = $this->parseOperationDate($op['operation_date'] ?? null);
+            if (null === $operationDate) {
+                $this->logger->warning('Ozon operation skipped: invalid operation_date', ['operation_id' => $op['operation_id'] ?? null]);
+                continue;
+            }
+
             $postingNumber = $op['posting']['posting_number'] ?? '';
-            $operationDate = new \DateTimeImmutable($op['operation_date']);
             $items = $op['items'] ?? [];
             $sku = !empty($items) ? (string)$items[0]['sku'] : '';
 
@@ -356,6 +370,24 @@ class OzonAdapter implements MarketplaceAdapterInterface
 
         // Прочее
         return 'ozon_other_service';
+    }
+
+    /**
+     * Безопасный разбор даты операции из ответа Ozon.
+     * Возвращает null, если поле отсутствует/пустое/имеет некорректный формат —
+     * вызывающий пропускает такую операцию, не роняя обработку всего батча.
+     */
+    private function parseOperationDate(mixed $value): ?\DateTimeImmutable
+    {
+        if (!is_string($value) || '' === $value) {
+            return null;
+        }
+
+        try {
+            return new \DateTimeImmutable($value);
+        } catch (\Exception) {
+            return null;
+        }
     }
 
     private function buildHeaders(MarketplaceConnection $connection): array

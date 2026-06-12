@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Marketplace\Application\Processor;
 
 use App\Company\Entity\Company;
-use App\Marketplace\Application\ProcessWbSalesAction;
 use App\Marketplace\Application\Processor\WbSalesRawProcessor;
+use App\Marketplace\Application\ProcessWbSalesAction;
 use App\Marketplace\Application\Service\MarketplaceBarcodeCatalogService;
 use App\Marketplace\Application\Service\MarketplaceCostPriceResolver;
 use App\Marketplace\Application\Service\WbListingResolverService;
@@ -42,10 +42,31 @@ final class WbSalesRawProcessorRevenueTest extends TestCase
 
         self::assertCount(1, $result['sales']);
         self::assertSame([['123']], $result['nmIdsCalls']);
-        self::assertSame('2493', $result['sales'][0]->getTotalRevenue());
-        self::assertSame('2493', $result['sales'][0]->getPricePerUnit());
+        self::assertSame('2493.00', $result['sales'][0]->getTotalRevenue());
+        self::assertSame('2493.00', $result['sales'][0]->getPricePerUnit());
         self::assertNotSame('1607', $result['sales'][0]->getTotalRevenue());
         self::assertSame('2026-01-10', $result['sales'][0]->getSaleDate()->format('Y-m-d'));
+    }
+
+    /**
+     * M1: цена за единицу считается через bcmath с точностью 2 знака —
+     * неделящаяся сумма не должна давать длинный float-хвост.
+     */
+    public function testPricePerUnitUsesTwoDecimalBcmathForNonDivisibleQuantity(): void
+    {
+        $result = $this->runProcessorWithRow([
+            'doc_type_name' => 'Продажа',
+            'retail_price_withdisc_rub' => 1000,
+            'quantity' => 3,
+            'srid' => 'WB-ORDER-DIV',
+            'nm_id' => '123',
+            'ts_name' => 'XL',
+            'sale_dt' => '2026-01-10 10:00:00',
+        ]);
+
+        self::assertCount(1, $result['sales']);
+        self::assertSame('1000.00', $result['sales'][0]->getTotalRevenue());
+        self::assertSame('333.33', $result['sales'][0]->getPricePerUnit());
     }
 
     public function testCamelCaseSaleCreatesSaleAndListingWithNormalizedMetadata(): void
@@ -70,7 +91,7 @@ final class WbSalesRawProcessorRevenueTest extends TestCase
 
         self::assertCount(1, $result['sales']);
         self::assertSame('test-sale-srid-1', $result['sales'][0]->getExternalOrderId());
-        self::assertSame('2099', $result['sales'][0]->getTotalRevenue());
+        self::assertSame('2099.00', $result['sales'][0]->getTotalRevenue());
         self::assertNotSame('1584', $result['sales'][0]->getTotalRevenue());
 
         self::assertCount(1, $result['createdListings']);
@@ -87,6 +108,7 @@ final class WbSalesRawProcessorRevenueTest extends TestCase
 
     /**
      * @param array<string, mixed> $row
+     *
      * @return array{sales: list<MarketplaceSale>, createdListings: list<MarketplaceListing>, nmIdsCalls: list<list<string>>}
      */
     private function runProcessorWithRow(array $row, bool $forceResolve = false): array
