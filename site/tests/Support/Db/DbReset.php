@@ -22,7 +22,12 @@ final class DbReset
             return;
         }
 
-        $quotedTables = array_map([$connection, 'quoteIdentifier'], $tableNames);
+        // listTableNames() возвращает зарезервированные имена уже в кавычках ("user") —
+        // снимаем их перед повторным квотированием, иначе получится ""user"".
+        $quotedTables = array_map(
+            static fn (string $t): string => $connection->quoteIdentifier(trim($t, '"')),
+            $tableNames,
+        );
         $tableList = implode(', ', $quotedTables);
 
         $connection->executeStatement("SET session_replication_role = 'replica'");

@@ -41,9 +41,9 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
 
     public function testEmptyResponseMarksEmptyWithoutRawDocumentAndWithoutDispatch(): void
     {
+        $bus = $this->swapBusSpy();
         $company = $this->createCompany(9201);
         $connection = $this->createWbSellerConnection($company, 9201);
-        $bus = $this->swapBusSpy();
         $this->swapWbClient([new MockResponse('', ['http_code' => 204])]);
 
         $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
@@ -58,9 +58,9 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
 
     public function testRowsResponseCreatesRawDocumentMarksProcessingAndDispatches(): void
     {
+        $bus = $this->swapBusSpy();
         $company = $this->createCompany(9202);
         $connection = $this->createWbSellerConnection($company, 9202);
-        $bus = $this->swapBusSpy();
         $this->swapWbClient([new MockResponse('[{"rrdId":11},{"rrdId":12}]', ['http_code' => 200])]);
 
         $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
@@ -101,13 +101,37 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
         }
     }
 
+    public function testTrulyUnexpectedExceptionMarksFailedRetryableAndRethrows(): void
+    {
+        $company = $this->createCompany(9305);
+        $connection = $this->createWbSellerConnection($company, 9305);
+        $http = new MockHttpClient(static function (): MockResponse {
+            throw new \RuntimeException('boom: unexpected infrastructure error');
+        });
+        self::getContainer()->set(WbFinanceSalesReportClient::class, new WbFinanceSalesReportClient($http, $this->createRateLimiter()));
+
+        $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
+        $this->expectException(\RuntimeException::class);
+
+        try {
+            $handler($this->message($company->getId(), $connection->getId(), false));
+        } finally {
+            $status = $this->findStatus($connection->getId(), $company->getId(), '2026-05-19');
+            self::assertNotNull($status);
+            self::assertSame(FinancialReportSyncStatus::FAILED, $status->getStatus());
+            self::assertNotNull($status->getNextRetryAt(), 'Статус должен остаться видимым для retry-планировщика.');
+            self::assertSame(\RuntimeException::class, $status->getLastErrorClass());
+            self::assertSame('boom: unexpected infrastructure error', $status->getLastErrorMessage());
+        }
+    }
+
     public function testRemote429SetsSharedCooldownAndNextDaySkipsHttp(): void
     {
+        $bus = $this->swapBusSpy();
         $company = $this->createCompany(9291);
         $connection = $this->createWbSellerConnection($company, 9291);
         $connection->setSettings(['seller_id' => 'seller-9291']);
         $this->em->flush();
-        $bus = $this->swapBusSpy();
         $storage = new InMemoryWbFinanceCooldownStorage();
         $requestCount = 0;
         $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
@@ -136,11 +160,11 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
 
     public function testConnectionFallbackBucketsAllowTwoUnknownSellerConnectionsToCallApiBackToBack(): void
     {
+        $this->swapBusSpy();
         $companyA = $this->createCompany(9292);
         $companyB = $this->createCompany(9293);
         $connectionA = $this->createWbSellerConnection($companyA, 9292);
         $connectionB = $this->createWbSellerConnection($companyB, 9293);
-        $this->swapBusSpy();
         $requestCount = 0;
         $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
             ++$requestCount;
@@ -156,7 +180,7 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
         self::assertSame(2, $requestCount);
         $secondStatus = $this->findStatus($connectionB->getId(), $companyB->getId(), '2026-05-19');
         self::assertNotNull($secondStatus);
-        self::assertSame(FinancialReportSyncStatus::SUCCESS, $secondStatus->getStatus());
+        self::assertSame(FinancialReportSyncStatus::EMPTY, $secondStatus->getStatus());
     }
 
     public function testCooldownExpiresAndAllowsApiRequestAgain(): void
@@ -202,9 +226,9 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
 
     public function testForceRefreshIsPropagatedToProcessDayReportMessage(): void
     {
+        $bus = $this->swapBusSpy();
         $company = $this->createCompany(9205);
         $connection = $this->createWbSellerConnection($company, 9205);
-        $bus = $this->swapBusSpy();
         $this->swapWbClient([new MockResponse('[{"rrdId":2}]', ['http_code' => 200])]);
 
         $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
@@ -217,10 +241,10 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
 
     public function testExistingCompletedRawWithForceFalseUsesCanonicalRawDocument(): void
     {
+        $bus = $this->swapBusSpy();
         $company = $this->createCompany(9206);
         $connection = $this->createWbSellerConnection($company, 9206);
         $existing = $this->createRaw($company, new \DateTimeImmutable('2026-05-19'), [['rrdId' => 100]], 1, PipelineStatus::COMPLETED);
-        $bus = $this->swapBusSpy();
         $this->swapWbClient([new MockResponse('[{"rrdId":200}]', ['http_code' => 200])]);
 
         $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
@@ -403,9 +427,9 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
 
     public function testDuplicateContinuationAfterFinalPageIsSkippedWithoutCallingWbApi(): void
     {
+        $bus = $this->swapBusSpy();
         $company = $this->createCompany(9216);
         $connection = $this->createWbSellerConnection($company, 9216);
-        $bus = $this->swapBusSpy();
         $firstPageRows = $this->pageRows(1, WbFinanceSalesReportClient::PAGE_SIZE);
         $this->swapWbClient([new MockResponse(json_encode($firstPageRows, JSON_THROW_ON_ERROR), ['http_code' => 200])]);
 
@@ -414,18 +438,16 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
         $continuation = $this->filterSyncMessages($bus->messages)[0] ?? null;
         self::assertInstanceOf(SyncWbFinancialReportDayMessage::class, $continuation);
 
+        $this->makeStatusRetryDue($company->getId(), '2026-05-19');
         $this->swapWbClient([new MockResponse('[{"rrdId":100001}]', ['http_code' => 200])]);
         $handler($continuation);
 
         $requestCount = 0;
-        self::getContainer()->set(WbFinanceSalesReportClient::class, new WbFinanceSalesReportClient(
-            new MockHttpClient(static function () use (&$requestCount): MockResponse {
-                ++$requestCount;
+        $this->swapWbClient(static function () use (&$requestCount): MockResponse {
+            ++$requestCount;
 
-                return new MockResponse('[]', ['http_code' => 200]);
-            }),
-            $this->createRateLimiter(),
-        ));
+            return new MockResponse('[]', ['http_code' => 200]);
+        });
         $handler($continuation);
 
         self::assertSame(0, $requestCount);
@@ -433,9 +455,9 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
 
     public function testTerminalFailureAfterPartialPageMarksStagingRawDocumentFailed(): void
     {
+        $bus = $this->swapBusSpy();
         $company = $this->createCompany(9217);
         $connection = $this->createWbSellerConnection($company, 9217);
-        $bus = $this->swapBusSpy();
         $firstPageRows = $this->pageRows(1, WbFinanceSalesReportClient::PAGE_SIZE);
         $this->swapWbClient([new MockResponse(json_encode($firstPageRows, JSON_THROW_ON_ERROR), ['http_code' => 200])]);
 
@@ -446,6 +468,7 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
         $rawDocumentId = $continuation->rawDocumentId;
         self::assertNotNull($rawDocumentId);
 
+        $this->makeStatusRetryDue($company->getId(), '2026-05-19');
         $this->swapWbClient([new MockResponse('{"error":"bad request"}', ['http_code' => 400])]);
         $this->expectException(UnrecoverableMessageHandlingException::class);
 
@@ -466,9 +489,9 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
 
     public function testHandlerRespectsPersistedFutureNextRetryAtWithoutCallingWbApi(): void
     {
+        $bus = $this->swapBusSpy();
         $company = $this->createCompany(9218);
         $connection = $this->createWbSellerConnection($company, 9218);
-        $bus = $this->swapBusSpy();
         $status = new MarketplaceFinancialReportSyncStatus(
             'cccccccc-cccc-4ccc-8ccc-000000009218',
             $company->getId(),
@@ -541,10 +564,76 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
         return $raw;
     }
 
-    /** @param list<MockResponse> $responses */
-    private function swapWbClient(array $responses): void
+    /** @var list<MockResponse> */
+    private array $wbMockResponses = [];
+
+    private ?\Closure $wbMockResponseFactory = null;
+
+    private bool $wbClientSwapped = false;
+
+    /**
+     * Подменяет WB-клиент один раз за тест; повторные вызовы лишь заменяют очередь
+     * mock-ответов — TestContainer не позволяет заменить уже инициализированный сервис.
+     *
+     * @param list<MockResponse>|\Closure $responses
+     */
+    private function swapWbClient(array|\Closure $responses): void
     {
-        self::getContainer()->set(WbFinanceSalesReportClient::class, new WbFinanceSalesReportClient(new MockHttpClient($responses), $this->createRateLimiter()));
+        if ($responses instanceof \Closure) {
+            $this->wbMockResponseFactory = $responses;
+            $this->wbMockResponses = [];
+        } else {
+            $this->wbMockResponseFactory = null;
+            $this->wbMockResponses = $responses;
+        }
+
+        if ($this->wbClientSwapped) {
+            return;
+        }
+
+        $http = new MockHttpClient(function (): MockResponse {
+            if (null !== $this->wbMockResponseFactory) {
+                return ($this->wbMockResponseFactory)();
+            }
+
+            $response = array_shift($this->wbMockResponses);
+            if (!$response instanceof MockResponse) {
+                throw new \LogicException('No queued WB mock response left.');
+            }
+
+            return $response;
+        });
+
+        // Щедрый лимит: до редизайна каждый swap создавал свежий limiter с полным
+        // бюджетом; теперь клиент один на тест, и локальный троттлинг не должен
+        // мешать сценариям с несколькими вызовами handler'а. Поведение троттлинга
+        // проверяют отдельные тесты со своими клиентами.
+        $limiter = new WbFinanceRateLimiter(
+            new RateLimiterFactory(['id' => 'wb_finance', 'policy' => 'token_bucket', 'limit' => 1000, 'rate' => ['interval' => '61 seconds', 'amount' => 1000]], new InMemoryStorage()),
+            new MockClock('2026-01-01T00:00:00Z'),
+            null,
+            null,
+        );
+        self::getContainer()->set(WbFinanceSalesReportClient::class, new WbFinanceSalesReportClient($http, $limiter));
+        $this->wbClientSwapped = true;
+    }
+
+    /**
+     * Continuation в проде приходит после задержки (financeRetryDelaySeconds = 70 с),
+     * поэтому next_retry_at сдвигается в прошлое — иначе handler уйдёт в постпон-ветку
+     * и не дойдёт до API-запроса.
+     */
+    private function makeStatusRetryDue(string $companyId, string $day): void
+    {
+        $this->em->getConnection()->executeStatement(
+            'UPDATE marketplace_financial_report_sync_statuses SET next_retry_at = :ts WHERE company_id = :companyId AND business_date = :day',
+            [
+                'ts' => (new \DateTimeImmutable('-5 minutes'))->format('Y-m-d H:i:s'),
+                'companyId' => $companyId,
+                'day' => $day,
+            ],
+        );
+        $this->em->clear();
     }
 
     private function swapBusSpy(): object

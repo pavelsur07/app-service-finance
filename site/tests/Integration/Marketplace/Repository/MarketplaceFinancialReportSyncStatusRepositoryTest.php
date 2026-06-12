@@ -11,6 +11,7 @@ use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
 
@@ -34,7 +35,7 @@ final class MarketplaceFinancialReportSyncStatusRepositoryTest extends Integrati
 
         $now = new \DateTimeImmutable('2026-01-05 12:00:00');
 
-        $this->persistStatus($companyId, $connectionId, '2026-01-01', FinancialReportSyncStatus::FAILED, null);
+        $this->persistStatus($companyId, $connectionId, '2026-01-01', FinancialReportSyncStatus::FAILED, new \DateTimeImmutable('2026-01-05 10:00:00'));
         $this->persistStatus($companyId, $connectionId, '2026-01-02', FinancialReportSyncStatus::FAILED, new \DateTimeImmutable('2026-01-05 11:00:00'));
         $this->persistStatus($companyId, $connectionId, '2026-01-03', FinancialReportSyncStatus::FAILED, new \DateTimeImmutable('2026-01-05 13:00:00'));
         $this->persistStatus($companyId, $connectionId, '2026-01-04', FinancialReportSyncStatus::SUCCESS);
@@ -63,6 +64,84 @@ final class MarketplaceFinancialReportSyncStatusRepositoryTest extends Integrati
         self::assertSame([FinancialReportSyncMode::MISSING, FinancialReportSyncMode::MISSING], array_map(static fn (array $item): FinancialReportSyncMode => $item['mode'], $days));
     }
 
+
+    public function testFindRetryDueDaysReturnsStuckQueuedAndLoadingOlderThanReclaimInterval(): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $connectionId = '22222222-2222-4222-8222-222222222222';
+        $this->seedActiveConnection($companyId, $connectionId);
+
+        $this->persistStatus($companyId, $connectionId, '2026-01-01', FinancialReportSyncStatus::QUEUED);
+        $this->persistStatus($companyId, $connectionId, '2026-01-02', FinancialReportSyncStatus::QUEUED);
+        $this->persistStatus($companyId, $connectionId, '2026-01-03', FinancialReportSyncStatus::LOADING);
+        $this->persistStatus($companyId, $connectionId, '2026-01-04', FinancialReportSyncStatus::LOADING);
+
+        $this->backdateStatusUpdatedAt($companyId, '2026-01-01');
+        $this->backdateStatusUpdatedAt($companyId, '2026-01-03');
+        $this->em->clear();
+
+        $days = $this->repository->findRetryDueDays(
+            $companyId,
+            $connectionId,
+            MarketplaceType::WILDBERRIES,
+            self::REPORT_TYPE,
+            new \DateTimeImmutable('2026-01-01 00:00:00'),
+            new \DateTimeImmutable('2026-01-10 00:00:00'),
+            new \DateTimeImmutable(),
+            10,
+        );
+
+        self::assertSame(
+            ['2026-01-01', '2026-01-03'],
+            array_map(static fn (array $item): string => $item['business_date']->format('Y-m-d'), $days),
+        );
+        self::assertSame(
+            [FinancialReportSyncMode::MISSING, FinancialReportSyncMode::DAILY],
+            array_map(static fn (array $item): FinancialReportSyncMode => $item['mode'], $days),
+        );
+    }
+
+    public function testClaimForQueueReclaimsOnlyStuckQueuedAndLoading(): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $connectionId = '22222222-2222-4222-8222-222222222222';
+        $this->seedActiveConnection($companyId, $connectionId);
+
+        $this->persistStatus($companyId, $connectionId, '2026-01-01', FinancialReportSyncStatus::QUEUED);
+        $this->persistStatus($companyId, $connectionId, '2026-01-02', FinancialReportSyncStatus::QUEUED);
+        $this->persistStatus($companyId, $connectionId, '2026-01-03', FinancialReportSyncStatus::LOADING);
+        $this->persistStatus($companyId, $connectionId, '2026-01-04', FinancialReportSyncStatus::LOADING);
+
+        $this->backdateStatusUpdatedAt($companyId, '2026-01-01');
+        $this->backdateStatusUpdatedAt($companyId, '2026-01-03');
+        $this->em->clear();
+
+        $now = new \DateTimeImmutable();
+        $claim = fn (string $day) => $this->repository->claimForQueue(
+            $connectionId,
+            $companyId,
+            MarketplaceType::WILDBERRIES,
+            self::REPORT_TYPE,
+            'endpoint',
+            new \DateTimeImmutable($day),
+            FinancialReportSyncMode::MISSING,
+            false,
+            $now,
+        );
+
+        $stuckQueued = $claim('2026-01-01 00:00:00');
+        self::assertInstanceOf(MarketplaceFinancialReportSyncStatus::class, $stuckQueued);
+        self::assertSame(FinancialReportSyncStatus::QUEUED, $stuckQueued->getStatus());
+        self::assertSame(FinancialReportSyncMode::MISSING, $stuckQueued->getMode());
+
+        self::assertNull($claim('2026-01-02 00:00:00'), 'Свежий QUEUED без next_retry_at ждёт своё сообщение и не переоткрывается.');
+
+        $stuckLoading = $claim('2026-01-03 00:00:00');
+        self::assertInstanceOf(MarketplaceFinancialReportSyncStatus::class, $stuckLoading);
+        self::assertSame(FinancialReportSyncStatus::QUEUED, $stuckLoading->getStatus());
+
+        self::assertNull($claim('2026-01-04 00:00:00'), 'Свежий LOADING — handler ещё работает, переоткрывать нельзя.');
+    }
 
     public function testFindStatusesForDateRangeFiltersByScopeRangeAndSortsAsc(): void
     {
@@ -373,8 +452,27 @@ final class MarketplaceFinancialReportSyncStatusRepositoryTest extends Integrati
     }
 
 
+    private function backdateStatusUpdatedAt(string $companyId, string $day, string $modify = '-3 hours'): void
+    {
+        $this->em->getConnection()->executeStatement(
+            'UPDATE marketplace_financial_report_sync_statuses SET updated_at = :ts WHERE company_id = :companyId AND business_date = :day',
+            [
+                'ts' => (new \DateTimeImmutable($modify))->format('Y-m-d H:i:s'),
+                'companyId' => $companyId,
+                'day' => $day,
+            ],
+        );
+    }
+
     private function seedConnectionForExistingCompany(string $companyId, string $connectionId): void
     {
+        // uniq_company_marketplace_type допускает один WB seller-кабинет на компанию:
+        // тесты «нового подключения» моделируют замену кабинета, поэтому старую строку убираем.
+        $this->em->getConnection()->executeStatement(
+            "DELETE FROM marketplace_connections WHERE company_id = :companyId AND marketplace = 'wildberries' AND connection_type = 'seller'",
+            ['companyId' => $companyId],
+        );
+
         $this->em->getConnection()->insert('marketplace_connections', [
             'id' => $connectionId,
             'company_id' => $companyId,
@@ -391,8 +489,13 @@ final class MarketplaceFinancialReportSyncStatusRepositoryTest extends Integrati
     {
         $existing = $this->em->find(Company::class, $companyId);
         if (!$existing instanceof Company) {
-            $company = CompanyBuilder::aCompany()->withId($companyId)->build();
-            $this->em->persist($company->getOwner());
+            $ownerId = Uuid::uuid7()->toString();
+            $owner = UserBuilder::aUser()
+                ->withId($ownerId)
+                ->withEmail(sprintf('owner+%s@example.test', $ownerId))
+                ->build();
+            $company = CompanyBuilder::aCompany()->withId($companyId)->withOwner($owner)->build();
+            $this->em->persist($owner);
             $this->em->persist($company);
             $this->em->flush();
         }

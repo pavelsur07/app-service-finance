@@ -14,8 +14,10 @@ use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Application\Command\SyncConnectionCommand;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Infrastructure\Query\OzonRealizationStatusQuery;
 use App\Marketplace\Infrastructure\Query\RawDocumentsListQuery;
+use App\Marketplace\Infrastructure\Query\WbFinanceSyncStatusListQuery;
 use App\Marketplace\Message\ReprocessCostsMessage;
 use App\Marketplace\Message\SyncOzonRealizationMessage;
 use App\Marketplace\Message\TriggerInitialSyncMessage;
@@ -54,6 +56,7 @@ class MarketplaceController extends AbstractController
         private readonly SyncConnectionAction             $syncConnectionAction,
         private readonly WbInitialSyncStartDateResolver   $wbInitialSyncStartDateResolver,
         private readonly WbFinancialReportSyncPlannerInterface $wbFinancialReportSyncPlanner,
+        private readonly WbFinanceSyncStatusListQuery     $wbFinanceSyncStatusListQuery,
     ) {
     }
 
@@ -77,11 +80,18 @@ class MarketplaceController extends AbstractController
             50,
         );
 
+        $wbFinanceSyncDays = array_map(static function (array $row): array {
+            $row['status_enum'] = FinancialReportSyncStatus::from((string) $row['status']);
+
+            return $row;
+        }, $this->wbFinanceSyncStatusListQuery->findRecentDays((string) $company->getId(), 14));
+
         return $this->render('marketplace/index.html.twig', [
             'connections'           => $connections,
             'rawDocumentsPager'     => $rawDocumentsPager,
             'availableMarketplaces' => MarketplaceType::cases(),
             'selectedMarketplace'   => $selectedMarketplace,
+            'wbFinanceSyncDays'     => $wbFinanceSyncDays,
         ]);
     }
 

@@ -46,7 +46,9 @@ abstract class IntegrationTestCase extends KernelTestCase
             if (!is_string($tableName) || '' === $tableName) {
                 continue;
             }
-            $tables[] = $tableName;
+            // В маппинге зарезервированные имена обёрнуты в backticks (`user`) —
+            // снимаем их, иначе имя не совпадёт со списком таблиц БД и таблица не очистится.
+            $tables[] = trim($tableName, '`');
         }
 
         $tables = array_values(array_unique($tables));
@@ -54,7 +56,12 @@ abstract class IntegrationTestCase extends KernelTestCase
             return;
         }
 
-        $existingTables = array_map('strtolower', $schemaManager->listTableNames());
+        // listTableNames() возвращает зарезервированные имена в кавычках ("user") —
+        // нормализуем, иначе такие таблицы не пройдут фильтр и не будут очищены.
+        $existingTables = array_map(
+            static fn (string $t): string => strtolower(trim($t, '"')),
+            $schemaManager->listTableNames(),
+        );
         $existingLookup = array_fill_keys($existingTables, true);
 
         $tables = array_values(array_filter(
