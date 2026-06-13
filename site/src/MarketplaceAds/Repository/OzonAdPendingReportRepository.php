@@ -159,10 +159,7 @@ class OzonAdPendingReportRepository extends ServiceEntityRepository
         ?string $errorMessage = null,
     ): int {
         if (!OzonAdPendingReportState::isTerminal($state)) {
-            throw new \InvalidArgumentException(sprintf(
-                'markFinalized принимает только терминальные state (OK/ERROR/ABANDONED), получено: %s',
-                $state,
-            ));
+            throw new \InvalidArgumentException(sprintf('markFinalized принимает только терминальные state (OK/ERROR/ABANDONED), получено: %s', $state));
         }
 
         return (int) $this->getEntityManager()->getConnection()->executeStatement(

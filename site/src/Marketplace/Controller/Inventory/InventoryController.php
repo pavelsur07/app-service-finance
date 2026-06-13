@@ -26,29 +26,29 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class InventoryController extends AbstractController
 {
     public function __construct(
-        private readonly ActiveCompanyService        $companyService,
-        private readonly InventoryCostListingQuery   $query,
+        private readonly ActiveCompanyService $companyService,
+        private readonly InventoryCostListingQuery $query,
         private readonly SetInventoryCostPriceAction $setAction,
         private readonly MarketplaceJobLogRepository $jobLogRepository,
-        private readonly MessageBusInterface         $messageBus,
+        private readonly MessageBusInterface $messageBus,
     ) {
     }
 
     #[Route('', name: 'marketplace_inventory_index', methods: ['GET'])]
     public function index(Request $request): Response
     {
-        $company     = $this->companyService->getActiveCompany();
-        $companyId   = (string) $company->getId();
+        $company = $this->companyService->getActiveCompany();
+        $companyId = (string) $company->getId();
 
-        $rawQuery    = $request->query->all();
+        $rawQuery = $request->query->all();
         $marketplace = self::stringOrNull($rawQuery['marketplace'] ?? null);
-        $search      = self::stringOrNull($rawQuery['q'] ?? null);
-        $pageRaw     = self::stringOrNull($rawQuery['page'] ?? null);
-        $page        = max(1, (int) ($pageRaw ?? '1'));
+        $search = self::stringOrNull($rawQuery['q'] ?? null);
+        $pageRaw = self::stringOrNull($rawQuery['page'] ?? null);
+        $page = max(1, (int) ($pageRaw ?? '1'));
 
-        if ($search !== null) {
+        if (null !== $search) {
             $search = trim($search);
-            if ($search === '') {
+            if ('' === $search) {
                 $search = null;
             }
         }
@@ -71,22 +71,22 @@ final class InventoryController extends AbstractController
         ]);
 
         return $this->render('marketplace/inventory/index.html.twig', [
-            'active_tab'  => 'inventory',
-            'pager'       => $pager,
+            'active_tab' => 'inventory',
+            'pager' => $pager,
             'marketplace' => $marketplace,
-            'search'      => $search,
-            'job_logs'    => $jobLogs,
+            'search' => $search,
+            'job_logs' => $jobLogs,
         ]);
     }
 
     #[Route('/{id}/history', name: 'marketplace_inventory_history', methods: ['GET'])]
     public function history(string $id): Response
     {
-        $company   = $this->companyService->getActiveCompany();
+        $company = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
         $meta = $this->query->findListingMeta($companyId, $id);
-        if ($meta === null) {
+        if (null === $meta) {
             throw $this->createNotFoundException('Листинг не найден.');
         }
 
@@ -94,29 +94,29 @@ final class InventoryController extends AbstractController
 
         return $this->render('marketplace/inventory/history.html.twig', [
             'active_tab' => 'inventory',
-            'listing'    => $meta,
-            'history'    => $history,
+            'listing' => $meta,
+            'history' => $history,
         ]);
     }
 
     #[Route('/{id}/set-cost', name: 'marketplace_inventory_set_cost', methods: ['POST'])]
     public function setCost(string $id, Request $request): Response
     {
-        $company   = $this->companyService->getActiveCompany();
+        $company = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
-        $priceAmount   = (string) $request->request->get('price_amount', '');
+        $priceAmount = (string) $request->request->get('price_amount', '');
         $effectiveFrom = (string) $request->request->get('effective_from', '');
-        $note          = (string) $request->request->get('note', '') ?: null;
+        $note = (string) $request->request->get('note', '') ?: null;
 
         try {
             $command = new SetInventoryCostPriceCommand(
-                companyId:     $companyId,
-                listingId:     $id,
+                companyId: $companyId,
+                listingId: $id,
                 effectiveFrom: new \DateTimeImmutable($effectiveFrom),
-                priceAmount:   $priceAmount,
-                currency:      'RUB',
-                note:          $note,
+                priceAmount: $priceAmount,
+                currency: 'RUB',
+                note: $note,
             );
 
             ($this->setAction)($command);
@@ -125,27 +125,27 @@ final class InventoryController extends AbstractController
         } catch (\DomainException $e) {
             $this->addFlash('error', $e->getMessage());
         } catch (\Exception $e) {
-            $this->addFlash('error', 'Ошибка сохранения: ' . $e->getMessage());
+            $this->addFlash('error', 'Ошибка сохранения: '.$e->getMessage());
         }
 
-        if ($request->request->get('return_to') === 'history') {
+        if ('history' === $request->request->get('return_to')) {
             return $this->redirectToRoute('marketplace_inventory_history', ['id' => $id]);
         }
 
-        $referer  = (string) $request->headers->get('referer', '');
-        $urlParts = $referer !== '' ? (parse_url($referer) ?: []) : [];
-        $path     = is_string($urlParts['path'] ?? null) ? $urlParts['path'] : '';
+        $referer = (string) $request->headers->get('referer', '');
+        $urlParts = '' !== $referer ? (parse_url($referer) ?: []) : [];
+        $path = is_string($urlParts['path'] ?? null) ? $urlParts['path'] : '';
 
-        if (str_contains($path, '/marketplace/inventory/' . $id . '/history')) {
+        if (str_contains($path, '/marketplace/inventory/'.$id.'/history')) {
             return $this->redirectToRoute('marketplace_inventory_history', ['id' => $id]);
         }
 
         $params = [];
-        $query  = is_string($urlParts['query'] ?? null) ? $urlParts['query'] : '';
-        if ($query !== '') {
+        $query = is_string($urlParts['query'] ?? null) ? $urlParts['query'] : '';
+        if ('' !== $query) {
             parse_str($query, $parsed);
             foreach (['marketplace', 'page', 'q'] as $key) {
-                if (isset($parsed[$key]) && is_string($parsed[$key]) && $parsed[$key] !== '') {
+                if (isset($parsed[$key]) && is_string($parsed[$key]) && '' !== $parsed[$key]) {
                     $params[$key] = $parsed[$key];
                 }
             }
@@ -157,7 +157,7 @@ final class InventoryController extends AbstractController
     #[Route('/sync-barcodes', name: 'marketplace_inventory_sync_barcodes', methods: ['POST'])]
     public function syncBarcodes(): Response
     {
-        $company   = $this->companyService->getActiveCompany();
+        $company = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
         $this->messageBus->dispatch(new SyncOzonListingBarcodesMessage(
@@ -171,6 +171,6 @@ final class InventoryController extends AbstractController
 
     private static function stringOrNull(mixed $raw): ?string
     {
-        return is_string($raw) && $raw !== '' ? $raw : null;
+        return is_string($raw) && '' !== $raw ? $raw : null;
     }
 }

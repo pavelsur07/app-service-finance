@@ -58,28 +58,59 @@ class UnitEconomyCostMapping
         Assert::uuid($costCategoryId);
         Assert::notEmpty($costCategoryName);
 
-        $this->id                  = $id;
-        $this->companyId           = $companyId;
-        $this->marketplace         = $marketplace;
+        $this->id = $id;
+        $this->companyId = $companyId;
+        $this->marketplace = $marketplace;
         $this->unitEconomyCostType = $unitEconomyCostType;
-        $this->costCategoryId      = $costCategoryId;
-        $this->costCategoryName    = $costCategoryName;
-        $this->createdAt           = new \DateTimeImmutable();
-        $this->updatedAt           = new \DateTimeImmutable();
+        $this->costCategoryId = $costCategoryId;
+        $this->costCategoryName = $costCategoryName;
+        $this->createdAt = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function remapTo(UnitEconomyCostType $newType): void
     {
         $this->unitEconomyCostType = $newType;
-        $this->updatedAt           = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
-    public function getId(): string { return $this->id; }
-    public function getCompanyId(): string { return $this->companyId; }
-    public function getMarketplace(): MarketplaceType { return $this->marketplace; }
-    public function getUnitEconomyCostType(): UnitEconomyCostType { return $this->unitEconomyCostType; }
-    public function getCostCategoryId(): string { return $this->costCategoryId; }
-    public function getCostCategoryName(): string { return $this->costCategoryName; }
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
-    public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
+    public function getId(): string
+    {
+        return $this->id;
+    }
+
+    public function getCompanyId(): string
+    {
+        return $this->companyId;
+    }
+
+    public function getMarketplace(): MarketplaceType
+    {
+        return $this->marketplace;
+    }
+
+    public function getUnitEconomyCostType(): UnitEconomyCostType
+    {
+        return $this->unitEconomyCostType;
+    }
+
+    public function getCostCategoryId(): string
+    {
+        return $this->costCategoryId;
+    }
+
+    public function getCostCategoryName(): string
+    {
+        return $this->costCategoryName;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    public function getUpdatedAt(): \DateTimeImmutable
+    {
+        return $this->updatedAt;
+    }
 }

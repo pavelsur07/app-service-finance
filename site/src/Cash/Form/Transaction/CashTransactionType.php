@@ -2,13 +2,13 @@
 
 namespace App\Cash\Form\Transaction;
 
+use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Entity\Company;
-use App\Cash\DTO\CashTransactionDTO;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Repository\ProjectDirectionRepository;
@@ -42,9 +42,9 @@ class CashTransactionType extends AbstractType
             ->add('occurredAt', DateType::class, ['widget' => 'single_text'])
             ->add('moneyAccount', ChoiceType::class, [
                 'choices' => $company ? $this->accountRepo->findBy(['company' => $company]) : [],
-                'choice_label' => fn (MoneyAccount $a) => $a->getName(),
+                'choice_label' => static fn (MoneyAccount $a) => $a->getName(),
                 'choice_value' => 'id',
-                'choice_attr' => fn (MoneyAccount $a) => ['data-currency' => $a->getCurrency()],
+                'choice_attr' => static fn (MoneyAccount $a) => ['data-currency' => $a->getCurrency()],
                 'mapped' => false,
             ])
             ->add('direction', ChoiceType::class, [
@@ -59,16 +59,16 @@ class CashTransactionType extends AbstractType
             ->add('cashflowCategory', ChoiceType::class, [
                 'required' => false,
                 'choices' => $company ? $this->categoryRepo->findTreeByCompany($company) : [],
-                'choice_label' => fn (CashflowCategory $c) => str_repeat("\u{a0}", $c->getLevel() - 1).$c->getName(),
+                'choice_label' => static fn (CashflowCategory $c) => str_repeat("\u{a0}", $c->getLevel() - 1).$c->getName(),
                 'choice_value' => 'id',
-                'choice_attr' => fn (CashflowCategory $c) => !$c->getChildren()->isEmpty() ? ['disabled' => 'disabled'] : [],
+                'choice_attr' => static fn (CashflowCategory $c) => !$c->getChildren()->isEmpty() ? ['disabled' => 'disabled'] : [],
                 'mapped' => false,
             ])
             ->add('projectDirection', ProjectDirectionPickerType::class, [
                 'required' => false,
                 'choices' => $company ? $this->projectDirectionRepo->findTreeByCompany($company) : [],
-                'choice_label' => fn (ProjectDirection $projectDirection) => str_repeat("\u{a0}", $projectDirection->getLevel() - 1).$projectDirection->getName(),
-                'choice_attr' => fn (ProjectDirection $projectDirection) => !$projectDirection->getChildren()->isEmpty() ? ['disabled' => 'disabled'] : [],
+                'choice_label' => static fn (ProjectDirection $projectDirection) => str_repeat("\u{a0}", $projectDirection->getLevel() - 1).$projectDirection->getName(),
+                'choice_attr' => static fn (ProjectDirection $projectDirection) => !$projectDirection->getChildren()->isEmpty() ? ['disabled' => 'disabled'] : [],
                 'mapped' => false,
             ])
             ->add('counterparty', ChoiceType::class, [
@@ -80,7 +80,7 @@ class CashTransactionType extends AbstractType
             ])
             ->add('description', TextareaType::class, ['required' => false]);
 
-        $builder->addEventListener(FormEvents::SUBMIT, function (FormEvent $event) use ($company) {
+        $builder->addEventListener(FormEvents::SUBMIT, static function (FormEvent $event) use ($company) {
             /** @var CashTransactionDTO $data */
             $data = $event->getData();
             $form = $event->getForm();

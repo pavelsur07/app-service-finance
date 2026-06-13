@@ -32,7 +32,7 @@ final class ReconciliationOvhCheckController extends AbstractController
     )]
     public function __invoke(): JsonResponse
     {
-        $company   = $this->activeCompanyService->getActiveCompany();
+        $company = $this->activeCompanyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
         // 1. category_exists
@@ -49,7 +49,7 @@ final class ReconciliationOvhCheckController extends AbstractController
         $categoryExists = $categoryRow ?: null;
 
         // 2. records_with_new_code
-        if ($categoryExists !== null) {
+        if (null !== $categoryExists) {
             $count = (int) $this->connection->fetchOne(
                 <<<'SQL'
                 SELECT COUNT(*)
@@ -59,7 +59,7 @@ final class ReconciliationOvhCheckController extends AbstractController
                 SQL,
                 [
                     'categoryId' => $categoryExists['id'],
-                    'companyId'  => $companyId,
+                    'companyId' => $companyId,
                 ],
             );
             $recordsWithNewCode = ['count' => $count];
@@ -79,7 +79,7 @@ final class ReconciliationOvhCheckController extends AbstractController
         );
 
         $rawDataSample = [];
-        if ($supplyAdditionalId !== false) {
+        if (false !== $supplyAdditionalId) {
             $rows = $this->connection->fetchAllAssociative(
                 <<<'SQL'
                 SELECT c.id, c.cost_date::text AS cost_date, c.amount, c.raw_data
@@ -92,7 +92,7 @@ final class ReconciliationOvhCheckController extends AbstractController
                 SQL,
                 [
                     'categoryId' => $supplyAdditionalId,
-                    'companyId'  => $companyId,
+                    'companyId' => $companyId,
                 ],
             );
 
@@ -100,9 +100,9 @@ final class ReconciliationOvhCheckController extends AbstractController
                 $rawData = json_decode($row['raw_data'] ?? '{}', true);
 
                 $entry = [
-                    'id'        => $row['id'],
+                    'id' => $row['id'],
                     'cost_date' => $row['cost_date'],
-                    'amount'    => $row['amount'],
+                    'amount' => $row['amount'],
                 ];
 
                 if ($i < 3) {
@@ -125,9 +125,9 @@ final class ReconciliationOvhCheckController extends AbstractController
         }
 
         return $this->json([
-            'category_exists'       => $categoryExists,
+            'category_exists' => $categoryExists,
             'records_with_new_code' => $recordsWithNewCode,
-            'raw_data_sample'       => $rawDataSample,
-        ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
+            'raw_data_sample' => $rawDataSample,
+        ], 200, [], ['json_encode_options' => \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE]);
     }
 }

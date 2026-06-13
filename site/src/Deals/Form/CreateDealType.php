@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Deals\Form;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\Counterparty;
 use App\Deals\DTO\CreateDealFormData;
 use App\Deals\Enum\DealChannel;
 use App\Deals\Enum\DealType;
-use App\Company\Entity\Counterparty;
 use Doctrine\ORM\EntityRepository;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Catalog\Application;
 
-use App\Catalog\DTO\SetPurchasePriceCommand;
 use App\Catalog\Domain\PurchasePriceTimelinePolicy;
+use App\Catalog\DTO\SetPurchasePriceCommand;
 use App\Catalog\Entity\ProductPurchasePrice;
 use App\Catalog\Infrastructure\ProductRepository;
 use App\Catalog\Infrastructure\Repository\ProductPurchasePriceRepository;
@@ -55,13 +55,13 @@ final class SetPurchasePriceAction
 
         // companyId передаётся как string — прямая связь с Company entity запрещена правилами разработки
         $newPrice = new ProductPurchasePrice(
-            id:           Uuid::uuid7()->toString(),
-            companyId:    $command->companyId,
-            product:      $product,
+            id: Uuid::uuid7()->toString(),
+            companyId: $command->companyId,
+            product: $product,
             effectiveFrom: $command->effectiveFrom,
-            priceAmount:  $command->priceAmount,
+            priceAmount: $command->priceAmount,
             priceCurrency: strtoupper($command->currency),
-            note:         $command->note,
+            note: $command->note,
         );
 
         $this->entityManager->persist($newPrice);

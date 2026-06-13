@@ -49,7 +49,7 @@ final readonly class OzonInventoryClient
             'Ozon Inventory API returned HTTP %d for %s: %s',
             $statusCode,
             self::STOCKS_ENDPOINT,
-            $payloadFragment !== '' ? $payloadFragment : '[empty response body]',
+            '' !== $payloadFragment ? $payloadFragment : '[empty response body]',
         );
 
         if (429 === $statusCode) {

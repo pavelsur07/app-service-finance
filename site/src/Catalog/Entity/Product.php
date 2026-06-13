@@ -75,10 +75,10 @@ class Product
     public function __construct(string $id, Company $company)
     {
         Assert::uuid($id);
-        $this->id        = $id;
-        $this->company   = $company;
-        $this->status    = ProductStatus::ACTIVE;
-        $this->barcodes  = new ArrayCollection();
+        $this->id = $id;
+        $this->company = $company;
+        $this->status = ProductStatus::ACTIVE;
+        $this->barcodes = new ArrayCollection();
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
     }
@@ -100,7 +100,7 @@ class Product
 
     public function setSku(string $sku): self
     {
-        $this->sku       = $sku;
+        $this->sku = $sku;
         $this->updatedAt = new \DateTimeImmutable();
 
         return $this;
@@ -113,7 +113,7 @@ class Product
 
     public function setName(string $name): self
     {
-        $this->name      = $name;
+        $this->name = $name;
         $this->updatedAt = new \DateTimeImmutable();
 
         return $this;
@@ -127,7 +127,7 @@ class Product
     public function setDescription(?string $description): self
     {
         $this->description = $description;
-        $this->updatedAt   = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable();
 
         return $this;
     }
@@ -139,7 +139,7 @@ class Product
 
     public function setVendorSku(?string $vendorSku): self
     {
-        $this->vendorSku = $vendorSku !== null ? trim($vendorSku) : null;
+        $this->vendorSku = null !== $vendorSku ? trim($vendorSku) : null;
         $this->updatedAt = new \DateTimeImmutable();
 
         return $this;
@@ -160,7 +160,7 @@ class Product
         }
 
         $this->internalArticle = $internalArticle;
-        $this->updatedAt       = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable();
 
         return $this;
     }
@@ -172,7 +172,7 @@ class Product
 
     public function setWeightKg(?string $weightKg): self
     {
-        $this->weightKg  = $weightKg;
+        $this->weightKg = $weightKg;
         $this->updatedAt = new \DateTimeImmutable();
 
         return $this;
@@ -186,7 +186,7 @@ class Product
     public function setDimensions(?array $dimensions): self
     {
         $this->dimensions = $dimensions;
-        $this->updatedAt  = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable();
 
         return $this;
     }
@@ -198,7 +198,7 @@ class Product
 
     public function setStatus(ProductStatus $status): self
     {
-        $this->status    = $status;
+        $this->status = $status;
         $this->updatedAt = new \DateTimeImmutable();
 
         return $this;

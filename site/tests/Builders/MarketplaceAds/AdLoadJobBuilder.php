@@ -133,10 +133,10 @@ final class AdLoadJobBuilder
 
         // Счётчики и статус изменяются только через guard-методы / raw SQL в Repository.
         // Для произвольного состояния в тестах используем Reflection.
-        if ($this->loadedDays !== 0) {
+        if (0 !== $this->loadedDays) {
             $this->setProperty($job, 'loadedDays', $this->loadedDays);
         }
-        if ($this->chunksTotal !== 0) {
+        if (0 !== $this->chunksTotal) {
             $this->setProperty($job, 'chunksTotal', $this->chunksTotal);
         }
 

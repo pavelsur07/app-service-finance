@@ -68,7 +68,7 @@ final readonly class MarketplaceAdsFacade
      * @param string|null $marketplace значение MarketplaceType::value ('wildberries', 'ozon').
      *                                 Если null — суммируются все площадки.
      *
-     * @return array<string, string>  listingId => decimal-string adSpend
+     * @return array<string, string> listingId => decimal-string adSpend
      */
     public function getAdSpendByListingForPeriod(
         string $companyId,

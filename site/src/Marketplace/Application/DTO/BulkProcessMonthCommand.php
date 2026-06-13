@@ -14,10 +14,10 @@ use Webmozart\Assert\Assert;
 final readonly class BulkProcessMonthCommand
 {
     public function __construct(
-        public string          $companyId,
+        public string $companyId,
         public MarketplaceType $marketplace,
-        public int             $year,
-        public int             $month,
+        public int $year,
+        public int $month,
     ) {
         Assert::range($year, 2000, 2100);
         Assert::range($month, 1, 12);

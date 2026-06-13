@@ -8,11 +8,11 @@ use App\Inventory\Enum\StockSnapshotMappingStatus;
 use App\Inventory\Infrastructure\Query\InventoryStockReportQuery;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Shared\Service\ActiveCompanyService;
+use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
-use Ramsey\Uuid\Uuid;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_USER')]
@@ -46,7 +46,7 @@ final class StockReportController extends AbstractController
         $mappingStatusValue = $request->query->getString('mappingStatus');
         $mappingStatus = '' !== $mappingStatusValue ? StockSnapshotMappingStatus::tryFrom($mappingStatusValue) : null;
 
-        if ($snapshotSessionId === null && $snapshotAtDt === null) {
+        if (null === $snapshotSessionId && null === $snapshotAtDt) {
             $snapshotSessionId = $this->stockReportQuery->findLatestSnapshotSessionId($companyId, $source);
         }
 

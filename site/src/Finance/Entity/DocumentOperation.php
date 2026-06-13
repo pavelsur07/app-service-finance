@@ -6,7 +6,6 @@ namespace App\Finance\Entity;
 
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
-use App\Finance\Entity\PLCategory;
 use App\Finance\Repository\DocumentOperationRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;

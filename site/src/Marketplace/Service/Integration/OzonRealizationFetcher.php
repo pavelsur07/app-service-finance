@@ -40,27 +40,22 @@ final class OzonRealizationFetcher
         $this->validatePeriod($year, $month);
 
         $this->logger->info('Ozon realization fetch started', [
-            'year'  => $year,
+            'year' => $year,
             'month' => $month,
         ]);
 
-        $response = $this->httpClient->request('POST', self::BASE_URL . self::ENDPOINT, [
+        $response = $this->httpClient->request('POST', self::BASE_URL.self::ENDPOINT, [
             'headers' => $this->buildHeaders($connection),
-            'json'    => [
+            'json' => [
                 'month' => $month,
-                'year'  => $year,
+                'year' => $year,
             ],
         ]);
 
         $statusCode = $response->getStatusCode();
 
-        if ($statusCode !== 200) {
-            throw new \RuntimeException(sprintf(
-                'Ozon realization API returned HTTP %d for %d-%02d',
-                $statusCode,
-                $year,
-                $month,
-            ));
+        if (200 !== $statusCode) {
+            throw new \RuntimeException(sprintf('Ozon realization API returned HTTP %d for %d-%02d', $statusCode, $year, $month));
         }
 
         $data = $response->toArray();
@@ -68,8 +63,8 @@ final class OzonRealizationFetcher
         $rows = $data['result']['rows'] ?? [];
 
         $this->logger->info('Ozon realization fetched', [
-            'year'       => $year,
-            'month'      => $month,
+            'year' => $year,
+            'month' => $month,
             'rows_count' => count($rows),
         ]);
 
@@ -90,20 +85,15 @@ final class OzonRealizationFetcher
 
         // Нельзя запросить текущий или будущий месяц — отчёт ещё не сформирован
         if ($requestedPeriod >= $now->modify('first day of this month')) {
-            throw new \InvalidArgumentException(sprintf(
-                'Cannot fetch realization for current or future month: %d-%02d. '
-                . 'Report is available after 5th of the following month.',
-                $year,
-                $month,
-            ));
+            throw new \InvalidArgumentException(sprintf('Cannot fetch realization for current or future month: %d-%02d. Report is available after 5th of the following month.', $year, $month));
         }
     }
 
     private function buildHeaders(MarketplaceConnection $connection): array
     {
         return [
-            'Client-Id'    => $connection->getClientId(),
-            'Api-Key'      => $connection->getApiKey(),
+            'Client-Id' => $connection->getClientId(),
+            'Api-Key' => $connection->getApiKey(),
             'Content-Type' => 'application/json',
         ];
     }

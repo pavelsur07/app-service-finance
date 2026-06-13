@@ -18,8 +18,9 @@ final class ScoreCompanyCounterpartiesAction
         private readonly CounterpartyHistoryQuery $historyQuery,
         private readonly CounterpartyRepository $counterpartyRepository, // <- Правильная зависимость
         private readonly CounterpartyScoringMath $scoringMath,
-        private readonly EntityManagerInterface $em // <- Оставляем только для flush/clear батчей
-    ) {}
+        private readonly EntityManagerInterface $em, // <- Оставляем только для flush/clear батчей
+    ) {
+    }
 
     public function __invoke(ScoreCompanyCounterpartiesCommand $command): void
     {
@@ -55,7 +56,7 @@ final class ScoreCompanyCounterpartiesAction
             $counterparty->setReliabilityScore($reliabilityScore);
             $counterparty->setLastScoredAt($now);
 
-            $counter++;
+            ++$counter;
 
             // Защита памяти воркера
             if (($counter % self::BATCH_SIZE) === 0) {

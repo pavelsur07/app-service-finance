@@ -10,4 +10,3 @@ interface ProductSkuUniquenessChecker
 
     public function existsSkuForCompanyExcludingProductId(string $sku, string $companyId, string $excludeProductId): bool;
 }
-

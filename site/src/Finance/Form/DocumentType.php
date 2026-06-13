@@ -6,8 +6,8 @@ namespace App\Finance\Form;
 
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
-use App\Finance\Enum\DocumentType as DocumentTypeEnum;
 use App\Finance\Entity\Document;
+use App\Finance\Enum\DocumentType as DocumentTypeEnum;
 use App\Shared\Form\Type\ProjectDirectionPickerType;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
@@ -35,7 +35,7 @@ class DocumentType extends AbstractType
             ])
             ->add('type', ChoiceType::class, [
                 'choices' => DocumentTypeEnum::cases(),
-                'choice_label' => fn (DocumentTypeEnum $type) => $type->label(),
+                'choice_label' => static fn (DocumentTypeEnum $type) => $type->label(),
                 'choice_value' => 'value',
                 'label' => 'Тип документа',
             ])
@@ -53,10 +53,10 @@ class DocumentType extends AbstractType
             ->add('projectDirection', ProjectDirectionPickerType::class, [
                 'class' => ProjectDirection::class,
                 'choices' => $options['project_directions'],
-                'choice_label' => function (ProjectDirection $item) {
+                'choice_label' => static function (ProjectDirection $item) {
                     return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
                 },
-                'choice_attr' => fn (ProjectDirection $item) => !$item->getChildren()->isEmpty() ? ['disabled' => 'disabled'] : [],
+                'choice_attr' => static fn (ProjectDirection $item) => !$item->getChildren()->isEmpty() ? ['disabled' => 'disabled'] : [],
                 'placeholder' => '—',
                 'required' => false,
                 'label' => 'Проект',

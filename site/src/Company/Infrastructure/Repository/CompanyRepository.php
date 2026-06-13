@@ -10,7 +10,7 @@ use Doctrine\Persistence\ManagerRegistry;
 
 class CompanyRepository extends ServiceEntityRepository
 {
-    public function __construct(ManagerRegistry $registry,  private readonly Connection $connection)
+    public function __construct(ManagerRegistry $registry, private readonly Connection $connection)
     {
         parent::__construct($registry, Company::class);
     }
@@ -25,7 +25,7 @@ class CompanyRepository extends ServiceEntityRepository
             ->getResult();
     }
 
-    function findById(string $companyId): ?Company
+    public function findById(string $companyId): ?Company
     {
         return $this->find($companyId);
     }

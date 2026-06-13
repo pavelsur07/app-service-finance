@@ -47,7 +47,7 @@ final class AdDailySyncCommandTest extends TestCase
         $planner
             ->expects(self::exactly(3))
             ->method('planBatchesForJob')
-            ->willReturnCallback(function (string $jobId, string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to) use ($yesterday, &$seenCompanies): int {
+            ->willReturnCallback(static function (string $jobId, string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to) use ($yesterday, &$seenCompanies): int {
                 self::assertEquals($yesterday, $from);
                 self::assertEquals($yesterday, $to);
                 $seenCompanies[] = $companyId;
@@ -102,7 +102,7 @@ final class AdDailySyncCommandTest extends TestCase
         $jobRepo = $this->createMock(AdLoadJobRepositoryInterface::class);
         $jobRepo
             ->method('existsByDateRange')
-            ->willReturnCallback(fn (string $companyId): bool => self::COMPANY_1 === $companyId);
+            ->willReturnCallback(static fn (string $companyId): bool => self::COMPANY_1 === $companyId);
 
         $em = $this->createMock(EntityManagerInterface::class);
 
@@ -111,7 +111,7 @@ final class AdDailySyncCommandTest extends TestCase
         $planner
             ->expects(self::once())
             ->method('planBatchesForJob')
-            ->willReturnCallback(function (string $jobId, string $companyId) use (&$plannedCompanies): int {
+            ->willReturnCallback(static function (string $jobId, string $companyId) use (&$plannedCompanies): int {
                 $plannedCompanies[] = $companyId;
 
                 return 2;
@@ -144,7 +144,7 @@ final class AdDailySyncCommandTest extends TestCase
         $planner
             ->expects(self::exactly(3))
             ->method('planBatchesForJob')
-            ->willReturnCallback(function (string $jobId, string $companyId) use (&$attempted): int {
+            ->willReturnCallback(static function (string $jobId, string $companyId) use (&$attempted): int {
                 $attempted[] = $companyId;
 
                 if (self::COMPANY_2 === $companyId) {
@@ -160,7 +160,7 @@ final class AdDailySyncCommandTest extends TestCase
             ->method('error')
             ->with(
                 'Daily sync: company failed',
-                self::callback(function (array $ctx): bool {
+                self::callback(static function (array $ctx): bool {
                     return self::COMPANY_2 === ($ctx['companyId'] ?? null)
                         && str_contains((string) ($ctx['error'] ?? ''), 'No SKU campaigns');
                 }),
@@ -188,8 +188,8 @@ final class AdDailySyncCommandTest extends TestCase
             ->with(
                 self::COMPANY_1,
                 MarketplaceType::OZON->value,
-                self::callback(fn (\DateTimeImmutable $d) => $d == $expectedYesterday),
-                self::callback(fn (\DateTimeImmutable $d) => $d == $expectedYesterday),
+                self::callback(static fn (\DateTimeImmutable $d) => $d == $expectedYesterday),
+                self::callback(static fn (\DateTimeImmutable $d) => $d == $expectedYesterday),
             )
             ->willReturn(true);
 

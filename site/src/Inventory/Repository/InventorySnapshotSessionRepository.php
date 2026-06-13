@@ -18,7 +18,6 @@ final class InventorySnapshotSessionRepository extends ServiceEntityRepository
         parent::__construct($registry, InventorySnapshotSession::class);
     }
 
-
     public function findByIdAndCompany(string $id, string $companyId): ?InventorySnapshotSession
     {
         Assert::uuid($id);

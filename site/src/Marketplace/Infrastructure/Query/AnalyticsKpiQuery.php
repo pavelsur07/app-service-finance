@@ -6,19 +6,19 @@ use App\Marketplace\Enum\MarketplaceType;
 use Doctrine\DBAL\Connection;
 
 /**
- * Query для получения KPI метрик аналитики маркетплейса
+ * Query для получения KPI метрик аналитики маркетплейса.
  *
  * Одним SQL запросом возвращает все 6 метрик + данные предыдущего периода для расчета роста
  */
 class AnalyticsKpiQuery
 {
     public function __construct(
-        private readonly Connection $connection
+        private readonly Connection $connection,
     ) {
     }
 
     /**
-     * Получить все KPI метрики за период
+     * Получить все KPI метрики за период.
      *
      * @return array{
      *   current: array{
@@ -41,7 +41,7 @@ class AnalyticsKpiQuery
         string $companyId,
         ?MarketplaceType $marketplace,
         \DateTimeInterface $from,
-        \DateTimeInterface $to
+        \DateTimeInterface $to,
     ): array {
         // Вычисляем предыдущий период (той же длины)
         $periodDays = $from->diff($to)->days;
@@ -51,7 +51,7 @@ class AnalyticsKpiQuery
         $qb = $this->connection->createQueryBuilder();
 
         // Основной запрос с подзапросами для текущего и предыдущего периода
-        $sql = "
+        $sql = '
             WITH current_period AS (
                 SELECT
                     COALESCE(SUM(s.total_revenue), 0) as revenue,
@@ -65,7 +65,7 @@ class AnalyticsKpiQuery
                 WHERE s.company_id = :company_id
                 AND s.sale_date >= :from
                 AND s.sale_date <= :to
-                " . ($marketplace ? "AND s.marketplace = :marketplace" : "") . "
+                '.($marketplace ? 'AND s.marketplace = :marketplace' : '').'
             ),
             previous_period AS (
                 SELECT
@@ -76,7 +76,7 @@ class AnalyticsKpiQuery
                 WHERE s.company_id = :company_id
                 AND s.sale_date >= :previous_from
                 AND s.sale_date < :previous_to
-                " . ($marketplace ? "AND s.marketplace = :marketplace" : "") . "
+                '.($marketplace ? 'AND s.marketplace = :marketplace' : '')."
             )
             SELECT
                 -- Current period
@@ -132,18 +132,18 @@ class AnalyticsKpiQuery
 
         return [
             'current' => [
-                'revenue' => (string)$result['current_revenue'],
-                'margin' => (string)$result['current_margin'],
-                'units_sold' => (int)$result['current_units_sold'],
-                'roi' => (float)$result['current_roi'],
-                'return_rate' => (float)$result['current_return_rate'],
-                'turnover_days' => (int)$result['current_turnover_days'],
-                'currency' => (string)$result['currency'],
+                'revenue' => (string) $result['current_revenue'],
+                'margin' => (string) $result['current_margin'],
+                'units_sold' => (int) $result['current_units_sold'],
+                'roi' => (float) $result['current_roi'],
+                'return_rate' => (float) $result['current_return_rate'],
+                'turnover_days' => (int) $result['current_turnover_days'],
+                'currency' => (string) $result['currency'],
             ],
             'previous' => [
-                'revenue' => (string)$result['previous_revenue'],
-                'margin' => (string)$result['previous_margin'],
-                'units_sold' => (int)$result['previous_units_sold'],
+                'revenue' => (string) $result['previous_revenue'],
+                'margin' => (string) $result['previous_margin'],
+                'units_sold' => (int) $result['previous_units_sold'],
             ],
         ];
     }

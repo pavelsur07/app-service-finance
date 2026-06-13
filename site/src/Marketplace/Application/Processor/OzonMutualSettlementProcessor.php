@@ -120,7 +120,7 @@ final readonly class OzonMutualSettlementProcessor
         ];
 
         // Ищем период и договор в строках 1-12, колонка C
-        for ($row = 1; $row <= 12; $row++) {
+        for ($row = 1; $row <= 12; ++$row) {
             $cellC = $this->getCellStringValue($sheet, 'C', $row);
 
             // Период: "за период с  01.01.2026 по 31.01.2026"
@@ -131,12 +131,12 @@ final readonly class OzonMutualSettlementProcessor
 
             // Договор: "по Договору ... № ИР-104604/21  от 31.10.2021"
             if (preg_match('/№\s*(.+?)\s{1,}от\s+(\d{2}\.\d{2}\.\d{4})/u', $cellC, $m)) {
-                $info['contract'] = trim($m[1]) . ' от ' . $m[2];
+                $info['contract'] = trim($m[1]).' от '.$m[2];
             }
         }
 
         // Ищем реквизиты в строках 1-12
-        for ($row = 1; $row <= 12; $row++) {
+        for ($row = 1; $row <= 12; ++$row) {
             $cellB = $this->getCellStringValue($sheet, 'B', $row);
             $normalizedB = $this->normalize($cellB);
 
@@ -146,7 +146,7 @@ final readonly class OzonMutualSettlementProcessor
                 $info['receiver_name'] = $this->getCellStringValueOrNull($sheet, 'J', $row + 1);
 
                 // Ищем ИНН/КПП по меткам в строках после "Плательщик:"
-                for ($sub = $row + 1; $sub <= min($row + 6, 15); $sub++) {
+                for ($sub = $row + 1; $sub <= min($row + 6, 15); ++$sub) {
                     $label = $this->normalizeMixedCyrillic($this->normalize($this->getCellStringValue($sheet, 'B', $sub)));
                     if (str_contains($label, 'инн')) {
                         $info['payer_inn'] = $this->getCellStringValueOrNull($sheet, 'D', $sub);
@@ -188,7 +188,7 @@ final readonly class OzonMutualSettlementProcessor
 
         // Ищем строку-заголовок: B == "Наименование"
         $dataStartRow = null;
-        for ($row = 1; $row <= $highestRow; $row++) {
+        for ($row = 1; $row <= $highestRow; ++$row) {
             $cellB = $this->getCellStringValue($sheet, 'B', $row);
             if ('наименование' === $this->normalizeMixedCyrillic($this->normalize($cellB))) {
                 $dataStartRow = $row + 1;
@@ -208,7 +208,7 @@ final readonly class OzonMutualSettlementProcessor
             ];
         }
 
-        for ($row = $dataStartRow; $row <= $highestRow; $row++) {
+        for ($row = $dataStartRow; $row <= $highestRow; ++$row) {
             $cellB = $this->getCellStringValue($sheet, 'B', $row);
             $normalizedB = $this->normalizeMixedCyrillic($this->normalize($cellB));
 
@@ -285,7 +285,7 @@ final readonly class OzonMutualSettlementProcessor
 
         // Ищем начало секции компенсаций
         $sectionStartRow = null;
-        for ($row = 1; $row <= $highestRow; $row++) {
+        for ($row = 1; $row <= $highestRow; ++$row) {
             $cellB = $this->getCellStringValue($sheet, 'B', $row);
             $normalizedB = $this->normalizeMixedCyrillic($this->normalize($cellB));
 
@@ -301,7 +301,7 @@ final readonly class OzonMutualSettlementProcessor
 
         // Ищем заголовок: B == "Наименование начисления"
         $dataStartRow = null;
-        for ($row = $sectionStartRow; $row <= min($sectionStartRow + 5, $highestRow); $row++) {
+        for ($row = $sectionStartRow; $row <= min($sectionStartRow + 5, $highestRow); ++$row) {
             $cellB = $this->getCellStringValue($sheet, 'B', $row);
             if (str_contains($this->normalize($cellB), 'наименование начисления')) {
                 $dataStartRow = $row + 1;
@@ -314,7 +314,7 @@ final readonly class OzonMutualSettlementProcessor
         }
 
         $hasData = false;
-        for ($row = $dataStartRow; $row <= $highestRow; $row++) {
+        for ($row = $dataStartRow; $row <= $highestRow; ++$row) {
             $cellB = $this->getCellStringValue($sheet, 'B', $row);
             $normalizedB = $this->normalizeMixedCyrillic($this->normalize($cellB));
 
@@ -346,7 +346,7 @@ final readonly class OzonMutualSettlementProcessor
 
     /**
      * Парсит ссылку на документ из колонки E.
-     * Формат: "№3648135 от 01.01.2026"
+     * Формат: "№3648135 от 01.01.2026".
      *
      * @return array{number: ?string, date: ?string}
      */
@@ -377,7 +377,7 @@ final readonly class OzonMutualSettlementProcessor
      */
     private function parseNumericCell(Worksheet $sheet, string $column, int $row): float
     {
-        $cell = $sheet->getCell($column . $row);
+        $cell = $sheet->getCell($column.$row);
         $value = $cell->getCalculatedValue();
 
         if (null === $value || '' === $value) {
@@ -404,7 +404,7 @@ final readonly class OzonMutualSettlementProcessor
      */
     private function parseDateCell(Worksheet $sheet, string $column, int $row): ?string
     {
-        $cell = $sheet->getCell($column . $row);
+        $cell = $sheet->getCell($column.$row);
         $value = $cell->getCalculatedValue();
 
         if (null === $value || '' === $value) {
@@ -452,7 +452,7 @@ final readonly class OzonMutualSettlementProcessor
 
     private function getCellStringValue(Worksheet $sheet, string $column, int $row): string
     {
-        $cell = $sheet->getCell($column . $row);
+        $cell = $sheet->getCell($column.$row);
         $value = $cell->getCalculatedValue();
 
         if (null === $value) {

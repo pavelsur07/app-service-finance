@@ -64,7 +64,7 @@ final class ProcessDayReportHandlerTest extends TestCase
 
         $flushes = 0;
         $em = $this->createMock(EntityManagerInterface::class);
-        $em->method('flush')->willReturnCallback(static function () use (&$flushes): void { $flushes++; });
+        $em->method('flush')->willReturnCallback(static function () use (&$flushes): void { ++$flushes; });
 
         $handler = new ProcessDayReportHandler($repo, $bus, $em, new NullLogger(), $safe, $statusRepo, $updater);
 
@@ -110,7 +110,7 @@ final class ProcessDayReportHandlerTest extends TestCase
         $em = $this->createMock(EntityManagerInterface::class);
 
         $handler = new ProcessDayReportHandler($repo, $bus, $em, new NullLogger(), $safe, $statusRepo, $updater);
-        $handler(new ProcessDayReportMessage((string)$company->getId(), $doc->getId(), true));
+        $handler(new ProcessDayReportMessage((string) $company->getId(), $doc->getId(), true));
 
         self::assertTrue(true);
     }

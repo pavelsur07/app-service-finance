@@ -33,20 +33,20 @@ final class MarketplaceCostCategoryResolver implements ResetInterface
         string $code,
         string $name,
     ): MarketplaceCostCategory {
-        $cacheKey = $company->getId() . '_' . $marketplace->value . '_' . $code;
+        $cacheKey = $company->getId().'_'.$marketplace->value.'_'.$code;
 
         if (isset($this->cache[$cacheKey])) {
             return $this->cache[$cacheKey];
         }
 
         $category = $this->costCategoryRepository->findOneBy([
-            'company'   => $company,
+            'company' => $company,
             'marketplace' => $marketplace,
-            'code'      => $code,
+            'code' => $code,
             'deletedAt' => null,
         ]);
 
-        if ($category === null) {
+        if (null === $category) {
             $category = new MarketplaceCostCategory(
                 Uuid::uuid7()->toString(),
                 $company,
@@ -73,7 +73,7 @@ final class MarketplaceCostCategoryResolver implements ResetInterface
      */
     public function resetCache(): void
     {
-        if ($this->cache === []) {
+        if ([] === $this->cache) {
             return;
         }
 
@@ -120,13 +120,13 @@ final class MarketplaceCostCategoryResolver implements ResetInterface
     public function preload(Company $company, MarketplaceType $marketplace): void
     {
         $categories = $this->costCategoryRepository->findBy([
-            'company'    => $company,
+            'company' => $company,
             'marketplace' => $marketplace,
-            'deletedAt'  => null,
+            'deletedAt' => null,
         ]);
 
         foreach ($categories as $category) {
-            $cacheKey = $company->getId() . '_' . $marketplace->value . '_' . $category->getCode();
+            $cacheKey = $company->getId().'_'.$marketplace->value.'_'.$category->getCode();
             $this->cache[$cacheKey] = $category;
         }
     }

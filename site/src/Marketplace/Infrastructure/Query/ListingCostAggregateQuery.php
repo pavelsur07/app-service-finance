@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Marketplace\Infrastructure\Query;
 
 use App\Marketplace\DTO\ListingCostCategoryAggregateDTO;
-use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 
 final readonly class ListingCostAggregateQuery
@@ -21,10 +20,10 @@ final readonly class ListingCostAggregateQuery
     public function executeByPeriod(
         string $companyId,
         ?string $marketplace,
-        DateTimeImmutable $from,
-        DateTimeImmutable $to,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
     ): array {
-        $mpFilter = $marketplace !== null ? 'AND c.marketplace = :marketplace' : '';
+        $mpFilter = null !== $marketplace ? 'AND c.marketplace = :marketplace' : '';
 
         // net_amount / costs_amount / storno_amount — классификация по operation_type.
         // После Phase 2B operation_type гарантированно NOT NULL (см. UnprocessedCostsQuery).
@@ -59,22 +58,22 @@ final readonly class ListingCostAggregateQuery
             GROUP BY c.listing_id, cc.code, cc.name
             SQL,
             array_filter([
-                'companyId'   => $companyId,
-                'periodFrom'  => $from->format('Y-m-d'),
-                'periodTo'    => $to->format('Y-m-d'),
+                'companyId' => $companyId,
+                'periodFrom' => $from->format('Y-m-d'),
+                'periodTo' => $to->format('Y-m-d'),
                 'marketplace' => $marketplace,
-            ], static fn ($v) => $v !== null),
+            ], static fn ($v) => null !== $v),
         );
 
         $result = [];
         foreach ($rows as $row) {
             $result[$row['listing_id']][] = new ListingCostCategoryAggregateDTO(
-                listingId:     $row['listing_id'],
-                categoryCode:  $row['category_code'],
-                categoryName:  $row['category_name'],
-                netAmount:     (string) $row['net_amount'],
-                costsAmount:   (string) $row['costs_amount'],
-                stornoAmount:  (string) $row['storno_amount'],
+                listingId: $row['listing_id'],
+                categoryCode: $row['category_code'],
+                categoryName: $row['category_name'],
+                netAmount: (string) $row['net_amount'],
+                costsAmount: (string) $row['costs_amount'],
+                stornoAmount: (string) $row['storno_amount'],
             );
         }
 

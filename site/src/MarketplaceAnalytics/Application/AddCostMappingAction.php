@@ -16,7 +16,8 @@ final class AddCostMappingAction
     public function __construct(
         private readonly UnitEconomyCostMappingRepositoryInterface $repository,
         private readonly EntityManagerInterface $entityManager,
-    ) {}
+    ) {
+    }
 
     public function __invoke(
         string $companyId,
@@ -27,7 +28,7 @@ final class AddCostMappingAction
     ): UnitEconomyCostMapping {
         $existing = $this->repository->findOneByCategoryId($companyId, $marketplace, $costCategoryId);
 
-        if ($existing !== null) {
+        if (null !== $existing) {
             throw new \DomainException('Маппинг для данной категории уже существует');
         }
 

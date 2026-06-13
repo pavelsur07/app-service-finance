@@ -15,6 +15,7 @@ final class BaseSignResolverService
 {
     /**
      * @param array<int, array<string, mixed>> $rows
+     *
      * @return array<string, string> Map<typeName, baseSign>
      */
     public function resolve(array $rows): array
@@ -24,9 +25,9 @@ final class BaseSignResolverService
 
         foreach ($rows as $row) {
             $typeName = $row['typeName'];
-            $amount   = (float) $row['amount'];
+            $amount = (float) $row['amount'];
 
-            if ($amount == 0) {
+            if (0 == $amount) {
                 continue;
             }
 
@@ -38,7 +39,7 @@ final class BaseSignResolverService
         }
 
         $allTypes = array_unique(array_column($rows, 'typeName'));
-        $result   = [];
+        $result = [];
 
         foreach ($allTypes as $typeName) {
             $pos = $positiveCount[$typeName] ?? 0;

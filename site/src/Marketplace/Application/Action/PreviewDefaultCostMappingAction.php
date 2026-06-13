@@ -28,22 +28,22 @@ final readonly class PreviewDefaultCostMappingAction
     public function __invoke(PreviewDefaultCostMappingCommand $command): DefaultCostMappingPreviewResult
     {
         $marketplace = MarketplaceType::tryFrom($command->marketplace);
-        if ($marketplace === null) {
+        if (null === $marketplace) {
             throw new \DomainException(sprintf('Unknown marketplace "%s".', $command->marketplace));
         }
 
         $rules = $this->yamlProvider->getForMarketplace($marketplace)->getRules();
-        if ($rules === []) {
+        if ([] === $rules) {
             return new DefaultCostMappingPreviewResult($marketplace, []);
         }
 
-        $costCodes = array_values(array_unique(array_map(static fn(DefaultCostMappingRule $rule): string => $rule->getCostCode(), $rules)));
-        $plCodes = array_values(array_unique(array_map(static fn(DefaultCostMappingRule $rule): string => $rule->getPlCode(), $rules)));
+        $costCodes = array_values(array_unique(array_map(static fn (DefaultCostMappingRule $rule): string => $rule->getCostCode(), $rules)));
+        $plCodes = array_values(array_unique(array_map(static fn (DefaultCostMappingRule $rule): string => $rule->getPlCode(), $rules)));
 
         $costByCode = $this->costCategoriesByCodeQuery->fetchIndexed($command->companyId, $marketplace, $costCodes);
         $plByCode = $this->plCategoriesByCodeQuery->fetchIndexed($command->companyId, $plCodes);
 
-        $costCategoryIds = array_values(array_map(static fn(array $row): string => $row['id'], $costByCode));
+        $costCategoryIds = array_values(array_map(static fn (array $row): string => $row['id'], $costByCode));
         $existingMappings = $this->mappingsByCostCategoryQuery->fetchIndexedByCostCategoryId($command->companyId, $costCategoryIds);
 
         $items = [];
@@ -58,9 +58,9 @@ final readonly class PreviewDefaultCostMappingAction
     {
         $cost = $costByCode[$rule->getCostCode()] ?? null;
         $plCandidates = $plByCode[$rule->getPlCode()] ?? [];
-        $pl = count($plCandidates) === 1 ? $plCandidates[0] : null;
+        $pl = 1 === count($plCandidates) ? $plCandidates[0] : null;
 
-        if ($cost === null) {
+        if (null === $cost) {
             return $this->item($rule, null, null, null, DefaultCostMappingPreviewStatus::MISSING_COST_CATEGORY, 'Категория затрат не найдена у компании.');
         }
 
@@ -68,24 +68,24 @@ final readonly class PreviewDefaultCostMappingAction
             return $this->item($rule, $cost, null, null, DefaultCostMappingPreviewStatus::INVALID_TARGET_CATEGORY, 'Найдено несколько категорий ОПиУ с таким code.');
         }
 
-        if ($pl === null) {
+        if (null === $pl) {
             return $this->item($rule, $cost, null, $existingMappings[$cost['id']] ?? null, DefaultCostMappingPreviewStatus::MISSING_PL_CATEGORY, 'Категория ОПиУ не найдена у компании.');
         }
 
-        if ($pl['type'] !== 'LEAF_INPUT') {
+        if ('LEAF_INPUT' !== $pl['type']) {
             return $this->item($rule, $cost, $pl, $existingMappings[$cost['id']] ?? null, DefaultCostMappingPreviewStatus::INVALID_TARGET_CATEGORY, 'Целевая категория ОПиУ должна быть LEAF_INPUT.');
         }
 
         $existing = $existingMappings[$cost['id']] ?? null;
-        if ($existing === null) {
+        if (null === $existing) {
             return $this->item($rule, $cost, $pl, null, DefaultCostMappingPreviewStatus::WILL_CREATE, 'Будет создан новый mapping.');
         }
 
-        if ($existing['include_in_pl'] === false) {
+        if (false === $existing['include_in_pl']) {
             return $this->item($rule, $cost, $pl, $existing, DefaultCostMappingPreviewStatus::SKIPPED_DISABLED, 'Пропущено: mapping отключён (include_in_pl=false).');
         }
 
-        if ($existing['pl_category_id'] === null) {
+        if (null === $existing['pl_category_id']) {
             return $this->item($rule, $cost, $pl, $existing, DefaultCostMappingPreviewStatus::WILL_FILL_EMPTY, 'Будет заполнено пустое поле категории ОПиУ.');
         }
 

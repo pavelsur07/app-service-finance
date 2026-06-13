@@ -39,23 +39,23 @@ final class ReconciliationCategoryBreakdownController extends AbstractController
     )]
     public function __invoke(Request $request): JsonResponse
     {
-        $company   = $this->activeCompanyService->getActiveCompany();
+        $company = $this->activeCompanyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
-        $payload   = json_decode($request->getContent(), true) ?? [];
+        $payload = json_decode($request->getContent(), true) ?? [];
         $sessionId = (string) ($payload['sessionId'] ?? '');
 
-        if ($sessionId === '') {
+        if ('' === $sessionId) {
             return $this->json(['error' => 'sessionId обязателен.'], 400);
         }
 
         $session = $this->sessionRepository->findByIdAndCompany($sessionId, $companyId);
-        if ($session === null) {
+        if (null === $session) {
             return $this->json(['error' => 'Сессия не найдена.'], 404);
         }
 
         $periodFrom = $session->getPeriodFrom()->format('Y-m-d');
-        $periodTo   = $session->getPeriodTo()->format('Y-m-d');
+        $periodTo = $session->getPeriodTo()->format('Y-m-d');
         $marketplace = $session->getMarketplace();
 
         // Суммы по каждому category_code.
@@ -91,10 +91,10 @@ final class ReconciliationCategoryBreakdownController extends AbstractController
             ORDER BY ABS(SUM(c.amount)) DESC
             SQL,
             [
-                'companyId'   => $companyId,
+                'companyId' => $companyId,
                 'marketplace' => $marketplace,
-                'periodFrom'  => $periodFrom,
-                'periodTo'    => $periodTo,
+                'periodFrom' => $periodFrom,
+                'periodTo' => $periodTo,
             ],
         );
 
@@ -107,8 +107,8 @@ final class ReconciliationCategoryBreakdownController extends AbstractController
                 'category_code' => $row['category_code'],
                 'category_name' => $row['category_name'],
                 'service_group' => $categoryToGroup[$row['category_code']] ?? null,
-                'net_amount'    => round((float) $row['net_amount'], 2),
-                'costs_amount'  => round((float) $row['costs_amount'], 2),
+                'net_amount' => round((float) $row['net_amount'], 2),
+                'costs_amount' => round((float) $row['costs_amount'], 2),
                 'storno_amount' => round((float) $row['storno_amount'], 2),
             ];
         }
@@ -120,16 +120,16 @@ final class ReconciliationCategoryBreakdownController extends AbstractController
             if (!isset($grouped[$group])) {
                 $grouped[$group] = [
                     'service_group' => $group,
-                    'net_amount'    => 0.0,
-                    'costs_amount'  => 0.0,
+                    'net_amount' => 0.0,
+                    'costs_amount' => 0.0,
                     'storno_amount' => 0.0,
-                    'categories'    => [],
+                    'categories' => [],
                 ];
             }
-            $grouped[$group]['net_amount']    = round($grouped[$group]['net_amount'] + $cat['net_amount'], 2);
-            $grouped[$group]['costs_amount']  = round($grouped[$group]['costs_amount'] + $cat['costs_amount'], 2);
+            $grouped[$group]['net_amount'] = round($grouped[$group]['net_amount'] + $cat['net_amount'], 2);
+            $grouped[$group]['costs_amount'] = round($grouped[$group]['costs_amount'] + $cat['costs_amount'], 2);
             $grouped[$group]['storno_amount'] = round($grouped[$group]['storno_amount'] + $cat['storno_amount'], 2);
-            $grouped[$group]['categories'][]  = $cat;
+            $grouped[$group]['categories'][] = $cat;
         }
         // Sort by abs net descending
         $byServiceGroup = array_values($grouped);
@@ -138,13 +138,13 @@ final class ReconciliationCategoryBreakdownController extends AbstractController
         // 3. unmapped — категории без маппинга в OzonXlsxServiceGroupMap
         $unmapped = array_values(array_filter(
             $categories,
-            static fn (array $c) => $c['service_group'] === null,
+            static fn (array $c) => null === $c['service_group'],
         ));
 
         return $this->json([
-            'categories'       => $categories,
+            'categories' => $categories,
             'by_service_group' => $byServiceGroup,
-            'unmapped'         => $unmapped,
+            'unmapped' => $unmapped,
         ]);
     }
 }

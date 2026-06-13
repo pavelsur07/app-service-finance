@@ -59,7 +59,6 @@ final class WbReportRowClassifierTest extends TestCase
         self::assertSame(StagingRecordType::COST, $this->classifier->classify($row));
     }
 
-
     public function testSnakeCaseLogisticsCorrectionClassifiedAsCost(): void
     {
         $row = ['supplier_oper_name' => 'Коррекция логистики', 'doc_type_name' => ''];
@@ -101,5 +100,4 @@ final class WbReportRowClassifierTest extends TestCase
 
         self::assertSame(StagingRecordType::COST, $this->classifier->classify($row));
     }
-
 }

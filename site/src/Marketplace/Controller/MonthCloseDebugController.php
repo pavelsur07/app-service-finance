@@ -37,8 +37,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class MonthCloseDebugController extends AbstractController
 {
     public function __construct(
-        private readonly ActiveCompanyService  $companyService,
-        private readonly MonthCloseDebugQuery  $debugQuery,
+        private readonly ActiveCompanyService $companyService,
+        private readonly MonthCloseDebugQuery $debugQuery,
         private readonly MonthCloseVerifyQuery $verifyQuery,
     ) {
     }
@@ -67,15 +67,15 @@ final class MonthCloseDebugController extends AbstractController
         }
 
         return $this->render('@Marketplace/month_close/debug.html.twig', [
-            'active_tab'             => 'month_close',
-            'marketplace'            => $marketplace,
+            'active_tab' => 'month_close',
+            'marketplace' => $marketplace,
             'available_marketplaces' => MarketplaceType::cases(),
-            'year'                   => $year,
-            'month'                  => $month,
-            'processed'              => $processed,
-            'document_id'            => $documentId,
-            'sales_returns'          => $salesReturns,
-            'realization'            => $realization,
+            'year' => $year,
+            'month' => $month,
+            'processed' => $processed,
+            'document_id' => $documentId,
+            'sales_returns' => $salesReturns,
+            'realization' => $realization,
         ]);
     }
 
@@ -91,33 +91,33 @@ final class MonthCloseDebugController extends AbstractController
             $periodFrom, $periodTo, $processed, $documentId,
         ] = $this->resolveParams($request);
 
-        $salesReturns  = $this->debugQuery->aggregateSalesReturns($companyId, $marketplace, $periodFrom, $periodTo, $processed, $documentId);
-        $salesDetail   = $this->debugQuery->detailSales($companyId, $marketplace, $periodFrom, $periodTo, $processed, $documentId);
+        $salesReturns = $this->debugQuery->aggregateSalesReturns($companyId, $marketplace, $periodFrom, $periodTo, $processed, $documentId);
+        $salesDetail = $this->debugQuery->detailSales($companyId, $marketplace, $periodFrom, $periodTo, $processed, $documentId);
         $returnsDetail = $this->debugQuery->detailReturns($companyId, $marketplace, $periodFrom, $periodTo, $processed, $documentId);
 
-        $realization       = [];
+        $realization = [];
         $realizationDetail = [];
         if ($marketplace === MarketplaceType::OZON->value) {
-            $realization       = $this->debugQuery->aggregateRealization($companyId, $periodFrom, $periodTo, $processed, $documentId);
+            $realization = $this->debugQuery->aggregateRealization($companyId, $periodFrom, $periodTo, $processed, $documentId);
             $realizationDetail = $this->debugQuery->detailRealization($companyId, $periodFrom, $periodTo, $processed, $documentId);
         }
 
         return $this->json([
             'meta' => [
-                'company_id'  => $companyId,
+                'company_id' => $companyId,
                 'marketplace' => $marketplace,
                 'period_from' => $periodFrom,
-                'period_to'   => $periodTo,
-                'processed'   => $processed,
+                'period_to' => $periodTo,
+                'processed' => $processed,
                 'document_id' => $documentId,
             ],
             'aggregate' => [
                 'sales_returns' => $salesReturns,
-                'realization'   => $realization,
+                'realization' => $realization,
             ],
             'detail' => [
-                'sales'       => $salesDetail,
-                'returns'     => $returnsDetail,
+                'sales' => $salesDetail,
+                'returns' => $returnsDetail,
                 'realization' => $realizationDetail,
             ],
         ]);
@@ -147,11 +147,11 @@ final class MonthCloseDebugController extends AbstractController
         return $this->json([
             'meta' => [
                 'marketplace' => $marketplace,
-                'period'      => "{$periodFrom} – {$periodTo}",
+                'period' => "{$periodFrom} – {$periodTo}",
                 'generated_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
             ],
             'checks' => $data,
-        ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
+        ], 200, [], ['json_encode_options' => \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE]);
     }
 
     // -------------------------------------------------------------------------
@@ -167,13 +167,13 @@ final class MonthCloseDebugController extends AbstractController
         ] = $this->resolveParams($request);
 
         $source = $request->query->get('source', 'sales');
-        $page   = max(1, (int) $request->query->get('page', 1));
+        $page = max(1, (int) $request->query->get('page', 1));
 
         $result = match ($source) {
-            'sales'       => $this->debugQuery->detailSales($companyId, $marketplace, $periodFrom, $periodTo, $processed, $documentId, $page),
-            'returns'     => $this->debugQuery->detailReturns($companyId, $marketplace, $periodFrom, $periodTo, $processed, $documentId, $page),
+            'sales' => $this->debugQuery->detailSales($companyId, $marketplace, $periodFrom, $periodTo, $processed, $documentId, $page),
+            'returns' => $this->debugQuery->detailReturns($companyId, $marketplace, $periodFrom, $periodTo, $processed, $documentId, $page),
             'realization' => $this->debugQuery->detailRealization($companyId, $periodFrom, $periodTo, $processed, $documentId, $page),
-            default       => throw $this->createNotFoundException("Unknown source: {$source}"),
+            default => throw $this->createNotFoundException("Unknown source: {$source}"),
         };
 
         return $this->json($result);
@@ -188,23 +188,23 @@ final class MonthCloseDebugController extends AbstractController
      */
     private function resolveParams(Request $request): array
     {
-        $company   = $this->companyService->getActiveCompany();
+        $company = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
         $marketplace = $request->query->get('marketplace') ?: MarketplaceType::OZON->value;
-        $year        = (int) $request->query->get('year', date('Y'));
-        $month       = (int) $request->query->get('month', date('n'));
+        $year = (int) $request->query->get('year', date('Y'));
+        $month = (int) $request->query->get('month', date('n'));
 
-        if (MarketplaceType::tryFrom($marketplace) === null) {
+        if (null === MarketplaceType::tryFrom($marketplace)) {
             $marketplace = MarketplaceType::OZON->value;
         }
 
         $periodFrom = sprintf('%d-%02d-01', $year, $month);
-        $periodTo   = (new \DateTimeImmutable($periodFrom))->modify('last day of this month')->format('Y-m-d');
+        $periodTo = (new \DateTimeImmutable($periodFrom))->modify('last day of this month')->format('Y-m-d');
 
         $processed = match ($request->query->get('processed', '')) {
-            '0'     => false,
-            '1'     => true,
+            '0' => false,
+            '1' => true,
             default => null,
         };
 

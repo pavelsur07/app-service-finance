@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Catalog\Controller\Api;
 
-use App\Catalog\Application\Command\ImportProductsCommand;
-use App\Catalog\Application\ImportProductsFromXlsAction;
 use App\Catalog\Entity\ProductImport;
 use App\Catalog\Infrastructure\Repository\ProductImportRepository;
 use App\Catalog\Message\ImportProductsMessage;
@@ -43,15 +41,15 @@ final class ProductImportController extends AbstractController
             return $this->json(['error' => 'Допустимые форматы: xls, xlsx.'], 422);
         }
 
-        $importId    = Uuid::uuid7()->toString();
+        $importId = Uuid::uuid7()->toString();
         $relativePath = sprintf('product_imports/%s/%s.%s', $companyId, $importId, $extension);
 
         $stored = $storageService->storeUploadedFile($file, $relativePath);
 
         $import = new ProductImport(
-            id:           $importId,
-            companyId:    $companyId,
-            filePath:     $stored['storagePath'],
+            id: $importId,
+            companyId: $companyId,
+            filePath: $stored['storagePath'],
             originalName: $stored['originalFilename'],
         );
         $importRepository->save($import);
@@ -59,12 +57,12 @@ final class ProductImportController extends AbstractController
         // ✅ companyId передаётся как string в Message — ActiveCompanyService в Handler запрещён
         $bus->dispatch(new ImportProductsMessage(
             companyId: $companyId,
-            importId:  $importId,
+            importId: $importId,
         ));
 
         return $this->json([
             'importId' => $importId,
-            'status'   => $import->getStatus(),
+            'status' => $import->getStatus(),
         ], 202);
     }
 
@@ -85,13 +83,13 @@ final class ProductImportController extends AbstractController
         }
 
         return $this->json([
-            'importId'    => $import->getId(),
-            'status'      => $import->getStatus(),
-            'rowsTotal'   => $import->getRowsTotal(),
+            'importId' => $import->getId(),
+            'status' => $import->getStatus(),
+            'rowsTotal' => $import->getRowsTotal(),
             'rowsCreated' => $import->getRowsCreated(),
             'rowsSkipped' => $import->getRowsSkipped(),
-            'errors'      => $import->getResultJson() ?? [],
-            'finishedAt'  => $import->getFinishedAt()?->format(\DateTimeInterface::ATOM),
+            'errors' => $import->getResultJson() ?? [],
+            'finishedAt' => $import->getFinishedAt()?->format(\DateTimeInterface::ATOM),
         ]);
     }
 }

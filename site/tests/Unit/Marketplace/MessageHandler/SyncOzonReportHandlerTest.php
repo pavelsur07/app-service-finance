@@ -47,7 +47,7 @@ final class SyncOzonReportHandlerTest extends TestCase
         $em->expects(self::once())
             ->method('persist')
             ->with(self::isInstanceOf(MarketplaceRawDocument::class))
-            ->willReturnCallback(function (object $entity) use (&$capturedPersistedDoc): void {
+            ->willReturnCallback(static function (object $entity) use (&$capturedPersistedDoc): void {
                 $capturedPersistedDoc = $entity;
             });
 
@@ -117,8 +117,6 @@ final class SyncOzonReportHandlerTest extends TestCase
         self::assertInstanceOf(ProcessDayReportMessage::class, $dispatchedMessage);
         self::assertSame($existingId, $dispatchedMessage->rawDocumentId);
     }
-
-
 
     public function testRefreshesExistingRawDocumentWithNullStatusAndKeepsId(): void
     {
@@ -306,7 +304,7 @@ final class SyncOzonReportHandlerTest extends TestCase
         $em->expects(self::once())
             ->method('persist')
             ->with(self::isInstanceOf(MarketplaceRawDocument::class))
-            ->willReturnCallback(function (object $entity) use (&$capturedPersistedDoc): void {
+            ->willReturnCallback(static function (object $entity) use (&$capturedPersistedDoc): void {
                 $capturedPersistedDoc = $entity;
             });
 
@@ -339,7 +337,7 @@ final class SyncOzonReportHandlerTest extends TestCase
                 self::identicalTo($company),
                 self::identicalTo(MarketplaceType::OZON),
                 self::identicalTo('sales_report'),
-                self::callback(static fn (\DateTimeImmutable $d): bool => $d->format('Y-m-d') === self::DATE),
+                self::callback(static fn (\DateTimeImmutable $d): bool => self::DATE === $d->format('Y-m-d')),
             )
             ->willReturn([]);
 
@@ -372,10 +370,10 @@ final class SyncOzonReportHandlerTest extends TestCase
     {
         $em = $this->createMock(EntityManagerInterface::class);
         $em->method('find')->willReturnCallback(static function (string $class, string $id) use ($company, $connection) {
-            if ($class === Company::class && $id === self::COMPANY_ID) {
+            if (Company::class === $class && self::COMPANY_ID === $id) {
                 return $company;
             }
-            if ($class === MarketplaceConnection::class && $id === self::CONNECTION_ID) {
+            if (MarketplaceConnection::class === $class && self::CONNECTION_ID === $id) {
                 return $connection;
             }
 

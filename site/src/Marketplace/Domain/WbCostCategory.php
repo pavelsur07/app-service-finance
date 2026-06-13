@@ -12,7 +12,8 @@ final readonly class WbCostCategory
         public string $widgetGroup,
         public string $breakdownGroup,
         public string $unitBucket,
-    ) {}
+    ) {
+    }
 
     /**
      * @return list<self>
@@ -22,7 +23,7 @@ final readonly class WbCostCategory
         /** @var list<self>|null $cache */
         static $cache = null;
 
-        if ($cache !== null) {
+        if (null !== $cache) {
             return $cache;
         }
 
@@ -54,7 +55,7 @@ final readonly class WbCostCategory
         /** @var array<string, self>|null $cache */
         static $cache = null;
 
-        if ($cache !== null) {
+        if (null !== $cache) {
             return $cache;
         }
 

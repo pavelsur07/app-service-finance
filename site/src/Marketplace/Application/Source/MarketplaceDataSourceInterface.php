@@ -51,7 +51,7 @@ interface MarketplaceDataSourceInterface
      * Реализации могут сузить выборку строк для оперативного документа,
      * но не должны менять бизнес-логику preflight.
      *
-     * @return array<int, array<string, mixed>>  строки для PLEntryDTO
+     * @return array<int, array<string, mixed>> строки для PLEntryDTO
      */
     public function getUnprocessedEntries(
         string $companyId,

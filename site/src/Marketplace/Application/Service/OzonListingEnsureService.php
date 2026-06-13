@@ -24,7 +24,8 @@ final class OzonListingEnsureService
     public function __construct(
         private readonly MarketplaceListingRepository $listingRepository,
         private readonly OzonListingUpsertQuery $upsertQuery,
-    ) {}
+    ) {
+    }
 
     /**
      * Гарантирует существование листингов для всех переданных SKU.
@@ -36,6 +37,7 @@ final class OzonListingEnsureService
      * 3. Повторно запрашиваем все SKU, получая и только что вставленные, и созданные конкурентным процессом.
      *
      * @param array<string, string|null> $skusWithNames [sku => name|null]
+     *
      * @return array<string, MarketplaceListing>
      */
     public function ensureListings(Company $company, array $skusWithNames): array

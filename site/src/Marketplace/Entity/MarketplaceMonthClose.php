@@ -115,13 +115,13 @@ class MarketplaceMonthClose
         Assert::range($month, 1, 12);
         Assert::greaterThan($year, 2000);
 
-        $this->id          = $id;
-        $this->companyId   = $companyId;
+        $this->id = $id;
+        $this->companyId = $companyId;
         $this->marketplace = $marketplace;
-        $this->year        = $year;
-        $this->month       = $month;
-        $this->createdAt   = new \DateTimeImmutable();
-        $this->updatedAt   = new \DateTimeImmutable();
+        $this->year = $year;
+        $this->month = $month;
+        $this->createdAt = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
     // --- Бизнес-методы ---
@@ -136,7 +136,7 @@ class MarketplaceMonthClose
 
         match ($stage) {
             CloseStage::SALES_RETURNS => $this->closeSalesReturns($userId, $plDocumentIds, $preflightSnapshot),
-            CloseStage::COSTS         => $this->closeCosts($userId, $plDocumentIds, $preflightSnapshot),
+            CloseStage::COSTS => $this->closeCosts($userId, $plDocumentIds, $preflightSnapshot),
         };
     }
 
@@ -155,7 +155,7 @@ class MarketplaceMonthClose
 
         match ($stage) {
             CloseStage::SALES_RETURNS => $this->doReopenSalesReturns(),
-            CloseStage::COSTS         => $this->doReopenCosts(),
+            CloseStage::COSTS => $this->doReopenCosts(),
         };
     }
 
@@ -163,7 +163,7 @@ class MarketplaceMonthClose
     {
         return match ($stage) {
             CloseStage::SALES_RETURNS => $this->stageSalesReturnsStatus,
-            CloseStage::COSTS         => $this->stageCostsStatus,
+            CloseStage::COSTS => $this->stageCostsStatus,
         };
     }
 
@@ -179,7 +179,7 @@ class MarketplaceMonthClose
     {
         $ids = match ($stage) {
             CloseStage::SALES_RETURNS => $this->stageSalesReturnsPLDocumentIds,
-            CloseStage::COSTS         => $this->stageCostsPLDocumentIds,
+            CloseStage::COSTS => $this->stageCostsPLDocumentIds,
         };
 
         if (!is_array($ids)) {
@@ -188,7 +188,7 @@ class MarketplaceMonthClose
 
         return array_values(array_filter(
             $ids,
-            static fn (mixed $id): bool => is_string($id) && $id !== '',
+            static fn (mixed $id): bool => is_string($id) && '' !== $id,
         ));
     }
 
@@ -213,21 +213,70 @@ class MarketplaceMonthClose
 
     // --- Getters ---
 
-    public function getId(): string { return $this->id; }
-    public function getCompanyId(): string { return $this->companyId; }
-    public function getMarketplace(): MarketplaceType { return $this->marketplace; }
-    public function getYear(): int { return $this->year; }
-    public function getMonth(): int { return $this->month; }
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
-    public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
+    public function getId(): string
+    {
+        return $this->id;
+    }
 
-    public function getStageSalesReturnsStatus(): MonthCloseStageStatus { return $this->stageSalesReturnsStatus; }
-    public function getStageSalesReturnsClosedAt(): ?\DateTimeImmutable { return $this->stageSalesReturnsClosedAt; }
-    public function getStageSalesReturnsPLDocumentIds(): ?array { return $this->stageSalesReturnsPLDocumentIds; }
+    public function getCompanyId(): string
+    {
+        return $this->companyId;
+    }
 
-    public function getStageCostsStatus(): MonthCloseStageStatus { return $this->stageCostsStatus; }
-    public function getStageCostsClosedAt(): ?\DateTimeImmutable { return $this->stageCostsClosedAt; }
-    public function getStageCostsPLDocumentIds(): ?array { return $this->stageCostsPLDocumentIds; }
+    public function getMarketplace(): MarketplaceType
+    {
+        return $this->marketplace;
+    }
+
+    public function getYear(): int
+    {
+        return $this->year;
+    }
+
+    public function getMonth(): int
+    {
+        return $this->month;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    public function getUpdatedAt(): \DateTimeImmutable
+    {
+        return $this->updatedAt;
+    }
+
+    public function getStageSalesReturnsStatus(): MonthCloseStageStatus
+    {
+        return $this->stageSalesReturnsStatus;
+    }
+
+    public function getStageSalesReturnsClosedAt(): ?\DateTimeImmutable
+    {
+        return $this->stageSalesReturnsClosedAt;
+    }
+
+    public function getStageSalesReturnsPLDocumentIds(): ?array
+    {
+        return $this->stageSalesReturnsPLDocumentIds;
+    }
+
+    public function getStageCostsStatus(): MonthCloseStageStatus
+    {
+        return $this->stageCostsStatus;
+    }
+
+    public function getStageCostsClosedAt(): ?\DateTimeImmutable
+    {
+        return $this->stageCostsClosedAt;
+    }
+
+    public function getStageCostsPLDocumentIds(): ?array
+    {
+        return $this->stageCostsPLDocumentIds;
+    }
 
     // --- Settings (общий JSON-blob) ---
 
@@ -238,7 +287,7 @@ class MarketplaceMonthClose
 
     public function setSettings(array $settings): void
     {
-        $this->settings  = $settings;
+        $this->settings = $settings;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
@@ -266,7 +315,7 @@ class MarketplaceMonthClose
         }
 
         $value = $byStage[$stage->value] ?? null;
-        if (!is_string($value) || $value === '') {
+        if (!is_string($value) || '' === $value) {
             return null;
         }
 
@@ -288,7 +337,7 @@ class MarketplaceMonthClose
     {
         $settings = $this->settings ?? [];
         $settings['costs_reconciliation'] = $reconciliation;
-        $this->settings  = $settings;
+        $this->settings = $settings;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
@@ -306,19 +355,19 @@ class MarketplaceMonthClose
 
     private function closeSalesReturns(string $userId, array $plDocumentIds, array $preflightSnapshot): void
     {
-        $this->stageSalesReturnsStatus            = MonthCloseStageStatus::CLOSED;
-        $this->stageSalesReturnsClosedAt          = new \DateTimeImmutable();
-        $this->stageSalesReturnsClosedByUserId    = $userId;
-        $this->stageSalesReturnsPLDocumentIds     = $plDocumentIds;
+        $this->stageSalesReturnsStatus = MonthCloseStageStatus::CLOSED;
+        $this->stageSalesReturnsClosedAt = new \DateTimeImmutable();
+        $this->stageSalesReturnsClosedByUserId = $userId;
+        $this->stageSalesReturnsPLDocumentIds = $plDocumentIds;
         $this->stageSalesReturnsPreflightSnapshot = $preflightSnapshot;
     }
 
     private function closeCosts(string $userId, array $plDocumentIds, array $preflightSnapshot): void
     {
-        $this->stageCostsStatus            = MonthCloseStageStatus::CLOSED;
-        $this->stageCostsClosedAt          = new \DateTimeImmutable();
-        $this->stageCostsClosedByUserId    = $userId;
-        $this->stageCostsPLDocumentIds     = $plDocumentIds;
+        $this->stageCostsStatus = MonthCloseStageStatus::CLOSED;
+        $this->stageCostsClosedAt = new \DateTimeImmutable();
+        $this->stageCostsClosedByUserId = $userId;
+        $this->stageCostsPLDocumentIds = $plDocumentIds;
         $this->stageCostsPreflightSnapshot = $preflightSnapshot;
     }
 
@@ -328,10 +377,10 @@ class MarketplaceMonthClose
      */
     private function doReopenSalesReturns(): void
     {
-        $this->stageSalesReturnsStatus            = MonthCloseStageStatus::REOPENED;
-        $this->stageSalesReturnsClosedAt          = null;
-        $this->stageSalesReturnsClosedByUserId    = null;
-        $this->stageSalesReturnsPLDocumentIds     = null;  // ← ключевой сброс
+        $this->stageSalesReturnsStatus = MonthCloseStageStatus::REOPENED;
+        $this->stageSalesReturnsClosedAt = null;
+        $this->stageSalesReturnsClosedByUserId = null;
+        $this->stageSalesReturnsPLDocumentIds = null;  // ← ключевой сброс
         $this->stageSalesReturnsPreflightSnapshot = null;
     }
 
@@ -341,10 +390,10 @@ class MarketplaceMonthClose
      */
     private function doReopenCosts(): void
     {
-        $this->stageCostsStatus            = MonthCloseStageStatus::REOPENED;
-        $this->stageCostsClosedAt          = null;
-        $this->stageCostsClosedByUserId    = null;
-        $this->stageCostsPLDocumentIds     = null;  // ← ключевой сброс
+        $this->stageCostsStatus = MonthCloseStageStatus::REOPENED;
+        $this->stageCostsClosedAt = null;
+        $this->stageCostsClosedByUserId = null;
+        $this->stageCostsPLDocumentIds = null;  // ← ключевой сброс
         $this->stageCostsPreflightSnapshot = null;
     }
 }

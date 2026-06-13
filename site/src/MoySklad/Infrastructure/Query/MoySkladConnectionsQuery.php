@@ -30,7 +30,7 @@ final readonly class MoySkladConnectionsQuery
             'name' => (string) $row['name'],
             'baseUrl' => (string) $row['baseUrl'],
             'isActive' => (bool) $row['isActive'],
-            'lastSyncAt' => $row['lastSyncAt'] !== null ? (string) $row['lastSyncAt'] : null,
+            'lastSyncAt' => null !== $row['lastSyncAt'] ? (string) $row['lastSyncAt'] : null,
             'updatedAt' => (string) $row['updatedAt'],
         ], $rows);
     }

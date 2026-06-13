@@ -66,7 +66,7 @@ final class DebugReparseMutualSettlementController extends AbstractController
         if (!file_exists($absolutePath)) {
             return $this->json([
                 'success' => false,
-                'error' => 'Файл не найден на диске: ' . $rawData['file_path'],
+                'error' => 'Файл не найден на диске: '.$rawData['file_path'],
             ], 404);
         }
 
@@ -79,7 +79,7 @@ final class DebugReparseMutualSettlementController extends AbstractController
             $document->setRecordsCount($parsed['meta']['rows_parsed'] ?? $parsed['totals']['rows_count'] ?? 0);
             $document->resetProcessingStatus();
             $document->markCompleted();
-            $document->addSyncNote('Reparsed at ' . (new \DateTimeImmutable())->format('Y-m-d H:i:s'));
+            $document->addSyncNote('Reparsed at '.(new \DateTimeImmutable())->format('Y-m-d H:i:s'));
 
             $this->em->flush();
 
@@ -94,7 +94,7 @@ final class DebugReparseMutualSettlementController extends AbstractController
             $document->setRawData($rawData);
             $document->resetProcessingStatus();
             $document->markStepFailed(PipelineStep::COSTS);
-            $document->addSyncNote('Reparse failed: ' . $e->getMessage());
+            $document->addSyncNote('Reparse failed: '.$e->getMessage());
 
             $this->em->flush();
 

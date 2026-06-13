@@ -10,12 +10,14 @@ use Doctrine\DBAL\Connection;
 
 final readonly class MarketplaceCostCategoriesByCodeQuery
 {
-    public function __construct(private Connection $connection) {}
+    public function __construct(private Connection $connection)
+    {
+    }
 
     /** @param list<string> $codes @return array<string, array{id: string, code: string, name: string}> */
     public function fetchIndexed(string $companyId, MarketplaceType $marketplace, array $codes): array
     {
-        if ($codes === []) {
+        if ([] === $codes) {
             return [];
         }
 

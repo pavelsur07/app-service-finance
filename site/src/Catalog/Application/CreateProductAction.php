@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Catalog\Application;
 
-use App\Catalog\DTO\CreateProductCommand;
 use App\Catalog\Domain\InternalArticleGenerator;
 use App\Catalog\Domain\ProductSkuPolicy;
+use App\Catalog\DTO\CreateProductCommand;
 use App\Catalog\Entity\Product;
 use App\Catalog\Enum\ProductStatus;
 use App\Company\Facade\CompanyFacade;

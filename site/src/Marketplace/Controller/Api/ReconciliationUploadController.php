@@ -37,22 +37,22 @@ final class ReconciliationUploadController extends AbstractController
     #[Route('/api/marketplace/reconciliation/upload', name: 'api_marketplace_reconciliation_upload', methods: ['POST'])]
     public function __invoke(Request $request): JsonResponse
     {
-        $company   = $this->activeCompanyService->getActiveCompany();
+        $company = $this->activeCompanyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
-        $file        = $request->files->get('file');
-        $periodFrom  = (string) $request->request->get('periodFrom', '');
-        $periodTo    = (string) $request->request->get('periodTo', '');
+        $file = $request->files->get('file');
+        $periodFrom = (string) $request->request->get('periodFrom', '');
+        $periodTo = (string) $request->request->get('periodTo', '');
         $marketplace = (string) $request->request->get('marketplace', 'ozon');
 
         // --- Валидация ---
 
-        if ($file === null) {
+        if (null === $file) {
             return $this->json(['error' => 'Файл не загружен.'], 400);
         }
 
         $extension = $file->guessExtension();
-        if ($extension !== 'xlsx') {
+        if ('xlsx' !== $extension) {
             return $this->json(['error' => 'Допустимый формат: .xlsx'], 400);
         }
 
@@ -61,9 +61,9 @@ final class ReconciliationUploadController extends AbstractController
         }
 
         $dateFrom = \DateTimeImmutable::createFromFormat('!Y-m-d', $periodFrom);
-        $dateTo   = \DateTimeImmutable::createFromFormat('!Y-m-d', $periodTo);
+        $dateTo = \DateTimeImmutable::createFromFormat('!Y-m-d', $periodTo);
 
-        if ($dateFrom === false || $dateTo === false) {
+        if (false === $dateFrom || false === $dateTo) {
             return $this->json(['error' => 'Некорректный формат дат. Ожидается Y-m-d.'], 400);
         }
 
@@ -71,7 +71,7 @@ final class ReconciliationUploadController extends AbstractController
             return $this->json(['error' => 'periodFrom должен быть раньше periodTo.'], 400);
         }
 
-        if (MarketplaceType::tryFrom($marketplace) === null) {
+        if (null === MarketplaceType::tryFrom($marketplace)) {
             return $this->json(['error' => 'Неизвестный маркетплейс.'], 400);
         }
 
@@ -115,16 +115,16 @@ final class ReconciliationUploadController extends AbstractController
             return $this->json(['error' => 'Unexpected state: session still pending.'], 500);
         }
 
-        if ($session->getStatus() === ReconciliationSessionStatus::FAILED) {
+        if (ReconciliationSessionStatus::FAILED === $session->getStatus()) {
             return $this->json([
-                'id'           => $session->getId(),
-                'status'       => $session->getStatus()->value,
+                'id' => $session->getId(),
+                'status' => $session->getStatus()->value,
                 'errorMessage' => $session->getErrorMessage(),
             ], 422);
         }
 
         return $this->json([
-            'id'     => $session->getId(),
+            'id' => $session->getId(),
             'status' => $session->getStatus()->value,
             'result' => $session->getDecodedResult(),
         ]);

@@ -25,7 +25,7 @@ final class UnitEconomyCostMappingRepository extends ServiceEntityRepository imp
         string $companyId,
     ): ?UnitEconomyCostMapping {
         return $this->findOneBy([
-            'id'        => $id,
+            'id' => $id,
             'companyId' => $companyId,
         ]);
     }
@@ -36,8 +36,8 @@ final class UnitEconomyCostMappingRepository extends ServiceEntityRepository imp
         string $costCategoryId,
     ): ?UnitEconomyCostMapping {
         return $this->findOneBy([
-            'companyId'      => $companyId,
-            'marketplace'    => $marketplace,
+            'companyId' => $companyId,
+            'marketplace' => $marketplace,
             'costCategoryId' => $costCategoryId,
         ]);
     }
@@ -50,7 +50,7 @@ final class UnitEconomyCostMappingRepository extends ServiceEntityRepository imp
         string $marketplace,
     ): array {
         return $this->findBy([
-            'companyId'   => $companyId,
+            'companyId' => $companyId,
             'marketplace' => $marketplace,
         ]);
     }
@@ -68,7 +68,7 @@ final class UnitEconomyCostMappingRepository extends ServiceEntityRepository imp
             ->where('m.companyId = :companyId')
             ->setParameter('companyId', $companyId);
 
-        if ($marketplace !== null) {
+        if (null !== $marketplace) {
             $qb->andWhere('m.marketplace = :marketplace')
                 ->setParameter('marketplace', $marketplace);
         }
@@ -95,7 +95,7 @@ final class UnitEconomyCostMappingRepository extends ServiceEntityRepository imp
     ): void {
         $mapping = $this->findById($id, $companyId);
 
-        if ($mapping === null) {
+        if (null === $mapping) {
             throw new \DomainException('Маппинг не найден');
         }
 

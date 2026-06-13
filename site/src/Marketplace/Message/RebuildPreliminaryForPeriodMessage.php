@@ -13,8 +13,8 @@ final readonly class RebuildPreliminaryForPeriodMessage
     public function __construct(
         public string $companyId,
         public string $marketplace,   // MarketplaceType::value
-        public int    $year,
-        public int    $month,
+        public int $year,
+        public int $month,
         public string $actorUserId,
     ) {
     }

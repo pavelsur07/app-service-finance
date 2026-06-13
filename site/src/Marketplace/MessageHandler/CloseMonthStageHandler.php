@@ -15,27 +15,27 @@ final class CloseMonthStageHandler
 {
     public function __construct(
         private readonly CloseMonthStageAction $action,
-        private readonly LoggerInterface       $logger,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
     public function __invoke(CloseMonthStageMessage $message): void
     {
         $this->logger->info('[MonthClose] Handler started', [
-            'company_id'  => $message->companyId,
+            'company_id' => $message->companyId,
             'marketplace' => $message->marketplace,
-            'year'        => $message->year,
-            'month'       => $message->month,
-            'stage'       => $message->stage,
+            'year' => $message->year,
+            'month' => $message->month,
+            'stage' => $message->stage,
         ]);
 
         try {
             $command = new CloseMonthStageCommand(
-                companyId:   $message->companyId,
+                companyId: $message->companyId,
                 marketplace: $message->marketplace,
-                year:        $message->year,
-                month:       $message->month,
-                stage:       $message->stage,
+                year: $message->year,
+                month: $message->month,
+                stage: $message->stage,
                 actorUserId: $message->actorUserId,
             );
 
@@ -43,20 +43,20 @@ final class CloseMonthStageHandler
 
             $this->logger->info('[MonthClose] Handler completed', [
                 'month_close_id' => $result['monthCloseId'],
-                'pl_documents'   => count($result['plDocumentIds']),
+                'pl_documents' => count($result['plDocumentIds']),
             ]);
         } catch (\DomainException $e) {
             // DomainException — не ретраим, данные не готовы
             $this->logger->error('[MonthClose] Domain error — no retry', [
                 'company_id' => $message->companyId,
-                'stage'      => $message->stage,
-                'error'      => $e->getMessage(),
+                'stage' => $message->stage,
+                'error' => $e->getMessage(),
             ]);
         } catch (\Throwable $e) {
             $this->logger->error('[MonthClose] Handler failed', [
                 'company_id' => $message->companyId,
-                'stage'      => $message->stage,
-                'error'      => $e->getMessage(),
+                'stage' => $message->stage,
+                'error' => $e->getMessage(),
             ]);
 
             throw $e; // Ретраим для технических ошибок

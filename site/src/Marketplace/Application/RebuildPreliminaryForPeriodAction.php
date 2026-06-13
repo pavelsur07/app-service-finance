@@ -31,10 +31,10 @@ final class RebuildPreliminaryForPeriodAction
 {
     public function __construct(
         private readonly MarketplaceMonthCloseRepository $monthCloseRepository,
-        private readonly ReopenMonthStageAction         $reopenAction,
-        private readonly MonthClosePreflightAction      $preflightAction,
-        private readonly CloseMonthStageAction          $closeAction,
-        private readonly LoggerInterface                $logger,
+        private readonly ReopenMonthStageAction $reopenAction,
+        private readonly MonthClosePreflightAction $preflightAction,
+        private readonly CloseMonthStageAction $closeAction,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -43,10 +43,10 @@ final class RebuildPreliminaryForPeriodAction
         $marketplace = MarketplaceType::from($command->marketplace);
 
         $this->logger->info('[PreliminaryRebuild] Started', [
-            'company_id'  => $command->companyId,
+            'company_id' => $command->companyId,
             'marketplace' => $command->marketplace,
-            'year'        => $command->year,
-            'month'       => $command->month,
+            'year' => $command->year,
+            'month' => $command->month,
         ]);
 
         foreach ([CloseStage::SALES_RETURNS, CloseStage::COSTS] as $stage) {
@@ -54,10 +54,10 @@ final class RebuildPreliminaryForPeriodAction
         }
 
         $this->logger->info('[PreliminaryRebuild] Finished', [
-            'company_id'  => $command->companyId,
+            'company_id' => $command->companyId,
             'marketplace' => $command->marketplace,
-            'year'        => $command->year,
-            'month'       => $command->month,
+            'year' => $command->year,
+            'month' => $command->month,
         ]);
     }
 
@@ -66,13 +66,13 @@ final class RebuildPreliminaryForPeriodAction
         MarketplaceType $marketplace,
         CloseStage $stage,
     ): void {
-        $monthClose    = $this->monthCloseRepository->findByPeriod(
+        $monthClose = $this->monthCloseRepository->findByPeriod(
             $command->companyId,
             $marketplace,
             $command->year,
             $command->month,
         );
-        $stageStatus   = $monthClose?->getStageStatus($stage) ?? MonthCloseStageStatus::PENDING;
+        $stageStatus = $monthClose?->getStageStatus($stage) ?? MonthCloseStageStatus::PENDING;
         // Per-stage флаг: финальное закрытие одного этапа нельзя путать
         // с предварительным закрытием соседнего этапа того же месяца.
         $wasPreliminary = $monthClose?->isStageLastCloseWasPreliminary($stage) ?? false;
@@ -80,11 +80,11 @@ final class RebuildPreliminaryForPeriodAction
 
         // Если этап закрыт и последнее закрытие НЕ было предварительным —
         // не трогаем (финальное закрытие остаётся неприкосновенным).
-        if ($stageStatus === MonthCloseStageStatus::CLOSED && !$wasPreliminary) {
+        if (MonthCloseStageStatus::CLOSED === $stageStatus && !$wasPreliminary) {
             $this->logger->info('[PreliminaryRebuild] Stage closed manually, skip', [
-                'company_id'  => $command->companyId,
+                'company_id' => $command->companyId,
                 'marketplace' => $command->marketplace,
-                'stage'       => $stage->value,
+                'stage' => $stage->value,
             ]);
 
             return;
@@ -92,22 +92,22 @@ final class RebuildPreliminaryForPeriodAction
 
         // Если этап CLOSED и предыдущее закрытие было предварительным —
         // переоткрываем перед новым предзакрытием.
-        if ($stageStatus === MonthCloseStageStatus::CLOSED && $wasPreliminary) {
+        if (MonthCloseStageStatus::CLOSED === $stageStatus && $wasPreliminary) {
             try {
                 ($this->reopenAction)(new ReopenMonthStageCommand(
-                    companyId:   $command->companyId,
+                    companyId: $command->companyId,
                     marketplace: $command->marketplace,
-                    year:        $command->year,
-                    month:       $command->month,
-                    stage:       $stage,
+                    year: $command->year,
+                    month: $command->month,
+                    stage: $stage,
                 ));
                 $wasReopened = true;
             } catch (\DomainException $e) {
                 $this->logger->warning('[PreliminaryRebuild] Reopen failed, skip stage', [
-                    'company_id'  => $command->companyId,
+                    'company_id' => $command->companyId,
                     'marketplace' => $command->marketplace,
-                    'stage'       => $stage->value,
-                    'error'       => $e->getMessage(),
+                    'stage' => $stage->value,
+                    'error' => $e->getMessage(),
                 ]);
 
                 return;
@@ -116,11 +116,11 @@ final class RebuildPreliminaryForPeriodAction
 
         // Preflight — не закрываем, если есть блокирующие ошибки.
         $preflightResult = ($this->preflightAction)(new PreflightMonthCloseCommand(
-            companyId:   $command->companyId,
+            companyId: $command->companyId,
             marketplace: $command->marketplace,
-            year:        $command->year,
-            month:       $command->month,
-            stage:       $stage,
+            year: $command->year,
+            month: $command->month,
+            stage: $stage,
         ));
 
         if (!$preflightResult->canClose()) {
@@ -130,30 +130,27 @@ final class RebuildPreliminaryForPeriodAction
             );
 
             $this->logger->warning('[PreliminaryRebuild] Preflight failed, skip stage', [
-                'company_id'  => $command->companyId,
+                'company_id' => $command->companyId,
                 'marketplace' => $command->marketplace,
-                'year'        => $command->year,
-                'month'       => $command->month,
-                'stage'       => $stage->value,
-                'errors'      => $errorKeys,
+                'year' => $command->year,
+                'month' => $command->month,
+                'stage' => $stage->value,
+                'errors' => $errorKeys,
                 'preliminary' => true,
             ]);
 
             if ($wasReopened) {
                 $this->logger->error('[PreliminaryRebuild] Preflight failed after reopen', [
-                    'company_id'  => $command->companyId,
+                    'company_id' => $command->companyId,
                     'marketplace' => $command->marketplace,
-                    'year'        => $command->year,
-                    'month'       => $command->month,
-                    'stage'       => $stage->value,
-                    'errors'      => $errorKeys,
+                    'year' => $command->year,
+                    'month' => $command->month,
+                    'stage' => $stage->value,
+                    'errors' => $errorKeys,
                     'preliminary' => true,
                 ]);
 
-                throw new \DomainException(sprintf(
-                    'Preliminary rebuild cannot be completed after reopen for stage "%s": blocking preflight errors.',
-                    $stage->value,
-                ));
+                throw new \DomainException(sprintf('Preliminary rebuild cannot be completed after reopen for stage "%s": blocking preflight errors.', $stage->value));
             }
 
             return;
@@ -162,21 +159,21 @@ final class RebuildPreliminaryForPeriodAction
         // Запускаем закрытие этапа в режиме предзакрытия.
         try {
             ($this->closeAction)(new CloseMonthStageCommand(
-                companyId:   $command->companyId,
+                companyId: $command->companyId,
                 marketplace: $command->marketplace,
-                year:        $command->year,
-                month:       $command->month,
-                stage:       $stage->value,
+                year: $command->year,
+                month: $command->month,
+                stage: $stage->value,
                 actorUserId: $command->actorUserId,
                 preliminary: true,
             ));
         } catch (\DomainException $e) {
             $this->logger->warning('[PreliminaryRebuild] Close skipped (domain)', [
-                'company_id'  => $command->companyId,
+                'company_id' => $command->companyId,
                 'marketplace' => $command->marketplace,
-                'year'        => $command->year,
-                'month'       => $command->month,
-                'stage'       => $stage->value,
+                'year' => $command->year,
+                'month' => $command->month,
+                'stage' => $stage->value,
                 'preliminary' => true,
                 'exception_class' => $e::class,
                 'exception_message' => $e->getMessage(),
@@ -184,13 +181,13 @@ final class RebuildPreliminaryForPeriodAction
 
             if ($wasReopened) {
                 $this->logger->error('[PreliminaryRebuild] Close failed after reopen', [
-                    'company_id'        => $command->companyId,
-                    'marketplace'       => $command->marketplace,
-                    'year'              => $command->year,
-                    'month'             => $command->month,
-                    'stage'             => $stage->value,
-                    'preliminary'       => true,
-                    'exception_class'   => $e::class,
+                    'company_id' => $command->companyId,
+                    'marketplace' => $command->marketplace,
+                    'year' => $command->year,
+                    'month' => $command->month,
+                    'stage' => $stage->value,
+                    'preliminary' => true,
+                    'exception_class' => $e::class,
                     'exception_message' => $e->getMessage(),
                 ]);
 
@@ -202,14 +199,14 @@ final class RebuildPreliminaryForPeriodAction
                     ? '[PreliminaryRebuild] Close failed after reopen'
                     : '[PreliminaryRebuild] Close failed',
                 [
-                    'company_id'        => $command->companyId,
-                    'marketplace'       => $command->marketplace,
-                    'year'              => $command->year,
-                    'month'             => $command->month,
-                    'stage'             => $stage->value,
-                    'preliminary'       => true,
-                    'was_reopened'      => $wasReopened,
-                    'exception_class'   => $e::class,
+                    'company_id' => $command->companyId,
+                    'marketplace' => $command->marketplace,
+                    'year' => $command->year,
+                    'month' => $command->month,
+                    'stage' => $stage->value,
+                    'preliminary' => true,
+                    'was_reopened' => $wasReopened,
+                    'exception_class' => $e::class,
                     'exception_message' => $e->getMessage(),
                 ],
             );

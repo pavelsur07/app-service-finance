@@ -28,42 +28,42 @@ class MarketplaceListingsController extends AbstractController
     #[Route('', name: 'marketplace_listings_index', methods: ['GET'])]
     public function index(Request $request): Response
     {
-        $company   = $this->activeCompanyService->getActiveCompany();
+        $company = $this->activeCompanyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
-        $filter      = $request->query->get('filter', 'all');
-        $page        = max(1, (int) $request->query->get('page', 1));
+        $filter = $request->query->get('filter', 'all');
+        $page = max(1, (int) $request->query->get('page', 1));
         $marketplace = $request->query->get('marketplace');
 
         // Валидируем marketplace из enum
         $marketplaceType = null;
-        if ($marketplace !== null) {
+        if (null !== $marketplace) {
             $marketplaceType = MarketplaceType::tryFrom($marketplace);
-            if ($marketplaceType === null) {
+            if (null === $marketplaceType) {
                 $marketplace = null;
             }
         }
 
         $mapped = match ($filter) {
-            'mapped'   => true,
+            'mapped' => true,
             'unmapped' => false,
-            default    => null,
+            default => null,
         };
 
-        $pager         = $this->listingsQuery->paginate($companyId, $mapped, $page, self::PER_PAGE, $marketplaceType);
-        $countAll      = $this->listingsQuery->countAll($companyId);
-        $countMapped   = $this->listingsQuery->countMapped($companyId);
+        $pager = $this->listingsQuery->paginate($companyId, $mapped, $page, self::PER_PAGE, $marketplaceType);
+        $countAll = $this->listingsQuery->countAll($companyId);
+        $countMapped = $this->listingsQuery->countMapped($companyId);
         $countUnmapped = $this->listingsQuery->countUnmapped($companyId);
 
         return $this->render('marketplace/listings/index.html.twig', [
-            'pager'                  => $pager,
-            'filter'                 => $filter,
-            'marketplace'            => $marketplace,
+            'pager' => $pager,
+            'filter' => $filter,
+            'marketplace' => $marketplace,
             'available_marketplaces' => MarketplaceType::cases(),
-            'count_all'              => $countAll,
-            'count_mapped'           => $countMapped,
-            'count_unmapped'         => $countUnmapped,
-            'active_tab'             => 'listings',
+            'count_all' => $countAll,
+            'count_mapped' => $countMapped,
+            'count_unmapped' => $countUnmapped,
+            'active_tab' => 'listings',
         ]);
     }
 }

@@ -3,12 +3,12 @@
 namespace App\Telegram\Controller;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Telegram\Application\CreateTelegramCashTransactionAction;
+use App\Telegram\Application\DTO\CreateTelegramCashTransactionCommand;
 use App\Telegram\Entity\ClientBinding;
 use App\Telegram\Entity\ImportJob;
 use App\Telegram\Entity\ReportSubscription;
 use App\Telegram\Entity\TelegramBot;
-use App\Telegram\Application\CreateTelegramCashTransactionAction;
-use App\Telegram\Application\DTO\CreateTelegramCashTransactionCommand;
 use App\Telegram\Entity\TelegramUser;
 use App\Telegram\Repository\BotLinkRepository;
 use App\Telegram\Repository\TelegramBotRepository;
@@ -840,7 +840,6 @@ class TelegramWebhookController extends AbstractController
         if (null === $result) {
             return $this->respondWithMessage($bot, $message, 'Формат: потратил 2500 на рекламу');
         }
-
 
         if ($result->skippedMissingMessageIdentity) {
             $this->logger->warning('Telegram cash transaction skipped: message identity is incomplete.', [

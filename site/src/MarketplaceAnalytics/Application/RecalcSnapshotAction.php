@@ -13,7 +13,8 @@ final class RecalcSnapshotAction
 {
     public function __construct(
         private readonly MessageBusInterface $messageBus,
-    ) {}
+    ) {
+    }
 
     public function __invoke(string $companyId, AnalysisPeriod $period): string
     {

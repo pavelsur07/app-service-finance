@@ -10,7 +10,7 @@ use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
 /**
- * MarketplaceStaging - промежуточная таблица для отслеживания каждой записи
+ * MarketplaceStaging - промежуточная таблица для отслеживания каждой записи.
  *
  * Workflow:
  * 1. Raw Document → Staging (парсинг) - status: pending
@@ -40,19 +40,19 @@ class MarketplaceStaging
     // === MARKETPLACE & SOURCE ===
 
     /**
-     * Маркетплейс (wildberries, ozon, yandex_market, sber_mega_market)
+     * Маркетплейс (wildberries, ozon, yandex_market, sber_mega_market).
      */
     #[ORM\Column(type: 'string', length: 30)]
     private string $marketplace;
 
     /**
-     * Уникальный ID записи из маркетплейса (srid для WB, operation_id для Ozon)
+     * Уникальный ID записи из маркетплейса (srid для WB, operation_id для Ozon).
      */
     #[ORM\Column(type: 'string', length: 255)]
     private string $sourceRecordId;
 
     /**
-     * Тип записи (sale, return, cost, storno)
+     * Тип записи (sale, return, cost, storno).
      */
     #[ORM\Column(type: 'string', length: 20, enumType: StagingRecordType::class)]
     private StagingRecordType $recordType;
@@ -60,7 +60,7 @@ class MarketplaceStaging
     // === RAW DATA ===
 
     /**
-     * Оригинальная запись из API (для отладки и переобработки)
+     * Оригинальная запись из API (для отладки и переобработки).
      */
     #[ORM\Column(type: 'json')]
     private array $rawData;
@@ -68,19 +68,19 @@ class MarketplaceStaging
     // === PARSED UNIVERSAL FIELDS ===
 
     /**
-     * Сумма операции (универсальное поле)
+     * Сумма операции (универсальное поле).
      */
     #[ORM\Column(type: 'decimal', precision: 15, scale: 2)]
     private string $amount;
 
     /**
-     * Дата операции (универсальное поле)
+     * Дата операции (универсальное поле).
      */
     #[ORM\Column(type: 'date_immutable')]
     private \DateTimeImmutable $recordDate;
 
     /**
-     * SKU маркетплейса (nm_id для WB, sku для Ozon)
+     * SKU маркетплейса (nm_id для WB, sku для Ozon).
      */
     #[ORM\Column(type: 'string', length: 100)]
     private string $marketplaceSku;
@@ -99,7 +99,7 @@ class MarketplaceStaging
      *     "posting_number": "12345-0001-1",
      *     "sale_commission": 150.00
      *   }
-     * }
+     * }.
      */
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $parsedData = null;
@@ -107,14 +107,14 @@ class MarketplaceStaging
     // === PRODUCT LINKING ===
 
     /**
-     * Связанный листинг маркетплейса (может быть null если не найден)
+     * Связанный листинг маркетплейса (может быть null если не найден).
      */
     #[ORM\ManyToOne(targetEntity: MarketplaceListing::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?MarketplaceListing $listing = null;
 
     /**
-     * Связан ли с товаром из каталога
+     * Связан ли с товаром из каталога.
      */
     #[ORM\Column(type: 'boolean')]
     private bool $linkedToProduct = false;
@@ -122,7 +122,7 @@ class MarketplaceStaging
     // === PROCESSING STATUS ===
 
     /**
-     * Статус обработки (pending, processing, completed, failed, skipped)
+     * Статус обработки (pending, processing, completed, failed, skipped).
      */
     #[ORM\Column(type: 'string', length: 20, enumType: ProcessingStatus::class)]
     private ProcessingStatus $processingStatus = ProcessingStatus::PENDING;
@@ -132,7 +132,7 @@ class MarketplaceStaging
      * [
      *   {"field": "amount", "error": "Amount cannot be negative"},
      *   {"field": "listing", "error": "Listing not found"}
-     * ]
+     * ].
      */
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $validationErrors = null;
@@ -140,13 +140,13 @@ class MarketplaceStaging
     // === FINAL ENTITY LINK ===
 
     /**
-     * ID созданной финальной сущности (MarketplaceSale/Return/Cost)
+     * ID созданной финальной сущности (MarketplaceSale/Return/Cost).
      */
     #[ORM\Column(type: 'guid', nullable: true)]
     private ?string $finalEntityId = null;
 
     /**
-     * Тип финальной сущности (MarketplaceSale, MarketplaceReturn, MarketplaceCost)
+     * Тип финальной сущности (MarketplaceSale, MarketplaceReturn, MarketplaceCost).
      */
     #[ORM\Column(type: 'string', length: 50, nullable: true)]
     private ?string $finalEntityType = null;
@@ -169,7 +169,7 @@ class MarketplaceStaging
         array $rawData,
         string $amount,
         \DateTimeImmutable $recordDate,
-        string $marketplaceSku
+        string $marketplaceSku,
     ) {
         Assert::uuid($id);
         Assert::notEmpty($marketplace);
@@ -291,19 +291,22 @@ class MarketplaceStaging
     public function setParsedData(?array $parsedData): self
     {
         $this->parsedData = $parsedData;
+
         return $this;
     }
 
     public function setListing(?MarketplaceListing $listing): self
     {
         $this->listing = $listing;
-        $this->linkedToProduct = $listing !== null && $listing->getProduct() !== null;
+        $this->linkedToProduct = null !== $listing && null !== $listing->getProduct();
+
         return $this;
     }
 
     public function setValidationErrors(?array $validationErrors): self
     {
         $this->validationErrors = $validationErrors;
+
         return $this;
     }
 
@@ -312,6 +315,7 @@ class MarketplaceStaging
     public function markProcessing(): self
     {
         $this->processingStatus = ProcessingStatus::PROCESSING;
+
         return $this;
     }
 
@@ -322,6 +326,7 @@ class MarketplaceStaging
         $this->finalEntityType = $finalEntityType;
         $this->processedAt = new \DateTimeImmutable();
         $this->validationErrors = null;
+
         return $this;
     }
 
@@ -330,6 +335,7 @@ class MarketplaceStaging
         $this->processingStatus = ProcessingStatus::FAILED;
         $this->validationErrors = $validationErrors;
         $this->processedAt = new \DateTimeImmutable();
+
         return $this;
     }
 
@@ -338,13 +344,14 @@ class MarketplaceStaging
         $this->processingStatus = ProcessingStatus::SKIPPED;
         $this->validationErrors = [['reason' => $reason]];
         $this->processedAt = new \DateTimeImmutable();
+
         return $this;
     }
 
     // === HELPER METHODS ===
 
     /**
-     * Получить поле из parsedData по ключу
+     * Получить поле из parsedData по ключу.
      */
     public function getParsedField(string $key, mixed $default = null): mixed
     {
@@ -352,11 +359,11 @@ class MarketplaceStaging
     }
 
     /**
-     * Добавить ошибку валидации
+     * Добавить ошибку валидации.
      */
     public function addValidationError(string $field, string $error): self
     {
-        if ($this->validationErrors === null) {
+        if (null === $this->validationErrors) {
             $this->validationErrors = [];
         }
 
@@ -369,26 +376,26 @@ class MarketplaceStaging
     }
 
     /**
-     * Готова ли запись к обработке
+     * Готова ли запись к обработке.
      */
     public function isPending(): bool
     {
-        return $this->processingStatus === ProcessingStatus::PENDING;
+        return ProcessingStatus::PENDING === $this->processingStatus;
     }
 
     /**
-     * Обработана ли запись успешно
+     * Обработана ли запись успешно.
      */
     public function isCompleted(): bool
     {
-        return $this->processingStatus === ProcessingStatus::COMPLETED;
+        return ProcessingStatus::COMPLETED === $this->processingStatus;
     }
 
     /**
-     * Провалилась ли обработка
+     * Провалилась ли обработка.
      */
     public function isFailed(): bool
     {
-        return $this->processingStatus === ProcessingStatus::FAILED;
+        return ProcessingStatus::FAILED === $this->processingStatus;
     }
 }

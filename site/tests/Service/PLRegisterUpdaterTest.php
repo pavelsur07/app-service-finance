@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace App\Tests\Service;
 
 use App\Company\Entity\Company;
+use App\Finance\Application\Service\PlNatureResolver;
+use App\Finance\Application\Service\PLRegisterUpdater;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\PLFlow;
 use App\Finance\Repository\DocumentRepository;
 use App\Finance\Repository\PLDailyTotalRepository;
-use App\Finance\Application\Service\PlNatureResolver;
-use App\Finance\Application\Service\PLRegisterUpdater;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;

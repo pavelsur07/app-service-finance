@@ -18,12 +18,12 @@ use Psr\Log\LoggerInterface;
 final class ReopenMonthStageAction
 {
     public function __construct(
-        private readonly MarketplaceMonthCloseRepository      $monthCloseRepository,
-        private readonly CompanyFacade                        $companyFacade,
-        private readonly MarkProcessedQuery                   $markProcessedQuery,
+        private readonly MarketplaceMonthCloseRepository $monthCloseRepository,
+        private readonly CompanyFacade $companyFacade,
+        private readonly MarkProcessedQuery $markProcessedQuery,
         private readonly MarketplaceOzonRealizationRepository $ozonRealizationRepository,
-        private readonly FinanceFacade                        $financeFacade,
-        private readonly LoggerInterface                      $logger,
+        private readonly FinanceFacade $financeFacade,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -38,7 +38,7 @@ final class ReopenMonthStageAction
             $command->month,
         );
 
-        if ($monthClose === null) {
+        if (null === $monthClose) {
             throw new \DomainException('Этап не найден.');
         }
 
@@ -47,40 +47,37 @@ final class ReopenMonthStageAction
         // Идемпотентность: если этап уже переоткрыт (например, предыдущее повторное
         // закрытие упало в Messenger) — молча завершаем без ошибки.
         // Маркировки уже были сняты при первом переоткрытии, PLDocument уже удалён.
-        if ($currentStatus === MonthCloseStageStatus::REOPENED) {
+        if (MonthCloseStageStatus::REOPENED === $currentStatus) {
             $this->logger->info('[MonthClose] Reopen: stage already reopened, skipping', [
-                'company_id'  => $command->companyId,
+                'company_id' => $command->companyId,
                 'marketplace' => $command->marketplace,
-                'year'        => $command->year,
-                'month'       => $command->month,
-                'stage'       => $command->stage->value,
+                'year' => $command->year,
+                'month' => $command->month,
+                'stage' => $command->stage->value,
             ]);
 
             return;
         }
 
         // Переоткрыть можно только закрытый этап
-        if ($currentStatus !== MonthCloseStageStatus::CLOSED) {
+        if (MonthCloseStageStatus::CLOSED !== $currentStatus) {
             throw new \DomainException('Этап не закрыт.');
         }
 
         // Проверка блокировки периода
         $company = $this->companyFacade->findById($command->companyId);
-        if ($company === null) {
+        if (null === $company) {
             throw new \DomainException('Компания не найдена.');
         }
 
         $lockBefore = $company->getFinanceLockBefore();
-        if ($lockBefore !== null && $monthClose->getPeriodEnd() <= $lockBefore) {
-            throw new \DomainException(sprintf(
-                'Период заблокирован для редактирования (дата блокировки: %s).',
-                $lockBefore->format('d.m.Y'),
-            ));
+        if (null !== $lockBefore && $monthClose->getPeriodEnd() <= $lockBefore) {
+            throw new \DomainException(sprintf('Период заблокирован для редактирования (дата блокировки: %s).', $lockBefore->format('d.m.Y')));
         }
 
         $documentIds = $monthClose->getStagePLDocumentIds($command->stage);
-        $periodFrom  = sprintf('%d-%02d-01', $monthClose->getYear(), $monthClose->getMonth());
-        $periodTo    = $monthClose->getPeriodEnd()->format('Y-m-d');
+        $periodFrom = sprintf('%d-%02d-01', $monthClose->getYear(), $monthClose->getMonth());
+        $periodTo = $monthClose->getPeriodEnd()->format('Y-m-d');
 
         // 1. Удалить PLDocument(ы) из Finance ПЕРЕД снятием маркировок.
         //    Это устраняет задвоение записей ОПиУ при повторном закрытии.
@@ -90,12 +87,12 @@ final class ReopenMonthStageAction
         // 2. Снять маркировки «обработано» с записей маркетплейса,
         //    чтобы они попали в выборку при следующем закрытии.
         $this->rollbackProcessedMarks(
-            companyId:     $command->companyId,
-            marketplace:   $command->marketplace,
-            stage:         $command->stage,
+            companyId: $command->companyId,
+            marketplace: $command->marketplace,
+            stage: $command->stage,
             plDocumentIds: $documentIds,
-            periodFrom:    $periodFrom,
-            periodTo:      $periodTo,
+            periodFrom: $periodFrom,
+            periodTo: $periodTo,
         );
 
         // 3. Переключить статус этапа и сбросить все поля (IDs, даты, snapshot).
@@ -103,12 +100,12 @@ final class ReopenMonthStageAction
         $this->monthCloseRepository->save($monthClose);
 
         $this->logger->info('[MonthClose] Stage reopened', [
-            'company_id'      => $command->companyId,
-            'marketplace'     => $command->marketplace,
-            'year'            => $command->year,
-            'month'           => $command->month,
-            'stage'           => $command->stage->value,
-            'deleted_docs'    => count($documentIds),
+            'company_id' => $command->companyId,
+            'marketplace' => $command->marketplace,
+            'year' => $command->year,
+            'month' => $command->month,
+            'stage' => $command->stage->value,
+            'deleted_docs' => count($documentIds),
         ]);
     }
 
@@ -126,7 +123,7 @@ final class ReopenMonthStageAction
                 $this->financeFacade->deletePLDocument($companyId, $documentId);
 
                 $this->logger->info('[MonthClose] PLDocument deleted', [
-                    'company_id'  => $companyId,
+                    'company_id' => $companyId,
                     'document_id' => $documentId,
                 ]);
             } catch (\DomainException $e) {
@@ -155,7 +152,7 @@ final class ReopenMonthStageAction
                 $periodFrom,
                 $periodTo,
             ),
-            CloseStage::COSTS => $plDocumentIds !== []
+            CloseStage::COSTS => [] !== $plDocumentIds
                 ? $this->markProcessedQuery->unmarkCostsByDocumentIds($companyId, $marketplace, $plDocumentIds)
                 : $this->markProcessedQuery->unmarkCostsByPeriod($companyId, $marketplace, $periodFrom, $periodTo),
         };
@@ -175,7 +172,7 @@ final class ReopenMonthStageAction
         // После шага deletePLDocuments() документы уже удалены, поэтому
         // unmark*ByDocumentIds — единственный надёжный путь:
         // фолбэк по периоду оставляем только для старых записей без сохранённых IDs.
-        if ($plDocumentIds !== []) {
+        if ([] !== $plDocumentIds) {
             $this->markProcessedQuery->unmarkSalesByDocumentIds($companyId, $marketplace, $plDocumentIds);
             $this->markProcessedQuery->unmarkReturnsByDocumentIds($companyId, $marketplace, $plDocumentIds);
         } else {
@@ -186,7 +183,7 @@ final class ReopenMonthStageAction
 
         // Для Ozon — отдельно снять маркировку реализации.
         if ($marketplace === MarketplaceType::OZON->value) {
-            if ($plDocumentIds !== []) {
+            if ([] !== $plDocumentIds) {
                 $this->ozonRealizationRepository->unmarkProcessedByDocumentIds($companyId, $plDocumentIds);
             } else {
                 $this->ozonRealizationRepository->unmarkProcessedByPeriod($companyId, $periodFrom, $periodTo);

@@ -62,7 +62,7 @@ final class DebugWidgetRevenueController extends AbstractController
         $company = $this->activeCompanyService->getActiveCompany();
 
         $marketplace = $request->query->get('marketplace');
-        if ($marketplace === null || $marketplace === '') {
+        if (null === $marketplace || '' === $marketplace) {
             $marketplace = null;
         } else {
             $validValues = array_map(
@@ -71,21 +71,21 @@ final class DebugWidgetRevenueController extends AbstractController
             );
             if (!in_array($marketplace, $validValues, true)) {
                 return $this->json([
-                    'error' => 'Invalid marketplace. Allowed: ' . implode(', ', $validValues),
+                    'error' => 'Invalid marketplace. Allowed: '.implode(', ', $validValues),
                 ], 422);
             }
         }
 
         $periodFromStr = (string) $request->query->get('periodFrom', '');
-        $periodToStr   = (string) $request->query->get('periodTo', '');
+        $periodToStr = (string) $request->query->get('periodTo', '');
 
-        if ($periodFromStr === '' || $periodToStr === '') {
+        if ('' === $periodFromStr || '' === $periodToStr) {
             return $this->json(['error' => 'periodFrom and periodTo are required'], 422);
         }
 
         try {
             $periodFrom = new \DateTimeImmutable($periodFromStr);
-            $periodTo   = new \DateTimeImmutable($periodToStr);
+            $periodTo = new \DateTimeImmutable($periodToStr);
         } catch (\Exception) {
             return $this->json(['error' => 'Invalid date format. Expected Y-m-d'], 422);
         }
@@ -102,25 +102,25 @@ final class DebugWidgetRevenueController extends AbstractController
 
         return new JsonResponse([
             'period' => [
-                'from'        => $periodFrom->format('Y-m-d'),
-                'to'          => $periodTo->format('Y-m-d'),
+                'from' => $periodFrom->format('Y-m-d'),
+                'to' => $periodTo->format('Y-m-d'),
                 'marketplace' => $marketplace,
             ],
             'sales_total_revenue' => $sales['total_revenue'],
-            'sales_count'         => $sales['count'],
-            'sales_quantity_sum'  => $sales['quantity_sum'],
+            'sales_count' => $sales['count'],
+            'sales_quantity_sum' => $sales['quantity_sum'],
             'costs_with_sale_codes' => [
-                'keywords'    => self::SALE_KEYWORDS,
-                'total_net'   => $this->sumField($saleCoded, 'net_amount'),
+                'keywords' => self::SALE_KEYWORDS,
+                'total_net' => $this->sumField($saleCoded, 'net_amount'),
                 'total_costs' => $this->sumField($saleCoded, 'sum_costs'),
-                'total_storno'=> $this->sumField($saleCoded, 'sum_storno'),
-                'rows'        => $saleCoded,
+                'total_storno' => $this->sumField($saleCoded, 'sum_storno'),
+                'rows' => $saleCoded,
             ],
             'costs_all_categories' => [
-                'total_net'   => $this->sumField($allCosts, 'net_amount'),
+                'total_net' => $this->sumField($allCosts, 'net_amount'),
                 'total_costs' => $this->sumField($allCosts, 'sum_costs'),
-                'total_storno'=> $this->sumField($allCosts, 'sum_storno'),
-                'rows'        => $allCosts,
+                'total_storno' => $this->sumField($allCosts, 'sum_storno'),
+                'rows' => $allCosts,
             ],
         ]);
     }
@@ -134,7 +134,7 @@ final class DebugWidgetRevenueController extends AbstractController
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
     ): array {
-        $mpFilter = $marketplace !== null ? 'AND s.marketplace = :marketplace' : '';
+        $mpFilter = null !== $marketplace ? 'AND s.marketplace = :marketplace' : '';
 
         $row = $this->connection->fetchAssociative(
             <<<SQL
@@ -149,17 +149,17 @@ final class DebugWidgetRevenueController extends AbstractController
               {$mpFilter}
             SQL,
             array_filter([
-                'companyId'   => $companyId,
-                'periodFrom'  => $from->format('Y-m-d'),
-                'periodTo'    => $to->format('Y-m-d'),
+                'companyId' => $companyId,
+                'periodFrom' => $from->format('Y-m-d'),
+                'periodTo' => $to->format('Y-m-d'),
                 'marketplace' => $marketplace,
-            ], static fn ($v) => $v !== null),
+            ], static fn ($v) => null !== $v),
         );
 
         return [
             'total_revenue' => (string) ($row['total_revenue'] ?? '0'),
-            'count'         => (int) ($row['sales_count'] ?? 0),
-            'quantity_sum'  => (int) ($row['quantity_sum'] ?? 0),
+            'count' => (int) ($row['sales_count'] ?? 0),
+            'quantity_sum' => (int) ($row['quantity_sum'] ?? 0),
         ];
     }
 
@@ -183,26 +183,26 @@ final class DebugWidgetRevenueController extends AbstractController
         ?array $keywords,
     ): array {
         $params = [
-            'companyId'  => $companyId,
+            'companyId' => $companyId,
             'periodFrom' => $from->format('Y-m-d'),
-            'periodTo'   => $to->format('Y-m-d'),
+            'periodTo' => $to->format('Y-m-d'),
         ];
 
         $mpFilter = '';
-        if ($marketplace !== null) {
+        if (null !== $marketplace) {
             $mpFilter = 'AND c.marketplace = :marketplace';
             $params['marketplace'] = $marketplace;
         }
 
         $keywordFilter = '';
-        if ($keywords !== null && $keywords !== []) {
+        if (null !== $keywords && [] !== $keywords) {
             $conditions = [];
             foreach ($keywords as $idx => $keyword) {
-                $ph = 'kw' . $idx;
+                $ph = 'kw'.$idx;
                 $conditions[] = "(LOWER(cc.code) LIKE :{$ph} OR LOWER(cc.name) LIKE :{$ph})";
-                $params[$ph] = '%' . strtolower($keyword) . '%';
+                $params[$ph] = '%'.strtolower($keyword).'%';
             }
-            $keywordFilter = 'AND (' . implode(' OR ', $conditions) . ')';
+            $keywordFilter = 'AND ('.implode(' OR ', $conditions).')';
         }
 
         $rows = $this->connection->fetchAllAssociative(
@@ -238,12 +238,12 @@ final class DebugWidgetRevenueController extends AbstractController
 
         return array_map(
             static fn (array $r): array => [
-                'category_code' => $r['category_code'] !== null ? (string) $r['category_code'] : null,
-                'category_name' => $r['category_name'] !== null ? (string) $r['category_name'] : null,
-                'rows_count'    => (int) $r['rows_count'],
-                'sum_costs'     => (string) $r['sum_costs'],
-                'sum_storno'    => (string) $r['sum_storno'],
-                'net_amount'    => (string) $r['net_amount'],
+                'category_code' => null !== $r['category_code'] ? (string) $r['category_code'] : null,
+                'category_name' => null !== $r['category_name'] ? (string) $r['category_name'] : null,
+                'rows_count' => (int) $r['rows_count'],
+                'sum_costs' => (string) $r['sum_costs'],
+                'sum_storno' => (string) $r['sum_storno'],
+                'net_amount' => (string) $r['net_amount'],
             ],
             $rows,
         );

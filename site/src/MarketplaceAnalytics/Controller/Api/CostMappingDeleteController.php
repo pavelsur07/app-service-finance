@@ -17,7 +17,8 @@ final class CostMappingDeleteController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly MarketplaceAnalyticsFacade $facade,
-    ) {}
+    ) {
+    }
 
     #[Route(
         '/api/marketplace-analytics/cost-mappings/{id}',

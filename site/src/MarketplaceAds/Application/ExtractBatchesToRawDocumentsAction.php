@@ -56,9 +56,9 @@ final readonly class ExtractBatchesToRawDocumentsAction
      * в Poller'е Task-13a упал, кнопка позволяет обработать job целиком).
      *
      * @return array{processed: int, skipped: int, errors: int}
-     *     processed — сколько новых AdRawDocument создано (и Messages диспатчнуто);
-     *     skipped   — сколько уже существовавших (company, batch, filename) пар найдено;
-     *     errors    — сколько batch'ей упало на extraction (распаковка/чтение файла).
+     *                                                          processed — сколько новых AdRawDocument создано (и Messages диспатчнуто);
+     *                                                          skipped   — сколько уже существовавших (company, batch, filename) пар найдено;
+     *                                                          errors    — сколько batch'ей упало на extraction (распаковка/чтение файла)
      */
     public function __invoke(string $jobId, string $companyId): array
     {
@@ -312,11 +312,7 @@ final readonly class ExtractBatchesToRawDocumentsAction
         $zip = new \ZipArchive();
         $openResult = $zip->open($absolutePath);
         if (true !== $openResult) {
-            throw new \RuntimeException(sprintf(
-                'Cannot open zip: %s (code %d)',
-                $absolutePath,
-                (int) $openResult,
-            ));
+            throw new \RuntimeException(sprintf('Cannot open zip: %s (code %d)', $absolutePath, (int) $openResult));
         }
 
         try {
@@ -390,11 +386,7 @@ final readonly class ExtractBatchesToRawDocumentsAction
     {
         $value = $batch->getMarketplace();
 
-        return MarketplaceType::tryFrom($value) ?? throw new \RuntimeException(sprintf(
-            'Unknown marketplace "%s" on batch %s',
-            $value,
-            $batch->getId(),
-        ));
+        return MarketplaceType::tryFrom($value) ?? throw new \RuntimeException(sprintf('Unknown marketplace "%s" on batch %s', $value, $batch->getId()));
     }
 
     public static function buildRawPayload(string $batchId, string $filename, string $csvContent): string

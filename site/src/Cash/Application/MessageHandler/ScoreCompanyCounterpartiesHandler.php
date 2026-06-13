@@ -13,8 +13,9 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 final class ScoreCompanyCounterpartiesHandler
 {
     public function __construct(
-        private readonly ScoreCompanyCounterpartiesAction $action
-    ) {}
+        private readonly ScoreCompanyCounterpartiesAction $action,
+    ) {
+    }
 
     public function __invoke(ScoreCompanyCounterpartiesMessage $message): void
     {

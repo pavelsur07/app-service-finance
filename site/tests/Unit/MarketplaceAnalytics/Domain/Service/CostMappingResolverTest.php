@@ -12,7 +12,7 @@ use PHPUnit\Framework\TestCase;
 
 final class CostMappingResolverTest extends TestCase
 {
-    private const COMPANY_ID  = '11111111-1111-1111-1111-111111111111';
+    private const COMPANY_ID = '11111111-1111-1111-1111-111111111111';
     private const MARKETPLACE = 'wildberries';
     private const CATEGORY_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 

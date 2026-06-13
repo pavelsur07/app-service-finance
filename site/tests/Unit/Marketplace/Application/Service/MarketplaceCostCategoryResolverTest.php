@@ -28,7 +28,7 @@ final class MarketplaceCostCategoryResolverTest extends TestCase
         $repository
             ->expects(self::exactly(2))
             ->method('findOneBy')
-            ->willReturnCallback(function (array $criteria) use ($companyA, $categoryA): ?MarketplaceCostCategory {
+            ->willReturnCallback(static function (array $criteria) use ($companyA, $categoryA): ?MarketplaceCostCategory {
                 if ($criteria['company'] === $companyA) {
                     return $categoryA;
                 }

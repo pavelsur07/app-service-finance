@@ -22,24 +22,24 @@ final class InventoryImportController extends AbstractController
 {
     public function __construct(
         private readonly ActiveCompanyService $companyService,
-        private readonly StorageService       $storageService,
-        private readonly MessageBusInterface  $messageBus,
+        private readonly StorageService $storageService,
+        private readonly MessageBusInterface $messageBus,
     ) {
     }
 
     #[Route('/import-cost-price', name: 'marketplace_inventory_import_cost_price', methods: ['POST'])]
     public function __invoke(Request $request): Response
     {
-        $company   = $this->companyService->getActiveCompany();
+        $company = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
-        $file          = $request->files->get('cost_file');
+        $file = $request->files->get('cost_file');
         $effectiveFrom = (string) $request->request->get('effective_from', '');
-        $marketplace   = (string) $request->request->get('marketplace', '');
+        $marketplace = (string) $request->request->get('marketplace', '');
         $identifierType = (string) $request->request->get('identifier_type', 'barcode');
 
         $marketplaceType = $marketplace ? MarketplaceType::tryFrom($marketplace) : null;
-        if ($marketplaceType === null) {
+        if (null === $marketplaceType) {
             $this->addFlash('error', 'Укажите маркетплейс.');
 
             return $this->redirectToRoute('marketplace_inventory_index');
@@ -52,7 +52,7 @@ final class InventoryImportController extends AbstractController
             return $this->redirectToRoute('marketplace_inventory_index');
         }
 
-        if ($marketplaceType !== MarketplaceType::OZON && $identifierType !== 'barcode') {
+        if (MarketplaceType::OZON !== $marketplaceType && 'barcode' !== $identifierType) {
             $this->addFlash('error', 'Для не-Ozon импорта разрешён только barcode.');
 
             return $this->redirectToRoute('marketplace_inventory_index');
@@ -89,18 +89,18 @@ final class InventoryImportController extends AbstractController
         try {
             $stored = $this->storageService->storeUploadedFile($file, $relativePath);
         } catch (\Exception $e) {
-            $this->addFlash('error', 'Ошибка сохранения файла: ' . $e->getMessage());
+            $this->addFlash('error', 'Ошибка сохранения файла: '.$e->getMessage());
 
             return $this->redirectToRoute('marketplace_inventory_index');
         }
 
         $this->messageBus->dispatch(new ImportInventoryCostPriceMessage(
-            companyId:        $companyId,
-            storagePath:      $stored['storagePath'],
+            companyId: $companyId,
+            storagePath: $stored['storagePath'],
             originalFilename: $stored['originalFilename'],
-            effectiveFrom:    $effectiveFrom,
-            marketplace:      $marketplaceType->value,
-            identifierType:   $identifierType,
+            effectiveFrom: $effectiveFrom,
+            marketplace: $marketplaceType->value,
+            identifierType: $identifierType,
         ));
 
         $this->addFlash('success', sprintf(
@@ -110,5 +110,4 @@ final class InventoryImportController extends AbstractController
 
         return $this->redirectToRoute('marketplace_inventory_index');
     }
-
 }

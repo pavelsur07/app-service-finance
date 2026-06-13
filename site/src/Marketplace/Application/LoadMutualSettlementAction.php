@@ -168,7 +168,7 @@ final class LoadMutualSettlementAction
             $rawDoc->markCompleted();
         } elseif (PipelineStatus::FAILED === $processingStatus) {
             $rawDoc->markStepFailed(PipelineStep::COSTS);
-            $rawDoc->setSyncNotes('Parsing failed: ' . ($rawData['parsing_error'] ?? 'unknown'));
+            $rawDoc->setSyncNotes('Parsing failed: '.($rawData['parsing_error'] ?? 'unknown'));
         }
 
         $this->em->persist($rawDoc);

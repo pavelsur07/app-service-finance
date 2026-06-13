@@ -64,6 +64,7 @@ final class OzonAdRawDataParser implements AdRawDataParserInterface
      * так что parseFlat() видит те же ключи, что и в legacy-формате.
      *
      * @param list<mixed> $campaigns
+     *
      * @return list<mixed>
      */
     private function flattenCampaigns(array $campaigns): array
@@ -105,6 +106,7 @@ final class OzonAdRawDataParser implements AdRawDataParserInterface
 
     /**
      * @param list<mixed> $rows
+     *
      * @return list<AdRawEntry>
      */
     private function parseFlat(array $rows): array

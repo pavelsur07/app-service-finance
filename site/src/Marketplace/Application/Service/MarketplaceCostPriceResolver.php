@@ -48,13 +48,13 @@ final class MarketplaceCostPriceResolver
         ?\DateTimeImmutable $returnDate = null,
     ): string {
         // Шаг 1: берём из продажи если есть реальная себестоимость
-        if ($sale !== null && $sale->getCostPrice() !== null && bccomp($sale->getCostPrice(), '0.00', 2) > 0) {
+        if (null !== $sale && null !== $sale->getCostPrice() && bccomp($sale->getCostPrice(), '0.00', 2) > 0) {
             return $sale->getCostPrice();
         }
 
         // Шаг 2: ищем по order_dt из rawData
         $orderDt = $rawData['order_dt'] ?? null;
-        if ($orderDt !== null && $orderDt !== '') {
+        if (null !== $orderDt && '' !== $orderDt) {
             try {
                 $orderDate = new \DateTimeImmutable($orderDt);
 
@@ -65,7 +65,7 @@ final class MarketplaceCostPriceResolver
         }
 
         // Шаг 3: резолвим по дате возврата если передана
-        if ($returnDate !== null) {
+        if (null !== $returnDate) {
             return $this->resolve($listing, $returnDate);
         }
 
@@ -78,7 +78,7 @@ final class MarketplaceCostPriceResolver
         return $this->costPriceResolver->resolve(
             companyId: (string) $listing->getCompany()->getId(),
             listingId: $listing->getId(),
-            date:      $date,
+            date: $date,
         );
     }
 }

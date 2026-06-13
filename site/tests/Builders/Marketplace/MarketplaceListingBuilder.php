@@ -79,7 +79,7 @@ final class MarketplaceListingBuilder
 
     public function build(): MarketplaceListing
     {
-        if ($this->company === null) {
+        if (null === $this->company) {
             throw new \LogicException('Company is required. Call forCompany().');
         }
 

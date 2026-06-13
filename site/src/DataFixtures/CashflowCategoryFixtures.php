@@ -17,7 +17,7 @@ final class CashflowCategoryFixtures extends Fixture implements DependentFixture
         /** @var Company $company */
         $company = $this->getReference(AppFixtures::REF_COMPANY_ROMASHKA, Company::class);
 
-        $make = function (
+        $make = static function (
             string $name,
             CashflowFlowKind $flowKind,
             bool $isSystem,

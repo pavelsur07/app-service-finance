@@ -13,7 +13,7 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * API эндпоинт для получения KPI метрик аналитики
+ * API эндпоинт для получения KPI метрик аналитики.
  */
 #[Route('/api/marketplace/analytics')]
 #[IsGranted('ROLE_USER')]
@@ -21,12 +21,12 @@ class AnalyticsKpiController extends AbstractController
 {
     public function __construct(
         private readonly AnalyticsKpiQuery $kpiQuery,
-        private readonly ActiveCompanyService $activeCompanyService
+        private readonly ActiveCompanyService $activeCompanyService,
     ) {
     }
 
     /**
-     * Получить все KPI метрики за период
+     * Получить все KPI метрики за период.
      *
      * Query params:
      * - from: дата начала периода (Y-m-d)
@@ -74,7 +74,7 @@ class AnalyticsKpiController extends AbstractController
 
         // Парсим marketplace (опционально)
         $marketplace = null;
-        if ($marketplaceStr && $marketplaceStr !== 'all') {
+        if ($marketplaceStr && 'all' !== $marketplaceStr) {
             $marketplace = MarketplaceType::tryFrom($marketplaceStr);
             if (!$marketplace) {
                 throw new BadRequestHttpException('Неверное значение marketplace. Допустимые: wildberries, ozon');

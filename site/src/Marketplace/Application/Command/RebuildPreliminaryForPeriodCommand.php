@@ -13,8 +13,8 @@ final class RebuildPreliminaryForPeriodCommand
     public function __construct(
         public readonly string $companyId,
         public readonly string $marketplace,   // MarketplaceType::value
-        public readonly int    $year,
-        public readonly int    $month,
+        public readonly int $year,
+        public readonly int $month,
         public readonly string $actorUserId,   // системный UUID (cron) или UUID реального пользователя (ручной запуск)
     ) {
     }

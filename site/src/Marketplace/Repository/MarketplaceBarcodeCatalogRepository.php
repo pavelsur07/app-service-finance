@@ -25,9 +25,9 @@ class MarketplaceBarcodeCatalogRepository extends ServiceEntityRepository
         string $barcode,
     ): ?MarketplaceBarcodeCatalog {
         return $this->findOneBy([
-            'companyId'   => $companyId,
+            'companyId' => $companyId,
             'marketplace' => $marketplace,
-            'barcode'     => $barcode,
+            'barcode' => $barcode,
         ]);
     }
 
@@ -35,6 +35,7 @@ class MarketplaceBarcodeCatalogRepository extends ServiceEntityRepository
      * Массовая загрузка по списку barcodes — индексировано по barcode.
      *
      * @param string[] $barcodes
+     *
      * @return array<string, MarketplaceBarcodeCatalog>
      */
     public function findByBarcodesIndexed(
@@ -79,7 +80,7 @@ class MarketplaceBarcodeCatalogRepository extends ServiceEntityRepository
         // Дедупликация внутри батча по ключу companyId+marketplace+barcode
         $deduped = [];
         foreach ($rows as $row) {
-            $key = $row['companyId'] . '_' . $row['marketplace']->value . '_' . $row['barcode'];
+            $key = $row['companyId'].'_'.$row['marketplace']->value.'_'.$row['barcode'];
             $deduped[$key] = $row;
         }
 
@@ -92,13 +93,13 @@ class MarketplaceBarcodeCatalogRepository extends ServiceEntityRepository
 
             foreach ($chunk as $row) {
                 $placeholders[] = "(:id$i, :companyId$i, :marketplace$i, :externalId$i, :barcode$i, :size$i)";
-                $params["id$i"]          = $row['id'];
-                $params["companyId$i"]   = $row['companyId'];
+                $params["id$i"] = $row['id'];
+                $params["companyId$i"] = $row['companyId'];
                 $params["marketplace$i"] = $row['marketplace']->value;
-                $params["externalId$i"]  = $row['externalId'];
-                $params["barcode$i"]     = $row['barcode'];
-                $params["size$i"]        = $row['size'];
-                $i++;
+                $params["externalId$i"] = $row['externalId'];
+                $params["barcode$i"] = $row['barcode'];
+                $params["size$i"] = $row['size'];
+                ++$i;
             }
 
             $sql = sprintf(

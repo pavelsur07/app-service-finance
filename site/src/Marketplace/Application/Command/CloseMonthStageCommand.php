@@ -15,11 +15,11 @@ final class CloseMonthStageCommand
     public function __construct(
         public readonly string $companyId,
         public readonly string $marketplace,
-        public readonly int    $year,
-        public readonly int    $month,
+        public readonly int $year,
+        public readonly int $month,
         public readonly string $stage,      // CloseStage::value — scalar для Message
         public readonly string $actorUserId,
-        public readonly bool   $preliminary = false,
+        public readonly bool $preliminary = false,
     ) {
     }
 }

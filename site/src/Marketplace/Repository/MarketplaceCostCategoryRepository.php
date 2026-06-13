@@ -34,7 +34,7 @@ class MarketplaceCostCategoryRepository extends ServiceEntityRepository
     public function findByCode(
         Company $company,
         MarketplaceType $marketplace,
-        string $code
+        string $code,
     ): ?MarketplaceCostCategory {
         return $this->createQueryBuilder('c')
             ->where('c.company = :company')
@@ -62,17 +62,12 @@ class MarketplaceCostCategoryRepository extends ServiceEntityRepository
 
     /**
      * Массовая загрузка категорий по кодам с индексацией (для bulk import)
-     * Возвращает массив: ['category_code' => Category]
-     *
-     * @param Company $company
-     * @param MarketplaceType $marketplace
-     * @param array $codes
-     * @return array
+     * Возвращает массив: ['category_code' => Category].
      */
     public function findByCodesIndexed(
         Company $company,
         MarketplaceType $marketplace,
-        array $codes
+        array $codes,
     ): array {
         if (empty($codes)) {
             return [];

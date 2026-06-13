@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Inventory\Entity;
 
-use App\Inventory\Enum\StockStatus;
 use App\Inventory\Enum\StockSnapshotMappingStatus;
+use App\Inventory\Enum\StockStatus;
 use App\Inventory\Repository\StockSnapshotRepository;
 use App\Marketplace\Enum\MarketplaceType;
 use Doctrine\DBAL\Types\Types;
@@ -126,11 +126,11 @@ class StockSnapshot
             sprintf('Reserved quantity must be non-negative, got: %s', $reservedQuantity),
         );
 
-        if ($listingId !== null) {
+        if (null !== $listingId) {
             Assert::uuid($listingId);
         }
 
-        if ($productId !== null) {
+        if (null !== $productId) {
             Assert::uuid($productId);
         }
 

@@ -10,7 +10,6 @@ use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusRepository;
-use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -209,7 +208,7 @@ final class WbFinancialReportsReconcileLegacyCommand extends Command
         }
     }
 
-    private function buildStatusFromRaw(string $companyId, string $connectionId, DateTimeImmutable $day, array $raw): MarketplaceFinancialReportSyncStatus
+    private function buildStatusFromRaw(string $companyId, string $connectionId, \DateTimeImmutable $day, array $raw): MarketplaceFinancialReportSyncStatus
     {
         $apiEndpoint = (string) ($raw['api_endpoint'] ?? self::API_ENDPOINT);
         $recordsCount = max(0, (int) ($raw['records_count'] ?? 0));
@@ -242,7 +241,7 @@ final class WbFinancialReportsReconcileLegacyCommand extends Command
 
         if (in_array($processingStatus, ['pending', 'running'], true)) {
             $syncedAt = $this->parseSyncedAt($raw['synced_at'] ?? null);
-            if (null !== $syncedAt && $syncedAt > new DateTimeImmutable('-6 hours')) {
+            if (null !== $syncedAt && $syncedAt > new \DateTimeImmutable('-6 hours')) {
                 $status->markProcessing();
             } else {
                 $status->markConflict('legacy_reconciled', 'Legacy raw in-flight appears stale.', null, null);
@@ -263,9 +262,9 @@ final class WbFinancialReportsReconcileLegacyCommand extends Command
         return $status;
     }
 
-    private function parseSyncedAt(mixed $value): ?DateTimeImmutable
+    private function parseSyncedAt(mixed $value): ?\DateTimeImmutable
     {
-        if ($value instanceof DateTimeImmutable) {
+        if ($value instanceof \DateTimeImmutable) {
             return $value;
         }
 
@@ -274,7 +273,7 @@ final class WbFinancialReportsReconcileLegacyCommand extends Command
         }
 
         try {
-            return new DateTimeImmutable($value);
+            return new \DateTimeImmutable($value);
         } catch (\Throwable) {
             return null;
         }
@@ -324,9 +323,9 @@ final class WbFinancialReportsReconcileLegacyCommand extends Command
         return $qb->executeQuery()->fetchAllAssociative();
     }
 
-    private function findDailyRaw(string $companyId, DateTimeImmutable $day): ?array
+    private function findDailyRaw(string $companyId, \DateTimeImmutable $day): ?array
     {
-        $sql = "SELECT id, processing_status, records_count, api_endpoint, synced_at
+        $sql = 'SELECT id, processing_status, records_count, api_endpoint, synced_at
                 FROM marketplace_raw_documents
                 WHERE company_id = :companyId
                   AND marketplace = :marketplace
@@ -334,7 +333,7 @@ final class WbFinancialReportsReconcileLegacyCommand extends Command
                   AND period_from = :day
                   AND period_to = :day
                 ORDER BY synced_at DESC
-                LIMIT 1";
+                LIMIT 1';
 
         $row = $this->connection->executeQuery($sql, [
             'companyId' => $companyId,
@@ -346,7 +345,7 @@ final class WbFinancialReportsReconcileLegacyCommand extends Command
         return false === $row ? null : $row;
     }
 
-    private function hasGeneratedRows(string $companyId, DateTimeImmutable $day): bool
+    private function hasGeneratedRows(string $companyId, \DateTimeImmutable $day): bool
     {
         $dayStart = $day->setTime(0, 0, 0);
         $nextDay = $dayStart->modify('+1 day');

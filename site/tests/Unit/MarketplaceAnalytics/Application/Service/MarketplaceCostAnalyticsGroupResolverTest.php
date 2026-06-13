@@ -30,7 +30,6 @@ final class MarketplaceCostAnalyticsGroupResolverTest extends TestCase
         $this->assertSame('logistics', $this->resolver->resolveUnitBucket('wildberries', 'logistics_delivery', ''));
     }
 
-
     public function testWbLogisticsCorrectionGroupsAndBucket(): void
     {
         $this->assertSame('Услуги доставки и FBO', $this->resolver->resolveWidgetGroup('wildberries', 'logistics_correction', ''));

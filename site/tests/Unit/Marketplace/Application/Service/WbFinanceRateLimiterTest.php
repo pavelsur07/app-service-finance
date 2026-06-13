@@ -27,7 +27,7 @@ final class WbFinanceRateLimiterTest extends TestCase
 
         self::assertNotNull($retryAfter);
         self::assertGreaterThan($clock->now()->getTimestamp(), $retryAfter->getTimestamp());
-        self::assertSame('2026-01-01T00:00:00+00:00', $clock->now()->format(DATE_ATOM));
+        self::assertSame('2026-01-01T00:00:00+00:00', $clock->now()->format(\DATE_ATOM));
     }
 
     public function testTryConsumeUsesSeparateBucketsForDifferentSellerRateLimitKeys(): void
@@ -38,7 +38,7 @@ final class WbFinanceRateLimiterTest extends TestCase
         self::assertNull($limiter->tryConsume('wb_finance_sales_reports:'.hash('sha256', 'token-a')));
         self::assertNull($limiter->tryConsume('wb_finance_sales_reports:'.hash('sha256', 'token-b')));
 
-        self::assertSame('2026-01-01T00:00:00+00:00', $clock->now()->format(DATE_ATOM));
+        self::assertSame('2026-01-01T00:00:00+00:00', $clock->now()->format(\DATE_ATOM));
     }
 
     public function testResolveSalesReportsBucketIdFallsBackToConnectionWhenSettingsHaveNoSellerIdentifiers(): void

@@ -10,8 +10,8 @@ final class ImportResult
      * @param ImportRowError[] $errors
      */
     public function __construct(
-        public readonly int   $created,
-        public readonly int   $skipped,
+        public readonly int $created,
+        public readonly int $skipped,
         public readonly array $errors,
     ) {
     }
@@ -29,6 +29,6 @@ final class ImportResult
     /** @return array<int, array{row: int, reason: string, message: string}> */
     public function errorsToArray(): array
     {
-        return array_map(static fn(ImportRowError $e) => $e->toArray(), $this->errors);
+        return array_map(static fn (ImportRowError $e) => $e->toArray(), $this->errors);
     }
 }

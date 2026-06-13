@@ -40,21 +40,21 @@ final class DebugUnknownOperationsController extends AbstractController
 
     public function __invoke(Request $request): JsonResponse
     {
-        $marketplace   = (string) $request->query->get('marketplace', '');
+        $marketplace = (string) $request->query->get('marketplace', '');
         $periodFromStr = (string) $request->query->get('periodFrom', '');
-        $periodToStr   = (string) $request->query->get('periodTo', '');
+        $periodToStr = (string) $request->query->get('periodTo', '');
 
-        if ($marketplace !== 'ozon') {
+        if ('ozon' !== $marketplace) {
             return $this->json(['error' => 'Only marketplace=ozon is supported'], 422);
         }
 
-        if ($periodFromStr === '' || $periodToStr === '') {
+        if ('' === $periodFromStr || '' === $periodToStr) {
             return $this->json(['error' => 'periodFrom and periodTo are required (Y-m-d)'], 422);
         }
 
         try {
             $periodFrom = new \DateTimeImmutable($periodFromStr);
-            $periodTo   = new \DateTimeImmutable($periodToStr);
+            $periodTo = new \DateTimeImmutable($periodToStr);
         } catch (\Exception) {
             return $this->json(['error' => 'Invalid date format. Expected Y-m-d'], 422);
         }
@@ -63,7 +63,7 @@ final class DebugUnknownOperationsController extends AbstractController
             return $this->json(['error' => 'periodFrom must be <= periodTo'], 422);
         }
 
-        $company   = $this->activeCompanyService->getActiveCompany();
+        $company = $this->activeCompanyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
         $rawDocs = $this->connection->iterateAssociative(
@@ -75,26 +75,26 @@ final class DebugUnknownOperationsController extends AbstractController
                AND period_from <= :periodTo
                AND period_to >= :periodFrom',
             [
-                'companyId'    => $companyId,
-                'marketplace'  => 'ozon',
+                'companyId' => $companyId,
+                'marketplace' => 'ozon',
                 'documentType' => 'sales_report',
-                'periodFrom'   => $periodFrom->format('Y-m-d'),
-                'periodTo'     => $periodTo->format('Y-m-d'),
+                'periodFrom' => $periodFrom->format('Y-m-d'),
+                'periodTo' => $periodTo->format('Y-m-d'),
             ],
         );
 
         /** @var array<string, array{count: int, totalAmount: float}> */
         $operationTypes = [];
         /** @var array<string, array{count: int, totalPrice: float}> */
-        $serviceNames   = [];
+        $serviceNames = [];
         $totalOperations = 0;
 
         $periodFromDate = $periodFrom->format('Y-m-d');
-        $periodToDate   = $periodTo->format('Y-m-d');
+        $periodToDate = $periodTo->format('Y-m-d');
 
         foreach ($rawDocs as $row) {
             $rawData = $row['raw_data'] ?? null;
-            if ($rawData === null || $rawData === '') {
+            if (null === $rawData || '' === $rawData) {
                 continue;
             }
 
@@ -116,22 +116,22 @@ final class DebugUnknownOperationsController extends AbstractController
 
                 // Фильтруем по operation_date — документ может покрывать более широкий период
                 $opDate = (string) ($op['operation_date'] ?? '');
-                if ($opDate !== '') {
+                if ('' !== $opDate) {
                     $opDay = substr($opDate, 0, 10); // "2026-01-15 10:00:00" → "2026-01-15"
                     if ($opDay < $periodFromDate || $opDay > $periodToDate) {
                         continue;
                     }
                 }
 
-                $totalOperations++;
+                ++$totalOperations;
 
                 $opType = (string) ($op['operation_type'] ?? '');
-                if ($opType !== '') {
+                if ('' !== $opType) {
                     $amount = (float) ($op['amount'] ?? 0);
                     if (!isset($operationTypes[$opType])) {
                         $operationTypes[$opType] = ['count' => 0, 'totalAmount' => 0.0];
                     }
-                    $operationTypes[$opType]['count']++;
+                    ++$operationTypes[$opType]['count'];
                     $operationTypes[$opType]['totalAmount'] += $amount;
                 }
 
@@ -142,21 +142,21 @@ final class DebugUnknownOperationsController extends AbstractController
                             continue;
                         }
                         $svcName = (string) ($service['name'] ?? '');
-                        if ($svcName === '') {
+                        if ('' === $svcName) {
                             continue;
                         }
                         $price = (float) ($service['price'] ?? 0);
                         if (!isset($serviceNames[$svcName])) {
                             $serviceNames[$svcName] = ['count' => 0, 'totalPrice' => 0.0];
                         }
-                        $serviceNames[$svcName]['count']++;
+                        ++$serviceNames[$svcName]['count'];
                         $serviceNames[$svcName]['totalPrice'] += $price;
                     }
                 }
             }
         }
 
-        [$knownOpTypes, $unknownOpTypes]   = $this->classify($operationTypes, 'totalAmount');
+        [$knownOpTypes, $unknownOpTypes] = $this->classify($operationTypes, 'totalAmount');
         [$knownSvcNames, $unknownSvcNames] = $this->classify($serviceNames, 'totalPrice');
 
         $totalUnknownOpAmount = 0.0;
@@ -172,34 +172,35 @@ final class DebugUnknownOperationsController extends AbstractController
         return $this->json([
             'period' => [
                 'from' => $periodFrom->format('Y-m-d'),
-                'to'   => $periodTo->format('Y-m-d'),
+                'to' => $periodTo->format('Y-m-d'),
             ],
-            'totalOperations'       => $totalOperations,
-            'knownOperationTypes'   => $knownOpTypes,
+            'totalOperations' => $totalOperations,
+            'knownOperationTypes' => $knownOpTypes,
             'unknownOperationTypes' => $unknownOpTypes,
-            'knownServiceNames'     => $knownSvcNames,
-            'unknownServiceNames'   => $unknownSvcNames,
+            'knownServiceNames' => $knownSvcNames,
+            'unknownServiceNames' => $unknownSvcNames,
             'summary' => [
-                'totalUnknownOpAmount'  => number_format($totalUnknownOpAmount, 2, '.', ''),
+                'totalUnknownOpAmount' => number_format($totalUnknownOpAmount, 2, '.', ''),
                 'totalUnknownSvcAmount' => number_format($totalUnknownSvcAmount, 2, '.', ''),
-                'hint'                  => 'Эти operation_type / service_name не маппятся в OzonServiceCategoryMap',
+                'hint' => 'Эти operation_type / service_name не маппятся в OzonServiceCategoryMap',
             ],
         ]);
     }
 
     /**
      * @param array<string, array{count: int, totalAmount?: float, totalPrice?: float}> $items
+     *
      * @return array{list<array{name: string, count: int, totalAmount: string}>, list<array{name: string, count: int, totalAmount: string}>}
      */
     private function classify(array $items, string $amountKey): array
     {
-        $known   = [];
+        $known = [];
         $unknown = [];
 
         foreach ($items as $name => $stats) {
             $entry = [
-                'name'        => $name,
-                'count'       => $stats['count'],
+                'name' => $name,
+                'count' => $stats['count'],
                 'totalAmount' => number_format($stats[$amountKey], 2, '.', ''),
             ];
 
@@ -210,8 +211,7 @@ final class DebugUnknownOperationsController extends AbstractController
             }
         }
 
-        $sortByAbsAmount = static fn (array $a, array $b): int
-            => abs((float) $b['totalAmount']) <=> abs((float) $a['totalAmount']);
+        $sortByAbsAmount = static fn (array $a, array $b): int => abs((float) $b['totalAmount']) <=> abs((float) $a['totalAmount']);
 
         usort($known, $sortByAbsAmount);
         usort($unknown, $sortByAbsAmount);

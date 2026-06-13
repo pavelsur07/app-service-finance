@@ -92,7 +92,7 @@ class MarketplaceRawDocument
         string $id,
         Company $company,
         MarketplaceType $marketplace,
-        string $documentType
+        string $documentType,
     ) {
         Assert::uuid($id);
         $this->id = $id;
@@ -162,9 +162,8 @@ class MarketplaceRawDocument
         array $rawData,
         string $apiEndpoint,
         int $recordsCount,
-        ?\DateTimeImmutable $syncedAt = null
-    ): self
-    {
+        ?\DateTimeImmutable $syncedAt = null,
+    ): self {
         $this->rawData = $rawData;
         $this->apiEndpoint = $apiEndpoint;
         $this->recordsCount = $recordsCount;
@@ -232,7 +231,7 @@ class MarketplaceRawDocument
 
     public function incrementRecordsCreated(): self
     {
-        $this->recordsCreated++;
+        ++$this->recordsCreated;
 
         return $this;
     }
@@ -251,7 +250,7 @@ class MarketplaceRawDocument
 
     public function incrementRecordsSkipped(): self
     {
-        $this->recordsSkipped++;
+        ++$this->recordsSkipped;
 
         return $this;
     }
@@ -276,7 +275,7 @@ class MarketplaceRawDocument
     public function addSyncNote(string $note): self
     {
         if ($this->syncNotes) {
-            $this->syncNotes .= "\n" . $note;
+            $this->syncNotes .= "\n".$note;
         } else {
             $this->syncNotes = $note;
         }
@@ -336,7 +335,7 @@ class MarketplaceRawDocument
             $failed[] = $step->value;
         }
 
-        $this->failedSteps      = $failed;
+        $this->failedSteps = $failed;
         $this->processingStatus = PipelineStatus::FAILED;
 
         return $this;
@@ -353,10 +352,10 @@ class MarketplaceRawDocument
         $this->succeededSteps = $succeeded;
 
         $failed = $this->failedSteps ?? [];
-        $failed = array_values(array_filter($failed, static fn(string $s) => $s !== $step->value));
+        $failed = array_values(array_filter($failed, static fn (string $s) => $s !== $step->value));
         $this->failedSteps = $failed;
 
-        if (count($succeeded) === count(PipelineStep::cases()) && count($failed) === 0) {
+        if (count($succeeded) === count(PipelineStep::cases()) && 0 === count($failed)) {
             $this->markCompleted();
         }
 
@@ -366,7 +365,7 @@ class MarketplaceRawDocument
     public function markCompleted(): self
     {
         $this->processingStatus = PipelineStatus::COMPLETED;
-        $this->processedAt      = new \DateTimeImmutable();
+        $this->processedAt = new \DateTimeImmutable();
 
         return $this;
     }
@@ -390,15 +389,15 @@ class MarketplaceRawDocument
     public function resetProcessingStatus(): self
     {
         $this->processingStatus = PipelineStatus::PENDING;
-        $this->processedAt      = null;
-        $this->failedSteps      = [];
-        $this->succeededSteps   = [];
+        $this->processedAt = null;
+        $this->failedSteps = [];
+        $this->succeededSteps = [];
 
         return $this;
     }
 
     public function isFullyProcessed(): bool
     {
-        return $this->processingStatus === PipelineStatus::COMPLETED;
+        return PipelineStatus::COMPLETED === $this->processingStatus;
     }
 }

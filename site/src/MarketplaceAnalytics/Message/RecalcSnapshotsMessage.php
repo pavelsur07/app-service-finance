@@ -10,5 +10,6 @@ final readonly class RecalcSnapshotsMessage
         public string $companyId,
         public string $dateFrom,
         public string $dateTo,
-    ) {}
+    ) {
+    }
 }

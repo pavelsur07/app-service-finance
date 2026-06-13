@@ -31,8 +31,8 @@ final readonly class UnitEconomicsQuery
                 'SUM(s.returns_quantity) AS returns_quantity',
                 'SUM(s.orders_quantity) AS orders_quantity',
                 'SUM(s.delivered_quantity) AS delivered_quantity',
-                "CASE WHEN SUM(s.sales_quantity) > 0 THEN SUM(s.avg_sale_price * s.sales_quantity) / SUM(s.sales_quantity) ELSE 0 END AS avg_sale_price",
-                "CASE WHEN COUNT(*) FILTER (WHERE s.cost_price IS NULL) > 0 THEN NULL ELSE SUM(s.total_cost_price) END AS total_cost_price",
+                'CASE WHEN SUM(s.sales_quantity) > 0 THEN SUM(s.avg_sale_price * s.sales_quantity) / SUM(s.sales_quantity) ELSE 0 END AS avg_sale_price',
+                'CASE WHEN COUNT(*) FILTER (WHERE s.cost_price IS NULL) > 0 THEN NULL ELSE SUM(s.total_cost_price) END AS total_cost_price',
                 'AVG(s.cost_price) AS avg_cost_price',
                 "COALESCE(SUM((s.cost_breakdown->>'logistics_to')::numeric), 0) AS logistics_to",
                 "COALESCE(SUM((s.cost_breakdown->>'logistics_back')::numeric), 0) AS logistics_back",
@@ -61,7 +61,7 @@ final readonly class UnitEconomicsQuery
             ->having('SUM(s.sales_quantity) > 0 OR SUM(s.revenue) > 0 OR SUM(s.refunds) > 0 OR SUM(s.orders_quantity) > 0')
             ->orderBy('SUM(s.revenue)', 'DESC');
 
-        if ($marketplace !== null) {
+        if (null !== $marketplace) {
             $qb->andWhere('s.marketplace = :marketplace')
                 ->setParameter('marketplace', $marketplace);
         }

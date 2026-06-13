@@ -38,7 +38,7 @@ class MoneyAccountType extends AbstractType
                 'required' => false,
                 'currency' => false,
             ])
-            #Коментарий: Поле неснижаемого остатка (ватерлинии) для счёта.
+            // Коментарий: Поле неснижаемого остатка (ватерлинии) для счёта.
             ->add('minimumSafeBalance', MoneyType::class, [
                 'label' => 'Неснижаемый остаток',
                 'required' => false,

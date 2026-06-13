@@ -109,7 +109,6 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
-
     public function findIdByCompanyImportSourceExternalIdDbal(string $companyId, string $importSource, string $externalId): ?string
     {
         $id = $this->getEntityManager()->getConnection()->fetchOne(

@@ -67,7 +67,7 @@ final class ChargeTypeManager
         $this->assertCompanyAccess($user, $company);
         $chargeType = $this->findChargeType($id, $company);
 
-        return $this->transactional(function () use ($chargeType): ChargeType {
+        return $this->transactional(static function () use ($chargeType): ChargeType {
             $chargeType->setIsActive(!$chargeType->isActive());
             $chargeType->setUpdatedAt(new \DateTimeImmutable());
 

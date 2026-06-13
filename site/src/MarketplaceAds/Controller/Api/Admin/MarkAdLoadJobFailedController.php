@@ -33,7 +33,8 @@ final class MarkAdLoadJobFailedController extends AbstractController
         private readonly AdScheduledBatchRepository $adScheduledBatchRepository,
         private readonly Security $security,
         private readonly LoggerInterface $logger,
-    ) {}
+    ) {
+    }
 
     public function __invoke(string $jobId, Request $request): JsonResponse
     {

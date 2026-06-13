@@ -172,6 +172,6 @@ class MarketplaceSyncCommand extends Command
             'isActive' => true,
         ]);
 
-        return array_map(fn ($c) => $c->getCompany(), $connections);
+        return array_map(static fn ($c) => $c->getCompany(), $connections);
     }
 }

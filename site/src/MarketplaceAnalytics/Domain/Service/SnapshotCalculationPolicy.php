@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\Domain\Service;
 
-use App\Marketplace\DTO\AdvertisingCostDTO;
 use App\Marketplace\Enum\AdvertisingType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\OrderStatus;
@@ -26,7 +25,8 @@ final readonly class SnapshotCalculationPolicy
         private MarketplaceFacade $marketplaceFacade,
         private CostMappingResolver $costMappingResolver,
         private ListingDailySnapshotRepositoryInterface $snapshotRepository,
-    ) {}
+    ) {
+    }
 
     public function calculateForListingDay(
         string $companyId,
@@ -62,15 +62,15 @@ final readonly class SnapshotCalculationPolicy
 
         // 3. Cost price
         $costPrice = null;
-        if (!empty($sales) && $sales[0]->rawData !== null && isset($sales[0]->rawData['cost_price'])) {
+        if (!empty($sales) && null !== $sales[0]->rawData && isset($sales[0]->rawData['cost_price'])) {
             $costPrice = (string) $sales[0]->rawData['cost_price'];
         }
-        if ($costPrice === null) {
+        if (null === $costPrice) {
             $costPrice = $this->marketplaceFacade->getCostPriceForListing($companyId, $listingId, $date);
         }
 
         $totalCostPrice = null;
-        if ($costPrice !== null) {
+        if (null !== $costPrice) {
             $totalCostPrice = bcmul($costPrice, (string) $salesQuantity, 2);
         } else {
             $flags = $flags->addFlag(DataQualityFlag::COST_PRICE_MISSING);
@@ -81,7 +81,7 @@ final readonly class SnapshotCalculationPolicy
         $costMap = [];
 
         foreach ($costs as $costDTO) {
-            $type = $costDTO->categoryId !== null
+            $type = null !== $costDTO->categoryId
                 ? $this->costMappingResolver->resolve($companyId, $marketplace, $costDTO->categoryId)
                 : UnitEconomyCostType::OTHER;
             if ($type->isAdvertising()) {
@@ -102,7 +102,7 @@ final readonly class SnapshotCalculationPolicy
         $otherDetails = [];
 
         foreach ($advCosts as $adv) {
-            if ($adv->advertisingType === AdvertisingType::CPC) {
+            if (AdvertisingType::CPC === $adv->advertisingType) {
                 $cpcSpend = bcadd($cpcSpend, $adv->amount, 2);
                 $cpcImpressions += $adv->analyticsData['impressions'] ?? 0;
                 $cpcClicks += $adv->analyticsData['clicks'] ?? 0;
@@ -161,8 +161,8 @@ final readonly class SnapshotCalculationPolicy
         $ordersQuantity = count($orders);
         $deliveredQuantity = 0;
         foreach ($orders as $order) {
-            if ($order->status === OrderStatus::DELIVERED) {
-                $deliveredQuantity++;
+            if (OrderStatus::DELIVERED === $order->status) {
+                ++$deliveredQuantity;
             }
         }
 
@@ -170,7 +170,7 @@ final readonly class SnapshotCalculationPolicy
 
         // 8. Upsert
         $snapshot = $this->snapshotRepository->findOneByUniqueKey($companyId, $listingId, $date);
-        if ($snapshot === null) {
+        if (null === $snapshot) {
             $snapshot = new ListingDailySnapshot(
                 Uuid::uuid7()->toString(),
                 $companyId,

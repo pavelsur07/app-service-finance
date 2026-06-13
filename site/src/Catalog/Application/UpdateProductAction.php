@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Catalog\Application;
 
-use App\Catalog\DTO\UpdateProductCommand;
 use App\Catalog\Domain\ProductSkuPolicy;
+use App\Catalog\DTO\UpdateProductCommand;
 use App\Catalog\Infrastructure\ProductRepository;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;

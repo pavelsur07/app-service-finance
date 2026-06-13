@@ -13,7 +13,8 @@ final readonly class SnapshotSummaryRequest
         public ?string $dateFrom,
         public ?string $dateTo,
         public ?string $listingId,
-    ) {}
+    ) {
+    }
 
     public static function fromRequest(Request $request): self
     {

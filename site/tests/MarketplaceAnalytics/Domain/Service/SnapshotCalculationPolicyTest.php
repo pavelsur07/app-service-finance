@@ -110,7 +110,7 @@ final class SnapshotCalculationPolicyTest extends TestCase
             ->willReturn([$logisticsCost, $advertisingCost]);
 
         $this->costMappingResolver->method('resolve')
-            ->willReturnCallback(static fn(string $cid, string $mp, string $code): UnitEconomyCostType => match ($code) {
+            ->willReturnCallback(static fn (string $cid, string $mp, string $code): UnitEconomyCostType => match ($code) {
                 'logistics_delivery' => UnitEconomyCostType::LOGISTICS_TO,
                 'advertising_cpc' => UnitEconomyCostType::ADVERTISING_CPC,
                 default => UnitEconomyCostType::OTHER,

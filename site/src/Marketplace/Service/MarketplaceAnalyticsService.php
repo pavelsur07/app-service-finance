@@ -104,7 +104,7 @@ class MarketplaceAnalyticsService
         }
 
         // Сортировка по profit DESC
-        usort($reports, fn ($a, $b) => bccomp($b->grossProfit, $a->grossProfit, 2));
+        usort($reports, static fn ($a, $b) => bccomp($b->grossProfit, $a->grossProfit, 2));
 
         return array_slice($reports, 0, $limit);
     }

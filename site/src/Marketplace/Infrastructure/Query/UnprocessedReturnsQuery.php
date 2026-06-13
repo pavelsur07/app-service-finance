@@ -113,10 +113,10 @@ final class UnprocessedReturnsQuery
         SQL;
 
         return $this->connection->fetchAllAssociative($sql, [
-            'companyId'   => $companyId,
+            'companyId' => $companyId,
             'marketplace' => $marketplace,
-            'periodFrom'  => $periodFrom,
-            'periodTo'    => $periodTo,
+            'periodFrom' => $periodFrom,
+            'periodTo' => $periodTo,
         ]);
     }
 }

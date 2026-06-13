@@ -24,15 +24,16 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
 final class ReconcileCostsAction
 {
     public function __construct(
-        private readonly OzonReportParserFacade          $parserFacade,
-        private readonly CostReconciliationQuery         $reconciliationQuery,
+        private readonly OzonReportParserFacade $parserFacade,
+        private readonly CostReconciliationQuery $reconciliationQuery,
         private readonly MarketplaceMonthCloseRepository $monthCloseRepository,
-        private readonly StorageService                  $storageService,
+        private readonly StorageService $storageService,
     ) {
     }
 
     /**
      * @return array{status: string, delta: float, result: array<string, mixed>}
+     *
      * @throws \DomainException если период не найден
      */
     public function __invoke(
@@ -43,8 +44,8 @@ final class ReconcileCostsAction
         UploadedFile $file,
     ): array {
         $marketplaceType = MarketplaceType::from($marketplace);
-        $periodFrom      = sprintf('%d-%02d-01', $year, $month);
-        $periodTo        = (new \DateTimeImmutable($periodFrom))->modify('last day of this month')->format('Y-m-d');
+        $periodFrom = sprintf('%d-%02d-01', $year, $month);
+        $periodTo = (new \DateTimeImmutable($periodFrom))->modify('last day of this month')->format('Y-m-d');
 
         // 1. Сохранить файл
         $relativePath = sprintf(
@@ -73,22 +74,22 @@ final class ReconcileCostsAction
             $companyId, $marketplaceType, $year, $month,
         );
 
-        if ($monthClose === null) {
+        if (null === $monthClose) {
             throw new \DomainException('Период не найден. Сначала закройте этап затрат.');
         }
 
         $monthClose->setCostsReconciliation(array_merge($reconciliationResult, [
-            'file_path'         => $stored['storagePath'],
-            'file_hash'         => $stored['fileHash'],
+            'file_path' => $stored['storagePath'],
+            'file_hash' => $stored['fileHash'],
             'original_filename' => $stored['originalFilename'],
-            'reconciled_at'     => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+            'reconciled_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
         ]));
 
         $this->monthCloseRepository->save($monthClose);
 
         return [
             'status' => $reconciliationResult['status'],
-            'delta'  => $reconciliationResult['delta'],
+            'delta' => $reconciliationResult['delta'],
             'result' => $reconciliationResult,
         ];
     }

@@ -32,6 +32,7 @@ final class CashflowCategoryBuilder
     {
         $clone = clone $this;
         $clone->id = $id;
+
         return $clone;
     }
 
@@ -39,6 +40,7 @@ final class CashflowCategoryBuilder
     {
         $clone = clone $this;
         $clone->company = $company;
+
         return $clone;
     }
 
@@ -46,11 +48,12 @@ final class CashflowCategoryBuilder
     {
         $clone = clone $this;
         $clone->name = $name;
+
         return $clone;
     }
 
     /**
-     * Генерирует уникальный ID на основе индекса (детерминированно)
+     * Генерирует уникальный ID на основе индекса (детерминированно).
      */
     public function withIndex(int $index): self
     {

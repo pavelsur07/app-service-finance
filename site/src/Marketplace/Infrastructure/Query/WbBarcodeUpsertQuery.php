@@ -30,11 +30,11 @@ final class WbBarcodeUpsertQuery
              VALUES (:id, :listingId, :companyId, :marketplace, :barcode)
              ON CONFLICT (company_id, marketplace, barcode) DO NOTHING',
             [
-                'id'          => Uuid::uuid7()->toString(),
-                'listingId'   => $listingId,
-                'companyId'   => $companyId,
+                'id' => Uuid::uuid7()->toString(),
+                'listingId' => $listingId,
+                'companyId' => $companyId,
                 'marketplace' => MarketplaceType::WILDBERRIES->value,
-                'barcode'     => $barcode,
+                'barcode' => $barcode,
             ],
         );
     }

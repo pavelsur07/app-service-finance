@@ -41,7 +41,7 @@ final class SnapshotListController extends AbstractController
         $listingId = $request->query->get('listing_id') ?: null;
         $page = max(1, $request->query->getInt('page', 1));
 
-        if ($marketplace !== null && MarketplaceType::tryFrom($marketplace) === null) {
+        if (null !== $marketplace && null === MarketplaceType::tryFrom($marketplace)) {
             $marketplace = null;
         }
 

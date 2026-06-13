@@ -226,7 +226,7 @@ final class CashflowReportBuilder
         }
 
         // Рекурсивный сбор узла
-        $makeNode = function (string $id, int $level) use (&$makeNode, $children, $byId, $categoryMap): array {
+        $makeNode = static function (string $id, int $level) use (&$makeNode, $children, $byId, $categoryMap): array {
             $cat = $byId[$id];
             // уровень ограничим 0..4
             $lvl = max(0, min(4, $level));

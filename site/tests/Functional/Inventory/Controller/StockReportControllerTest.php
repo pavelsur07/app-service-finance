@@ -57,7 +57,6 @@ final class StockReportControllerTest extends WebTestCaseBase
         self::assertStringNotContainsString('SKU-OLD', (string) $client->getResponse()->getContent());
     }
 
-
     public function testInvalidSnapshotSessionIdDoesNotBreakPageAndFallsBackToLatest(): void
     {
         $client = static::createClient();

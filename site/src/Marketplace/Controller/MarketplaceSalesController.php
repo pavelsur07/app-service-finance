@@ -22,21 +22,21 @@ final class MarketplaceSalesController extends AbstractController
 {
     public function __construct(
         private readonly ActiveCompanyService $companyService,
-        private readonly SalesListQuery       $salesListQuery,
+        private readonly SalesListQuery $salesListQuery,
     ) {
     }
 
     #[Route('/sales', name: 'marketplace_sales_index')]
     public function __invoke(Request $request): Response
     {
-        $company      = $this->companyService->getActiveCompany();
-        $companyId    = (string) $company->getId();
-        $marketplace  = $this->stringOrNull($request->query->all()['marketplace'] ?? null);
-        $dateFrom     = $this->parseDate($request->query->all()['date_from'] ?? null);
-        $dateTo       = $this->parseDate($request->query->all()['date_to'] ?? null);
-        $page         = max(1, $request->query->getInt('page', 1));
+        $company = $this->companyService->getActiveCompany();
+        $companyId = (string) $company->getId();
+        $marketplace = $this->stringOrNull($request->query->all()['marketplace'] ?? null);
+        $dateFrom = $this->parseDate($request->query->all()['date_from'] ?? null);
+        $dateTo = $this->parseDate($request->query->all()['date_to'] ?? null);
+        $page = max(1, $request->query->getInt('page', 1));
 
-        $qb      = $this->salesListQuery->buildQueryBuilder($companyId, $marketplace, $dateFrom, $dateTo);
+        $qb = $this->salesListQuery->buildQueryBuilder($companyId, $marketplace, $dateFrom, $dateTo);
         $adapter = new QueryAdapter($qb, static function (QueryBuilder $qb): void {
             $qb->select('COUNT(s.id)')->resetOrderBy();
         });
@@ -48,22 +48,22 @@ final class MarketplaceSalesController extends AbstractController
         );
 
         return $this->render('marketplace/sales.html.twig', [
-            'pager'                  => $pager,
+            'pager' => $pager,
             'available_marketplaces' => MarketplaceType::cases(),
-            'selected_marketplace'   => $marketplace,
-            'selected_date_from'     => $dateFrom?->format('Y-m-d'),
-            'selected_date_to'       => $dateTo?->format('Y-m-d'),
+            'selected_marketplace' => $marketplace,
+            'selected_date_from' => $dateFrom?->format('Y-m-d'),
+            'selected_date_to' => $dateTo?->format('Y-m-d'),
         ]);
     }
 
     private function parseDate(mixed $raw): ?\DateTimeImmutable
     {
-        if (!is_string($raw) || $raw === '') {
+        if (!is_string($raw) || '' === $raw) {
             return null;
         }
 
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $raw);
-        if ($date === false || $date->format('Y-m-d') !== $raw) {
+        if (false === $date || $date->format('Y-m-d') !== $raw) {
             return null;
         }
 
@@ -72,6 +72,6 @@ final class MarketplaceSalesController extends AbstractController
 
     private function stringOrNull(mixed $raw): ?string
     {
-        return is_string($raw) && $raw !== '' ? $raw : null;
+        return is_string($raw) && '' !== $raw ? $raw : null;
     }
 }

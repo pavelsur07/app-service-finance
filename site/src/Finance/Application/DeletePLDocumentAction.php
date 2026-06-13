@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Finance\Application;
 
 use App\Company\Facade\CompanyFacade;
-use App\Finance\Repository\DocumentRepository;
 use App\Finance\Application\Service\PLRegisterUpdater;
+use App\Finance\Repository\DocumentRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -21,10 +21,10 @@ use Doctrine\ORM\EntityManagerInterface;
 final class DeletePLDocumentAction
 {
     public function __construct(
-        private readonly DocumentRepository    $documentRepository,
+        private readonly DocumentRepository $documentRepository,
         private readonly EntityManagerInterface $em,
-        private readonly PLRegisterUpdater     $plRegisterUpdater,
-        private readonly CompanyFacade         $companyFacade,
+        private readonly PLRegisterUpdater $plRegisterUpdater,
+        private readonly CompanyFacade $companyFacade,
     ) {
     }
 
@@ -35,17 +35,13 @@ final class DeletePLDocumentAction
     {
         $document = $this->documentRepository->find($documentId);
 
-        if ($document === null) {
+        if (null === $document) {
             // Документ уже удалён — идемпотентно, не ошибка
             return;
         }
 
         if ((string) $document->getCompany()->getId() !== $companyId) {
-            throw new \DomainException(sprintf(
-                'Document "%s" does not belong to company "%s".',
-                $documentId,
-                $companyId,
-            ));
+            throw new \DomainException(sprintf('Document "%s" does not belong to company "%s".', $documentId, $companyId));
         }
 
         // Запоминаем дату ДО удаления — нужна для пересчёта регистра
@@ -57,7 +53,7 @@ final class DeletePLDocumentAction
         // Пересчитываем PL-регистр за день удалённого документа.
         // Метод recalcRange принимает Company — получаем через Facade.
         $company = $this->companyFacade->findById($companyId);
-        if ($company === null) {
+        if (null === $company) {
             // Компания удалена — регистр пересчитывать незачем
             return;
         }

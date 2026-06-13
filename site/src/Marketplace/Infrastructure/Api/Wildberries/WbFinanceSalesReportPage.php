@@ -11,5 +11,6 @@ final readonly class WbFinanceSalesReportPage
         public array $rows,
         public ?int $nextRrdId,
         public bool $hasNextPage,
-    ) {}
+    ) {
+    }
 }

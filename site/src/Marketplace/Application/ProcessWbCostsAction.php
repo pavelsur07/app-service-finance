@@ -13,8 +13,8 @@ use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
 use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
+use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
 use App\Marketplace\Repository\MarketplaceListingBarcodeRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Service\CostCalculator\CostCalculatorInterface;
@@ -46,11 +46,11 @@ final class ProcessWbCostsAction
     {
         $company = $this->em->find(Company::class, $companyId);
         if (!$company instanceof Company) {
-            throw new \RuntimeException('Company not found: ' . $companyId);
+            throw new \RuntimeException('Company not found: '.$companyId);
         }
         $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
         if (!$rawDoc instanceof MarketplaceRawDocument) {
-            throw new \RuntimeException('Raw document not found: ' . $rawDocId);
+            throw new \RuntimeException('Raw document not found: '.$rawDocId);
         }
         $rawData = $rawDoc->getRawData();
         $companyId = (string) $company->getId();
@@ -78,7 +78,7 @@ final class ProcessWbCostsAction
         $allNmIdsMap = [];
         foreach ($costsData as $item) {
             $nmId = trim($this->normalizer->nmId($item));
-            if ($nmId === '' || $nmId === '0') {
+            if ('' === $nmId || '0' === $nmId) {
                 continue;
             }
             $allNmIdsMap[$nmId] = true;
@@ -89,7 +89,7 @@ final class ProcessWbCostsAction
         $allBarcodes = [];
         foreach ($costsData as $item) {
             $barcode = trim((string) $this->normalizer->barcode($item));
-            if ($barcode !== '') {
+            if ('' !== $barcode) {
                 $allBarcodes[$barcode] = true;
             }
         }
@@ -130,33 +130,33 @@ final class ProcessWbCostsAction
         $newListingsCreated = 0;
         foreach ($costsData as $item) {
             $nmId = trim($this->normalizer->nmId($item));
-            if ($nmId === '' || $nmId === '0') {
+            if ('' === $nmId || '0' === $nmId) {
                 continue;
             }
 
             $tsName = $this->normalizer->techSize($item);
             $barcode = trim((string) $this->normalizer->barcode($item));
 
-            if (trim((string) $tsName) === '' && $barcode !== '' && isset($barcodeSizeMap[$barcode])) {
+            if ('' === trim((string) $tsName) && '' !== $barcode && isset($barcodeSizeMap[$barcode])) {
                 $tsName = $barcodeSizeMap[$barcode];
             }
 
-            $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
-            $cacheKey = $nmId . '_' . $size;
+            $size = '' !== trim((string) $tsName) ? trim((string) $tsName) : 'UNKNOWN';
+            $cacheKey = $nmId.'_'.$size;
 
             if (isset($listingsCache[$cacheKey])) {
                 continue;
             }
 
             $listing = $this->listingResolver->resolve($company, $nmId, $tsName, [
-                'sa_name'      => $this->normalizer->vendorCode($item),
-                'brand_name'   => $this->normalizer->brandName($item),
+                'sa_name' => $this->normalizer->vendorCode($item),
+                'brand_name' => $this->normalizer->brandName($item),
                 'subject_name' => $this->normalizer->subjectName($item),
                 'retail_price' => (string) $this->normalizer->retailPrice($item),
             ], $barcode);
 
             $listingsCache[$cacheKey] = $listing;
-            $newListingsCreated++;
+            ++$newListingsCreated;
         }
 
         if ($newListingsCreated > 0) {
@@ -198,7 +198,7 @@ final class ProcessWbCostsAction
 
             $dbExistingMap = $this->costExistingExternalIdsQuery->execute($companyId, $pendingIds);
 
-            $knownExternalIdsMap = $knownExternalIdsMap + $dbExistingMap;
+            $knownExternalIdsMap += $dbExistingMap;
 
             foreach ($pending as $pendingItem) {
                 $externalId = $pendingItem['external_id'];
@@ -241,8 +241,8 @@ final class ProcessWbCostsAction
 
                 $this->em->persist($cost);
                 $knownExternalIdsMap[$externalId] = true;
-                $synced++;
-                $counter++;
+                ++$synced;
+                ++$counter;
             }
 
             if (($counter - $lastFlushedCounter) >= $batchSize) {
@@ -272,7 +272,7 @@ final class ProcessWbCostsAction
                 $this->logger->info('Costs batch processed', [
                     'processed' => $counter,
                     'synced' => $synced,
-                    'memory' => round(memory_get_usage(true) / 1024 / 1024, 2) . ' MB',
+                    'memory' => round(memory_get_usage(true) / 1024 / 1024, 2).' MB',
                 ]);
             }
 
@@ -294,20 +294,20 @@ final class ProcessWbCostsAction
                     // Получаем listing из кэша по nm_id + size (с barcode fallback)
                     $nmId = trim($this->normalizer->nmId($item));
                     $barcode = trim((string) $this->normalizer->barcode($item));
-                    if ($nmId === '' || $nmId === '0') {
+                    if ('' === $nmId || '0' === $nmId) {
                         // nm_id пустой — ищем листинг по barcode из предзагруженного кэша
-                        $listing = $barcode !== '' && isset($barcodeListingMap[$barcode])
+                        $listing = '' !== $barcode && isset($barcodeListingMap[$barcode])
                             ? $barcodeListingMap[$barcode]
                             : null;
                     } else {
                         $tsName = $this->normalizer->techSize($item);
 
-                        if (trim((string) $tsName) === '' && $barcode !== '' && isset($barcodeSizeMap[$barcode])) {
+                        if ('' === trim((string) $tsName) && '' !== $barcode && isset($barcodeSizeMap[$barcode])) {
                             $tsName = $barcodeSizeMap[$barcode];
                         }
 
-                        $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
-                        $cacheKey = $nmId . '_' . $size;
+                        $size = '' !== trim((string) $tsName) ? trim((string) $tsName) : 'UNKNOWN';
+                        $cacheKey = $nmId.'_'.$size;
                         $listing = $listingsCache[$cacheKey] ?? null;
                     }
 
@@ -338,7 +338,7 @@ final class ProcessWbCostsAction
                     if (!isset($unprocessedTypes[$operName])) {
                         $unprocessedTypes[$operName] = 0;
                     }
-                    $unprocessedTypes[$operName]++;
+                    ++$unprocessedTypes[$operName];
                 }
             } catch (\Exception $e) {
                 $this->logger->error('Failed to process cost item', [
@@ -353,7 +353,7 @@ final class ProcessWbCostsAction
             $processPendingBatch();
         }
 
-        if ($counter % $batchSize !== 0) {
+        if (0 !== $counter % $batchSize) {
             $this->em->flush();
             $this->em->clear();
         }
@@ -372,7 +372,7 @@ final class ProcessWbCostsAction
             'total_synced' => $synced,
             'total_records' => count($rawData),
             'unprocessed_count' => $unprocessedCount,
-            'peak_memory' => round(memory_get_peak_usage(true) / 1024 / 1024, 2) . ' MB',
+            'peak_memory' => round(memory_get_peak_usage(true) / 1024 / 1024, 2).' MB',
         ]);
 
         return $synced;

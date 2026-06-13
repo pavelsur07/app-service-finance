@@ -86,12 +86,7 @@ final class StorageService
         if ($written !== $sizeBytes) {
             // Удаляем частично записанный файл, чтобы downstream не подхватил битый payload.
             @unlink($absolutePath);
-            throw new \RuntimeException(sprintf(
-                'Short write to storage file "%s": wrote %d of %d bytes.',
-                $absolutePath,
-                $written,
-                $sizeBytes,
-            ));
+            throw new \RuntimeException(sprintf('Short write to storage file "%s": wrote %d of %d bytes.', $absolutePath, $written, $sizeBytes));
         }
 
         $fileHash = hash('sha256', $bytes);

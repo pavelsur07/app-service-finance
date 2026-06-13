@@ -47,8 +47,8 @@ final class TriggerInitialSyncHandler
 
         if (null === $connection || MarketplaceConnectionType::SELLER !== $connection->getConnectionType()) {
             $this->logger->warning('InitialSync: skipped — connection missing or not SELLER', [
-                'company_id'      => $message->companyId,
-                'connection_id'   => $message->connectionId,
+                'company_id' => $message->companyId,
+                'connection_id' => $message->connectionId,
                 'connection_type' => $connection?->getConnectionType()->value,
             ]);
 
@@ -56,7 +56,7 @@ final class TriggerInitialSyncHandler
         }
 
         $yesterday = $this->clock->now()->modify('-1 day')->setTime(0, 0, 0);
-        $yearStart = new \DateTimeImmutable((int) $yesterday->format('Y') . '-01-01 00:00:00');
+        $yearStart = new \DateTimeImmutable((int) $yesterday->format('Y').'-01-01 00:00:00');
         $syncStart = $yearStart;
 
         if (MarketplaceType::WILDBERRIES === $connection->getMarketplace()) {
@@ -85,7 +85,7 @@ final class TriggerInitialSyncHandler
 
         if (empty($weeks)) {
             $this->logger->warning('InitialSync: no weeks to sync', [
-                'company_id'    => $message->companyId,
+                'company_id' => $message->companyId,
                 'connection_id' => $message->connectionId,
             ]);
 
@@ -93,26 +93,25 @@ final class TriggerInitialSyncHandler
         }
 
         // Диспатчим только первую партию — цепочка продолжится из InitialSyncHandler
-        $first  = $weeks[0];
+        $first = $weeks[0];
         $second = $weeks[1] ?? null;
 
         $this->messageBus->dispatch(new InitialSyncMessage(
-            companyId:    $message->companyId,
+            companyId: $message->companyId,
             connectionId: $message->connectionId,
-            marketplace:  $message->marketplace,
-            dateFrom:     $first['from'],
-            dateTo:       $first['to'],
+            marketplace: $message->marketplace,
+            dateFrom: $first['from'],
+            dateTo: $first['to'],
             nextDateFrom: $second ? $second['from'] : null,
-            nextDateTo:   $second ? $second['to']   : null,
+            nextDateTo: $second ? $second['to'] : null,
         ));
 
         $this->logger->info('InitialSync: dispatched first batch', [
-            'company_id'    => $message->companyId,
-            'marketplace'   => $message->marketplace,
-            'date_from'     => $first['from'],
-            'date_to'       => $first['to'],
+            'company_id' => $message->companyId,
+            'marketplace' => $message->marketplace,
+            'date_from' => $first['from'],
+            'date_to' => $first['to'],
             'total_batches' => count($weeks),
         ]);
     }
-
 }

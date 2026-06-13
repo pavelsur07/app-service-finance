@@ -72,7 +72,6 @@ final class WbSalesReportRowNormalizerTest extends TestCase
         self::assertTrue($this->normalizer->isSaleOrReturn($row));
     }
 
-
     public function testPvzCompensationWithReturnWordIsStillSaleByDocTypeOnly(): void
     {
         $row = [

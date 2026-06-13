@@ -77,17 +77,17 @@ class MarketplaceAdvertisingCost
         Assert::numeric($amount);
         Assert::greaterThanEq((float) $amount, 0.0);
 
-        $this->companyId          = $companyId;
-        $this->listingId          = $listingId;
-        $this->marketplace        = $marketplace;
-        $this->date               = $date;
-        $this->advertisingType    = $advertisingType;
-        $this->amount             = $amount;
-        $this->analyticsData      = $analyticsData;
+        $this->companyId = $companyId;
+        $this->listingId = $listingId;
+        $this->marketplace = $marketplace;
+        $this->date = $date;
+        $this->advertisingType = $advertisingType;
+        $this->amount = $amount;
+        $this->analyticsData = $analyticsData;
         $this->externalCampaignId = $externalCampaignId;
-        $this->rawData            = $rawData;
-        $this->createdAt          = new \DateTimeImmutable();
-        $this->updatedAt          = new \DateTimeImmutable();
+        $this->rawData = $rawData;
+        $this->createdAt = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function updateAmount(string $amount, array $analyticsData): void
@@ -95,27 +95,74 @@ class MarketplaceAdvertisingCost
         Assert::numeric($amount);
         Assert::greaterThanEq((float) $amount, 0.0);
 
-        $this->amount        = $amount;
+        $this->amount = $amount;
         $this->analyticsData = $analyticsData;
-        $this->updatedAt     = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function updateRawData(?array $rawData): void
     {
-        $this->rawData   = $rawData;
+        $this->rawData = $rawData;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
-    public function getId(): string { return $this->id; }
-    public function getCompanyId(): string { return $this->companyId; }
-    public function getListingId(): string { return $this->listingId; }
-    public function getMarketplace(): MarketplaceType { return $this->marketplace; }
-    public function getDate(): \DateTimeImmutable { return $this->date; }
-    public function getAdvertisingType(): AdvertisingType { return $this->advertisingType; }
-    public function getAmount(): string { return $this->amount; }
-    public function getAnalyticsData(): array { return $this->analyticsData; }
-    public function getExternalCampaignId(): string { return $this->externalCampaignId; }
-    public function getRawData(): ?array { return $this->rawData; }
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
-    public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
+    public function getId(): string
+    {
+        return $this->id;
+    }
+
+    public function getCompanyId(): string
+    {
+        return $this->companyId;
+    }
+
+    public function getListingId(): string
+    {
+        return $this->listingId;
+    }
+
+    public function getMarketplace(): MarketplaceType
+    {
+        return $this->marketplace;
+    }
+
+    public function getDate(): \DateTimeImmutable
+    {
+        return $this->date;
+    }
+
+    public function getAdvertisingType(): AdvertisingType
+    {
+        return $this->advertisingType;
+    }
+
+    public function getAmount(): string
+    {
+        return $this->amount;
+    }
+
+    public function getAnalyticsData(): array
+    {
+        return $this->analyticsData;
+    }
+
+    public function getExternalCampaignId(): string
+    {
+        return $this->externalCampaignId;
+    }
+
+    public function getRawData(): ?array
+    {
+        return $this->rawData;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    public function getUpdatedAt(): \DateTimeImmutable
+    {
+        return $this->updatedAt;
+    }
 }

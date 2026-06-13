@@ -49,7 +49,7 @@ final class OzonServiceCategoryMap
         $category = OzonCostCategory::findByServiceName($serviceName)
             ?? OzonCostCategory::findByOperationType($serviceName);
 
-        if ($category !== null) {
+        if (null !== $category) {
             return $category->code;
         }
 
@@ -57,8 +57,8 @@ final class OzonServiceCategoryMap
 
         $logger->warning('ozon_unknown_service_name', [
             'service_name' => $serviceName,
-            'resolved_to'  => $fallback,
-            'hint'         => 'Add to OzonCostCategory::all()',
+            'resolved_to' => $fallback,
+            'hint' => 'Add to OzonCostCategory::all()',
         ]);
 
         return $fallback;
@@ -70,16 +70,16 @@ final class OzonServiceCategoryMap
     public static function getMapStats(): array
     {
         $allCategories = OzonCostCategory::all();
-        $totalEntries  = count(self::ZERO_MARKERS);
+        $totalEntries = count(self::ZERO_MARKERS);
 
         foreach ($allCategories as $c) {
             $totalEntries += count($c->serviceNames) + count($c->operationTypes);
         }
 
         return [
-            'version'           => self::VERSION,
-            'total_entries'     => $totalEntries,
-            'zero_markers'      => count(self::ZERO_MARKERS),
+            'version' => self::VERSION,
+            'total_entries' => $totalEntries,
+            'zero_markers' => count(self::ZERO_MARKERS),
             'unique_categories' => count($allCategories),
         ];
     }
@@ -97,8 +97,8 @@ final class OzonServiceCategoryMap
      */
     public static function isKnown(string $serviceName): bool
     {
-        return OzonCostCategory::findByServiceName($serviceName) !== null
-            || OzonCostCategory::findByOperationType($serviceName) !== null;
+        return null !== OzonCostCategory::findByServiceName($serviceName)
+            || null !== OzonCostCategory::findByOperationType($serviceName);
     }
 
     /**

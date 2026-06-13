@@ -10,7 +10,6 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\ActiveWbConnectionsQuery;
 use App\Marketplace\Message\SyncWbFinancialReportDayMessage;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusLookupInterface;
-use DateTimeImmutable;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 
@@ -25,7 +24,8 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         private readonly MarketplaceFinancialReportSyncStatusLookupInterface $syncStatusRepository,
         private readonly MessageBusInterface $messageBus,
         private readonly ClockInterface $clock,
-    ) {}
+    ) {
+    }
 
     public function planDaily(?string $companyId = null, ?string $connectionId = null, bool $force = false): int
     {
@@ -108,7 +108,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
                         if ($dailyCompleted) {
                             $success[] = [
                                 'day' => $day,
-                                'updated_at' => $refreshStatusEntity->getUpdatedAt() ?? new DateTimeImmutable('9999-12-31T00:00:00+00:00'),
+                                'updated_at' => $refreshStatusEntity->getUpdatedAt() ?? new \DateTimeImmutable('9999-12-31T00:00:00+00:00'),
                             ];
                         }
 
@@ -130,7 +130,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
                 return $a['day']->getTimestamp() <=> $b['day']->getTimestamp();
             });
 
-            $successDays = array_map(static fn (array $item): DateTimeImmutable => $item['day'], $success);
+            $successDays = array_map(static fn (array $item): \DateTimeImmutable => $item['day'], $success);
 
             $scheduledForConnection = 0;
             foreach (array_merge($retryDue, $successDays, $dailyCompletedWithoutRefresh) as $day) {
@@ -150,7 +150,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         return $dispatched;
     }
 
-    public function planDueRetry(?string $companyId = null, ?string $connectionId = null, int $maxDays = 1, ?DateTimeImmutable $from = null, ?DateTimeImmutable $to = null): int
+    public function planDueRetry(?string $companyId = null, ?string $connectionId = null, int $maxDays = 1, ?\DateTimeImmutable $from = null, ?\DateTimeImmutable $to = null): int
     {
         if ($maxDays <= 0) {
             return 0;
@@ -197,13 +197,12 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         return $dispatched;
     }
 
-
     /**
      * @deprecated Use planRangeLimited() from console commands. planRange() schedules full explicit range without dispatch limit.
      */
     public function planRange(
-        DateTimeImmutable $from,
-        DateTimeImmutable $to,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
         FinancialReportSyncMode $mode,
         ?string $companyId = null,
         ?string $connectionId = null,
@@ -218,8 +217,8 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
     }
 
     public function planRangeLimited(
-        DateTimeImmutable $from,
-        DateTimeImmutable $to,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
         FinancialReportSyncMode $mode,
         int $maxDays,
         ?string $companyId = null,
@@ -266,7 +265,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         );
     }
 
-    public function planMissing(?string $companyId = null, ?string $connectionId = null, int $maxDays = 14, ?DateTimeImmutable $from = null, ?DateTimeImmutable $to = null): int
+    public function planMissing(?string $companyId = null, ?string $connectionId = null, int $maxDays = 14, ?\DateTimeImmutable $from = null, ?\DateTimeImmutable $to = null): int
     {
         if ($maxDays <= 0) {
             return 0;
@@ -343,7 +342,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         return $dispatched;
     }
 
-    public function planInitial(?string $companyId = null, ?string $connectionId = null, ?DateTimeImmutable $startFrom = null, int $maxDays = 1): int
+    public function planInitial(?string $companyId = null, ?string $connectionId = null, ?\DateTimeImmutable $startFrom = null, int $maxDays = 1): int
     {
         if ($maxDays <= 0) {
             return 0;
@@ -375,9 +374,9 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
     }
 
     /** @param list<array{id: string, company_id: string, connection_id: string}> $connections
-     * @param list<DateTimeImmutable> $days
+     * @param list<\DateTimeImmutable> $days
      *
-     * @return list<array{company_id: string, connection_id: string, day: DateTimeImmutable}>
+     * @return list<array{company_id: string, connection_id: string, day: \DateTimeImmutable}>
      */
     private function buildRangeCandidates(array $connections, array $days): array
     {
@@ -410,7 +409,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
     }
 
     /** @param list<array{id: string, company_id: string, connection_id: string}> $connections
-     * @param list<DateTimeImmutable> $days
+     * @param list<\DateTimeImmutable> $days
      */
     private function planForDays(
         array $connections,
@@ -418,8 +417,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         FinancialReportSyncMode $mode,
         bool $forceRefresh,
         ?int $maxDaysPerConnection = null,
-    ): int
-    {
+    ): int {
         $dispatched = 0;
 
         foreach ($connections as $connection) {
@@ -442,7 +440,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         return $dispatched;
     }
 
-    private function claimAndDispatch(string $companyId, string $connectionId, DateTimeImmutable $day, FinancialReportSyncMode $mode, bool $forceRefresh): bool
+    private function claimAndDispatch(string $companyId, string $connectionId, \DateTimeImmutable $day, FinancialReportSyncMode $mode, bool $forceRefresh): bool
     {
         $status = $this->syncStatusRepository->claimForQueue(
             $connectionId,
@@ -465,7 +463,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         return true;
     }
 
-    private function dispatch(string $companyId, string $connectionId, DateTimeImmutable $day, FinancialReportSyncMode $mode, bool $forceRefresh, int $rrdId = 0, ?string $rawDocumentId = null): void
+    private function dispatch(string $companyId, string $connectionId, \DateTimeImmutable $day, FinancialReportSyncMode $mode, bool $forceRefresh, int $rrdId = 0, ?string $rawDocumentId = null): void
     {
         $this->messageBus->dispatch(new SyncWbFinancialReportDayMessage(
             $companyId,

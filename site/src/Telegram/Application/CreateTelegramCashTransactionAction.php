@@ -16,7 +16,8 @@ final readonly class CreateTelegramCashTransactionAction
     public function __construct(
         private CashFacade $cashFacade,
         private TelegramCashTransactionExternalIdGenerator $externalIdGenerator,
-    ) {}
+    ) {
+    }
 
     public function __invoke(CreateTelegramCashTransactionCommand $command): ?CreateTelegramCashTransactionActionResult
     {

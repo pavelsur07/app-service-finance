@@ -43,31 +43,31 @@ final class DebugWipeCompanyDataController extends AbstractController
 
     public function __invoke(Request $request): JsonResponse
     {
-        $company   = $this->activeCompanyService->getActiveCompany();
+        $company = $this->activeCompanyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
         $marketplaceStr = (string) $request->query->get('marketplace', '');
-        $fromStr        = (string) $request->query->get('from', '');
-        $toStr          = (string) $request->query->get('to', '');
-        $confirm        = (string) $request->query->get('confirm', '0') === '1';
-        $force          = (string) $request->query->get('force', '0') === '1';
+        $fromStr = (string) $request->query->get('from', '');
+        $toStr = (string) $request->query->get('to', '');
+        $confirm = '1' === (string) $request->query->get('confirm', '0');
+        $force = '1' === (string) $request->query->get('force', '0');
 
-        if ($marketplaceStr === '' || $fromStr === '' || $toStr === '') {
+        if ('' === $marketplaceStr || '' === $fromStr || '' === $toStr) {
             return $this->json(['error' => 'marketplace, from, to are required'], 422);
         }
 
         $marketplace = MarketplaceType::tryFrom($marketplaceStr);
-        if ($marketplace === null) {
-            return $this->json(['error' => 'Unknown marketplace: ' . $marketplaceStr], 422);
+        if (null === $marketplace) {
+            return $this->json(['error' => 'Unknown marketplace: '.$marketplaceStr], 422);
         }
 
-        if ($marketplace !== MarketplaceType::OZON) {
+        if (MarketplaceType::OZON !== $marketplace) {
             return $this->json(['error' => 'Only ozon is supported at the moment'], 422);
         }
 
         $from = $this->parseStrictDate($fromStr);
-        $to   = $this->parseStrictDate($toStr);
-        if ($from === null || $to === null) {
+        $to = $this->parseStrictDate($toStr);
+        if (null === $from || null === $to) {
             return $this->json(['error' => 'Invalid date format (Y-m-d expected, must be a real calendar date)'], 422);
         }
 
@@ -76,20 +76,20 @@ final class DebugWipeCompanyDataController extends AbstractController
         }
 
         $periodFrom = $from->format('Y-m-d');
-        $periodTo   = $to->format('Y-m-d');
+        $periodTo = $to->format('Y-m-d');
 
         if (!$confirm) {
-            $counts        = $this->countRecords($companyId, $marketplace, $periodFrom, $periodTo, $force);
+            $counts = $this->countRecords($companyId, $marketplace, $periodFrom, $periodTo, $force);
             $skippedClosed = $force ? ['sales' => 0, 'returns' => 0, 'costs' => 0, 'raw_documents' => 0] : $this->countClosed($companyId, $marketplace, $periodFrom, $periodTo);
 
             return $this->json([
-                'mode'           => 'preview',
-                'companyId'      => $companyId,
-                'marketplace'    => $marketplace->value,
-                'from'           => $periodFrom,
-                'to'             => $periodTo,
-                'force'          => $force,
-                'counts'         => $counts,
+                'mode' => 'preview',
+                'companyId' => $companyId,
+                'marketplace' => $marketplace->value,
+                'from' => $periodFrom,
+                'to' => $periodTo,
+                'force' => $force,
+                'counts' => $counts,
                 'skipped_closed' => $skippedClosed,
             ]);
         }
@@ -97,7 +97,7 @@ final class DebugWipeCompanyDataController extends AbstractController
         $this->connection->beginTransaction();
 
         try {
-            $counts        = $this->deleteRecords($companyId, $marketplace, $periodFrom, $periodTo, $force);
+            $counts = $this->deleteRecords($companyId, $marketplace, $periodFrom, $periodTo, $force);
             $skippedClosed = $force ? ['sales' => 0, 'returns' => 0, 'costs' => 0, 'raw_documents' => 0] : $this->countClosed($companyId, $marketplace, $periodFrom, $periodTo);
 
             $this->connection->commit();
@@ -107,22 +107,22 @@ final class DebugWipeCompanyDataController extends AbstractController
         }
 
         $this->logger->info('[DebugWipe] Company data wiped', [
-            'company_id'  => $companyId,
+            'company_id' => $companyId,
             'marketplace' => $marketplace->value,
-            'from'        => $periodFrom,
-            'to'          => $periodTo,
-            'force'       => $force,
-            'counts'      => $counts,
+            'from' => $periodFrom,
+            'to' => $periodTo,
+            'force' => $force,
+            'counts' => $counts,
         ]);
 
         return $this->json([
-            'mode'           => 'executed',
-            'companyId'      => $companyId,
-            'marketplace'    => $marketplace->value,
-            'from'           => $periodFrom,
-            'to'             => $periodTo,
-            'force'          => $force,
-            'counts'         => $counts,
+            'mode' => 'executed',
+            'companyId' => $companyId,
+            'marketplace' => $marketplace->value,
+            'from' => $periodFrom,
+            'to' => $periodTo,
+            'force' => $force,
+            'counts' => $counts,
             'skipped_closed' => $skippedClosed,
         ]);
     }
@@ -155,8 +155,8 @@ final class DebugWipeCompanyDataController extends AbstractController
 
         $rawDocs = $force
             ? (int) $this->connection->fetchOne(
-                "SELECT COUNT(*) FROM marketplace_raw_documents
-                 WHERE company_id = :cid AND marketplace = :mp AND period_from >= :from AND period_to <= :to",
+                'SELECT COUNT(*) FROM marketplace_raw_documents
+                 WHERE company_id = :cid AND marketplace = :mp AND period_from >= :from AND period_to <= :to',
                 ['cid' => $companyId, 'mp' => $mp, 'from' => $from, 'to' => $to],
             )
             : 0;
@@ -172,26 +172,26 @@ final class DebugWipeCompanyDataController extends AbstractController
         $mp = $marketplace->value;
 
         $sales = (int) $this->connection->fetchOne(
-            "SELECT COUNT(*) FROM marketplace_sales
-             WHERE company_id = :cid AND marketplace = :mp AND sale_date BETWEEN :from AND :to AND document_id IS NOT NULL",
+            'SELECT COUNT(*) FROM marketplace_sales
+             WHERE company_id = :cid AND marketplace = :mp AND sale_date BETWEEN :from AND :to AND document_id IS NOT NULL',
             ['cid' => $companyId, 'mp' => $mp, 'from' => $from, 'to' => $to],
         );
 
         $returns = (int) $this->connection->fetchOne(
-            "SELECT COUNT(*) FROM marketplace_returns
-             WHERE company_id = :cid AND marketplace = :mp AND return_date BETWEEN :from AND :to AND document_id IS NOT NULL",
+            'SELECT COUNT(*) FROM marketplace_returns
+             WHERE company_id = :cid AND marketplace = :mp AND return_date BETWEEN :from AND :to AND document_id IS NOT NULL',
             ['cid' => $companyId, 'mp' => $mp, 'from' => $from, 'to' => $to],
         );
 
         $costs = (int) $this->connection->fetchOne(
-            "SELECT COUNT(*) FROM marketplace_costs
-             WHERE company_id = :cid AND marketplace = :mp AND cost_date BETWEEN :from AND :to AND document_id IS NOT NULL",
+            'SELECT COUNT(*) FROM marketplace_costs
+             WHERE company_id = :cid AND marketplace = :mp AND cost_date BETWEEN :from AND :to AND document_id IS NOT NULL',
             ['cid' => $companyId, 'mp' => $mp, 'from' => $from, 'to' => $to],
         );
 
         $rawDocs = (int) $this->connection->fetchOne(
-            "SELECT COUNT(*) FROM marketplace_raw_documents
-             WHERE company_id = :cid AND marketplace = :mp AND period_from >= :from AND period_to <= :to",
+            'SELECT COUNT(*) FROM marketplace_raw_documents
+             WHERE company_id = :cid AND marketplace = :mp AND period_from >= :from AND period_to <= :to',
             ['cid' => $companyId, 'mp' => $mp, 'from' => $from, 'to' => $to],
         );
 
@@ -226,8 +226,8 @@ final class DebugWipeCompanyDataController extends AbstractController
 
         $rawDocs = $force
             ? (int) $this->connection->executeStatement(
-                "DELETE FROM marketplace_raw_documents
-                 WHERE company_id = :cid AND marketplace = :mp AND period_from >= :from AND period_to <= :to",
+                'DELETE FROM marketplace_raw_documents
+                 WHERE company_id = :cid AND marketplace = :mp AND period_from >= :from AND period_to <= :to',
                 ['cid' => $companyId, 'mp' => $mp, 'from' => $from, 'to' => $to],
             )
             : 0;
@@ -239,7 +239,7 @@ final class DebugWipeCompanyDataController extends AbstractController
     {
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
 
-        if ($date === false || $date->format('Y-m-d') !== $value) {
+        if (false === $date || $date->format('Y-m-d') !== $value) {
             return null;
         }
 

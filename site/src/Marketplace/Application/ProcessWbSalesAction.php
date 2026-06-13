@@ -33,12 +33,12 @@ final class ProcessWbSalesAction
     {
         $company = $this->em->find(Company::class, $companyId);
         if (!$company instanceof Company) {
-            throw new \RuntimeException('Company not found: ' . $companyId);
+            throw new \RuntimeException('Company not found: '.$companyId);
         }
 
         $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
         if (!$rawDoc instanceof MarketplaceRawDocument) {
-            throw new \RuntimeException('Raw document not found: ' . $rawDocId);
+            throw new \RuntimeException('Raw document not found: '.$rawDocId);
         }
 
         $rawData = $rawDoc->getRawData();
@@ -53,6 +53,7 @@ final class ProcessWbSalesAction
 
         if (empty($salesData)) {
             $this->logger->info('[WB] No sales to process');
+
             return 0;
         }
 
@@ -77,18 +78,18 @@ final class ProcessWbSalesAction
         foreach ($salesData as $item) {
             $nmId = $this->normalizer->nmId($item);
             $tsName = $this->normalizer->techSize($item);
-            $size = (trim((string) $tsName) !== '') ? trim((string) $tsName) : 'UNKNOWN';
-            $cacheKey = $nmId . '_' . $size;
+            $size = ('' !== trim((string) $tsName)) ? trim((string) $tsName) : 'UNKNOWN';
+            $cacheKey = $nmId.'_'.$size;
 
             if (!isset($listingsCache[$cacheKey])) {
                 $listing = $this->listingResolver->resolve($company, $nmId, $tsName, [
-                    'sa_name'      => $this->normalizer->vendorCode($item),
-                    'brand_name'   => $this->normalizer->brandName($item),
+                    'sa_name' => $this->normalizer->vendorCode($item),
+                    'brand_name' => $this->normalizer->brandName($item),
                     'subject_name' => $this->normalizer->subjectName($item),
                     'retail_price' => (string) $this->normalizer->retailPrice($item),
                 ]);
                 $listingsCache[$cacheKey] = $listing;
-                $newListingsCreated++;
+                ++$newListingsCreated;
             }
         }
 
@@ -107,11 +108,11 @@ final class ProcessWbSalesAction
 
                 $nmId = $this->normalizer->nmId($item);
                 $tsName = $this->normalizer->techSize($item);
-                $size = (trim((string) $tsName) !== '') ? trim((string) $tsName) : 'UNKNOWN';
-                $cacheKey = $nmId . '_' . $size;
+                $size = ('' !== trim((string) $tsName)) ? trim((string) $tsName) : 'UNKNOWN';
+                $cacheKey = $nmId.'_'.$size;
                 $listing = $listingsCache[$cacheKey] ?? null;
 
-                if ($listing === null) {
+                if (null === $listing) {
                     $this->logger->error('[WB] Listing missing from cache', ['nm_id' => $nmId]);
                     continue;
                 }
@@ -137,10 +138,10 @@ final class ProcessWbSalesAction
 
                 $this->em->persist($sale);
                 $existingSridsMap[$externalOrderId] = true;
-                $synced++;
-                $counter++;
+                ++$synced;
+                ++$counter;
 
-                if ($counter % $batchSize === 0) {
+                if (0 === $counter % $batchSize) {
                     $this->em->flush();
                     $this->em->clear();
                     $company = $this->em->find(Company::class, $companyId);
@@ -153,23 +154,24 @@ final class ProcessWbSalesAction
                     gc_collect_cycles();
                     $this->logger->info('[WB] Sales batch', [
                         'processed' => $counter,
-                        'memory'    => round(memory_get_usage(true) / 1024 / 1024, 2) . ' MB',
+                        'memory' => round(memory_get_usage(true) / 1024 / 1024, 2).' MB',
                     ]);
                 }
             } catch (\Throwable $e) {
                 $this->logger->error('[WB] Failed to process sale', [
-                    'srid'  => $this->normalizer->srid($item) ?? 'unknown',
+                    'srid' => $this->normalizer->srid($item) ?? 'unknown',
                     'error' => $e->getMessage(),
                 ]);
             }
         }
 
-        if ($counter % $batchSize !== 0) {
+        if (0 !== $counter % $batchSize) {
             $this->em->flush();
             $this->em->clear();
         }
 
         $this->logger->info('[WB] Sales processing completed', ['total_synced' => $synced]);
+
         return $synced;
     }
 }

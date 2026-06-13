@@ -36,7 +36,7 @@ final class RawOperationsAnalysisQuery
     ): array {
         return [
             'operation_types' => $this->operationTypes($companyId, $marketplace, $periodFrom, $periodTo, $filterCategory),
-            'service_names'   => $this->serviceNames($companyId, $marketplace, $periodFrom, $periodTo, $filterCategory),
+            'service_names' => $this->serviceNames($companyId, $marketplace, $periodFrom, $periodTo, $filterCategory),
             'category_totals' => $this->categoryTotals($companyId, $marketplace, $periodFrom, $periodTo, $filterCategory),
         ];
     }
@@ -56,9 +56,9 @@ final class RawOperationsAnalysisQuery
         string $periodTo,
         ?string $filterCategory,
     ): array {
-        $categoryJoin = $filterCategory !== null
-            ? "AND cc.code = :filterCategory"
-            : "";
+        $categoryJoin = null !== $filterCategory
+            ? 'AND cc.code = :filterCategory'
+            : '';
 
         $rows = $this->connection->fetchAllAssociative(
             <<<SQL
@@ -82,22 +82,22 @@ final class RawOperationsAnalysisQuery
             ORDER BY cc.code, SUM(c.amount) DESC
             SQL,
             array_filter([
-                'companyId'      => $companyId,
-                'marketplace'    => $marketplace,
-                'periodFrom'     => $periodFrom,
-                'periodTo'       => $periodTo,
+                'companyId' => $companyId,
+                'marketplace' => $marketplace,
+                'periodFrom' => $periodFrom,
+                'periodTo' => $periodTo,
                 'filterCategory' => $filterCategory,
             ]),
         );
 
         return array_map(static fn (array $r) => [
-            'category_code'  => $r['category_code'],
-            'category_name'  => $r['category_name'],
+            'category_code' => $r['category_code'],
+            'category_name' => $r['category_name'],
             'operation_type' => $r['operation_type'],
-            'count'          => (int) $r['count'],
-            'amount'         => number_format((float) $r['amount'], 2, '.', ' '),
-            'first_date'     => $r['first_date'],
-            'last_date'      => $r['last_date'],
+            'count' => (int) $r['count'],
+            'amount' => number_format((float) $r['amount'], 2, '.', ' '),
+            'first_date' => $r['first_date'],
+            'last_date' => $r['last_date'],
         ], $rows);
     }
 
@@ -114,9 +114,9 @@ final class RawOperationsAnalysisQuery
         string $periodTo,
         ?string $filterCategory,
     ): array {
-        $categoryJoin = $filterCategory !== null
-            ? "AND cc.code = :filterCategory"
-            : "";
+        $categoryJoin = null !== $filterCategory
+            ? 'AND cc.code = :filterCategory'
+            : '';
 
         $rows = $this->connection->fetchAllAssociative(
             <<<SQL
@@ -140,10 +140,10 @@ final class RawOperationsAnalysisQuery
             ORDER BY cc.code, SUM(c.amount) DESC
             SQL,
             array_filter([
-                'companyId'      => $companyId,
-                'marketplace'    => $marketplace,
-                'periodFrom'     => $periodFrom,
-                'periodTo'       => $periodTo,
+                'companyId' => $companyId,
+                'marketplace' => $marketplace,
+                'periodFrom' => $periodFrom,
+                'periodTo' => $periodTo,
                 'filterCategory' => $filterCategory,
             ]),
         );
@@ -151,11 +151,11 @@ final class RawOperationsAnalysisQuery
         return array_map(static fn (array $r) => [
             'category_code' => $r['category_code'],
             'category_name' => $r['category_name'],
-            'service_name'  => $r['service_name'],
-            'count'         => (int) $r['count'],
-            'amount'        => number_format((float) $r['amount'], 2, '.', ' '),
-            'first_date'    => $r['first_date'],
-            'last_date'     => $r['last_date'],
+            'service_name' => $r['service_name'],
+            'count' => (int) $r['count'],
+            'amount' => number_format((float) $r['amount'], 2, '.', ' '),
+            'first_date' => $r['first_date'],
+            'last_date' => $r['last_date'],
         ], $rows);
     }
 
@@ -171,9 +171,9 @@ final class RawOperationsAnalysisQuery
         string $periodTo,
         ?string $filterCategory,
     ): array {
-        $categoryJoin = $filterCategory !== null
-            ? "AND cc.code = :filterCategory"
-            : "";
+        $categoryJoin = null !== $filterCategory
+            ? 'AND cc.code = :filterCategory'
+            : '';
 
         $rows = $this->connection->fetchAllAssociative(
             <<<SQL
@@ -193,10 +193,10 @@ final class RawOperationsAnalysisQuery
             ORDER BY SUM(c.amount) DESC
             SQL,
             array_filter([
-                'companyId'      => $companyId,
-                'marketplace'    => $marketplace,
-                'periodFrom'     => $periodFrom,
-                'periodTo'       => $periodTo,
+                'companyId' => $companyId,
+                'marketplace' => $marketplace,
+                'periodFrom' => $periodFrom,
+                'periodTo' => $periodTo,
                 'filterCategory' => $filterCategory,
             ]),
         );
@@ -204,8 +204,8 @@ final class RawOperationsAnalysisQuery
         return array_map(static fn (array $r) => [
             'category_code' => $r['category_code'],
             'category_name' => $r['category_name'],
-            'count'         => (int) $r['count'],
-            'amount'        => number_format((float) $r['amount'], 2, '.', ' '),
+            'count' => (int) $r['count'],
+            'amount' => number_format((float) $r['amount'], 2, '.', ' '),
         ], $rows);
     }
 }

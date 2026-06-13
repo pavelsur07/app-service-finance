@@ -11,15 +11,15 @@ namespace App\Catalog\DTO;
 final class ParsedProductRow
 {
     /**
-     * @param int         $rowNumber   Номер строки в файле (для отчёта об ошибках)
-     * @param string|null $name        Наименование товара
-     * @param string|null $vendorSku   Артикул продавца (внешний)
-     * @param string|null $barcodes    Баркод(ы) через ";" или ","
+     * @param int $rowNumber Номер строки в файле (для отчёта об ошибках)
+     * @param string|null $name Наименование товара
+     * @param string|null $vendorSku Артикул продавца (внешний)
+     * @param string|null $barcodes Баркод(ы) через ";" или ","
      * @param string|null $priceAmount Закупочная цена (может быть "0")
-     * @param string|null $currency    Валюта ISO 4217 (RUB, USD, EUR)
+     * @param string|null $currency Валюта ISO 4217 (RUB, USD, EUR)
      */
     public function __construct(
-        public readonly int     $rowNumber,
+        public readonly int $rowNumber,
         public readonly ?string $name,
         public readonly ?string $vendorSku,
         public readonly ?string $barcodes,
@@ -30,7 +30,7 @@ final class ParsedProductRow
 
     /**
      * Разбивает строку баркодов на массив отдельных значений.
-     * Поддерживаемые разделители: ";" и ","
+     * Поддерживаемые разделители: ";" и ",".
      *
      * @return string[]
      */
@@ -42,7 +42,7 @@ final class ParsedProductRow
 
         return array_values(array_filter(
             array_map('trim', preg_split('/[;,]/', $this->barcodes) ?: []),
-            static fn(string $b) => '' !== $b,
+            static fn (string $b) => '' !== $b,
         ));
     }
 

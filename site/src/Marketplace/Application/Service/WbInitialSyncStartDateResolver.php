@@ -23,7 +23,7 @@ class WbInitialSyncStartDateResolver
     public function resolve(Company $company, MarketplaceConnection $connection): \DateTimeImmutable
     {
         $now = $this->clock->now()->setTime(0, 0, 0);
-        $yearStart = new \DateTimeImmutable((int) $now->format('Y') . '-01-01 00:00:00');
+        $yearStart = new \DateTimeImmutable((int) $now->format('Y').'-01-01 00:00:00');
         $yesterday = $now->modify('-1 day');
         $settingsOverride = $this->parseSettingsStartDateOverride($connection->getSettings() ?? [], $yesterday);
 

@@ -19,9 +19,9 @@ use App\Marketplace\Infrastructure\Query\UnprocessedSalesQuery;
 final class SalesReturnsDataSource implements MarketplaceDataSourceInterface
 {
     public function __construct(
-        private readonly UnprocessedSalesQuery   $salesQuery,
+        private readonly UnprocessedSalesQuery $salesQuery,
         private readonly UnprocessedReturnsQuery $returnsQuery,
-        private readonly MarkProcessedQuery      $markProcessedQuery,
+        private readonly MarkProcessedQuery $markProcessedQuery,
     ) {
     }
 

@@ -30,11 +30,11 @@ final class UnitEconomicsController extends AbstractController
 
     public function __invoke(Request $request): JsonResponse
     {
-        $company   = $this->companyService->getActiveCompany();
+        $company = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
         $marketplace = $request->query->get('marketplace');
-        if ($marketplace === null || $marketplace === '') {
+        if (null === $marketplace || '' === $marketplace) {
             $marketplace = null;
         } else {
             $validValues = array_map(
@@ -43,7 +43,7 @@ final class UnitEconomicsController extends AbstractController
             );
             if (!in_array($marketplace, $validValues, true)) {
                 return $this->json([
-                    'error' => 'Invalid marketplace. Allowed: ' . implode(', ', $validValues),
+                    'error' => 'Invalid marketplace. Allowed: '.implode(', ', $validValues),
                 ], 422);
             }
         }
@@ -63,7 +63,7 @@ final class UnitEconomicsController extends AbstractController
 
         $page = max(1, $request->query->getInt('page', 1));
 
-        $qb      = $this->unitEconomicsQuery->buildQueryBuilder($companyId, $marketplace, $dateFrom, $dateTo);
+        $qb = $this->unitEconomicsQuery->buildQueryBuilder($companyId, $marketplace, $dateFrom, $dateTo);
         $adapter = new QueryAdapter($qb, static function (QueryBuilder $qb): void {
             $qb->select('COUNT(DISTINCT s.listing_id)')
                 ->resetGroupBy()

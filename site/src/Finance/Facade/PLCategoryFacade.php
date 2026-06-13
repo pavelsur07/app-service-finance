@@ -20,7 +20,7 @@ final class PLCategoryFacade
 {
     public function __construct(
         private readonly PLCategoryRepository $repository,
-        private readonly CompanyFacade        $companyFacade,
+        private readonly CompanyFacade $companyFacade,
     ) {
     }
 
@@ -32,20 +32,20 @@ final class PLCategoryFacade
     public function getTreeByCompanyId(string $companyId): array
     {
         $company = $this->companyFacade->findById($companyId);
-        if ($company === null) {
+        if (null === $company) {
             return [];
         }
 
         $entities = $this->repository->findTreeByCompany($company);
 
         return array_map(
-            static fn($cat) => new PLCategoryDTO(
-                id:        (string) $cat->getId(),
-                name:      $cat->getName(),
-                level:     $cat->getLevel(),
-                parentId:  $cat->getParent()?->getId(),
+            static fn ($cat) => new PLCategoryDTO(
+                id: (string) $cat->getId(),
+                name: $cat->getName(),
+                level: $cat->getLevel(),
+                parentId: $cat->getParent()?->getId(),
                 sortOrder: $cat->getSortOrder(),
-                code:      $cat->getCode(),
+                code: $cat->getCode(),
             ),
             $entities,
         );
@@ -59,7 +59,7 @@ final class PLCategoryFacade
     public function findTreeEntitiesByCompanyId(string $companyId): array
     {
         $company = $this->companyFacade->findById($companyId);
-        if ($company === null) {
+        if (null === $company) {
             return [];
         }
 
@@ -72,22 +72,22 @@ final class PLCategoryFacade
     public function findByIdAndCompany(string $categoryId, string $companyId): ?PLCategoryDTO
     {
         $company = $this->companyFacade->findById($companyId);
-        if ($company === null) {
+        if (null === $company) {
             return null;
         }
 
         $cat = $this->repository->find($categoryId);
-        if ($cat === null || (string) $cat->getCompany()->getId() !== $companyId) {
+        if (null === $cat || (string) $cat->getCompany()->getId() !== $companyId) {
             return null;
         }
 
         return new PLCategoryDTO(
-            id:        (string) $cat->getId(),
-            name:      $cat->getName(),
-            level:     $cat->getLevel(),
-            parentId:  $cat->getParent()?->getId(),
+            id: (string) $cat->getId(),
+            name: $cat->getName(),
+            level: $cat->getLevel(),
+            parentId: $cat->getParent()?->getId(),
             sortOrder: $cat->getSortOrder(),
-            code:      $cat->getCode(),
+            code: $cat->getCode(),
         );
     }
 }

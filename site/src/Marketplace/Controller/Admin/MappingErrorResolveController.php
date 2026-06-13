@@ -21,8 +21,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class MappingErrorResolveController extends AbstractController
 {
     public function __construct(
-        private readonly MappingErrorRepository  $repository,
-        private readonly EntityManagerInterface  $em,
+        private readonly MappingErrorRepository $repository,
+        private readonly EntityManagerInterface $em,
     ) {
     }
 
@@ -30,7 +30,7 @@ final class MappingErrorResolveController extends AbstractController
     {
         $error = $this->repository->find($id);
 
-        if ($error === null) {
+        if (null === $error) {
             throw $this->createNotFoundException('Ошибка маппинга не найдена.');
         }
 

@@ -25,10 +25,10 @@ final class AdEfficiencyQuery
     private const DEFAULT_SORT_DIR = 'desc';
 
     private const SORT_COLUMNS = [
-        'sku'        => 'l.marketplace_sku',
-        'title'      => 'l.name',
-        'revenue'    => 'revenue',
-        'adSpend'    => 'ad_spend',
+        'sku' => 'l.marketplace_sku',
+        'title' => 'l.name',
+        'revenue' => 'revenue',
+        'adSpend' => 'ad_spend',
         'drrPercent' => 'drr_percent',
     ];
 

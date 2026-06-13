@@ -67,9 +67,10 @@ class MarketplaceReturnRepository extends ServiceEntityRepository
     }
 
     /**
-     * Массовая проверка существующих SRID возвратов (для bulk import)
+     * Массовая проверка существующих SRID возвратов (для bulk import).
      *
      * @param string[] $srids
+     *
      * @return array<string, true>
      */
     public function getExistingExternalIds(string $companyId, array $srids): array
@@ -120,7 +121,6 @@ class MarketplaceReturnRepository extends ServiceEntityRepository
 
         return $qb->getQuery()->getResult();
     }
-
 
     public function countDocumentLinkedByRawDocument(
         Company $company,

@@ -24,7 +24,8 @@ final class CostMappingsIndexController extends AbstractController
         private readonly UnitEconomyCostMappingRepositoryInterface $repository,
         private readonly EnsureCostMappingsSeededAction $ensureCostMappingsSeededAction,
         private readonly MarketplaceFacade $marketplaceFacade,
-    ) {}
+    ) {
+    }
 
     #[Route(
         '/marketplace-analytics/cost-mappings',
@@ -57,14 +58,14 @@ final class CostMappingsIndexController extends AbstractController
         );
 
         return $this->render('marketplace_analytics/cost_mappings/index.html.twig', [
-            'mappings'               => $result['items'],
-            'total'                  => $result['total'],
-            'page'                   => $page,
+            'mappings' => $result['items'],
+            'total' => $result['total'],
+            'page' => $page,
             'available_marketplaces' => MarketplaceType::cases(),
-            'selected_marketplace'   => $selectedMarketplace,
-            'categories'             => $categories,
-            'cost_types'             => UnitEconomyCostType::cases(),
-            'filters'                => ['marketplace' => $selectedMarketplace],
+            'selected_marketplace' => $selectedMarketplace,
+            'categories' => $categories,
+            'cost_types' => UnitEconomyCostType::cases(),
+            'filters' => ['marketplace' => $selectedMarketplace],
         ]);
     }
 }

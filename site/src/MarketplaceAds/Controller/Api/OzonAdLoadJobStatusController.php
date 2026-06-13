@@ -23,7 +23,8 @@ final class OzonAdLoadJobStatusController extends AbstractController
         private readonly AdLoadJobRepository $adLoadJobRepository,
         private readonly AdChunkProgressRepository $chunkProgressRepository,
         private readonly AdRawDocumentRepository $rawDocumentRepository,
-    ) {}
+    ) {
+    }
 
     public function __invoke(string $jobId): JsonResponse
     {

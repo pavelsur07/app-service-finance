@@ -17,7 +17,7 @@ final readonly class UpdateMoySkladConnectionAction
     public function __invoke(UpdateMoySkladConnectionCommand $command): MoySkladConnection
     {
         $connection = $this->repository->findByIdAndCompanyId($command->id, $command->companyId);
-        if ($connection === null) {
+        if (null === $connection) {
             throw new \DomainException('Подключение не найдено.');
         }
 

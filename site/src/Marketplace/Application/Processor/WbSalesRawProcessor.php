@@ -37,11 +37,11 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
     public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = ''): bool
     {
         if ($type instanceof StagingRecordType) {
-            return $type === StagingRecordType::SALE
-                && $marketplace === MarketplaceType::WILDBERRIES;
+            return StagingRecordType::SALE === $type
+                && MarketplaceType::WILDBERRIES === $marketplace;
         }
 
-        return $type === MarketplaceType::WILDBERRIES->value && $kind === 'sales';
+        return $type === MarketplaceType::WILDBERRIES->value && 'sales' === $kind;
     }
 
     public function process(string $companyId, string $rawDocId): int
@@ -64,7 +64,7 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
 
         $company = $this->em->find(Company::class, $companyId);
         if (!$company instanceof Company) {
-            throw new \RuntimeException('Company not found: ' . $companyId);
+            throw new \RuntimeException('Company not found: '.$companyId);
         }
 
         $salesData = array_filter($rawRows, function (array $item): bool {
@@ -93,8 +93,8 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
         foreach ($salesData as $item) {
             $nmId = $this->normalizer->nmId($item);
             $tsName = $this->normalizer->techSize($item);
-            $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
-            $cacheKey = $nmId . '_' . $size;
+            $size = '' !== trim((string) $tsName) ? trim((string) $tsName) : 'UNKNOWN';
+            $cacheKey = $nmId.'_'.$size;
 
             if (isset($listingsCache[$cacheKey])) {
                 continue;
@@ -102,13 +102,13 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
 
             $barcode = (string) ($this->normalizer->barcode($item) ?? '');
             $listing = $this->listingResolver->resolve($company, $nmId, $tsName, [
-                'sa_name'      => $this->normalizer->vendorCode($item),
-                'brand_name'   => $this->normalizer->brandName($item),
+                'sa_name' => $this->normalizer->vendorCode($item),
+                'brand_name' => $this->normalizer->brandName($item),
                 'subject_name' => $this->normalizer->subjectName($item),
                 'retail_price' => (string) $this->normalizer->retailPrice($item),
             ], $barcode);
             $listingsCache[$cacheKey] = $listing;
-            $newListings++;
+            ++$newListings;
         }
 
         if ($newListings > 0) {
@@ -122,14 +122,14 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
 
         foreach ($salesData as $item) {
             $srid = (string) ($this->normalizer->srid($item) ?? '');
-            if ($srid === '' || isset($existingMap[$srid])) {
+            if ('' === $srid || isset($existingMap[$srid])) {
                 continue;
             }
 
             $nmId = $this->normalizer->nmId($item);
             $tsName = $this->normalizer->techSize($item);
-            $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
-            $listing = $listingsCache[$nmId . '_' . $size] ?? null;
+            $size = '' !== trim((string) $tsName) ? trim((string) $tsName) : 'UNKNOWN';
+            $listing = $listingsCache[$nmId.'_'.$size] ?? null;
 
             if (!$listing) {
                 $this->logger->warning('[WB] processBatch sales: listing not found', ['nm_id' => $nmId]);
@@ -159,7 +159,7 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
             $sale->setTotalRevenue($totalRevenue);
             $sale->setCostPrice($this->costPriceResolver->resolveForSale($listing, $saleDate));
             $sale->setRawData($item);
-            if ($rawDocId !== null) {
+            if (null !== $rawDocId) {
                 $sale->setRawDocumentId($rawDocId);
             }
 

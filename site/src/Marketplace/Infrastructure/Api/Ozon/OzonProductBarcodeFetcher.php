@@ -22,21 +22,22 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final class OzonProductBarcodeFetcher
 {
-    private const BASE_URL   = 'https://api-seller.ozon.ru';
-    private const ENDPOINT   = '/v3/product/info/list';
+    private const BASE_URL = 'https://api-seller.ozon.ru';
+    private const ENDPOINT = '/v3/product/info/list';
     private const BATCH_SIZE = 1000;
 
     public function __construct(
-        private readonly HttpClientInterface         $httpClient,
+        private readonly HttpClientInterface $httpClient,
         private readonly MarketplaceCredentialsQuery $credentialsQuery,
-        private readonly LoggerInterface             $logger,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
     /**
      * Получить баркоды и артикул продавца для списка SKU.
      *
-     * @param  string[] $skus  marketplace_sku (финансовый SKU Ozon)
+     * @param string[] $skus marketplace_sku (финансовый SKU Ozon)
+     *
      * @return array<string, array{barcodes: string[], offer_id: string|null}>
      */
     public function fetchProductDataBySkus(string $companyId, array $skus): array
@@ -47,58 +48,55 @@ final class OzonProductBarcodeFetcher
 
         $credentials = $this->credentialsQuery->getCredentials($companyId, MarketplaceType::OZON);
 
-        if ($credentials === null || $credentials['api_key'] === '' || $credentials['client_id'] === null) {
-            throw new \RuntimeException('Ozon API credentials not found for company: ' . $companyId);
+        if (null === $credentials || '' === $credentials['api_key'] || null === $credentials['client_id']) {
+            throw new \RuntimeException('Ozon API credentials not found for company: '.$companyId);
         }
 
         $headers = [
-            'Client-Id'    => $credentials['client_id'],
-            'Api-Key'      => $credentials['api_key'],
+            'Client-Id' => $credentials['client_id'],
+            'Api-Key' => $credentials['api_key'],
             'Content-Type' => 'application/json',
         ];
 
-        $result  = [];
+        $result = [];
         $batches = array_chunk($skus, self::BATCH_SIZE);
 
         foreach ($batches as $batchIndex => $batch) {
             $this->logger->info('[OzonBarcode] Fetching batch', [
                 'company_id' => $companyId,
-                'batch'      => $batchIndex + 1,
-                'total'      => count($batches),
+                'batch' => $batchIndex + 1,
+                'total' => count($batches),
                 'skus_count' => count($batch),
             ]);
 
-            $response = $this->httpClient->request('POST', self::BASE_URL . self::ENDPOINT, [
+            $response = $this->httpClient->request('POST', self::BASE_URL.self::ENDPOINT, [
                 'headers' => $headers,
-                'json'    => [
-                    'sku'        => array_map('intval', $batch),
-                    'offer_id'   => [],
+                'json' => [
+                    'sku' => array_map('intval', $batch),
+                    'offer_id' => [],
                     'product_id' => [],
                 ],
                 'timeout' => 60,
             ]);
 
             $statusCode = $response->getStatusCode();
-            if ($statusCode !== 200) {
-                throw new \RuntimeException(sprintf(
-                    'Ozon product info API returned HTTP %d',
-                    $statusCode,
-                ));
+            if (200 !== $statusCode) {
+                throw new \RuntimeException(sprintf('Ozon product info API returned HTTP %d', $statusCode));
             }
 
-            $data  = $response->toArray();
+            $data = $response->toArray();
             $items = $data['items'] ?? [];
 
             foreach ($items as $item) {
-                $sku      = (string) ($item['sku'] ?? '');
+                $sku = (string) ($item['sku'] ?? '');
                 $barcodes = array_values(
                     array_filter(array_map('strval', $item['barcodes'] ?? []))
                 );
-                $offerId  = isset($item['offer_id']) && $item['offer_id'] !== ''
+                $offerId = isset($item['offer_id']) && '' !== $item['offer_id']
                     ? (string) $item['offer_id']
                     : null;
 
-                if ($sku === '') {
+                if ('' === $sku) {
                     continue;
                 }
 
@@ -109,10 +107,10 @@ final class OzonProductBarcodeFetcher
             }
 
             $this->logger->info('[OzonBarcode] Batch fetched', [
-                'company_id'     => $companyId,
-                'batch'          => $batchIndex + 1,
+                'company_id' => $companyId,
+                'batch' => $batchIndex + 1,
                 'items_returned' => count($items),
-                'with_barcodes'  => count(array_filter($result, fn($d) => !empty($d['barcodes']))),
+                'with_barcodes' => count(array_filter($result, static fn ($d) => !empty($d['barcodes']))),
             ]);
         }
 

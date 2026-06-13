@@ -72,8 +72,8 @@ final class DebugLoadMutualSettlementController extends AbstractController
 
         $responseSize = $result['responseSize'];
         $formattedSize = $responseSize >= 1024
-            ? round($responseSize / 1024, 1) . 'KB'
-            : $responseSize . 'B';
+            ? round($responseSize / 1024, 1).'KB'
+            : $responseSize.'B';
 
         return $this->json([
             'success' => true,

@@ -22,7 +22,7 @@ class CashTransactionAutoRuleConditionType extends AbstractType
                 'class' => CashTransactionAutoRuleConditionField::class,
                 'label' => 'Если у операции заполнено поле',
                 'row_attr' => ['class' => 'condition-field-row'],
-                'choice_label' => function (CashTransactionAutoRuleConditionField $choice) {
+                'choice_label' => static function (CashTransactionAutoRuleConditionField $choice) {
                     return match ($choice) {
                         CashTransactionAutoRuleConditionField::COUNTERPARTY => 'Контрагент (точное совпадение)',
                         CashTransactionAutoRuleConditionField::COUNTERPARTY_NAME => 'Название контрагента содержит',
@@ -37,7 +37,7 @@ class CashTransactionAutoRuleConditionType extends AbstractType
                 'class' => CashTransactionAutoRuleConditionOperator::class,
                 'label' => 'Оператор',
                 'row_attr' => ['class' => 'condition-operator-row'],
-                'choice_label' => function (CashTransactionAutoRuleConditionOperator $choice) {
+                'choice_label' => static function (CashTransactionAutoRuleConditionOperator $choice) {
                     return match ($choice) {
                         CashTransactionAutoRuleConditionOperator::EQUAL => '=',
                         CashTransactionAutoRuleConditionOperator::GREATER_THAN => '>',

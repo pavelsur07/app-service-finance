@@ -22,33 +22,33 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class InventorySyncSingleBarcodeController extends AbstractController
 {
     public function __construct(
-        private readonly ActiveCompanyService            $companyService,
-        private readonly MarketplaceListingRepository    $listingRepository,
+        private readonly ActiveCompanyService $companyService,
+        private readonly MarketplaceListingRepository $listingRepository,
         private readonly MarketplaceListingBarcodeRepository $barcodeRepository,
-        private readonly OzonProductBarcodeFetcher       $barcodeFetcher,
-        private readonly EntityManagerInterface          $em,
+        private readonly OzonProductBarcodeFetcher $barcodeFetcher,
+        private readonly EntityManagerInterface $em,
     ) {
     }
 
     #[Route('/{id}/sync-barcode', name: 'marketplace_inventory_sync_barcode_single', methods: ['POST'])]
     public function __invoke(string $id): Response
     {
-        $company   = $this->companyService->getActiveCompany();
+        $company = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
         $listing = $this->listingRepository->findByIdAndCompany($id, $companyId);
 
-        if ($listing === null) {
+        if (null === $listing) {
             throw $this->createNotFoundException('Листинг не найден.');
         }
 
-        if ($listing->getMarketplace() !== MarketplaceType::OZON) {
+        if (MarketplaceType::OZON !== $listing->getMarketplace()) {
             $this->addFlash('warning', 'Синхронизация баркодов доступна только для Ozon.');
 
             return $this->redirectToRoute('marketplace_inventory_index');
         }
 
-        $sku      = $listing->getMarketplaceSku();
+        $sku = $listing->getMarketplaceSku();
         $skuToData = $this->barcodeFetcher->fetchProductDataBySkus($companyId, [$sku]);
 
         if (empty($skuToData) || empty($skuToData[$sku])) {
@@ -60,18 +60,18 @@ final class InventorySyncSingleBarcodeController extends AbstractController
             return $this->redirectToRoute('marketplace_inventory_index');
         }
 
-        $data    = $skuToData[$sku];
+        $data = $skuToData[$sku];
         $created = 0;
 
         // Обновляем supplier_sku если не заполнен
         $offerId = $data['offer_id'] ?? null;
-        if ($offerId !== null && $offerId !== '' && $listing->getSupplierSku() === null) {
+        if (null !== $offerId && '' !== $offerId && null === $listing->getSupplierSku()) {
             $listing->setSupplierSku($offerId);
         }
 
         // Сохраняем новые баркоды
         foreach ($data['barcodes'] as $barcode) {
-            if ($barcode === '') {
+            if ('' === $barcode) {
                 continue;
             }
 
@@ -86,7 +86,7 @@ final class InventorySyncSingleBarcodeController extends AbstractController
                 MarketplaceType::OZON->value,
                 $barcode,
             ));
-            $created++;
+            ++$created;
         }
 
         $this->em->flush();

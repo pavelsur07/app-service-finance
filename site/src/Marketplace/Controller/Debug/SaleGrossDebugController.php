@@ -44,7 +44,7 @@ final class SaleGrossDebugController extends AbstractController
         $companyId = (string) $this->activeCompanyService->getActiveCompany()->getId();
 
         $requestedCompanyId = (string) $request->query->get('company_id', '');
-        if ($requestedCompanyId !== '' && $requestedCompanyId !== $companyId) {
+        if ('' !== $requestedCompanyId && $requestedCompanyId !== $companyId) {
             return $this->json([
                 'error' => 'company_id в query не совпадает с активной компанией пользователя',
             ], 403);
@@ -54,10 +54,10 @@ final class SaleGrossDebugController extends AbstractController
         $from = (string) $request->query->get('from', '');
         $to = (string) $request->query->get('to', '');
 
-        if (MarketplaceType::tryFrom($marketplace) === null) {
+        if (null === MarketplaceType::tryFrom($marketplace)) {
             return $this->json([
                 'error' => 'marketplace must be one of: '
-                    . implode(', ', array_map(static fn (MarketplaceType $m): string => $m->value, MarketplaceType::cases())),
+                    .implode(', ', array_map(static fn (MarketplaceType $m): string => $m->value, MarketplaceType::cases())),
             ], 400);
         }
         if (!preg_match(self::DATE_REGEX, $from) || !$this->isValidDate($from)) {
@@ -68,28 +68,29 @@ final class SaleGrossDebugController extends AbstractController
         }
 
         $params = [
-            'companyId'  => $companyId,
+            'companyId' => $companyId,
             'marketplace' => $marketplace,
             'periodFrom' => $from,
-            'periodTo'   => $to,
+            'periodTo' => $to,
         ];
 
         return $this->json([
             'meta' => [
-                'company_id'   => $companyId,
-                'marketplace'  => $marketplace,
-                'period'       => "{$from} – {$to}",
+                'company_id' => $companyId,
+                'marketplace' => $marketplace,
+                'period' => "{$from} – {$to}",
                 'generated_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
-                'hint'         => 'by_quantity: если delta=0 на quantity=1 и delta>0 на quantity≥2 — гипотеза SALE_GROSS inflation подтверждена.',
+                'hint' => 'by_quantity: если delta=0 на quantity=1 и delta>0 на quantity≥2 — гипотеза SALE_GROSS inflation подтверждена.',
             ],
-            'totals'         => $this->totals($params),
-            'by_quantity'    => $this->byQuantity($params),
+            'totals' => $this->totals($params),
+            'by_quantity' => $this->byQuantity($params),
             'top_delta_rows' => $this->topDeltaRows($params),
-        ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
+        ], 200, [], ['json_encode_options' => \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE]);
     }
 
     /**
      * @param array<string, string> $params
+     *
      * @return array<string, mixed>
      */
     private function totals(array $params): array
@@ -112,20 +113,21 @@ final class SaleGrossDebugController extends AbstractController
 
         $row = $row ?: [];
         $unit = (float) ($row['unit_revenue'] ?? 0);
-        $pnl  = (float) ($row['pnl_gross_revenue'] ?? 0);
+        $pnl = (float) ($row['pnl_gross_revenue'] ?? 0);
 
         return [
-            'unit_revenue'      => round($unit, 2),
+            'unit_revenue' => round($unit, 2),
             'pnl_gross_revenue' => round($pnl, 2),
-            'delta'             => round($pnl - $unit, 2),
-            'rows_total'        => (int) ($row['rows_total'] ?? 0),
-            'rows_open'         => (int) ($row['rows_open'] ?? 0),
-            'rows_closed'       => (int) ($row['rows_closed'] ?? 0),
+            'delta' => round($pnl - $unit, 2),
+            'rows_total' => (int) ($row['rows_total'] ?? 0),
+            'rows_open' => (int) ($row['rows_open'] ?? 0),
+            'rows_closed' => (int) ($row['rows_closed'] ?? 0),
         ];
     }
 
     /**
      * @param array<string, string> $params
+     *
      * @return list<array<string, mixed>>
      */
     private function byQuantity(array $params): array
@@ -149,20 +151,21 @@ final class SaleGrossDebugController extends AbstractController
 
         return array_map(static function (array $row): array {
             $unit = (float) $row['unit_revenue'];
-            $pnl  = (float) $row['pnl_revenue'];
+            $pnl = (float) $row['pnl_revenue'];
 
             return [
-                'quantity'     => (int) $row['quantity'],
-                'rows'         => (int) $row['rows'],
+                'quantity' => (int) $row['quantity'],
+                'rows' => (int) $row['rows'],
                 'unit_revenue' => round($unit, 2),
-                'pnl_revenue'  => round($pnl, 2),
-                'delta'        => round($pnl - $unit, 2),
+                'pnl_revenue' => round($pnl, 2),
+                'delta' => round($pnl - $unit, 2),
             ];
         }, $rows);
     }
 
     /**
      * @param array<string, string> $params
+     *
      * @return list<array<string, mixed>>
      */
     private function topDeltaRows(array $params): array
@@ -192,15 +195,15 @@ final class SaleGrossDebugController extends AbstractController
         );
 
         return array_map(static fn (array $row): array => [
-            'id'                => $row['id'],
+            'id' => $row['id'],
             'external_order_id' => $row['external_order_id'],
-            'sale_date'         => $row['sale_date'],
-            'quantity'          => (int) $row['quantity'],
-            'price_per_unit'    => (float) $row['price_per_unit'],
-            'total_revenue'     => (float) $row['total_revenue'],
-            'pnl_value'         => round((float) $row['pnl_value'], 2),
-            'delta'             => round((float) $row['delta'], 2),
-            'document_id'       => $row['document_id'],
+            'sale_date' => $row['sale_date'],
+            'quantity' => (int) $row['quantity'],
+            'price_per_unit' => (float) $row['price_per_unit'],
+            'total_revenue' => (float) $row['total_revenue'],
+            'pnl_value' => round((float) $row['pnl_value'], 2),
+            'delta' => round((float) $row['delta'], 2),
+            'document_id' => $row['document_id'],
         ], $rows);
     }
 
@@ -208,6 +211,6 @@ final class SaleGrossDebugController extends AbstractController
     {
         $dt = \DateTimeImmutable::createFromFormat('Y-m-d', $date);
 
-        return $dt !== null && $dt->format('Y-m-d') === $date;
+        return null !== $dt && $dt->format('Y-m-d') === $date;
     }
 }

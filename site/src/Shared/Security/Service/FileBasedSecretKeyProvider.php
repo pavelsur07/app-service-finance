@@ -63,7 +63,7 @@ final readonly class FileBasedSecretKeyProvider implements SecretKeyProviderInte
         }
 
         try {
-            $decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+            $decoded = json_decode($raw, true, 512, \JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
             throw new MissingEncryptionKeyException('Encryption key file has invalid format.');
         }

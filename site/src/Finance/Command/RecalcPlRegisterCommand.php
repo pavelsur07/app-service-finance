@@ -124,7 +124,7 @@ final class RecalcPlRegisterCommand extends Command
 
         foreach ($companies as $company) {
             $companyId = (string) $company->getId();
-            $lockKey = 'finance_recalc_pl_register_' . $companyId;
+            $lockKey = 'finance_recalc_pl_register_'.$companyId;
             $lock = $this->lockFactory->createLock($lockKey, self::LOCK_TTL_SECONDS);
 
             if (!$lock->acquire()) {

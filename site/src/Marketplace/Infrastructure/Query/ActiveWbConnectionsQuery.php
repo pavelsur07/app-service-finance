@@ -14,7 +14,8 @@ final class ActiveWbConnectionsQuery
 {
     public function __construct(
         private readonly Connection $connection,
-    ) {}
+    ) {
+    }
 
     /**
      * @return list<array{id: string, connection_id: string, company_id: string}>

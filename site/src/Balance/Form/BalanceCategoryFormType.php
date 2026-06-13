@@ -31,7 +31,7 @@ class BalanceCategoryFormType extends AbstractType
                 'label' => 'Родитель',
                 'choices' => $options['parents'],
                 'choice_value' => 'id',
-                'choice_label' => function (BalanceCategory $item): string {
+                'choice_label' => static function (BalanceCategory $item): string {
                     return str_repeat('—', max($item->getLevel() - 1, 0)).' '.$item->getName();
                 },
                 'required' => false,

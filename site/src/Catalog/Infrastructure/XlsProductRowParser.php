@@ -22,11 +22,11 @@ final class XlsProductRowParser
 {
     private const HEADER_ROW = 1;
 
-    private const COL_NAME       = 0; // A
+    private const COL_NAME = 0; // A
     private const COL_VENDOR_SKU = 1; // B
-    private const COL_BARCODES   = 2; // C
-    private const COL_PRICE      = 3; // D
-    private const COL_CURRENCY   = 4; // E
+    private const COL_BARCODES = 2; // C
+    private const COL_PRICE = 3; // D
+    private const COL_CURRENCY = 4; // E
 
     /**
      * @return ParsedProductRow[]
@@ -39,27 +39,23 @@ final class XlsProductRowParser
             throw new \RuntimeException(sprintf('Import file not found: %s', $filePath));
         }
 
-        $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        $extension = strtolower(pathinfo($filePath, \PATHINFO_EXTENSION));
 
         return match ($extension) {
-            'xlsx'  => $this->parseWithReader(new XlsxReader(), $filePath),
-            'xls'   => $this->parseWithReader(new XlsReader(), $filePath),
-            default => throw new \RuntimeException(
-                sprintf('Unsupported file extension "%s". Allowed: xls, xlsx.', $extension)
-            ),
+            'xlsx' => $this->parseWithReader(new XlsxReader(), $filePath),
+            'xls' => $this->parseWithReader(new XlsReader(), $filePath),
+            default => throw new \RuntimeException(sprintf('Unsupported file extension "%s". Allowed: xls, xlsx.', $extension)),
         };
     }
 
     /**
-     * @param XlsReader|XlsxReader $reader
-     *
      * @return ParsedProductRow[]
      */
     private function parseWithReader(XlsReader|XlsxReader $reader, string $filePath): array
     {
         $reader->open($filePath);
 
-        $rows      = [];
+        $rows = [];
         $rowNumber = 0;
 
         foreach ($reader->getSheetIterator() as $sheet) {
@@ -67,7 +63,7 @@ final class XlsProductRowParser
             foreach ($sheet->getRowIterator() as $row) {
                 ++$rowNumber;
 
-                if ($rowNumber === self::HEADER_ROW) {
+                if (self::HEADER_ROW === $rowNumber) {
                     continue;
                 }
 
@@ -81,12 +77,12 @@ final class XlsProductRowParser
                 }
 
                 $rows[] = new ParsedProductRow(
-                    rowNumber:  $rowNumber,
-                    name:       $name,
-                    vendorSku:  $this->cellString($cells, self::COL_VENDOR_SKU),
-                    barcodes:   $this->cellString($cells, self::COL_BARCODES),
+                    rowNumber: $rowNumber,
+                    name: $name,
+                    vendorSku: $this->cellString($cells, self::COL_VENDOR_SKU),
+                    barcodes: $this->cellString($cells, self::COL_BARCODES),
                     priceAmount: $this->cellNumericAsString($cells, self::COL_PRICE),
-                    currency:   $this->cellString($cells, self::COL_CURRENCY),
+                    currency: $this->cellString($cells, self::COL_CURRENCY),
                 );
             }
 

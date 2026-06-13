@@ -26,5 +26,6 @@ final readonly class CreateCashTransactionCommand
         public ?string $externalId = null,
         public ?string $dedupeHash = null,
         public ?array $rawData = null,
-    ) {}
+    ) {
+    }
 }

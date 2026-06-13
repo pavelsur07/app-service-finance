@@ -112,7 +112,6 @@ final class LoadOzonAdStatisticsRangeHandler
             'totalDays' => $job->getTotalDays(),
             'chunksCount' => count($chunks),
         ]);
-
     }
 
     /**

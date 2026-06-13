@@ -10,7 +10,7 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * API для получения списка продуктов (для UI)
+ * API для получения списка продуктов (для UI).
  *
  * ВАЖНО: Использует Query, НЕ прямой DBAL!
  */
@@ -20,12 +20,12 @@ class ProductsListController extends AbstractController
 {
     public function __construct(
         private readonly ProductQuery $productsQuery,              // ✅ Query!
-        private readonly ActiveCompanyService $activeCompanyService // ✅ Только в Controller
+        private readonly ActiveCompanyService $activeCompanyService, // ✅ Только в Controller
     ) {
     }
 
     /**
-     * Получить список продуктов компании (для select)
+     * Получить список продуктов компании (для select).
      *
      * GET /api/products
      * Response: [{"id": "uuid", "sku": "...", "name": "..."}]

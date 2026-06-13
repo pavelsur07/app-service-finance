@@ -6,14 +6,15 @@ namespace App\Marketplace\Service\CostCalculator;
 
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
+use App\Shared\Service\SlugifyService;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
-use App\Shared\Service\SlugifyService;
 
 class WbDeductionCalculator implements CostCalculatorInterface
 {
     private WbSalesReportRowNormalizer $normalizer;
     private WbCostExternalIdBuilder $externalIdBuilder;
+
     public function __construct(
         private readonly SlugifyService $slugify,
         ?WbSalesReportRowNormalizer $normalizer = null,
@@ -25,7 +26,7 @@ class WbDeductionCalculator implements CostCalculatorInterface
 
     public function supports(array $item): bool
     {
-        return $this->normalizer->sellerOperName($item) === 'Удержание';
+        return 'Удержание' === $this->normalizer->sellerOperName($item);
     }
 
     public function requiresListing(): bool
@@ -35,12 +36,11 @@ class WbDeductionCalculator implements CostCalculatorInterface
 
     public function calculate(array $item, ?MarketplaceListing $listing): array
     {
-        $deduction = (float)($item['deduction'] ?? 0);
+        $deduction = (float) ($item['deduction'] ?? 0);
 
         if (abs($deduction) < 0.01) {
             return [];
         }
-
 
         $saleDate = $this->normalizer->operationDate($item);
 
@@ -54,14 +54,14 @@ class WbDeductionCalculator implements CostCalculatorInterface
         // Находим последнее двоеточие
         $colonPos = strrpos($bonusTypeName, ':');
 
-        if ($colonPos !== false) {
+        if (false !== $colonPos) {
             // Есть двоеточие - проверяем что перед ним ID (примерно 20 символов латиницы/цифр)
             $beforeColon = substr($bonusTypeName, 0, $colonPos);
 
             // Находим последний пробел перед двоеточием
             $lastSpacePos = strrpos($beforeColon, ' ');
 
-            if ($lastSpacePos !== false) {
+            if (false !== $lastSpacePos) {
                 // Проверяем что между последним пробелом и двоеточием примерно 15-25 символов
                 $potentialId = substr($beforeColon, $lastSpacePos + 1);
                 $idLength = strlen($potentialId);
@@ -75,14 +75,14 @@ class WbDeductionCalculator implements CostCalculatorInterface
 
         // Шаг 2: Удаляем всё после запятой (например: ", документ №123")
         $commaPos = strpos($bonusTypeName, ',');
-        if ($commaPos !== false) {
+        if (false !== $commaPos) {
             $categoryName = trim(substr($bonusTypeName, 0, $commaPos));
         } else {
             $categoryName = trim($bonusTypeName);
         }
 
         // Если пусто - используем дефолт
-        if ($categoryName === '') {
+        if ('' === $categoryName) {
             $categoryName = 'Удержание';
         }
 
@@ -96,7 +96,7 @@ class WbDeductionCalculator implements CostCalculatorInterface
         }
 
         $externalId = $this->externalIdBuilder->build($item, $categoryCode);
-        if ($externalId === null) {
+        if (null === $externalId) {
             return [];
         }
 
@@ -107,7 +107,7 @@ class WbDeductionCalculator implements CostCalculatorInterface
             [
                 'category_code' => $categoryCode,
                 'category_name' => $categoryName, // Передаём name для автосоздания
-                'amount' => (string)abs($deduction),
+                'amount' => (string) abs($deduction),
                 'external_id' => $externalId,
                 'cost_date' => $saleDate,
                 'description' => $categoryName,

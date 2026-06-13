@@ -19,5 +19,6 @@ final readonly class PortfolioSummary
         public ?float $revenueDeltaPercent,
         public ?string $profitDeltaAbsolute,
         public ?float $profitDeltaPercent,
-    ) {}
+    ) {
+    }
 }

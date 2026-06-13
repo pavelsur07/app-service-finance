@@ -15,11 +15,11 @@ use App\Shared\Service\Storage\StorageService;
 final class OzonReportParserFacade
 {
     public function __construct(
-        private readonly XlsxReaderService       $reader,
-        private readonly BaseSignResolverService  $baseSignResolver,
-        private readonly RowClassifierService     $classifier,
-        private readonly ReportAggregatorService  $aggregator,
-        private readonly StorageService           $storageService,
+        private readonly XlsxReaderService $reader,
+        private readonly BaseSignResolverService $baseSignResolver,
+        private readonly RowClassifierService $classifier,
+        private readonly ReportAggregatorService $aggregator,
+        private readonly StorageService $storageService,
     ) {
     }
 
@@ -30,8 +30,8 @@ final class OzonReportParserFacade
      */
     public function parseFromPath(string $absolutePath): array
     {
-        $data       = $this->reader->read($absolutePath);
-        $baseSign   = $this->baseSignResolver->resolve($data['rows']);
+        $data = $this->reader->read($absolutePath);
+        $baseSign = $this->baseSignResolver->resolve($data['rows']);
         $classified = $this->classifier->classify($data['rows'], $baseSign);
 
         return $this->aggregator->aggregate($data['period'], $classified, $baseSign);

@@ -114,7 +114,6 @@ final class OzonProductStocksRawNormalizerTest extends TestCase
         self::assertSame('0.000', $rows[0]->reservedQuantity);
     }
 
-
     public function testSkipsEmptySkuValuesAndKeepsValidSku(): void
     {
         $rows = $this->normalizer->normalize([

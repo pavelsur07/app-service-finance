@@ -6,12 +6,12 @@ namespace App\Marketplace\Application\Service;
 
 use App\Marketplace\Entity\MarketplaceFinancialReportSyncError;
 use App\Marketplace\Entity\MarketplaceFinancialReportSyncStatus;
+use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\PipelineStatus;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncErrorRepository;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusRepository;
-use App\Marketplace\Entity\MarketplaceRawDocument;
-use App\Marketplace\Enum\PipelineStatus;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 
@@ -21,8 +21,8 @@ final readonly class WbFinancialReportSyncStatusUpdater implements WbFinancialRe
         private MarketplaceFinancialReportSyncStatusRepository $statusRepository,
         private MarketplaceFinancialReportSyncErrorRepository $errorRepository,
         private LoggerInterface $logger,
-    ) {}
-
+    ) {
+    }
 
     public function findOrCreateForDay(string $connectionId, string $companyId, string $reportType, string $apiEndpoint, \DateTimeImmutable $businessDate): MarketplaceFinancialReportSyncStatus
     {
@@ -102,7 +102,6 @@ final readonly class WbFinancialReportSyncStatusUpdater implements WbFinancialRe
         $this->saveError($status, $errorClass, $errorMessage, $statusCode, $responseExcerpt, $requestPayload);
     }
 
-
     /** @param array<string,mixed>|null $requestPayload */
     public function markFailedRetryablePreservingCursor(
         MarketplaceFinancialReportSyncStatus $status,
@@ -144,11 +143,10 @@ final readonly class WbFinancialReportSyncStatusUpdater implements WbFinancialRe
         $this->saveError($status, $errorClass, $errorMessage, $statusCode, $responseExcerpt, $requestPayload);
     }
 
-
     /** @param array{sync_status_id?: string|null, company_id?: string|null, connection_id?: string|null, marketplace?: string|null, report_type?: string|null, mode?: string|null, business_date?: string|null, raw_document_id?: string|null}|null $context */
     public function syncByRawPipelineResult(MarketplaceRawDocument $rawDocument, ?\Throwable $failure = null, ?array $context = null): void
     {
-        if ($rawDocument->getMarketplace() !== MarketplaceType::WILDBERRIES || $rawDocument->getDocumentType() !== 'sales_report') {
+        if (MarketplaceType::WILDBERRIES !== $rawDocument->getMarketplace() || 'sales_report' !== $rawDocument->getDocumentType()) {
             return;
         }
 
@@ -164,15 +162,15 @@ final readonly class WbFinancialReportSyncStatusUpdater implements WbFinancialRe
         }
 
         $status = $this->resolveStatusForRawPipelineResult($rawDocument, $context);
-        if ($status === null) {
+        if (null === $status) {
             return;
         }
 
         $before = $status->getStatus()->value;
 
-        if ($rawDocument->getProcessingStatus() === PipelineStatus::COMPLETED) {
+        if (PipelineStatus::COMPLETED === $rawDocument->getProcessingStatus()) {
             $status->markSuccess();
-        } elseif ($rawDocument->getProcessingStatus() === PipelineStatus::FAILED) {
+        } elseif (PipelineStatus::FAILED === $rawDocument->getProcessingStatus()) {
             $errorClass = null !== $failure ? $failure::class : 'PipelineFailedException';
             $errorMessage = $failure?->getMessage() ?? sprintf('Raw pipeline failed for document %s', $rawDocument->getId());
 
@@ -235,7 +233,7 @@ final readonly class WbFinancialReportSyncStatusUpdater implements WbFinancialRe
         $reportType = $context['report_type'] ?? null;
         $contextRawDocumentId = $context['raw_document_id'] ?? $rawDocumentId;
 
-        if ($marketplace === null || $mode === null || $businessDate === null || !is_string($reportType) || $reportType === '' || $contextRawDocumentId !== $rawDocumentId) {
+        if (null === $marketplace || null === $mode || null === $businessDate || !is_string($reportType) || '' === $reportType || $contextRawDocumentId !== $rawDocumentId) {
             $this->logger->warning('WB sync status finalization skipped because exact context is incomplete or mismatched.', [
                 'company_id' => $companyId,
                 'raw_document_id' => $rawDocumentId,
@@ -256,7 +254,7 @@ final readonly class WbFinancialReportSyncStatusUpdater implements WbFinancialRe
             $rawDocumentId,
         );
 
-        if ($status === null) {
+        if (null === $status) {
             $this->logger->warning('WB sync status finalization skipped: no status matches exact raw pipeline context.', [
                 'company_id' => $companyId,
                 'raw_document_id' => $rawDocumentId,

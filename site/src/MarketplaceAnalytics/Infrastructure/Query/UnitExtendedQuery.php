@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\Infrastructure\Query;
 
-use App\Marketplace\Facade\MarketplaceFacade;
 use App\Inventory\Facade\InventoryFacade;
+use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
 
@@ -81,11 +81,11 @@ final readonly class UnitExtendedQuery
             $listingCosts = $costs[$listingId] ?? [];
             $meta = $listingMeta[$listingId] ?? null;
 
-            $revenue = $sale !== null ? (float) $sale->revenue : 0.0;
-            $quantity = $sale !== null ? $sale->quantity : 0;
-            $returnsTotal = $ret !== null ? (float) $ret->returnsTotal : 0.0;
-            $costPriceTotal = $sale !== null ? (float) $sale->costPriceTotal : 0.0;
-            $costPriceQuantity = $sale !== null ? $sale->costPriceQuantity : 0;
+            $revenue = null !== $sale ? (float) $sale->revenue : 0.0;
+            $quantity = null !== $sale ? $sale->quantity : 0;
+            $returnsTotal = null !== $ret ? (float) $ret->returnsTotal : 0.0;
+            $costPriceTotal = null !== $sale ? (float) $sale->costPriceTotal : 0.0;
+            $costPriceQuantity = null !== $sale ? $sale->costPriceQuantity : 0;
             $costPriceUnit = $costPriceQuantity > 0
                 ? round($costPriceTotal / $costPriceQuantity, 2)
                 : 0.0;
@@ -110,10 +110,10 @@ final readonly class UnitExtendedQuery
                 $costsAmt = (float) $cat->costsAmount;
                 $stornoAmt = (float) $cat->stornoAmount;
 
-                $costMarketplace = $mp !== '' ? $mp : $marketplace;
+                $costMarketplace = '' !== $mp ? $mp : $marketplace;
 
                 $allCategoriesRaw[] = [
-                    'marketplace' => $costMarketplace !== '' ? $costMarketplace : null,
+                    'marketplace' => '' !== $costMarketplace ? $costMarketplace : null,
                     'code' => $code,
                     'name' => $cat->categoryName,
                     'costsAmount' => round($costsAmt, 2),
@@ -122,14 +122,14 @@ final readonly class UnitExtendedQuery
                 ];
 
                 $unitBucket = $this->groupResolver->resolveUnitBucket(
-                    $costMarketplace !== '' ? $costMarketplace : null,
+                    '' !== $costMarketplace ? $costMarketplace : null,
                     $code,
                     $cat->categoryName,
                 );
 
-                if ($unitBucket === 'commission') {
+                if ('commission' === $unitBucket) {
                     $commission += $net;
-                } elseif ($unitBucket === 'logistics') {
+                } elseif ('logistics' === $unitBucket) {
                     $logistics += $net;
                 } else {
                     $otherCosts += $net;
@@ -238,6 +238,7 @@ final readonly class UnitExtendedQuery
 
     /**
      * @param list<array{marketplace: ?string, code: string, name: string, costsAmount: float, stornoAmount: float, netAmount: float}> $categories
+     *
      * @return list<array<string, mixed>>
      */
     private function buildBreakdown(array $categories, bool $excludeUnitColumns): array
@@ -248,7 +249,7 @@ final readonly class UnitExtendedQuery
 
             if ($excludeUnitColumns) {
                 $unitBucket = $this->groupResolver->resolveUnitBucket($marketplace, $cat['code'], $cat['name']);
-                if ($unitBucket === 'commission' || $unitBucket === 'logistics') {
+                if ('commission' === $unitBucket || 'logistics' === $unitBucket) {
                     continue;
                 }
             }

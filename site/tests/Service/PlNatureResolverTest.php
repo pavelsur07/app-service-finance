@@ -6,12 +6,12 @@ namespace App\Tests\Service;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
+use App\Finance\Application\Service\PlNatureResolver;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\PLFlow;
 use App\Finance\Enum\PlNature;
-use App\Finance\Application\Service\PlNatureResolver;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 

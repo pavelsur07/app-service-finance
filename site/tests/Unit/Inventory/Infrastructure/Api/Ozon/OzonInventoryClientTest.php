@@ -106,8 +106,6 @@ final class OzonInventoryClientTest extends TestCase
         $client->fetchStocks('cid', 'key', 0);
     }
 
-
-
     public function testRequestBodyDoesNotContainLastIdWhenCursorIsNull(): void
     {
         $captured = [];

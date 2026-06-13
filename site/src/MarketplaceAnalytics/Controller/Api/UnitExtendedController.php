@@ -29,11 +29,11 @@ final class UnitExtendedController extends AbstractController
 
     public function __invoke(Request $request): JsonResponse
     {
-        $company   = $this->companyService->getActiveCompany();
+        $company = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
         $marketplace = $request->query->get('marketplace');
-        if ($marketplace === null || $marketplace === '') {
+        if (null === $marketplace || '' === $marketplace) {
             $marketplace = null;
         } else {
             $validValues = array_map(
@@ -42,15 +42,15 @@ final class UnitExtendedController extends AbstractController
             );
             if (!in_array($marketplace, $validValues, true)) {
                 return $this->json([
-                    'error' => 'Invalid marketplace. Allowed: ' . implode(', ', $validValues),
+                    'error' => 'Invalid marketplace. Allowed: '.implode(', ', $validValues),
                 ], 422);
             }
         }
 
         $periodFrom = $request->query->get('periodFrom', '');
-        $periodTo   = $request->query->get('periodTo', '');
+        $periodTo = $request->query->get('periodTo', '');
 
-        if ($periodFrom === '' || $periodTo === '') {
+        if ('' === $periodFrom || '' === $periodTo) {
             return $this->json(['error' => 'periodFrom and periodTo are required'], 422);
         }
 

@@ -30,7 +30,7 @@ final readonly class StockQtyByListingOnDateQuery
             ]
         );
 
-        if (!is_string($snapshotDate) || $snapshotDate === '') {
+        if (!is_string($snapshotDate) || '' === $snapshotDate) {
             return [];
         }
 
@@ -47,7 +47,7 @@ final readonly class StockQtyByListingOnDateQuery
         );
 
         $snapshotAt = is_array($snapshotAtRow) ? ($snapshotAtRow['snapshot_at'] ?? null) : null;
-        if (!is_string($snapshotAt) || $snapshotAt === '') {
+        if (!is_string($snapshotAt) || '' === $snapshotAt) {
             return [];
         }
 

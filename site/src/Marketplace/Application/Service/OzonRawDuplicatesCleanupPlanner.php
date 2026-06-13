@@ -26,7 +26,7 @@ final readonly class OzonRawDuplicatesCleanupPlanner
 
         foreach ($days as $day) {
             $rawDocuments = $this->findRawDocumentsForDay($companyId, $day);
-            if ($rawDocuments === []) {
+            if ([] === $rawDocuments) {
                 continue;
             }
 
@@ -46,7 +46,7 @@ final readonly class OzonRawDuplicatesCleanupPlanner
             $warnings = [];
             $hasPendingOrRunning = $this->hasPendingOrRunningRawDocument($rawDocuments);
             $canonicalStatus = $this->findRawDocumentStatusById($rawDocuments, $canonical);
-            $canonicalFailed = $canonicalStatus === 'failed';
+            $canonicalFailed = 'failed' === $canonicalStatus;
 
             if ($closedSales > 0 || $closedReturns > 0 || $closedCosts > 0) {
                 $warnings[] = 'Найдены closed rows (document_id IS NOT NULL), auto-cleanup отключён для этого дня.';
@@ -58,7 +58,7 @@ final readonly class OzonRawDuplicatesCleanupPlanner
                 $warnings[] = 'Canonical rawDoc имеет FAILED статус, auto-cleanup запрещён до успешной перезагрузки/пересборки документа.';
             }
 
-            if ($staleSales + $staleReturns + $staleCosts === 0) {
+            if (0 === $staleSales + $staleReturns + $staleCosts) {
                 $warnings[] = 'Stale open rows не найдены, очистка processed-таблиц для дня не требуется.';
             }
 
@@ -74,7 +74,7 @@ final readonly class OzonRawDuplicatesCleanupPlanner
                 closedSalesRowsCount: $closedSales,
                 closedReturnsRowsCount: $closedReturns,
                 closedCostsRowsCount: $closedCosts,
-                canAutoCleanup: !$hasPendingOrRunning && !$canonicalFailed && $closedSales === 0 && $closedReturns === 0 && $closedCosts === 0,
+                canAutoCleanup: !$hasPendingOrRunning && !$canonicalFailed && 0 === $closedSales && 0 === $closedReturns && 0 === $closedCosts,
                 safeToDeleteRawDocumentIds: $safeToDeleteRawDocs,
                 warnings: $warnings,
             );
@@ -260,17 +260,17 @@ final readonly class OzonRawDuplicatesCleanupPlanner
             };
 
             $statusCmp = $statusRank($right['processing_status']) <=> $statusRank($left['processing_status']);
-            if ($statusCmp !== 0) {
+            if (0 !== $statusCmp) {
                 return $statusCmp;
             }
 
             $syncedCmp = strtotime((string) $right['synced_at']) <=> strtotime((string) $left['synced_at']);
-            if ($syncedCmp !== 0) {
+            if (0 !== $syncedCmp) {
                 return $syncedCmp;
             }
 
             $recordsCmp = ((int) $right['records_count']) <=> ((int) $left['records_count']);
-            if ($recordsCmp !== 0) {
+            if (0 !== $recordsCmp) {
                 return $recordsCmp;
             }
 
@@ -318,7 +318,7 @@ final readonly class OzonRawDuplicatesCleanupPlanner
                 continue;
             }
 
-            return $rawDocument['processing_status'] === null ? null : (string) $rawDocument['processing_status'];
+            return null === $rawDocument['processing_status'] ? null : (string) $rawDocument['processing_status'];
         }
 
         return null;
@@ -327,7 +327,7 @@ final readonly class OzonRawDuplicatesCleanupPlanner
     /** @param list<string> $rawDocumentIds */
     private function findSafeToDeleteRawDocuments(array $rawDocumentIds): array
     {
-        if ($rawDocumentIds === []) {
+        if ([] === $rawDocumentIds) {
             return [];
         }
 
@@ -343,7 +343,7 @@ final readonly class OzonRawDuplicatesCleanupPlanner
                 ['rawDocumentId' => $rawDocumentId],
             );
 
-            if ($references === 0) {
+            if (0 === $references) {
                 $safe[] = $rawDocumentId;
             }
         }

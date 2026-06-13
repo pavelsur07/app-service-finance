@@ -42,16 +42,16 @@ final class DebugWipeRawDocumentsController extends AbstractController
 
     public function __invoke(Request $request): JsonResponse
     {
-        $company   = $this->activeCompanyService->getActiveCompany();
+        $company = $this->activeCompanyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
         $marketplaceStr = (string) $request->query->get('marketplace', '');
-        $fromStr        = (string) $request->query->get('from', '');
-        $toStr          = (string) $request->query->get('to', '');
-        $confirm        = (string) $request->query->get('confirm', '0') === '1';
-        $modeStr        = (string) $request->query->get('mode', 'overlapping');
+        $fromStr = (string) $request->query->get('from', '');
+        $toStr = (string) $request->query->get('to', '');
+        $confirm = '1' === (string) $request->query->get('confirm', '0');
+        $modeStr = (string) $request->query->get('mode', 'overlapping');
 
-        if ($marketplaceStr === '' || $fromStr === '' || $toStr === '') {
+        if ('' === $marketplaceStr || '' === $fromStr || '' === $toStr) {
             return $this->json(['error' => 'marketplace, from, to are required'], 422);
         }
 
@@ -60,17 +60,17 @@ final class DebugWipeRawDocumentsController extends AbstractController
         }
 
         $marketplace = MarketplaceType::tryFrom($marketplaceStr);
-        if ($marketplace === null) {
-            return $this->json(['error' => 'Unknown marketplace: ' . $marketplaceStr], 422);
+        if (null === $marketplace) {
+            return $this->json(['error' => 'Unknown marketplace: '.$marketplaceStr], 422);
         }
 
-        if ($marketplace !== MarketplaceType::OZON) {
+        if (MarketplaceType::OZON !== $marketplace) {
             return $this->json(['error' => 'Only ozon is supported at the moment'], 422);
         }
 
         $from = $this->parseStrictDate($fromStr);
-        $to   = $this->parseStrictDate($toStr);
-        if ($from === null || $to === null) {
+        $to = $this->parseStrictDate($toStr);
+        if (null === $from || null === $to) {
             return $this->json(['error' => 'Invalid date format (Y-m-d expected, must be a real calendar date)'], 422);
         }
 
@@ -79,25 +79,25 @@ final class DebugWipeRawDocumentsController extends AbstractController
         }
 
         $periodFrom = $from->format('Y-m-d');
-        $periodTo   = $to->format('Y-m-d');
+        $periodTo = $to->format('Y-m-d');
 
-        $periodCondition = $modeStr === 'overlapping'
+        $periodCondition = 'overlapping' === $modeStr
             ? 'AND mrd.period_from <= :periodTo AND mrd.period_to >= :periodFrom'
             : 'AND mrd.period_from >= :periodFrom AND mrd.period_to <= :periodTo';
 
         $sample = $this->fetchSample($companyId, $marketplace, $periodFrom, $periodTo, $periodCondition);
-        $count  = count($sample);
+        $count = count($sample);
 
         if (!$confirm) {
             return $this->json([
-                'mode'                    => 'preview',
-                'raw_docs_mode'           => $modeStr,
-                'companyId'               => $companyId,
-                'marketplace'             => $marketplace->value,
-                'from'                    => $periodFrom,
-                'to'                      => $periodTo,
+                'mode' => 'preview',
+                'raw_docs_mode' => $modeStr,
+                'companyId' => $companyId,
+                'marketplace' => $marketplace->value,
+                'from' => $periodFrom,
+                'to' => $periodTo,
                 'raw_documents_to_delete' => $count,
-                'sample'                  => $sample,
+                'sample' => $sample,
             ]);
         }
 
@@ -105,22 +105,22 @@ final class DebugWipeRawDocumentsController extends AbstractController
         $orphans = $this->countOrphanedRecords($companyId, $marketplace, $periodFrom, $periodTo);
 
         $this->logger->info('[DebugWipeRawDocuments] Raw documents deleted', [
-            'company_id'  => $companyId,
+            'company_id' => $companyId,
             'marketplace' => $marketplace->value,
-            'from'        => $periodFrom,
-            'to'          => $periodTo,
-            'mode'        => $modeStr,
-            'deleted'     => $deleted,
+            'from' => $periodFrom,
+            'to' => $periodTo,
+            'mode' => $modeStr,
+            'deleted' => $deleted,
         ]);
 
         return $this->json([
-            'mode'                          => 'executed',
-            'raw_docs_mode'                 => $modeStr,
-            'companyId'                     => $companyId,
-            'marketplace'                   => $marketplace->value,
-            'from'                          => $periodFrom,
-            'to'                            => $periodTo,
-            'raw_documents_deleted'         => $deleted,
+            'mode' => 'executed',
+            'raw_docs_mode' => $modeStr,
+            'companyId' => $companyId,
+            'marketplace' => $marketplace->value,
+            'from' => $periodFrom,
+            'to' => $periodTo,
+            'raw_documents_deleted' => $deleted,
             'orphaned_records_after_delete' => $orphans,
         ]);
     }
@@ -149,20 +149,20 @@ final class DebugWipeRawDocumentsController extends AbstractController
                {$periodCondition}
              ORDER BY mrd.period_from, mrd.synced_at",
             [
-                'companyId'   => $companyId,
+                'companyId' => $companyId,
                 'marketplace' => $marketplace->value,
-                'periodFrom'  => $periodFrom,
-                'periodTo'    => $periodTo,
+                'periodFrom' => $periodFrom,
+                'periodTo' => $periodTo,
             ],
         );
 
         return array_map(
             static fn (array $r): array => [
-                'id'                => (string) $r['id'],
-                'period'            => $r['period_from'] . ' — ' . $r['period_to'],
-                'synced_at'         => (string) $r['synced_at'],
-                'records_count'     => (int) $r['records_count'],
-                'document_type'     => (string) $r['document_type'],
+                'id' => (string) $r['id'],
+                'period' => $r['period_from'].' — '.$r['period_to'],
+                'synced_at' => (string) $r['synced_at'],
+                'records_count' => (int) $r['records_count'],
+                'document_type' => (string) $r['document_type'],
                 'processing_status' => $r['processing_status'],
             ],
             $rows,
@@ -184,10 +184,10 @@ final class DebugWipeRawDocumentsController extends AbstractController
                AND mrd.marketplace = :marketplace
                {$periodCondition}",
             [
-                'companyId'   => $companyId,
+                'companyId' => $companyId,
                 'marketplace' => $marketplace->value,
-                'periodFrom'  => $periodFrom,
-                'periodTo'    => $periodTo,
+                'periodFrom' => $periodFrom,
+                'periodTo' => $periodTo,
             ],
         );
     }
@@ -204,29 +204,29 @@ final class DebugWipeRawDocumentsController extends AbstractController
         $mp = $marketplace->value;
 
         $sales = (int) $this->connection->fetchOne(
-            "SELECT COUNT(*) FROM marketplace_sales ms
+            'SELECT COUNT(*) FROM marketplace_sales ms
              WHERE ms.company_id = :cid AND ms.marketplace = :mp
                AND ms.sale_date BETWEEN :from AND :to
                AND ms.raw_document_id IS NOT NULL
-               AND NOT EXISTS (SELECT 1 FROM marketplace_raw_documents mrd WHERE mrd.id = ms.raw_document_id)",
+               AND NOT EXISTS (SELECT 1 FROM marketplace_raw_documents mrd WHERE mrd.id = ms.raw_document_id)',
             ['cid' => $companyId, 'mp' => $mp, 'from' => $periodFrom, 'to' => $periodTo],
         );
 
         $returns = (int) $this->connection->fetchOne(
-            "SELECT COUNT(*) FROM marketplace_returns mr
+            'SELECT COUNT(*) FROM marketplace_returns mr
              WHERE mr.company_id = :cid AND mr.marketplace = :mp
                AND mr.return_date BETWEEN :from AND :to
                AND mr.raw_document_id IS NOT NULL
-               AND NOT EXISTS (SELECT 1 FROM marketplace_raw_documents mrd WHERE mrd.id = mr.raw_document_id)",
+               AND NOT EXISTS (SELECT 1 FROM marketplace_raw_documents mrd WHERE mrd.id = mr.raw_document_id)',
             ['cid' => $companyId, 'mp' => $mp, 'from' => $periodFrom, 'to' => $periodTo],
         );
 
         $costs = (int) $this->connection->fetchOne(
-            "SELECT COUNT(*) FROM marketplace_costs mc
+            'SELECT COUNT(*) FROM marketplace_costs mc
              WHERE mc.company_id = :cid AND mc.marketplace = :mp
                AND mc.cost_date BETWEEN :from AND :to
                AND mc.raw_document_id IS NOT NULL
-               AND NOT EXISTS (SELECT 1 FROM marketplace_raw_documents mrd WHERE mrd.id = mc.raw_document_id)",
+               AND NOT EXISTS (SELECT 1 FROM marketplace_raw_documents mrd WHERE mrd.id = mc.raw_document_id)',
             ['cid' => $companyId, 'mp' => $mp, 'from' => $periodFrom, 'to' => $periodTo],
         );
 
@@ -237,7 +237,7 @@ final class DebugWipeRawDocumentsController extends AbstractController
     {
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
 
-        if ($date === false || $date->format('Y-m-d') !== $value) {
+        if (false === $date || $date->format('Y-m-d') !== $value) {
             return null;
         }
 

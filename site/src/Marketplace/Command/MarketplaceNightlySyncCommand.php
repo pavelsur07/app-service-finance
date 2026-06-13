@@ -57,7 +57,7 @@ final class MarketplaceNightlySyncCommand extends Command
         $dispatched = 0;
 
         foreach ($connections as $row) {
-            $companyId    = (string) $row['company_id'];
+            $companyId = (string) $row['company_id'];
             $connectionId = (string) ($row['connection_id'] ?? $row['id']);
 
             $this->messageBus->dispatch(
@@ -70,13 +70,13 @@ final class MarketplaceNightlySyncCommand extends Command
                 ),
             );
 
-            $dispatched++;
+            ++$dispatched;
 
             $this->logger->info('Dispatched WB sync message', [
-                'company_id'    => $companyId,
+                'company_id' => $companyId,
                 'connection_id' => $connectionId,
                 'business_date' => $businessDate,
-                'mode'          => FinancialReportSyncMode::DAILY->value,
+                'mode' => FinancialReportSyncMode::DAILY->value,
             ]);
         }
 

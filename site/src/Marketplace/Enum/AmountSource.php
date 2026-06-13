@@ -32,15 +32,15 @@ namespace App\Marketplace\Enum;
 enum AmountSource: string
 {
     // === Sale sources ===
-    case SALE_GROSS        = 'sale_gross';
-    case SALE_REVENUE      = 'sale_revenue';
-    case SALE_COST_PRICE   = 'sale_cost_price';
-    case SALE_REALIZATION  = 'sale_realization';
+    case SALE_GROSS = 'sale_gross';
+    case SALE_REVENUE = 'sale_revenue';
+    case SALE_COST_PRICE = 'sale_cost_price';
+    case SALE_REALIZATION = 'sale_realization';
 
     // === Return sources ===
-    case RETURN_REFUND      = 'return_refund';
-    case RETURN_GROSS       = 'return_gross';
-    case RETURN_COST_PRICE  = 'return_cost_price';
+    case RETURN_REFUND = 'return_refund';
+    case RETURN_GROSS = 'return_gross';
+    case RETURN_COST_PRICE = 'return_cost_price';
     case RETURN_REALIZATION = 'return_realization';
 
     public function getOperationType(): string
@@ -49,7 +49,7 @@ enum AmountSource: string
             self::SALE_GROSS,
             self::SALE_REVENUE,
             self::SALE_COST_PRICE,
-            self::SALE_REALIZATION   => 'sale',
+            self::SALE_REALIZATION => 'sale',
 
             self::RETURN_REFUND,
             self::RETURN_GROSS,
@@ -61,12 +61,12 @@ enum AmountSource: string
     public function getDisplayName(): string
     {
         return match ($this) {
-            self::SALE_GROSS        => 'Выручка без СПП (цена продавца × кол-во)',
-            self::SALE_REVENUE      => 'Выручка (accruals_for_sale)',
-            self::SALE_COST_PRICE   => 'Себестоимость продаж (costPrice × кол-во)',
-            self::SALE_REALIZATION  => 'Реализация Ozon (price_per_instance × кол-во)',
-            self::RETURN_REFUND     => 'Сумма возврата (refundAmount)',
-            self::RETURN_GROSS      => 'Возврат без СПП (цена × кол-во)',
+            self::SALE_GROSS => 'Выручка без СПП (цена продавца × кол-во)',
+            self::SALE_REVENUE => 'Выручка (accruals_for_sale)',
+            self::SALE_COST_PRICE => 'Себестоимость продаж (costPrice × кол-во)',
+            self::SALE_REALIZATION => 'Реализация Ozon (price_per_instance × кол-во)',
+            self::RETURN_REFUND => 'Сумма возврата (refundAmount)',
+            self::RETURN_GROSS => 'Возврат без СПП (цена × кол-во)',
             self::RETURN_COST_PRICE => 'Себестоимость возвратов (costPrice × кол-во)',
             self::RETURN_REALIZATION => 'Возврат с СПП Ozon (return_commission.price_per_instance × кол-во)',
         };
@@ -82,14 +82,14 @@ enum AmountSource: string
     public function getSqlExpression(?MarketplaceType $marketplace = null): string
     {
         return match ($this) {
-            self::SALE_GROSS        => $marketplace === MarketplaceType::OZON
+            self::SALE_GROSS => MarketplaceType::OZON === $marketplace
                 ? 's.total_revenue'
                 : 's.price_per_unit * s.quantity',
-            self::SALE_REVENUE      => 's.total_revenue',
-            self::SALE_COST_PRICE   => 's.cost_price * s.quantity',
-            self::SALE_REALIZATION  => 'r.total_amount',        // marketplace_ozon_realizations: price_per_instance × quantity
-            self::RETURN_REFUND     => 'r.refund_amount',
-            self::RETURN_GROSS      => 'ms.price_per_unit * r.quantity',
+            self::SALE_REVENUE => 's.total_revenue',
+            self::SALE_COST_PRICE => 's.cost_price * s.quantity',
+            self::SALE_REALIZATION => 'r.total_amount',        // marketplace_ozon_realizations: price_per_instance × quantity
+            self::RETURN_REFUND => 'r.refund_amount',
+            self::RETURN_GROSS => 'ms.price_per_unit * r.quantity',
             self::RETURN_COST_PRICE => 'ms.cost_price * r.quantity',
             self::RETURN_REALIZATION => 'r.return_amount',      // marketplace_ozon_realizations: return_price_per_instance × return_quantity
         };
@@ -104,7 +104,7 @@ enum AmountSource: string
         return match ($this) {
             self::SALE_REALIZATION,
             self::RETURN_REALIZATION => MarketplaceType::OZON,
-            default                  => null,
+            default => null,
         };
     }
 }

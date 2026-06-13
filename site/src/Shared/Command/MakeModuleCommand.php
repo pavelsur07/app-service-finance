@@ -10,8 +10,8 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\Filesystem\Filesystem;
 
 #[AsCommand(
     name: 'app:make:module',
@@ -22,7 +22,7 @@ class MakeModuleCommand extends Command
     public function __construct(
         #[Autowire('%kernel.project_dir%')]
         private readonly string $projectDir,
-        private readonly Filesystem $filesystem = new Filesystem()
+        private readonly Filesystem $filesystem = new Filesystem(),
     ) {
         parent::__construct();
     }
@@ -44,6 +44,7 @@ class MakeModuleCommand extends Command
 
         if ($this->filesystem->exists($modulePath)) {
             $io->error(sprintf('Модуль "%s" уже существует по пути %s!', $moduleName, $modulePath));
+
             return Command::FAILURE;
         }
 
@@ -69,7 +70,7 @@ class MakeModuleCommand extends Command
         foreach ($directories as $dir) {
             $path = sprintf('%s/%s', $modulePath, $dir);
             $this->filesystem->mkdir($path);
-            $this->filesystem->touch($path . '/.gitkeep');
+            $this->filesystem->touch($path.'/.gitkeep');
         }
 
         // 2. Генерация базовых классов
@@ -79,13 +80,13 @@ class MakeModuleCommand extends Command
         $templatesPath = sprintf('%s/templates/%s', $this->projectDir, strtolower($moduleName));
         if (!$this->filesystem->exists($templatesPath)) {
             $this->filesystem->mkdir($templatesPath);
-            $this->filesystem->touch($templatesPath . '/.gitkeep');
+            $this->filesystem->touch($templatesPath.'/.gitkeep');
         }
 
         $io->success([
             sprintf('Модуль "%s" успешно сгенерирован!', $moduleName),
             'Сгенерированы классы: Controller, Action, FacadeInterface, Request DTO, Enum',
-            sprintf('Путь: src/%s', $moduleName)
+            sprintf('Путь: src/%s', $moduleName),
         ]);
 
         return Command::SUCCESS;
@@ -112,7 +113,7 @@ interface {$moduleName}FacadeInterface
 }
 
 PHP;
-        $this->filesystem->dumpFile($modulePath . "/Facade/{$moduleName}FacadeInterface.php", $facadeContent);
+        $this->filesystem->dumpFile($modulePath."/Facade/{$moduleName}FacadeInterface.php", $facadeContent);
 
         // --- 2. Enum ---
         $enumContent = <<<PHP
@@ -130,7 +131,7 @@ enum {$moduleName}Status: string
 }
 
 PHP;
-        $this->filesystem->dumpFile($modulePath . "/Enum/{$moduleName}Status.php", $enumContent);
+        $this->filesystem->dumpFile($modulePath."/Enum/{$moduleName}Status.php", $enumContent);
 
         // --- 3. DTO (Api Request) ---
         $dtoContent = <<<PHP
@@ -153,7 +154,7 @@ final class Create{$moduleName}Request
 }
 
 PHP;
-        $this->filesystem->dumpFile($modulePath . "/Api/Request/Create{$moduleName}Request.php", $dtoContent);
+        $this->filesystem->dumpFile($modulePath."/Api/Request/Create{$moduleName}Request.php", $dtoContent);
 
         // --- 4. Application Action ---
         $actionContent = <<<PHP
@@ -182,7 +183,7 @@ final class Create{$moduleName}Action
 }
 
 PHP;
-        $this->filesystem->dumpFile($modulePath . "/Application/Create{$moduleName}Action.php", $actionContent);
+        $this->filesystem->dumpFile($modulePath."/Application/Create{$moduleName}Action.php", $actionContent);
 
         // --- 5. Controller ---
         $controllerContent = <<<PHP
@@ -217,6 +218,6 @@ final class {$moduleName}Controller extends AbstractController
 }
 
 PHP;
-        $this->filesystem->dumpFile($modulePath . "/Controller/{$moduleName}Controller.php", $controllerContent);
+        $this->filesystem->dumpFile($modulePath."/Controller/{$moduleName}Controller.php", $controllerContent);
     }
 }

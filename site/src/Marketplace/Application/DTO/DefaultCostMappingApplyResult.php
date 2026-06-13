@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Application\DTO;
 
-use App\Marketplace\Enum\DefaultCostMappingPreviewStatus;
 use App\Marketplace\Enum\MarketplaceType;
 
 final readonly class DefaultCostMappingApplyResult
@@ -25,20 +24,59 @@ final readonly class DefaultCostMappingApplyResult
     ) {
     }
 
-    public function getMarketplace(): MarketplaceType { return $this->marketplace; }
-    public function getPreview(): DefaultCostMappingPreviewResult { return $this->preview; }
-    public function getCreatedCount(): int { return count($this->createdCostCodes); }
-    public function getUpdatedCount(): int { return count($this->updatedCostCodes); }
-    public function getSkippedCount(): int { return count($this->skippedCostCodes); }
-    public function getBlockedCount(): int { return count($this->blockedCostCodes); }
+    public function getMarketplace(): MarketplaceType
+    {
+        return $this->marketplace;
+    }
+
+    public function getPreview(): DefaultCostMappingPreviewResult
+    {
+        return $this->preview;
+    }
+
+    public function getCreatedCount(): int
+    {
+        return count($this->createdCostCodes);
+    }
+
+    public function getUpdatedCount(): int
+    {
+        return count($this->updatedCostCodes);
+    }
+
+    public function getSkippedCount(): int
+    {
+        return count($this->skippedCostCodes);
+    }
+
+    public function getBlockedCount(): int
+    {
+        return count($this->blockedCostCodes);
+    }
+
     /** @return list<string> */
-    public function getCreatedCostCodes(): array { return $this->createdCostCodes; }
+    public function getCreatedCostCodes(): array
+    {
+        return $this->createdCostCodes;
+    }
+
     /** @return list<string> */
-    public function getUpdatedCostCodes(): array { return $this->updatedCostCodes; }
+    public function getUpdatedCostCodes(): array
+    {
+        return $this->updatedCostCodes;
+    }
+
     /** @return list<string> */
-    public function getSkippedCostCodes(): array { return $this->skippedCostCodes; }
+    public function getSkippedCostCodes(): array
+    {
+        return $this->skippedCostCodes;
+    }
+
     /** @return list<string> */
-    public function getBlockedCostCodes(): array { return $this->blockedCostCodes; }
+    public function getBlockedCostCodes(): array
+    {
+        return $this->blockedCostCodes;
+    }
 
     /** @return array<string,int> */
     public function getSummary(): array

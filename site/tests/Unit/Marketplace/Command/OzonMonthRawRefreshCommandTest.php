@@ -43,7 +43,7 @@ final class OzonMonthRawRefreshCommandTest extends TestCase
     {
         $messages = [];
         $bus = $this->createMock(MessageBusInterface::class);
-        $bus->expects(self::exactly(2))->method('dispatch')->willReturnCallback(function (object $message) use (&$messages): Envelope {
+        $bus->expects(self::exactly(2))->method('dispatch')->willReturnCallback(static function (object $message) use (&$messages): Envelope {
             $messages[] = $message;
 
             return new Envelope($message);
@@ -178,8 +178,8 @@ final class OzonMonthRawRefreshCommandTest extends TestCase
     ): CommandTester {
         $dbal = $this->createMock(Connection::class);
         $dbal->method('fetchAllAssociative')
-            ->willReturnCallback(function (string $sql, array $params = []) use ($connectionRows, $connectionAssert): array {
-                if ($connectionAssert !== null) {
+            ->willReturnCallback(static function (string $sql, array $params = []) use ($connectionRows, $connectionAssert): array {
+                if (null !== $connectionAssert) {
                     $connectionAssert($sql, $params);
                 }
 

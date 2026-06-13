@@ -22,7 +22,7 @@ class WbStorageCalculator implements CostCalculatorInterface
 
     public function supports(array $item): bool
     {
-        return $this->normalizer->sellerOperName($item) === 'Хранение';
+        return 'Хранение' === $this->normalizer->sellerOperName($item);
     }
 
     public function requiresListing(): bool
@@ -39,7 +39,7 @@ class WbStorageCalculator implements CostCalculatorInterface
         }
 
         $externalId = $this->externalIdBuilder->build($item, 'storage');
-        if ($externalId === null) {
+        if (null === $externalId) {
             return [];
         }
 
@@ -48,7 +48,7 @@ class WbStorageCalculator implements CostCalculatorInterface
         return [
             [
                 'category_code' => 'storage',
-                'amount' => (string)abs($storageFee),
+                'amount' => (string) abs($storageFee),
                 'external_id' => $externalId,
                 'cost_date' => $saleDate,
                 'description' => 'Хранение WB',

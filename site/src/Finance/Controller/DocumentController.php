@@ -6,18 +6,18 @@ namespace App\Finance\Controller;
 
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Company\Entity\Company;
-use App\Finance\DTO\DocumentListDTO;
-use App\Finance\Entity\Document;
-use App\Finance\Entity\DocumentOperation;
-use App\Finance\Form\DocumentType;
-use App\Finance\Repository\DocumentRepository;
-use App\Finance\Enum\PlNature;
-use App\Finance\Enum\DocumentStatus;
 use App\Company\Repository\CounterpartyRepository;
-use App\Finance\Repository\PLCategoryRepository;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Finance\Application\Service\PlNatureResolver;
 use App\Finance\Application\Service\PLRegisterUpdater;
+use App\Finance\DTO\DocumentListDTO;
+use App\Finance\Entity\Document;
+use App\Finance\Entity\DocumentOperation;
+use App\Finance\Enum\DocumentStatus;
+use App\Finance\Enum\PlNature;
+use App\Finance\Form\DocumentType;
+use App\Finance\Repository\DocumentRepository;
+use App\Finance\Repository\PLCategoryRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -305,7 +305,7 @@ class DocumentController extends AbstractController
         }
 
         $response = $this->json($payload, Response::HTTP_OK, [], [
-            'json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE,
+            'json_encode_options' => \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE,
         ]);
         $response->headers->set('Content-Disposition', sprintf('attachment; filename="document-%s.json"', $document->getId()));
 

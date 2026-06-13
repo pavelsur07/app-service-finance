@@ -11,7 +11,8 @@ final readonly class CostMappingResolver
 {
     public function __construct(
         private UnitEconomyCostMappingRepositoryInterface $repository,
-    ) {}
+    ) {
+    }
 
     public function resolve(
         string $companyId,

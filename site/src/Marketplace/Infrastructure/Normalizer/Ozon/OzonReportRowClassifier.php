@@ -14,7 +14,7 @@ final readonly class OzonReportRowClassifier implements RowClassifierInterface
 {
     public function supports(MarketplaceType $type): bool
     {
-        return $type === MarketplaceType::OZON;
+        return MarketplaceType::OZON === $type;
     }
 
     public function classify(array $rawRow): StagingRecordType
@@ -23,7 +23,7 @@ final readonly class OzonReportRowClassifier implements RowClassifierInterface
         $operationType = $rawRow['operation_type'] ?? '';
 
         // orders → продажи
-        if ($type === 'orders') {
+        if ('orders' === $type) {
             return StagingRecordType::SALE;
         }
 
@@ -31,12 +31,12 @@ final readonly class OzonReportRowClassifier implements RowClassifierInterface
         // ClientReturnAgentOperation = реальный возврат товара покупателем → RETURN
         // OperationAgentStornoDeliveredToCustomer = сторно начисления продажи → SALE
         // OperationItemReturn = затраты на обработку возврата (логистика) → COST
-        if ($type === 'returns') {
-            if ($operationType === 'ClientReturnAgentOperation') {
+        if ('returns' === $type) {
+            if ('ClientReturnAgentOperation' === $operationType) {
                 return StagingRecordType::RETURN;
             }
 
-            if ($operationType === 'OperationAgentStornoDeliveredToCustomer') {
+            if ('OperationAgentStornoDeliveredToCustomer' === $operationType) {
                 return StagingRecordType::SALE;
             }
 

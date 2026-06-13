@@ -93,7 +93,7 @@ class CashTransactionAutoRuleService
                     case CashTransactionAutoRuleConditionField::AMOUNT:
                         // amount хранится строкой; сравним через bccomp при масштабе 2
                         $amt = $t->getAmount();
-                        $cmp = fn (string $a, string $b) => \bccomp($a, $b, 2);
+                        $cmp = static fn (string $a, string $b) => \bccomp($a, $b, 2);
                         if (CashTransactionAutoRuleConditionOperator::BETWEEN === $operator) {
                             if (!($cmp($amt, (string) $value) >= 0 && $cmp($amt, (string) $valueTo) <= 0)) {
                                 $ok = false;

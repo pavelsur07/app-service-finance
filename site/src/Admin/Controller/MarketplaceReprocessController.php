@@ -23,7 +23,7 @@ final class MarketplaceReprocessController extends AbstractController
         $documents = $repository->findDocsWithCrossCompanyCosts();
 
         return $this->render('admin/marketplace/reprocess/index.html.twig', [
-            'documents' => array_map(static fn($doc): array => [
+            'documents' => array_map(static fn ($doc): array => [
                 'id' => $doc->getId(),
                 'company_id' => (string) $doc->getCompany()->getId(),
             ], $documents),
@@ -42,11 +42,11 @@ final class MarketplaceReprocessController extends AbstractController
         }
 
         $companyId = trim((string) $request->request->get('company_id', ''));
-        $filterCompanyId = $companyId !== '' ? $companyId : null;
+        $filterCompanyId = '' !== $companyId ? $companyId : null;
 
         $documents = $repository->findDocsWithCrossCompanyCosts($filterCompanyId);
 
-        if ($documents === []) {
+        if ([] === $documents) {
             $this->addFlash('success', 'Нет документов для переобработки.');
 
             return $this->redirectToRoute('admin_marketplace_reprocess_index');

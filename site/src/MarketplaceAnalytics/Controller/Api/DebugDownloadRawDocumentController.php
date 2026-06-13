@@ -84,7 +84,7 @@ final class DebugDownloadRawDocumentController extends AbstractController
         }
 
         $contentType = $rawData['content_type'] ?? 'application/octet-stream';
-        $extension = self::EXTENSION_MAP[$contentType] ?? pathinfo($absolutePath, PATHINFO_EXTENSION) ?: 'bin';
+        $extension = self::EXTENSION_MAP[$contentType] ?? pathinfo($absolutePath, \PATHINFO_EXTENSION) ?: 'bin';
         $filename = sprintf('mutual_settlement_%s.%s', $periodFrom, $extension);
 
         $response = new BinaryFileResponse($absolutePath);

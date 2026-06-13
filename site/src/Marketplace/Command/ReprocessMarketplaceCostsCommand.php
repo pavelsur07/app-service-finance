@@ -51,7 +51,7 @@ final class ReprocessMarketplaceCostsCommand extends Command
         $companyId = $input->getOption('company-id');
         $dryRun = $input->getOption('dry-run');
 
-        if ($companyId !== null) {
+        if (null !== $companyId) {
             try {
                 Assert::uuid($companyId);
             } catch (\InvalidArgumentException) {
@@ -61,11 +61,11 @@ final class ReprocessMarketplaceCostsCommand extends Command
             }
         }
 
-        $io->title('Переобработка затрат с неправильными категориями' . ($dryRun ? ' [DRY-RUN]' : ''));
+        $io->title('Переобработка затрат с неправильными категориями'.($dryRun ? ' [DRY-RUN]' : ''));
 
         $documents = $this->repository->findDocsWithCrossCompanyCosts($companyId);
 
-        if ($documents === []) {
+        if ([] === $documents) {
             $io->success('Не найдено документов с неправильными категориями.');
 
             return Command::SUCCESS;
@@ -76,7 +76,7 @@ final class ReprocessMarketplaceCostsCommand extends Command
 
         $io->table(
             ['Raw Document ID', 'Company ID', 'Period From', 'Period To'],
-            array_map(static fn($doc): array => [
+            array_map(static fn ($doc): array => [
                 $doc->getId(),
                 (string) $doc->getCompany()->getId(),
                 $doc->getPeriodFrom()->format('Y-m-d'),
@@ -109,7 +109,7 @@ final class ReprocessMarketplaceCostsCommand extends Command
 
             try {
                 $this->syncFacade->processCostsFromRaw($docCompanyId, $docId);
-                $processed++;
+                ++$processed;
             } catch (\Throwable $e) {
                 $failedDocs[] = sprintf('%s: %s', $docId, $e->getMessage());
             }
@@ -124,7 +124,7 @@ final class ReprocessMarketplaceCostsCommand extends Command
         $io->section('Итог');
         $io->text(sprintf('  Обработано: %d', $processed));
 
-        if ($failedDocs !== []) {
+        if ([] !== $failedDocs) {
             $io->text(sprintf('  Ошибок:     %d', count($failedDocs)));
             $io->newLine();
             $io->warning('Документы с ошибками:');
@@ -133,6 +133,6 @@ final class ReprocessMarketplaceCostsCommand extends Command
 
         $io->success('Переобработка затрат завершена.');
 
-        return $failedDocs !== [] ? Command::FAILURE : Command::SUCCESS;
+        return [] !== $failedDocs ? Command::FAILURE : Command::SUCCESS;
     }
 }

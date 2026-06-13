@@ -38,7 +38,7 @@ final class InventoryStockReportQuery
             ->executeQuery()
             ->fetchOne();
 
-        return $value !== false ? (string) $value : null;
+        return false !== $value ? (string) $value : null;
     }
 
     public function getPage(
@@ -104,23 +104,23 @@ final class InventoryStockReportQuery
             ->orderBy('s.snapshot_at', 'DESC')
             ->addOrderBy('s.id', 'DESC');
 
-        if ($snapshotSessionId !== null) {
+        if (null !== $snapshotSessionId) {
             Assert::uuid($snapshotSessionId);
             $qb->andWhere('s.snapshot_session_id = :snapshotSessionId')
                 ->setParameter('snapshotSessionId', $snapshotSessionId);
         }
 
-        if ($snapshotAt !== null) {
+        if (null !== $snapshotAt) {
             $qb->andWhere('s.snapshot_at = :snapshotAt')
                 ->setParameter('snapshotAt', $snapshotAt, \Doctrine\DBAL\Types\Types::DATETIME_IMMUTABLE);
         }
 
-        if ($search !== null && '' !== trim($search)) {
+        if (null !== $search && '' !== trim($search)) {
             $qb->andWhere('(LOWER(s.source_sku) LIKE :search OR LOWER(s.source_offer_id) LIKE :search)')
                 ->setParameter('search', '%'.mb_strtolower(trim($search)).'%');
         }
 
-        if ($mappingStatus !== null) {
+        if (null !== $mappingStatus) {
             $qb->andWhere('s.mapping_status = :mappingStatus')
                 ->setParameter('mappingStatus', $mappingStatus->value);
         }

@@ -15,7 +15,7 @@ use Symfony\Component\Yaml\Yaml;
 final class DefaultCostMappingYamlProvider
 {
     private const SUPPORTED_VERSION = 1;
-    
+
     /** @var array<string, DefaultCostMappingRuleSet>|null */
     private ?array $cachedRuleSets = null;
 
@@ -33,7 +33,7 @@ final class DefaultCostMappingYamlProvider
     /** @return array<string, DefaultCostMappingRuleSet> */
     public function getAll(): array
     {
-        if ($this->cachedRuleSets !== null) {
+        if (null !== $this->cachedRuleSets) {
             return $this->cachedRuleSets;
         }
 
@@ -52,10 +52,7 @@ final class DefaultCostMappingYamlProvider
         try {
             $data = Yaml::parseFile($this->configPath);
         } catch (ParseException $exception) {
-            throw new DefaultCostMappingConfigException(
-                sprintf('Failed to parse YAML config: %s', $exception->getMessage()),
-                previous: $exception,
-            );
+            throw new DefaultCostMappingConfigException(sprintf('Failed to parse YAML config: %s', $exception->getMessage()), previous: $exception);
         }
 
         if (!is_array($data)) {
@@ -73,7 +70,7 @@ final class DefaultCostMappingYamlProvider
         $result = [];
         foreach ($data['marketplaces'] as $marketplaceKey => $marketplaceConfig) {
             $marketplace = MarketplaceType::tryFrom((string) $marketplaceKey);
-            if ($marketplace === null) {
+            if (null === $marketplace) {
                 throw new DefaultCostMappingConfigException(sprintf('Unknown marketplace "%s" in default cost mapping config.', (string) $marketplaceKey));
             }
 
@@ -112,12 +109,12 @@ final class DefaultCostMappingYamlProvider
 
                 $rawConfidence = $rawRule['confidence'] ?? DefaultCostMappingConfidence::HIGH->value;
                 $confidence = is_string($rawConfidence) ? DefaultCostMappingConfidence::tryFrom($rawConfidence) : null;
-                if ($confidence === null) {
+                if (null === $confidence) {
                     throw new DefaultCostMappingConfigException(sprintf('Rule #%d in marketplace "%s" has invalid confidence "%s".', $index, $marketplace->value, (string) $rawConfidence));
                 }
 
                 $note = $rawRule['note'] ?? null;
-                if ($note !== null && !is_string($note)) {
+                if (null !== $note && !is_string($note)) {
                     throw new DefaultCostMappingConfigException(sprintf('Rule #%d in marketplace "%s" has invalid "note" value.', $index, $marketplace->value));
                 }
 
@@ -144,7 +141,7 @@ final class DefaultCostMappingYamlProvider
     private function requireNonEmptyString(array $rawRule, string $field, string $marketplace, int $index): string
     {
         $value = $rawRule[$field] ?? null;
-        if (!is_string($value) || trim($value) === '') {
+        if (!is_string($value) || '' === trim($value)) {
             throw new DefaultCostMappingConfigException(sprintf('Rule #%d in marketplace "%s" must contain non-empty string "%s".', $index, $marketplace, $field));
         }
 

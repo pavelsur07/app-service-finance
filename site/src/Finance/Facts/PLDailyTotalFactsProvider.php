@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Finance\Facts;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\ProjectDirection;
+use App\Company\Repository\ProjectDirectionRepository;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Entity\PLDailyTotal;
-use App\Company\Entity\ProjectDirection;
 use App\Finance\Report\PlReportPeriod;
 use App\Finance\Repository\PLCategoryRepository;
-use App\Company\Repository\ProjectDirectionRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class PLDailyTotalFactsProvider implements FactsProviderInterface

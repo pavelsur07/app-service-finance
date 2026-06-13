@@ -131,21 +131,80 @@ class OzonTransactionTotalsCheck
         );
     }
 
-    public function getId(): string { return $this->id; }
-    public function getCompanyId(): string { return $this->companyId; }
-    public function getRawDocumentId(): string { return $this->rawDocumentId; }
-    public function getPeriodFrom(): \DateTimeImmutable { return $this->periodFrom; }
-    public function getPeriodTo(): \DateTimeImmutable { return $this->periodTo; }
-    public function getStatus(): OzonTransactionTotalsCheckStatus { return $this->status; }
-    public function getCheckType(): string { return $this->checkType; }
-    public function getDetailTotals(): array { return $this->detailTotals; }
-    public function getOzonTotals(): array { return $this->ozonTotals; }
-    public function getDiffs(): array { return $this->diffs; }
-    public function getTolerance(): string { return $this->tolerance; }
-    public function getCheckedAt(): \DateTimeImmutable { return $this->checkedAt; }
-    public function getErrorMessage(): ?string { return $this->errorMessage; }
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
-    public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
+    public function getId(): string
+    {
+        return $this->id;
+    }
+
+    public function getCompanyId(): string
+    {
+        return $this->companyId;
+    }
+
+    public function getRawDocumentId(): string
+    {
+        return $this->rawDocumentId;
+    }
+
+    public function getPeriodFrom(): \DateTimeImmutable
+    {
+        return $this->periodFrom;
+    }
+
+    public function getPeriodTo(): \DateTimeImmutable
+    {
+        return $this->periodTo;
+    }
+
+    public function getStatus(): OzonTransactionTotalsCheckStatus
+    {
+        return $this->status;
+    }
+
+    public function getCheckType(): string
+    {
+        return $this->checkType;
+    }
+
+    public function getDetailTotals(): array
+    {
+        return $this->detailTotals;
+    }
+
+    public function getOzonTotals(): array
+    {
+        return $this->ozonTotals;
+    }
+
+    public function getDiffs(): array
+    {
+        return $this->diffs;
+    }
+
+    public function getTolerance(): string
+    {
+        return $this->tolerance;
+    }
+
+    public function getCheckedAt(): \DateTimeImmutable
+    {
+        return $this->checkedAt;
+    }
+
+    public function getErrorMessage(): ?string
+    {
+        return $this->errorMessage;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    public function getUpdatedAt(): \DateTimeImmutable
+    {
+        return $this->updatedAt;
+    }
 
     private function mark(
         OzonTransactionTotalsCheckStatus $status,

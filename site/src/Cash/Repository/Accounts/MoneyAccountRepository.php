@@ -3,8 +3,8 @@
 namespace App\Cash\Repository\Accounts;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
-use App\Company\Entity\Company;
 use App\Cash\Enum\Accounts\MoneyAccountType;
+use App\Company\Entity\Company;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 use Ramsey\Uuid\UuidInterface;

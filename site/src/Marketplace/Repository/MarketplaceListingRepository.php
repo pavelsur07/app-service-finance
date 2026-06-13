@@ -16,7 +16,6 @@ class MarketplaceListingRepository extends ServiceEntityRepository
         parent::__construct($registry, MarketplaceListing::class);
     }
 
-
     // -------------------------------------------------------------------------
     // Добавить в MarketplaceListingRepository
     // Worker-safe: принимает companyId string, не объект Company
@@ -29,10 +28,9 @@ class MarketplaceListingRepository extends ServiceEntityRepository
      * @return MarketplaceListing[]
      */
     public function findByCompanyIdAndMarketplace(
-        string          $companyId,
+        string $companyId,
         MarketplaceType $marketplace,
-    ): array
-    {
+    ): array {
         return $this->createQueryBuilder('l')
             ->where('IDENTITY(l.company) = :companyId')
             ->andWhere('l.marketplace = :marketplace')
@@ -114,7 +112,7 @@ class MarketplaceListingRepository extends ServiceEntityRepository
             ->setParameter('productId', $productId)
             ->setMaxResults(1);
 
-        if ($excludeListingId !== null) {
+        if (null !== $excludeListingId) {
             $qb->andWhere('l.id != :excludeId')
                 ->setParameter('excludeId', $excludeListingId);
         }
@@ -173,6 +171,7 @@ class MarketplaceListingRepository extends ServiceEntityRepository
 
     /**
      * @param string[] $productIds
+     *
      * @return array<string, string[]>
      */
     public function findMarketplaceNamesByProductIds(string $companyId, array $productIds): array
@@ -228,6 +227,7 @@ class MarketplaceListingRepository extends ServiceEntityRepository
 
     /**
      * @param string[] $skus
+     *
      * @return array<string, MarketplaceListing>
      */
     public function findListingsBySkusIndexed(
@@ -266,8 +266,8 @@ class MarketplaceListingRepository extends ServiceEntityRepository
      * Листинги, не существующие в БД или принадлежащие другой компании, отсутствуют в результирующем массиве.
      * productId = null если листинг существует, но не привязан к продукту (orphan).
      *
-     * @param string         $companyId
-     * @param array<string>  $listingIds
+     * @param array<string> $listingIds
+     *
      * @return array<string, string|null> map listingId => productId|null
      */
     public function findListingToProductMap(string $companyId, array $listingIds): array
@@ -290,7 +290,7 @@ class MarketplaceListingRepository extends ServiceEntityRepository
         $map = [];
         foreach ($rows as $row) {
             $listingId = (string) $row['listingId'];
-            $productId = $row['productId'] !== null ? (string) $row['productId'] : null;
+            $productId = null !== $row['productId'] ? (string) $row['productId'] : null;
             $map[$listingId] = $productId;
         }
 
@@ -299,6 +299,7 @@ class MarketplaceListingRepository extends ServiceEntityRepository
 
     /**
      * @param string[] $nmIds
+     *
      * @return array<string, MarketplaceListing> ['nmId_size' => Listing]
      */
     public function findListingsByNmIdsIndexed(
@@ -324,7 +325,7 @@ class MarketplaceListingRepository extends ServiceEntityRepository
 
         $indexed = [];
         foreach ($listings as $listing) {
-            $key = $listing->getMarketplaceSku() . '_' . $listing->getSize();
+            $key = $listing->getMarketplaceSku().'_'.$listing->getSize();
             $indexed[$key] = $listing;
         }
 

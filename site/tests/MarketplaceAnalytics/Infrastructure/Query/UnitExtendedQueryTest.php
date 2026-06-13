@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\MarketplaceAnalytics\Infrastructure\Query;
 
+use App\Inventory\Facade\InventoryFacade;
 use App\Marketplace\DTO\ListingCostCategoryAggregateDTO;
 use App\Marketplace\DTO\ListingMetaDTO;
-use App\Marketplace\DTO\ListingReturnAggregateDTO;
 use App\Marketplace\DTO\ListingSalesAggregateDTO;
 use App\Marketplace\Facade\MarketplaceFacade;
-use App\Inventory\Facade\InventoryFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
 use App\MarketplaceAnalytics\Infrastructure\Query\UnitExtendedQuery;
@@ -227,6 +226,7 @@ final class UnitExtendedQueryTest extends TestCase
         $penalty = $this->findBreakdownGroup($wb['allCostsBreakdown'], 'Другие услуги и штрафы');
         self::assertNotNull($penalty);
     }
+
     public function testMarketplaceFilterIsPropagatedToBothAdsFacadeCalls(): void
     {
         $this->stubSales([]);
@@ -250,7 +250,6 @@ final class UnitExtendedQueryTest extends TestCase
 
         $this->query->execute(self::COMPANY_ID, $marketplaceArg, self::PERIOD_FROM, self::PERIOD_TO);
     }
-
 
     public function testStockQtyAndCapitalCalculatedFromInventoryFacade(): void
     {
@@ -347,10 +346,9 @@ final class UnitExtendedQueryTest extends TestCase
         $this->adsFacade->method('getTotalAdCostForPeriod')->willReturn($value);
     }
 
-
-
     /**
      * @param list<array<string, mixed>> $groups
+     *
      * @return array<string, mixed>|null
      */
     private function findBreakdownGroup(array $groups, string $serviceGroup): ?array
@@ -363,6 +361,7 @@ final class UnitExtendedQueryTest extends TestCase
 
         return null;
     }
+
     /**
      * @return array{items: list<array<string, mixed>>, totals: array<string, mixed>}
      */
@@ -378,6 +377,7 @@ final class UnitExtendedQueryTest extends TestCase
 
     /**
      * @param list<array<string, mixed>> $items
+     *
      * @return array<string, mixed>|null
      */
     private function findRow(array $items, string $listingId): ?array

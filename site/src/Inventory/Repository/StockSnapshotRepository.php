@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Inventory\Repository;
 
 use App\Inventory\Entity\StockSnapshot;
-use Doctrine\DBAL\ParameterType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\Persistence\ManagerRegistry;
 
 final class StockSnapshotRepository extends ServiceEntityRepository

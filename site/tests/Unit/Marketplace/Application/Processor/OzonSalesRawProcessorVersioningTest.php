@@ -86,7 +86,7 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
         $processor->processBatch('company-1', MarketplaceType::OZON, [
             $this->makeOp('A', +1584, '2026-02-24 10:00:00'),
             $this->makeOp('B', +2000, '2026-02-24 11:00:00'),
-            $this->makeOp('C', +500,  '2026-02-24 12:00:00'),
+            $this->makeOp('C', +500, '2026-02-24 12:00:00'),
         ]);
 
         self::assertSame(['A', 'B', 'C'], $this->getPersistedExternalIds());
@@ -121,7 +121,6 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
 
         self::assertSame(['X', 'X_storno', 'X_v2'], $this->getPersistedExternalIds());
     }
-
 
     /**
      * Регрессия: повторная обработка одного raw_document_id не должна создавать _v2 дубли.
@@ -328,8 +327,7 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
         array $existingIds,
         ?\DateTimeImmutable $financeLockBefore = null,
         int &$deleteByRawDocumentCalls = 0,
-    ): OzonSalesRawProcessor
-    {
+    ): OzonSalesRawProcessor {
         $this->persistedSales = [];
 
         $company = (new \ReflectionClass(Company::class))->newInstanceWithoutConstructor();
@@ -348,11 +346,11 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
 
         $em = $this->createMock(EntityManagerInterface::class);
         $em->method('find')->willReturnCallback(static function (string $className, mixed $id) use ($company, $rawDoc): object|null {
-            if ($className === Company::class) {
+            if (Company::class === $className) {
                 return $company;
             }
 
-            if ($className === MarketplaceRawDocument::class && $id === '11111111-1111-1111-1111-111111111111') {
+            if (MarketplaceRawDocument::class === $className && '11111111-1111-1111-1111-111111111111' === $id) {
                 return $rawDoc;
             }
 
@@ -389,7 +387,8 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
             });
         $saleRepository->method('deleteByRawDocument')
             ->willReturnCallback(function (Company $company, MarketplaceType $marketplace, string $rawDocumentId) use (&$deleteByRawDocumentCalls): int {
-                $deleteByRawDocumentCalls++;
+                ++$deleteByRawDocumentCalls;
+
                 return $this->deletePersistedSalesByRawDocumentId($rawDocumentId);
             });
 
@@ -425,7 +424,6 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
 
         return $processor;
     }
-
 
     /** @return list<string> */
     private function getPersistedExternalIds(): array
@@ -477,7 +475,7 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
         return [
             'type' => 'orders',
             'operation_type' => $accrual < 0 ? 'OperationAgentStornoDeliveredToCustomer' : 'OperationAgentDeliveredToCustomer',
-            'operation_id' => 'op_' . md5($postingNumber . $accrual . $date),
+            'operation_id' => 'op_'.md5($postingNumber.$accrual.$date),
             'operation_date' => $date,
             'accruals_for_sale' => $accrual,
             'posting' => ['posting_number' => $postingNumber],

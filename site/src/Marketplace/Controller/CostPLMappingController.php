@@ -24,27 +24,27 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class CostPLMappingController extends AbstractController
 {
     public function __construct(
-        private readonly ActiveCompanyService               $companyService,
+        private readonly ActiveCompanyService $companyService,
         private readonly MarketplaceCostPLMappingRepository $mappingRepository,
-        private readonly MarketplaceCostCategoryRepository  $costCategoryRepository,
-        private readonly MarketplaceCostRepository          $costRepository,
-        private readonly PLCategoryFacade                   $plCategoryFacade,
-        private readonly EntityManagerInterface             $em,
+        private readonly MarketplaceCostCategoryRepository $costCategoryRepository,
+        private readonly MarketplaceCostRepository $costRepository,
+        private readonly PLCategoryFacade $plCategoryFacade,
+        private readonly EntityManagerInterface $em,
     ) {
     }
 
     #[Route('', name: 'marketplace_cost_pl_mapping_index', methods: ['GET'])]
     public function index(Request $request): Response
     {
-        $company     = $this->companyService->getActiveCompany();
-        $companyId   = (string) $company->getId();
+        $company = $this->companyService->getActiveCompany();
+        $companyId = (string) $company->getId();
         $marketplace = $request->query->get('marketplace') ?: null;
 
         $marketplaceType = $marketplace ? MarketplaceType::tryFrom($marketplace) : null;
 
         $allCategories = $this->costCategoryRepository->findByCompany($company);
-        $costCategories = $marketplaceType !== null
-            ? array_filter($allCategories, static fn($c) => $c->getMarketplace() === $marketplaceType)
+        $costCategories = null !== $marketplaceType
+            ? array_filter($allCategories, static fn ($c) => $c->getMarketplace() === $marketplaceType)
             : $allCategories;
 
         $mappings = $this->mappingRepository->findByCompany($companyId);
@@ -56,43 +56,43 @@ final class CostPLMappingController extends AbstractController
         $plCategories = $this->plCategoryFacade->getTreeByCompanyId($companyId);
 
         return $this->render('marketplace/cost_pl_mapping/index.html.twig', [
-            'active_tab'             => 'cost_pl_mapping',
-            'cost_categories'        => $costCategories,
-            'mappings_indexed'       => $mappingsIndexed,
-            'pl_categories'          => $plCategories,
+            'active_tab' => 'cost_pl_mapping',
+            'cost_categories' => $costCategories,
+            'mappings_indexed' => $mappingsIndexed,
+            'pl_categories' => $plCategories,
             'available_marketplaces' => MarketplaceType::cases(),
-            'selected_marketplace'   => $marketplace,
+            'selected_marketplace' => $marketplace,
         ]);
     }
 
     #[Route('/bulk-save', name: 'marketplace_cost_pl_mapping_bulk_save', methods: ['POST'])]
     public function bulkSave(Request $request): Response
     {
-        $company   = $this->companyService->getActiveCompany();
+        $company = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
         $marketplace = (string) $request->request->get('marketplace', '');
 
-        $rows  = $request->request->all('mappings');
+        $rows = $request->request->all('mappings');
         $saved = 0;
 
         foreach ($rows as $costCategoryId => $data) {
             $plCategoryId = ($data['pl_category_id'] ?? '') ?: null;
-            $includeInPl  = isset($data['include_in_pl']);
-            $sortOrder    = (int) ($data['sort_order'] ?? 0);
+            $includeInPl = isset($data['include_in_pl']);
+            $sortOrder = (int) ($data['sort_order'] ?? 0);
 
             $costCategory = $this->costCategoryRepository->find($costCategoryId);
-            if ($costCategory === null || (string) $costCategory->getCompany()->getId() !== $companyId) {
+            if (null === $costCategory || (string) $costCategory->getCompany()->getId() !== $companyId) {
                 continue;
             }
 
-            if ($plCategoryId !== null
-                && $this->plCategoryFacade->findByIdAndCompany($plCategoryId, $companyId) === null) {
+            if (null !== $plCategoryId
+                && null === $this->plCategoryFacade->findByIdAndCompany($plCategoryId, $companyId)) {
                 continue;
             }
 
             $mapping = $this->mappingRepository->findByCostCategory($companyId, $costCategoryId);
 
-            if ($mapping === null) {
+            if (null === $mapping) {
                 $mapping = new MarketplaceCostPLMapping(
                     Uuid::uuid4()->toString(),
                     $companyId,
@@ -105,7 +105,7 @@ final class CostPLMappingController extends AbstractController
                 $mapping->update($plCategoryId, $includeInPl, $sortOrder);
             }
 
-            $saved++;
+            ++$saved;
         }
 
         $this->em->flush();
@@ -120,22 +120,23 @@ final class CostPLMappingController extends AbstractController
     #[Route('/{id}/delete-category', name: 'marketplace_cost_pl_mapping_delete_category', methods: ['POST'])]
     public function deleteCategory(string $id, Request $request): Response
     {
-        $company   = $this->companyService->getActiveCompany();
+        $company = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
         $marketplace = (string) $request->request->get('marketplace', '');
 
         $category = $this->costCategoryRepository->find($id);
 
-        if ($category === null || (string) $category->getCompany()->getId() !== $companyId) {
+        if (null === $category || (string) $category->getCompany()->getId() !== $companyId) {
             throw $this->createNotFoundException();
         }
 
-        if (!$this->isCsrfTokenValid('delete' . $id, $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('delete'.$id, $request->request->get('_token'))) {
             throw $this->createAccessDeniedException('Invalid CSRF token.');
         }
 
         if ($category->isSystem()) {
             $this->addFlash('error', 'Невозможно удалить системную категорию');
+
             return $this->redirectToRoute('marketplace_cost_pl_mapping_index', ['marketplace' => $marketplace]);
         }
 
@@ -146,11 +147,12 @@ final class CostPLMappingController extends AbstractController
                 $category->getName(),
                 $costsCount
             ));
+
             return $this->redirectToRoute('marketplace_cost_pl_mapping_index', ['marketplace' => $marketplace]);
         }
 
         $mapping = $this->mappingRepository->findByCostCategory($companyId, $id);
-        if ($mapping !== null) {
+        if (null !== $mapping) {
             $this->em->remove($mapping);
         }
 

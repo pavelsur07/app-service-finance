@@ -6,8 +6,8 @@ namespace App\Finance\Form;
 
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
-use App\Finance\Entity\PLCategory;
 use App\Finance\Entity\DocumentOperation;
+use App\Finance\Entity\PLCategory;
 use App\Shared\Form\Type\ProjectDirectionPickerType;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
@@ -23,7 +23,7 @@ class DocumentOperationType extends AbstractType
             ->add('category', EntityType::class, [
                 'class' => PLCategory::class,
                 'choices' => $options['categories'],
-                'choice_label' => function (PLCategory $item) {
+                'choice_label' => static function (PLCategory $item) {
                     return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
                 },
                 'label' => 'Категория',
@@ -47,10 +47,10 @@ class DocumentOperationType extends AbstractType
             ->add('projectDirection', ProjectDirectionPickerType::class, [
                 'class' => ProjectDirection::class,
                 'choices' => $options['project_directions'],
-                'choice_label' => function (ProjectDirection $item) {
+                'choice_label' => static function (ProjectDirection $item) {
                     return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
                 },
-                'choice_attr' => fn (ProjectDirection $item) => !$item->getChildren()->isEmpty() ? ['disabled' => 'disabled'] : [],
+                'choice_attr' => static fn (ProjectDirection $item) => !$item->getChildren()->isEmpty() ? ['disabled' => 'disabled'] : [],
                 'required' => false,
                 'label' => 'Проект',
                 'attr' => [

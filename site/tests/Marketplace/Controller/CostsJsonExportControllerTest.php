@@ -118,6 +118,7 @@ final class CostsJsonExportControllerTest extends WebTestCaseBase
 
         if (!$withListing) {
             $em->flush();
+
             return [$owner, $company, $category];
         }
 

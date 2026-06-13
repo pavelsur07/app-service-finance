@@ -64,4 +64,3 @@ final class ProductShowPurchasePriceBlockTest extends WebTestCaseBase
         self::assertStringContainsString('199900 RUB', $content);
     }
 }
-

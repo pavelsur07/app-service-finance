@@ -13,7 +13,8 @@ final readonly class RecalculateJobResponse
         private string $marketplace,
         private string $dateFrom,
         private string $dateTo,
-    ) {}
+    ) {
+    }
 
     public function toArray(): array
     {

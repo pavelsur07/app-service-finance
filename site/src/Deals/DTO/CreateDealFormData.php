@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Deals\DTO;
 
+use App\Company\Entity\Counterparty;
 use App\Deals\Enum\DealChannel;
 use App\Deals\Enum\DealType;
-use App\Company\Entity\Counterparty;
 use Symfony\Component\Validator\Constraints as Assert;
 
 final class CreateDealFormData

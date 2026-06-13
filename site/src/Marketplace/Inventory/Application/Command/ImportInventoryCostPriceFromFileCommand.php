@@ -13,12 +13,12 @@ use App\Marketplace\Enum\MarketplaceType;
 final class ImportInventoryCostPriceFromFileCommand
 {
     public function __construct(
-        public readonly string          $companyId,
-        public readonly string          $absoluteFilePath,
-        public readonly string          $originalFilename,
+        public readonly string $companyId,
+        public readonly string $absoluteFilePath,
+        public readonly string $originalFilename,
         public readonly \DateTimeImmutable $effectiveFrom,
         public readonly MarketplaceType $marketplace,
-        public readonly string          $identifierType = 'barcode',
+        public readonly string $identifierType = 'barcode',
     ) {
     }
 }

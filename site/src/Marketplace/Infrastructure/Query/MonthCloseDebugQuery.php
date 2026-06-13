@@ -54,7 +54,7 @@ final class MonthCloseDebugQuery
         ?string $documentId,
     ): array {
         return array_merge(
-            $this->aggregateTable('marketplace_sales',  'sale_date',   'sale',   $companyId, $marketplace, $periodFrom, $periodTo, $processed, $documentId),
+            $this->aggregateTable('marketplace_sales', 'sale_date', 'sale', $companyId, $marketplace, $periodFrom, $periodTo, $processed, $documentId),
             $this->aggregateTable('marketplace_returns', 'return_date', 'return', $companyId, $marketplace, $periodFrom, $periodTo, $processed, $documentId),
         );
     }
@@ -84,9 +84,9 @@ final class MonthCloseDebugQuery
         ?string $documentId,
     ): array {
         $params = [
-            'companyId'  => $companyId,
+            'companyId' => $companyId,
             'periodFrom' => $periodFrom,
-            'periodTo'   => $periodTo,
+            'periodTo' => $periodTo,
         ];
 
         $filter = $this->buildProcessedFilter('r.pl_document_id', $processed, $documentId, $params);
@@ -141,10 +141,10 @@ final class MonthCloseDebugQuery
         int $page = 1,
     ): array {
         $params = [
-            'companyId'   => $companyId,
+            'companyId' => $companyId,
             'marketplace' => $marketplace,
-            'periodFrom'  => $periodFrom,
-            'periodTo'    => $periodTo,
+            'periodFrom' => $periodFrom,
+            'periodTo' => $periodTo,
         ];
 
         $filter = $this->buildProcessedFilter('s.document_id', $processed, $documentId, $params);
@@ -166,7 +166,7 @@ final class MonthCloseDebugQuery
         );
 
         $offset = ($page - 1) * self::PAGE_SIZE;
-        $params['limit']  = self::PAGE_SIZE;
+        $params['limit'] = self::PAGE_SIZE;
         $params['offset'] = $offset;
 
         $rows = $this->connection->fetchAllAssociative(
@@ -231,10 +231,10 @@ final class MonthCloseDebugQuery
         int $page = 1,
     ): array {
         $params = [
-            'companyId'   => $companyId,
+            'companyId' => $companyId,
             'marketplace' => $marketplace,
-            'periodFrom'  => $periodFrom,
-            'periodTo'    => $periodTo,
+            'periodFrom' => $periodFrom,
+            'periodTo' => $periodTo,
         ];
 
         $filter = $this->buildProcessedFilter('r.document_id', $processed, $documentId, $params);
@@ -256,7 +256,7 @@ final class MonthCloseDebugQuery
         );
 
         $offset = ($page - 1) * self::PAGE_SIZE;
-        $params['limit']  = self::PAGE_SIZE;
+        $params['limit'] = self::PAGE_SIZE;
         $params['offset'] = $offset;
 
         $rows = $this->connection->fetchAllAssociative(
@@ -324,9 +324,9 @@ final class MonthCloseDebugQuery
         int $page = 1,
     ): array {
         $params = [
-            'companyId'  => $companyId,
+            'companyId' => $companyId,
             'periodFrom' => $periodFrom,
-            'periodTo'   => $periodTo,
+            'periodTo' => $periodTo,
         ];
 
         $filter = $this->buildProcessedFilter('r.pl_document_id', $processed, $documentId, $params);
@@ -347,7 +347,7 @@ final class MonthCloseDebugQuery
         );
 
         $offset = ($page - 1) * self::PAGE_SIZE;
-        $params['limit']  = self::PAGE_SIZE;
+        $params['limit'] = self::PAGE_SIZE;
         $params['offset'] = $offset;
 
         $rows = $this->connection->fetchAllAssociative(
@@ -408,16 +408,16 @@ final class MonthCloseDebugQuery
         ?string $documentId,
     ): array {
         $params = [
-            'companyId'     => $companyId,
-            'marketplace'   => $marketplace,
-            'periodFrom'    => $periodFrom,
-            'periodTo'      => $periodTo,
+            'companyId' => $companyId,
+            'marketplace' => $marketplace,
+            'periodFrom' => $periodFrom,
+            'periodTo' => $periodTo,
             'operationType' => $sourceType,
         ];
 
         $filter = $this->buildProcessedFilter('s.document_id', $processed, $documentId, $params);
 
-        $amountExpr = $sourceType === 'sale'
+        $amountExpr = 'sale' === $sourceType
             ? "CASE m.amount_source
                    WHEN 'sale_gross'      THEN s.price_per_unit * s.quantity
                    WHEN 'sale_revenue'    THEN s.total_revenue
@@ -431,7 +431,7 @@ final class MonthCloseDebugQuery
                    ELSE 0
                END";
 
-        $joinSales = $sourceType === 'return'
+        $joinSales = 'return' === $sourceType
             ? 'LEFT JOIN marketplace_sales ms ON ms.id = s.sale_id'
             : '';
 
@@ -473,6 +473,7 @@ final class MonthCloseDebugQuery
 
     /**
      * @param array<string,mixed> $row
+     *
      * @return array<string,mixed>
      */
     private function normalizeDocumentIds(array $row): array
@@ -492,17 +493,17 @@ final class MonthCloseDebugQuery
         ?string $documentId,
         array &$params,
     ): string {
-        if ($documentId !== null) {
+        if (null !== $documentId) {
             $params['documentId'] = $documentId;
 
             return "AND {$column} = :documentId";
         }
 
-        if ($processed === false) {
+        if (false === $processed) {
             return "AND {$column} IS NULL";
         }
 
-        if ($processed === true) {
+        if (true === $processed) {
             return "AND {$column} IS NOT NULL";
         }
 
@@ -513,9 +514,9 @@ final class MonthCloseDebugQuery
     private function paginate(array $rows, int $total, int $page): array
     {
         return [
-            'rows'  => $rows,
+            'rows' => $rows,
             'total' => $total,
-            'page'  => $page,
+            'page' => $page,
             'pages' => max(1, (int) ceil($total / self::PAGE_SIZE)),
         ];
     }

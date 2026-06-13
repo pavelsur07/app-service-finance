@@ -26,7 +26,8 @@ final class CostMappingRemapController extends AbstractController
         private readonly MarketplaceAnalyticsFacade $facade,
         private readonly SerializerInterface $serializer,
         private readonly ValidatorInterface $validator,
-    ) {}
+    ) {
+    }
 
     #[Route(
         '/api/marketplace-analytics/cost-mappings/{id}/remap',
@@ -60,7 +61,7 @@ final class CostMappingRemapController extends AbstractController
         }
 
         $type = UnitEconomyCostType::tryFrom($dto->unitEconomyCostType);
-        if ($type === null) {
+        if (null === $type) {
             return $this->json(
                 ['type' => 'VALIDATION_ERROR', 'message' => 'Неизвестный тип статьи юнит-экономики'],
                 Response::HTTP_UNPROCESSABLE_ENTITY,

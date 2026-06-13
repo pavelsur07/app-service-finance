@@ -2,12 +2,12 @@
 
 namespace App\Cash\Entity\Transaction;
 
+use App\Cash\Enum\PaymentPlan\PaymentPlanType;
 use App\Cash\Enum\Transaction\CashflowCategoryStatus;
 use App\Cash\Enum\Transaction\CashflowFlowKind;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Entity\Company;
 use App\Finance\Entity\PLCategory;
-use App\Cash\Enum\PaymentPlan\PaymentPlanType;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;

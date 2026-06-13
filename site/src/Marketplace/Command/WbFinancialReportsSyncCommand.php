@@ -8,8 +8,6 @@ use App\Marketplace\Application\Service\WbFinancialReportPeriodResolver;
 use App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface;
 use App\Marketplace\Application\Service\WbFinancialReportSyncPlanResult;
 use App\Marketplace\Enum\FinancialReportSyncMode;
-use DateTimeImmutable;
-use DomainException;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -76,11 +74,11 @@ final class WbFinancialReportsSyncCommand extends Command
             [$from, $to] = $this->resolveRange($input);
 
             if ('all' === $mode && null !== $from) {
-                throw new DomainException('Use explicit --mode when --date or --from/--to is provided.');
+                throw new \DomainException('Use explicit --mode when --date or --from/--to is provided.');
             }
 
             if ('missing' === $mode && null !== $from) {
-                throw new DomainException('Mode missing does not support --date or --from/--to. Use --max-days instead.');
+                throw new \DomainException('Mode missing does not support --date or --from/--to. Use --max-days instead.');
             }
 
             $modesToRun = 'all' === $mode
@@ -142,7 +140,7 @@ final class WbFinancialReportsSyncCommand extends Command
         }
     }
 
-    private function runMode(string $mode, ?string $companyId, ?string $connectionId, bool $force, int $maxDays, int $daysBack, ?int $windowDays, ?DateTimeImmutable $from, ?DateTimeImmutable $to): int|WbFinancialReportSyncPlanResult
+    private function runMode(string $mode, ?string $companyId, ?string $connectionId, bool $force, int $maxDays, int $daysBack, ?int $windowDays, ?\DateTimeImmutable $from, ?\DateTimeImmutable $to): int|WbFinancialReportSyncPlanResult
     {
         return match ($mode) {
             'daily' => null !== $from
@@ -160,7 +158,7 @@ final class WbFinancialReportsSyncCommand extends Command
                     ? $this->planner->planRefreshRecentDays($companyId, $connectionId, $windowDays, $maxDays)
                     : $this->planner->planRefresh14Days($companyId, $connectionId, $maxDays)),
             'missing' => $this->planner->planMissing($companyId, $connectionId, $maxDays),
-            default => throw new DomainException(sprintf('Unsupported mode: %s', $mode)),
+            default => throw new \DomainException(sprintf('Unsupported mode: %s', $mode)),
         };
     }
 
@@ -168,7 +166,7 @@ final class WbFinancialReportsSyncCommand extends Command
     {
         $normalized = strtolower(trim($mode));
         if (!\in_array($normalized, ['all', 'initial', 'daily', 'refresh', 'refresh14', 'missing'], true)) {
-            throw new DomainException('Invalid --mode. Allowed: all|initial|daily|refresh|refresh14|missing');
+            throw new \DomainException('Invalid --mode. Allowed: all|initial|daily|refresh|refresh14|missing');
         }
 
         return $normalized;
@@ -183,7 +181,7 @@ final class WbFinancialReportsSyncCommand extends Command
     {
         $value = (int) $raw;
         if ($value <= 0) {
-            throw new DomainException(sprintf('Option %s must be a positive integer.', $optionName));
+            throw new \DomainException(sprintf('Option %s must be a positive integer.', $optionName));
         }
 
         return $value;
@@ -196,7 +194,7 @@ final class WbFinancialReportsSyncCommand extends Command
         $to = $this->normalizeOptional((string) $input->getOption('to'));
 
         if (null !== $date && (null !== $from || null !== $to)) {
-            throw new DomainException('Use either --date or --from/--to, not both.');
+            throw new \DomainException('Use either --date or --from/--to, not both.');
         }
 
         if (null !== $date) {
@@ -210,14 +208,14 @@ final class WbFinancialReportsSyncCommand extends Command
         }
 
         if (null === $from || null === $to) {
-            throw new DomainException('Both --from and --to are required for range planning.');
+            throw new \DomainException('Both --from and --to are required for range planning.');
         }
 
         $fromDate = $this->periodResolver->normalizeBusinessDate($from);
         $toDate = $this->periodResolver->normalizeBusinessDate($to);
 
         if ($fromDate > $toDate) {
-            throw new DomainException('Option --from must be less than or equal to --to.');
+            throw new \DomainException('Option --from must be less than or equal to --to.');
         }
 
         return [$fromDate, $toDate];

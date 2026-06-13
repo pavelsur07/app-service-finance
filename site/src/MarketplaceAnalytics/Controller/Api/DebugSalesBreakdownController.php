@@ -38,21 +38,21 @@ final class DebugSalesBreakdownController extends AbstractController
         $companyId = (string) $company->getId();
 
         $marketplace = $request->query->get('marketplace');
-        if ($marketplace !== 'ozon') {
+        if ('ozon' !== $marketplace) {
             return $this->json(['error' => 'Only marketplace=ozon is supported'], 422);
         }
 
         $fromStr = (string) $request->query->get('from', '');
         $toStr = (string) $request->query->get('to', '');
 
-        if ($fromStr === '' || $toStr === '') {
+        if ('' === $fromStr || '' === $toStr) {
             return $this->json(['error' => 'from and to are required (YYYY-MM-DD)'], 422);
         }
 
         $from = \DateTimeImmutable::createFromFormat('Y-m-d', $fromStr);
         $to = \DateTimeImmutable::createFromFormat('Y-m-d', $toStr);
 
-        if ($from === false || $to === false
+        if (false === $from || false === $to
             || $from->format('Y-m-d') !== $fromStr
             || $to->format('Y-m-d') !== $toStr
         ) {
@@ -201,9 +201,9 @@ final class DebugSalesBreakdownController extends AbstractController
         ?string $table,
     ): JsonResponse|StreamedResponse {
         $allowedTables = ['sales', 'returns', 'costs'];
-        if ($table === null || !in_array($table, $allowedTables, true)) {
+        if (null === $table || !in_array($table, $allowedTables, true)) {
             return $this->json([
-                'error' => 'table parameter is required for csv format. Allowed: ' . implode(', ', $allowedTables),
+                'error' => 'table parameter is required for csv format. Allowed: '.implode(', ', $allowedTables),
             ], 422);
         }
 
@@ -271,7 +271,7 @@ final class DebugSalesBreakdownController extends AbstractController
         $connection = $this->connection;
 
         $response = new StreamedResponse(static function () use ($connection, $headers, $sql, $params): void {
-            $out = fopen('php://output', 'wb');
+            $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF");
             fputcsv($out, $headers, ',', '"', '');
 

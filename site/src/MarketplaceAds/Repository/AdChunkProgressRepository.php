@@ -93,11 +93,7 @@ final class AdChunkProgressRepository extends ServiceEntityRepository implements
         // драйвера (invalid input syntax for type uuid) и превратит IDOR-guard
         // в 500-ошибку вместо обещанного интерфейсом \DomainException.
         if (!Uuid::isValid($jobId) || !Uuid::isValid($companyId)) {
-            throw new \DomainException(sprintf(
-                'AdLoadJob %s не найден или не принадлежит компании %s.',
-                $jobId,
-                $companyId,
-            ));
+            throw new \DomainException(sprintf('AdLoadJob %s не найден или не принадлежит компании %s.', $jobId, $companyId));
         }
 
         $found = $this->getEntityManager()->getConnection()->fetchOne(
@@ -109,11 +105,7 @@ final class AdChunkProgressRepository extends ServiceEntityRepository implements
         );
 
         if (false === $found) {
-            throw new \DomainException(sprintf(
-                'AdLoadJob %s не найден или не принадлежит компании %s.',
-                $jobId,
-                $companyId,
-            ));
+            throw new \DomainException(sprintf('AdLoadJob %s не найден или не принадлежит компании %s.', $jobId, $companyId));
         }
     }
 }

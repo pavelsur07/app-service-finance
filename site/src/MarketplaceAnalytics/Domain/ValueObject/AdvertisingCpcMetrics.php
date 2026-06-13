@@ -63,9 +63,9 @@ final readonly class AdvertisingCpcMetrics
 
     public function isEmpty(): bool
     {
-        return bccomp($this->spend, '0.00', 2) === 0
-            && $this->impressions === 0
-            && $this->clicks === 0;
+        return 0 === bccomp($this->spend, '0.00', 2)
+            && 0 === $this->impressions
+            && 0 === $this->clicks;
     }
 
     public static function empty(): self

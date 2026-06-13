@@ -6,18 +6,18 @@ use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\PaymentPlan\PaymentRecurrenceRule;
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Enum\Accounts\MoneyAccountType;
+use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
+use App\Cash\Enum\PaymentPlan\PaymentPlanType as PaymentPlanTypeEnum;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Cash\Repository\PaymentPlan\PaymentRecurrenceRuleRepository;
 use App\Cash\Service\PaymentPlan\PaymentPlanService;
 use App\Cash\Service\PaymentPlan\PaymentRecurrenceService;
 use App\Cash\Service\PaymentPlan\RecurrenceMaterializer;
 use App\Company\Entity\Company;
+use App\Company\Entity\Counterparty;
 use App\Company\Entity\User;
 use App\Company\Enum\CounterpartyType;
-use App\Company\Entity\Counterparty;
-use App\Cash\Enum\Accounts\MoneyAccountType;
-use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
-use App\Cash\Enum\PaymentPlan\PaymentPlanType as PaymentPlanTypeEnum;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
@@ -98,7 +98,7 @@ final class RecurrenceMaterializerTest extends TestCase
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager->expects($this->once())
             ->method('persist')
-            ->with($this->callback(function (PaymentPlan $created) use ($company, $category, $rule, $account, $counterparty) {
+            ->with($this->callback(static function (PaymentPlan $created) use ($company, $category, $rule, $account, $counterparty) {
                 self::assertSame($company, $created->getCompany());
                 self::assertSame($category, $created->getCashflowCategory());
                 self::assertSame('2024-02-01', $created->getPlannedAt()->format('Y-m-d'));

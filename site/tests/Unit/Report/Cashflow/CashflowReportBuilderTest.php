@@ -76,7 +76,7 @@ final class CashflowReportBuilderTest extends TestCase
         $queryBuilder->method('select')->willReturnSelf();
         $queryBuilder->method('where')->willReturnSelf();
         $queryBuilder->method('andWhere')
-            ->willReturnCallback(function (string $expr) use (&$whereExpressions, $queryBuilder): QueryBuilder {
+            ->willReturnCallback(static function (string $expr) use (&$whereExpressions, $queryBuilder): QueryBuilder {
                 $whereExpressions[] = $expr;
 
                 return $queryBuilder;

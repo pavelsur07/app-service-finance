@@ -35,12 +35,12 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class CostsDebugController extends AbstractController
 {
     public function __construct(
-        private readonly ActiveCompanyService        $companyService,
-        private readonly CostsVerifyQuery            $verifyQuery,
-        private readonly RawOperationsAnalysisQuery  $rawOperationsQuery,
-        private readonly OzonReportParserFacade      $parserFacade,
-        private readonly CostReconciliationQuery     $reconciliationQuery,
-        private readonly Connection                  $connection,
+        private readonly ActiveCompanyService $companyService,
+        private readonly CostsVerifyQuery $verifyQuery,
+        private readonly RawOperationsAnalysisQuery $rawOperationsQuery,
+        private readonly OzonReportParserFacade $parserFacade,
+        private readonly CostReconciliationQuery $reconciliationQuery,
+        private readonly Connection $connection,
     ) {
     }
 
@@ -58,7 +58,7 @@ final class CostsDebugController extends AbstractController
     {
         [$companyId, $marketplace, $year, $month, $periodFrom, $periodTo] = $this->resolveParams($request);
 
-        $xlsxTotal = $request->query->get('xlsx_total') !== null
+        $xlsxTotal = null !== $request->query->get('xlsx_total')
             ? (float) $request->query->get('xlsx_total')
             : null;
 
@@ -66,12 +66,12 @@ final class CostsDebugController extends AbstractController
 
         return $this->json([
             'meta' => [
-                'marketplace'  => $marketplace,
-                'period'       => "{$periodFrom} – {$periodTo}",
+                'marketplace' => $marketplace,
+                'period' => "{$periodFrom} – {$periodTo}",
                 'generated_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
             ],
             'checks' => $data,
-        ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
+        ], 200, [], ['json_encode_options' => \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE]);
     }
 
     // -------------------------------------------------------------------------
@@ -102,13 +102,13 @@ final class CostsDebugController extends AbstractController
 
         return $this->json([
             'meta' => [
-                'marketplace'     => $marketplace,
-                'period'          => "{$periodFrom} – {$periodTo}",
+                'marketplace' => $marketplace,
+                'period' => "{$periodFrom} – {$periodTo}",
                 'filter_category' => $filterCategory,
-                'generated_at'    => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+                'generated_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
             ],
             'data' => $data,
-        ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
+        ], 200, [], ['json_encode_options' => \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE]);
     }
 
     // -------------------------------------------------------------------------
@@ -132,9 +132,9 @@ final class CostsDebugController extends AbstractController
         [$companyId, $marketplace, $year, $month, $periodFrom, $periodTo] = $this->resolveParams($request);
 
         $keyword = trim((string) $request->query->get('q', ''));
-        $limit   = max(1, min(100, (int) $request->query->get('limit', 20)));
+        $limit = max(1, min(100, (int) $request->query->get('limit', 20)));
 
-        if ($keyword === '') {
+        if ('' === $keyword) {
             return $this->json(['error' => 'Параметр ?q= обязателен'], 400);
         }
 
@@ -175,35 +175,35 @@ final class CostsDebugController extends AbstractController
             LIMIT {$limit}
             SQL,
             [
-                'companyId'   => $companyId,
+                'companyId' => $companyId,
                 'marketplace' => $marketplace,
-                'periodFrom'  => $periodFrom,
-                'periodTo'    => $periodTo,
-                'keyword'     => '%' . $keyword . '%',
+                'periodFrom' => $periodFrom,
+                'periodTo' => $periodTo,
+                'keyword' => '%'.$keyword.'%',
             ],
         );
 
         return $this->json([
             'meta' => [
-                'marketplace'  => $marketplace,
-                'period'       => "{$periodFrom} – {$periodTo}",
-                'keyword'      => $keyword,
-                'found'        => count($rows),
-                'limit'        => $limit,
+                'marketplace' => $marketplace,
+                'period' => "{$periodFrom} – {$periodTo}",
+                'keyword' => $keyword,
+                'found' => count($rows),
+                'limit' => $limit,
                 'generated_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
             ],
             'results' => array_map(static fn (array $r) => [
-                'doc_id'             => $r['doc_id'],
-                'period'             => $r['period_from'] . ' – ' . $r['period_to'],
-                'operation_id'       => $r['operation_id'],
-                'operation_type'     => $r['operation_type'],
-                'operation_type_name'=> $r['operation_type_name'],
-                'type'               => $r['type'],
-                'amount'             => $r['amount'],
-                'operation_date'     => $r['operation_date'],
-                'services'           => json_decode($r['services'] ?? '[]', true),
+                'doc_id' => $r['doc_id'],
+                'period' => $r['period_from'].' – '.$r['period_to'],
+                'operation_id' => $r['operation_id'],
+                'operation_type' => $r['operation_type'],
+                'operation_type_name' => $r['operation_type_name'],
+                'type' => $r['type'],
+                'amount' => $r['amount'],
+                'operation_date' => $r['operation_date'],
+                'services' => json_decode($r['services'] ?? '[]', true),
             ], $rows),
-        ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
+        ], 200, [], ['json_encode_options' => \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE]);
     }
 
     // -------------------------------------------------------------------------
@@ -219,43 +219,43 @@ final class CostsDebugController extends AbstractController
     public function xlsxParse(Request $request): JsonResponse
     {
         $file = $request->files->get('xlsx_file');
-        if ($file === null) {
+        if (null === $file) {
             return $this->json(['error' => 'Файл не загружен. Передай xlsx_file в form-data.'], 400);
         }
 
         try {
             $result = $this->parserFacade->parseFromPath($file->getPathname());
         } catch (\Throwable $e) {
-            return $this->json(['error' => 'Ошибка парсинга: ' . $e->getMessage()], 500);
+            return $this->json(['error' => 'Ошибка парсинга: '.$e->getMessage()], 500);
         }
 
         return $this->json([
             'meta' => [
-                'generated_at'   => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
-                'hint'           => 'Это ReportResult из xlsx без записи в БД. Сравни totalNet с нашим xlsx_comparable из verify.',
+                'generated_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+                'hint' => 'Это ReportResult из xlsx без записи в БД. Сравни totalNet с нашим xlsx_comparable из verify.',
             ],
             'report' => [
-                'period'         => $result['period'],
+                'period' => $result['period'],
                 'total_accruals' => $result['totalAccruals'],
                 'total_expenses' => $result['totalExpenses'],
-                'total_storno'   => $result['totalStorno'],
-                'total_net'      => $result['totalNet'],
-                'lines_count'    => count($result['lines']),
-                'lines'          => array_map(static fn(array $l) => [
-                    'typeName'     => $l['typeName'],
+                'total_storno' => $result['totalStorno'],
+                'total_net' => $result['totalNet'],
+                'lines_count' => count($result['lines']),
+                'lines' => array_map(static fn (array $l) => [
+                    'typeName' => $l['typeName'],
                     'serviceGroup' => $l['serviceGroup'],
-                    'baseSign'     => $l['baseSign'],
-                    'accruals'     => $l['accruals'],
-                    'expenses'     => $l['expenses'],
-                    'storno'       => $l['storno'],
-                    'zero'         => $l['zero'],
-                    'line_net'     => round(
+                    'baseSign' => $l['baseSign'],
+                    'accruals' => $l['accruals'],
+                    'expenses' => $l['expenses'],
+                    'storno' => $l['storno'],
+                    'zero' => $l['zero'],
+                    'line_net' => round(
                         $l['accruals']['total'] + $l['expenses']['total'] + $l['storno']['total'],
                         2
                     ),
                 ], $result['lines']),
             ],
-        ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
+        ], 200, [], ['json_encode_options' => \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE]);
     }
 
     // -------------------------------------------------------------------------
@@ -272,14 +272,14 @@ final class CostsDebugController extends AbstractController
         [$companyId, $marketplace, $year, $month, $periodFrom, $periodTo] = $this->resolveParams($request);
 
         $file = $request->files->get('xlsx_file');
-        if ($file === null) {
+        if (null === $file) {
             return $this->json(['error' => 'Файл не загружен. Передай xlsx_file в form-data.'], 400);
         }
 
         try {
             $reportResult = $this->parserFacade->parseFromPath($file->getPathname());
         } catch (\Throwable $e) {
-            return $this->json(['error' => 'Ошибка парсинга xlsx: ' . $e->getMessage()], 500);
+            return $this->json(['error' => 'Ошибка парсинга xlsx: '.$e->getMessage()], 500);
         }
 
         $reconciliation = $this->reconciliationQuery->reconcile(
@@ -291,34 +291,34 @@ final class CostsDebugController extends AbstractController
 
         return $this->json([
             'meta' => [
-                'marketplace'  => $marketplace,
-                'period'       => "{$periodFrom} – {$periodTo}",
+                'marketplace' => $marketplace,
+                'period' => "{$periodFrom} – {$periodTo}",
                 'generated_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
             ],
             'reconciliation' => $reconciliation,
             'xlsx_report' => [
-                'period'         => $reportResult['period'],
+                'period' => $reportResult['period'],
                 'total_accruals' => $reportResult['totalAccruals'],
                 'total_expenses' => $reportResult['totalExpenses'],
-                'total_storno'   => $reportResult['totalStorno'],
-                'total_net'      => $reportResult['totalNet'],
+                'total_storno' => $reportResult['totalStorno'],
+                'total_net' => $reportResult['totalNet'],
                 'xlsx_total_abs' => abs($reportResult['totalNet']),
-                'lines_count'    => count($reportResult['lines']),
+                'lines_count' => count($reportResult['lines']),
                 'by_service_group' => $this->aggregateByServiceGroup($reportResult['lines']),
             ],
             'api_data' => [
-                'net_amount'         => $verifyData['grand_total']['net_amount'] ?? null,
-                'costs_amount'       => $verifyData['grand_total']['costs_amount'] ?? null,
-                'storno_amount'      => $verifyData['grand_total']['storno_amount'] ?? null,
-                'return_revenue'     => $verifyData['returns_reconciliation']['total_refund_amount'] ?? null,
-                'xlsx_comparable'    => $reconciliation['xlsx_comparable'],
+                'net_amount' => $verifyData['grand_total']['net_amount'] ?? null,
+                'costs_amount' => $verifyData['grand_total']['costs_amount'] ?? null,
+                'storno_amount' => $verifyData['grand_total']['storno_amount'] ?? null,
+                'return_revenue' => $verifyData['returns_reconciliation']['total_refund_amount'] ?? null,
+                'xlsx_comparable' => $reconciliation['xlsx_comparable'],
             ],
             'hint' => [
-                'formula'        => 'xlsx_comparable = api_net_amount + return_revenue_amount',
-                'delta_meaning'  => 'delta > 0: xlsx больше нашего comparable. delta < 0: xlsx меньше.',
-                'check_groups'   => 'Сравни by_service_group из xlsx с totals_by_category из verify.',
+                'formula' => 'xlsx_comparable = api_net_amount + return_revenue_amount',
+                'delta_meaning' => 'delta > 0: xlsx больше нашего comparable. delta < 0: xlsx меньше.',
+                'check_groups' => 'Сравни by_service_group из xlsx с totals_by_category из verify.',
             ],
-        ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
+        ], 200, [], ['json_encode_options' => \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE]);
     }
 
     // -------------------------------------------------------------------------
@@ -335,25 +335,27 @@ final class CostsDebugController extends AbstractController
         [$companyId, $marketplace, $year, $month, $periodFrom, $periodTo] = $this->resolveParams($request);
 
         $templateVars = [
-            'active_tab'             => 'costs_debug',
-            'marketplace'            => $marketplace,
+            'active_tab' => 'costs_debug',
+            'marketplace' => $marketplace,
             'available_marketplaces' => MarketplaceType::cases(),
-            'year'                   => $year,
-            'month'                  => $month,
+            'year' => $year,
+            'month' => $month,
         ];
 
         if ($request->isMethod('POST')) {
             $file = $request->files->get('xlsx_file');
 
-            if ($file === null) {
+            if (null === $file) {
                 $this->addFlash('error', 'Файл не загружен.');
+
                 return $this->render('@Marketplace/costs/reconciliation_debug.html.twig', $templateVars);
             }
 
             try {
                 $reportResult = $this->parserFacade->parseFromPath($file->getPathname());
             } catch (\Throwable $e) {
-                $this->addFlash('error', 'Ошибка парсинга xlsx: ' . $e->getMessage());
+                $this->addFlash('error', 'Ошибка парсинга xlsx: '.$e->getMessage());
+
                 return $this->render('@Marketplace/costs/reconciliation_debug.html.twig', $templateVars);
             }
 
@@ -365,21 +367,21 @@ final class CostsDebugController extends AbstractController
 
             $templateVars['result'] = [
                 'reconciliation' => $reconciliation,
-                'xlsx_report'    => [
-                    'period'           => $reportResult['period'],
-                    'total_accruals'   => $reportResult['totalAccruals'],
-                    'total_expenses'   => $reportResult['totalExpenses'],
-                    'total_storno'     => $reportResult['totalStorno'],
-                    'total_net'        => $reportResult['totalNet'],
-                    'expenses_only'    => $reconciliation['xlsx_total'],
-                    'lines_count'      => count($reportResult['lines']),
+                'xlsx_report' => [
+                    'period' => $reportResult['period'],
+                    'total_accruals' => $reportResult['totalAccruals'],
+                    'total_expenses' => $reportResult['totalExpenses'],
+                    'total_storno' => $reportResult['totalStorno'],
+                    'total_net' => $reportResult['totalNet'],
+                    'expenses_only' => $reconciliation['xlsx_total'],
+                    'lines_count' => count($reportResult['lines']),
                     'by_service_group' => $this->aggregateByServiceGroup($reportResult['lines']),
                 ],
-                'api_data'       => [
-                    'net_amount'      => $verifyData['grand_total']['net_amount'] ?? null,
-                    'costs_amount'    => $verifyData['grand_total']['costs_amount'] ?? null,
-                    'storno_amount'   => $verifyData['grand_total']['storno_amount'] ?? null,
-                    'return_revenue'  => $verifyData['returns_reconciliation']['total_refund_amount'] ?? null,
+                'api_data' => [
+                    'net_amount' => $verifyData['grand_total']['net_amount'] ?? null,
+                    'costs_amount' => $verifyData['grand_total']['costs_amount'] ?? null,
+                    'storno_amount' => $verifyData['grand_total']['storno_amount'] ?? null,
+                    'return_revenue' => $verifyData['returns_reconciliation']['total_refund_amount'] ?? null,
                     'xlsx_comparable' => $reconciliation['xlsx_comparable'],
                 ],
                 'api_categories' => $verifyData['totals_by_category'] ?? [],
@@ -397,21 +399,22 @@ final class CostsDebugController extends AbstractController
             if (!isset($groups[$group])) {
                 $groups[$group] = [
                     'serviceGroup' => $group,
-                    'total'        => 0.0,
-                    'accruals'     => 0.0,
-                    'expenses'     => 0.0,
-                    'storno'       => 0.0,
-                    'types'        => [],
+                    'total' => 0.0,
+                    'accruals' => 0.0,
+                    'expenses' => 0.0,
+                    'storno' => 0.0,
+                    'types' => [],
                 ];
             }
             $lineNet = $line['accruals']['total'] + $line['expenses']['total'] + $line['storno']['total'];
-            $groups[$group]['total']    = round($groups[$group]['total'] + $lineNet, 2);
+            $groups[$group]['total'] = round($groups[$group]['total'] + $lineNet, 2);
             $groups[$group]['accruals'] = round($groups[$group]['accruals'] + $line['accruals']['total'], 2);
             $groups[$group]['expenses'] = round($groups[$group]['expenses'] + $line['expenses']['total'], 2);
-            $groups[$group]['storno']   = round($groups[$group]['storno'] + $line['storno']['total'], 2);
-            $groups[$group]['types'][]  = ['typeName' => $line['typeName'], 'net' => round($lineNet, 2)];
+            $groups[$group]['storno'] = round($groups[$group]['storno'] + $line['storno']['total'], 2);
+            $groups[$group]['types'][] = ['typeName' => $line['typeName'], 'net' => round($lineNet, 2)];
         }
-        usort($groups, fn($a, $b) => $a['total'] <=> $b['total']);
+        usort($groups, static fn ($a, $b) => $a['total'] <=> $b['total']);
+
         return array_values($groups);
     }
 
@@ -429,7 +432,7 @@ final class CostsDebugController extends AbstractController
         return $this->json([
             'map' => OzonServiceCategoryMap::getMapStats(),
             'hint' => 'Сравни version с последним коммитом в OzonServiceCategoryMap',
-        ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
+        ], 200, [], ['json_encode_options' => \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE]);
     }
 
     // -------------------------------------------------------------------------
@@ -439,22 +442,22 @@ final class CostsDebugController extends AbstractController
      */
     private function resolveParams(Request $request): array
     {
-        $company   = $this->companyService->getActiveCompany();
+        $company = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
         // При POST читаем из request (form), при GET — из query
         $get = $request->isMethod('POST') ? $request->request : $request->query;
 
         $marketplace = $get->get('marketplace') ?: MarketplaceType::OZON->value;
-        $year        = (int) $get->get('year', date('Y'));
-        $month       = (int) $get->get('month', date('n'));
+        $year = (int) $get->get('year', date('Y'));
+        $month = (int) $get->get('month', date('n'));
 
-        if (MarketplaceType::tryFrom($marketplace) === null) {
+        if (null === MarketplaceType::tryFrom($marketplace)) {
             $marketplace = MarketplaceType::OZON->value;
         }
 
         $periodFrom = sprintf('%d-%02d-01', $year, $month);
-        $periodTo   = (new \DateTimeImmutable($periodFrom))->modify('last day of this month')->format('Y-m-d');
+        $periodTo = (new \DateTimeImmutable($periodFrom))->modify('last day of this month')->format('Y-m-d');
 
         return [$companyId, $marketplace, $year, $month, $periodFrom, $periodTo];
     }

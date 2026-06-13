@@ -54,7 +54,6 @@ class PLCategoryRepository extends ServiceEntityRepository
         }
     }
 
-
     /**
      * @return string[]
      */

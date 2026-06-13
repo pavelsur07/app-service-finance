@@ -49,11 +49,11 @@ use Ramsey\Uuid\Uuid;
 final class ProcessOzonRealizationAction
 {
     public function __construct(
-        private readonly MarketplaceRawDocumentRepository      $rawDocumentRepository,
-        private readonly MarketplaceOzonRealizationRepository  $realizationRepository,
-        private readonly MarketplaceListingRepository          $listingRepository,
-        private readonly EntityManagerInterface                $em,
-        private readonly LoggerInterface                       $logger,
+        private readonly MarketplaceRawDocumentRepository $rawDocumentRepository,
+        private readonly MarketplaceOzonRealizationRepository $realizationRepository,
+        private readonly MarketplaceListingRepository $listingRepository,
+        private readonly EntityManagerInterface $em,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -64,29 +64,26 @@ final class ProcessOzonRealizationAction
     {
         $rawDoc = $this->rawDocumentRepository->find($rawDocId);
 
-        if ($rawDoc === null) {
+        if (null === $rawDoc) {
             throw new \RuntimeException(sprintf('Raw document not found: %s', $rawDocId));
         }
 
-        if ($rawDoc->getMarketplace() !== MarketplaceType::OZON) {
+        if (MarketplaceType::OZON !== $rawDoc->getMarketplace()) {
             throw new \InvalidArgumentException('ProcessOzonRealizationAction supports only Ozon.');
         }
 
-        if ($rawDoc->getDocumentType() !== 'realization') {
-            throw new \InvalidArgumentException(sprintf(
-                'Expected documentType "realization", got "%s".',
-                $rawDoc->getDocumentType(),
-            ));
+        if ('realization' !== $rawDoc->getDocumentType()) {
+            throw new \InvalidArgumentException(sprintf('Expected documentType "realization", got "%s".', $rawDoc->getDocumentType()));
         }
 
         $company = $this->em->find(Company::class, $companyId);
         if (!$company instanceof Company) {
-            throw new \RuntimeException('Company not found: ' . $companyId);
+            throw new \RuntimeException('Company not found: '.$companyId);
         }
 
         $rawData = $rawDoc->getRawData();
-        $rows    = $rawData['result']['rows'] ?? [];
-        $header  = $rawData['result']['header'] ?? [];
+        $rows = $rawData['result']['rows'] ?? [];
+        $header = $rawData['result']['header'] ?? [];
 
         if (empty($rows)) {
             $this->logger->info('[OzonRealization] No rows in document', ['raw_doc_id' => $rawDocId]);
@@ -96,7 +93,7 @@ final class ProcessOzonRealizationAction
 
         // Период из заголовка реализации
         $periodFrom = new \DateTimeImmutable($header['start_date'] ?? date('Y-m-01'));
-        $periodTo   = new \DateTimeImmutable($header['stop_date'] ?? date('Y-m-t'));
+        $periodTo = new \DateTimeImmutable($header['stop_date'] ?? date('Y-m-t'));
 
         // Проверяем режим: первичная обработка или переобработка (повторный запуск)
         $isReprocess = $this->realizationRepository->existsForPeriod(
@@ -108,7 +105,7 @@ final class ProcessOzonRealizationAction
         if ($isReprocess) {
             $this->logger->info('[OzonRealization] Reprocessing existing period — updating return_commission fields', [
                 'period_from' => $periodFrom->format('Y-m-d'),
-                'period_to'   => $periodTo->format('Y-m-d'),
+                'period_to' => $periodTo->format('Y-m-d'),
             ]);
 
             return $this->reprocess($companyId, $rawDoc, $rows, $periodFrom, $periodTo);
@@ -134,7 +131,7 @@ final class ProcessOzonRealizationAction
         $allSkus = [];
         foreach ($rows as $row) {
             $sku = (string) ($row['item']['sku'] ?? '');
-            if ($sku !== '') {
+            if ('' !== $sku) {
                 $allSkus[$sku] = true;
             }
         }
@@ -145,25 +142,25 @@ final class ProcessOzonRealizationAction
             array_keys($allSkus),
         );
 
-        $created   = 0;
-        $skipped   = 0;
+        $created = 0;
+        $skipped = 0;
         $batchSize = 250;
-        $counter   = 0;
-        $rawDocId  = $rawDoc->getId();
+        $counter = 0;
+        $rawDocId = $rawDoc->getId();
 
         foreach ($rows as $row) {
-            $sku      = (string) ($row['item']['sku'] ?? '');
-            $offerId  = (string) ($row['item']['offer_id'] ?? '') ?: null;
-            $name     = (string) ($row['item']['name'] ?? '') ?: null;
+            $sku = (string) ($row['item']['sku'] ?? '');
+            $offerId = (string) ($row['item']['offer_id'] ?? '') ?: null;
+            $name = (string) ($row['item']['name'] ?? '') ?: null;
 
             $deliveryCommission = $row['delivery_commission'] ?? null;
-            $returnCommission   = $row['return_commission'] ?? null;
+            $returnCommission = $row['return_commission'] ?? null;
 
-            $quantity         = (int)   ($deliveryCommission['quantity'] ?? 0);
+            $quantity = (int) ($deliveryCommission['quantity'] ?? 0);
             $pricePerInstance = (float) ($deliveryCommission['price_per_instance'] ?? 0);
 
-            if ($sku === '') {
-                $skipped++;
+            if ('' === $sku) {
+                ++$skipped;
                 continue;
             }
 
@@ -172,16 +169,16 @@ final class ProcessOzonRealizationAction
             // Создаём запись с total_amount = 0 и заполненным return_amount,
             // чтобы return_realization попал в ОПиУ при закрытии месяца.
             if ($quantity <= 0 || $pricePerInstance <= 0) {
-                if ($returnCommission === null) {
-                    $skipped++;
+                if (null === $returnCommission) {
+                    ++$skipped;
                     continue;
                 }
 
                 $returnPrice = (float) ($returnCommission['price_per_instance'] ?? 0);
-                $returnQty   = (int)   ($returnCommission['quantity'] ?? 0);
+                $returnQty = (int) ($returnCommission['quantity'] ?? 0);
 
                 if ($returnPrice <= 0 || $returnQty <= 0) {
-                    $skipped++;
+                    ++$skipped;
                     continue;
                 }
 
@@ -202,10 +199,10 @@ final class ProcessOzonRealizationAction
                 $realization->setReturnCommission($returnPrice, $returnQty);
 
                 $this->em->persist($realization);
-                $created++;
-                $counter++;
+                ++$created;
+                ++$counter;
 
-                if ($counter % $batchSize === 0) {
+                if (0 === $counter % $batchSize) {
                     $this->em->flush();
                     $this->em->clear();
                     $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
@@ -231,23 +228,23 @@ final class ProcessOzonRealizationAction
 
             // Возврат
             $returnCommission = $row['return_commission'] ?? null;
-            if ($returnCommission !== null) {
+            if (null !== $returnCommission) {
                 $returnPrice = (float) ($returnCommission['price_per_instance'] ?? 0);
-                $returnQty   = (int)   ($returnCommission['quantity'] ?? 0);
+                $returnQty = (int) ($returnCommission['quantity'] ?? 0);
                 $realization->setReturnCommission($returnPrice, $returnQty);
             }
 
             $this->em->persist($realization);
 
-            $created++;
-            $counter++;
+            ++$created;
+            ++$counter;
 
-            if ($counter % $batchSize === 0) {
+            if (0 === $counter % $batchSize) {
                 $this->em->flush();
                 $this->em->clear();
 
                 $company = $this->em->find(Company::class, $companyId);
-                $rawDoc  = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
+                $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
 
                 foreach ($listingsCache as $k => $listing) {
                     $listingsCache[$k] = $this->em->getReference(
@@ -266,8 +263,8 @@ final class ProcessOzonRealizationAction
 
         $this->logger->info('[OzonRealization] Completed', [
             'raw_doc_id' => $rawDocId,
-            'created'    => $created,
-            'skipped'    => $skipped,
+            'created' => $created,
+            'skipped' => $skipped,
         ]);
 
         return ['created' => $created, 'updated' => 0, 'skipped' => $skipped];
@@ -311,7 +308,7 @@ final class ProcessOzonRealizationAction
         \DateTimeImmutable $periodFrom,
         \DateTimeImmutable $periodTo,
     ): array {
-        $rawDocId   = $rawDoc->getId();
+        $rawDocId = $rawDoc->getId();
         $connection = $this->em->getConnection();
 
         // 1. Сохраняем pl_document_id по SKU перед удалением
@@ -335,17 +332,17 @@ final class ProcessOzonRealizationAction
 
         $this->logger->info('[OzonRealization] Reprocess: deleted existing rows', [
             'raw_doc_id' => $rawDocId,
-            'deleted'    => $deleted,
+            'deleted' => $deleted,
         ]);
 
         // 3. Пересоздаём через process() — создаёт строки с правильными полями
         $company = $this->em->find(Company::class, $companyId);
-        $result  = $this->process($companyId, $rawDoc, $rows, $periodFrom, $periodTo);
+        $result = $this->process($companyId, $rawDoc, $rows, $periodFrom, $periodTo);
 
         // 4. Восстанавливаем pl_document_id для закрытых строк
         if (!empty($plDocumentIds)) {
             foreach ($plDocumentIds as $sku => $plDocumentId) {
-                if ($plDocumentId === null) {
+                if (null === $plDocumentId) {
                     continue;
                 }
 
@@ -357,23 +354,23 @@ final class ProcessOzonRealizationAction
                        AND sku            = :sku',
                     [
                         'plDocumentId' => $plDocumentId,
-                        'companyId'    => $companyId,
-                        'rawDocId'     => $rawDocId,
-                        'sku'          => (string) $sku,
+                        'companyId' => $companyId,
+                        'rawDocId' => $rawDocId,
+                        'sku' => (string) $sku,
                     ],
                 );
             }
 
             $this->logger->info('[OzonRealization] Reprocess: restored pl_document_id', [
                 'raw_doc_id' => $rawDocId,
-                'restored'   => count($plDocumentIds),
+                'restored' => count($plDocumentIds),
             ]);
         }
 
         $this->logger->info('[OzonRealization] Reprocess completed', [
             'raw_doc_id' => $rawDocId,
-            'created'    => $result['created'],
-            'skipped'    => $result['skipped'],
+            'created' => $result['created'],
+            'skipped' => $result['skipped'],
         ]);
 
         return ['created' => 0, 'updated' => $result['created'], 'skipped' => $result['skipped']];
@@ -382,7 +379,7 @@ final class ProcessOzonRealizationAction
     private function updateRawDocStats(string $rawDocId, int $created, int $skipped): void
     {
         $rawDoc = $this->rawDocumentRepository->find($rawDocId);
-        if ($rawDoc !== null) {
+        if (null !== $rawDoc) {
             $rawDoc->setRecordsCreated($created);
             $rawDoc->setRecordsSkipped($skipped);
             $this->em->flush();

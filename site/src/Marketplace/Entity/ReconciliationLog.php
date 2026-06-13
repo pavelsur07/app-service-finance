@@ -7,7 +7,7 @@ use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
 /**
- * ReconciliationLog - лог проверок сверки данных
+ * ReconciliationLog - лог проверок сверки данных.
  *
  * Сохраняет результаты каждой проверки:
  * - Проверка количества продаж
@@ -43,7 +43,7 @@ class ReconciliationLog
     private string $checkType;
 
     /**
-     * Прошла ли проверка
+     * Прошла ли проверка.
      */
     #[ORM\Column(type: 'boolean')]
     private bool $passed;
@@ -59,13 +59,13 @@ class ReconciliationLog
      *   "amount_difference": -500.00,
      *   "threshold": 0.01,
      *   "notes": "2 records failed validation"
-     * }
+     * }.
      */
     #[ORM\Column(type: 'json')]
     private array $details;
 
     /**
-     * Когда проверка была выполнена
+     * Когда проверка была выполнена.
      */
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $checkedAt;
@@ -75,7 +75,7 @@ class ReconciliationLog
         ProcessingBatch $processingBatch,
         string $checkType,
         bool $passed,
-        array $details
+        array $details,
     ) {
         Assert::uuid($id);
         Assert::notEmpty($checkType);
@@ -123,7 +123,7 @@ class ReconciliationLog
     // === HELPER METHODS ===
 
     /**
-     * Получить значение из деталей
+     * Получить значение из деталей.
      */
     public function getDetail(string $key, mixed $default = null): mixed
     {
@@ -131,7 +131,7 @@ class ReconciliationLog
     }
 
     /**
-     * Получить человекочитаемое описание проверки
+     * Получить человекочитаемое описание проверки.
      */
     public function getCheckTypeLabel(): string
     {
@@ -147,7 +147,7 @@ class ReconciliationLog
     }
 
     /**
-     * Получить краткое описание результата
+     * Получить краткое описание результата.
      */
     public function getSummary(): string
     {
@@ -163,20 +163,20 @@ class ReconciliationLog
     }
 
     /**
-     * Есть ли расхождения в суммах
+     * Есть ли расхождения в суммах.
      */
     public function hasAmountDiscrepancy(): bool
     {
         $expectedAmount = $this->getDetail('expected_amount');
         $actualAmount = $this->getDetail('actual_amount');
 
-        return $expectedAmount !== null
-            && $actualAmount !== null
-            && abs((float)$expectedAmount - (float)$actualAmount) > 0.01;
+        return null !== $expectedAmount
+            && null !== $actualAmount
+            && abs((float) $expectedAmount - (float) $actualAmount) > 0.01;
     }
 
     /**
-     * Получить описание расхождения в суммах
+     * Получить описание расхождения в суммах.
      */
     public function getAmountDiscrepancySummary(): ?string
     {
@@ -190,9 +190,9 @@ class ReconciliationLog
 
         return sprintf(
             'Ожидалось: %.2f ₽, Фактически: %.2f ₽ (разница: %.2f ₽)',
-            (float)$expected,
-            (float)$actual,
-            (float)$diff
+            (float) $expected,
+            (float) $actual,
+            (float) $diff
         );
     }
 }

@@ -26,7 +26,8 @@ final class SnapshotRecalculateController extends AbstractController
         private readonly MarketplaceAnalyticsFacade $facade,
         private readonly SerializerInterface $serializer,
         private readonly ValidatorInterface $validator,
-    ) {}
+    ) {
+    }
 
     #[Route(
         '/api/marketplace-analytics/snapshots/recalculate',

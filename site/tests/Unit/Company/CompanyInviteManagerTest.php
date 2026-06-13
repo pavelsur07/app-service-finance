@@ -43,7 +43,7 @@ final class CompanyInviteManagerTest extends TestCase
         $em
             ->expects(self::once())
             ->method('persist')
-            ->with(self::callback(function (CompanyInvite $invite) use (&$capturedInvite): bool {
+            ->with(self::callback(static function (CompanyInvite $invite) use (&$capturedInvite): bool {
                 $capturedInvite = $invite;
 
                 return true;

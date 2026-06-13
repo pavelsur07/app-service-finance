@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Marketplace;
 
+use App\Company\Entity\Company;
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorInterface;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistryInterface;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
-use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
@@ -43,8 +43,8 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $this->createMock(RowClassifierRegistryInterface::class),
             $this->createMock(MarketplaceRawProcessorRegistryInterface::class),
             $repository,
-            $this->createMock(\App\Marketplace\Repository\MarketplaceSaleRepository::class),
-            $this->createMock(\App\Marketplace\Repository\MarketplaceReturnRepository::class),
+            $this->createMock(MarketplaceSaleRepository::class),
+            $this->createMock(MarketplaceReturnRepository::class),
             $this->createMock(EntityManagerInterface::class),
             $this->createCostCategoryResolver(),
             $this->createMock(Connection::class),
@@ -75,8 +75,8 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $classifierRegistry,
             $this->createMock(MarketplaceRawProcessorRegistryInterface::class),
             $repository,
-            $this->createMock(\App\Marketplace\Repository\MarketplaceSaleRepository::class),
-            $this->createMock(\App\Marketplace\Repository\MarketplaceReturnRepository::class),
+            $this->createMock(MarketplaceSaleRepository::class),
+            $this->createMock(MarketplaceReturnRepository::class),
             $this->createMock(EntityManagerInterface::class),
             $this->createCostCategoryResolver(),
             $this->createMock(Connection::class),
@@ -119,8 +119,8 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $this->createMock(RowClassifierRegistryInterface::class),
             $processorRegistry,
             $repository,
-            $this->createMock(\App\Marketplace\Repository\MarketplaceSaleRepository::class),
-            $this->createMock(\App\Marketplace\Repository\MarketplaceReturnRepository::class),
+            $this->createMock(MarketplaceSaleRepository::class),
+            $this->createMock(MarketplaceReturnRepository::class),
             $this->createMock(EntityManagerInterface::class),
             $this->createCostCategoryResolver(),
             $this->createMock(Connection::class),

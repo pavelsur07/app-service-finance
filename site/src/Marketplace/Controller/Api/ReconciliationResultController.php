@@ -26,24 +26,24 @@ final class ReconciliationResultController extends AbstractController
     #[Route('/api/marketplace/reconciliation/{id}', name: 'api_marketplace_reconciliation_result', methods: ['GET'])]
     public function __invoke(string $id): JsonResponse
     {
-        $company   = $this->activeCompanyService->getActiveCompany();
+        $company = $this->activeCompanyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
         $session = $this->sessionRepository->findByIdAndCompany($id, $companyId);
 
-        if ($session === null) {
+        if (null === $session) {
             throw $this->createNotFoundException();
         }
 
         return $this->json([
-            'id'               => $session->getId(),
-            'marketplace'      => $session->getMarketplace(),
-            'periodFrom'       => $session->getPeriodFrom()->format('Y-m-d'),
-            'periodTo'         => $session->getPeriodTo()->format('Y-m-d'),
+            'id' => $session->getId(),
+            'marketplace' => $session->getMarketplace(),
+            'periodFrom' => $session->getPeriodFrom()->format('Y-m-d'),
+            'periodTo' => $session->getPeriodTo()->format('Y-m-d'),
             'originalFilename' => $session->getOriginalFilename(),
-            'status'           => $session->getStatus()->value,
-            'result'           => $session->getDecodedResult(),
-            'createdAt'        => $session->getCreatedAt()->format('c'),
+            'status' => $session->getStatus()->value,
+            'result' => $session->getDecodedResult(),
+            'createdAt' => $session->getCreatedAt()->format('c'),
         ]);
     }
 }

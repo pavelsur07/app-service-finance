@@ -14,7 +14,8 @@ final readonly class PortfolioSummaryPolicy
 {
     public function __construct(
         private ListingDailySnapshotRepositoryInterface $snapshotRepository,
-    ) {}
+    ) {
+    }
 
     public function calculate(
         string $companyId,
@@ -31,7 +32,7 @@ final readonly class PortfolioSummaryPolicy
         [$totalRevenue, $totalProfit] = $this->computeTotals($snapshots);
 
         $marginPercent = null;
-        if (bccomp($totalRevenue, '0.00', 2) > 0 && $totalProfit !== null) {
+        if (bccomp($totalRevenue, '0.00', 2) > 0 && null !== $totalProfit) {
             $marginPercent = (float) bcdiv(bcmul($totalProfit, '100', 2), $totalRevenue, 2);
         }
 
@@ -54,22 +55,22 @@ final readonly class PortfolioSummaryPolicy
                 $previousRevenue,
                 2,
             );
-        } elseif (bccomp($totalRevenue, '0.00', 2) === 0) {
+        } elseif (0 === bccomp($totalRevenue, '0.00', 2)) {
             $revenueDeltaAbsolute = '0.00';
             $revenueDeltaPercent = 0.0;
         }
 
         $profitDeltaAbsolute = null;
         $profitDeltaPercent = null;
-        if ($totalProfit !== null && $previousProfit !== null) {
-            if (bccomp($previousProfit, '0.00', 2) !== 0) {
+        if (null !== $totalProfit && null !== $previousProfit) {
+            if (0 !== bccomp($previousProfit, '0.00', 2)) {
                 $profitDeltaAbsolute = bcsub($totalProfit, $previousProfit, 2);
                 $profitDeltaPercent = (float) bcdiv(
                     bcmul($profitDeltaAbsolute, '100', 2),
                     $previousProfit,
                     2,
                 );
-            } elseif (bccomp($totalProfit, '0.00', 2) === 0) {
+            } elseif (0 === bccomp($totalProfit, '0.00', 2)) {
                 $profitDeltaAbsolute = '0.00';
                 $profitDeltaPercent = 0.0;
             }
@@ -91,6 +92,7 @@ final readonly class PortfolioSummaryPolicy
 
     /**
      * @param ListingDailySnapshot[] $snapshots
+     *
      * @return array{0: string, 1: ?string}
      */
     private function computeTotals(array $snapshots): array
@@ -105,7 +107,7 @@ final readonly class PortfolioSummaryPolicy
             $totalRevenue = bcadd($totalRevenue, $snapshot->getRevenue(), 2);
             $totalRefunds = bcadd($totalRefunds, $snapshot->getRefunds(), 2);
 
-            if ($snapshot->getCostPrice() === null) {
+            if (null === $snapshot->getCostPrice()) {
                 $allHaveCostPrice = false;
             } else {
                 $totalCostPrice = bcadd($totalCostPrice, $snapshot->getTotalCostPrice() ?? '0.00', 2);

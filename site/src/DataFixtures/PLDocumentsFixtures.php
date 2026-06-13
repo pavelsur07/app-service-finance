@@ -3,12 +3,12 @@
 namespace App\DataFixtures;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\ProjectDirection;
+use App\Finance\Application\Service\PLRegisterUpdater;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
 use App\Finance\Entity\PLCategory;
-use App\Company\Entity\ProjectDirection;
 use App\Finance\Enum\DocumentType;
-use App\Finance\Application\Service\PLRegisterUpdater;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Common\DataFixtures\DependentFixtureInterface;
 use Doctrine\Persistence\ObjectManager;

@@ -32,7 +32,7 @@ final class GetWidgetsSummaryController extends AbstractController
         $company = $this->activeCompanyService->getActiveCompany();
 
         $marketplace = $request->query->get('marketplace');
-        if ($marketplace === null || $marketplace === '') {
+        if (null === $marketplace || '' === $marketplace) {
             $marketplace = null;
         } else {
             $validValues = array_map(
@@ -41,21 +41,21 @@ final class GetWidgetsSummaryController extends AbstractController
             );
             if (!in_array($marketplace, $validValues, true)) {
                 return $this->json([
-                    'error' => 'Invalid marketplace. Allowed: ' . implode(', ', $validValues),
+                    'error' => 'Invalid marketplace. Allowed: '.implode(', ', $validValues),
                 ], 422);
             }
         }
 
         $periodFromStr = $request->query->get('periodFrom', '');
-        $periodToStr   = $request->query->get('periodTo', '');
+        $periodToStr = $request->query->get('periodTo', '');
 
-        if ($periodFromStr === '' || $periodToStr === '') {
+        if ('' === $periodFromStr || '' === $periodToStr) {
             return $this->json(['error' => 'periodFrom and periodTo are required'], 422);
         }
 
         try {
             $periodFrom = new \DateTimeImmutable($periodFromStr);
-            $periodTo   = new \DateTimeImmutable($periodToStr);
+            $periodTo = new \DateTimeImmutable($periodToStr);
         } catch (\Exception) {
             return $this->json(['error' => 'Invalid date format. Expected Y-m-d'], 422);
         }
@@ -83,13 +83,13 @@ final class GetWidgetsSummaryController extends AbstractController
         );
 
         return new JsonResponse([
-            'current'  => $current,
+            'current' => $current,
             'previous' => $previous,
-            'period'   => [
-                'from'         => $periodFrom->format('Y-m-d'),
-                'to'           => $periodTo->format('Y-m-d'),
+            'period' => [
+                'from' => $periodFrom->format('Y-m-d'),
+                'to' => $periodTo->format('Y-m-d'),
                 'previousFrom' => $prevFrom->format('Y-m-d'),
-                'previousTo'   => $prevTo->format('Y-m-d'),
+                'previousTo' => $prevTo->format('Y-m-d'),
             ],
         ]);
     }

@@ -170,7 +170,7 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
         $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
         $repo->method('findLatestActiveJobByCompanyAndMarketplace')->willReturn(null);
         $repo->method('findCompletedJobCoveringDate')->willReturn(null);
-        $repo->method('findLatestJobCoveringDate')->willReturn($this->job(AdLoadJobStatus::FAILED, 'Marketplace API rate limit exceeded'));        
+        $repo->method('findLatestJobCoveringDate')->willReturn($this->job(AdLoadJobStatus::FAILED, 'Marketplace API rate limit exceeded'));
 
         $dispatch = $this->createMock(DispatchOzonAdLoadActionInterface::class);
         $dispatch->expects(self::never())->method('__invoke');
@@ -200,7 +200,7 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
         $dispatch = $this->createMock(DispatchOzonAdLoadActionInterface::class);
         $calls = 0;
         $dispatch->expects(self::exactly(2))->method('__invoke')
-            ->willReturnCallback(function (string $companyId, \DateTimeImmutable $dateFrom, \DateTimeImmutable $dateTo) use (&$calls): AdLoadJob {
+            ->willReturnCallback(static function (string $companyId, \DateTimeImmutable $dateFrom, \DateTimeImmutable $dateTo) use (&$calls): AdLoadJob {
                 ++$calls;
                 if (1 === $calls) {
                     throw new \RuntimeException('boom');
@@ -372,7 +372,6 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
         self::assertStringContainsString('deferred=3', $tester->getDisplay());
     }
 
-
     public function testAllActiveUsesConnectionsQueryAndProcessesEachCompany(): void
     {
         $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
@@ -422,7 +421,7 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
 
         $dispatch = $this->createMock(DispatchOzonAdLoadActionInterface::class);
         $dispatch->expects(self::once())->method('__invoke')
-            ->with(self::COMPANY_ID, self::callback(fn (\DateTimeImmutable $d): bool => $expectedFrom === $d->format('Y-m-d')), self::anything());
+            ->with(self::COMPANY_ID, self::callback(static fn (\DateTimeImmutable $d): bool => $expectedFrom === $d->format('Y-m-d')), self::anything());
 
         $tester = $this->tester($repo, $dispatch);
         $code = $tester->execute(['--company' => self::COMPANY_ID, '--days-back' => '14']);
@@ -442,7 +441,7 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
 
         $dispatch = $this->createMock(DispatchOzonAdLoadActionInterface::class);
         $dispatch->expects(self::exactly(2))->method('__invoke')
-            ->willReturnCallback(function (string $companyId, \DateTimeImmutable $dateFrom, \DateTimeImmutable $dateTo) use ($rateLimitedCompanyId): AdLoadJob {
+            ->willReturnCallback(static function (string $companyId, \DateTimeImmutable $dateFrom, \DateTimeImmutable $dateTo) use ($rateLimitedCompanyId): AdLoadJob {
                 if ($rateLimitedCompanyId === $companyId) {
                     throw new \RuntimeException('rate_limited', 0, new OzonRateLimitException('429'));
                 }
@@ -465,7 +464,6 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
         self::assertStringContainsString('failed=0', $display);
         self::assertStringNotContainsString('Return value must be of type', $display);
     }
-
 
     public function testActiveCompanyJobForAnotherDateDefersMissingDayWithoutDispatchAndWithoutErrorLog(): void
     {
@@ -532,7 +530,6 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
             $logger,
         );
     }
-
 
     private function emptyConnectionsQuery(): ActiveOzonPerformanceConnectionsQuery
     {

@@ -92,14 +92,14 @@ class ListingDailySnapshot
         Assert::uuid($companyId);
         Assert::uuid($listingId);
 
-        $this->id           = $id;
-        $this->companyId    = $companyId;
-        $this->listingId    = $listingId;
-        $this->marketplace  = $marketplace;
+        $this->id = $id;
+        $this->companyId = $companyId;
+        $this->listingId = $listingId;
+        $this->marketplace = $marketplace;
         $this->snapshotDate = $snapshotDate;
         $this->calculatedAt = new \DateTimeImmutable();
-        $this->createdAt    = new \DateTimeImmutable();
-        $this->updatedAt    = new \DateTimeImmutable();
+        $this->createdAt = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function recalculate(
@@ -116,40 +116,119 @@ class ListingDailySnapshot
         array $advertisingDetails,
         array $dataQuality,
     ): void {
-        $this->revenue             = $revenue;
-        $this->refunds             = $refunds;
-        $this->salesQuantity       = $salesQuantity;
-        $this->returnsQuantity     = $returnsQuantity;
-        $this->ordersQuantity      = $ordersQuantity;
-        $this->deliveredQuantity   = $deliveredQuantity;
-        $this->avgSalePrice        = $avgSalePrice;
-        $this->costPrice           = $costPrice;
-        $this->totalCostPrice      = $totalCostPrice;
-        $this->costBreakdown       = $costBreakdown;
-        $this->advertisingDetails  = $advertisingDetails;
-        $this->dataQuality         = $dataQuality;
-        $this->calculatedAt        = new \DateTimeImmutable();
-        $this->updatedAt           = new \DateTimeImmutable();
+        $this->revenue = $revenue;
+        $this->refunds = $refunds;
+        $this->salesQuantity = $salesQuantity;
+        $this->returnsQuantity = $returnsQuantity;
+        $this->ordersQuantity = $ordersQuantity;
+        $this->deliveredQuantity = $deliveredQuantity;
+        $this->avgSalePrice = $avgSalePrice;
+        $this->costPrice = $costPrice;
+        $this->totalCostPrice = $totalCostPrice;
+        $this->costBreakdown = $costBreakdown;
+        $this->advertisingDetails = $advertisingDetails;
+        $this->dataQuality = $dataQuality;
+        $this->calculatedAt = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
-    public function getId(): string { return $this->id; }
-    public function getCompanyId(): string { return $this->companyId; }
-    public function getListingId(): string { return $this->listingId; }
-    public function getMarketplace(): MarketplaceType { return $this->marketplace; }
-    public function getSnapshotDate(): \DateTimeImmutable { return $this->snapshotDate; }
-    public function getRevenue(): string { return $this->revenue; }
-    public function getRefunds(): string { return $this->refunds; }
-    public function getSalesQuantity(): int { return $this->salesQuantity; }
-    public function getReturnsQuantity(): int { return $this->returnsQuantity; }
-    public function getOrdersQuantity(): int { return $this->ordersQuantity; }
-    public function getDeliveredQuantity(): int { return $this->deliveredQuantity; }
-    public function getAvgSalePrice(): string { return $this->avgSalePrice; }
-    public function getCostPrice(): ?string { return $this->costPrice; }
-    public function getTotalCostPrice(): ?string { return $this->totalCostPrice; }
-    public function getCostBreakdown(): array { return $this->costBreakdown; }
-    public function getAdvertisingDetails(): array { return $this->advertisingDetails; }
-    public function getDataQuality(): array { return $this->dataQuality; }
-    public function getCalculatedAt(): \DateTimeImmutable { return $this->calculatedAt; }
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
-    public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
+    public function getId(): string
+    {
+        return $this->id;
+    }
+
+    public function getCompanyId(): string
+    {
+        return $this->companyId;
+    }
+
+    public function getListingId(): string
+    {
+        return $this->listingId;
+    }
+
+    public function getMarketplace(): MarketplaceType
+    {
+        return $this->marketplace;
+    }
+
+    public function getSnapshotDate(): \DateTimeImmutable
+    {
+        return $this->snapshotDate;
+    }
+
+    public function getRevenue(): string
+    {
+        return $this->revenue;
+    }
+
+    public function getRefunds(): string
+    {
+        return $this->refunds;
+    }
+
+    public function getSalesQuantity(): int
+    {
+        return $this->salesQuantity;
+    }
+
+    public function getReturnsQuantity(): int
+    {
+        return $this->returnsQuantity;
+    }
+
+    public function getOrdersQuantity(): int
+    {
+        return $this->ordersQuantity;
+    }
+
+    public function getDeliveredQuantity(): int
+    {
+        return $this->deliveredQuantity;
+    }
+
+    public function getAvgSalePrice(): string
+    {
+        return $this->avgSalePrice;
+    }
+
+    public function getCostPrice(): ?string
+    {
+        return $this->costPrice;
+    }
+
+    public function getTotalCostPrice(): ?string
+    {
+        return $this->totalCostPrice;
+    }
+
+    public function getCostBreakdown(): array
+    {
+        return $this->costBreakdown;
+    }
+
+    public function getAdvertisingDetails(): array
+    {
+        return $this->advertisingDetails;
+    }
+
+    public function getDataQuality(): array
+    {
+        return $this->dataQuality;
+    }
+
+    public function getCalculatedAt(): \DateTimeImmutable
+    {
+        return $this->calculatedAt;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    public function getUpdatedAt(): \DateTimeImmutable
+    {
+        return $this->updatedAt;
+    }
 }

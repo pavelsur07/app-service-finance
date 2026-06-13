@@ -278,7 +278,7 @@ final class MarketplaceSalesControllerTest extends WebTestCaseBase
      */
     private function seedFiveAndAHalfPagesOfSales(MarketplaceListing $listing): void
     {
-        for ($i = 1; $i <= 55; $i++) {
+        for ($i = 1; $i <= 55; ++$i) {
             $day = (($i - 1) % 30) + 1;
             $this->seedSale($listing, sprintf('2026-04-%02d', $day));
         }

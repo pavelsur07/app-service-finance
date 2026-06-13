@@ -81,14 +81,14 @@ class MarketplaceInventoryCostPrice
         Assert::greaterThanEq((float) $priceAmount, 0.0);
         Assert::length($priceCurrency, 3);
 
-        $this->id            = $id;
-        $this->companyId     = $companyId;
-        $this->listing       = $listing;
+        $this->id = $id;
+        $this->companyId = $companyId;
+        $this->listing = $listing;
         $this->effectiveFrom = $effectiveFrom;
-        $this->priceAmount   = $priceAmount;
+        $this->priceAmount = $priceAmount;
         $this->priceCurrency = strtoupper($priceCurrency);
-        $this->note          = $note;
-        $this->createdAt     = new \DateTimeImmutable();
+        $this->note = $note;
+        $this->createdAt = new \DateTimeImmutable();
     }
 
     public function getId(): string

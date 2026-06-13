@@ -33,12 +33,12 @@ final class ProcessWbReturnsAction
     {
         $company = $this->em->find(Company::class, $companyId);
         if (!$company instanceof Company) {
-            throw new \RuntimeException('Company not found: ' . $companyId);
+            throw new \RuntimeException('Company not found: '.$companyId);
         }
 
         $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
         if (!$rawDoc instanceof MarketplaceRawDocument) {
-            throw new \RuntimeException('Raw document not found: ' . $rawDocId);
+            throw new \RuntimeException('Raw document not found: '.$rawDocId);
         }
 
         $rawData = $rawDoc->getRawData();
@@ -80,22 +80,22 @@ final class ProcessWbReturnsAction
         foreach ($returnsData as $item) {
             $nmId = $this->normalizer->nmId($item);
             $tsName = $this->normalizer->techSize($item);
-            $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
-            $cacheKey = $nmId . '_' . $size;
+            $size = '' !== trim((string) $tsName) ? trim((string) $tsName) : 'UNKNOWN';
+            $cacheKey = $nmId.'_'.$size;
 
             if (isset($listingsCache[$cacheKey])) {
                 continue;
             }
 
             $listing = $this->listingResolver->resolve($company, $nmId, $tsName, [
-                'sa_name'      => $this->normalizer->vendorCode($item),
-                'brand_name'   => $this->normalizer->brandName($item),
+                'sa_name' => $this->normalizer->vendorCode($item),
+                'brand_name' => $this->normalizer->brandName($item),
                 'subject_name' => $this->normalizer->subjectName($item),
                 'retail_price' => (string) $this->normalizer->retailPrice($item),
             ]);
 
             $listingsCache[$cacheKey] = $listing;
-            $newListingsCreated++;
+            ++$newListingsCreated;
         }
 
         if ($newListingsCreated > 0) {
@@ -115,8 +115,8 @@ final class ProcessWbReturnsAction
 
                 $nmId = $this->normalizer->nmId($item);
                 $tsName = $this->normalizer->techSize($item);
-                $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
-                $cacheKey = $nmId . '_' . $size;
+                $size = '' !== trim((string) $tsName) ? trim((string) $tsName) : 'UNKNOWN';
+                $cacheKey = $nmId.'_'.$size;
 
                 $listing = $listingsCache[$cacheKey] ?? null;
 
@@ -146,10 +146,10 @@ final class ProcessWbReturnsAction
                 $this->em->persist($return);
                 $existingSridsMap[$externalReturnId] = true;
 
-                $synced++;
-                $counter++;
+                ++$synced;
+                ++$counter;
 
-                if ($counter % $batchSize === 0) {
+                if (0 === $counter % $batchSize) {
                     $this->em->flush();
                     $this->em->clear();
 
@@ -167,7 +167,7 @@ final class ProcessWbReturnsAction
                     $this->logger->info('[WB] Returns batch', [
                         'processed' => $counter,
                         'synced' => $synced,
-                        'memory' => round(memory_get_usage(true) / 1024 / 1024, 2) . ' MB',
+                        'memory' => round(memory_get_usage(true) / 1024 / 1024, 2).' MB',
                     ]);
                 }
             } catch (\Exception $e) {
@@ -179,7 +179,7 @@ final class ProcessWbReturnsAction
             }
         }
 
-        if ($counter % $batchSize !== 0) {
+        if (0 !== $counter % $batchSize) {
             $this->em->flush();
             $this->em->clear();
         }

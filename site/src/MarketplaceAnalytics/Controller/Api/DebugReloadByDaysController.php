@@ -48,32 +48,32 @@ final class DebugReloadByDaysController extends AbstractController
 
     public function __invoke(Request $request): JsonResponse
     {
-        $company   = $this->activeCompanyService->getActiveCompany();
+        $company = $this->activeCompanyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
         $marketplaceStr = (string) $request->query->get('marketplace', '');
-        $fromStr        = (string) $request->query->get('from', '');
-        $toStr          = (string) $request->query->get('to', '');
-        $confirm        = (string) $request->query->get('confirm', '0') === '1';
-        $chunkSize      = max(1, (int) $request->query->get('chunkSize', (string) self::DEFAULT_CHUNK_SIZE));
-        $offset         = max(0, (int) $request->query->get('offset', '0'));
+        $fromStr = (string) $request->query->get('from', '');
+        $toStr = (string) $request->query->get('to', '');
+        $confirm = '1' === (string) $request->query->get('confirm', '0');
+        $chunkSize = max(1, (int) $request->query->get('chunkSize', (string) self::DEFAULT_CHUNK_SIZE));
+        $offset = max(0, (int) $request->query->get('offset', '0'));
 
-        if ($marketplaceStr === '' || $fromStr === '' || $toStr === '') {
+        if ('' === $marketplaceStr || '' === $fromStr || '' === $toStr) {
             return $this->json(['error' => 'marketplace, from, to are required'], 422);
         }
 
         $marketplace = MarketplaceType::tryFrom($marketplaceStr);
-        if ($marketplace === null) {
-            return $this->json(['error' => 'Unknown marketplace: ' . $marketplaceStr], 422);
+        if (null === $marketplace) {
+            return $this->json(['error' => 'Unknown marketplace: '.$marketplaceStr], 422);
         }
 
-        if ($marketplace !== MarketplaceType::OZON) {
+        if (MarketplaceType::OZON !== $marketplace) {
             return $this->json(['error' => 'Only ozon is supported at the moment'], 422);
         }
 
         $from = $this->parseStrictDate($fromStr);
-        $to   = $this->parseStrictDate($toStr);
-        if ($from === null || $to === null) {
+        $to = $this->parseStrictDate($toStr);
+        if (null === $from || null === $to) {
             return $this->json(['error' => 'Invalid date format (Y-m-d expected, must be a real calendar date)'], 422);
         }
 
@@ -82,32 +82,32 @@ final class DebugReloadByDaysController extends AbstractController
         }
 
         $connectionId = $this->findConnectionId($companyId, $marketplace);
-        if ($connectionId === null) {
-            return $this->json(['error' => 'No active connection found for company ' . $companyId . ' on ' . $marketplace->value], 404);
+        if (null === $connectionId) {
+            return $this->json(['error' => 'No active connection found for company '.$companyId.' on '.$marketplace->value], 404);
         }
 
-        $allDays        = $this->buildDaysList($from, $to);
-        $existingDays   = $this->findExistingDays($companyId, $marketplace, $from, $to);
-        $toDispatchAll  = array_values(array_filter($allDays, static fn (string $d): bool => !isset($existingDays[$d])));
-        $skippedCount   = count($allDays) - count($toDispatchAll);
+        $allDays = $this->buildDaysList($from, $to);
+        $existingDays = $this->findExistingDays($companyId, $marketplace, $from, $to);
+        $toDispatchAll = array_values(array_filter($allDays, static fn (string $d): bool => !isset($existingDays[$d])));
+        $skippedCount = count($allDays) - count($toDispatchAll);
         $totalToDispatch = count($toDispatchAll);
 
         if (!$confirm) {
             return $this->json([
-                'mode'               => 'preview',
-                'companyId'          => $companyId,
-                'marketplace'        => $marketplace->value,
-                'from'               => $from->format('Y-m-d'),
-                'to'                 => $to->format('Y-m-d'),
-                'total_days'         => count($allDays),
-                'skipped_existing'   => $skippedCount,
-                'to_dispatch_total'  => $totalToDispatch,
-                'suggested_chunks'   => $totalToDispatch > 0 ? (int) ceil($totalToDispatch / $chunkSize) : 0,
+                'mode' => 'preview',
+                'companyId' => $companyId,
+                'marketplace' => $marketplace->value,
+                'from' => $from->format('Y-m-d'),
+                'to' => $to->format('Y-m-d'),
+                'total_days' => count($allDays),
+                'skipped_existing' => $skippedCount,
+                'to_dispatch_total' => $totalToDispatch,
+                'suggested_chunks' => $totalToDispatch > 0 ? (int) ceil($totalToDispatch / $chunkSize) : 0,
                 'suggested_chunk_size' => $chunkSize,
             ]);
         }
 
-        $chunk      = array_slice($toDispatchAll, $offset, $chunkSize);
+        $chunk = array_slice($toDispatchAll, $offset, $chunkSize);
         $dispatched = 0;
 
         foreach ($chunk as $dayStr) {
@@ -116,38 +116,38 @@ final class DebugReloadByDaysController extends AbstractController
                 connectionId: $connectionId,
                 date: $dayStr,
             ));
-            $dispatched++;
+            ++$dispatched;
         }
 
         $nextOffset = $offset + $chunkSize;
-        $hasMore    = $nextOffset < $totalToDispatch;
+        $hasMore = $nextOffset < $totalToDispatch;
 
         $this->logger->info('[DebugReloadByDays] Chunk dispatched', [
-            'company_id'  => $companyId,
+            'company_id' => $companyId,
             'marketplace' => $marketplace->value,
-            'offset'      => $offset,
-            'chunk_size'  => $chunkSize,
-            'dispatched'  => $dispatched,
-            'has_more'    => $hasMore,
+            'offset' => $offset,
+            'chunk_size' => $chunkSize,
+            'dispatched' => $dispatched,
+            'has_more' => $hasMore,
         ]);
 
         return $this->json([
-            'mode'              => 'executed',
-            'companyId'         => $companyId,
-            'marketplace'       => $marketplace->value,
-            'from'              => $from->format('Y-m-d'),
-            'to'                => $to->format('Y-m-d'),
-            'total_days'        => count($allDays),
-            'skipped_existing'  => $skippedCount,
+            'mode' => 'executed',
+            'companyId' => $companyId,
+            'marketplace' => $marketplace->value,
+            'from' => $from->format('Y-m-d'),
+            'to' => $to->format('Y-m-d'),
+            'total_days' => count($allDays),
+            'skipped_existing' => $skippedCount,
             'to_dispatch_total' => $totalToDispatch,
-            'chunk'             => [
-                'offset'     => $offset,
-                'size'       => $chunkSize,
+            'chunk' => [
+                'offset' => $offset,
+                'size' => $chunkSize,
                 'dispatched' => $dispatched,
             ],
             'next_offset' => $hasMore ? $nextOffset : null,
-            'has_more'    => $hasMore,
-            'hint'        => $hasMore
+            'has_more' => $hasMore,
+            'hint' => $hasMore
                 ? sprintf('Call again with offset=%d to dispatch next chunk', $nextOffset)
                 : 'All days dispatched',
         ]);
@@ -162,7 +162,7 @@ final class DebugReloadByDaysController extends AbstractController
             ['companyId' => $companyId, 'mp' => $marketplace->value],
         );
 
-        return $id !== false ? (string) $id : null;
+        return false !== $id ? (string) $id : null;
     }
 
     /**
@@ -200,10 +200,10 @@ final class DebugReloadByDaysController extends AbstractController
                AND period_from >= :from
                AND period_to <= :to",
             [
-                'cid'  => $companyId,
-                'mp'   => $marketplace->value,
+                'cid' => $companyId,
+                'mp' => $marketplace->value,
                 'from' => $from->format('Y-m-d'),
-                'to'   => $to->format('Y-m-d'),
+                'to' => $to->format('Y-m-d'),
             ],
         );
 
@@ -214,7 +214,7 @@ final class DebugReloadByDaysController extends AbstractController
     {
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
 
-        if ($date === false || $date->format('Y-m-d') !== $value) {
+        if (false === $date || $date->format('Y-m-d') !== $value) {
             return null;
         }
 

@@ -10,8 +10,8 @@ use App\MarketplaceAnalytics\Enum\UnitEconomyCostType;
 
 final class UnitEconomyCostMappingBuilder
 {
-    public const DEFAULT_ID          = '55555555-5555-5555-5555-555555555555';
-    public const DEFAULT_COMPANY_ID  = '11111111-1111-1111-1111-111111111111';
+    public const DEFAULT_ID = '55555555-5555-5555-5555-555555555555';
+    public const DEFAULT_COMPANY_ID = '11111111-1111-1111-1111-111111111111';
     public const DEFAULT_CATEGORY_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 
     private string $id = self::DEFAULT_ID;

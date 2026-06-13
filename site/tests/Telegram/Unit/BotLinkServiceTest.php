@@ -97,7 +97,7 @@ final class BotLinkServiceTest extends TestCase
     public function testTtlNormalization(?int $inputTtl, int $expectedMin, int $expectedMax): void
     {
         $persisted = null;
-        $this->em->method('persist')->willReturnCallback(function ($entity) use (&$persisted) {
+        $this->em->method('persist')->willReturnCallback(static function ($entity) use (&$persisted) {
             $persisted = $entity;
         });
         $this->em->expects(self::once())->method('flush');
@@ -127,7 +127,7 @@ final class BotLinkServiceTest extends TestCase
     public function testValidateAndConsumeHappyPath(): void
     {
         $captured = null;
-        $this->em->method('persist')->willReturnCallback(function ($entity) use (&$captured) {
+        $this->em->method('persist')->willReturnCallback(static function ($entity) use (&$captured) {
             $captured = $entity;
         });
         $this->em->expects(self::any())->method('flush');
@@ -226,7 +226,7 @@ final class BotLinkServiceTest extends TestCase
 
         // Захватим entity, созданную при createFinanceLink()
         $captured = null;
-        $this->em->method('persist')->willReturnCallback(function ($e) use (&$captured) {
+        $this->em->method('persist')->willReturnCallback(static function ($e) use (&$captured) {
             $captured = $e;
         });
         $this->em->expects(self::any())->method('flush');
@@ -304,7 +304,7 @@ final class BotLinkServiceTest extends TestCase
     private function makeLinkAlive(): array
     {
         $captured = null;
-        $this->em->method('persist')->willReturnCallback(function ($e) use (&$captured) {
+        $this->em->method('persist')->willReturnCallback(static function ($e) use (&$captured) {
             $captured = $e;
         });
         $this->em->expects(self::any())->method('flush');

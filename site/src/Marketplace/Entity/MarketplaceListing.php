@@ -99,7 +99,7 @@ class MarketplaceListing
      */
     public function isMapped(): bool
     {
-        return $this->product !== null;
+        return null !== $this->product;
     }
 
     public function getMarketplace(): MarketplaceType
@@ -187,7 +187,7 @@ class MarketplaceListing
     public function setSize(?string $size): self
     {
         // Если size пустой или null - устанавливаем 'UNKNOWN'
-        $this->size = ($size === null || trim($size) === '') ? 'UNKNOWN' : trim($size);
+        $this->size = (null === $size || '' === trim($size)) ? 'UNKNOWN' : trim($size);
 
         return $this;
     }
@@ -210,11 +210,12 @@ class MarketplaceListing
     public function setName(?string $name): self
     {
         $this->name = $name;
+
         return $this;
     }
 
     /**
-     * Lifecycle callback: вызывается перед первым сохранением entity в БД
+     * Lifecycle callback: вызывается перед первым сохранением entity в БД.
      */
     #[ORM\PrePersist]
     public function onPrePersist(): void
@@ -224,7 +225,7 @@ class MarketplaceListing
     }
 
     /**
-     * Lifecycle callback: вызывается перед каждым обновлением entity в БД
+     * Lifecycle callback: вызывается перед каждым обновлением entity в БД.
      */
     #[ORM\PreUpdate]
     public function onPreUpdate(): void

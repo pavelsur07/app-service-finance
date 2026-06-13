@@ -19,7 +19,8 @@ final class OzonAdLoadRangeController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $companyService,
         private readonly DispatchOzonAdLoadAction $dispatchAction,
-    ) {}
+    ) {
+    }
 
     public function __invoke(Request $request): JsonResponse
     {
@@ -51,7 +52,7 @@ final class OzonAdLoadRangeController extends AbstractController
                     ['jobId' => $job->getId()],
                 ),
             ]);
-        } catch (\DomainException | \InvalidArgumentException $e) {
+        } catch (\DomainException|\InvalidArgumentException $e) {
             return $this->json(['message' => $e->getMessage()], 400);
         }
     }

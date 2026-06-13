@@ -45,9 +45,9 @@ final class WildberriesAdRawDataParserTest extends TestCase
         $json = json_encode([
             'adverts' => [
                 ['advertId' => 123, 'advertName' => 'Кампания 1', 'nmId' => 456,
-                 'sum' => 150.50, 'views' => 1000, 'clicks' => 50],
+                    'sum' => 150.50, 'views' => 1000, 'clicks' => 50],
             ],
-        ], JSON_THROW_ON_ERROR);
+        ], \JSON_THROW_ON_ERROR);
 
         $result = $this->parser->parse($json);
 
@@ -67,13 +67,13 @@ final class WildberriesAdRawDataParserTest extends TestCase
         $json = json_encode([
             'adverts' => [
                 ['advertId' => 123, 'advertName' => 'К1', 'nmId' => 456,
-                 'sum' => 100.25, 'views' => 500, 'clicks' => 20],
+                    'sum' => 100.25, 'views' => 500, 'clicks' => 20],
                 ['advertId' => 123, 'advertName' => 'К1', 'nmId' => 456,
-                 'sum' => 50.75, 'views' => 300, 'clicks' => 15],
+                    'sum' => 50.75, 'views' => 300, 'clicks' => 15],
                 ['advertId' => 123, 'advertName' => 'К1', 'nmId' => 999,
-                 'sum' => 25.00, 'views' => 100, 'clicks' => 5],
+                    'sum' => 25.00, 'views' => 100, 'clicks' => 5],
             ],
-        ], JSON_THROW_ON_ERROR);
+        ], \JSON_THROW_ON_ERROR);
 
         $result = $this->parser->parse($json);
 
@@ -95,11 +95,11 @@ final class WildberriesAdRawDataParserTest extends TestCase
         $json = json_encode([
             'adverts' => [
                 ['advertId' => 111, 'advertName' => 'A', 'nmId' => 456,
-                 'sum' => 10.00, 'views' => 100, 'clicks' => 1],
+                    'sum' => 10.00, 'views' => 100, 'clicks' => 1],
                 ['advertId' => 222, 'advertName' => 'B', 'nmId' => 456,
-                 'sum' => 20.00, 'views' => 200, 'clicks' => 2],
+                    'sum' => 20.00, 'views' => 200, 'clicks' => 2],
             ],
-        ], JSON_THROW_ON_ERROR);
+        ], \JSON_THROW_ON_ERROR);
 
         $result = $this->parser->parse($json);
 
@@ -119,9 +119,9 @@ final class WildberriesAdRawDataParserTest extends TestCase
         $json = json_encode([
             'adverts' => [
                 ['advertId' => 1, 'advertName' => 'A', 'nmId' => 2,
-                 'sum' => 1.005, 'views' => 1, 'clicks' => 0],
+                    'sum' => 1.005, 'views' => 1, 'clicks' => 0],
             ],
-        ], JSON_THROW_ON_ERROR);
+        ], \JSON_THROW_ON_ERROR);
 
         $result = $this->parser->parse($json);
 
@@ -138,13 +138,13 @@ final class WildberriesAdRawDataParserTest extends TestCase
         $json = json_encode([
             'adverts' => [
                 ['advertId' => 1, 'advertName' => 'A', 'nmId' => 2,
-                 'sum' => 0.005, 'views' => 1, 'clicks' => 0],
+                    'sum' => 0.005, 'views' => 1, 'clicks' => 0],
                 ['advertId' => 1, 'advertName' => 'A', 'nmId' => 2,
-                 'sum' => 0.005, 'views' => 1, 'clicks' => 0],
+                    'sum' => 0.005, 'views' => 1, 'clicks' => 0],
                 ['advertId' => 1, 'advertName' => 'A', 'nmId' => 2,
-                 'sum' => 0.005, 'views' => 1, 'clicks' => 0],
+                    'sum' => 0.005, 'views' => 1, 'clicks' => 0],
             ],
-        ], JSON_THROW_ON_ERROR);
+        ], \JSON_THROW_ON_ERROR);
 
         $result = $this->parser->parse($json);
 
@@ -157,13 +157,13 @@ final class WildberriesAdRawDataParserTest extends TestCase
         $json = json_encode([
             'adverts' => [
                 ['advertId' => 1, 'advertName' => 'A', 'nmId' => 2,
-                 'sum' => 10.00, 'views' => 100, 'clicks' => 5],
+                    'sum' => 10.00, 'views' => 100, 'clicks' => 5],
                 ['advertName' => 'no id', 'nmId' => 3,
-                 'sum' => 5.00, 'views' => 50, 'clicks' => 1],
+                    'sum' => 5.00, 'views' => 50, 'clicks' => 1],
                 ['advertId' => 2, 'advertName' => 'no nmId',
-                 'sum' => 5.00, 'views' => 50, 'clicks' => 1],
+                    'sum' => 5.00, 'views' => 50, 'clicks' => 1],
             ],
-        ], JSON_THROW_ON_ERROR);
+        ], \JSON_THROW_ON_ERROR);
 
         $result = $this->parser->parse($json);
 
@@ -185,21 +185,21 @@ final class WildberriesAdRawDataParserTest extends TestCase
         $json = json_encode([
             'adverts' => [
                 ['advertId' => 1, 'advertName' => 'A', 'nmId' => 2,
-                 'sum' => 10.00, 'views' => 100, 'clicks' => 5],
+                    'sum' => 10.00, 'views' => 100, 'clicks' => 5],
                 ['advertName' => 'no id', 'nmId' => 3,
-                 'sum' => 5.00, 'views' => 50, 'clicks' => 1],
+                    'sum' => 5.00, 'views' => 50, 'clicks' => 1],
                 ['advertId' => 2, 'advertName' => 'no nmId',
-                 'sum' => 5.00, 'views' => 50, 'clicks' => 1],
+                    'sum' => 5.00, 'views' => 50, 'clicks' => 1],
                 'not-an-array',
             ],
-        ], JSON_THROW_ON_ERROR);
+        ], \JSON_THROW_ON_ERROR);
 
         $parser->parse($json);
 
-        $warnings = array_filter($logger->records, static fn(array $r) => $r['level'] === 'warning');
+        $warnings = array_filter($logger->records, static fn (array $r) => 'warning' === $r['level']);
         self::assertCount(2, $warnings, 'Each skipped row with missing fields must emit a warning');
 
-        $summaries = array_filter($logger->records, static fn(array $r) => $r['level'] === 'info');
+        $summaries = array_filter($logger->records, static fn (array $r) => 'info' === $r['level']);
         self::assertCount(1, $summaries, 'Exactly one summary info-log must be emitted when rows were skipped');
 
         $summary = array_values($summaries)[0];
@@ -217,9 +217,9 @@ final class WildberriesAdRawDataParserTest extends TestCase
         $json = json_encode([
             'adverts' => [
                 ['advertId' => 1, 'advertName' => 'A', 'nmId' => 2,
-                 'sum' => 10.00, 'views' => 100, 'clicks' => 5],
+                    'sum' => 10.00, 'views' => 100, 'clicks' => 5],
             ],
-        ], JSON_THROW_ON_ERROR);
+        ], \JSON_THROW_ON_ERROR);
 
         $parser->parse($json);
 

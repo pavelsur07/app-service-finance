@@ -28,7 +28,8 @@ final class MarketplaceAdsLogsController extends AbstractController
     public function __construct(
         #[Autowire('%kernel.logs_dir%')]
         private readonly string $logsDir,
-    ) {}
+    ) {
+    }
 
     public function __invoke(Request $request): Response
     {
@@ -85,7 +86,7 @@ final class MarketplaceAdsLogsController extends AbstractController
 
     private function findLatestLogFile(): ?string
     {
-        $pattern = rtrim($this->logsDir, '/') . '/marketplace_ads*.log';
+        $pattern = rtrim($this->logsDir, '/').'/marketplace_ads*.log';
         $matches = glob($pattern);
 
         if (false === $matches || [] === $matches) {
@@ -123,7 +124,7 @@ final class MarketplaceAdsLogsController extends AbstractController
         }
 
         if ($size <= self::SMALL_FILE_THRESHOLD_BYTES) {
-            $all = file($file, FILE_IGNORE_NEW_LINES);
+            $all = file($file, \FILE_IGNORE_NEW_LINES);
             if (false === $all) {
                 return [];
             }
@@ -139,13 +140,13 @@ final class MarketplaceAdsLogsController extends AbstractController
      */
     private function readTailChunked(string $file, int $lines): array
     {
-        $handle = fopen($file, 'rb');
+        $handle = fopen($file, 'r');
         if (false === $handle) {
             return [];
         }
 
         try {
-            fseek($handle, 0, SEEK_END);
+            fseek($handle, 0, \SEEK_END);
             $position = ftell($handle);
             $buffer = '';
             $newlines = 0;
@@ -155,7 +156,7 @@ final class MarketplaceAdsLogsController extends AbstractController
                 $position -= $readSize;
                 fseek($handle, $position);
                 $chunk = (string) fread($handle, $readSize);
-                $buffer = $chunk . $buffer;
+                $buffer = $chunk.$buffer;
                 $newlines += substr_count($chunk, "\n");
             }
         } finally {

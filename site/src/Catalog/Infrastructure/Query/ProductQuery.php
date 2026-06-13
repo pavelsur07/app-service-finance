@@ -32,21 +32,21 @@ SQL;
         }
 
         return [
-            'id'              => (string) $row['id'],
-            'sku'             => (string) $row['sku'],
-            'name'            => (string) $row['name'],
-            'description'     => null !== $row['description'] ? (string) $row['description'] : null,
+            'id' => (string) $row['id'],
+            'sku' => (string) $row['sku'],
+            'name' => (string) $row['name'],
+            'description' => null !== $row['description'] ? (string) $row['description'] : null,
             'internalArticle' => null !== $row['internal_article'] ? (string) $row['internal_article'] : null,
-            'vendorSku'       => null !== $row['vendor_sku'] ? (string) $row['vendor_sku'] : null,
-            'weightKg'        => null !== $row['weight_kg'] ? (string) $row['weight_kg'] : null,
-            'status'          => (string) $row['status'],
-            'createdAt'       => new \DateTimeImmutable((string) $row['created_at']),
-            'updatedAt'       => new \DateTimeImmutable((string) $row['updated_at']),
+            'vendorSku' => null !== $row['vendor_sku'] ? (string) $row['vendor_sku'] : null,
+            'weightKg' => null !== $row['weight_kg'] ? (string) $row['weight_kg'] : null,
+            'status' => (string) $row['status'],
+            'createdAt' => new \DateTimeImmutable((string) $row['created_at']),
+            'updatedAt' => new \DateTimeImmutable((string) $row['updated_at']),
         ];
     }
 
     /**
-     * Получить список продуктов компании (для select в UI)
+     * Получить список продуктов компании (для select в UI).
      *
      * @return array<int, array{id: string, sku: string, name: string}>
      */
@@ -64,7 +64,7 @@ SQL;
     }
 
     /**
-     * Найти продукт по ID (с проверкой принадлежности к компании!)
+     * Найти продукт по ID (с проверкой принадлежности к компании!).
      */
     public function findByIdAndCompany(string $productId, string $companyId): ?array
     {

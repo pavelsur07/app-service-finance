@@ -24,7 +24,7 @@ class ProjectDirectionType extends AbstractType
             ->add('parent', EntityType::class, [
                 'class' => ProjectDirection::class,
                 'choices' => $options['parents'],
-                'choice_label' => function (ProjectDirection $item) {
+                'choice_label' => static function (ProjectDirection $item) {
                     return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
                 },
                 'required' => false,

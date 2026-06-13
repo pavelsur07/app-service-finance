@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Deals;
 
 use App\Company\Repository\CompanyMemberRepository;
+use App\Company\Repository\CounterpartyRepository;
 use App\Deals\Exception\InvalidDealState;
 use App\Deals\Repository\ChargeTypeRepository;
 use App\Deals\Service\DealManager;
 use App\Deals\Service\DealNumberGenerator;
 use App\Deals\Service\DealTotalsCalculator;
 use App\Deals\Service\Request\AddDealItemRequest;
-use App\Company\Repository\CounterpartyRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Deals\DealBuilder;

@@ -161,11 +161,7 @@ final class RequestOzonAdBatchHandler
         // гарантирует; попадание сюда означает permanent bug у вызывающего.
         $batchSize = count($message->campaignIds);
         if ($batchSize < 1 || $batchSize > self::STATISTICS_BATCH_SIZE) {
-            throw new UnrecoverableMessageHandlingException(sprintf(
-                'RequestOzonAdBatchMessage: campaignIds size %d out of [1..%d]',
-                $batchSize,
-                self::STATISTICS_BATCH_SIZE,
-            ));
+            throw new UnrecoverableMessageHandlingException(sprintf('RequestOzonAdBatchMessage: campaignIds size %d out of [1..%d]', $batchSize, self::STATISTICS_BATCH_SIZE));
         }
 
         $dateFrom = \DateTimeImmutable::createFromFormat('!Y-m-d', $message->dateFrom);
@@ -179,11 +175,7 @@ final class RequestOzonAdBatchHandler
         ) {
             // Не должно случаться: orchestrator передаёт заранее провалидированные
             // строки. Но если вдруг — permanent bug, ретрай бессмыслен.
-            throw new UnrecoverableMessageHandlingException(sprintf(
-                'RequestOzonAdBatchMessage: invalid date format (from=%s, to=%s)',
-                $message->dateFrom,
-                $message->dateTo,
-            ));
+            throw new UnrecoverableMessageHandlingException(sprintf('RequestOzonAdBatchMessage: invalid date format (from=%s, to=%s)', $message->dateFrom, $message->dateTo));
         }
 
         $dateFrom = $dateFrom->setTime(0, 0);
@@ -220,11 +212,7 @@ final class RequestOzonAdBatchHandler
                 );
             }
 
-            throw new UnrecoverableMessageHandlingException(
-                'RequestOzonAdBatchMessage: Ozon permanent failure — '.$e->getMessage(),
-                0,
-                $e,
-            );
+            throw new UnrecoverableMessageHandlingException('RequestOzonAdBatchMessage: Ozon permanent failure — '.$e->getMessage(), 0, $e);
         } catch (OzonRateLimitException $e) {
             // Ozon backend busy with another /statistics request on this
             // account. Reschedule THIS message with a 60s delay. This does
@@ -256,11 +244,7 @@ final class RequestOzonAdBatchHandler
                     );
                 }
 
-                throw new UnrecoverableMessageHandlingException(
-                    'RequestOzonAdBatchMessage: Ozon rate limit exhausted',
-                    0,
-                    $e,
-                );
+                throw new UnrecoverableMessageHandlingException('RequestOzonAdBatchMessage: Ozon rate limit exhausted', 0, $e);
             }
 
             $next = new RequestOzonAdBatchMessage(

@@ -46,7 +46,7 @@ final class SnapshotRawJsonControllerTest extends WebTestCaseBase
         $client->request('GET', sprintf('/inventory/snapshots/%s/json', $session->getId()));
 
         self::assertResponseIsSuccessful();
-        $json = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        $json = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
         self::assertSame($session->getId(), $json['snapshotSession']['id']);
         self::assertSame('ozon', $json['snapshotSession']['source']);
         self::assertSame(1, count($json['rawSnapshots']));
@@ -127,7 +127,7 @@ final class SnapshotRawJsonControllerTest extends WebTestCaseBase
         $client->request('GET', sprintf('/inventory/snapshots/%s/json', $session->getId()));
 
         self::assertResponseIsSuccessful();
-        $json = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        $json = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
         self::assertSame($session->getId(), $json['snapshotSession']['id']);
         self::assertSame([], $json['rawSnapshots']);
         self::assertSame('No raw snapshots saved for this session.', $json['message']);
@@ -140,6 +140,6 @@ final class SnapshotRawJsonControllerTest extends WebTestCaseBase
 
         $client->request('GET', '/inventory/snapshots/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/json');
 
-        self::assertTrue($client->getResponse()->isRedirect() || $client->getResponse()->getStatusCode() === 403);
+        self::assertTrue($client->getResponse()->isRedirect() || 403 === $client->getResponse()->getStatusCode());
     }
 }

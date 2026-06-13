@@ -30,6 +30,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
 final class OzonDailySyncCommand extends Command
 {
     private const LOOKBACK_DAYS = 14;
+
     public function __construct(
         private readonly ActiveOzonConnectionsQuery $connectionsQuery,
         private readonly MessageBusInterface $messageBus,
@@ -56,22 +57,22 @@ final class OzonDailySyncCommand extends Command
         $today = new \DateTimeImmutable('today', $timezone);
 
         foreach ($connections as $row) {
-            $companyId    = (string) $row['company_id'];
+            $companyId = (string) $row['company_id'];
             $connectionId = (string) $row['id'];
 
-            for ($offset = 1; $offset <= self::LOOKBACK_DAYS; $offset++) {
+            for ($offset = 1; $offset <= self::LOOKBACK_DAYS; ++$offset) {
                 $date = $today->modify(sprintf('-%d day', $offset))->format('Y-m-d');
 
                 $this->messageBus->dispatch(
                     new SyncOzonReportMessage($companyId, $connectionId, $date),
                 );
 
-                $dispatched++;
+                ++$dispatched;
 
                 $this->logger->info('Dispatched Ozon rolling sync message', [
-                    'company_id'    => $companyId,
+                    'company_id' => $companyId,
                     'connection_id' => $connectionId,
-                    'date'          => $date,
+                    'date' => $date,
                 ]);
             }
         }

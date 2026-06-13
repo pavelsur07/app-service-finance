@@ -14,8 +14,8 @@ use PHPUnit\Framework\TestCase;
 
 final class RemapCostMappingActionTest extends TestCase
 {
-    private const COMPANY_ID  = '11111111-1111-1111-1111-111111111111';
-    private const MAPPING_ID  = '55555555-5555-5555-5555-555555555555';
+    private const COMPANY_ID = '11111111-1111-1111-1111-111111111111';
+    private const MAPPING_ID = '55555555-5555-5555-5555-555555555555';
 
     private UnitEconomyCostMappingRepositoryInterface&MockObject $repository;
     private EntityManagerInterface&MockObject $entityManager;
@@ -23,7 +23,7 @@ final class RemapCostMappingActionTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->repository    = $this->createMock(UnitEconomyCostMappingRepositoryInterface::class);
+        $this->repository = $this->createMock(UnitEconomyCostMappingRepositoryInterface::class);
         $this->entityManager = $this->createMock(EntityManagerInterface::class);
 
         $this->action = new RemapCostMappingAction(

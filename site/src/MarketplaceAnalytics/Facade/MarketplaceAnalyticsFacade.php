@@ -25,7 +25,8 @@ final readonly class MarketplaceAnalyticsFacade
         private AddCostMappingAction $addCostMappingAction,
         private DeleteCostMappingAction $deleteCostMappingAction,
         private RemapCostMappingAction $remapCostMappingAction,
-    ) {}
+    ) {
+    }
 
     /**
      * @return ListingUnitEconomics[]

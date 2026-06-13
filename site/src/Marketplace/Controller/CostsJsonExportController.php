@@ -76,7 +76,7 @@ final class CostsJsonExportController extends AbstractController
 
     private function stringOrNull(mixed $raw): ?string
     {
-        if (!is_string($raw) || $raw === '') {
+        if (!is_string($raw) || '' === $raw) {
             return null;
         }
 
@@ -86,7 +86,7 @@ final class CostsJsonExportController extends AbstractController
     private function uuidOrNull(mixed $raw): ?string
     {
         $value = $this->stringOrNull($raw);
-        if ($value === null || !Uuid::isValid($value)) {
+        if (null === $value || !Uuid::isValid($value)) {
             return null;
         }
 
@@ -97,7 +97,7 @@ final class CostsJsonExportController extends AbstractController
     {
         $value = $this->stringOrNull($raw);
 
-        if ($value === 'all' || $value === 'linked' || $value === 'general') {
+        if ('all' === $value || 'linked' === $value || 'general' === $value) {
             return $value;
         }
 
@@ -107,7 +107,7 @@ final class CostsJsonExportController extends AbstractController
     private function resolveMarketplace(mixed $raw): MarketplaceType
     {
         $value = $this->stringOrNull($raw);
-        if ($value === null) {
+        if (null === $value) {
             return MarketplaceType::OZON;
         }
 
@@ -117,12 +117,12 @@ final class CostsJsonExportController extends AbstractController
     private function resolveDate(mixed $raw, \DateTimeImmutable $default): \DateTimeImmutable
     {
         $value = $this->stringOrNull($raw);
-        if ($value === null) {
+        if (null === $value) {
             return $default;
         }
 
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
-        if ($date === false || $date->format('Y-m-d') !== $value) {
+        if (false === $date || $date->format('Y-m-d') !== $value) {
             return $default;
         }
 

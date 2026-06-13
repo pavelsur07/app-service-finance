@@ -20,5 +20,6 @@ final class RecalculateSnapshotsRequest
         #[Assert\NotBlank]
         #[Assert\Date]
         public readonly string $dateTo = '',
-    ) {}
+    ) {
+    }
 }

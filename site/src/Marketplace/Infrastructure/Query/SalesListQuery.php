@@ -39,17 +39,17 @@ final class SalesListQuery
             ->setParameter('companyId', $companyId)
             ->orderBy('s.sale_date', 'DESC');
 
-        if ($marketplace !== null) {
+        if (null !== $marketplace) {
             $qb->andWhere('s.marketplace = :marketplace')
                 ->setParameter('marketplace', $marketplace);
         }
 
-        if ($from !== null) {
+        if (null !== $from) {
             $qb->andWhere('s.sale_date >= :saleDateFrom')
                 ->setParameter('saleDateFrom', $from->format('Y-m-d'));
         }
 
-        if ($to !== null) {
+        if (null !== $to) {
             $qb->andWhere('s.sale_date <= :saleDateTo')
                 ->setParameter('saleDateTo', $to->format('Y-m-d'));
         }

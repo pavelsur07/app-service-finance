@@ -34,9 +34,7 @@ final class MapListingToProductAction
         );
 
         if (!$listing) {
-            throw new \InvalidArgumentException(
-                "Listing not found or does not belong to company: {$cmd->listingId}",
-            );
+            throw new \InvalidArgumentException("Listing not found or does not belong to company: {$cmd->listingId}");
         }
 
         $product = $this->productFacade->findByIdAndCompany(
@@ -45,9 +43,7 @@ final class MapListingToProductAction
         );
 
         if (!$product) {
-            throw new \InvalidArgumentException(
-                "Product not found or does not belong to company: {$cmd->productId}",
-            );
+            throw new \InvalidArgumentException("Product not found or does not belong to company: {$cmd->productId}");
         }
 
         // Проверяем бизнес-правило: товар уже привязан к другому листингу этого маркетплейса?
@@ -58,29 +54,22 @@ final class MapListingToProductAction
             $cmd->listingId, // исключаем текущий листинг (переназначение разрешено)
         );
 
-        if ($existingListing !== null) {
-            throw new \LogicException(sprintf(
-                'Товар "%s" уже привязан к листингу %s (%s) на маркетплейсе %s. '
-                . 'Один товар может быть привязан только к одному листингу на маркетплейс.',
-                $product->getSku(),
-                $existingListing->getMarketplaceSku(),
-                $existingListing->getSize(),
-                $listing->getMarketplace()->value,
-            ));
+        if (null !== $existingListing) {
+            throw new \LogicException(sprintf('Товар "%s" уже привязан к листингу %s (%s) на маркетплейсе %s. Один товар может быть привязан только к одному листингу на маркетплейс.', $product->getSku(), $existingListing->getMarketplaceSku(), $existingListing->getSize(), $listing->getMarketplace()->value));
         }
 
         $listing->setProduct($product);
         $this->listingRepository->save($listing);
 
         $this->logger->info('Listing mapped to product', [
-            'company_id'    => $cmd->companyId,
+            'company_id' => $cmd->companyId,
             'actor_user_id' => $cmd->actorUserId,
-            'listing_id'    => $cmd->listingId,
-            'product_id'    => $cmd->productId,
-            'marketplace'   => $listing->getMarketplace()->value,
-            'nm_id'         => $listing->getMarketplaceSku(),
-            'size'          => $listing->getSize(),
-            'sku'           => $listing->getSupplierSku(),
+            'listing_id' => $cmd->listingId,
+            'product_id' => $cmd->productId,
+            'marketplace' => $listing->getMarketplace()->value,
+            'nm_id' => $listing->getMarketplaceSku(),
+            'size' => $listing->getSize(),
+            'sku' => $listing->getSupplierSku(),
         ]);
     }
 }

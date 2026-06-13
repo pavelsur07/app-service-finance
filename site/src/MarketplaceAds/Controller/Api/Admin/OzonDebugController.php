@@ -118,7 +118,7 @@ final class OzonDebugController extends AbstractController
 
         return new JsonResponse([
             'companyId' => $companyId,
-            'client_id' => substr($row['client_id'], 0, 16) . '...',
+            'client_id' => substr($row['client_id'], 0, 16).'...',
             'http_code' => $campaignCode,
             'total_campaigns' => count($enriched),
             'top_level_keys' => array_keys($campaignData),

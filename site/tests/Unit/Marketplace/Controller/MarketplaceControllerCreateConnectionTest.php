@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Marketplace\Controller;
 
+use App\Company\Repository\ProjectDirectionRepository;
 use App\Marketplace\Application\ReprocessMarketplacePeriodAction;
 use App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface;
 use App\Marketplace\Application\Service\WbInitialSyncStartDateResolver;
@@ -19,7 +20,6 @@ use App\Marketplace\Message\TriggerInitialSyncMessage;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
-use App\Company\Repository\ProjectDirectionRepository;
 use App\Shared\Service\ActiveCompanyService;
 use App\Tests\Builders\Company\CompanyBuilder;
 use Doctrine\ORM\EntityManagerInterface;
@@ -189,22 +189,7 @@ final class MarketplaceControllerCreateConnectionTest extends TestCase
         WbInitialSyncStartDateResolver $startDateResolver,
         WbFinancialReportSyncPlannerInterface $planner,
     ): MarketplaceController {
-        return new class(
-            $companyService,
-            $connectionRepository,
-            self::uninitialized(MarketplaceRawDocumentRepository::class),
-            self::uninitialized(MarketplaceAdapterRegistry::class),
-            self::uninitialized(OzonRealizationStatusQuery::class),
-            self::uninitialized(RawDocumentsListQuery::class),
-            self::uninitialized(ProjectDirectionRepository::class),
-            $em,
-            $messageBus,
-            self::uninitialized(ReprocessMarketplacePeriodAction::class),
-            self::uninitialized(SyncConnectionAction::class),
-            $startDateResolver,
-            $planner,
-            self::uninitialized(WbFinanceSyncStatusListQuery::class),
-        ) extends MarketplaceController {
+        return new class($companyService, $connectionRepository, self::uninitialized(MarketplaceRawDocumentRepository::class), self::uninitialized(MarketplaceAdapterRegistry::class), self::uninitialized(OzonRealizationStatusQuery::class), self::uninitialized(RawDocumentsListQuery::class), self::uninitialized(ProjectDirectionRepository::class), $em, $messageBus, self::uninitialized(ReprocessMarketplacePeriodAction::class), self::uninitialized(SyncConnectionAction::class), $startDateResolver, $planner, self::uninitialized(WbFinanceSyncStatusListQuery::class)) extends MarketplaceController {
             protected function addFlash(string $type, mixed $message): void
             {
             }

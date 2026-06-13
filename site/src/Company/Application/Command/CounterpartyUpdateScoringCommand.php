@@ -8,8 +8,7 @@ class CounterpartyUpdateScoringCommand
         public string $companyId,
         public string $counterpartyId,
         public ?int $averageDelayDays,
-        public int $reliabilityScore
-    )
-    {
+        public int $reliabilityScore,
+    ) {
     }
 }

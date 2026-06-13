@@ -14,7 +14,8 @@ final readonly class DefaultCostMappingSeedPolicy
 {
     public function __construct(
         private UnitEconomyCostMappingRepositoryInterface $repository,
-    ) {}
+    ) {
+    }
 
     public function seedForCompanyAndMarketplace(
         string $companyId,

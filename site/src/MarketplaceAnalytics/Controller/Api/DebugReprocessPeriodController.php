@@ -52,27 +52,27 @@ final class DebugReprocessPeriodController extends AbstractController
     public function __invoke(Request $request): JsonResponse
     {
         $marketplaceStr = (string) $request->query->get('marketplace', '');
-        $fromStr        = (string) $request->query->get('from', '');
-        $toStr          = (string) $request->query->get('to', '');
-        $confirm        = (string) $request->query->get('confirm', '0') === '1';
-        $force          = (string) $request->query->get('force', '0') === '1';
+        $fromStr = (string) $request->query->get('from', '');
+        $toStr = (string) $request->query->get('to', '');
+        $confirm = '1' === (string) $request->query->get('confirm', '0');
+        $force = '1' === (string) $request->query->get('force', '0');
 
-        if ($marketplaceStr === '' || $fromStr === '' || $toStr === '') {
+        if ('' === $marketplaceStr || '' === $fromStr || '' === $toStr) {
             return $this->json(['error' => 'marketplace, from, to are required'], 422);
         }
 
         $marketplace = MarketplaceType::tryFrom($marketplaceStr);
-        if ($marketplace === null) {
-            return $this->json(['error' => 'Unknown marketplace: ' . $marketplaceStr], 422);
+        if (null === $marketplace) {
+            return $this->json(['error' => 'Unknown marketplace: '.$marketplaceStr], 422);
         }
 
-        if ($marketplace !== MarketplaceType::OZON) {
+        if (MarketplaceType::OZON !== $marketplace) {
             return $this->json(['error' => 'Only ozon is supported at the moment'], 422);
         }
 
         $from = $this->parseStrictDate($fromStr);
-        $to   = $this->parseStrictDate($toStr);
-        if ($from === null || $to === null) {
+        $to = $this->parseStrictDate($toStr);
+        if (null === $from || null === $to) {
             return $this->json(['error' => 'Invalid date format (Y-m-d expected, must be a real calendar date)'], 422);
         }
 
@@ -80,7 +80,7 @@ final class DebugReprocessPeriodController extends AbstractController
             return $this->json(['error' => 'from must be <= to'], 422);
         }
 
-        $company   = $this->activeCompanyService->getActiveCompany();
+        $company = $this->activeCompanyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
         $orphans = $this->countOrphans($companyId, $marketplace, $from, $to, $force);
@@ -88,17 +88,17 @@ final class DebugReprocessPeriodController extends AbstractController
 
         if (!$confirm) {
             return new JsonResponse([
-                'preview'     => true,
-                'force'       => $force,
+                'preview' => true,
+                'force' => $force,
                 'marketplace' => $marketplace->value,
-                'companyId'   => $companyId,
-                'period'      => [
+                'companyId' => $companyId,
+                'period' => [
                     'from' => $from->format('Y-m-d'),
-                    'to'   => $to->format('Y-m-d'),
+                    'to' => $to->format('Y-m-d'),
                 ],
-                'orphansToDelete'         => $orphans,
+                'orphansToDelete' => $orphans,
                 'rawDocumentsToReprocess' => [
-                    'count'     => count($rawDocs),
+                    'count' => count($rawDocs),
                     'documents' => $rawDocs,
                 ],
                 'hint' => $force
@@ -109,31 +109,31 @@ final class DebugReprocessPeriodController extends AbstractController
 
         $totalsBefore = $this->countTotals($companyId, $marketplace, $from, $to);
 
-        $deleted          = $this->deleteOrphans($companyId, $marketplace, $from, $to, $force);
+        $deleted = $this->deleteOrphans($companyId, $marketplace, $from, $to, $force);
         $reprocessResults = $this->reprocessDocuments($companyId, $rawDocs);
 
         $totalsAfter = $this->countTotals($companyId, $marketplace, $from, $to);
 
         return new JsonResponse([
-            'preview'     => false,
-            'force'       => $force,
+            'preview' => false,
+            'force' => $force,
             'marketplace' => $marketplace->value,
-            'companyId'   => $companyId,
-            'period'      => [
+            'companyId' => $companyId,
+            'period' => [
                 'from' => $from->format('Y-m-d'),
-                'to'   => $to->format('Y-m-d'),
+                'to' => $to->format('Y-m-d'),
             ],
-            'deletedOrphans'          => $deleted,
+            'deletedOrphans' => $deleted,
             'rawDocumentsReprocessed' => [
-                'count'   => count($reprocessResults),
+                'count' => count($reprocessResults),
                 'results' => $reprocessResults,
             ],
             'totalsBefore' => $totalsBefore,
-            'totalsAfter'  => $totalsAfter,
-            'netChange'    => [
-                'sales'   => $totalsAfter['sales']   - $totalsBefore['sales'],
+            'totalsAfter' => $totalsAfter,
+            'netChange' => [
+                'sales' => $totalsAfter['sales'] - $totalsBefore['sales'],
                 'returns' => $totalsAfter['returns'] - $totalsBefore['returns'],
-                'costs'   => $totalsAfter['costs']   - $totalsBefore['costs'],
+                'costs' => $totalsAfter['costs'] - $totalsBefore['costs'],
             ],
         ]);
     }
@@ -148,7 +148,7 @@ final class DebugReprocessPeriodController extends AbstractController
     {
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
 
-        if ($date === false || $date->format('Y-m-d') !== $value) {
+        if (false === $date || $date->format('Y-m-d') !== $value) {
             return null;
         }
 
@@ -166,10 +166,10 @@ final class DebugReprocessPeriodController extends AbstractController
         bool $force = false,
     ): array {
         $params = [
-            'companyId'   => $companyId,
+            'companyId' => $companyId,
             'marketplace' => $marketplace->value,
-            'periodFrom'  => $from->format('Y-m-d'),
-            'periodTo'    => $to->format('Y-m-d'),
+            'periodFrom' => $from->format('Y-m-d'),
+            'periodTo' => $to->format('Y-m-d'),
         ];
 
         $documentFilter = $force ? '' : 'AND document_id IS NULL';
@@ -223,10 +223,10 @@ final class DebugReprocessPeriodController extends AbstractController
         \DateTimeImmutable $to,
     ): array {
         $params = [
-            'companyId'   => $companyId,
+            'companyId' => $companyId,
             'marketplace' => $marketplace->value,
-            'periodFrom'  => $from->format('Y-m-d'),
-            'periodTo'    => $to->format('Y-m-d'),
+            'periodFrom' => $from->format('Y-m-d'),
+            'periodTo' => $to->format('Y-m-d'),
         ];
 
         $sales = (int) $this->connection->fetchOne(
@@ -294,20 +294,20 @@ final class DebugReprocessPeriodController extends AbstractController
             ORDER BY mrd.period_from, mrd.synced_at
             SQL,
             [
-                'companyId'   => $companyId,
+                'companyId' => $companyId,
                 'marketplace' => $marketplace->value,
-                'periodFrom'  => $from->format('Y-m-d'),
-                'periodTo'    => $to->format('Y-m-d'),
+                'periodFrom' => $from->format('Y-m-d'),
+                'periodTo' => $to->format('Y-m-d'),
             ],
         );
 
         return array_map(
             static fn (array $r): array => [
-                'id'               => (string) $r['id'],
-                'periodFrom'       => (string) $r['period_from'],
-                'periodTo'         => (string) $r['period_to'],
-                'syncedAt'         => (string) $r['synced_at'],
-                'recordsCount'     => (int) $r['records_count'],
+                'id' => (string) $r['id'],
+                'periodFrom' => (string) $r['period_from'],
+                'periodTo' => (string) $r['period_to'],
+                'syncedAt' => (string) $r['synced_at'],
+                'recordsCount' => (int) $r['records_count'],
                 'processingStatus' => (string) $r['processing_status'],
             ],
             $rows,
@@ -325,10 +325,10 @@ final class DebugReprocessPeriodController extends AbstractController
         bool $force = false,
     ): array {
         $params = [
-            'companyId'   => $companyId,
+            'companyId' => $companyId,
             'marketplace' => $marketplace->value,
-            'periodFrom'  => $from->format('Y-m-d'),
-            'periodTo'    => $to->format('Y-m-d'),
+            'periodFrom' => $from->format('Y-m-d'),
+            'periodTo' => $to->format('Y-m-d'),
         ];
 
         $documentFilter = $force ? '' : 'AND document_id IS NULL';
@@ -370,14 +370,14 @@ final class DebugReprocessPeriodController extends AbstractController
         );
 
         $this->logger->info('[DebugReprocessPeriod] Orphans deleted', [
-            'company_id'  => $companyId,
+            'company_id' => $companyId,
             'marketplace' => $marketplace->value,
             'period_from' => $from->format('Y-m-d'),
-            'period_to'   => $to->format('Y-m-d'),
-            'force'       => $force,
-            'sales'       => $sales,
-            'returns'     => $returns,
-            'costs'       => $costs,
+            'period_to' => $to->format('Y-m-d'),
+            'force' => $force,
+            'sales' => $sales,
+            'returns' => $returns,
+            'costs' => $costs,
         ]);
 
         return ['sales' => $sales, 'returns' => $returns, 'costs' => $costs];
@@ -397,9 +397,9 @@ final class DebugReprocessPeriodController extends AbstractController
 
         foreach ($rawDocs as $doc) {
             $result = [
-                'id'         => $doc['id'],
+                'id' => $doc['id'],
                 'periodFrom' => $doc['periodFrom'],
-                'periodTo'   => $doc['periodTo'],
+                'periodTo' => $doc['periodTo'],
             ];
 
             foreach (['sales', 'returns', 'costs'] as $step) {
@@ -408,17 +408,17 @@ final class DebugReprocessPeriodController extends AbstractController
                         companyId: $companyId,
                         rawDocId: $doc['id'],
                         kind: $step,
-                        forceReprocess: $step === 'costs',
+                        forceReprocess: 'costs' === $step,
                     );
                     $count = ($this->processAction)($cmd);
                     $result[$step] = ['status' => 'ok', 'processed' => $count];
                 } catch (\Throwable $e) {
                     $result[$step] = ['status' => 'error', 'message' => $e->getMessage()];
                     $this->logger->error('[DebugReprocessPeriod] Processor failed', [
-                        'step'        => $step,
-                        'raw_doc_id'  => $doc['id'],
-                        'company_id'  => $companyId,
-                        'error'       => $e->getMessage(),
+                        'step' => $step,
+                        'raw_doc_id' => $doc['id'],
+                        'company_id' => $companyId,
+                        'error' => $e->getMessage(),
                     ]);
                 }
             }

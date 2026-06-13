@@ -66,17 +66,17 @@ final class OzonCostsRawProcessorTest extends TestCase
     public function testSaleCommissionNegativeProducesChargeEntry(): void
     {
         $entries = $this->extractEntries([
-            'operation_id'        => '1001',
-            'operation_type'      => 'MarketplaceSellerCompensationOperation',
+            'operation_id' => '1001',
+            'operation_type' => 'MarketplaceSellerCompensationOperation',
             'operation_type_name' => 'Продажа',
-            'operation_date'      => '2026-01-15 10:00:00',
-            'sale_commission'     => -150.50,
-            'delivery_charge'     => 0,
+            'operation_date' => '2026-01-15 10:00:00',
+            'sale_commission' => -150.50,
+            'delivery_charge' => 0,
             'return_delivery_charge' => 0,
-            'amount'              => 0,
-            'type'                => 'orders',
-            'items'               => [['sku' => '111', 'name' => 'Товар']],
-            'services'            => [],
+            'amount' => 0,
+            'type' => 'orders',
+            'items' => [['sku' => '111', 'name' => 'Товар']],
+            'services' => [],
         ]);
 
         $commission = $this->findEntry($entries, 'ozon_sale_commission');
@@ -92,17 +92,17 @@ final class OzonCostsRawProcessorTest extends TestCase
     public function testSaleCommissionPositiveProducesStornoEntry(): void
     {
         $entries = $this->extractEntries([
-            'operation_id'        => '1002',
-            'operation_type'      => 'MarketplaceSellerCompensationOperation',
+            'operation_id' => '1002',
+            'operation_type' => 'MarketplaceSellerCompensationOperation',
             'operation_type_name' => 'Корректировка',
-            'operation_date'      => '2026-01-15 10:00:00',
-            'sale_commission'     => 75.00,
-            'delivery_charge'     => 0,
+            'operation_date' => '2026-01-15 10:00:00',
+            'sale_commission' => 75.00,
+            'delivery_charge' => 0,
             'return_delivery_charge' => 0,
-            'amount'              => 0,
-            'type'                => 'orders',
-            'items'               => [['sku' => '111', 'name' => 'Товар']],
-            'services'            => [],
+            'amount' => 0,
+            'type' => 'orders',
+            'items' => [['sku' => '111', 'name' => 'Товар']],
+            'services' => [],
         ]);
 
         $commission = $this->findEntry($entries, 'ozon_sale_commission');
@@ -119,17 +119,17 @@ final class OzonCostsRawProcessorTest extends TestCase
     public function testClientReturnCommissionProducesStornoEntry(): void
     {
         $entries = $this->extractEntries([
-            'operation_id'        => '1003',
-            'operation_type'      => 'ClientReturnAgentOperation',
+            'operation_id' => '1003',
+            'operation_type' => 'ClientReturnAgentOperation',
             'operation_type_name' => 'Возврат покупателя',
-            'operation_date'      => '2026-01-20 12:00:00',
-            'sale_commission'     => 200.00,
-            'delivery_charge'     => 0,
+            'operation_date' => '2026-01-20 12:00:00',
+            'sale_commission' => 200.00,
+            'delivery_charge' => 0,
             'return_delivery_charge' => 0,
-            'amount'              => 0,
-            'type'                => 'returns',
-            'items'               => [],
-            'services'            => [],
+            'amount' => 0,
+            'type' => 'returns',
+            'items' => [],
+            'services' => [],
         ]);
 
         $commission = $this->findEntry($entries, 'ozon_sale_commission');
@@ -146,17 +146,17 @@ final class OzonCostsRawProcessorTest extends TestCase
     public function testClientReturnWithZeroCommissionProducesNoEntry(): void
     {
         $entries = $this->extractEntries([
-            'operation_id'        => '1004',
-            'operation_type'      => 'ClientReturnAgentOperation',
+            'operation_id' => '1004',
+            'operation_type' => 'ClientReturnAgentOperation',
             'operation_type_name' => 'Возврат покупателя',
-            'operation_date'      => '2026-01-20 12:00:00',
-            'sale_commission'     => 0,
-            'delivery_charge'     => 0,
+            'operation_date' => '2026-01-20 12:00:00',
+            'sale_commission' => 0,
+            'delivery_charge' => 0,
             'return_delivery_charge' => 0,
-            'amount'              => 0,
-            'type'                => 'returns',
-            'items'               => [],
-            'services'            => [],
+            'amount' => 0,
+            'type' => 'returns',
+            'items' => [],
+            'services' => [],
         ]);
 
         self::assertEmpty($entries, 'Возврат без комиссии не должен создавать записей');
@@ -168,17 +168,17 @@ final class OzonCostsRawProcessorTest extends TestCase
     public function testDeliveryChargeProducesChargeEntry(): void
     {
         $entries = $this->extractEntries([
-            'operation_id'        => '1005',
-            'operation_type'      => 'MarketplaceSellerCompensationOperation',
+            'operation_id' => '1005',
+            'operation_type' => 'MarketplaceSellerCompensationOperation',
             'operation_type_name' => 'Доставка',
-            'operation_date'      => '2026-01-15 10:00:00',
-            'sale_commission'     => 0,
-            'delivery_charge'     => -55.00,
+            'operation_date' => '2026-01-15 10:00:00',
+            'sale_commission' => 0,
+            'delivery_charge' => -55.00,
             'return_delivery_charge' => 0,
-            'amount'              => 0,
-            'type'                => 'orders',
-            'items'               => [['sku' => '222', 'name' => 'Товар']],
-            'services'            => [],
+            'amount' => 0,
+            'type' => 'orders',
+            'items' => [['sku' => '222', 'name' => 'Товар']],
+            'services' => [],
         ]);
 
         $delivery = $this->findEntry($entries, 'ozon_delivery');
@@ -194,17 +194,17 @@ final class OzonCostsRawProcessorTest extends TestCase
     public function testServiceNegativePriceProducesChargeEntry(): void
     {
         $entries = $this->extractEntries([
-            'operation_id'        => '1006',
-            'operation_type'      => 'OperationMarketplaceServiceStorage',
+            'operation_id' => '1006',
+            'operation_type' => 'OperationMarketplaceServiceStorage',
             'operation_type_name' => 'Хранение',
-            'operation_date'      => '2026-01-15 10:00:00',
-            'sale_commission'     => 0,
-            'delivery_charge'     => 0,
+            'operation_date' => '2026-01-15 10:00:00',
+            'sale_commission' => 0,
+            'delivery_charge' => 0,
             'return_delivery_charge' => 0,
-            'amount'              => 0,
-            'type'                => 'services',
-            'items'               => [],
-            'services'            => [
+            'amount' => 0,
+            'type' => 'services',
+            'items' => [],
+            'services' => [
                 ['name' => 'OperationMarketplaceServiceStorage', 'price' => -120.00],
             ],
         ]);
@@ -222,17 +222,17 @@ final class OzonCostsRawProcessorTest extends TestCase
     public function testServicePositivePriceProducesStornoEntry(): void
     {
         $entries = $this->extractEntries([
-            'operation_id'        => '1007',
-            'operation_type'      => 'MarketplaceRedistributionOfAcquiringOperation',
+            'operation_id' => '1007',
+            'operation_type' => 'MarketplaceRedistributionOfAcquiringOperation',
             'operation_type_name' => 'Возврат эквайринга',
-            'operation_date'      => '2026-01-15 10:00:00',
-            'sale_commission'     => 0,
-            'delivery_charge'     => 0,
+            'operation_date' => '2026-01-15 10:00:00',
+            'sale_commission' => 0,
+            'delivery_charge' => 0,
             'return_delivery_charge' => 0,
-            'amount'              => 0,
-            'type'                => 'services',
-            'items'               => [['sku' => '333', 'name' => 'Товар']],
-            'services'            => [
+            'amount' => 0,
+            'type' => 'services',
+            'items' => [['sku' => '333', 'name' => 'Товар']],
+            'services' => [
                 ['name' => 'MarketplaceRedistributionOfAcquiringOperation', 'price' => 30.00],
             ],
         ]);
@@ -250,17 +250,17 @@ final class OzonCostsRawProcessorTest extends TestCase
     public function testZeroMarkerServiceProducesNoEntry(): void
     {
         $entries = $this->extractEntries([
-            'operation_id'        => '1008',
-            'operation_type'      => 'SomeOperation',
+            'operation_id' => '1008',
+            'operation_type' => 'SomeOperation',
             'operation_type_name' => 'Нулевой маркер',
-            'operation_date'      => '2026-01-15 10:00:00',
-            'sale_commission'     => 0,
-            'delivery_charge'     => 0,
+            'operation_date' => '2026-01-15 10:00:00',
+            'sale_commission' => 0,
+            'delivery_charge' => 0,
             'return_delivery_charge' => 0,
-            'amount'              => 0,
-            'type'                => 'services',
-            'items'               => [],
-            'services'            => [
+            'amount' => 0,
+            'type' => 'services',
+            'items' => [],
+            'services' => [
                 ['name' => 'MarketplaceServiceItemReturnNotDelivToCustomer', 'price' => 0],
             ],
         ]);
@@ -274,17 +274,17 @@ final class OzonCostsRawProcessorTest extends TestCase
     public function testOperationWithoutServicesUsesOpAmount(): void
     {
         $entries = $this->extractEntries([
-            'operation_id'        => '1009',
-            'operation_type'      => 'OperationMarketplaceCostPerClick',
+            'operation_id' => '1009',
+            'operation_type' => 'OperationMarketplaceCostPerClick',
             'operation_type_name' => 'Оплата за клик',
-            'operation_date'      => '2026-01-15 10:00:00',
-            'sale_commission'     => 0,
-            'delivery_charge'     => 0,
+            'operation_date' => '2026-01-15 10:00:00',
+            'sale_commission' => 0,
+            'delivery_charge' => 0,
             'return_delivery_charge' => 0,
-            'amount'              => -500.00,
-            'type'                => 'other',
-            'items'               => [],
-            'services'            => [],
+            'amount' => -500.00,
+            'type' => 'other',
+            'items' => [],
+            'services' => [],
         ]);
 
         $cpc = $this->findEntry($entries, 'ozon_cpc');
@@ -300,17 +300,17 @@ final class OzonCostsRawProcessorTest extends TestCase
     public function testCompensationPositiveAmountGoesToCompensation(): void
     {
         $entries = $this->extractEntries([
-            'operation_id'        => '1011',
-            'operation_type'      => 'MarketplaceSellerCompensationOperation',
+            'operation_id' => '1011',
+            'operation_type' => 'MarketplaceSellerCompensationOperation',
             'operation_type_name' => 'Компенсация',
-            'operation_date'      => '2026-01-15 10:00:00',
-            'sale_commission'     => 0,
-            'delivery_charge'     => 0,
+            'operation_date' => '2026-01-15 10:00:00',
+            'sale_commission' => 0,
+            'delivery_charge' => 0,
             'return_delivery_charge' => 0,
-            'amount'              => 250.00,
-            'type'                => 'compensation',
-            'items'               => [],
-            'services'            => [],
+            'amount' => 250.00,
+            'type' => 'compensation',
+            'items' => [],
+            'services' => [],
         ]);
 
         $entry = $this->findEntry($entries, 'ozon_compensation');
@@ -327,17 +327,17 @@ final class OzonCostsRawProcessorTest extends TestCase
     public function testCompensationNegativeAmountGoesToDecompensation(): void
     {
         $entries = $this->extractEntries([
-            'operation_id'        => '1012',
-            'operation_type'      => 'MarketplaceSellerCompensationOperation',
+            'operation_id' => '1012',
+            'operation_type' => 'MarketplaceSellerCompensationOperation',
             'operation_type_name' => 'Декомпенсация',
-            'operation_date'      => '2026-01-15 10:00:00',
-            'sale_commission'     => 0,
-            'delivery_charge'     => 0,
+            'operation_date' => '2026-01-15 10:00:00',
+            'sale_commission' => 0,
+            'delivery_charge' => 0,
             'return_delivery_charge' => 0,
-            'amount'              => -180.00,
-            'type'                => 'compensation',
-            'items'               => [],
-            'services'            => [],
+            'amount' => -180.00,
+            'type' => 'compensation',
+            'items' => [],
+            'services' => [],
         ]);
 
         $entry = $this->findEntry($entries, 'ozon_decompensation');
@@ -354,26 +354,26 @@ final class OzonCostsRawProcessorTest extends TestCase
     public function testMultiSkuServiceSplitsAmountCorrectly(): void
     {
         $entries = $this->extractEntries([
-            'operation_id'        => '1010',
-            'operation_type'      => 'MarketplaceServiceItemFulfillment',
+            'operation_id' => '1010',
+            'operation_type' => 'MarketplaceServiceItemFulfillment',
             'operation_type_name' => 'Сборка',
-            'operation_date'      => '2026-01-15 10:00:00',
-            'sale_commission'     => 0,
-            'delivery_charge'     => 0,
+            'operation_date' => '2026-01-15 10:00:00',
+            'sale_commission' => 0,
+            'delivery_charge' => 0,
             'return_delivery_charge' => 0,
-            'amount'              => 0,
-            'type'                => 'services',
-            'items'               => [
+            'amount' => 0,
+            'type' => 'services',
+            'items' => [
                 ['sku' => '100', 'name' => 'Товар А'],
                 ['sku' => '101', 'name' => 'Товар Б'],
                 ['sku' => '102', 'name' => 'Товар В'],
             ],
-            'services'            => [
+            'services' => [
                 ['name' => 'MarketplaceServiceItemFulfillment', 'price' => -90.00],
             ],
         ]);
 
-        $fulfillment = array_filter($entries, static fn (array $e) => $e['category_code'] === 'ozon_fulfillment');
+        $fulfillment = array_filter($entries, static fn (array $e) => 'ozon_fulfillment' === $e['category_code']);
         self::assertCount(3, $fulfillment, 'Должно быть 3 записи для 3 SKU');
 
         $total = array_sum(array_column($fulfillment, 'amount'));
@@ -395,17 +395,17 @@ final class OzonCostsRawProcessorTest extends TestCase
     public function testDeliveryToHandoverPlaceProducesChargeEntry(): void
     {
         $entries = $this->extractEntries([
-            'operation_id'        => '2100',
-            'operation_type'      => 'MarketplaceServiceItemDeliveryToHandoverPlaceOzon',
+            'operation_id' => '2100',
+            'operation_type' => 'MarketplaceServiceItemDeliveryToHandoverPlaceOzon',
             'operation_type_name' => 'Доставка до места передачи',
-            'operation_date'      => '2026-01-15 10:00:00',
-            'sale_commission'     => 0,
-            'delivery_charge'     => 0,
+            'operation_date' => '2026-01-15 10:00:00',
+            'sale_commission' => 0,
+            'delivery_charge' => 0,
             'return_delivery_charge' => 0,
-            'amount'              => 0,
-            'type'                => 'services',
-            'items'               => [['sku' => '501', 'name' => 'Товар']],
-            'services'            => [
+            'amount' => 0,
+            'type' => 'services',
+            'items' => [['sku' => '501', 'name' => 'Товар']],
+            'services' => [
                 ['name' => 'MarketplaceServiceItemDeliveryToHandoverPlaceOzon', 'price' => -88.00],
             ],
         ]);
@@ -423,17 +423,17 @@ final class OzonCostsRawProcessorTest extends TestCase
     public function testAcceleratedProductReviewsProducesChargeEntry(): void
     {
         $entries = $this->extractEntries([
-            'operation_id'        => '2101',
-            'operation_type'      => 'OperationMarketplaceAcceleratedProductReviews',
+            'operation_id' => '2101',
+            'operation_type' => 'OperationMarketplaceAcceleratedProductReviews',
             'operation_type_name' => 'Ускоренные отзывы',
-            'operation_date'      => '2026-01-15 10:00:00',
-            'sale_commission'     => 0,
-            'delivery_charge'     => 0,
+            'operation_date' => '2026-01-15 10:00:00',
+            'sale_commission' => 0,
+            'delivery_charge' => 0,
             'return_delivery_charge' => 0,
-            'amount'              => 0,
-            'type'                => 'services',
-            'items'               => [],
-            'services'            => [
+            'amount' => 0,
+            'type' => 'services',
+            'items' => [],
+            'services' => [
                 ['name' => 'OperationMarketplaceAcceleratedProductReviews', 'price' => -250.00],
             ],
         ]);
@@ -451,17 +451,17 @@ final class OzonCostsRawProcessorTest extends TestCase
     public function testCorrectionPointOperationProducesChargeEntry(): void
     {
         $entries = $this->extractEntries([
-            'operation_id'        => '2102',
-            'operation_type'      => 'MarketplaceCorrectionPointOperation',
+            'operation_id' => '2102',
+            'operation_type' => 'MarketplaceCorrectionPointOperation',
             'operation_type_name' => 'Корректировка по операции',
-            'operation_date'      => '2026-01-15 10:00:00',
-            'sale_commission'     => 0,
-            'delivery_charge'     => 0,
+            'operation_date' => '2026-01-15 10:00:00',
+            'sale_commission' => 0,
+            'delivery_charge' => 0,
             'return_delivery_charge' => 0,
-            'amount'              => 0,
-            'type'                => 'services',
-            'items'               => [],
-            'services'            => [
+            'amount' => 0,
+            'type' => 'services',
+            'items' => [],
+            'services' => [
                 ['name' => 'MarketplaceCorrectionPointOperation', 'price' => -45.00],
             ],
         ]);
@@ -479,17 +479,17 @@ final class OzonCostsRawProcessorTest extends TestCase
     public function testCorrectionPointOperationPositivePriceProducesStornoEntry(): void
     {
         $entries = $this->extractEntries([
-            'operation_id'        => '2103',
-            'operation_type'      => 'MarketplaceCorrectionPointOperation',
+            'operation_id' => '2103',
+            'operation_type' => 'MarketplaceCorrectionPointOperation',
             'operation_type_name' => 'Корректировка по операции',
-            'operation_date'      => '2026-01-15 10:00:00',
-            'sale_commission'     => 0,
-            'delivery_charge'     => 0,
+            'operation_date' => '2026-01-15 10:00:00',
+            'sale_commission' => 0,
+            'delivery_charge' => 0,
             'return_delivery_charge' => 0,
-            'amount'              => 0,
-            'type'                => 'services',
-            'items'               => [],
-            'services'            => [
+            'amount' => 0,
+            'type' => 'services',
+            'items' => [],
+            'services' => [
                 ['name' => 'MarketplaceCorrectionPointOperation', 'price' => 45.00],
             ],
         ]);
@@ -507,17 +507,17 @@ final class OzonCostsRawProcessorTest extends TestCase
     public function testSellerCorrectionOperationProducesChargeEntry(): void
     {
         $entries = $this->extractEntries([
-            'operation_id'        => '2104',
-            'operation_type'      => 'MarketplaceSellerCorrectionOperation',
+            'operation_id' => '2104',
+            'operation_type' => 'MarketplaceSellerCorrectionOperation',
             'operation_type_name' => 'Корректировка продавца',
-            'operation_date'      => '2026-01-15 10:00:00',
-            'sale_commission'     => 0,
-            'delivery_charge'     => 0,
+            'operation_date' => '2026-01-15 10:00:00',
+            'sale_commission' => 0,
+            'delivery_charge' => 0,
             'return_delivery_charge' => 0,
-            'amount'              => 0,
-            'type'                => 'services',
-            'items'               => [],
-            'services'            => [
+            'amount' => 0,
+            'type' => 'services',
+            'items' => [],
+            'services' => [
                 ['name' => 'MarketplaceSellerCorrectionOperation', 'price' => -120.00],
             ],
         ]);
@@ -535,17 +535,17 @@ final class OzonCostsRawProcessorTest extends TestCase
     public function testSupplyInboundSupplyShortageProducesChargeEntry(): void
     {
         $entries = $this->extractEntries([
-            'operation_id'        => '2105',
-            'operation_type'      => 'OperationMarketplaceServiceSupplyInboundSupplyShortage',
+            'operation_id' => '2105',
+            'operation_type' => 'OperationMarketplaceServiceSupplyInboundSupplyShortage',
             'operation_type_name' => 'Недостача при поставке',
-            'operation_date'      => '2026-01-15 10:00:00',
-            'sale_commission'     => 0,
-            'delivery_charge'     => 0,
+            'operation_date' => '2026-01-15 10:00:00',
+            'sale_commission' => 0,
+            'delivery_charge' => 0,
             'return_delivery_charge' => 0,
-            'amount'              => 0,
-            'type'                => 'services',
-            'items'               => [],
-            'services'            => [
+            'amount' => 0,
+            'type' => 'services',
+            'items' => [],
+            'services' => [
                 ['name' => 'OperationMarketplaceServiceSupplyInboundSupplyShortage', 'price' => -330.00],
             ],
         ]);
@@ -565,18 +565,18 @@ final class OzonCostsRawProcessorTest extends TestCase
     public function testStornoDeliveredToCustomerProducesNoMainEntry(): void
     {
         $entries = $this->extractEntries([
-            'operation_id'           => '2001',
-            'operation_type'         => 'OperationAgentStornoDeliveredToCustomer',
-            'operation_type_name'    => 'Сторно доставки покупателю',
-            'operation_date'         => '2026-02-16 12:00:00',
-            'sale_commission'        => 0,
-            'delivery_charge'        => 0,
+            'operation_id' => '2001',
+            'operation_type' => 'OperationAgentStornoDeliveredToCustomer',
+            'operation_type_name' => 'Сторно доставки покупателю',
+            'operation_date' => '2026-02-16 12:00:00',
+            'sale_commission' => 0,
+            'delivery_charge' => 0,
             'return_delivery_charge' => 0,
-            'amount'                 => -1201.00,
-            'accruals_for_sale'      => -1201.00,
-            'type'                   => 'returns',
-            'items'                  => [['sku' => '444', 'name' => 'Товар']],
-            'services'               => [],
+            'amount' => -1201.00,
+            'accruals_for_sale' => -1201.00,
+            'type' => 'returns',
+            'items' => [['sku' => '444', 'name' => 'Товар']],
+            'services' => [],
         ]);
 
         $mainEntry = array_filter($entries, static fn (array $e) => str_ends_with($e['external_id'], '_main'));
@@ -590,18 +590,18 @@ final class OzonCostsRawProcessorTest extends TestCase
     public function testStornoDeliveredToCustomerStillExtractsCommission(): void
     {
         $entries = $this->extractEntries([
-            'operation_id'           => '2002',
-            'operation_type'         => 'OperationAgentStornoDeliveredToCustomer',
-            'operation_type_name'    => 'Сторно доставки покупателю',
-            'operation_date'         => '2026-02-16 12:00:00',
-            'sale_commission'        => 150.00,
-            'delivery_charge'        => 0,
+            'operation_id' => '2002',
+            'operation_type' => 'OperationAgentStornoDeliveredToCustomer',
+            'operation_type_name' => 'Сторно доставки покупателю',
+            'operation_date' => '2026-02-16 12:00:00',
+            'sale_commission' => 150.00,
+            'delivery_charge' => 0,
             'return_delivery_charge' => 0,
-            'amount'                 => -1051.00,
-            'accruals_for_sale'      => -1201.00,
-            'type'                   => 'returns',
-            'items'                  => [['sku' => '444', 'name' => 'Товар']],
-            'services'               => [],
+            'amount' => -1051.00,
+            'accruals_for_sale' => -1201.00,
+            'type' => 'returns',
+            'items' => [['sku' => '444', 'name' => 'Товар']],
+            'services' => [],
         ]);
 
         $commission = $this->findEntry($entries, 'ozon_sale_commission');
@@ -632,11 +632,11 @@ final class OzonCostsRawProcessorTest extends TestCase
             return $this->extractClientReturnEntries($op);
         }
 
-        $ref    = new \ReflectionClass($processor);
+        $ref = new \ReflectionClass($processor);
         $method = $ref->getMethod('extractCostEntries');
         $method->setAccessible(true);
 
-        $operationId   = (string) $op['operation_id'];
+        $operationId = (string) $op['operation_id'];
         $operationDate = new \DateTimeImmutable($op['operation_date']);
 
         return $method->invoke($processor, $op, $operationId, $operationDate);
@@ -649,14 +649,14 @@ final class OzonCostsRawProcessorTest extends TestCase
      */
     private function extractClientReturnEntries(array $op): array
     {
-        $entries          = [];
+        $entries = [];
         $returnCommission = (float) ($op['sale_commission'] ?? 0);
 
         if ($returnCommission > 0) {
             $entries[] = [
-                'external_id'    => $op['operation_id'] . '_commission_return',
-                'category_code'  => 'ozon_sale_commission',
-                'amount'         => (string) abs($returnCommission),
+                'external_id' => $op['operation_id'].'_commission_return',
+                'category_code' => 'ozon_sale_commission',
+                'amount' => (string) abs($returnCommission),
                 'operation_type' => MarketplaceCostOperationType::STORNO,
             ];
         }
@@ -666,6 +666,7 @@ final class OzonCostsRawProcessorTest extends TestCase
 
     /**
      * @param array<int, array<string, mixed>> $entries
+     *
      * @return array<string, mixed>|null
      */
     private function findEntry(array $entries, string $categoryCode): ?array
@@ -689,7 +690,7 @@ final class OzonCostsRawProcessorTest extends TestCase
 
         $loggerProp = (new \ReflectionClass($processor))->getProperty('logger');
         $loggerProp->setAccessible(true);
-        $loggerProp->setValue($processor, new \Psr\Log\NullLogger());
+        $loggerProp->setValue($processor, new NullLogger());
 
         return $processor;
     }

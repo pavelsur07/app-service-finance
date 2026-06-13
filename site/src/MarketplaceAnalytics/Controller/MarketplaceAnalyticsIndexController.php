@@ -17,7 +17,8 @@ final class MarketplaceAnalyticsIndexController extends AbstractController
 {
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
-    ) {}
+    ) {
+    }
 
     #[Route(
         '/marketplace-analytics',

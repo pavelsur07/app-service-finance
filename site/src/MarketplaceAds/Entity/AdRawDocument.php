@@ -112,10 +112,7 @@ class AdRawDocument
     public function markFailed(string $reason): void
     {
         if ($this->status->isTerminal()) {
-            throw new \DomainException(sprintf(
-                'Нельзя пометить документ как ошибочный в статусе %s.',
-                $this->status->value,
-            ));
+            throw new \DomainException(sprintf('Нельзя пометить документ как ошибочный в статусе %s.', $this->status->value));
         }
 
         $this->status = AdRawDocumentStatus::FAILED;

@@ -22,7 +22,8 @@ final class AdRawDocumentsListController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly AdRawDocumentRepository $rawDocumentRepository,
-    ) {}
+    ) {
+    }
 
     public function __invoke(Request $request): JsonResponse
     {

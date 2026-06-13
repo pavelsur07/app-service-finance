@@ -27,6 +27,7 @@ final class CostReconciliationQuery
 
     /**
      * @param array<string, mixed> $reportResult ReportResult от OzonReportParserFacade
+     *
      * @return array<string, mixed>
      */
     public function reconcile(
@@ -72,17 +73,17 @@ final class CostReconciliationQuery
               AND c.marketplace = :marketplace
               AND c.cost_date  >= :periodFrom
               AND c.cost_date  <= :periodTo
-            SQL,            [
-            'companyId'   => $companyId,
-            'marketplace' => $marketplace,
-            'periodFrom'  => $periodFrom,
-            'periodTo'    => $periodTo,
-        ],
+            SQL, [
+                'companyId' => $companyId,
+                'marketplace' => $marketplace,
+                'periodFrom' => $periodFrom,
+                'periodTo' => $periodTo,
+            ],
         );
 
-        $apiNetAmount    = (float) ($apiStats['net_amount'] ?? 0);
-        $returnRevenue   = (float) ($apiStats['return_revenue_amount'] ?? 0);
-        $apiCostsAmount  = (float) ($apiStats['costs_amount'] ?? 0);
+        $apiNetAmount = (float) ($apiStats['net_amount'] ?? 0);
+        $returnRevenue = (float) ($apiStats['return_revenue_amount'] ?? 0);
+        $apiCostsAmount = (float) ($apiStats['costs_amount'] ?? 0);
         $apiStornoAmount = (float) ($apiStats['storno_amount'] ?? 0);
 
         // xlsx_total = сумма итогов отрицательных serviceGroup из xlsx.
@@ -94,11 +95,11 @@ final class CostReconciliationQuery
         // если он передан, иначе считаем по lines.
         $groupTotals = $reportResult['groupNetByServiceGroup'] ?? null;
 
-        if ($groupTotals === null) {
+        if (null === $groupTotals) {
             // Fallback: считаем по lines (менее точно)
             $groupTotals = [];
             foreach ($reportResult['lines'] as $line) {
-                $group   = $line['serviceGroup'] ?: 'Без группы';
+                $group = $line['serviceGroup'] ?: 'Без группы';
                 $lineNet = $line['accruals']['total'] + $line['expenses']['total'] + $line['storno']['total'];
                 $groupTotals[$group] = ($groupTotals[$group] ?? 0.0) + $lineNet;
             }
@@ -115,7 +116,7 @@ final class CostReconciliationQuery
         // Сопоставимая сумма — наша формула сверки
         $xlsxComparable = $apiNetAmount + $returnRevenue;
 
-        $delta  = round(abs($xlsxComparable) - $xlsxTotal, 2);
+        $delta = round(abs($xlsxComparable) - $xlsxTotal, 2);
         $status = abs($delta) < 0.01 ? 'matched' : 'mismatch';
 
         // Сверка по serviceGroup — сравниваем xlsx группы с нашими категориями
@@ -125,17 +126,17 @@ final class CostReconciliationQuery
         );
 
         return [
-            'status'            => $status,
-            'api_net_amount'    => round($apiNetAmount, 2),
-            'api_costs_amount'  => round($apiCostsAmount, 2),
+            'status' => $status,
+            'api_net_amount' => round($apiNetAmount, 2),
+            'api_costs_amount' => round($apiCostsAmount, 2),
             'api_storno_amount' => round($apiStornoAmount, 2),
-            'return_revenue'    => round($returnRevenue, 2),
-            'xlsx_comparable'   => round($xlsxComparable, 2),
-            'xlsx_total'        => round($xlsxTotal, 2),
-            'delta'             => $delta,
-            'xlsx_period'       => $reportResult['period'] ?? '',
-            'xlsx_lines_count'  => count($reportResult['lines'] ?? []),
-            'group_comparison'  => $groupComparison,
+            'return_revenue' => round($returnRevenue, 2),
+            'xlsx_comparable' => round($xlsxComparable, 2),
+            'xlsx_total' => round($xlsxTotal, 2),
+            'delta' => $delta,
+            'xlsx_period' => $reportResult['period'] ?? '',
+            'xlsx_lines_count' => count($reportResult['lines'] ?? []),
+            'group_comparison' => $groupComparison,
         ];
     }
 
@@ -143,6 +144,7 @@ final class CostReconciliationQuery
      * Сверка по serviceGroup: xlsx vs наши категории.
      *
      * @param array<string, float> $xlsxGroupTotals serviceGroup → raw sum
+     *
      * @return array<int, array<string, mixed>>
      */
     private function buildGroupComparison(
@@ -183,24 +185,24 @@ final class CostReconciliationQuery
             GROUP BY cc.code
             SQL,
             [
-                'companyId'   => $companyId,
+                'companyId' => $companyId,
                 'marketplace' => $marketplace,
-                'periodFrom'  => $periodFrom,
-                'periodTo'    => $periodTo,
+                'periodFrom' => $periodFrom,
+                'periodTo' => $periodTo,
             ],
         );
 
         // Группируем наши категории по serviceGroup
         $categoryToGroup = OzonXlsxServiceGroupMap::getCategoryToServiceGroup();
-        $apiByGroup      = [];
+        $apiByGroup = [];
 
         foreach ($apiByCategory as $row) {
             $group = $categoryToGroup[$row['category_code']] ?? 'Не определена';
             if (!isset($apiByGroup[$group])) {
                 $apiByGroup[$group] = ['net_amount' => 0.0, 'costs_amount' => 0.0, 'storno_amount' => 0.0];
             }
-            $apiByGroup[$group]['net_amount']    += (float) $row['net_amount'];
-            $apiByGroup[$group]['costs_amount']  += (float) $row['costs_amount'];
+            $apiByGroup[$group]['net_amount'] += (float) $row['net_amount'];
+            $apiByGroup[$group]['costs_amount'] += (float) $row['costs_amount'];
             $apiByGroup[$group]['storno_amount'] += (float) $row['storno_amount'];
         }
 
@@ -213,28 +215,29 @@ final class CostReconciliationQuery
         $result = [];
         foreach ($allGroups as $group) {
             $xlsxNet = $xlsxGroupTotals[$group] ?? 0.0;
-            $apiNet  = $apiByGroup[$group]['net_amount'] ?? 0.0;
+            $apiNet = $apiByGroup[$group]['net_amount'] ?? 0.0;
 
             // Для группы Возвраты api = return_revenue (из marketplace_returns)
-            $delta  = round(abs($xlsxNet) - abs($apiNet), 2);
+            $delta = round(abs($xlsxNet) - abs($apiNet), 2);
             $status = abs($delta) < 0.01 ? 'matched' : 'mismatch';
 
             $result[] = [
-                'service_group'  => $group,
-                'xlsx_net'       => round($xlsxNet, 2),
-                'api_net'        => round($apiNet, 2),
-                'api_costs'      => round($apiByGroup[$group]['costs_amount'] ?? 0.0, 2),
-                'api_storno'     => round($apiByGroup[$group]['storno_amount'] ?? 0.0, 2),
-                'delta'          => $delta,
-                'status'         => $status,
+                'service_group' => $group,
+                'xlsx_net' => round($xlsxNet, 2),
+                'api_net' => round($apiNet, 2),
+                'api_costs' => round($apiByGroup[$group]['costs_amount'] ?? 0.0, 2),
+                'api_storno' => round($apiByGroup[$group]['storno_amount'] ?? 0.0, 2),
+                'delta' => $delta,
+                'status' => $status,
             ];
         }
 
         // Сортируем: сначала mismatch, потом по имени группы
         usort($result, static function (array $a, array $b): int {
             if ($a['status'] !== $b['status']) {
-                return $a['status'] === 'mismatch' ? -1 : 1;
+                return 'mismatch' === $a['status'] ? -1 : 1;
             }
+
             return strcmp($a['service_group'], $b['service_group']);
         });
 

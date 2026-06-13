@@ -73,30 +73,65 @@ class MarketplaceCostPLMapping
         Assert::uuid($id);
         Assert::uuid($companyId);
 
-        $this->id           = $id;
-        $this->companyId    = $companyId;
+        $this->id = $id;
+        $this->companyId = $companyId;
         $this->costCategory = $costCategory;
         $this->plCategoryId = $plCategoryId;
-        $this->includeInPl  = $includeInPl;
-        $this->createdAt    = new \DateTimeImmutable();
-        $this->updatedAt    = new \DateTimeImmutable();
+        $this->includeInPl = $includeInPl;
+        $this->createdAt = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function update(?string $plCategoryId, bool $includeInPl, int $sortOrder): void
     {
         $this->plCategoryId = $plCategoryId;
-        $this->includeInPl  = $includeInPl;
-        $this->sortOrder    = $sortOrder;
-        $this->updatedAt    = new \DateTimeImmutable();
+        $this->includeInPl = $includeInPl;
+        $this->sortOrder = $sortOrder;
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
-    public function getId(): string { return $this->id; }
-    public function getCompanyId(): string { return $this->companyId; }
-    public function getCostCategory(): MarketplaceCostCategory { return $this->costCategory; }
-    public function getPlCategoryId(): ?string { return $this->plCategoryId; }
-    public function isIncludeInPl(): bool { return $this->includeInPl; }
-    public function isNegative(): bool { return $this->isNegative; }
-    public function getSortOrder(): int { return $this->sortOrder; }
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
-    public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
+    public function getId(): string
+    {
+        return $this->id;
+    }
+
+    public function getCompanyId(): string
+    {
+        return $this->companyId;
+    }
+
+    public function getCostCategory(): MarketplaceCostCategory
+    {
+        return $this->costCategory;
+    }
+
+    public function getPlCategoryId(): ?string
+    {
+        return $this->plCategoryId;
+    }
+
+    public function isIncludeInPl(): bool
+    {
+        return $this->includeInPl;
+    }
+
+    public function isNegative(): bool
+    {
+        return $this->isNegative;
+    }
+
+    public function getSortOrder(): int
+    {
+        return $this->sortOrder;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    public function getUpdatedAt(): \DateTimeImmutable
+    {
+        return $this->updatedAt;
+    }
 }

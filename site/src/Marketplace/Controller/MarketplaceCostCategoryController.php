@@ -24,8 +24,9 @@ class MarketplaceCostCategoryController extends AbstractController
         private readonly CompanyContextService $companyContext,
         private readonly MarketplaceCostCategoryRepository $repository,
         private readonly MarketplaceCostRepository $costRepository,
-        private readonly EntityManagerInterface $em
-    ) {}
+        private readonly EntityManagerInterface $em,
+    ) {
+    }
 
     #[Route('', name: 'marketplace_cost_categories_index')]
     public function index(): Response
@@ -52,6 +53,7 @@ class MarketplaceCostCategoryController extends AbstractController
 
         if (!$name || !$code || !$marketplaceValue) {
             $this->addFlash('error', 'Заполните все обязательные поля');
+
             return $this->redirectToRoute('marketplace_cost_categories_index');
         }
 
@@ -59,6 +61,7 @@ class MarketplaceCostCategoryController extends AbstractController
             $marketplace = MarketplaceType::from($marketplaceValue);
         } catch (\ValueError $e) {
             $this->addFlash('error', 'Неверный маркетплейс');
+
             return $this->redirectToRoute('marketplace_cost_categories_index');
         }
 
@@ -66,6 +69,7 @@ class MarketplaceCostCategoryController extends AbstractController
         $existing = $this->repository->findByCode($company, $marketplace, $code);
         if ($existing) {
             $this->addFlash('error', sprintf('Категория с кодом "%s" уже существует для %s', $code, $marketplace->displayName));
+
             return $this->redirectToRoute('marketplace_cost_categories_index');
         }
 
@@ -131,6 +135,7 @@ class MarketplaceCostCategoryController extends AbstractController
 
         if (!$name || !$code) {
             $this->addFlash('error', 'Заполните все обязательные поля');
+
             return $this->redirectToRoute('marketplace_cost_categories_index');
         }
 
@@ -138,6 +143,7 @@ class MarketplaceCostCategoryController extends AbstractController
         $existing = $this->repository->findByCode($company, $category->getMarketplace(), $code);
         if ($existing && $existing->getId() !== $id) {
             $this->addFlash('error', sprintf('Категория с кодом "%s" уже существует', $code));
+
             return $this->redirectToRoute('marketplace_cost_categories_index');
         }
 
@@ -162,7 +168,7 @@ class MarketplaceCostCategoryController extends AbstractController
             throw $this->createNotFoundException();
         }
 
-        if (!$this->isCsrfTokenValid('toggle' . $id, $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('toggle'.$id, $request->request->get('_token'))) {
             throw $this->createAccessDeniedException('Invalid CSRF token.');
         }
 
@@ -185,13 +191,14 @@ class MarketplaceCostCategoryController extends AbstractController
             throw $this->createNotFoundException();
         }
 
-        if (!$this->isCsrfTokenValid('delete' . $id, $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('delete'.$id, $request->request->get('_token'))) {
             throw $this->createAccessDeniedException('Invalid CSRF token.');
         }
 
         // Проверка: системная категория
         if ($category->isSystem()) {
             $this->addFlash('error', 'Невозможно удалить системную категорию');
+
             return $this->redirectToRoute('marketplace_cost_categories_index');
         }
 
@@ -200,11 +207,12 @@ class MarketplaceCostCategoryController extends AbstractController
 
         if ($costsCount > 0) {
             $this->addFlash('error', sprintf(
-                'Невозможно удалить категорию "%s". Она содержит %d затрат(ы). ' .
+                'Невозможно удалить категорию "%s". Она содержит %d затрат(ы). '.
                 'Сначала удалите затраты или переназначьте их на другую категорию.',
                 $category->getName(),
                 $costsCount
             ));
+
             return $this->redirectToRoute('marketplace_cost_categories_index');
         }
 

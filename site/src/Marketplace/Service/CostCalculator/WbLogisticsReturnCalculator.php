@@ -22,8 +22,8 @@ class WbLogisticsReturnCalculator implements CostCalculatorInterface
 
     public function supports(array $item): bool
     {
-        return $this->normalizer->sellerOperName($item) === 'Логистика'
-            && (int) $this->normalizer->returnAmount($item) === 1;
+        return 'Логистика' === $this->normalizer->sellerOperName($item)
+            && 1 === (int) $this->normalizer->returnAmount($item);
     }
 
     public function requiresListing(): bool
@@ -40,7 +40,7 @@ class WbLogisticsReturnCalculator implements CostCalculatorInterface
         }
 
         $externalId = $this->externalIdBuilder->build($item, 'logistics_return');
-        if ($externalId === null) {
+        if (null === $externalId) {
             return [];
         }
 
@@ -49,7 +49,7 @@ class WbLogisticsReturnCalculator implements CostCalculatorInterface
         return [
             [
                 'category_code' => 'logistics_return',
-                'amount' => (string)abs($deliveryRub),
+                'amount' => (string) abs($deliveryRub),
                 'external_id' => $externalId,
                 'cost_date' => $saleDate,
                 'description' => 'Логистика возврат',

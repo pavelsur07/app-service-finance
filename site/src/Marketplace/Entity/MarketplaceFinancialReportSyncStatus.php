@@ -128,33 +128,140 @@ class MarketplaceFinancialReportSyncStatus
         $this->updatedAt = $now;
     }
 
-    public function getId(): string { return $this->id; }
-    public function getCompanyId(): string { return $this->companyId; }
-    public function getConnectionId(): string { return $this->connectionId; }
-    public function getMarketplace(): MarketplaceType { return $this->marketplace; }
-    public function getReportType(): string { return $this->reportType; }
-    public function getApiEndpoint(): string { return $this->apiEndpoint; }
-    public function getBusinessDate(): \DateTimeImmutable { return $this->businessDate; }
-    public function getStatus(): FinancialReportSyncStatus { return $this->status; }
-    public function getMode(): ?FinancialReportSyncMode { return $this->mode; }
-    public function getRawDocumentId(): ?string { return $this->rawDocumentId; }
-    public function getRecordsCount(): int { return $this->recordsCount; }
-    public function getRowsHash(): ?string { return $this->rowsHash; }
-    public function getStagingRawDocumentId(): ?string { return $this->stagingRawDocumentId; }
-    public function getNextRrdId(): ?int { return $this->nextRrdId; }
-    public function getAttempts(): int { return $this->attempts; }
-    public function getLastAttemptAt(): ?\DateTimeImmutable { return $this->lastAttemptAt; }
-    public function getNextRetryAt(): ?\DateTimeImmutable { return $this->nextRetryAt; }
-    public function getStartedAt(): ?\DateTimeImmutable { return $this->startedAt; }
-    public function getFinishedAt(): ?\DateTimeImmutable { return $this->finishedAt; }
-    public function getLastSuccessAt(): ?\DateTimeImmutable { return $this->lastSuccessAt; }
-    public function getLastEmptyAt(): ?\DateTimeImmutable { return $this->lastEmptyAt; }
-    public function getLastErrorClass(): ?string { return $this->lastErrorClass; }
-    public function getLastErrorMessage(): ?string { return $this->lastErrorMessage; }
-    public function getLastErrorStatusCode(): ?int { return $this->lastErrorStatusCode; }
-    public function getLastErrorResponseExcerpt(): ?string { return $this->lastErrorResponseExcerpt; }
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
-    public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
+    public function getId(): string
+    {
+        return $this->id;
+    }
+
+    public function getCompanyId(): string
+    {
+        return $this->companyId;
+    }
+
+    public function getConnectionId(): string
+    {
+        return $this->connectionId;
+    }
+
+    public function getMarketplace(): MarketplaceType
+    {
+        return $this->marketplace;
+    }
+
+    public function getReportType(): string
+    {
+        return $this->reportType;
+    }
+
+    public function getApiEndpoint(): string
+    {
+        return $this->apiEndpoint;
+    }
+
+    public function getBusinessDate(): \DateTimeImmutable
+    {
+        return $this->businessDate;
+    }
+
+    public function getStatus(): FinancialReportSyncStatus
+    {
+        return $this->status;
+    }
+
+    public function getMode(): ?FinancialReportSyncMode
+    {
+        return $this->mode;
+    }
+
+    public function getRawDocumentId(): ?string
+    {
+        return $this->rawDocumentId;
+    }
+
+    public function getRecordsCount(): int
+    {
+        return $this->recordsCount;
+    }
+
+    public function getRowsHash(): ?string
+    {
+        return $this->rowsHash;
+    }
+
+    public function getStagingRawDocumentId(): ?string
+    {
+        return $this->stagingRawDocumentId;
+    }
+
+    public function getNextRrdId(): ?int
+    {
+        return $this->nextRrdId;
+    }
+
+    public function getAttempts(): int
+    {
+        return $this->attempts;
+    }
+
+    public function getLastAttemptAt(): ?\DateTimeImmutable
+    {
+        return $this->lastAttemptAt;
+    }
+
+    public function getNextRetryAt(): ?\DateTimeImmutable
+    {
+        return $this->nextRetryAt;
+    }
+
+    public function getStartedAt(): ?\DateTimeImmutable
+    {
+        return $this->startedAt;
+    }
+
+    public function getFinishedAt(): ?\DateTimeImmutable
+    {
+        return $this->finishedAt;
+    }
+
+    public function getLastSuccessAt(): ?\DateTimeImmutable
+    {
+        return $this->lastSuccessAt;
+    }
+
+    public function getLastEmptyAt(): ?\DateTimeImmutable
+    {
+        return $this->lastEmptyAt;
+    }
+
+    public function getLastErrorClass(): ?string
+    {
+        return $this->lastErrorClass;
+    }
+
+    public function getLastErrorMessage(): ?string
+    {
+        return $this->lastErrorMessage;
+    }
+
+    public function getLastErrorStatusCode(): ?int
+    {
+        return $this->lastErrorStatusCode;
+    }
+
+    public function getLastErrorResponseExcerpt(): ?string
+    {
+        return $this->lastErrorResponseExcerpt;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    public function getUpdatedAt(): \DateTimeImmutable
+    {
+        return $this->updatedAt;
+    }
 
     public function updateTechnicalContext(string $connectionId, string $apiEndpoint): void
     {
@@ -196,7 +303,7 @@ class MarketplaceFinancialReportSyncStatus
             $this->rawDocumentId = null;
             $this->rowsHash = null;
         }
-        $this->attempts++;
+        ++$this->attempts;
         $this->lastAttemptAt = $now;
         $this->nextRetryAt = null;
         $this->startedAt ??= $now;

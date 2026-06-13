@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Marketplace\Infrastructure\Query;
 
 use App\Marketplace\DTO\ListingReturnAggregateDTO;
-use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 
 final readonly class ListingReturnAggregateQuery
@@ -21,10 +20,10 @@ final readonly class ListingReturnAggregateQuery
     public function executeByPeriod(
         string $companyId,
         ?string $marketplace,
-        DateTimeImmutable $from,
-        DateTimeImmutable $to,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
     ): array {
-        $mpFilter = $marketplace !== null ? 'AND r.marketplace = :marketplace' : '';
+        $mpFilter = null !== $marketplace ? 'AND r.marketplace = :marketplace' : '';
 
         $rows = $this->connection->fetchAllAssociative(
             <<<SQL
@@ -40,18 +39,18 @@ final readonly class ListingReturnAggregateQuery
             GROUP BY r.listing_id
             SQL,
             array_filter([
-                'companyId'   => $companyId,
-                'periodFrom'  => $from->format('Y-m-d'),
-                'periodTo'    => $to->format('Y-m-d'),
+                'companyId' => $companyId,
+                'periodFrom' => $from->format('Y-m-d'),
+                'periodTo' => $to->format('Y-m-d'),
                 'marketplace' => $marketplace,
-            ], static fn ($v) => $v !== null),
+            ], static fn ($v) => null !== $v),
         );
 
         $result = [];
         foreach ($rows as $row) {
             $result[$row['listing_id']] = new ListingReturnAggregateDTO(
-                listingId:       $row['listing_id'],
-                returnsTotal:    (string) $row['returns_total'],
+                listingId: $row['listing_id'],
+                returnsTotal: (string) $row['returns_total'],
                 returnsQuantity: (int) $row['returns_quantity'],
             );
         }

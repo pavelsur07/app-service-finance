@@ -102,10 +102,7 @@ class AdLoadJob
     public function markRunning(): void
     {
         if (AdLoadJobStatus::PENDING !== $this->status) {
-            throw new \DomainException(sprintf(
-                'Запустить можно только задание в статусе PENDING, текущий: %s.',
-                $this->status->value,
-            ));
+            throw new \DomainException(sprintf('Запустить можно только задание в статусе PENDING, текущий: %s.', $this->status->value));
         }
 
         $this->status = AdLoadJobStatus::RUNNING;
@@ -116,10 +113,7 @@ class AdLoadJob
     public function markCompleted(): void
     {
         if ($this->status->isTerminal()) {
-            throw new \DomainException(sprintf(
-                'Нельзя завершить задание в терминальном статусе: %s.',
-                $this->status->value,
-            ));
+            throw new \DomainException(sprintf('Нельзя завершить задание в терминальном статусе: %s.', $this->status->value));
         }
 
         $this->status = AdLoadJobStatus::COMPLETED;
@@ -130,10 +124,7 @@ class AdLoadJob
     public function setChunksTotal(int $total): void
     {
         if ($this->status->isTerminal()) {
-            throw new \DomainException(sprintf(
-                'Нельзя установить chunksTotal на задание в терминальном статусе: %s.',
-                $this->status->value,
-            ));
+            throw new \DomainException(sprintf('Нельзя установить chunksTotal на задание в терминальном статусе: %s.', $this->status->value));
         }
 
         Assert::greaterThanEq($total, 1, 'chunksTotal должен быть >= 1.');
@@ -145,10 +136,7 @@ class AdLoadJob
     public function markFailed(string $reason): void
     {
         if ($this->status->isTerminal()) {
-            throw new \DomainException(sprintf(
-                'Нельзя пометить неуспешным задание в терминальном статусе: %s.',
-                $this->status->value,
-            ));
+            throw new \DomainException(sprintf('Нельзя пометить неуспешным задание в терминальном статусе: %s.', $this->status->value));
         }
 
         Assert::notEmpty($reason, 'Причина ошибки не может быть пустой.');

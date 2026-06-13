@@ -10,4 +10,3 @@ enum StockSnapshotMappingStatus: string
     case Unmapped = 'unmapped';
     case Ambiguous = 'ambiguous';
 }
-

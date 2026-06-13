@@ -60,7 +60,7 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
                 $businessDate->format('Y-m-d'),
                 FinancialReportSyncStatus::QUEUED,
                 null,
-                $now->format(DATE_ATOM),
+                $now->format(\DATE_ATOM),
             );
         };
         $this->statuses->method('claimForQueue')->willReturnCallback(
@@ -129,7 +129,7 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
             $businessDate->format('Y-m-d'),
             FinancialReportSyncStatus::QUEUED,
             null,
-            $now->format(DATE_ATOM),
+            $now->format(\DATE_ATOM),
             123,
             'bbbbbbbb-bbbb-4bbb-8bbb-000000009999',
         );
@@ -307,7 +307,7 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
                 $businessDate->format('Y-m-d'),
                 FinancialReportSyncStatus::QUEUED,
                 null,
-                $now->format(DATE_ATOM),
+                $now->format(\DATE_ATOM),
             );
         };
 
@@ -338,7 +338,7 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
                 $businessDate->format('Y-m-d'),
                 FinancialReportSyncStatus::QUEUED,
                 null,
-                $now->format(DATE_ATOM),
+                $now->format(\DATE_ATOM),
             );
         };
 
@@ -379,7 +379,7 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
                 $businessDate->format('Y-m-d'),
                 FinancialReportSyncStatus::QUEUED,
                 null,
-                $now->format(DATE_ATOM),
+                $now->format(\DATE_ATOM),
             );
         };
 
@@ -541,7 +541,7 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
             $businessDate->format('Y-m-d'),
             FinancialReportSyncStatus::QUEUED,
             null,
-            $now->format(DATE_ATOM),
+            $now->format(\DATE_ATOM),
             456,
             'bbbbbbbb-bbbb-4bbb-8bbb-000000008888',
         );

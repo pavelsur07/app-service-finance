@@ -44,7 +44,7 @@ class WbCommissionCalculator implements CostCalculatorInterface
         }
 
         $externalId = $this->externalIdBuilder->build($item, 'commission');
-        if ($externalId === null) {
+        if (null === $externalId) {
             return [];
         }
 
@@ -56,7 +56,7 @@ class WbCommissionCalculator implements CostCalculatorInterface
         return [
             [
                 'category_code' => 'commission',
-                'amount' => (string)abs($commission),
+                'amount' => (string) abs($commission),
                 'external_id' => $externalId,
                 'cost_date' => $saleDate,
                 'description' => 'Комиссия маркетплейса',

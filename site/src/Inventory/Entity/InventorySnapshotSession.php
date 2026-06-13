@@ -74,15 +74,15 @@ class InventorySnapshotSession
     ) {
         Assert::uuid($companyId);
 
-        if ($triggeredBy !== null) {
+        if (null !== $triggeredBy) {
             Assert::uuid($triggeredBy);
         }
 
-        if ($correlationId !== null) {
+        if (null !== $correlationId) {
             Assert::uuid($correlationId);
         }
 
-        if ($expectedPages !== null && $expectedPages < 0) {
+        if (null !== $expectedPages && $expectedPages < 0) {
             throw new \DomainException('expectedPages must be greater than or equal to 0.');
         }
 
@@ -173,7 +173,7 @@ class InventorySnapshotSession
 
     public function markInProgress(): void
     {
-        if ($this->status !== SnapshotSessionStatus::Pending) {
+        if (SnapshotSessionStatus::Pending !== $this->status) {
             throw new \DomainException('Only pending sessions can be moved to in-progress status.');
         }
 
@@ -213,7 +213,7 @@ class InventorySnapshotSession
 
     public function setExpectedPages(?int $expectedPages): void
     {
-        if ($expectedPages !== null && $expectedPages < 0) {
+        if (null !== $expectedPages && $expectedPages < 0) {
             throw new \DomainException('expectedPages must be greater than or equal to 0.');
         }
 
@@ -259,24 +259,14 @@ class InventorySnapshotSession
     private function assertNotTerminal(SnapshotSessionStatus $target): void
     {
         if ($this->isTerminal()) {
-            throw new \LogicException(sprintf(
-                'Cannot transition session %s from terminal status %s to %s',
-                $this->id,
-                $this->status->value,
-                $target->value,
-            ));
+            throw new \LogicException(sprintf('Cannot transition session %s from terminal status %s to %s', $this->id, $this->status->value, $target->value));
         }
     }
 
     private function assertNotTerminalForMutation(string $field): void
     {
         if ($this->isTerminal()) {
-            throw new \LogicException(sprintf(
-                'Cannot modify %s on terminal session %s (status: %s)',
-                $field,
-                $this->id,
-                $this->status->value,
-            ));
+            throw new \LogicException(sprintf('Cannot modify %s on terminal session %s (status: %s)', $field, $this->id, $this->status->value));
         }
     }
 

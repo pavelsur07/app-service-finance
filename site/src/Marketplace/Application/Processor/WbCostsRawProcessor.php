@@ -46,11 +46,11 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
     public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = ''): bool
     {
         if ($type instanceof StagingRecordType) {
-            return $type === StagingRecordType::COST
-                && $marketplace === MarketplaceType::WILDBERRIES;
+            return StagingRecordType::COST === $type
+                && MarketplaceType::WILDBERRIES === $marketplace;
         }
 
-        return $type === MarketplaceType::WILDBERRIES->value && $kind === 'costs';
+        return $type === MarketplaceType::WILDBERRIES->value && 'costs' === $kind;
     }
 
     public function process(string $companyId, string $rawDocId): int
@@ -73,7 +73,7 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
 
         $company = $this->em->find(Company::class, $companyId);
         if (!$company instanceof Company) {
-            throw new \RuntimeException('Company not found: ' . $companyId);
+            throw new \RuntimeException('Company not found: '.$companyId);
         }
 
         $costsData = $rawRows;
@@ -86,7 +86,7 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
         $allBarcodes = [];
         foreach ($costsData as $item) {
             $barcode = trim((string) $this->normalizer->barcode($item));
-            if ($barcode !== '') {
+            if ('' !== $barcode) {
                 $allBarcodes[$barcode] = true;
             }
         }
@@ -115,7 +115,7 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
         $allNmIdsMap = [];
         foreach ($costsData as $item) {
             $nmId = trim($this->normalizer->nmId($item));
-            if ($nmId !== '' && $nmId !== '0') {
+            if ('' !== $nmId && '0' !== $nmId) {
                 $allNmIdsMap[$nmId] = true;
             }
         }
@@ -133,7 +133,7 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
         $newListings = 0;
         foreach ($costsData as $item) {
             $nmId = trim($this->normalizer->nmId($item));
-            if ($nmId === '' || $nmId === '0') {
+            if ('' === $nmId || '0' === $nmId) {
                 continue;
             }
 
@@ -141,25 +141,25 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
             $barcode = trim((string) $this->normalizer->barcode($item));
 
             // Если ts_name пустой — ищем size в каталоге по barcode
-            if (trim((string) $tsName) === '' && $barcode !== '' && isset($barcodeSizeMap[$barcode])) {
+            if ('' === trim((string) $tsName) && '' !== $barcode && isset($barcodeSizeMap[$barcode])) {
                 $tsName = $barcodeSizeMap[$barcode];
             }
 
-            $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
-            $cacheKey = $nmId . '_' . $size;
+            $size = '' !== trim((string) $tsName) ? trim((string) $tsName) : 'UNKNOWN';
+            $cacheKey = $nmId.'_'.$size;
 
             if (isset($listingsCache[$cacheKey])) {
                 continue;
             }
 
             $listing = $this->listingResolver->resolve($company, $nmId, $tsName, [
-                'sa_name'      => $this->normalizer->vendorCode($item),
-                'brand_name'   => $this->normalizer->brandName($item),
+                'sa_name' => $this->normalizer->vendorCode($item),
+                'brand_name' => $this->normalizer->brandName($item),
                 'subject_name' => $this->normalizer->subjectName($item),
                 'retail_price' => (string) $this->normalizer->retailPrice($item),
             ], $barcode);
             $listingsCache[$cacheKey] = $listing;
-            $newListings++;
+            ++$newListings;
         }
 
         if ($newListings > 0) {
@@ -176,20 +176,20 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
             $nmId = trim($this->normalizer->nmId($item));
             $listing = null;
 
-            if ($nmId !== '' && $nmId !== '0') {
+            if ('' !== $nmId && '0' !== $nmId) {
                 $tsName = $this->normalizer->techSize($item);
                 $barcode = trim((string) $this->normalizer->barcode($item));
 
-                if (trim((string) $tsName) === '' && $barcode !== '' && isset($barcodeSizeMap[$barcode])) {
+                if ('' === trim((string) $tsName) && '' !== $barcode && isset($barcodeSizeMap[$barcode])) {
                     $tsName = $barcodeSizeMap[$barcode];
                 }
 
-                $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
-                $listing = $listingsCache[$nmId . '_' . $size] ?? null;
+                $size = '' !== trim((string) $tsName) ? trim((string) $tsName) : 'UNKNOWN';
+                $listing = $listingsCache[$nmId.'_'.$size] ?? null;
             } else {
                 // nm_id пустой — ищем листинг по barcode из предзагруженного кэша
                 $barcode = trim((string) $this->normalizer->barcode($item));
-                if ($barcode !== '' && isset($barcodeListingMap[$barcode])) {
+                if ('' !== $barcode && isset($barcodeListingMap[$barcode])) {
                     $listing = $barcodeListingMap[$barcode];
                 }
             }
@@ -241,7 +241,7 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
             );
 
             $cost->setExternalId($externalId);
-            if ($rawDocId !== null) {
+            if (null !== $rawDocId) {
                 $cost->setRawDocumentId($rawDocId);
             }
             $cost->setCostDate($costData['cost_date']);

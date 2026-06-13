@@ -81,7 +81,7 @@ final class OzonRealizationSyncCommand extends Command
         if ($companyIdFilter) {
             $connections = array_filter(
                 $connections,
-                fn(array $c) => $c['company_id'] === $companyIdFilter,
+                static fn (array $c) => $c['company_id'] === $companyIdFilter,
             );
 
             if (empty($connections)) {
@@ -100,10 +100,10 @@ final class OzonRealizationSyncCommand extends Command
         $dispatched = 0;
         foreach ($connections as $connection) {
             $this->messageBus->dispatch(new SyncOzonRealizationMessage(
-                companyId:    $connection['company_id'],
+                companyId: $connection['company_id'],
                 connectionId: $connection['connection_id'],
-                year:         $year,
-                month:        $month,
+                year: $year,
+                month: $month,
             ));
 
             $io->text(sprintf(
@@ -112,7 +112,7 @@ final class OzonRealizationSyncCommand extends Command
                 $connection['connection_id'],
             ));
 
-            $dispatched++;
+            ++$dispatched;
         }
 
         $io->success(sprintf(
@@ -130,16 +130,16 @@ final class OzonRealizationSyncCommand extends Command
      */
     private function resolvePeriod(InputInterface $input): array
     {
-        $yearOption  = $input->getOption('year');
+        $yearOption = $input->getOption('year');
         $monthOption = $input->getOption('month');
 
-        if ($yearOption !== null && $monthOption !== null) {
-            return [(int)$yearOption, (int)$monthOption];
+        if (null !== $yearOption && null !== $monthOption) {
+            return [(int) $yearOption, (int) $monthOption];
         }
 
         // По умолчанию — прошлый месяц
         $lastMonth = new \DateTimeImmutable('first day of last month');
 
-        return [(int)$lastMonth->format('Y'), (int)$lastMonth->format('n')];
+        return [(int) $lastMonth->format('Y'), (int) $lastMonth->format('n')];
     }
 }

@@ -72,9 +72,9 @@ final class OzonMonthRawRefreshCommand extends Command
 
         foreach ($plan as $item) {
             if ('planned' !== $item->status) {
-                $skipped++;
+                ++$skipped;
                 if ('finance_locked' === $item->skippedReason) {
-                    $skippedFinanceLocked++;
+                    ++$skippedFinanceLocked;
                 }
 
                 continue;
@@ -86,7 +86,7 @@ final class OzonMonthRawRefreshCommand extends Command
                 date: $item->date,
             ));
 
-            $plannedDispatched++;
+            ++$plannedDispatched;
         }
 
         if (0 === $plannedDispatched) {

@@ -4,12 +4,12 @@ namespace App\Cash\Entity\PaymentPlan;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Enum\PaymentPlan\PaymentPlanSource;
+use App\Cash\Enum\PaymentPlan\PaymentPlanStatus;
+use App\Cash\Enum\PaymentPlan\PaymentPlanType;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
-use App\Cash\Enum\PaymentPlan\PaymentPlanStatus;
-use App\Cash\Enum\PaymentPlan\PaymentPlanSource;
-use App\Cash\Enum\PaymentPlan\PaymentPlanType;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
@@ -43,26 +43,26 @@ class PaymentPlan
     #[ORM\JoinColumn(onDelete: 'SET NULL')]
     private ?Counterparty $counterparty = null;
 
-    # Комментарий: ожидаемая дата оплаты, которую рассчитывает прогноз.
+    // Комментарий: ожидаемая дата оплаты, которую рассчитывает прогноз.
     #[ORM\Column(name: 'expected_at', type: 'date_immutable', nullable: true)]
     private ?\DateTimeImmutable $plannedAt;
 
-    # Комментарий: жесткая дата из документа (счет/договор), не меняется алгоритмами.
+    // Комментарий: жесткая дата из документа (счет/договор), не меняется алгоритмами.
     #[ORM\Column(type: 'date_immutable')]
     private \DateTimeImmutable $documentDate;
 
-    # Комментарий: вероятность поступления денег в процентах (0-100).
+    // Комментарий: вероятность поступления денег в процентах (0-100).
     #[ORM\Column(type: 'smallint', options: ['default' => 100])]
     private int $probability = 100;
 
-    # Комментарий: источник создания плана (ручной ввод, API, импорт).
+    // Комментарий: источник создания плана (ручной ввод, API, импорт).
     #[ORM\Column(enumType: PaymentPlanSource::class, options: ['default' => PaymentPlanSource::MANUAL->value])]
     private PaymentPlanSource $source = PaymentPlanSource::MANUAL;
 
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
     private bool $isFrozen = false;
 
-    # Комментарий: идентификатор внешнего документа для дедупликации при синхронизации.
+    // Комментарий: идентификатор внешнего документа для дедупликации при синхронизации.
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
     private ?string $externalId = null;
 

@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Marketplace\Application\Processor;
 
 use App\Company\Entity\Company;
-use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Application\Service\MappingErrorLogger;
+use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Application\Service\OzonListingEnsureService;
-use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceListing;
+use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
@@ -59,11 +59,11 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
     public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = ''): bool
     {
         if ($type instanceof StagingRecordType) {
-            return $type === StagingRecordType::COST
-                && $marketplace === MarketplaceType::OZON;
+            return StagingRecordType::COST === $type
+                && MarketplaceType::OZON === $marketplace;
         }
 
-        return $type === MarketplaceType::OZON->value && $kind === 'costs';
+        return $type === MarketplaceType::OZON->value && 'costs' === $kind;
     }
 
     public function process(string $companyId, string $rawDocId): int
@@ -98,7 +98,7 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
 
         $company = $this->em->find(Company::class, $companyId);
         if (!$company instanceof Company) {
-            throw new \RuntimeException('Company not found: ' . $companyId);
+            throw new \RuntimeException('Company not found: '.$companyId);
         }
 
         // Определяем период из первой строки для логирования ошибок маппинга
@@ -108,11 +108,12 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
             if (!empty($op['operation_date'])) {
                 try {
                     $firstDate = new \DateTimeImmutable($op['operation_date']);
-                } catch (\Throwable) {}
+                } catch (\Throwable) {
+                }
                 break;
             }
         }
-        $this->currentYear  = $firstDate ? (int) $firstDate->format('Y') : (int) date('Y');
+        $this->currentYear = $firstDate ? (int) $firstDate->format('Y') : (int) date('Y');
         $this->currentMonth = $firstDate ? (int) $firstDate->format('n') : (int) date('n');
 
         // Собираем SKU с именами для идемпотентного создания листингов
@@ -120,7 +121,7 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         foreach ($rawRows as $op) {
             foreach ($op['items'] ?? [] as $item) {
                 $sku = (string) ($item['sku'] ?? '');
-                if ($sku !== '' && !isset($skusWithNames[$sku])) {
+                if ('' !== $sku && !isset($skusWithNames[$sku])) {
                     $skusWithNames[$sku] = $item['name'] ?? null;
                 }
             }
@@ -132,8 +133,8 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
             $listingsIdCache[$sku] = $listing->getId();
         }
 
-        $shouldCleanup = $rawDocId !== null && $this->cleanedUpRawDocId !== $rawDocId;
-        $useTransaction = $rawDocId !== null;
+        $shouldCleanup = null !== $rawDocId && $this->cleanedUpRawDocId !== $rawDocId;
+        $useTransaction = null !== $rawDocId;
 
         if ($useTransaction) {
             $this->connection->beginTransaction();
@@ -149,55 +150,55 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
             // Генерируем cost entries
             $allEntries = [];
             foreach ($rawRows as $op) {
-            $operationId = (string) ($op['operation_id'] ?? '');
-            if ($operationId === '') {
-                continue;
-            }
-
-            // ClientReturnAgentOperation — финансовый возврат покупателю.
-            // Сам возврат обрабатывается в OzonReturnsRawProcessor.
-            // Но sale_commission > 0 = возврат комиссии продавцу — сторно начисленной комиссии.
-            if (($op['operation_type'] ?? '') === 'ClientReturnAgentOperation') {
-                $returnCommission = (float) ($op['sale_commission'] ?? 0);
-                if ($returnCommission > 0) {
-                    $operationId = (string) ($op['operation_id'] ?? '');
-                    try {
-                        $operationDate = new \DateTimeImmutable($op['operation_date']);
-                    } catch (\Throwable) {
-                        continue;
-                    }
-                    // Положительная сумма + operation_type = STORNO
-                    $allEntries[] = [
-                        'entry' => [
-                            'external_id'    => $operationId . '_commission_return',
-                            'category_code'  => 'ozon_sale_commission',
-                            'category_name'  => 'Комиссия Ozon за продажу',
-                            'amount'         => (string) abs($returnCommission),
-                            'cost_date'      => $operationDate,
-                            'description'    => 'Возврат комиссии Ozon',
-                            'operation_type' => MarketplaceCostOperationType::STORNO,
-                            '_item_idx'      => 0,
-                        ],
-                        'listingId' => null,
-                    ];
+                $operationId = (string) ($op['operation_id'] ?? '');
+                if ('' === $operationId) {
+                    continue;
                 }
-                continue;
-            }
 
-            try {
-                $operationDate = new \DateTimeImmutable($op['operation_date']);
-            } catch (\Throwable) {
-                continue;
-            }
+                // ClientReturnAgentOperation — финансовый возврат покупателю.
+                // Сам возврат обрабатывается в OzonReturnsRawProcessor.
+                // Но sale_commission > 0 = возврат комиссии продавцу — сторно начисленной комиссии.
+                if (($op['operation_type'] ?? '') === 'ClientReturnAgentOperation') {
+                    $returnCommission = (float) ($op['sale_commission'] ?? 0);
+                    if ($returnCommission > 0) {
+                        $operationId = (string) ($op['operation_id'] ?? '');
+                        try {
+                            $operationDate = new \DateTimeImmutable($op['operation_date']);
+                        } catch (\Throwable) {
+                            continue;
+                        }
+                        // Положительная сумма + operation_type = STORNO
+                        $allEntries[] = [
+                            'entry' => [
+                                'external_id' => $operationId.'_commission_return',
+                                'category_code' => 'ozon_sale_commission',
+                                'category_name' => 'Комиссия Ozon за продажу',
+                                'amount' => (string) abs($returnCommission),
+                                'cost_date' => $operationDate,
+                                'description' => 'Возврат комиссии Ozon',
+                                'operation_type' => MarketplaceCostOperationType::STORNO,
+                                '_item_idx' => 0,
+                            ],
+                            'listingId' => null,
+                        ];
+                    }
+                    continue;
+                }
 
-            foreach ($this->extractCostEntries($op, $operationId, $operationDate) as $entry) {
-                $itemIdx   = $entry['_item_idx'] ?? 0;
-                $items     = $op['items'] ?? [];
-                $sku       = (string) ($items[$itemIdx]['sku'] ?? '');
-                $listingId = $sku !== '' ? ($listingsIdCache[$sku] ?? null) : null;
+                try {
+                    $operationDate = new \DateTimeImmutable($op['operation_date']);
+                } catch (\Throwable) {
+                    continue;
+                }
 
-                $allEntries[] = ['entry' => $entry, 'listingId' => $listingId];
-            }
+                foreach ($this->extractCostEntries($op, $operationId, $operationDate) as $entry) {
+                    $itemIdx = $entry['_item_idx'] ?? 0;
+                    $items = $op['items'] ?? [];
+                    $sku = (string) ($items[$itemIdx]['sku'] ?? '');
+                    $listingId = '' !== $sku ? ($listingsIdCache[$sku] ?? null) : null;
+
+                    $allEntries[] = ['entry' => $entry, 'listingId' => $listingId];
+                }
             }
 
             if (empty($allEntries)) {
@@ -207,6 +208,7 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
                 if ($shouldCleanup) {
                     $this->cleanedUpRawDocId = $rawDocId;
                 }
+
                 return;
             }
 
@@ -218,39 +220,39 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
             $existingMap = $this->costExistingIdsQuery->execute($companyId, $allExternalIds);
 
             foreach ($allEntries as $row) {
-            $entry      = $row['entry'];
-            $externalId = $entry['external_id'];
+                $entry = $row['entry'];
+                $externalId = $entry['external_id'];
 
-            if (isset($existingMap[$externalId])) {
-                continue;
-            }
+                if (isset($existingMap[$externalId])) {
+                    continue;
+                }
 
-            $category = $this->categoryResolver->resolve(
-                $company,
-                MarketplaceType::OZON,
-                $entry['category_code'],
-                $entry['category_name'],
-            );
+                $category = $this->categoryResolver->resolve(
+                    $company,
+                    MarketplaceType::OZON,
+                    $entry['category_code'],
+                    $entry['category_name'],
+                );
 
-            $cost = new MarketplaceCost(
-                Uuid::uuid4()->toString(),
-                $company,
-                MarketplaceType::OZON,
-                $category,
-            );
+                $cost = new MarketplaceCost(
+                    Uuid::uuid4()->toString(),
+                    $company,
+                    MarketplaceType::OZON,
+                    $category,
+                );
 
-            $cost->setExternalId($externalId);
-            if ($rawDocId !== null) {
-                $cost->setRawDocumentId($rawDocId);
-            }
-            $cost->setCostDate($entry['cost_date']);
-            $cost->setAmount($entry['amount']);
-            $cost->setDescription($entry['description']);
-            $cost->setOperationType($entry['operation_type']);
+                $cost->setExternalId($externalId);
+                if (null !== $rawDocId) {
+                    $cost->setRawDocumentId($rawDocId);
+                }
+                $cost->setCostDate($entry['cost_date']);
+                $cost->setAmount($entry['amount']);
+                $cost->setDescription($entry['description']);
+                $cost->setOperationType($entry['operation_type']);
 
-            if ($row['listingId']) {
-                $cost->setListing($this->em->getReference(MarketplaceListing::class, $row['listingId']));
-            }
+                if ($row['listingId']) {
+                    $cost->setListing($this->em->getReference(MarketplaceListing::class, $row['listingId']));
+                }
 
                 $this->em->persist($cost);
                 $existingMap[$externalId] = true;
@@ -283,13 +285,8 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         $company = $rawDoc->getCompany();
         $lockBefore = $company->getFinanceLockBefore();
 
-        if ($lockBefore !== null && $rawDoc->getPeriodFrom() <= $lockBefore) {
-            throw new \DomainException(sprintf(
-                'Период raw-документа заблокирован для переобработки затрат (financeLockBefore: %s, period: %s—%s).',
-                $lockBefore->format('d.m.Y'),
-                $rawDoc->getPeriodFrom()->format('Y-m-d'),
-                $rawDoc->getPeriodTo()->format('Y-m-d'),
-            ));
+        if (null !== $lockBefore && $rawDoc->getPeriodFrom() <= $lockBefore) {
+            throw new \DomainException(sprintf('Период raw-документа заблокирован для переобработки затрат (financeLockBefore: %s, period: %s—%s).', $lockBefore->format('d.m.Y'), $rawDoc->getPeriodFrom()->format('Y-m-d'), $rawDoc->getPeriodTo()->format('Y-m-d')));
         }
 
         $periodFrom = $rawDoc->getPeriodFrom()->format('Y-m-d');
@@ -348,18 +345,18 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         $rawCommission = (float) ($op['sale_commission'] ?? 0);
         if (abs($rawCommission) > 0.001) {
             $entries[] = [
-                'external_id'    => $operationId . '_commission',
-                'category_code'  => 'ozon_sale_commission',
-                'category_name'  => 'Комиссия Ozon за продажу',
-                'amount'         => (string) abs($rawCommission),
-                'cost_date'      => $operationDate,
-                'description'    => $rawCommission > 0
+                'external_id' => $operationId.'_commission',
+                'category_code' => 'ozon_sale_commission',
+                'category_name' => 'Комиссия Ozon за продажу',
+                'amount' => (string) abs($rawCommission),
+                'cost_date' => $operationDate,
+                'description' => $rawCommission > 0
                     ? 'Возврат комиссии Ozon (корректировка)'
                     : 'Комиссия за продажу Ozon',
                 'operation_type' => $rawCommission > 0
                     ? MarketplaceCostOperationType::STORNO
                     : MarketplaceCostOperationType::CHARGE,
-                '_item_idx'      => 0,
+                '_item_idx' => 0,
             ];
         }
 
@@ -367,14 +364,14 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         $delivery = abs((float) ($op['delivery_charge'] ?? 0));
         if ($delivery > 0) {
             $entries[] = [
-                'external_id'    => $operationId . '_delivery',
-                'category_code'  => 'ozon_delivery',
-                'category_name'  => 'Доставка Ozon',
-                'amount'         => (string) $delivery,
-                'cost_date'      => $operationDate,
-                'description'    => 'Доставка Ozon',
+                'external_id' => $operationId.'_delivery',
+                'category_code' => 'ozon_delivery',
+                'category_name' => 'Доставка Ozon',
+                'amount' => (string) $delivery,
+                'cost_date' => $operationDate,
+                'description' => 'Доставка Ozon',
                 'operation_type' => MarketplaceCostOperationType::CHARGE,
-                '_item_idx'      => 0,
+                '_item_idx' => 0,
             ];
         }
 
@@ -382,24 +379,24 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         $returnDelivery = abs((float) ($op['return_delivery_charge'] ?? 0));
         if ($returnDelivery > 0) {
             $entries[] = [
-                'external_id'    => $operationId . '_return_delivery',
-                'category_code'  => 'ozon_return_delivery',
-                'category_name'  => 'Обратная доставка Ozon',
-                'amount'         => (string) $returnDelivery,
-                'cost_date'      => $operationDate,
-                'description'    => 'Обратная доставка Ozon',
+                'external_id' => $operationId.'_return_delivery',
+                'category_code' => 'ozon_return_delivery',
+                'category_name' => 'Обратная доставка Ozon',
+                'amount' => (string) $returnDelivery,
+                'cost_date' => $operationDate,
+                'description' => 'Обратная доставка Ozon',
                 'operation_type' => MarketplaceCostOperationType::CHARGE,
-                '_item_idx'      => 0,
+                '_item_idx' => 0,
             ];
         }
 
         // 4. services[]
-        $services  = $op['services'] ?? [];
-        $items     = $op['items'] ?? [];
+        $services = $op['services'] ?? [];
+        $items = $op['items'] ?? [];
         $itemCount = max(1, count($items));
 
         foreach ($services as $svcIdx => $service) {
-            $servicePrice  = (float) ($service['price'] ?? 0);
+            $servicePrice = (float) ($service['price'] ?? 0);
             $serviceAmount = abs($servicePrice);
 
             if ($serviceAmount <= 0.001) {
@@ -426,20 +423,20 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
             // Деньги через bcmath с точностью 2 знака, чтобы не накапливать float-погрешность.
             $serviceAmountStr = number_format($serviceAmount, 2, '.', '');
 
-            if ($itemCount === 1) {
+            if (1 === $itemCount) {
                 $entries[] = [
-                    'external_id'    => $operationId . '_svc_' . $svcIdx,
-                    'category_code'  => $categoryCode,
-                    'category_name'  => $this->resolveCategoryName($categoryCode),
-                    'amount'         => $serviceAmountStr,
-                    'cost_date'      => $operationDate,
-                    'description'    => $serviceName,
+                    'external_id' => $operationId.'_svc_'.$svcIdx,
+                    'category_code' => $categoryCode,
+                    'category_name' => $this->resolveCategoryName($categoryCode),
+                    'amount' => $serviceAmountStr,
+                    'cost_date' => $operationDate,
+                    'description' => $serviceName,
                     'operation_type' => $serviceOpType,
-                    '_item_idx'      => 0,
+                    '_item_idx' => 0,
                 ];
             } else {
                 // Multi-SKU: делим поровну, остаток (копейки) добиваем на последнем SKU.
-                $perItem     = bcdiv($serviceAmountStr, (string) $itemCount, 2);
+                $perItem = bcdiv($serviceAmountStr, (string) $itemCount, 2);
                 $distributed = '0.00';
 
                 foreach ($items as $itemIdx => $item) {
@@ -448,14 +445,14 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
                     $distributed = bcadd($distributed, $perItem, 2);
 
                     $entries[] = [
-                        'external_id'    => $operationId . '_svc_' . $svcIdx . '_item_' . $itemIdx,
-                        'category_code'  => $categoryCode,
-                        'category_name'  => $this->resolveCategoryName($categoryCode),
-                        'amount'         => $amount,
-                        'cost_date'      => $operationDate,
-                        'description'    => $serviceName,
+                        'external_id' => $operationId.'_svc_'.$svcIdx.'_item_'.$itemIdx,
+                        'category_code' => $categoryCode,
+                        'category_name' => $this->resolveCategoryName($categoryCode),
+                        'amount' => $amount,
+                        'cost_date' => $operationDate,
+                        'description' => $serviceName,
                         'operation_type' => $serviceOpType,
-                        '_item_idx'      => $itemIdx,
+                        '_item_idx' => $itemIdx,
                     ];
                 }
             }
@@ -465,16 +462,16 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         // Применимо к: реклама, хранение, кросс-докинг, поставка, досрочная выплата, компенсации и т.д.
         if (empty($services)) {
             $rawAmount = (float) ($op['amount'] ?? 0);
-            $opAmount  = abs($rawAmount);
-            $opType    = $op['type'] ?? '';
+            $opAmount = abs($rawAmount);
+            $opType = $op['type'] ?? '';
 
             // Пропускаем продажи и сторно продаж (выручка учитывается в sales, не в costs)
             $opOperationType = $op['operation_type'] ?? '';
             if ($opAmount > 0.001
-                && $opType !== 'orders'
-                && $opOperationType !== 'OperationAgentStornoDeliveredToCustomer'
+                && 'orders' !== $opType
+                && 'OperationAgentStornoDeliveredToCustomer' !== $opOperationType
             ) {
-                if ($opType === 'compensation') {
+                if ('compensation' === $opType) {
                     // Компенсации: разделяем по знаку исходного amount на две разные категории.
                     // rawAmount >= 0 = компенсация от Ozon (доход продавца) → ozon_compensation → STORNO
                     // rawAmount  < 0 = декомпенсация (Ozon списывает с продавца) → ozon_decompensation → CHARGE
@@ -483,21 +480,21 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
                     $storedAmount = $opAmount;
                 } else {
                     $operationType = $op['operation_type'] ?? '';
-                    $categoryCode  = $this->resolveServiceCategoryCode($operationType);
-                    $storedAmount  = $opAmount;
+                    $categoryCode = $this->resolveServiceCategoryCode($operationType);
+                    $storedAmount = $opAmount;
                 }
 
                 $entries[] = [
-                    'external_id'    => $operationId . '_main',
-                    'category_code'  => $categoryCode,
-                    'category_name'  => $this->resolveCategoryName($categoryCode),
-                    'amount'         => (string) $storedAmount,
-                    'cost_date'      => $operationDate,
-                    'description'    => $op['operation_type_name'] ?? ($op['operation_type'] ?? ''),
+                    'external_id' => $operationId.'_main',
+                    'category_code' => $categoryCode,
+                    'category_name' => $this->resolveCategoryName($categoryCode),
+                    'amount' => (string) $storedAmount,
+                    'cost_date' => $operationDate,
+                    'description' => $op['operation_type_name'] ?? ($op['operation_type'] ?? ''),
                     'operation_type' => $rawAmount > 0
                         ? MarketplaceCostOperationType::STORNO
                         : MarketplaceCostOperationType::CHARGE,
-                    '_item_idx'      => 0,
+                    '_item_idx' => 0,
                 ];
             }
         }
@@ -510,14 +507,14 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         if (!OzonServiceCategoryMap::isKnown($serviceName) && !OzonServiceCategoryMap::isZeroMarker($serviceName)) {
             // Неизвестный service_name — логируем для мониторинга в админке
             $this->mappingErrorLogger->log(
-                companyId:     $this->currentCompanyId,
-                marketplace:   MarketplaceType::OZON->value,
-                year:          $this->currentYear,
-                month:         $this->currentMonth,
-                serviceName:   $serviceName,
+                companyId: $this->currentCompanyId,
+                marketplace: MarketplaceType::OZON->value,
+                year: $this->currentYear,
+                month: $this->currentMonth,
+                serviceName: $serviceName,
                 operationType: $rawOp['operation_type'] ?? '',
-                amount:        abs((float) ($rawOp['amount'] ?? 0)),
-                sampleRaw:     $rawOp,
+                amount: abs((float) ($rawOp['amount'] ?? 0)),
+                sampleRaw: $rawOp,
             );
         }
 
@@ -530,6 +527,4 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
     {
         return OzonServiceCategoryMap::getCategoryName($categoryCode);
     }
-
-
 }

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Company;
 
 use App\Company\Entity\Company;
-use App\Company\Enum\CounterpartyType;
 use App\Company\Entity\Counterparty;
+use App\Company\Enum\CounterpartyType;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\CounterpartyBuilder;
 use PHPUnit\Framework\TestCase;

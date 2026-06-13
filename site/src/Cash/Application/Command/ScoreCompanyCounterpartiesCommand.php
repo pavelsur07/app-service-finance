@@ -8,5 +8,6 @@ final readonly class ScoreCompanyCounterpartiesCommand
 {
     public function __construct(
         public string $companyId,
-    ) {}
+    ) {
+    }
 }

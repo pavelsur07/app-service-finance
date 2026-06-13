@@ -36,7 +36,7 @@ final readonly class PortfolioSummaryQuery
         string $dateFrom,
         string $dateTo,
     ): array {
-        $marketplaceCondition = $marketplace !== null ? 'AND marketplace = :marketplace' : '';
+        $marketplaceCondition = null !== $marketplace ? 'AND marketplace = :marketplace' : '';
 
         $sql = <<<SQL
             SELECT
@@ -71,13 +71,13 @@ final readonly class PortfolioSummaryQuery
             'dateTo' => $dateTo,
         ];
 
-        if ($marketplace !== null) {
+        if (null !== $marketplace) {
             $params['marketplace'] = $marketplace;
         }
 
         $row = $this->connection->fetchAssociative($sql, $params);
 
-        if ($row === false) {
+        if (false === $row) {
             return self::DEFAULTS;
         }
 
@@ -86,7 +86,7 @@ final readonly class PortfolioSummaryQuery
             'total_refunds' => (string) $row['total_refunds'],
             'total_sales_quantity' => (int) $row['total_sales_quantity'],
             'total_listings' => (int) $row['total_listings'],
-            'total_profit' => $row['total_profit'] !== null ? (string) $row['total_profit'] : null,
+            'total_profit' => null !== $row['total_profit'] ? (string) $row['total_profit'] : null,
         ];
     }
 }

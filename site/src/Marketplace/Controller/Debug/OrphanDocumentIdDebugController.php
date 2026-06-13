@@ -42,15 +42,15 @@ final class OrphanDocumentIdDebugController extends AbstractController
         return $this->json([
             'meta' => [
                 'generated_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
-                'scope'        => 'all_companies',
-                'hint'         => 'Ожидание: десятки–сотни строк в январе–апреле 2026. Иное — стоп-сигнал, не применять миграцию.',
-                'note'         => 'Endpoint scoped to marketplace_costs rows where document_id references a documents.id that no longer exists.',
+                'scope' => 'all_companies',
+                'hint' => 'Ожидание: десятки–сотни строк в январе–апреле 2026. Иное — стоп-сигнал, не применять миграцию.',
+                'note' => 'Endpoint scoped to marketplace_costs rows where document_id references a documents.id that no longer exists.',
             ],
-            'totals'         => $this->totals(),
-            'by_company'     => $this->byCompany(),
-            'by_period_month'=> $this->byPeriodMonth(),
-            'sample_rows'    => $this->sampleRows(),
-        ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
+            'totals' => $this->totals(),
+            'by_company' => $this->byCompany(),
+            'by_period_month' => $this->byPeriodMonth(),
+            'sample_rows' => $this->sampleRows(),
+        ], 200, [], ['json_encode_options' => \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE]);
     }
 
     /**
@@ -76,13 +76,13 @@ final class OrphanDocumentIdDebugController extends AbstractController
         $row = $row ?: [];
 
         return [
-            'orphan_rows'           => (int) ($row['orphan_rows'] ?? 0),
-            'affected_companies'    => (int) ($row['affected_companies'] ?? 0),
+            'orphan_rows' => (int) ($row['orphan_rows'] ?? 0),
+            'affected_companies' => (int) ($row['affected_companies'] ?? 0),
             'affected_marketplaces' => (int) ($row['affected_marketplaces'] ?? 0),
-            'earliest_cost_date'    => $row['earliest_cost_date'] ?? null,
-            'latest_cost_date'      => $row['latest_cost_date'] ?? null,
-            'earliest_updated_at'   => $row['earliest_updated_at'] ?? null,
-            'latest_updated_at'     => $row['latest_updated_at'] ?? null,
+            'earliest_cost_date' => $row['earliest_cost_date'] ?? null,
+            'latest_cost_date' => $row['latest_cost_date'] ?? null,
+            'earliest_updated_at' => $row['earliest_updated_at'] ?? null,
+            'latest_updated_at' => $row['latest_updated_at'] ?? null,
         ];
     }
 
@@ -106,10 +106,10 @@ final class OrphanDocumentIdDebugController extends AbstractController
         SQL);
 
         return array_map(static fn (array $row): array => [
-            'company_id'  => $row['company_id'],
+            'company_id' => $row['company_id'],
             'orphan_rows' => (int) $row['orphan_rows'],
-            'min_date'    => $row['min_date'],
-            'max_date'    => $row['max_date'],
+            'min_date' => $row['min_date'],
+            'max_date' => $row['max_date'],
         ], $rows);
     }
 
@@ -132,7 +132,7 @@ final class OrphanDocumentIdDebugController extends AbstractController
 
         return array_map(static fn (array $row): array => [
             'month' => $row['month'],
-            'rows'  => (int) $row['rows'],
+            'rows' => (int) $row['rows'],
         ], $rows);
     }
 
@@ -159,12 +159,12 @@ final class OrphanDocumentIdDebugController extends AbstractController
         SQL);
 
         return array_map(static fn (array $row): array => [
-            'id'          => $row['id'],
-            'company_id'  => $row['company_id'],
+            'id' => $row['id'],
+            'company_id' => $row['company_id'],
             'marketplace' => $row['marketplace'],
-            'cost_date'   => $row['cost_date'],
+            'cost_date' => $row['cost_date'],
             'document_id' => $row['document_id'],
-            'updated_at'  => $row['updated_at'],
+            'updated_at' => $row['updated_at'],
         ], $rows);
     }
 }

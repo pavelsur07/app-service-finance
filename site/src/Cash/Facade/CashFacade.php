@@ -16,7 +16,8 @@ final readonly class CashFacade
     public function __construct(
         private CashTransactionService $cashTransactionService,
         private CashTransactionRepository $cashTransactionRepository,
-    ) {}
+    ) {
+    }
 
     public function createTransaction(CreateCashTransactionCommand $command): CreateCashTransactionResult
     {
@@ -76,5 +77,4 @@ final readonly class CashFacade
             $command->externalId,
         );
     }
-
 }

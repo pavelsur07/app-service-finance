@@ -33,7 +33,7 @@ final readonly class AdvertisingOtherMetrics
 
     public function isEmpty(): bool
     {
-        return bccomp($this->spend, '0.00', 2) === 0;
+        return 0 === bccomp($this->spend, '0.00', 2);
     }
 
     public static function empty(): self

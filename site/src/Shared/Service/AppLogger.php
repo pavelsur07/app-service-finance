@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Shared\Service;
 
 use Psr\Log\LoggerInterface;
-use Sentry\State\HubInterface;
 use Sentry\Severity;
+use Sentry\State\HubInterface;
 
 /**
  * Единая точка входа для логирования бизнес-событий и метрик.
@@ -15,12 +15,12 @@ class AppLogger
 {
     public function __construct(
         private readonly LoggerInterface $logger,
-        private readonly HubInterface $sentryHub
+        private readonly HubInterface $sentryHub,
     ) {
     }
 
     /**
-     * Обычный информационный лог (пишется только в файл/консоль)
+     * Обычный информационный лог (пишется только в файл/консоль).
      */
     public function info(string $message, array $context = []): void
     {
@@ -37,11 +37,11 @@ class AppLogger
     }
 
     /**
-     * Фиксация ошибок с отправкой в Sentry
+     * Фиксация ошибок с отправкой в Sentry.
      */
-    public function error(string $message, \Throwable $exception = null, array $context = []): void
+    public function error(string $message, ?\Throwable $exception = null, array $context = []): void
     {
-        if ($exception !== null) {
+        if (null !== $exception) {
             $context['exception'] = $exception;
         }
 
@@ -51,7 +51,7 @@ class AppLogger
     }
 
     /**
-     * Точечная отправка аномалий производительности (деградации) в Sentry
+     * Точечная отправка аномалий производительности (деградации) в Sentry.
      */
     public function logSlowExecution(string $operationName, int $durationMs, int $thresholdMs = 0): void
     {

@@ -238,7 +238,7 @@ class OzonAdClient implements AdPlatformClientInterface
      * }>}>
      *
      * @throws \InvalidArgumentException если dateFrom > dateTo или диапазон > 62 дня
-     * @throws \RuntimeException         если Performance-подключение не настроено либо API вернул ошибку
+     * @throws \RuntimeException если Performance-подключение не настроено либо API вернул ошибку
      */
     public function fetchAdStatisticsRange(
         string $companyId,
@@ -443,7 +443,7 @@ class OzonAdClient implements AdPlatformClientInterface
      *
      * @throws OzonPermanentApiException 403 / отсутствующие credentials
      * @throws \InvalidArgumentException диапазон > 62 дней / from > to
-     * @throws \RuntimeException         прочие non-2xx / network / JSON-ошибки
+     * @throws \RuntimeException прочие non-2xx / network / JSON-ошибки
      */
     public function requestStatisticsOnly(
         string $companyId,
@@ -557,7 +557,7 @@ class OzonAdClient implements AdPlatformClientInterface
      *
      * @throws OzonPermanentApiException 403 / отсутствующие credentials
      * @throws \InvalidArgumentException диапазон > 62 дней / from > to
-     * @throws \RuntimeException         прочие non-2xx / network / JSON-ошибки
+     * @throws \RuntimeException прочие non-2xx / network / JSON-ошибки
      */
     public function prepareStatisticsBatches(
         string $companyId,
@@ -616,7 +616,7 @@ class OzonAdClient implements AdPlatformClientInterface
      * @return list<array{id: string, title: string, state: string}>
      *
      * @throws OzonPermanentApiException 403 / отсутствующие credentials
-     * @throws \RuntimeException         прочие non-2xx / network / JSON-ошибки
+     * @throws \RuntimeException прочие non-2xx / network / JSON-ошибки
      */
     public function listAllSkuCampaigns(string $companyId): array
     {
@@ -644,7 +644,7 @@ class OzonAdClient implements AdPlatformClientInterface
      * Семантика ошибок:
      *  - 403 / отсутствующие credentials → {@see OzonPermanentApiException}
      *    (caller помечает batch FAILED);
-     *  - 429 → {@see \App\MarketplaceAds\Exception\OzonRateLimitException}
+     *  - 429 → {@see OzonRateLimitException}
      *    (caller перепланирует `scheduled_at` на +N минут);
      *  - 5xx / network / JSON → `\RuntimeException` (caller откатывает
      *    транзакцию, batch остаётся PLANNED, cron попробует на следующем тике).
@@ -654,9 +654,9 @@ class OzonAdClient implements AdPlatformClientInterface
      * @return string UUID созданного отчёта
      *
      * @throws OzonPermanentApiException
-     * @throws \App\MarketplaceAds\Exception\OzonRateLimitException
+     * @throws OzonRateLimitException
      * @throws \InvalidArgumentException пустой $campaignIds или диапазон > 62 дней
-     * @throws \RuntimeException         прочие non-2xx / network / JSON-ошибки
+     * @throws \RuntimeException прочие non-2xx / network / JSON-ошибки
      */
     public function postStatistics(
         string $companyId,
@@ -735,7 +735,7 @@ class OzonAdClient implements AdPlatformClientInterface
      *
      * @throws OzonPermanentApiException 403
      * @throws \InvalidArgumentException пустой $campaignIds
-     * @throws \RuntimeException         прочие non-2xx (включая 429) / 5xx / network
+     * @throws \RuntimeException прочие non-2xx (включая 429) / 5xx / network
      */
     public function requestOneBatch(
         string $companyId,
@@ -827,7 +827,7 @@ class OzonAdClient implements AdPlatformClientInterface
      *                                                         + сырой ответ Ozon
      *
      * @throws OzonPermanentApiException 403 (нет Performance scope / client_id блокирован)
-     * @throws \RuntimeException         остальные non-2xx / network / JSON-ошибки
+     * @throws \RuntimeException остальные non-2xx / network / JSON-ошибки
      */
     public function pollOneReport(string $companyId, string $uuid): array
     {
@@ -882,7 +882,7 @@ class OzonAdClient implements AdPlatformClientInterface
      * @return array<string, string> UUID => raw state, пусто = листинг пуст
      *
      * @throws OzonPermanentApiException 403 (нет Performance scope / client_id блокирован)
-     * @throws \RuntimeException         остальные non-2xx / network / JSON-ошибки
+     * @throws \RuntimeException остальные non-2xx / network / JSON-ошибки
      */
     public function listReportsForCompany(string $companyId): array
     {
@@ -939,7 +939,7 @@ class OzonAdClient implements AdPlatformClientInterface
      * @return array{body: string, contentType: ?string}
      *
      * @throws OzonPermanentApiException 403 / отсутствующие credentials
-     * @throws \RuntimeException         отчёт не в ready-состоянии или прочие non-2xx / network / JSON-ошибки
+     * @throws \RuntimeException отчёт не в ready-состоянии или прочие non-2xx / network / JSON-ошибки
      */
     public function fetchReportContent(string $companyId, string $reportUuid): array
     {
@@ -1004,7 +1004,7 @@ class OzonAdClient implements AdPlatformClientInterface
      * НЕ трогает $this->lastChunkDownloads — bronze в async-flow'е пишет
      * handler сам из возвращаемого `downloads` массива.
      *
-     * @param list<string> $campaignIds Используются только для логирования контекста.
+     * @param list<string> $campaignIds используются только для логирования контекста
      *
      * @return array{
      *     downloads: list<OzonReportDownload>,
@@ -1016,7 +1016,7 @@ class OzonAdClient implements AdPlatformClientInterface
      * }
      *
      * @throws OzonPermanentApiException 403 / отсутствующие credentials
-     * @throws \RuntimeException         отчёт не в ready-состоянии или прочие non-2xx / network / JSON-ошибки
+     * @throws \RuntimeException отчёт не в ready-состоянии или прочие non-2xx / network / JSON-ошибки
      *
      * @deprecated Since v1.18 (task-8): парсинг отключён, метод не вызывается.
      *             {@see DownloadOzonAdReportHandler} использует
@@ -1102,11 +1102,7 @@ class OzonAdClient implements AdPlatformClientInterface
 
         $state = strtoupper($this->stringifyApiField($data['state'] ?? null));
         if ('OK' !== $state && 'READY' !== $state) {
-            throw new \RuntimeException(sprintf(
-                'Ozon Performance: downloadAndConvertReport вызван для отчёта %s в не-готовом state=%s',
-                $uuid,
-                $state,
-            ));
+            throw new \RuntimeException(sprintf('Ozon Performance: downloadAndConvertReport вызван для отчёта %s в не-готовом state=%s', $uuid, $state));
         }
 
         $link = $this->stringifyApiField($data['link'] ?? $data['report']['link'] ?? null);
@@ -1385,7 +1381,7 @@ class OzonAdClient implements AdPlatformClientInterface
     }
 
     /**
-     * @param list<string>         $campaignIds
+     * @param list<string> $campaignIds
      * @param 'NO_GROUP_BY'|'DATE' $groupBy
      */
     private function requestStatistics(
@@ -1460,7 +1456,7 @@ class OzonAdClient implements AdPlatformClientInterface
      * третий UUID.
      *
      * @param list<OzonAdPendingReport> $inFlightReports
-     * @param list<string>              $campaignIds
+     * @param list<string> $campaignIds
      */
     private function matchResumableReport(
         array $inFlightReports,
@@ -1749,12 +1745,7 @@ class OzonAdClient implements AdPlatformClientInterface
             $zip = new \ZipArchive();
             $openResult = $zip->open($tmpPath);
             if (true !== $openResult) {
-                throw new \RuntimeException(sprintf(
-                    'Ozon Performance: не удалось открыть ZIP-отчёт (uuid=%s, size=%d bytes, ZipArchive error code=%d)',
-                    $reportUuid,
-                    strlen($zipBytes),
-                    is_int($openResult) ? $openResult : -1,
-                ));
+                throw new \RuntimeException(sprintf('Ozon Performance: не удалось открыть ZIP-отчёт (uuid=%s, size=%d bytes, ZipArchive error code=%d)', $reportUuid, strlen($zipBytes), is_int($openResult) ? $openResult : -1));
             }
 
             try {
@@ -1841,7 +1832,7 @@ class OzonAdClient implements AdPlatformClientInterface
      * строка «;Кампания по продвижению № N…», и campaign_id в data-строках
      * берётся именно из неё. Единый pass'ом по concat'у терял бы attribution.
      *
-     * @param list<string>          $csvParts  CSV verbatim по каждому файлу из ZIP
+     * @param list<string> $csvParts CSV verbatim по каждому файлу из ZIP
      * @param array<string, string> $namesById кэш campaign_name по campaign_id
      *
      * @return list<array{campaign_id: string, campaign_name: string, sku: string, spend: float, views: int, clicks: int}>
@@ -1921,7 +1912,7 @@ class OzonAdClient implements AdPlatformClientInterface
      * для plain-CSV). Каждая часть обрабатывается независимо со своим preamble'ом,
      * см. комментарий к {@see self::convertCsvToRows()}.
      *
-     * @param list<string>          $csvParts  CSV verbatim по каждому файлу из ZIP
+     * @param list<string> $csvParts CSV verbatim по каждому файлу из ZIP
      * @param array<string, string> $namesById кэш campaign_name по campaign_id
      *
      * @return array<string, array<string, array{
@@ -2059,7 +2050,7 @@ class OzonAdClient implements AdPlatformClientInterface
         // с переводами строк внутри кавычек и не создаёт отдельный массив строк
         // в памяти. escape='' — RFC 4180 не знает backslash-экранирования,
         // экранирование кавычки делается удвоением ("" внутри строкового поля).
-        $fp = fopen('php://memory', 'r+b');
+        $fp = fopen('php://memory', 'r+');
         if (false === $fp) {
             throw new \RuntimeException('Ozon Performance: не удалось открыть in-memory поток для CSV');
         }
@@ -2174,7 +2165,7 @@ class OzonAdClient implements AdPlatformClientInterface
      * результат к (float)/(int)).
      *
      * @param array<string, string> $row
-     * @param list<string>          $keys
+     * @param list<string> $keys
      */
     private function pickColumn(array $row, array $keys): string
     {

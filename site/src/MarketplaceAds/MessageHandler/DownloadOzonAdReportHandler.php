@@ -123,11 +123,7 @@ final class DownloadOzonAdReportHandler
                 'error' => $e->getMessage(),
             ]);
 
-            throw new UnrecoverableMessageHandlingException(
-                'DownloadOzonAdReportMessage: Ozon permanent failure — '.$e->getMessage(),
-                0,
-                $e,
-            );
+            throw new UnrecoverableMessageHandlingException('DownloadOzonAdReportMessage: Ozon permanent failure — '.$e->getMessage(), 0, $e);
         }
 
         $body = $response['body'];

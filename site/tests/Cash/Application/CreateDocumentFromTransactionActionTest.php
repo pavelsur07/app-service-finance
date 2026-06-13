@@ -37,7 +37,7 @@ final class CreateDocumentFromTransactionActionTest extends IntegrationTestCase
     private function makeCompany(): Company
     {
         $user = UserBuilder::aUser()
-            ->withEmail(Uuid::uuid4()->toString() . '@test.com')
+            ->withEmail(Uuid::uuid4()->toString().'@test.com')
             ->withPasswordHash('hash')
             ->build();
 
@@ -111,7 +111,7 @@ final class CreateDocumentFromTransactionActionTest extends IntegrationTestCase
     // Сценарий A — полный маппинг, создание без подтверждения
     // -------------------------------------------------------------------------
 
-    public function testScenarioA_createDocumentWithFullMapping(): void
+    public function testScenarioACreateDocumentWithFullMapping(): void
     {
         $company = $this->makeCompany();
         $account = $this->makeMoneyAccount($company);
@@ -151,7 +151,7 @@ final class CreateDocumentFromTransactionActionTest extends IntegrationTestCase
     // Сценарий A — частичное разнесение (уже есть документ на 300)
     // -------------------------------------------------------------------------
 
-    public function testScenarioA_partialAllocation(): void
+    public function testScenarioAPartialAllocation(): void
     {
         $company = $this->makeCompany();
         $account = $this->makeMoneyAccount($company);
@@ -191,7 +191,7 @@ final class CreateDocumentFromTransactionActionTest extends IntegrationTestCase
     // Сценарий B, шаг 1 — нет PLCategory, confirmed=false → needsConfirmation
     // -------------------------------------------------------------------------
 
-    public function testScenarioB_step1_returnsNeedsConfirmation(): void
+    public function testScenarioBStep1ReturnsNeedsConfirmation(): void
     {
         $company = $this->makeCompany();
         $account = $this->makeMoneyAccount($company);
@@ -216,7 +216,7 @@ final class CreateDocumentFromTransactionActionTest extends IntegrationTestCase
     // Сценарий B, шаг 2 — нет PLCategory, confirmed=true → violation
     // -------------------------------------------------------------------------
 
-    public function testScenarioB_step2_createDocumentWithViolation(): void
+    public function testScenarioBStep2CreateDocumentWithViolation(): void
     {
         $company = $this->makeCompany();
         $account = $this->makeMoneyAccount($company);
@@ -252,7 +252,7 @@ final class CreateDocumentFromTransactionActionTest extends IntegrationTestCase
     // Сценарий B, шаг 2 — нет cashflowCategory вообще, confirmed=true → violation
     // -------------------------------------------------------------------------
 
-    public function testScenarioB_step2_noCashflowCategory(): void
+    public function testScenarioBStep2NoCashflowCategory(): void
     {
         $company = $this->makeCompany();
         $account = $this->makeMoneyAccount($company);

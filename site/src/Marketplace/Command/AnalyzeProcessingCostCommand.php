@@ -16,7 +16,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 class AnalyzeProcessingCostCommand extends Command
 {
     public function __construct(
-        private readonly EntityManagerInterface $em
+        private readonly EntityManagerInterface $em,
     ) {
         parent::__construct();
     }
@@ -42,6 +42,7 @@ class AnalyzeProcessingCostCommand extends Command
 
         if (empty($documents)) {
             $io->error('Не найдено raw документов. Загрузите данные из WB.');
+
             return Command::FAILURE;
         }
 
@@ -77,6 +78,7 @@ class AnalyzeProcessingCostCommand extends Command
                 '2. Обработать данные',
                 '3. Запустить эту команду снова',
             ]);
+
             return Command::FAILURE;
         }
 
@@ -121,12 +123,12 @@ class AnalyzeProcessingCostCommand extends Command
                     $numericFields[$field] = ['count' => 0, 'non_zero' => 0, 'values' => []];
                 }
 
-                if ($value !== null) {
-                    $numericFields[$field]['count']++;
+                if (null !== $value) {
+                    ++$numericFields[$field]['count'];
                     $numericFields[$field]['values'][] = $value;
 
-                    if ((float)$value != 0) {
-                        $numericFields[$field]['non_zero']++;
+                    if (0 != (float) $value) {
+                        ++$numericFields[$field]['non_zero'];
                         $tableData[] = [$field, $value, '✅'];
                     } else {
                         $tableData[] = [$field, $value, ''];
@@ -154,17 +156,18 @@ class AnalyzeProcessingCostCommand extends Command
                     $stats['count'],
                     $stats['non_zero'],
                     round($avgValue, 2),
-                    '✅ ВЕРОЯТНО'
+                    '✅ ВЕРОЯТНО',
                 ];
             }
         }
 
         if (empty($statsData)) {
             $io->error('Не найдено полей с ненулевыми значениями!');
+
             return Command::FAILURE;
         }
 
-        usort($statsData, fn($a, $b) => $b[2] <=> $a[2]); // Сортируем по non_zero
+        usort($statsData, static fn ($a, $b) => $b[2] <=> $a[2]); // Сортируем по non_zero
 
         $io->table(
             ['Поле', 'Всего', 'Ненулевых', 'Среднее', 'Рекомендация'],

@@ -46,7 +46,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
             $payload = $options['json'] ?? null;
             if (null === $payload && isset($options['body']) && is_string($options['body']) && '' !== $options['body']) {
-                $payload = json_decode($options['body'], true, 512, JSON_THROW_ON_ERROR);
+                $payload = json_decode($options['body'], true, 512, \JSON_THROW_ON_ERROR);
             }
             $captured[] = $payload;
 
@@ -131,12 +131,12 @@ final class WbFinanceSalesReportClientTest extends TestCase
             ++$requestCount;
             $payload = $options['json'] ?? null;
             if (null === $payload && isset($options['body']) && is_string($options['body']) && '' !== $options['body']) {
-                $payload = json_decode($options['body'], true, 512, JSON_THROW_ON_ERROR);
+                $payload = json_decode($options['body'], true, 512, \JSON_THROW_ON_ERROR);
             }
             $captured[] = $payload;
 
             return match ($requestCount) {
-                1 => new MockResponse((string) json_encode($rows, JSON_THROW_ON_ERROR), ['http_code' => 200]),
+                1 => new MockResponse((string) json_encode($rows, \JSON_THROW_ON_ERROR), ['http_code' => 200]),
                 default => new MockResponse('', ['http_code' => 204]),
             };
         });
@@ -182,7 +182,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
             $payload = $options['json'] ?? null;
             if (null === $payload && isset($options['body']) && is_string($options['body']) && '' !== $options['body']) {
-                $payload = json_decode($options['body'], true, 512, JSON_THROW_ON_ERROR);
+                $payload = json_decode($options['body'], true, 512, \JSON_THROW_ON_ERROR);
             }
             $captured = [$method, $url, $payload];
 
@@ -341,7 +341,6 @@ final class WbFinanceSalesReportClientTest extends TestCase
         }
     }
 
-
     public function testRemote429RetryAfterSecondsSetsCooldownFromNow(): void
     {
         $storage = new InMemoryWbFinanceCooldownStorage();
@@ -439,7 +438,6 @@ final class WbFinanceSalesReportClientTest extends TestCase
             $storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:connection:connection-id'),
         );
     }
-
 
     public function testRemote429RetryAfterTakesPriorityOverLongResetTimestamp(): void
     {
@@ -545,13 +543,13 @@ final class WbFinanceSalesReportClientTest extends TestCase
             $payload = $options['json'] ?? null;
 
             if (null === $payload && isset($options['body']) && is_string($options['body']) && '' !== $options['body']) {
-                $payload = json_decode($options['body'], true, 512, JSON_THROW_ON_ERROR);
+                $payload = json_decode($options['body'], true, 512, \JSON_THROW_ON_ERROR);
             }
 
             $captured[] = $payload;
 
             return match (count($captured)) {
-                1 => new MockResponse((string) json_encode($rows, JSON_THROW_ON_ERROR), ['http_code' => 200]),
+                1 => new MockResponse((string) json_encode($rows, \JSON_THROW_ON_ERROR), ['http_code' => 200]),
                 default => new MockResponse('', ['http_code' => 204]),
             };
         });
@@ -708,7 +706,6 @@ final class WbFinanceSalesReportClientTest extends TestCase
         return new WbFinanceRateLimiter($factory, $clock ?? new MockClock(), null, $storage);
     }
 }
-
 
 final class InMemoryLogger extends AbstractLogger
 {

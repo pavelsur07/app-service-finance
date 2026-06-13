@@ -14,5 +14,6 @@ final readonly class SyncWbFinancialReportDayMessage
         public bool $forceRefresh,
         public int $rrdId = 0,
         public ?string $rawDocumentId = null,
-    ) {}
+    ) {
+    }
 }

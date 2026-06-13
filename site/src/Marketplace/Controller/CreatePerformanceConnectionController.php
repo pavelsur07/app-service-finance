@@ -49,7 +49,7 @@ final class CreatePerformanceConnectionController extends AbstractController
     {
         $company = $this->companyService->getActiveCompany();
 
-        $clientId     = trim((string) $request->request->get('client_id', ''));
+        $clientId = trim((string) $request->request->get('client_id', ''));
         $clientSecret = trim((string) $request->request->get('client_secret', ''));
 
         if ('' === $clientId || '' === $clientSecret) {

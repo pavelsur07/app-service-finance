@@ -127,7 +127,7 @@ final class HealthController extends AbstractController
     private function checkRedisCache(): bool
     {
         try {
-            $value = $this->cache->get('health.ping', function (ItemInterface $item): string {
+            $value = $this->cache->get('health.ping', static function (ItemInterface $item): string {
                 $item->expiresAfter(5);
 
                 return 'pong';

@@ -35,7 +35,7 @@ class PLCategoryFormType extends AbstractType
             ->add('parent', EntityType::class, [
                 'class' => PLCategory::class,
                 'choices' => $options['parents'],
-                'choice_label' => function (PLCategory $item) {
+                'choice_label' => static function (PLCategory $item) {
                     return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
                 },
                 'required' => false,

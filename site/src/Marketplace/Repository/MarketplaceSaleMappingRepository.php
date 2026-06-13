@@ -95,7 +95,7 @@ final class MarketplaceSaleMappingRepository extends ServiceEntityRepository
         MarketplaceType $marketplace,
         string $operationType,
         AmountSource $amountSource,
-        ?string $excludeId = null
+        ?string $excludeId = null,
     ): int {
         $qb = $this->getEntityManager()->createQueryBuilder()
             ->update(MarketplaceSaleMapping::class, 'm')

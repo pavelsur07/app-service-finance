@@ -164,7 +164,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
 
         $groupNames = array_map(
             static fn (array $g): string => $g['serviceGroup'],
-            array_filter($result['widgetGroups'], static fn (array $g): bool => $g['netAmount'] !== 0.0),
+            array_filter($result['widgetGroups'], static fn (array $g): bool => 0.0 !== $g['netAmount']),
         );
         $groupNames = array_values($groupNames);
 
@@ -279,7 +279,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         $capturedSql = null;
         $this->connection
             ->method('fetchAllAssociative')
-            ->willReturnCallback(function (string $sql) use (&$capturedSql): array {
+            ->willReturnCallback(static function (string $sql) use (&$capturedSql): array {
                 $capturedSql = $sql;
 
                 return [];
@@ -403,6 +403,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
 
     /**
      * @param list<array<string, mixed>> $widgetGroups
+     *
      * @return array<string, mixed>|null
      */
     private function findGroup(array $widgetGroups, string $serviceGroup): ?array
@@ -418,6 +419,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
 
     /**
      * @param list<array<string, mixed>> $widgetGroups
+     *
      * @return array<string, mixed>
      */
     private function findCategory(array $widgetGroups, string $serviceGroup): array
@@ -427,7 +429,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         $category = $group['categories'][0] ?? null;
         self::assertNotNull($category);
 
-        /** @var array<string, mixed> $category */
+        /* @var array<string, mixed> $category */
         return $category;
     }
 }

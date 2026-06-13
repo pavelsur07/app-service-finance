@@ -18,7 +18,8 @@ final class OzonAdInitialLoadController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $companyService,
         private readonly DispatchOzonAdLoadAction $dispatchAction,
-    ) {}
+    ) {
+    }
 
     public function __invoke(): JsonResponse
     {
@@ -26,7 +27,7 @@ final class OzonAdInitialLoadController extends AbstractController
         $companyId = $company->getId();
 
         $now = new \DateTimeImmutable();
-        $dateFrom = new \DateTimeImmutable($now->format('Y') . '-01-01');
+        $dateFrom = new \DateTimeImmutable($now->format('Y').'-01-01');
         $dateTo = (new \DateTimeImmutable('yesterday'))->setTime(0, 0);
 
         try {

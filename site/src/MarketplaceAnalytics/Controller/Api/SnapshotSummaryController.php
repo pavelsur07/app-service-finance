@@ -22,7 +22,8 @@ final class SnapshotSummaryController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly MarketplaceAnalyticsFacade $facade,
-    ) {}
+    ) {
+    }
 
     #[Route(
         '/api/marketplace-analytics/snapshots/summary',
@@ -34,11 +35,11 @@ final class SnapshotSummaryController extends AbstractController
         $company = $this->activeCompanyService->getActiveCompany();
         $req = SnapshotSummaryRequest::fromRequest($request);
 
-        $marketplace = ($req->marketplace !== null && $req->marketplace !== '')
+        $marketplace = (null !== $req->marketplace && '' !== $req->marketplace)
             ? $req->marketplace
             : null;
 
-        if ($req->dateFrom === null || $req->dateTo === null) {
+        if (null === $req->dateFrom || null === $req->dateTo) {
             return $this->json(
                 ['type' => 'BAD_REQUEST', 'message' => 'Параметры dateFrom и dateTo обязательны'],
                 Response::HTTP_BAD_REQUEST,

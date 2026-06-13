@@ -62,14 +62,14 @@ final class ImportProductsFromXlsAction
             }
 
             $filePath = $this->storageService->getAbsolutePath($import->getFilePath());
-            $rows     = $this->parser->parse($filePath);
-            $result   = $this->processRows($rows, $command->companyId, $company);
+            $rows = $this->parser->parse($filePath);
+            $result = $this->processRows($rows, $command->companyId, $company);
 
             $import->markDone(
-                rowsTotal:   $result->total(),
+                rowsTotal: $result->total(),
                 rowsCreated: $result->created,
                 rowsSkipped: $result->skipped,
-                errors:      $result->errorsToArray(),
+                errors: $result->errorsToArray(),
             );
             $this->importRepository->save($import);
 
@@ -85,11 +85,11 @@ final class ImportProductsFromXlsAction
     {
         // Prefetch существующих vendorSku и баркодов одним запросом каждый — защита от N+1
         $existingVendorSkus = $this->productRepository->findVendorSkuSetByCompany($companyId);
-        $existingBarcodes   = $this->barcodeRepository->findBarcodeSetByCompany($companyId);
+        $existingBarcodes = $this->barcodeRepository->findBarcodeSetByCompany($companyId);
 
         $created = 0;
         $skipped = 0;
-        $errors  = [];
+        $errors = [];
 
         /** @var array<array{product: Product, row: ParsedProductRow}> $batch */
         $batch = [];
@@ -116,11 +116,11 @@ final class ImportProductsFromXlsAction
 
                 foreach ($row->parseBarcodes() as $index => $barcode) {
                     $pb = new ProductBarcode(
-                        id:        Uuid::uuid7()->toString(),
+                        id: Uuid::uuid7()->toString(),
                         companyId: $companyId,
-                        product:   $product,
-                        barcode:   $barcode,
-                        type:      ProductBarcode::TYPE_EAN13,
+                        product: $product,
+                        barcode: $barcode,
+                        type: ProductBarcode::TYPE_EAN13,
                         isPrimary: 0 === $index,
                     );
                     $this->entityManager->persist($pb);
@@ -176,13 +176,13 @@ final class ImportProductsFromXlsAction
 
     private function createPrice(Product $product, ParsedProductRow $row, string $companyId): void
     {
-        $cmd                = new SetPurchasePriceCommand();
-        $cmd->companyId     = $companyId;
-        $cmd->productId     = $product->getId();
+        $cmd = new SetPurchasePriceCommand();
+        $cmd->companyId = $companyId;
+        $cmd->productId = $product->getId();
         $cmd->effectiveFrom = new \DateTimeImmutable('today');
-        $cmd->priceAmount   = $row->priceAmount ?? '0.00';
-        $cmd->currency      = $row->resolvedCurrency();
-        $cmd->note          = 'Импорт из XLS';
+        $cmd->priceAmount = $row->priceAmount ?? '0.00';
+        $cmd->currency = $row->resolvedCurrency();
+        $cmd->note = 'Импорт из XLS';
 
         ($this->setPurchasePriceAction)($cmd);
     }
@@ -190,15 +190,11 @@ final class ImportProductsFromXlsAction
     private function validateRow(ParsedProductRow $row): void
     {
         if (null === $row->name || '' === trim($row->name)) {
-            throw new \DomainException(
-                sprintf('Строка %d: наименование обязательно.', $row->rowNumber)
-            );
+            throw new \DomainException(sprintf('Строка %d: наименование обязательно.', $row->rowNumber));
         }
 
         if ($row->hasPrice() && (!is_numeric($row->priceAmount) || (float) $row->priceAmount < 0)) {
-            throw new \DomainException(
-                sprintf('Строка %d: цена должна быть числом >= 0.', $row->rowNumber)
-            );
+            throw new \DomainException(sprintf('Строка %d: цена должна быть числом >= 0.', $row->rowNumber));
         }
     }
 

@@ -8,8 +8,8 @@ use App\Cash\Entity\Transaction\CashTransaction;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
-use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\DocumentStatus;
+use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\PLDocumentSource;
 use App\Finance\Enum\PLDocumentStream;
 use App\Finance\Repository\DocumentRepository;
@@ -232,17 +232,27 @@ class Document
     }
 
     // + геттеры/сеттеры
-    public function getSource(): ?PLDocumentSource { return $this->source; }
+    public function getSource(): ?PLDocumentSource
+    {
+        return $this->source;
+    }
+
     public function setSource(?PLDocumentSource $source): self
     {
         $this->source = $source;
+
         return $this;
     }
 
-    public function getStream(): ?PLDocumentStream { return $this->stream; }
+    public function getStream(): ?PLDocumentStream
+    {
+        return $this->stream;
+    }
+
     public function setStream(?PLDocumentStream $stream): self
     {
         $this->stream = $stream;
+
         return $this;
     }
 

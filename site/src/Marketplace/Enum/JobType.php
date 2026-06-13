@@ -6,8 +6,8 @@ namespace App\Marketplace\Enum;
 
 enum JobType: string
 {
-    case BARCODE_SYNC_OZON    = 'barcode_sync_ozon';
-    case COST_PRICE_IMPORT    = 'cost_price_import';
+    case BARCODE_SYNC_OZON = 'barcode_sync_ozon';
+    case COST_PRICE_IMPORT = 'cost_price_import';
 
     public function getLabel(): string
     {

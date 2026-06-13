@@ -54,12 +54,12 @@ final class ProductPurchasePriceCreateController extends AbstractController
             $data = $form->getData();
 
             $command = new SetPurchasePriceCommand();
-            $command->companyId   = $companyId;
-            $command->productId   = $id;
+            $command->companyId = $companyId;
+            $command->productId = $id;
             $command->effectiveFrom = \DateTimeImmutable::createFromInterface($data['effectiveFrom']);
             $command->priceAmount = (string) $data['priceAmount'];
-            $command->currency    = (string) $data['currency'];
-            $command->note        = isset($data['note']) && '' !== trim((string) $data['note'])
+            $command->currency = (string) $data['currency'];
+            $command->note = isset($data['note']) && '' !== trim((string) $data['note'])
                 ? (string) $data['note']
                 : null;
 
@@ -73,12 +73,12 @@ final class ProductPurchasePriceCreateController extends AbstractController
         $today = new \DateTimeImmutable('today');
 
         return $this->render('catalog/product/show.html.twig', [
-            'product'            => $product,
+            'product' => $product,
             'todayPurchasePrice' => $purchasePriceQuery->findPriceAtDate($companyId, $id, $today),
-            'priceAtDate'        => null,
+            'priceAtDate' => null,
             'priceAtPurchasePrice' => null,
-            'purchasePriceForm'  => $form->createView(),
-            'canEditProduct'     => null !== $this->router->getRouteCollection()->get('catalog_products_edit'),
+            'purchasePriceForm' => $form->createView(),
+            'canEditProduct' => null !== $this->router->getRouteCollection()->get('catalog_products_edit'),
         ]);
     }
 }

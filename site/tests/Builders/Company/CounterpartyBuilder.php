@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Builders\Company;
 
 use App\Company\Entity\Company;
-use App\Company\Enum\CounterpartyType;
 use App\Company\Entity\Counterparty;
+use App\Company\Enum\CounterpartyType;
 use Webmozart\Assert\Assert;
 
 final class CounterpartyBuilder

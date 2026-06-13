@@ -98,7 +98,7 @@ final class SodiumFieldEncryptionServiceTest extends TestCase
     private function providerWithKeys(array $keys, string $activeVersion): FileBasedSecretKeyProvider
     {
         return new FileBasedSecretKeyProvider(
-            keyFile: $this->createTempFile((string) json_encode($keys, JSON_THROW_ON_ERROR)),
+            keyFile: $this->createTempFile((string) json_encode($keys, \JSON_THROW_ON_ERROR)),
             currentKeyVersion: $activeVersion,
             fallbackKeyFromEnv: null,
         );

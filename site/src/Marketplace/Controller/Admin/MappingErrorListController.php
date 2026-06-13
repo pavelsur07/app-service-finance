@@ -36,8 +36,8 @@ final class MappingErrorListController extends AbstractController
         $unresolvedCount = count($this->repository->findUnresolvedWithCompanyInfo());
 
         return $this->render('marketplace/admin/mapping_error_list.html.twig', [
-            'errors'           => $errors,
-            'show_all'         => $showAll,
+            'errors' => $errors,
+            'show_all' => $showAll,
             'unresolved_count' => $unresolvedCount,
         ]);
     }

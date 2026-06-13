@@ -76,7 +76,7 @@ final readonly class OzonFetcher implements MarketplaceFetcherInterface
             yield $decoded;
 
             $pageCount = (int) ($decoded['result']['page_count'] ?? $page);
-            $page++;
+            ++$page;
         } while ($page <= $pageCount);
     }
 }

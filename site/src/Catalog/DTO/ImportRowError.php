@@ -6,11 +6,11 @@ namespace App\Catalog\DTO;
 
 final class ImportRowError
 {
-    public const REASON_DUPLICATE  = 'duplicate';
+    public const REASON_DUPLICATE = 'duplicate';
     public const REASON_VALIDATION = 'validation';
 
     public function __construct(
-        public readonly int    $rowNumber,
+        public readonly int $rowNumber,
         public readonly string $reason,
         public readonly string $message,
     ) {
@@ -29,8 +29,8 @@ final class ImportRowError
     public function toArray(): array
     {
         return [
-            'row'     => $this->rowNumber,
-            'reason'  => $this->reason,
+            'row' => $this->rowNumber,
+            'reason' => $this->reason,
             'message' => $this->message,
         ];
     }

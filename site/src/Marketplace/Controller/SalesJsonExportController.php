@@ -19,31 +19,31 @@ final class SalesJsonExportController extends AbstractController
 {
     public function __construct(
         private readonly ActiveCompanyService $companyService,
-        private readonly SalesListQuery       $salesListQuery,
+        private readonly SalesListQuery $salesListQuery,
     ) {
     }
 
     #[Route('/sales/export.json', name: 'marketplace_sales_export_json', methods: ['GET'])]
     public function __invoke(Request $request): Response
     {
-        $company     = $this->companyService->getActiveCompany();
-        $companyId   = (string) $company->getId();
+        $company = $this->companyService->getActiveCompany();
+        $companyId = (string) $company->getId();
         $marketplace = $this->stringOrNull($request->query->all()['marketplace'] ?? null);
-        $dateFrom    = $this->parseDate($request->query->all()['date_from'] ?? null);
-        $dateTo      = $this->parseDate($request->query->all()['date_to'] ?? null);
+        $dateFrom = $this->parseDate($request->query->all()['date_from'] ?? null);
+        $dateTo = $this->parseDate($request->query->all()['date_to'] ?? null);
 
-        $qb   = $this->salesListQuery->buildQueryBuilder($companyId, $marketplace, $dateFrom, $dateTo);
+        $qb = $this->salesListQuery->buildQueryBuilder($companyId, $marketplace, $dateFrom, $dateTo);
         $rows = $qb->executeQuery()->fetchAllAssociative();
 
         $payload = [
             'exported_at' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
-            'filters'     => [
+            'filters' => [
                 'marketplace' => $marketplace,
-                'date_from'   => $dateFrom?->format('Y-m-d'),
-                'date_to'     => $dateTo?->format('Y-m-d'),
+                'date_from' => $dateFrom?->format('Y-m-d'),
+                'date_to' => $dateTo?->format('Y-m-d'),
             ],
-            'count'       => \count($rows),
-            'sales'       => $rows,
+            'count' => \count($rows),
+            'sales' => $rows,
         ];
 
         $response = new JsonResponse($payload);
@@ -60,12 +60,12 @@ final class SalesJsonExportController extends AbstractController
 
     private function parseDate(mixed $raw): ?\DateTimeImmutable
     {
-        if (!is_string($raw) || $raw === '') {
+        if (!is_string($raw) || '' === $raw) {
             return null;
         }
 
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $raw);
-        if ($date === false || $date->format('Y-m-d') !== $raw) {
+        if (false === $date || $date->format('Y-m-d') !== $raw) {
             return null;
         }
 
@@ -74,6 +74,6 @@ final class SalesJsonExportController extends AbstractController
 
     private function stringOrNull(mixed $raw): ?string
     {
-        return is_string($raw) && $raw !== '' ? $raw : null;
+        return is_string($raw) && '' !== $raw ? $raw : null;
     }
 }

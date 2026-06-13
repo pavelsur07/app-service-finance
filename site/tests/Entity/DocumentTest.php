@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Entity;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\Counterparty;
 use App\Company\Entity\User;
 use App\Company\Enum\CounterpartyType;
-use App\Company\Entity\Counterparty;
 use App\Finance\Entity\Document;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;

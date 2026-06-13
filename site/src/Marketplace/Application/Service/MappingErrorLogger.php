@@ -27,8 +27,8 @@ final class MappingErrorLogger
     private array $seenInBatch = [];
 
     public function __construct(
-        private readonly MappingErrorRepository  $repository,
-        private readonly EntityManagerInterface  $em,
+        private readonly MappingErrorRepository $repository,
+        private readonly EntityManagerInterface $em,
     ) {
     }
 
@@ -51,8 +51,9 @@ final class MappingErrorLogger
             $companyId, $marketplace, $year, $month, $serviceName,
         );
 
-        if ($existing !== null) {
+        if (null !== $existing) {
             $existing->incrementAmount(abs($amount));
+
             return;
         }
 
@@ -64,16 +65,16 @@ final class MappingErrorLogger
         $this->seenInBatch[$key] = true;
 
         $error = new MappingError(
-            id:            Uuid::uuid7()->toString(),
-            companyId:     $companyId,
-            marketplace:   $marketplace,
-            year:          $year,
-            month:         $month,
-            serviceName:   $serviceName,
+            id: Uuid::uuid7()->toString(),
+            companyId: $companyId,
+            marketplace: $marketplace,
+            year: $year,
+            month: $month,
+            serviceName: $serviceName,
             operationType: $operationType,
-            totalAmount:   abs($amount),
-            rowsCount:     1,
-            sampleRawJson: $sampleRaw !== null ? $this->sanitizeSample($sampleRaw) : null,
+            totalAmount: abs($amount),
+            rowsCount: 1,
+            sampleRawJson: null !== $sampleRaw ? $this->sanitizeSample($sampleRaw) : null,
         );
 
         $this->em->persist($error);
@@ -91,18 +92,19 @@ final class MappingErrorLogger
      * Оставляем только диагностически полезные поля, убираем PII.
      *
      * @param array<string, mixed> $raw
+     *
      * @return array<string, mixed>
      */
     private function sanitizeSample(array $raw): array
     {
         return [
-            'operation_id'        => $raw['operation_id'] ?? null,
-            'operation_type'      => $raw['operation_type'] ?? null,
+            'operation_id' => $raw['operation_id'] ?? null,
+            'operation_type' => $raw['operation_type'] ?? null,
             'operation_type_name' => $raw['operation_type_name'] ?? null,
-            'type'                => $raw['type'] ?? null,
-            'amount'              => $raw['amount'] ?? null,
-            'services'            => array_map(
-                static fn(array $s) => ['name' => $s['name'] ?? null, 'price' => $s['price'] ?? null],
+            'type' => $raw['type'] ?? null,
+            'amount' => $raw['amount'] ?? null,
+            'services' => array_map(
+                static fn (array $s) => ['name' => $s['name'] ?? null, 'price' => $s['price'] ?? null],
                 (array) ($raw['services'] ?? []),
             ),
         ];

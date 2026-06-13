@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Marketplace\Application\Service;
 
 use App\Marketplace\Application\Service\WbFinancialReportPeriodResolver;
-use DomainException;
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Clock\MockClock;
 
@@ -63,7 +61,7 @@ final class WbFinancialReportPeriodResolverTest extends TestCase
     {
         $resolver = new WbFinancialReportPeriodResolver(new MockClock('2026-05-20 12:00:00 UTC'));
 
-        $this->expectException(DomainException::class);
+        $this->expectException(\DomainException::class);
         $resolver->daysBetween(
             new \DateTimeImmutable('2026-05-10 00:00:00 Europe/Moscow'),
             new \DateTimeImmutable('2026-05-09 00:00:00 Europe/Moscow'),
@@ -83,7 +81,7 @@ final class WbFinancialReportPeriodResolverTest extends TestCase
     {
         $resolver = new WbFinancialReportPeriodResolver(new MockClock('2026-05-20 12:00:00 UTC'));
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(\InvalidArgumentException::class);
         $resolver->normalizeBusinessDate('   ');
     }
 
@@ -91,7 +89,7 @@ final class WbFinancialReportPeriodResolverTest extends TestCase
     {
         $resolver = new WbFinancialReportPeriodResolver(new MockClock('2026-05-20 12:00:00 UTC'));
 
-        $this->expectException(DomainException::class);
+        $this->expectException(\DomainException::class);
         $resolver->normalizeBusinessDate('2026-02-30');
     }
 }

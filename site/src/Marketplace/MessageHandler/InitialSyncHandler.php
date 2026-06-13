@@ -111,8 +111,8 @@ final class InitialSyncHandler
             return;
         }
 
-        $fromDate    = new \DateTimeImmutable($message->dateFrom);
-        $toDate      = new \DateTimeImmutable($message->dateTo);
+        $fromDate = new \DateTimeImmutable($message->dateFrom);
+        $toDate = new \DateTimeImmutable($message->dateTo);
 
         try {
             $entityManagerClosedByUniqueViolation = false;
@@ -130,7 +130,7 @@ final class InitialSyncHandler
                 $apiEndpoint,
             );
 
-            if ($existingRawDocument !== null) {
+            if (null !== $existingRawDocument) {
                 $this->logger->info('InitialSync: idempotent skip, raw document already exists', [
                     'company_id' => $message->companyId,
                     'connection_id' => $message->connectionId,
@@ -162,10 +162,10 @@ final class InitialSyncHandler
                         $this->em->flush();
 
                         $this->logger->info('InitialSync: batch saved', [
-                            'company_id'    => $message->companyId,
-                            'marketplace'   => $message->marketplace,
-                            'date_from'     => $message->dateFrom,
-                            'date_to'       => $message->dateTo,
+                            'company_id' => $message->companyId,
+                            'marketplace' => $message->marketplace,
+                            'date_from' => $message->dateFrom,
+                            'date_to' => $message->dateTo,
                             'records_count' => count($rawData),
                         ]);
                     } catch (UniqueConstraintViolationException $e) {
@@ -184,16 +184,16 @@ final class InitialSyncHandler
                     }
                 } else {
                     $this->logger->info('InitialSync: empty batch, skipping', [
-                        'company_id'  => $message->companyId,
+                        'company_id' => $message->companyId,
                         'marketplace' => $message->marketplace,
-                        'date_from'   => $message->dateFrom,
-                        'date_to'     => $message->dateTo,
+                        'date_from' => $message->dateFrom,
+                        'date_to' => $message->dateTo,
                     ]);
                 }
             }
 
             // Диспатчим следующую партию если она есть
-            if ($message->nextDateFrom !== null && $message->nextDateTo !== null) {
+            if (null !== $message->nextDateFrom && null !== $message->nextDateTo) {
                 // Граница первичной синхронизации — вчера: за сегодня данные
                 // ещё неполные, их загрузит ежедневный cron завтра.
                 $yesterday = $this->clock->now()->modify('-1 day')->setTime(0, 0, 0);
@@ -207,34 +207,34 @@ final class InitialSyncHandler
                 }
 
                 // Оставшиеся партиции считаем от конца следующей партии
-                $afterStart      = $nextTo->modify('+1 day')->setTime(0, 0, 0);
-                $hasAfter        = $afterStart <= $yesterday;
+                $afterStart = $nextTo->modify('+1 day')->setTime(0, 0, 0);
+                $hasAfter = $afterStart <= $yesterday;
                 $afterPartitions = $hasAfter
                     ? $this->partitionService->buildPartitions($afterStart, $yesterday)
                     : [];
 
                 $afterFromStr = !empty($afterPartitions) ? $afterPartitions[0]['from'] : null;
-                $afterToStr   = !empty($afterPartitions) ? $afterPartitions[0]['to']   : null;
+                $afterToStr = !empty($afterPartitions) ? $afterPartitions[0]['to'] : null;
 
                 // Используем клампнутый $nextTo — если ограничение по today сработало,
                 // следующая задача не должна тянуть данные за будущий период.
                 $nextToStr = $nextTo->format('Y-m-d H:i:s');
 
                 $this->messageBus->dispatch(new InitialSyncMessage(
-                    companyId:    $message->companyId,
+                    companyId: $message->companyId,
                     connectionId: $message->connectionId,
-                    marketplace:  $message->marketplace,
-                    dateFrom:     $message->nextDateFrom,
-                    dateTo:       $nextToStr,
+                    marketplace: $message->marketplace,
+                    dateFrom: $message->nextDateFrom,
+                    dateTo: $nextToStr,
                     nextDateFrom: $afterFromStr,
-                    nextDateTo:   $afterToStr,
+                    nextDateTo: $afterToStr,
                 ));
 
                 $this->logger->info('InitialSync: dispatched next batch', [
-                    'company_id'  => $message->companyId,
+                    'company_id' => $message->companyId,
                     'marketplace' => $message->marketplace,
-                    'date_from'   => $message->nextDateFrom,
-                    'date_to'     => $nextToStr,
+                    'date_from' => $message->nextDateFrom,
+                    'date_to' => $nextToStr,
                 ]);
             } else {
                 if ($entityManagerClosedByUniqueViolation) {
@@ -257,7 +257,7 @@ final class InitialSyncHandler
                 }
 
                 $this->logger->info('InitialSync: all batches completed', [
-                    'company_id'  => $message->companyId,
+                    'company_id' => $message->companyId,
                     'marketplace' => $message->marketplace,
                 ]);
             }
@@ -272,7 +272,7 @@ final class InitialSyncHandler
                 'date_from' => $message->dateFrom,
                 'date_to' => $message->dateTo,
                 'retry_after' => $e->getRetryAfter(),
-                'retry_after_fallback' => $e->getRetryAfter() === null,
+                'retry_after_fallback' => null === $e->getRetryAfter(),
                 'retry_delay_ms' => $retryAfterMs,
                 'error' => $e->getMessage(),
             ]);
@@ -303,11 +303,11 @@ final class InitialSyncHandler
             throw new RecoverableMessageHandlingException($e->getMessage(), 0, $e);
         } catch (\Throwable $e) {
             $this->logger->error('InitialSync: batch failed', [
-                'company_id'  => $message->companyId,
+                'company_id' => $message->companyId,
                 'marketplace' => $message->marketplace,
-                'date_from'   => $message->dateFrom,
-                'date_to'     => $message->dateTo,
-                'error'       => $e->getMessage(),
+                'date_from' => $message->dateFrom,
+                'date_to' => $message->dateTo,
+                'error' => $e->getMessage(),
             ]);
 
             // Пробрасываем — Messenger сделает retry согласно конфигурации

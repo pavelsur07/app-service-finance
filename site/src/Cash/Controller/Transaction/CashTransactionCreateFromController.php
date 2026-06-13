@@ -38,7 +38,7 @@ final class CashTransactionCreateFromController extends AbstractController
             return new JsonResponse(['error' => true, 'message' => 'Неверный CSRF-токен.'], 403);
         }
 
-        $confirmed = filter_var($request->request->get('confirmed', false), FILTER_VALIDATE_BOOLEAN);
+        $confirmed = filter_var($request->request->get('confirmed', false), \FILTER_VALIDATE_BOOLEAN);
 
         try {
             $result = ($this->action)($tx, $confirmed);
@@ -49,11 +49,11 @@ final class CashTransactionCreateFromController extends AbstractController
         if ($result->needsConfirmation) {
             return new JsonResponse([
                 'needsConfirmation' => true,
-                'warningMessage'    => $result->warningMessage,
+                'warningMessage' => $result->warningMessage,
             ]);
         }
 
-        if ($result->hasViolation && $result->documentId !== null) {
+        if ($result->hasViolation && null !== $result->documentId) {
             return new JsonResponse([
                 'redirect' => $this->generateUrl('document_edit', ['id' => $result->documentId]),
             ]);
@@ -61,7 +61,7 @@ final class CashTransactionCreateFromController extends AbstractController
 
         return new JsonResponse([
             'success' => true,
-            'flash'   => 'Документ ОПиУ создан.',
+            'flash' => 'Документ ОПиУ создан.',
         ]);
     }
 }

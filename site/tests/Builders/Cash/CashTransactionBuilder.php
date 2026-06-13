@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Builders\Cash;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
-use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Company\Entity\Company;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -131,7 +131,7 @@ final class CashTransactionBuilder
         $tx->setIsTransfer($this->isTransfer);
         $tx->setCashflowCategory($this->cashflowCategory);
 
-        if ($this->allocatedAmount !== '0.00') {
+        if ('0.00' !== $this->allocatedAmount) {
             $prop = new \ReflectionProperty(CashTransaction::class, 'allocatedAmount');
             $prop->setAccessible(true);
             $prop->setValue($tx, $this->allocatedAmount);

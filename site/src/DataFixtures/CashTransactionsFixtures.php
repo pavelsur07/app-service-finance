@@ -31,7 +31,7 @@ final class CashTransactionsFixtures extends Fixture implements DependentFixture
         $monthCurrent = (new \DateTimeImmutable('first day of this month'))->setTime(10, 0);
 
         $categoryRepo = $manager->getRepository(CashflowCategory::class);
-        $catByName = fn (string $name): CashflowCategory => $categoryRepo->findOneBy(['company' => $company, 'name' => $name])
+        $catByName = static fn (string $name): CashflowCategory => $categoryRepo->findOneBy(['company' => $company, 'name' => $name])
             ?? throw new \RuntimeException(sprintf('Cashflow category "%s" not found', $name));
 
         $sales = $catByName('Продажи');
@@ -40,7 +40,7 @@ final class CashTransactionsFixtures extends Fixture implements DependentFixture
         $refundSupplier = $catByName('REFUND_SUPPLIER');
         $internalTransfer = $catByName('INTERNAL TRANSFER');
 
-        $make = function (
+        $make = static function (
             \DateTimeImmutable $date,
             string $amount,
             CashDirection $direction,

@@ -19,7 +19,8 @@ final class CostMappingShowController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly UnitEconomyCostMappingRepositoryInterface $repository,
-    ) {}
+    ) {
+    }
 
     #[Route(
         '/api/marketplace-analytics/cost-mappings/{id}',
@@ -31,7 +32,7 @@ final class CostMappingShowController extends AbstractController
         $company = $this->activeCompanyService->getActiveCompany();
         $mapping = $this->repository->findById($id, $company->getId());
 
-        if ($mapping === null) {
+        if (null === $mapping) {
             return $this->json(
                 ['type' => 'NOT_FOUND', 'message' => 'Маппинг не найден'],
                 Response::HTTP_NOT_FOUND,

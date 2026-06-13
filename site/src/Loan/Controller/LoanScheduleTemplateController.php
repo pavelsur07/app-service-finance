@@ -19,7 +19,7 @@ final class LoanScheduleTemplateController extends AbstractController
         $response->headers->set('Content-Type', 'text/csv; charset=UTF-8');
         $response->headers->set('Content-Disposition', 'attachment; filename="loan_schedule_template.csv"');
 
-        $response->setCallback(function () {
+        $response->setCallback(static function () {
             $handle = fopen('php://output', 'w');
 
             $rows = [

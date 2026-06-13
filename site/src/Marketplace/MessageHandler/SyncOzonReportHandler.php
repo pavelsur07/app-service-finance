@@ -41,18 +41,18 @@ final class SyncOzonReportHandler
 
     public function __invoke(SyncOzonReportMessage $message): void
     {
-        $companyId    = $message->companyId;
+        $companyId = $message->companyId;
         $connectionId = $message->connectionId;
-        $dateKey      = $message->date ?? (new \DateTimeImmutable('yesterday', new \DateTimeZone('Europe/Moscow')))->format('Y-m-d');
+        $dateKey = $message->date ?? (new \DateTimeImmutable('yesterday', new \DateTimeZone('Europe/Moscow')))->format('Y-m-d');
 
         $lock = $this->lockFactory->createLock(
-            'marketplace_sync_' . $companyId . '_ozon_' . $dateKey,
+            'marketplace_sync_'.$companyId.'_ozon_'.$dateKey,
             self::LOCK_TTL_SECONDS,
         );
 
         if (!$lock->acquire()) {
             $this->logger->warning('Ozon sync already in progress, skipping', [
-                'company_id'    => $companyId,
+                'company_id' => $companyId,
                 'connection_id' => $connectionId,
             ]);
 
@@ -90,20 +90,20 @@ final class SyncOzonReportHandler
 
         $timezone = new \DateTimeZone('Europe/Moscow');
 
-        if ($date !== null) {
+        if (null !== $date) {
             $parsed = \DateTimeImmutable::createFromFormat('!Y-m-d', $date, $timezone);
-            if ($parsed === false || $parsed->format('Y-m-d') !== $date) {
+            if (false === $parsed || $parsed->format('Y-m-d') !== $date) {
                 $this->logger->error('Invalid date in SyncOzonReportMessage, skipping', [
                     'company_id' => $companyId,
-                    'date'       => $date,
+                    'date' => $date,
                 ]);
 
                 return;
             }
             $fromDate = $parsed;
-            $toDate   = $parsed;
+            $toDate = $parsed;
         } else {
-            $toDate   = new \DateTimeImmutable('yesterday', $timezone);
+            $toDate = new \DateTimeImmutable('yesterday', $timezone);
             $fromDate = $toDate;
         }
 
@@ -134,15 +134,15 @@ final class SyncOzonReportHandler
         }
 
         if (
-            $existingDoc !== null
+            null !== $existingDoc
             && in_array($existingDoc->getProcessingStatus(), [PipelineStatus::PENDING, PipelineStatus::RUNNING], true)
         ) {
             $this->logger->info('Skipping Ozon refresh: pipeline is still in progress for this raw document', [
-                'company_id'      => $companyId,
-                'connection_id'   => $connectionId,
+                'company_id' => $companyId,
+                'connection_id' => $connectionId,
                 'raw_document_id' => $existingDoc->getId(),
-                'status'          => $existingDoc->getProcessingStatus()?->value,
-                'date'            => $fromDate->format('Y-m-d'),
+                'status' => $existingDoc->getProcessingStatus()?->value,
+                'date' => $fromDate->format('Y-m-d'),
             ]);
 
             return;
@@ -161,7 +161,7 @@ final class SyncOzonReportHandler
             if (empty($rawData)) {
                 $this->logger->info('Ozon API returned empty report', [
                     'company_id' => $companyId,
-                    'period'     => $fromDate->format('Y-m-d') . ' - ' . $toDate->format('Y-m-d'),
+                    'period' => $fromDate->format('Y-m-d').' - '.$toDate->format('Y-m-d'),
                 ]);
                 $connection->markSyncSuccess();
                 $this->em->flush();
@@ -169,7 +169,7 @@ final class SyncOzonReportHandler
                 return;
             }
 
-            if ($existingDoc !== null) {
+            if (null !== $existingDoc) {
                 $existingDoc->refreshRawData(
                     rawData: $rawData,
                     apiEndpoint: $adapter->getApiEndpointName(),
@@ -181,11 +181,11 @@ final class SyncOzonReportHandler
                 $rawDocId = $existingDoc->getId();
 
                 $this->logger->info('Ozon raw report refreshed', [
-                    'company_id'    => $companyId,
+                    'company_id' => $companyId,
                     'connection_id' => $connectionId,
-                    'raw_doc_id'    => $rawDocId,
+                    'raw_doc_id' => $rawDocId,
                     'records_count' => count($rawData),
-                    'period'        => $fromDate->format('Y-m-d') . ' - ' . $toDate->format('Y-m-d'),
+                    'period' => $fromDate->format('Y-m-d').' - '.$toDate->format('Y-m-d'),
                 ]);
             } else {
                 $rawDoc = new MarketplaceRawDocument(
@@ -206,11 +206,11 @@ final class SyncOzonReportHandler
                 $rawDocId = $rawDoc->getId();
 
                 $this->logger->info('Ozon raw report saved', [
-                    'company_id'    => $companyId,
+                    'company_id' => $companyId,
                     'connection_id' => $connectionId,
-                    'raw_doc_id'    => $rawDocId,
+                    'raw_doc_id' => $rawDocId,
                     'records_count' => count($rawData),
-                    'period'        => $fromDate->format('Y-m-d') . ' - ' . $toDate->format('Y-m-d'),
+                    'period' => $fromDate->format('Y-m-d').' - '.$toDate->format('Y-m-d'),
                 ]);
             }
 
@@ -219,9 +219,9 @@ final class SyncOzonReportHandler
             $this->em->flush();
         } catch (\Throwable $e) {
             $this->logger->error('Ozon daily sync failed', [
-                'company_id'    => $companyId,
+                'company_id' => $companyId,
                 'connection_id' => $connectionId,
-                'error'         => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
 
             try {
@@ -246,14 +246,14 @@ final class SyncOzonReportHandler
             ));
 
             $this->logger->info('Dispatched auto-processing for Ozon day report', [
-                'company_id'      => $companyId,
+                'company_id' => $companyId,
                 'raw_document_id' => $rawDocId,
             ]);
         } catch (\Throwable $e) {
             $this->logger->error('Failed to dispatch auto-processing for Ozon', [
-                'company_id'      => $companyId,
+                'company_id' => $companyId,
                 'raw_document_id' => $rawDocId,
-                'error'           => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
         }
     }

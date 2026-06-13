@@ -117,7 +117,7 @@ final class UnitExtendedXlsxExporterTest extends TestCase
         $query
             ->expects(self::once())
             ->method('execute')
-            ->with(self::COMPANY_ID, 'ozon', '2026-01-01', '2026-01-31', PHP_INT_MAX)
+            ->with(self::COMPANY_ID, 'ozon', '2026-01-01', '2026-01-31', \PHP_INT_MAX)
             ->willReturn(['items' => $items, 'totals' => $totals]);
 
         $exporter = new UnitExtendedXlsxExporter($query);

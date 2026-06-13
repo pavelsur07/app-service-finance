@@ -2,8 +2,8 @@
 
 namespace App\Cash\Entity\Accounts;
 
-use App\Company\Entity\Company;
 use App\Cash\Enum\Accounts\MoneyAccountType;
+use App\Company\Entity\Company;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
@@ -46,7 +46,7 @@ class MoneyAccount
     #[ORM\Column(type: 'decimal', precision: 18, scale: 2)]
     private string $currentBalance = '0.00';
 
-    #Коментарий: Неснижаемый остаток (ватерлиния) для конкретного счёта.
+    // Коментарий: Неснижаемый остаток (ватерлиния) для конкретного счёта.
     #[ORM\Column(type: 'decimal', precision: 14, scale: 2)]
     private string $minimumSafeBalance = '0.00';
 

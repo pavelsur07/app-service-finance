@@ -22,7 +22,7 @@ class WbLoyaltyDiscountCalculator implements CostCalculatorInterface
 
     public function supports(array $item): bool
     {
-        return $this->normalizer->sellerOperName($item) === 'Компенсация скидки по программе лояльности';
+        return 'Компенсация скидки по программе лояльности' === $this->normalizer->sellerOperName($item);
     }
 
     public function requiresListing(): bool
@@ -39,7 +39,7 @@ class WbLoyaltyDiscountCalculator implements CostCalculatorInterface
         }
 
         $externalId = $this->externalIdBuilder->build($item, 'wb_loyalty_discount_compensation');
-        if ($externalId === null) {
+        if (null === $externalId) {
             return [];
         }
 
@@ -51,7 +51,7 @@ class WbLoyaltyDiscountCalculator implements CostCalculatorInterface
         return [
             [
                 'category_code' => 'wb_loyalty_discount_compensation',
-                'amount' => (string)abs($cashbackDiscount),
+                'amount' => (string) abs($cashbackDiscount),
                 'external_id' => $externalId,
                 'cost_date' => $saleDate,
                 'description' => 'Компенсация скидки по программе лояльности WB',

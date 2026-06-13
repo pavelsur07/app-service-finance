@@ -29,7 +29,7 @@ final class CostsPreviewController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $companyService,
         private readonly UnprocessedCostsQuery $unprocessedCostsQuery,
-        private readonly PreflightCostsQuery   $preflightCostsQuery,
+        private readonly PreflightCostsQuery $preflightCostsQuery,
     ) {
     }
 
@@ -47,18 +47,18 @@ final class CostsPreviewController extends AbstractController
     #[Route('/costs-preview', name: 'marketplace_month_close_costs_preview', methods: ['GET'])]
     public function preview(Request $request): JsonResponse
     {
-        $company     = $this->companyService->getActiveCompany();
-        $companyId   = (string) $company->getId();
+        $company = $this->companyService->getActiveCompany();
+        $companyId = (string) $company->getId();
         $marketplace = $request->query->get('marketplace') ?: MarketplaceType::OZON->value;
-        $year        = (int) $request->query->get('year', date('Y'));
-        $month       = (int) $request->query->get('month', date('n'));
+        $year = (int) $request->query->get('year', date('Y'));
+        $month = (int) $request->query->get('month', date('n'));
 
-        if (MarketplaceType::tryFrom($marketplace) === null) {
+        if (null === MarketplaceType::tryFrom($marketplace)) {
             $marketplace = MarketplaceType::OZON->value;
         }
 
         $periodFrom = sprintf('%d-%02d-01', $year, $month);
-        $periodTo   = (new \DateTimeImmutable($periodFrom))->modify('last day of this month')->format('Y-m-d');
+        $periodTo = (new \DateTimeImmutable($periodFrom))->modify('last day of this month')->format('Y-m-d');
 
         // Строки которые войдут в PLDocument
         $entries = $this->unprocessedCostsQuery->execute($companyId, $marketplace, $periodFrom, $periodTo);
@@ -73,7 +73,7 @@ final class CostsPreviewController extends AbstractController
         $costsStats = $this->preflightCostsQuery->getCostsStats($companyId, $marketplace, $periodFrom, $periodTo);
 
         // Суммаризация строк PLDocument
-        $totalCostsAmount  = '0';
+        $totalCostsAmount = '0';
         $totalStornoAmount = '0';
         foreach ($entries as $entry) {
             if ($entry['is_storno']) {
@@ -85,55 +85,55 @@ final class CostsPreviewController extends AbstractController
 
         return $this->json([
             'meta' => [
-                'marketplace'  => $marketplace,
-                'period'       => "{$periodFrom} – {$periodTo}",
+                'marketplace' => $marketplace,
+                'period' => "{$periodFrom} – {$periodTo}",
                 'generated_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
-                'hint'         => 'Это предпросмотр PLDocument который будет создан при закрытии этапа COSTS',
+                'hint' => 'Это предпросмотр PLDocument который будет создан при закрытии этапа COSTS',
             ],
             'summary' => [
-                'total_records'          => (int) $costsStats['total'],
-                'already_processed'      => (int) $costsStats['already_processed'],
-                'without_pl_mapping'     => (int) $costsStats['without_pl_mapping'],
-                'excluded_from_pl'       => (int) $costsStats['excluded_from_pl'],
-                'pl_document_lines'      => count($entries),
-                'costs_lines'            => count(array_filter($entries, fn($e) => !$e['is_storno'])),
-                'storno_lines'           => count(array_filter($entries, fn($e) => $e['is_storno'])),
-                'costs_amount'           => number_format((float) $totalCostsAmount, 2, '.', ' '),
-                'storno_amount'          => number_format((float) $totalStornoAmount, 2, '.', ' '),
-                'control_sum_net'        => number_format((float) $controlSum, 2, '.', ' '),
-                'net_amount_for_pl'      => number_format((float) $costsStats['net_amount_for_pl'], 2, '.', ' '),
+                'total_records' => (int) $costsStats['total'],
+                'already_processed' => (int) $costsStats['already_processed'],
+                'without_pl_mapping' => (int) $costsStats['without_pl_mapping'],
+                'excluded_from_pl' => (int) $costsStats['excluded_from_pl'],
+                'pl_document_lines' => count($entries),
+                'costs_lines' => count(array_filter($entries, static fn ($e) => !$e['is_storno'])),
+                'storno_lines' => count(array_filter($entries, static fn ($e) => $e['is_storno'])),
+                'costs_amount' => number_format((float) $totalCostsAmount, 2, '.', ' '),
+                'storno_amount' => number_format((float) $totalStornoAmount, 2, '.', ' '),
+                'control_sum_net' => number_format((float) $controlSum, 2, '.', ' '),
+                'net_amount_for_pl' => number_format((float) $costsStats['net_amount_for_pl'], 2, '.', ' '),
             ],
             'pl_document_lines' => array_map(static fn (array $e) => [
                 'cost_category_code' => $e['cost_category_code'],
                 'cost_category_name' => $e['cost_category_name'],
-                'pl_category_id'     => $e['pl_category_id'],
-                'is_storno'          => $e['is_storno'],
-                'costs_amount'       => number_format((float) $e['costs_amount'], 2, '.', ' '),
-                'storno_amount'      => number_format((float) $e['storno_amount'], 2, '.', ' '),
-                'total_amount'       => number_format((float) $e['total_amount'], 2, '.', ' '),
-                'is_negative'        => $e['is_negative'],
-                'description'        => $e['description'],
-                'sort_order'         => $e['sort_order'],
-                'records_count'      => $e['records_count'],
+                'pl_category_id' => $e['pl_category_id'],
+                'is_storno' => $e['is_storno'],
+                'costs_amount' => number_format((float) $e['costs_amount'], 2, '.', ' '),
+                'storno_amount' => number_format((float) $e['storno_amount'], 2, '.', ' '),
+                'total_amount' => number_format((float) $e['total_amount'], 2, '.', ' '),
+                'is_negative' => $e['is_negative'],
+                'description' => $e['description'],
+                'sort_order' => $e['sort_order'],
+                'records_count' => $e['records_count'],
             ], $entries),
             'category_breakdown' => array_map(static fn (array $r) => [
-                'category_code'      => $r['category_code'],
-                'category_name'      => $r['category_name'],
-                'pl_category_id'     => $r['pl_category_id'],
-                'include_in_pl'      => (bool) $r['include_in_pl'],
-                'is_negative'        => (bool) $r['is_negative'],
-                'count'              => (int) $r['count'],
-                'costs_amount'       => number_format((float) $r['costs_amount'], 2, '.', ' '),
-                'storno_amount'      => number_format((float) $r['storno_amount'], 2, '.', ' '),
-                'net_amount'         => number_format((float) $r['net_amount'], 2, '.', ' '),
-                'already_processed'  => (int) $r['already_processed'],
-                'status'             => match (true) {
-                    $r['pl_category_id'] === null                    => 'no_mapping',
-                    !(bool) $r['include_in_pl']                      => 'excluded',
-                    (int) $r['already_processed'] > 0                => 'already_processed',
-                    default                                          => 'will_be_closed',
+                'category_code' => $r['category_code'],
+                'category_name' => $r['category_name'],
+                'pl_category_id' => $r['pl_category_id'],
+                'include_in_pl' => (bool) $r['include_in_pl'],
+                'is_negative' => (bool) $r['is_negative'],
+                'count' => (int) $r['count'],
+                'costs_amount' => number_format((float) $r['costs_amount'], 2, '.', ' '),
+                'storno_amount' => number_format((float) $r['storno_amount'], 2, '.', ' '),
+                'net_amount' => number_format((float) $r['net_amount'], 2, '.', ' '),
+                'already_processed' => (int) $r['already_processed'],
+                'status' => match (true) {
+                    null === $r['pl_category_id'] => 'no_mapping',
+                    !(bool) $r['include_in_pl'] => 'excluded',
+                    (int) $r['already_processed'] > 0 => 'already_processed',
+                    default => 'will_be_closed',
                 },
             ], $breakdown),
-        ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
+        ], 200, [], ['json_encode_options' => \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE]);
     }
 }

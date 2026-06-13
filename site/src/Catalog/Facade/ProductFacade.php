@@ -18,4 +18,3 @@ final readonly class ProductFacade
         return $this->productRepository->findByIdAndCompany($productId, $companyId);
     }
 }
-

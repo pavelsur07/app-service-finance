@@ -2,9 +2,9 @@
 
 namespace App\Deals\Service;
 
+use App\Company\Entity\Counterparty;
 use App\Deals\Enum\DealChannel;
 use App\Deals\Enum\DealStatus;
-use App\Company\Entity\Counterparty;
 
 class DealFilter
 {

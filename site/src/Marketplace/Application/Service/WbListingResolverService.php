@@ -51,18 +51,18 @@ final class WbListingResolverService
             $size,
         );
 
-        if ($listing !== null) {
+        if (null !== $listing) {
             return $listing;
         }
 
         // 2. Если size=UNKNOWN и есть barcode — ищем листинг через barcode + marketplace
-        if ($size === 'UNKNOWN' && $barcode !== null && $barcode !== '') {
+        if ('UNKNOWN' === $size && null !== $barcode && '' !== $barcode) {
             $barcodeEntity = $this->barcodeRepository->findByBarcode(
                 $companyId,
                 $barcode,
                 MarketplaceType::WILDBERRIES,
             );
-            if ($barcodeEntity !== null) {
+            if (null !== $barcodeEntity) {
                 return $barcodeEntity->getListing();
             }
         }
@@ -77,7 +77,7 @@ final class WbListingResolverService
             $brandName,
             $subjectName,
             $saName,
-            $size !== 'UNKNOWN' ? $size : null,
+            'UNKNOWN' !== $size ? $size : null,
         ]);
 
         $listing = new MarketplaceListing(
@@ -89,19 +89,19 @@ final class WbListingResolverService
 
         $listing->setMarketplaceSku($nmId);
         $listing->setSize($size);
-        $listing->setSupplierSku($saName !== '' ? $saName : null);
-        $listing->setPrice($price !== '' ? $price : '0');
-        $listing->setName($nameParts !== [] ? implode(' ', $nameParts) : null);
+        $listing->setSupplierSku('' !== $saName ? $saName : null);
+        $listing->setPrice('' !== $price ? $price : '0');
+        $listing->setName([] !== $nameParts ? implode(' ', $nameParts) : null);
 
         $this->em->persist($listing);
 
         // Откладываем вставку баркода до вызова flushBarcodes() после em->flush(),
         // чтобы FK (listing_id → marketplace_listings) был уже в БД.
-        if ($barcode !== null && $barcode !== '' && $size !== 'UNKNOWN') {
+        if (null !== $barcode && '' !== $barcode && 'UNKNOWN' !== $size) {
             $this->pendingBarcodes[] = [
                 'companyId' => $companyId,
                 'listingId' => $listing->getId(),
-                'barcode'   => $barcode,
+                'barcode' => $barcode,
             ];
         }
 
@@ -128,6 +128,6 @@ final class WbListingResolverService
     {
         $normalized = trim((string) $tsName);
 
-        return $normalized !== '' ? $normalized : 'UNKNOWN';
+        return '' !== $normalized ? $normalized : 'UNKNOWN';
     }
 }

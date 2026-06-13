@@ -36,7 +36,7 @@ final class PreflightResult
     {
         return array_values(array_filter(
             $this->checks,
-            static fn(PreflightCheck $c) => !$c->passed && $c->blocking,
+            static fn (PreflightCheck $c) => !$c->passed && $c->blocking,
         ));
     }
 
@@ -47,7 +47,7 @@ final class PreflightResult
     {
         return array_values(array_filter(
             $this->checks,
-            static fn(PreflightCheck $c) => !$c->passed && !$c->blocking,
+            static fn (PreflightCheck $c) => !$c->passed && !$c->blocking,
         ));
     }
 
@@ -57,14 +57,14 @@ final class PreflightResult
     public function toArray(): array
     {
         return array_map(
-            static fn(PreflightCheck $c) => [
-                'key'      => $c->key,
-                'label'    => $c->label,
-                'passed'   => $c->passed,
+            static fn (PreflightCheck $c) => [
+                'key' => $c->key,
+                'label' => $c->label,
+                'passed' => $c->passed,
                 'blocking' => $c->blocking,
-                'message'  => $c->message,
-                'value'    => $c->value,
-                'details'  => $c->details,
+                'message' => $c->message,
+                'value' => $c->value,
+                'details' => $c->details,
             ],
             $this->checks,
         );

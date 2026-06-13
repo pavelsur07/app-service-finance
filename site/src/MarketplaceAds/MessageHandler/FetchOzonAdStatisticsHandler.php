@@ -141,11 +141,7 @@ final class FetchOzonAdStatisticsHandler
                 );
             }
 
-            throw new UnrecoverableMessageHandlingException(sprintf(
-                'FetchOzonAdStatisticsMessage: invalid date format (from=%s, to=%s)',
-                $message->dateFrom,
-                $message->dateTo,
-            ));
+            throw new UnrecoverableMessageHandlingException(sprintf('FetchOzonAdStatisticsMessage: invalid date format (from=%s, to=%s)', $message->dateFrom, $message->dateTo));
         }
 
         $dateFrom = $dateFrom->setTime(0, 0);
@@ -173,11 +169,7 @@ final class FetchOzonAdStatisticsHandler
                 );
             }
 
-            throw new UnrecoverableMessageHandlingException(
-                'FetchOzonAdStatisticsMessage: invalid date range — '.$e->getMessage(),
-                0,
-                $e,
-            );
+            throw new UnrecoverableMessageHandlingException('FetchOzonAdStatisticsMessage: invalid date range — '.$e->getMessage(), 0, $e);
         } catch (OzonPermanentApiException $e) {
             // 403 / missing credentials — permanent denial. Abandon все
             // in-flight pending-отчёты этого job'а (из предыдущих чанков /
@@ -198,11 +190,7 @@ final class FetchOzonAdStatisticsHandler
                 );
             }
 
-            throw new UnrecoverableMessageHandlingException(
-                'FetchOzonAdStatisticsMessage: Ozon permanent failure — '.$e->getMessage(),
-                0,
-                $e,
-            );
+            throw new UnrecoverableMessageHandlingException('FetchOzonAdStatisticsMessage: Ozon permanent failure — '.$e->getMessage(), 0, $e);
         } catch (\Throwable $e) {
             // Сетевые сбои / 5xx / JSON-ошибки на prep-стадии — transient,
             // Messenger сделает retry. prepareStatisticsBatches идемпотентен

@@ -22,7 +22,7 @@ final class CostsDataSource implements MarketplaceDataSourceInterface
 {
     public function __construct(
         private readonly UnprocessedCostsQuery $costsQuery,
-        private readonly MarkProcessedQuery    $markProcessedQuery,
+        private readonly MarkProcessedQuery $markProcessedQuery,
     ) {
     }
 

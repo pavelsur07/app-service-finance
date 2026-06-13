@@ -23,26 +23,25 @@ class MarketplaceCostRepository extends ServiceEntityRepository
         Company $company,
         ?MarketplaceType $marketplace = null,
         ?\DateTimeImmutable $dateFrom = null,
-        ?\DateTimeImmutable $dateTo = null
-    ): QueryBuilder
-    {
+        ?\DateTimeImmutable $dateTo = null,
+    ): QueryBuilder {
         $qb = $this->createQueryBuilder('c')
             ->leftJoin('c.category', 'cat')->addSelect('cat')
             ->leftJoin('c.listing', 'l')->addSelect('l')
             ->where('c.company = :company')
             ->setParameter('company', $company);
 
-        if ($marketplace !== null) {
+        if (null !== $marketplace) {
             $qb->andWhere('c.marketplace = :marketplace')
                 ->setParameter('marketplace', $marketplace);
         }
 
-        if ($dateFrom !== null) {
+        if (null !== $dateFrom) {
             $qb->andWhere('c.costDate >= :dateFrom')
                 ->setParameter('dateFrom', $dateFrom);
         }
 
-        if ($dateTo !== null) {
+        if (null !== $dateTo) {
             $qb->andWhere('c.costDate <= :dateTo')
                 ->setParameter('dateTo', $dateTo);
         }
@@ -56,7 +55,7 @@ class MarketplaceCostRepository extends ServiceEntityRepository
     public function findByProduct(
         Product $product,
         \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate
+        \DateTimeInterface $toDate,
     ): array {
         return $this->createQueryBuilder('c')
             ->join('c.listing', 'l')
@@ -72,13 +71,14 @@ class MarketplaceCostRepository extends ServiceEntityRepository
     }
 
     /**
-     * Общие затраты (не привязанные к листингу, например реклама)
+     * Общие затраты (не привязанные к листингу, например реклама).
+     *
      * @return MarketplaceCost[]
      */
     public function findGeneralCosts(
         Company $company,
         \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate
+        \DateTimeInterface $toDate,
     ): array {
         return $this->createQueryBuilder('c')
             ->where('c.company = :company')
@@ -95,11 +95,7 @@ class MarketplaceCostRepository extends ServiceEntityRepository
 
     /**
      * Массовая проверка существующих external_id затрат (для bulk import)
-     * Возвращает массив для isset() проверок: ['id1' => true, 'id2' => true]
-     *
-     * @param string $companyId
-     * @param array $externalIds
-     * @return array
+     * Возвращает массив для isset() проверок: ['id1' => true, 'id2' => true].
      */
     public function getExistingExternalIds(string $companyId, array $externalIds): array
     {
@@ -118,7 +114,6 @@ class MarketplaceCostRepository extends ServiceEntityRepository
 
         return array_fill_keys($result, true);
     }
-
 
     public function countDocumentLinkedByRawDocument(
         Company $company,
@@ -191,29 +186,29 @@ class MarketplaceCostRepository extends ServiceEntityRepository
             ->setParameter('companyId', (string) $company->getId())
             ->orderBy('c.cost_date', 'DESC');
 
-        if ($marketplace !== null) {
+        if (null !== $marketplace) {
             $qb->andWhere('c.marketplace = :marketplace')
                 ->setParameter('marketplace', $marketplace->value);
         }
 
-        if ($dateFrom !== null) {
+        if (null !== $dateFrom) {
             $qb->andWhere('c.cost_date >= :dateFrom')
                 ->setParameter('dateFrom', $dateFrom->format('Y-m-d'));
         }
 
-        if ($dateTo !== null) {
+        if (null !== $dateTo) {
             $qb->andWhere('c.cost_date <= :dateTo')
                 ->setParameter('dateTo', $dateTo->format('Y-m-d'));
         }
 
-        if ($categoryId !== null) {
+        if (null !== $categoryId) {
             $qb->andWhere('c.category_id = :categoryId')
                 ->setParameter('categoryId', $categoryId);
         }
 
-        if ($mapped === 'linked') {
+        if ('linked' === $mapped) {
             $qb->andWhere('c.listing_id IS NOT NULL');
-        } elseif ($mapped === 'general') {
+        } elseif ('general' === $mapped) {
             $qb->andWhere('c.listing_id IS NULL');
         }
 

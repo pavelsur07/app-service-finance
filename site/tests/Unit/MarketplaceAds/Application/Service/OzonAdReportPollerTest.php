@@ -83,7 +83,7 @@ final class OzonAdReportPollerTest extends TestCase
 
         $this->bus->expects(self::once())
             ->method('dispatch')
-            ->willReturnCallback(function (object $message) use ($r): Envelope {
+            ->willReturnCallback(static function (object $message) use ($r): Envelope {
                 self::assertInstanceOf(DownloadOzonAdReportMessage::class, $message);
                 self::assertSame(self::COMPANY_ID, $message->companyId);
                 self::assertSame($r->getId(), $message->pendingReportId);
@@ -220,7 +220,7 @@ final class OzonAdReportPollerTest extends TestCase
 
         $this->client->expects(self::exactly(3))
             ->method('pollOneReport')
-            ->willReturnCallback(function (string $companyId, string $uuid): array {
+            ->willReturnCallback(static function (string $companyId, string $uuid): array {
                 if ('uuid-2' === $uuid) {
                     throw new \RuntimeException('network blip');
                 }
@@ -237,7 +237,7 @@ final class OzonAdReportPollerTest extends TestCase
         $dispatched = [];
         $this->bus->expects(self::exactly(2))
             ->method('dispatch')
-            ->willReturnCallback(function (object $message) use (&$dispatched): Envelope {
+            ->willReturnCallback(static function (object $message) use (&$dispatched): Envelope {
                 self::assertInstanceOf(DownloadOzonAdReportMessage::class, $message);
                 $dispatched[] = $message->pendingReportId;
 
@@ -287,7 +287,7 @@ final class OzonAdReportPollerTest extends TestCase
             ->method('warning')
             ->with(
                 self::stringContains('permanent API exception'),
-                self::callback(function (array $context) use ($r): bool {
+                self::callback(static function (array $context) use ($r): bool {
                     self::assertSame(self::COMPANY_ID, $context['companyId'] ?? null);
                     self::assertSame('uuid-permanent', $context['reportUuid'] ?? null);
                     self::assertSame($r->getId(), $context['pendingReportId'] ?? null);
@@ -324,7 +324,7 @@ final class OzonAdReportPollerTest extends TestCase
             ->method('warning')
             ->with(
                 self::stringContains('update returned 0 rows'),
-                self::callback(function (array $context) use ($r): bool {
+                self::callback(static function (array $context) use ($r): bool {
                     self::assertSame(self::COMPANY_ID, $context['companyId'] ?? null);
                     self::assertSame('uuid-race', $context['reportUuid'] ?? null);
                     self::assertSame($r->getId(), $context['pendingReportId'] ?? null);
@@ -383,7 +383,7 @@ final class OzonAdReportPollerTest extends TestCase
 
         $this->bus->expects(self::once())
             ->method('dispatch')
-            ->willReturnCallback(function (object $message) use ($r): Envelope {
+            ->willReturnCallback(static function (object $message) use ($r): Envelope {
                 self::assertInstanceOf(DownloadOzonAdReportMessage::class, $message);
                 self::assertSame($r->getId(), $message->pendingReportId);
 

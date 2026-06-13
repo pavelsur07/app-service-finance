@@ -204,7 +204,7 @@ final readonly class WbFinanceSalesReportClient
         }
 
         try {
-            $decoded = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+            $decoded = json_decode($body, true, 512, \JSON_THROW_ON_ERROR);
         } catch (\JsonException $e) {
             throw new MarketplaceInvalidApiResponseException('WB API returned invalid JSON.', $statusCode, $excerpt, $dateFrom, $dateTo, $e);
         }
@@ -273,7 +273,7 @@ final readonly class WbFinanceSalesReportClient
             }
 
             try {
-                $decoded = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+                $decoded = json_decode($body, true, 512, \JSON_THROW_ON_ERROR);
             } catch (\JsonException) {
                 $this->logger->warning('WB finance ping returned non-JSON body with 200.', ['response_excerpt' => $excerpt]);
 
@@ -374,7 +374,7 @@ final readonly class WbFinanceSalesReportClient
         }
 
         try {
-            $decoded = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+            $decoded = json_decode($body, true, 512, \JSON_THROW_ON_ERROR);
         } catch (\JsonException $e) {
             throw new MarketplaceInvalidApiResponseException('WB API returned invalid JSON.', $statusCode, $excerpt, $dateFrom, $dateTo, $e);
         }
@@ -587,7 +587,7 @@ final readonly class WbFinanceSalesReportClient
             );
         }
 
-        return json_encode($normalized, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}';
+        return json_encode($normalized, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE | \JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}';
     }
 
     private function logWbResponse(

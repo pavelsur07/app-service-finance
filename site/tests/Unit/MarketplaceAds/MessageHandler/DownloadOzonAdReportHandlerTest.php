@@ -182,7 +182,7 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
         $saved = [];
         $this->rawRepo->expects(self::exactly(2))
             ->method('save')
-            ->willReturnCallback(function (AdRawDocument $doc) use (&$saved): void {
+            ->willReturnCallback(static function (AdRawDocument $doc) use (&$saved): void {
                 $saved[] = $doc;
             });
 
@@ -201,13 +201,13 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
         $trace = [];
         $this->em->expects(self::once())
             ->method('flush')
-            ->willReturnCallback(function () use (&$trace): void {
+            ->willReturnCallback(static function () use (&$trace): void {
                 $trace[] = 'flush';
             });
         $this->pendingRepo->expects(self::once())
             ->method('markFinalized')
             ->with(self::COMPANY_ID, self::OZON_UUID, OzonAdPendingReportState::OK, null)
-            ->willReturnCallback(function () use (&$trace): int {
+            ->willReturnCallback(static function () use (&$trace): int {
                 $trace[] = 'markFinalized';
 
                 return 1;
@@ -347,7 +347,7 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
 
         // findByMarketplaceAndDate — existing для первого дня, null для второго.
         $this->rawRepo->method('findByMarketplaceAndDate')
-            ->willReturnCallback(function (string $companyId, string $mp, \DateTimeImmutable $date) use ($existing): ?AdRawDocument {
+            ->willReturnCallback(static function (string $companyId, string $mp, \DateTimeImmutable $date) use ($existing): ?AdRawDocument {
                 if ('2026-04-01' === $date->format('Y-m-d')) {
                     return $existing;
                 }

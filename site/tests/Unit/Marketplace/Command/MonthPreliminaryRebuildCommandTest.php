@@ -30,10 +30,10 @@ final class MonthPreliminaryRebuildCommandTest extends TestCase
         $bus
             ->expects(self::exactly(3))
             ->method('dispatch')
-            ->willReturnCallback(function (object $message) use (&$dispatched): Envelope {
+            ->willReturnCallback(static function (object $message) use (&$dispatched): Envelope {
                 self::assertInstanceOf(RebuildPreliminaryForPeriodMessage::class, $message);
                 $dispatched[] = [
-                    'companyId'   => $message->companyId,
+                    'companyId' => $message->companyId,
                     'marketplace' => $message->marketplace,
                 ];
 
@@ -43,15 +43,15 @@ final class MonthPreliminaryRebuildCommandTest extends TestCase
         $logger = $this->createMock(LoggerInterface::class);
 
         $command = new MonthPreliminaryRebuildCommand($query, $bus, $logger);
-        $tester  = new CommandTester($command);
+        $tester = new CommandTester($command);
 
         $exitCode = $tester->execute([]);
 
         self::assertSame(Command::SUCCESS, $exitCode);
         self::assertCount(3, $dispatched);
-        self::assertSame(['companyId' => 'company-a', 'marketplace' => 'ozon'],        $dispatched[0]);
+        self::assertSame(['companyId' => 'company-a', 'marketplace' => 'ozon'], $dispatched[0]);
         self::assertSame(['companyId' => 'company-a', 'marketplace' => 'wildberries'], $dispatched[1]);
-        self::assertSame(['companyId' => 'company-b', 'marketplace' => 'ozon'],        $dispatched[2]);
+        self::assertSame(['companyId' => 'company-b', 'marketplace' => 'ozon'], $dispatched[2]);
     }
 
     public function testEmptyConnectionListExitsSuccess(): void
@@ -65,7 +65,7 @@ final class MonthPreliminaryRebuildCommandTest extends TestCase
         $logger = $this->createMock(LoggerInterface::class);
 
         $command = new MonthPreliminaryRebuildCommand($query, $bus, $logger);
-        $tester  = new CommandTester($command);
+        $tester = new CommandTester($command);
 
         $exitCode = $tester->execute([]);
 
@@ -87,10 +87,10 @@ final class MonthPreliminaryRebuildCommandTest extends TestCase
         $bus
             ->expects(self::exactly(3))
             ->method('dispatch')
-            ->willReturnCallback(function (object $message) use (&$attempted): Envelope {
+            ->willReturnCallback(static function (object $message) use (&$attempted): Envelope {
                 $attempted[] = $message->companyId;
 
-                if ($message->companyId === 'company-b') {
+                if ('company-b' === $message->companyId) {
                     throw new \RuntimeException('queue down');
                 }
 
@@ -107,7 +107,7 @@ final class MonthPreliminaryRebuildCommandTest extends TestCase
             );
 
         $command = new MonthPreliminaryRebuildCommand($query, $bus, $logger);
-        $tester  = new CommandTester($command);
+        $tester = new CommandTester($command);
 
         $exitCode = $tester->execute([]);
 

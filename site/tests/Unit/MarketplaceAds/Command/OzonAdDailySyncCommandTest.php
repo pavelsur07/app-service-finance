@@ -34,7 +34,7 @@ final class OzonAdDailySyncCommandTest extends TestCase
         $action
             ->expects(self::exactly(3))
             ->method('__invoke')
-            ->willReturnCallback(function (string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to) use ($yesterday, &$receivedCompanies): AdLoadJob {
+            ->willReturnCallback(static function (string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to) use ($yesterday, &$receivedCompanies): AdLoadJob {
                 self::assertEquals($yesterday, $from);
                 self::assertEquals($yesterday, $to);
                 $receivedCompanies[] = $companyId;
@@ -87,7 +87,7 @@ final class OzonAdDailySyncCommandTest extends TestCase
         $action
             ->expects(self::exactly(3))
             ->method('__invoke')
-            ->willReturnCallback(function (string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to) use (&$received): AdLoadJob {
+            ->willReturnCallback(static function (string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to) use (&$received): AdLoadJob {
                 $received[] = $companyId;
 
                 if (self::COMPANY_2 === $companyId) {
@@ -120,7 +120,7 @@ final class OzonAdDailySyncCommandTest extends TestCase
         $action
             ->expects(self::exactly(3))
             ->method('__invoke')
-            ->willReturnCallback(function (string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to) use (&$received): AdLoadJob {
+            ->willReturnCallback(static function (string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to) use (&$received): AdLoadJob {
                 $received[] = $companyId;
 
                 if (self::COMPANY_1 === $companyId) {

@@ -31,32 +31,36 @@ final readonly class NormalizeInventorySnapshotAction
         private StockSnapshotRepository $stockSnapshotRepository,
         private EntityManagerInterface $entityManager,
         private AppLogger $logger,
-    ) {}
+    ) {
+    }
 
     public function __invoke(string $companyId, string $snapshotSessionId, MarketplaceType $source): void
     {
         $session = $this->sessionRepository->findByIdAndCompany($snapshotSessionId, $companyId);
-        if ($session === null) {
+        if (null === $session) {
             $this->logger->warning('Normalization skipped: session not found.', compact('companyId', 'snapshotSessionId'));
+
             return;
         }
 
-        if ($session->getStatus() !== SnapshotSessionStatus::Completed) {
+        if (SnapshotSessionStatus::Completed !== $session->getStatus()) {
             $this->logger->warning('Normalization skipped: session is not completed.', [
                 'companyId' => $companyId,
                 'snapshotSessionId' => $snapshotSessionId,
                 'status' => $session->getStatus()->value,
             ]);
+
             return;
         }
 
-        if ($source !== MarketplaceType::OZON) {
+        if (MarketplaceType::OZON !== $source) {
             $this->logger->warning('Normalization skipped: source is not supported.', ['source' => $source->value]);
+
             return;
         }
 
         $rawSnapshots = $this->rawSnapshotRepository->findBySessionAndCompanyOrdered($snapshotSessionId, $companyId);
-        if ($rawSnapshots === []) {
+        if ([] === $rawSnapshots) {
             return;
         }
 
@@ -70,7 +74,7 @@ final readonly class NormalizeInventorySnapshotAction
             }
         }
 
-        if ($sourceSkus === []) {
+        if ([] === $sourceSkus) {
             foreach ($rawSnapshots as $rawSnapshot) {
                 $rawSnapshot->markAsProcessed();
             }
@@ -86,7 +90,7 @@ final readonly class NormalizeInventorySnapshotAction
         $mappingBySku = [];
         foreach (array_unique($sourceSkus) as $sku) {
             $matches = $listingsBySku[$sku] ?? [];
-            if (count($matches) === 1) {
+            if (1 === count($matches)) {
                 $mappingBySku[$sku] = ['status' => StockSnapshotMappingStatus::Mapped, 'listingId' => $matches[0]['id']];
                 $mappedListingIds[] = $matches[0]['id'];
                 continue;
@@ -104,7 +108,7 @@ final readonly class NormalizeInventorySnapshotAction
             foreach ($rowsByRaw[$rawSnapshot->getId()] ?? [] as $row) {
                 $mapping = $mappingBySku[$row->sourceSku] ?? ['status' => StockSnapshotMappingStatus::Unmapped, 'listingId' => null];
                 $listingId = $mapping['listingId'];
-                $productId = $listingId !== null ? ($productsByListing[$listingId] ?? null) : null;
+                $productId = null !== $listingId ? ($productsByListing[$listingId] ?? null) : null;
                 $location = $locationByFulfillmentType[$this->normalizeFulfillmentType($row->fulfillmentType)];
 
                 $this->stockSnapshotRepository->upsertDaySnapshot(new StockSnapshot(
@@ -134,7 +138,7 @@ final readonly class NormalizeInventorySnapshotAction
     }
 
     /**
-     * @param array<string, list<\App\Inventory\Application\DTO\NormalizedStockRow>> $rowsByRaw
+     * @param array<string, list<DTO\NormalizedStockRow>> $rowsByRaw
      *
      * @return array<string, Location>
      */
@@ -164,7 +168,7 @@ final readonly class NormalizeInventorySnapshotAction
             'externalId' => $externalId,
         ]);
 
-        if ($location !== null) {
+        if (null !== $location) {
             return $location;
         }
 
@@ -185,6 +189,6 @@ final readonly class NormalizeInventorySnapshotAction
     {
         $normalizedValue = trim((string) $fulfillmentType);
 
-        return $normalizedValue !== '' ? mb_strtolower($normalizedValue) : 'unknown';
+        return '' !== $normalizedValue ? mb_strtolower($normalizedValue) : 'unknown';
     }
 }

@@ -22,19 +22,19 @@ final class MarketplaceReturnsController extends AbstractController
 {
     public function __construct(
         private readonly ActiveCompanyService $companyService,
-        private readonly ReturnsListQuery     $returnsListQuery,
+        private readonly ReturnsListQuery $returnsListQuery,
     ) {
     }
 
     #[Route('/returns', name: 'marketplace_returns_index')]
     public function __invoke(Request $request): Response
     {
-        $company     = $this->companyService->getActiveCompany();
-        $companyId   = (string) $company->getId();
+        $company = $this->companyService->getActiveCompany();
+        $companyId = (string) $company->getId();
         $marketplace = $request->query->get('marketplace') ?: null;
-        $page        = max(1, $request->query->getInt('page', 1));
+        $page = max(1, $request->query->getInt('page', 1));
 
-        $qb      = $this->returnsListQuery->buildQueryBuilder($companyId, $marketplace);
+        $qb = $this->returnsListQuery->buildQueryBuilder($companyId, $marketplace);
         $adapter = new QueryAdapter($qb, static function (QueryBuilder $qb): void {
             $qb->select('COUNT(r.id)')->resetOrderBy();
         });
@@ -46,9 +46,9 @@ final class MarketplaceReturnsController extends AbstractController
         );
 
         return $this->render('marketplace/returns.html.twig', [
-            'pager'                  => $pager,
+            'pager' => $pager,
             'available_marketplaces' => MarketplaceType::cases(),
-            'selected_marketplace'   => $marketplace,
+            'selected_marketplace' => $marketplace,
         ]);
     }
 }

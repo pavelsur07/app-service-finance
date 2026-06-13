@@ -3,8 +3,10 @@
 namespace App\Deals\Service;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\Counterparty;
 use App\Company\Entity\User;
 use App\Company\Repository\CompanyMemberRepository;
+use App\Company\Repository\CounterpartyRepository;
 use App\Deals\Entity\Deal;
 use App\Deals\Entity\DealAdjustment;
 use App\Deals\Entity\DealCharge;
@@ -23,8 +25,6 @@ use App\Deals\Service\Request\RemoveDealChargeRequest;
 use App\Deals\Service\Request\RemoveDealItemRequest;
 use App\Deals\Service\Request\UpdateDealHeaderRequest;
 use App\Deals\Service\Request\UpdateDealItemRequest;
-use App\Company\Entity\Counterparty;
-use App\Company\Repository\CounterpartyRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 
@@ -264,7 +264,7 @@ final class DealManager
         $this->assertCompanyAccess($user, $company);
         $this->assertDealAccess($deal, $company);
 
-        return $this->transactional(function () use ($deal): Deal {
+        return $this->transactional(static function () use ($deal): Deal {
             if ($deal->isConfirmed()) {
                 throw new InvalidDealState('Deal is already confirmed.');
             }
@@ -284,7 +284,7 @@ final class DealManager
         $this->assertCompanyAccess($user, $company);
         $this->assertDealAccess($deal, $company);
 
-        return $this->transactional(function () use ($deal): Deal {
+        return $this->transactional(static function () use ($deal): Deal {
             if ($deal->isCancelled() || DealStatus::CLOSED === $deal->getStatus()) {
                 throw new InvalidDealState('Deal cannot be cancelled in current state.');
             }

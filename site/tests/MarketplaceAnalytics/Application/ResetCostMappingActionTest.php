@@ -23,7 +23,7 @@ final class ResetCostMappingActionTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->repository    = $this->createMock(UnitEconomyCostMappingRepositoryInterface::class);
+        $this->repository = $this->createMock(UnitEconomyCostMappingRepositoryInterface::class);
         $this->entityManager = $this->createMock(EntityManagerInterface::class);
 
         $this->action = new ResetCostMappingAction(

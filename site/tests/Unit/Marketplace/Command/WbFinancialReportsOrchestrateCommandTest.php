@@ -70,7 +70,7 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
     {
         $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
         $dailySqlAssertions = 0;
-        $this->db->method('fetchOne')->willReturnCallback(function (string $sql, array $params = []) use (&$dailySqlAssertions): mixed {
+        $this->db->method('fetchOne')->willReturnCallback(static function (string $sql, array $params = []) use (&$dailySqlAssertions): mixed {
             if (str_contains($sql, 'AND business_date = :businessDate')) {
                 ++$dailySqlAssertions;
                 self::assertStringContainsString("AND mode = 'daily'", $sql);
@@ -111,7 +111,7 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
     {
         $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
         $dueRetrySqlAssertions = 0;
-        $this->db->method('fetchOne')->willReturnCallback(function (string $sql, array $params = []) use (&$dueRetrySqlAssertions): mixed {
+        $this->db->method('fetchOne')->willReturnCallback(static function (string $sql, array $params = []) use (&$dueRetrySqlAssertions): mixed {
             if (str_contains($sql, 'AND business_date = :businessDate')) {
                 return 'success';
             }

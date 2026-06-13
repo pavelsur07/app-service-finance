@@ -32,17 +32,17 @@ final class CostCategoriesCleanupController extends AbstractController
 {
     public function __construct(
         private readonly ActiveCompanyService $companyService,
-        private readonly Connection           $connection,
+        private readonly Connection $connection,
     ) {
     }
 
     #[Route('/cleanup-categories', name: 'marketplace_costs_cleanup_categories', methods: ['GET', 'POST'])]
     public function cleanup(Request $request): JsonResponse
     {
-        $company   = $this->companyService->getActiveCompany();
+        $company = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
-        $confirm   = $request->isMethod('POST')
-            && $request->request->get('confirm', '0') === '1';
+        $confirm = $request->isMethod('POST')
+            && '1' === $request->request->get('confirm', '0');
 
         // Находим категории без единой привязанной записи затрат
         $unused = $this->connection->fetchAllAssociative(
@@ -68,16 +68,16 @@ final class CostCategoriesCleanupController extends AbstractController
                 ->getToken('cleanup_categories')->getValue();
 
             return $this->json([
-                'action'    => 'preview',
+                'action' => 'preview',
                 'to_delete' => count($unused),
-                'items'     => array_map(static fn (array $r) => [
-                    'code'       => $r['code'],
-                    'name'       => $r['name'],
+                'items' => array_map(static fn (array $r) => [
+                    'code' => $r['code'],
+                    'name' => $r['name'],
                     'created_at' => $r['created_at'],
                 ], $unused),
-                '_token'    => $csrfToken,
+                '_token' => $csrfToken,
                 'next_step' => 'POST /marketplace/costs/admin/cleanup-categories with confirm=1&_token=<value from _token above>',
-            ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
+            ], 200, [], ['json_encode_options' => \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE]);
         }
 
         if (!$this->isCsrfTokenValid('cleanup_categories', $request->request->get('_token'))) {
@@ -91,13 +91,13 @@ final class CostCategoriesCleanupController extends AbstractController
                 'DELETE FROM marketplace_cost_categories WHERE id = :id',
                 ['id' => $row['id']],
             );
-            $deleted++;
+            ++$deleted;
         }
 
         return $this->json([
-            'action'  => 'deleted',
+            'action' => 'deleted',
             'deleted' => $deleted,
-            'items'   => array_map(static fn (array $r) => $r['code'], $unused),
-        ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
+            'items' => array_map(static fn (array $r) => $r['code'], $unused),
+        ], 200, [], ['json_encode_options' => \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE]);
     }
 }

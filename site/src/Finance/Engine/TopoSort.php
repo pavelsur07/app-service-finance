@@ -11,7 +11,7 @@ final class TopoSort
     /** @param array<string,PLCategory> $byId */
     public function sort(Graph $g, array $byId): array
     {
-        return $g->topoSort(function (string $a, string $b) use ($byId) {
+        return $g->topoSort(static function (string $a, string $b) use ($byId) {
             $A = $byId[$a] ?? null;
             $B = $byId[$b] ?? null;
             $ao = $A?->getCalcOrder() ?? 0;

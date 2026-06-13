@@ -24,7 +24,7 @@ final class WidgetServiceGroupMap
         /** @var array<string, string>|null $cache */
         static $cache = null;
 
-        if ($cache === null) {
+        if (null === $cache) {
             $cache = [];
             foreach (OzonCostCategory::all() as $c) {
                 $cache[$c->code] = $c->widgetGroup;

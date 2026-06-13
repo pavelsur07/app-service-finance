@@ -46,8 +46,7 @@ final class OzonAdClientTest extends TestCase
         // markFinalized не падали при реальном flush().
         $this->pendingReportRepo = $this->createMock(OzonAdPendingReportRepository::class);
         $this->pendingReportRepo->method('create')->willReturnCallback(
-            static fn (string $companyId, string $ozonUuid, \DateTimeImmutable $from, \DateTimeImmutable $to, array $campaignIds, ?string $jobId): OzonAdPendingReport
-                => new OzonAdPendingReport($companyId, $ozonUuid, $from, $to, $campaignIds, $jobId),
+            static fn (string $companyId, string $ozonUuid, \DateTimeImmutable $from, \DateTimeImmutable $to, array $campaignIds, ?string $jobId): OzonAdPendingReport => new OzonAdPendingReport($companyId, $ozonUuid, $from, $to, $campaignIds, $jobId),
         );
         $this->pendingReportRepo->method('updateState')->willReturn(1);
         $this->pendingReportRepo->method('markFinalized')->willReturn(1);
@@ -418,7 +417,7 @@ final class OzonAdClientTest extends TestCase
             tokenBody: $this->tokenBody('TKN-E1'),
             campaignListBody: $this->campaignListBody(1),
             statisticsBody: '{"UUID":"uuid-err-1"}',
-            stateBody: json_encode(['state' => 'ERROR', 'error' => 'нет прав'], JSON_THROW_ON_ERROR),
+            stateBody: json_encode(['state' => 'ERROR', 'error' => 'нет прав'], \JSON_THROW_ON_ERROR),
         );
 
         $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
@@ -454,7 +453,7 @@ final class OzonAdClientTest extends TestCase
             tokenBody: $this->tokenBody('TKN-E2'),
             campaignListBody: $this->campaignListBody(1),
             statisticsBody: '{"UUID":"uuid-err-2"}',
-            stateBody: json_encode(['state' => 'ERROR', 'error' => $errorPayload], JSON_THROW_ON_ERROR),
+            stateBody: json_encode(['state' => 'ERROR', 'error' => $errorPayload], \JSON_THROW_ON_ERROR),
         );
 
         $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
@@ -490,7 +489,7 @@ final class OzonAdClientTest extends TestCase
             tokenBody: $this->tokenBody('TKN-E3'),
             campaignListBody: $this->campaignListBody(1),
             statisticsBody: '{"UUID":"uuid-err-3"}',
-            stateBody: json_encode(['state' => 'ERROR', 'error' => $errorPayload], JSON_THROW_ON_ERROR),
+            stateBody: json_encode(['state' => 'ERROR', 'error' => $errorPayload], \JSON_THROW_ON_ERROR),
         );
 
         $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
@@ -712,7 +711,7 @@ final class OzonAdClientTest extends TestCase
         $json = $client->fetchAdStatistics(self::COMPANY_ID, new \DateTimeImmutable('2026-03-01'));
 
         self::assertJson($json);
-        $decoded = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
+        $decoded = json_decode($json, true, flags: \JSON_THROW_ON_ERROR);
         self::assertIsArray($decoded);
         self::assertArrayHasKey('rows', $decoded);
         self::assertCount(2, $decoded['rows']);
@@ -1037,12 +1036,11 @@ final class OzonAdClientTest extends TestCase
         $updateStateCalls = [];
         $repo = $this->createMock(OzonAdPendingReportRepository::class);
         $repo->method('create')->willReturnCallback(
-            static fn (string $companyId, string $ozonUuid, \DateTimeImmutable $from, \DateTimeImmutable $to, array $campaignIds, ?string $jobId): OzonAdPendingReport
-                => new OzonAdPendingReport($companyId, $ozonUuid, $from, $to, $campaignIds, $jobId),
+            static fn (string $companyId, string $ozonUuid, \DateTimeImmutable $from, \DateTimeImmutable $to, array $campaignIds, ?string $jobId): OzonAdPendingReport => new OzonAdPendingReport($companyId, $ozonUuid, $from, $to, $campaignIds, $jobId),
         );
         $repo->expects(self::atLeastOnce())
             ->method('updateState')
-            ->willReturnCallback(function (string $companyId, string $uuid, string $state, \DateTimeImmutable $now, int $attempt, ?\DateTimeImmutable $firstNonPendingAt = null) use (&$updateStateCalls): int {
+            ->willReturnCallback(static function (string $companyId, string $uuid, string $state, \DateTimeImmutable $now, int $attempt, ?\DateTimeImmutable $firstNonPendingAt = null) use (&$updateStateCalls): int {
                 $updateStateCalls[] = [
                     'companyId' => $companyId,
                     'uuid' => $uuid,
@@ -1091,8 +1089,8 @@ final class OzonAdClientTest extends TestCase
     // -----------------------------------------------------------------
     public function testPollReportCapturesFirstNonPendingAtOnceAcrossIterations(): void
     {
-        $statePending = json_encode(['state' => 'NOT_STARTED'], JSON_THROW_ON_ERROR);
-        $stateInProgress = json_encode(['state' => 'IN_PROGRESS'], JSON_THROW_ON_ERROR);
+        $statePending = json_encode(['state' => 'NOT_STARTED'], \JSON_THROW_ON_ERROR);
+        $stateInProgress = json_encode(['state' => 'IN_PROGRESS'], \JSON_THROW_ON_ERROR);
         $stateReady = $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-multi');
 
         $http = new MockHttpClient([
@@ -1112,12 +1110,11 @@ final class OzonAdClientTest extends TestCase
 
         $repo = $this->createMock(OzonAdPendingReportRepository::class);
         $repo->method('create')->willReturnCallback(
-            static fn (string $companyId, string $ozonUuid, \DateTimeImmutable $from, \DateTimeImmutable $to, array $campaignIds, ?string $jobId): OzonAdPendingReport
-                => new OzonAdPendingReport($companyId, $ozonUuid, $from, $to, $campaignIds, $jobId),
+            static fn (string $companyId, string $ozonUuid, \DateTimeImmutable $from, \DateTimeImmutable $to, array $campaignIds, ?string $jobId): OzonAdPendingReport => new OzonAdPendingReport($companyId, $ozonUuid, $from, $to, $campaignIds, $jobId),
         );
         $repo->expects(self::exactly(3))
             ->method('updateState')
-            ->willReturnCallback(function (string $companyId, string $uuid, string $state, \DateTimeImmutable $now, int $attempt, ?\DateTimeImmutable $firstNonPendingAt = null) use (&$calls): int {
+            ->willReturnCallback(static function (string $companyId, string $uuid, string $state, \DateTimeImmutable $now, int $attempt, ?\DateTimeImmutable $firstNonPendingAt = null) use (&$calls): int {
                 $calls[] = [
                     'companyId' => $companyId,
                     'uuid' => $uuid,
@@ -1185,7 +1182,7 @@ final class OzonAdClientTest extends TestCase
             tokenBody: $this->tokenBody('TKN-E1'),
             campaignListBody: $this->campaignListBody(1),
             statisticsBody: '{"UUID":"uuid-first-err"}',
-            stateBody: json_encode(['state' => 'ERROR', 'error' => 'квота'], JSON_THROW_ON_ERROR),
+            stateBody: json_encode(['state' => 'ERROR', 'error' => 'квота'], \JSON_THROW_ON_ERROR),
         );
 
         $repo = $this->createMock(OzonAdPendingReportRepository::class);
@@ -1193,8 +1190,7 @@ final class OzonAdClientTest extends TestCase
             ->method('create')
             ->with(self::COMPANY_ID, 'uuid-first-err', self::anything(), self::anything(), self::anything(), self::anything())
             ->willReturnCallback(
-                static fn (string $companyId, string $ozonUuid, \DateTimeImmutable $from, \DateTimeImmutable $to, array $campaignIds, ?string $jobId): OzonAdPendingReport
-                    => new OzonAdPendingReport($companyId, $ozonUuid, $from, $to, $campaignIds, $jobId),
+                static fn (string $companyId, string $ozonUuid, \DateTimeImmutable $from, \DateTimeImmutable $to, array $campaignIds, ?string $jobId): OzonAdPendingReport => new OzonAdPendingReport($companyId, $ozonUuid, $from, $to, $campaignIds, $jobId),
             );
         $repo->expects(self::once())
             ->method('updateState')
@@ -1249,7 +1245,7 @@ final class OzonAdClientTest extends TestCase
             new MockResponse($this->tokenBody('TKN-QF')),
             new MockResponse($this->campaignListBody(1)),
             // НЕТ POST /statistics: resume-путь пропускает шаг.
-            new MockResponse(json_encode(['state' => 'NOT_STARTED'], JSON_THROW_ON_ERROR)),
+            new MockResponse(json_encode(['state' => 'NOT_STARTED'], \JSON_THROW_ON_ERROR)),
         ]);
 
         $repo = $this->createMock(OzonAdPendingReportRepository::class);
@@ -1312,8 +1308,8 @@ final class OzonAdClientTest extends TestCase
             new MockResponse('{"UUID":"uuid-ok-ns"}'),
             // NOT_STARTED → IN_PROGRESS → OK: последовательность проверяется без
             // ожидания реального времени благодаря MockClock.
-            new MockResponse(json_encode(['state' => 'NOT_STARTED'], JSON_THROW_ON_ERROR)),
-            new MockResponse(json_encode(['state' => 'IN_PROGRESS'], JSON_THROW_ON_ERROR)),
+            new MockResponse(json_encode(['state' => 'NOT_STARTED'], \JSON_THROW_ON_ERROR)),
+            new MockResponse(json_encode(['state' => 'IN_PROGRESS'], \JSON_THROW_ON_ERROR)),
             new MockResponse($this->stateReadyBody('/api/client/statistics/report?UUID=uuid-ok-ns')),
             new MockResponse("date;campaign_id;campaign_name;sku;spend;views;clicks\n2026-03-01;111;Campaign A;SKU-1;1;1;1\n"),
         ]);
@@ -1430,8 +1426,7 @@ final class OzonAdClientTest extends TestCase
             ->method('create')
             ->with(self::COMPANY_ID, 'uuid-resume-new', self::anything(), self::anything(), self::anything(), 'dddddddd-dddd-dddd-dddd-000000000001')
             ->willReturnCallback(
-                static fn (string $companyId, string $ozonUuid, \DateTimeImmutable $from, \DateTimeImmutable $to, array $campaignIds, ?string $jobId): OzonAdPendingReport
-                    => new OzonAdPendingReport($companyId, $ozonUuid, $from, $to, $campaignIds, $jobId),
+                static fn (string $companyId, string $ozonUuid, \DateTimeImmutable $from, \DateTimeImmutable $to, array $campaignIds, ?string $jobId): OzonAdPendingReport => new OzonAdPendingReport($companyId, $ozonUuid, $from, $to, $campaignIds, $jobId),
             );
         $repo->method('updateState')->willReturn(1);
         $repo->method('markFinalized')->willReturnCallback(static function (string $companyId, string $uuid, string $state, ?string $error = null) use (&$finalizedCalls): int {
@@ -1572,8 +1567,7 @@ final class OzonAdClientTest extends TestCase
         // при наличии jobId (якорь для сравнения батчей).
         $repo->expects(self::never())->method('findInFlightByJob');
         $repo->method('create')->willReturnCallback(
-            static fn (string $companyId, string $ozonUuid, \DateTimeImmutable $from, \DateTimeImmutable $to, array $campaignIds, ?string $jobId): OzonAdPendingReport
-                => new OzonAdPendingReport($companyId, $ozonUuid, $from, $to, $campaignIds, $jobId),
+            static fn (string $companyId, string $ozonUuid, \DateTimeImmutable $from, \DateTimeImmutable $to, array $campaignIds, ?string $jobId): OzonAdPendingReport => new OzonAdPendingReport($companyId, $ozonUuid, $from, $to, $campaignIds, $jobId),
         );
         $repo->method('updateState')->willReturn(1);
         $repo->method('markFinalized')->willReturn(1);
@@ -2012,7 +2006,7 @@ final class OzonAdClientTest extends TestCase
             'access_token' => $token,
             'expires_in' => 1800,
             'token_type' => 'Bearer',
-        ], JSON_THROW_ON_ERROR);
+        ], \JSON_THROW_ON_ERROR);
     }
 
     /**
@@ -2030,7 +2024,7 @@ final class OzonAdClientTest extends TestCase
             ];
         }
 
-        return json_encode(['list' => $list], JSON_THROW_ON_ERROR);
+        return json_encode(['list' => $list], \JSON_THROW_ON_ERROR);
     }
 
     /**
@@ -2051,12 +2045,12 @@ final class OzonAdClientTest extends TestCase
             ];
         }
 
-        return json_encode(['list' => $list], JSON_THROW_ON_ERROR);
+        return json_encode(['list' => $list], \JSON_THROW_ON_ERROR);
     }
 
     private function stateReadyBody(string $link): string
     {
-        return json_encode(['state' => 'OK', 'link' => $link], JSON_THROW_ON_ERROR);
+        return json_encode(['state' => 'OK', 'link' => $link], \JSON_THROW_ON_ERROR);
     }
 
     /**
@@ -2101,13 +2095,13 @@ final class OzonAdClientTest extends TestCase
      * for every request in order. Returns a callable compatible with MockHttpClient.
      *
      * @param list<array{method: string, url: string, auth: ?string}> $log
-     * @param list<MockResponse>                                      $responses
+     * @param list<MockResponse> $responses
      */
     private function scriptedResponsesWithRecording(array &$log, array $responses): callable
     {
         $i = 0;
 
-        return function (string $method, string $url, array $options) use (&$log, $responses, &$i): ResponseInterface {
+        return static function (string $method, string $url, array $options) use (&$log, $responses, &$i): ResponseInterface {
             $auth = null;
             foreach ($options['headers'] ?? [] as $h) {
                 if (is_string($h) && str_starts_with($h, 'Authorization: ')) {

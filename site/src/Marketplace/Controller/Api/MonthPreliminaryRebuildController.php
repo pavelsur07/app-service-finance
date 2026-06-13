@@ -26,19 +26,19 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class MonthPreliminaryRebuildController extends AbstractController
 {
     public function __construct(
-        private readonly ActiveCompanyService     $activeCompanyService,
-        private readonly MessageBusInterface      $messageBus,
-        private readonly RateLimiterFactory       $marketplacePreliminaryRebuildLimiter,
-        private readonly LoggerInterface          $logger,
+        private readonly ActiveCompanyService $activeCompanyService,
+        private readonly MessageBusInterface $messageBus,
+        private readonly RateLimiterFactory $marketplacePreliminaryRebuildLimiter,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
     #[Route('/rebuild', name: 'marketplace_month_preliminary_rebuild', methods: ['POST'])]
     public function rebuild(Request $request): JsonResponse
     {
-        $company   = $this->activeCompanyService->getActiveCompany();
+        $company = $this->activeCompanyService->getActiveCompany();
         $companyId = (string) $company->getId();
-        $user      = $this->getUser();
+        $user = $this->getUser();
 
         $payload = json_decode((string) $request->getContent(), true);
         if (!is_array($payload)) {
@@ -46,10 +46,10 @@ final class MonthPreliminaryRebuildController extends AbstractController
         }
 
         $marketplace = (string) ($payload['marketplace'] ?? '');
-        $year        = (int)    ($payload['year']  ?? 0);
-        $month       = (int)    ($payload['month'] ?? 0);
+        $year = (int) ($payload['year'] ?? 0);
+        $month = (int) ($payload['month'] ?? 0);
 
-        if (MarketplaceType::tryFrom($marketplace) === null) {
+        if (null === MarketplaceType::tryFrom($marketplace)) {
             return new JsonResponse(
                 ['error' => 'Некорректный маркетплейс.'],
                 Response::HTTP_BAD_REQUEST,
@@ -74,19 +74,19 @@ final class MonthPreliminaryRebuildController extends AbstractController
         }
 
         $this->messageBus->dispatch(new RebuildPreliminaryForPeriodMessage(
-            companyId:   $companyId,
+            companyId: $companyId,
             marketplace: $marketplace,
-            year:        $year,
-            month:       $month,
+            year: $year,
+            month: $month,
             actorUserId: (string) $user->getId(),
         ));
 
         $this->logger->info('[PreliminaryRebuild] Manual rebuild requested', [
-            'company_id'  => $companyId,
+            'company_id' => $companyId,
             'marketplace' => $marketplace,
-            'year'        => $year,
-            'month'       => $month,
-            'user_id'     => (string) $user->getId(),
+            'year' => $year,
+            'month' => $month,
+            'user_id' => (string) $user->getId(),
         ]);
 
         return new JsonResponse(

@@ -29,11 +29,10 @@ final class StockQtyByListingOnDateQueryTest extends TestCase
             ->method('fetchAllAssociative')
             ->with(
                 self::stringContains('s.snapshot_at = :snapshotAt'),
-                self::callback(static fn (array $params): bool =>
-                    $params['companyId'] === self::COMPANY_ID
-                    && $params['snapshotDate'] === '2026-04-30'
+                self::callback(static fn (array $params): bool => self::COMPANY_ID === $params['companyId']
+                    && '2026-04-30' === $params['snapshotDate']
                     && $params['snapshotAt'] instanceof \DateTimeImmutable
-                    && $params['snapshotAt']->format('Y-m-d H:i:s') === '2026-04-30 15:00:00'
+                    && '2026-04-30 15:00:00' === $params['snapshotAt']->format('Y-m-d H:i:s')
                 ),
             )
             ->willReturn([
@@ -59,9 +58,8 @@ final class StockQtyByListingOnDateQueryTest extends TestCase
             ->method('fetchAssociative')
             ->with(
                 self::stringContains('MAX(s.snapshot_at)'),
-                self::callback(static fn (array $params): bool =>
-                    $params['companyId'] === self::COMPANY_ID
-                    && $params['snapshotDate'] === '2026-05-01'
+                self::callback(static fn (array $params): bool => self::COMPANY_ID === $params['companyId']
+                    && '2026-05-01' === $params['snapshotDate']
                 ),
             )
             ->willReturn(['snapshot_at' => '2026-05-01 23:59:59']);
@@ -70,10 +68,9 @@ final class StockQtyByListingOnDateQueryTest extends TestCase
             ->method('fetchAllAssociative')
             ->with(
                 self::anything(),
-                self::callback(static fn (array $params): bool =>
-                    $params['snapshotDate'] === '2026-05-01'
+                self::callback(static fn (array $params): bool => '2026-05-01' === $params['snapshotDate']
                     && $params['snapshotAt'] instanceof \DateTimeImmutable
-                    && $params['snapshotAt']->format('Y-m-d H:i:s') === '2026-05-01 23:59:59'
+                    && '2026-05-01 23:59:59' === $params['snapshotAt']->format('Y-m-d H:i:s')
                 ),
             )
             ->willReturn([
@@ -85,8 +82,6 @@ final class StockQtyByListingOnDateQueryTest extends TestCase
 
         self::assertSame(['l-2' => 7.0], $result);
     }
-
-
 
     public function testUsesLatestSnapshotAtInsideSelectedDay(): void
     {
@@ -105,10 +100,9 @@ final class StockQtyByListingOnDateQueryTest extends TestCase
             ->method('fetchAllAssociative')
             ->with(
                 self::stringContains('s.snapshot_at = :snapshotAt'),
-                self::callback(static fn (array $params): bool =>
-                    $params['snapshotDate'] === '2026-05-01'
+                self::callback(static fn (array $params): bool => '2026-05-01' === $params['snapshotDate']
                     && $params['snapshotAt'] instanceof \DateTimeImmutable
-                    && $params['snapshotAt']->format('Y-m-d H:i:s') === '2026-05-01 20:15:00'
+                    && '2026-05-01 20:15:00' === $params['snapshotAt']->format('Y-m-d H:i:s')
                 ),
             )
             ->willReturn([

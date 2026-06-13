@@ -24,7 +24,8 @@ final class SnapshotShowController extends AbstractController
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly ListingDailySnapshotRepositoryInterface $snapshotRepository,
         private readonly MarketplaceFacade $marketplaceFacade,
-    ) {}
+    ) {
+    }
 
     #[OA\Get(
         summary: 'Снэпшот по ID',
@@ -66,7 +67,7 @@ final class SnapshotShowController extends AbstractController
         $company = $this->activeCompanyService->getActiveCompany();
         $snapshot = $this->snapshotRepository->findById($id, $company->getId());
 
-        if ($snapshot === null) {
+        if (null === $snapshot) {
             return $this->json(
                 ['type' => 'NOT_FOUND', 'message' => 'Снимок не найден'],
                 Response::HTTP_NOT_FOUND,

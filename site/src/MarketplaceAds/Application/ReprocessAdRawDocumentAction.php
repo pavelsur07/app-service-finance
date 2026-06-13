@@ -40,10 +40,7 @@ final readonly class ReprocessAdRawDocumentAction
         $document = $this->rawDocumentRepository->findByIdAndCompany($adRawDocumentId, $companyId);
 
         if (null === $document) {
-            throw new AdRawDocumentNotFoundException(sprintf(
-                'AdRawDocument %s не найден.',
-                $adRawDocumentId,
-            ));
+            throw new AdRawDocumentNotFoundException(sprintf('AdRawDocument %s не найден.', $adRawDocumentId));
         }
 
         if (AdRawDocumentStatus::DRAFT !== $document->getStatus()) {

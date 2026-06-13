@@ -39,15 +39,15 @@ final class DebugOzonReconciliationController extends AbstractController
     public function __invoke(Request $request): JsonResponse
     {
         $periodFromStr = (string) $request->query->get('periodFrom', '');
-        $periodToStr   = (string) $request->query->get('periodTo', '');
+        $periodToStr = (string) $request->query->get('periodTo', '');
 
-        if ($periodFromStr === '' || $periodToStr === '') {
+        if ('' === $periodFromStr || '' === $periodToStr) {
             return $this->json(['error' => 'periodFrom and periodTo are required (Y-m-d)'], 422);
         }
 
         try {
             $periodFrom = new \DateTimeImmutable($periodFromStr);
-            $periodTo   = new \DateTimeImmutable($periodToStr);
+            $periodTo = new \DateTimeImmutable($periodToStr);
         } catch (\Exception) {
             return $this->json(['error' => 'Invalid date format. Expected Y-m-d'], 422);
         }
@@ -56,19 +56,19 @@ final class DebugOzonReconciliationController extends AbstractController
             return $this->json(['error' => 'periodFrom must be <= periodTo'], 422);
         }
 
-        $company   = $this->activeCompanyService->getActiveCompany();
+        $company = $this->activeCompanyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
-        $salesByDate  = $this->fetchSalesByDate($companyId, $periodFrom, $periodTo);
+        $salesByDate = $this->fetchSalesByDate($companyId, $periodFrom, $periodTo);
         $rawDocuments = $this->fetchRawDocuments($companyId, $periodFrom, $periodTo);
-        $stornoSales  = $this->fetchStornoSales($companyId, $periodFrom, $periodTo);
-        $orphanCount  = $this->fetchSalesWithoutRawDocument($companyId, $periodFrom, $periodTo);
-        $gaps         = $this->buildGaps($salesByDate, $rawDocuments, $orphanCount);
+        $stornoSales = $this->fetchStornoSales($companyId, $periodFrom, $periodTo);
+        $orphanCount = $this->fetchSalesWithoutRawDocument($companyId, $periodFrom, $periodTo);
+        $gaps = $this->buildGaps($salesByDate, $rawDocuments, $orphanCount);
 
-        $totalCount   = 0;
+        $totalCount = 0;
         $totalRevenue = '0';
         foreach ($salesByDate as $row) {
-            $totalCount   += $row['count'];
+            $totalCount += $row['count'];
             $totalRevenue = bcadd($totalRevenue, $row['revenue'], 2);
         }
 
@@ -80,21 +80,21 @@ final class DebugOzonReconciliationController extends AbstractController
         return new JsonResponse([
             'period' => [
                 'from' => $periodFrom->format('Y-m-d'),
-                'to'   => $periodTo->format('Y-m-d'),
+                'to' => $periodTo->format('Y-m-d'),
             ],
             'sales' => [
-                'count'        => $totalCount,
+                'count' => $totalCount,
                 'totalRevenue' => $totalRevenue,
-                'byDate'       => $salesByDate,
+                'byDate' => $salesByDate,
             ],
             'rawDocuments' => [
-                'count'     => count($rawDocuments),
+                'count' => count($rawDocuments),
                 'documents' => $rawDocuments,
             ],
             'stornoSales' => [
-                'count'        => count($stornoSales),
+                'count' => count($stornoSales),
                 'totalRevenue' => $stornoRevenue,
-                'items'        => $stornoSales,
+                'items' => $stornoSales,
             ],
             'gaps' => $gaps,
         ]);
@@ -123,16 +123,16 @@ final class DebugOzonReconciliationController extends AbstractController
             ORDER BY s.sale_date
             SQL,
             [
-                'companyId'  => $companyId,
+                'companyId' => $companyId,
                 'periodFrom' => $from->format('Y-m-d'),
-                'periodTo'   => $to->format('Y-m-d'),
+                'periodTo' => $to->format('Y-m-d'),
             ],
         );
 
         $result = [];
         foreach ($rows as $row) {
             $result[(string) $row['dt']] = [
-                'count'   => (int) $row['cnt'],
+                'count' => (int) $row['cnt'],
                 'revenue' => (string) ($row['revenue'] ?? '0'),
             ];
         }
@@ -171,22 +171,22 @@ final class DebugOzonReconciliationController extends AbstractController
             ORDER BY mrd.period_from, mrd.synced_at
             SQL,
             [
-                'companyId'  => $companyId,
+                'companyId' => $companyId,
                 'periodFrom' => $from->format('Y-m-d'),
-                'periodTo'   => $to->format('Y-m-d'),
+                'periodTo' => $to->format('Y-m-d'),
             ],
         );
 
         $result = [];
         foreach ($rows as $row) {
             $result[] = [
-                'id'              => (string) $row['id'],
-                'status'          => $row['processing_status'] !== null ? (string) $row['processing_status'] : null,
-                'syncedAt'        => (string) $row['synced_at'],
-                'documentType'    => (string) $row['document_type'],
+                'id' => (string) $row['id'],
+                'status' => null !== $row['processing_status'] ? (string) $row['processing_status'] : null,
+                'syncedAt' => (string) $row['synced_at'],
+                'documentType' => (string) $row['document_type'],
                 'operationsCount' => (int) $row['records_count'],
-                'periodFrom'      => (string) $row['period_from'],
-                'periodTo'        => (string) $row['period_to'],
+                'periodFrom' => (string) $row['period_from'],
+                'periodTo' => (string) $row['period_to'],
             ];
         }
 
@@ -219,17 +219,17 @@ final class DebugOzonReconciliationController extends AbstractController
             ORDER BY s.sale_date, s.external_order_id
             SQL,
             [
-                'companyId'  => $companyId,
+                'companyId' => $companyId,
                 'periodFrom' => $from->format('Y-m-d'),
-                'periodTo'   => $to->format('Y-m-d'),
+                'periodTo' => $to->format('Y-m-d'),
             ],
         );
 
         return array_map(
             static fn (array $r): array => [
                 'externalOrderId' => (string) $r['external_order_id'],
-                'totalRevenue'    => (string) ($r['total_revenue'] ?? '0'),
-                'saleDate'        => (string) $r['sale_date'],
+                'totalRevenue' => (string) ($r['total_revenue'] ?? '0'),
+                'saleDate' => (string) $r['sale_date'],
             ],
             $rows,
         );
@@ -255,9 +255,9 @@ final class DebugOzonReconciliationController extends AbstractController
               AND s.raw_document_id IS NULL
             SQL,
             [
-                'companyId'  => $companyId,
+                'companyId' => $companyId,
                 'periodFrom' => $from->format('Y-m-d'),
-                'periodTo'   => $to->format('Y-m-d'),
+                'periodTo' => $to->format('Y-m-d'),
             ],
         );
 
@@ -267,8 +267,8 @@ final class DebugOzonReconciliationController extends AbstractController
     /**
      * Пробелы: даты с продажами, для которых нет покрывающего raw-документа.
      *
-     * @param array<string, array{count: int, revenue: string}>             $salesByDate
-     * @param list<array{periodFrom: string, periodTo: string, ...}>        $rawDocuments
+     * @param array<string, array{count: int, revenue: string}> $salesByDate
+     * @param list<array{periodFrom: string, periodTo: string, ...}> $rawDocuments
      *
      * @return array{datesWithoutRawDocuments: list<string>, salesWithoutRawDocument: int}
      */
@@ -278,7 +278,7 @@ final class DebugOzonReconciliationController extends AbstractController
         $coveredDates = [];
         foreach ($rawDocuments as $doc) {
             $cursor = new \DateTimeImmutable($doc['periodFrom']);
-            $end    = new \DateTimeImmutable($doc['periodTo']);
+            $end = new \DateTimeImmutable($doc['periodTo']);
             while ($cursor <= $end) {
                 $coveredDates[$cursor->format('Y-m-d')] = true;
                 $cursor = $cursor->modify('+1 day');
@@ -296,7 +296,7 @@ final class DebugOzonReconciliationController extends AbstractController
 
         return [
             'datesWithoutRawDocuments' => $datesWithoutRawDocuments,
-            'salesWithoutRawDocument'  => $salesWithoutRawDocument,
+            'salesWithoutRawDocument' => $salesWithoutRawDocument,
         ];
     }
 }

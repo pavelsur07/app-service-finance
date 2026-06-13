@@ -49,7 +49,7 @@ final class MoySkladConnectionWriteRepository extends ServiceEntityRepository
             ->setParameter('companyId', $companyId)
             ->setParameter('name', trim($name));
 
-        if ($excludeId !== null) {
+        if (null !== $excludeId) {
             $qb->andWhere('c.id != :excludeId')->setParameter('excludeId', $excludeId);
         }
 

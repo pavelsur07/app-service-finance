@@ -29,6 +29,6 @@ enum PLDocumentSource: string
 
     public function isMarketplace(): bool
     {
-        return $this !== self::MANUAL;
+        return self::MANUAL !== $this;
     }
 }

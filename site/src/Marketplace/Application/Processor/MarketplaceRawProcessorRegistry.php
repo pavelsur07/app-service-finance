@@ -46,7 +46,7 @@ final readonly class MarketplaceRawProcessorRegistry implements MarketplaceRawPr
         // без переключения на альтернативные processor-реализации.
         $docs = $this->rawDocumentRepository->findByCompanyAndMarketplace($companyId, $marketplace);
 
-        if ($docs === []) {
+        if ([] === $docs) {
             return 0;
         }
 

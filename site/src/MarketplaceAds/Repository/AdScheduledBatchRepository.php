@@ -60,11 +60,11 @@ final class AdScheduledBatchRepository extends ServiceEntityRepository implement
 
         $sql = sprintf(
             'SELECT %s FROM marketplace_ad_scheduled_batches b '
-            . 'WHERE b.state = :state '
-            . "  AND EXISTS (SELECT 1 FROM marketplace_ad_load_jobs j WHERE j.id = b.job_id AND j.status IN ('pending','running')) "
-            . '  AND b.scheduled_at <= NOW() '
-            . 'ORDER BY b.scheduled_at ASC, b.batch_index ASC '
-            . 'LIMIT 1 FOR UPDATE SKIP LOCKED',
+            .'WHERE b.state = :state '
+            ."  AND EXISTS (SELECT 1 FROM marketplace_ad_load_jobs j WHERE j.id = b.job_id AND j.status IN ('pending','running')) "
+            .'  AND b.scheduled_at <= NOW() '
+            .'ORDER BY b.scheduled_at ASC, b.batch_index ASC '
+            .'LIMIT 1 FOR UPDATE SKIP LOCKED',
             $rsm->generateSelectClause(['b' => 'b']),
         );
 
@@ -94,9 +94,9 @@ final class AdScheduledBatchRepository extends ServiceEntityRepository implement
 
         $sql = sprintf(
             'SELECT %s FROM marketplace_ad_scheduled_batches b '
-            . 'WHERE b.state = :state '
-            . "  AND EXISTS (SELECT 1 FROM marketplace_ad_load_jobs j WHERE j.id = b.job_id AND j.status IN ('pending','running')) "
-            . 'ORDER BY b.started_at ASC NULLS LAST',
+            .'WHERE b.state = :state '
+            ."  AND EXISTS (SELECT 1 FROM marketplace_ad_load_jobs j WHERE j.id = b.job_id AND j.status IN ('pending','running')) "
+            .'ORDER BY b.started_at ASC NULLS LAST',
             $rsm->generateSelectClause(['b' => 'b']),
         );
 

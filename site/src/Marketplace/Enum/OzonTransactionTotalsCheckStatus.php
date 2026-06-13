@@ -23,11 +23,11 @@ enum OzonTransactionTotalsCheckStatus: string
 
     public function isSuccessful(): bool
     {
-        return $this === self::OK;
+        return self::OK === $this;
     }
 
     public function isBlocking(): bool
     {
-        return $this === self::FAILED;
+        return self::FAILED === $this;
     }
 }

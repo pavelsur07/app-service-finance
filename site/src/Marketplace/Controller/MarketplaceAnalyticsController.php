@@ -14,7 +14,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 class MarketplaceAnalyticsController extends AbstractController
 {
     public function __construct(
-        private readonly ActiveCompanyService $activeCompanyService
+        private readonly ActiveCompanyService $activeCompanyService,
     ) {
     }
 

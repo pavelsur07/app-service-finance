@@ -33,15 +33,15 @@ final class ReconciliationSalesDetailController extends AbstractController
     )]
     public function __invoke(Request $request): JsonResponse
     {
-        $company   = $this->activeCompanyService->getActiveCompany();
+        $company = $this->activeCompanyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
-        $payload     = json_decode($request->getContent(), true) ?? [];
-        $periodFrom  = $payload['periodFrom'] ?? '';
-        $periodTo    = $payload['periodTo'] ?? '';
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $periodFrom = $payload['periodFrom'] ?? '';
+        $periodTo = $payload['periodTo'] ?? '';
         $marketplace = $payload['marketplace'] ?? 'ozon';
 
-        if ($periodFrom === '' || $periodTo === '') {
+        if ('' === $periodFrom || '' === $periodTo) {
             return $this->json(['error' => 'periodFrom and periodTo are required'], 400);
         }
 
@@ -50,7 +50,7 @@ final class ReconciliationSalesDetailController extends AbstractController
         } catch (\Throwable $e) {
             return new JsonResponse([
                 'error' => $e->getMessage(),
-                'file'  => $e->getFile() . ':' . $e->getLine(),
+                'file' => $e->getFile().':'.$e->getLine(),
                 'trace' => array_slice(explode("\n", $e->getTraceAsString()), 0, 5),
             ], 500);
         }
@@ -63,10 +63,10 @@ final class ReconciliationSalesDetailController extends AbstractController
         string $periodTo,
     ): JsonResponse {
         $params = [
-            'companyId'   => $companyId,
+            'companyId' => $companyId,
             'marketplace' => $marketplace,
-            'periodFrom'  => $periodFrom,
-            'periodTo'    => $periodTo,
+            'periodFrom' => $periodFrom,
+            'periodTo' => $periodTo,
         ];
 
         // 1. summary — общие цифры
@@ -98,10 +98,10 @@ final class ReconciliationSalesDetailController extends AbstractController
 
         $totalRecords = (int) ($totals['total_records'] ?? 0);
         $summary = [
-            'total_records'        => $totalRecords,
-            'total_revenue'        => $totals['total_revenue'] ?? '0',
+            'total_records' => $totalRecords,
+            'total_revenue' => $totals['total_revenue'] ?? '0',
             'unique_external_orders' => (int) $uniqueOrders,
-            'duplicates_count'     => $totalRecords - (int) $uniqueOrders,
+            'duplicates_count' => $totalRecords - (int) $uniqueOrders,
         ];
 
         // 2. duplicates — записи с одинаковым external_order_id
@@ -169,10 +169,10 @@ final class ReconciliationSalesDetailController extends AbstractController
         );
 
         return $this->json([
-            'summary'                  => $summary,
-            'duplicates'               => $duplicates,
-            'top_revenue'              => $topRevenue,
+            'summary' => $summary,
+            'duplicates' => $duplicates,
+            'top_revenue' => $topRevenue,
             'revenue_by_external_order' => $revenueByOrder,
-        ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
+        ], 200, [], ['json_encode_options' => \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE]);
     }
 }

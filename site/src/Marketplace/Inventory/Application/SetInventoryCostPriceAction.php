@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Marketplace\Inventory\Application;
 
 use App\Marketplace\Entity\Inventory\MarketplaceInventoryCostPrice;
-use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Inventory\Application\Command\SetInventoryCostPriceCommand;
 use App\Marketplace\Inventory\Infrastructure\Repository\MarketplaceInventoryCostPriceRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
@@ -43,7 +42,7 @@ final class SetInventoryCostPriceAction
             $command->companyId,
         );
 
-        if ($listing === null) {
+        if (null === $listing) {
             throw new NotFoundHttpException('Листинг не найден.');
         }
 
@@ -54,12 +53,8 @@ final class SetInventoryCostPriceAction
             $command->effectiveFrom,
         );
 
-        if ($nextPrice !== null && $nextPrice->getEffectiveFrom() <= $command->effectiveFrom) {
-            throw new \DomainException(sprintf(
-                'Дата %s перекрывается с существующей записью от %s.',
-                $command->effectiveFrom->format('d.m.Y'),
-                $nextPrice->getEffectiveFrom()->format('d.m.Y'),
-            ));
+        if (null !== $nextPrice && $nextPrice->getEffectiveFrom() <= $command->effectiveFrom) {
+            throw new \DomainException(sprintf('Дата %s перекрывается с существующей записью от %s.', $command->effectiveFrom->format('d.m.Y'), $nextPrice->getEffectiveFrom()->format('d.m.Y')));
         }
 
         // Закрываем предыдущую активную запись
@@ -69,7 +64,7 @@ final class SetInventoryCostPriceAction
             $command->effectiveFrom,
         );
 
-        if ($activePrice !== null) {
+        if (null !== $activePrice) {
             $activePrice->closeAt(
                 $command->effectiveFrom->sub(new \DateInterval('P1D')),
             );
@@ -77,13 +72,13 @@ final class SetInventoryCostPriceAction
 
         // Создаём новую запись
         $newPrice = new MarketplaceInventoryCostPrice(
-            id:            Uuid::uuid7()->toString(),
-            companyId:     $command->companyId,
-            listing:       $listing,
+            id: Uuid::uuid7()->toString(),
+            companyId: $command->companyId,
+            listing: $listing,
             effectiveFrom: $command->effectiveFrom,
-            priceAmount:   $command->priceAmount,
+            priceAmount: $command->priceAmount,
             priceCurrency: strtoupper($command->currency),
-            note:          $command->note,
+            note: $command->note,
         );
 
         $this->em->persist($newPrice);
@@ -94,11 +89,11 @@ final class SetInventoryCostPriceAction
 
     private function assertCommandIsValid(SetInventoryCostPriceCommand $command): void
     {
-        if (trim($command->companyId) === '') {
+        if ('' === trim($command->companyId)) {
             throw new \DomainException('companyId обязателен.');
         }
 
-        if (trim($command->listingId) === '') {
+        if ('' === trim($command->listingId)) {
             throw new \DomainException('listingId обязателен.');
         }
 
@@ -106,7 +101,7 @@ final class SetInventoryCostPriceAction
             throw new \DomainException('priceAmount должен быть неотрицательным числом.');
         }
 
-        if (mb_strlen(trim($command->currency)) !== 3) {
+        if (3 !== mb_strlen(trim($command->currency))) {
             throw new \DomainException('currency должен содержать 3 символа.');
         }
     }

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Marketplace\Infrastructure\Query;
 
 use App\Marketplace\DTO\ListingSalesAggregateDTO;
-use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 
 final readonly class ListingSalesAggregateQuery
@@ -21,10 +20,10 @@ final readonly class ListingSalesAggregateQuery
     public function executeByPeriod(
         string $companyId,
         ?string $marketplace,
-        DateTimeImmutable $from,
-        DateTimeImmutable $to,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
     ): array {
-        $mpFilter = $marketplace !== null ? 'AND s.marketplace = :marketplace' : '';
+        $mpFilter = null !== $marketplace ? 'AND s.marketplace = :marketplace' : '';
 
         $rows = $this->connection->fetchAllAssociative(
             <<<SQL
@@ -49,25 +48,25 @@ final readonly class ListingSalesAggregateQuery
             GROUP BY s.listing_id, l.name, l.marketplace_sku, l.marketplace, l.supplier_sku
             SQL,
             array_filter([
-                'companyId'   => $companyId,
-                'periodFrom'  => $from->format('Y-m-d'),
-                'periodTo'    => $to->format('Y-m-d'),
+                'companyId' => $companyId,
+                'periodFrom' => $from->format('Y-m-d'),
+                'periodTo' => $to->format('Y-m-d'),
                 'marketplace' => $marketplace,
-            ], static fn ($v) => $v !== null),
+            ], static fn ($v) => null !== $v),
         );
 
         $result = [];
         foreach ($rows as $row) {
             $result[$row['listing_id']] = new ListingSalesAggregateDTO(
-                listingId:         $row['listing_id'],
-                title:             $row['listing_title'],
-                sku:               $row['listing_sku'],
-                marketplace:       $row['listing_marketplace'],
-                revenue:           (string) $row['revenue'],
-                quantity:          (int) $row['quantity'],
-                costPriceTotal:    (string) $row['cost_price_total'],
+                listingId: $row['listing_id'],
+                title: $row['listing_title'],
+                sku: $row['listing_sku'],
+                marketplace: $row['listing_marketplace'],
+                revenue: (string) $row['revenue'],
+                quantity: (int) $row['quantity'],
+                costPriceTotal: (string) $row['cost_price_total'],
                 costPriceQuantity: (int) $row['cost_price_quantity'],
-                supplierSku:       $row['supplier_sku'] !== null ? (string) $row['supplier_sku'] : null,
+                supplierSku: null !== $row['supplier_sku'] ? (string) $row['supplier_sku'] : null,
             );
         }
 

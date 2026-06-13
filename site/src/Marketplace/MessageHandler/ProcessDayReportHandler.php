@@ -10,9 +10,9 @@ use App\Marketplace\Entity\MarketplaceFinancialReportSyncStatus;
 use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PipelineStep;
+use App\Marketplace\Exception\WbGeneratedRowsConflictException;
 use App\Marketplace\Message\ProcessDayReportMessage;
 use App\Marketplace\Message\ProcessRawDocumentStepMessage;
-use App\Marketplace\Exception\WbGeneratedRowsConflictException;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusLookupInterface;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -45,27 +45,23 @@ final class ProcessDayReportHandler
     {
         $doc = $this->repository->find($message->rawDocumentId);
 
-        if ($doc === null) {
-            throw new UnrecoverableMessageHandlingException(
-                sprintf('MarketplaceRawDocument not found: %s', $message->rawDocumentId),
-            );
+        if (null === $doc) {
+            throw new UnrecoverableMessageHandlingException(sprintf('MarketplaceRawDocument not found: %s', $message->rawDocumentId));
         }
 
         if ((string) $doc->getCompany()->getId() !== $message->companyId) {
-            throw new UnrecoverableMessageHandlingException(
-                sprintf('IDOR: document %s does not belong to company %s', $message->rawDocumentId, $message->companyId),
-            );
+            throw new UnrecoverableMessageHandlingException(sprintf('IDOR: document %s does not belong to company %s', $message->rawDocumentId, $message->companyId));
         }
 
         if ($message->forceRefresh
-            && $doc->getMarketplace() === MarketplaceType::WILDBERRIES
-            && $doc->getDocumentType() === 'sales_report'
+            && MarketplaceType::WILDBERRIES === $doc->getMarketplace()
+            && 'sales_report' === $doc->getDocumentType()
         ) {
             try {
                 $this->safeReplaceService->cleanupForRawDocument($doc->getCompany(), $doc->getId(), $doc->getPeriodFrom());
             } catch (WbGeneratedRowsConflictException $e) {
                 $status = $this->findExactSyncStatusForMessage($message);
-                if ($status !== null) {
+                if (null !== $status) {
                     $this->syncStatusUpdater->markConflict($status, $e::class, $e->getMessage());
                     $this->entityManager->flush();
                 }
@@ -98,9 +94,9 @@ final class ProcessDayReportHandler
         }
 
         $this->logger->info('Auto-dispatched pipeline for raw document', [
-            'company_id'      => $message->companyId,
+            'company_id' => $message->companyId,
             'raw_document_id' => $message->rawDocumentId,
-            'marketplace'     => $doc->getMarketplace()->value,
+            'marketplace' => $doc->getMarketplace()->value,
         ]);
     }
 
@@ -120,7 +116,7 @@ final class ProcessDayReportHandler
         $mode = null === $message->mode ? null : FinancialReportSyncMode::tryFrom($message->mode);
         $businessDate = $this->parseBusinessDate($message->businessDate);
 
-        if ($marketplace === null || $mode === null || $businessDate === null || null === $message->reportType) {
+        if (null === $marketplace || null === $mode || null === $businessDate || null === $message->reportType) {
             $this->logger->warning('WB day processing conflict: cannot mark sync status because exact context is incomplete', [
                 'company_id' => $message->companyId,
                 'connection_id' => $message->connectionId,
@@ -146,7 +142,7 @@ final class ProcessDayReportHandler
             $message->rawDocumentId,
         );
 
-        if ($status === null) {
+        if (null === $status) {
             $this->logger->warning('WB day processing conflict: no sync status matches exact raw document context', [
                 'company_id' => $message->companyId,
                 'connection_id' => $message->connectionId,

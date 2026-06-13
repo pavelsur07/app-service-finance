@@ -12,7 +12,8 @@ final class DeleteCostMappingAction
     public function __construct(
         private readonly UnitEconomyCostMappingRepositoryInterface $repository,
         private readonly EntityManagerInterface $entityManager,
-    ) {}
+    ) {
+    }
 
     public function __invoke(string $companyId, string $mappingId): void
     {

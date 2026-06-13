@@ -19,7 +19,7 @@ namespace App\Marketplace\Domain;
 final readonly class OzonCostCategory
 {
     /**
-     * @param string[] $serviceNames   Имена сервисов из services[].name в API Ozon
+     * @param string[] $serviceNames Имена сервисов из services[].name в API Ozon
      * @param string[] $operationTypes Коды operation_type / operation_type_name для операций без services[]
      */
     public function __construct(
@@ -29,7 +29,8 @@ final readonly class OzonCostCategory
         public string $xlsxGroup,
         public array $serviceNames = [],
         public array $operationTypes = [],
-    ) {}
+    ) {
+    }
 
     // -------------------------------------------------------------------------
     // Registry
@@ -43,7 +44,7 @@ final readonly class OzonCostCategory
         /** @var OzonCostCategory[]|null $cache */
         static $cache = null;
 
-        if ($cache !== null) {
+        if (null !== $cache) {
             return $cache;
         }
 
@@ -622,7 +623,7 @@ final readonly class OzonCostCategory
         /** @var array<string, OzonCostCategory>|null $map */
         static $map = null;
 
-        if ($map === null) {
+        if (null === $map) {
             $map = [];
             foreach (self::all() as $c) {
                 $map[$c->code] = $c;
@@ -649,7 +650,7 @@ final readonly class OzonCostCategory
         /** @var array<string, OzonCostCategory>|null $index */
         static $index = null;
 
-        if ($index === null) {
+        if (null === $index) {
             $index = [];
             foreach (self::all() as $c) {
                 foreach ($c->serviceNames as $name) {
@@ -678,7 +679,7 @@ final readonly class OzonCostCategory
         /** @var array<string, OzonCostCategory>|null $index */
         static $index = null;
 
-        if ($index === null) {
+        if (null === $index) {
             $index = [];
             foreach (self::all() as $c) {
                 foreach ($c->operationTypes as $opType) {

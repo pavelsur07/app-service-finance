@@ -72,7 +72,7 @@ class MarketplaceSaleMapping
 
     /**
      * Шаблон описания для строки ОПиУ.
-     * Пример: "Выручка с СПП — WB", "Себестоимость — Ozon"
+     * Пример: "Выручка с СПП — WB", "Себестоимость — Ozon".
      */
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
     private ?string $descriptionTemplate = null;

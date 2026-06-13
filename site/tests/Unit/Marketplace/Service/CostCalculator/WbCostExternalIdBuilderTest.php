@@ -61,7 +61,7 @@ final class CollectingLogger extends AbstractLogger
 
     public function log($level, $message, array $context = []): void
     {
-        if ($level === 'warning') {
+        if ('warning' === $level) {
             $this->warnings[] = ['message' => (string) $message, 'context' => $context];
         }
     }

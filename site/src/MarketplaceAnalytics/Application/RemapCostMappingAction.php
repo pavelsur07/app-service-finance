@@ -14,7 +14,8 @@ final class RemapCostMappingAction
     public function __construct(
         private readonly UnitEconomyCostMappingRepositoryInterface $repository,
         private readonly EntityManagerInterface $entityManager,
-    ) {}
+    ) {
+    }
 
     public function __invoke(
         string $companyId,
@@ -23,7 +24,7 @@ final class RemapCostMappingAction
     ): UnitEconomyCostMapping {
         $mapping = $this->repository->findById($mappingId, $companyId);
 
-        if ($mapping === null) {
+        if (null === $mapping) {
             throw new \DomainException('Маппинг не найден');
         }
 

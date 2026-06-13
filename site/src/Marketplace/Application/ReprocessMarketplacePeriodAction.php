@@ -6,8 +6,6 @@ namespace App\Marketplace\Application;
 
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Infrastructure\Query\MarkProcessedQuery;
-use App\Marketplace\Repository\MarketplaceOzonRealizationRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Psr\Log\LoggerInterface;
 
@@ -38,10 +36,10 @@ use Psr\Log\LoggerInterface;
 final class ReprocessMarketplacePeriodAction
 {
     public function __construct(
-        private readonly MarketplaceRawDocumentRepository    $rawDocumentRepository,
+        private readonly MarketplaceRawDocumentRepository $rawDocumentRepository,
         private readonly ProcessMarketplaceRawDocumentAction $processRawAction,
-        private readonly ProcessOzonRealizationAction        $processRealizationAction,
-        private readonly LoggerInterface                     $logger,
+        private readonly ProcessOzonRealizationAction $processRealizationAction,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -59,9 +57,9 @@ final class ReprocessMarketplacePeriodAction
 
         // Определяем какой documentType искать
         $documentType = match ($type) {
-            'sales_report'  => 'sales_report',
-            'realization'   => 'realization',
-            default         => null, // все
+            'sales_report' => 'sales_report',
+            'realization' => 'realization',
+            default => null, // все
         };
 
         $rawDocs = $this->rawDocumentRepository->findByCompanyAndPeriod(
@@ -75,19 +73,19 @@ final class ReprocessMarketplacePeriodAction
         $stats = ['docs' => 0, 'sales' => 0, 'returns' => 0, 'costs' => 0, 'realization' => 0];
 
         foreach ($rawDocs as $doc) {
-            $docId   = $doc->getId();
+            $docId = $doc->getId();
             $docType = $doc->getDocumentType();
 
             $this->logger->info('[Reprocess] Processing raw doc', [
-                'doc_id'    => $docId,
-                'doc_type'  => $docType,
-                'period'    => $periodFrom->format('Y-m-d') . ' – ' . $periodTo->format('Y-m-d'),
+                'doc_id' => $docId,
+                'doc_type' => $docType,
+                'period' => $periodFrom->format('Y-m-d').' – '.$periodTo->format('Y-m-d'),
             ]);
 
-            if ($docType === 'realization' && $marketplaceEnum === MarketplaceType::OZON) {
+            if ('realization' === $docType && MarketplaceType::OZON === $marketplaceEnum) {
                 $result = ($this->processRealizationAction)($companyId, $docId);
                 $stats['realization'] += $result['created'] + $result['updated'];
-            } elseif ($docType === 'sales_report') {
+            } elseif ('sales_report' === $docType) {
                 $cmd = new ProcessMarketplaceRawDocumentCommand($companyId, $docId, 'sales');
                 $stats['sales'] += ($this->processRawAction)($cmd);
 
@@ -98,7 +96,7 @@ final class ReprocessMarketplacePeriodAction
                 $stats['costs'] += ($this->processRawAction)($cmd);
             }
 
-            $stats['docs']++;
+            ++$stats['docs'];
         }
 
         $this->logger->info('[Reprocess] Completed', array_merge(['companyId' => $companyId], $stats));

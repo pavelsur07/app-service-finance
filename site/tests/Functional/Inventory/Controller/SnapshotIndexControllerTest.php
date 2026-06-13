@@ -88,9 +88,9 @@ final class SnapshotIndexControllerTest extends WebTestCaseBase
                 ->withCompanyId($company->getId())
                 ->withCorrelationId(sprintf('33333333-3333-7333-8333-%012d', $i + 3000))
                 ->build();
-            if ($i % 2 === 0) {
+            if (0 === $i % 2) {
                 $session->markCompleted();
-            } elseif ($i % 3 === 0) {
+            } elseif (0 === $i % 3) {
                 $session->markPartial('partial');
             } else {
                 $session->markFailed('failed');

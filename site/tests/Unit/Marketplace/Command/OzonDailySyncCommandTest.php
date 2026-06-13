@@ -35,7 +35,7 @@ final class OzonDailySyncCommandTest extends TestCase
         $bus
             ->expects(self::exactly(14))
             ->method('dispatch')
-            ->willReturnCallback(function (object $message) use (&$messages): Envelope {
+            ->willReturnCallback(static function (object $message) use (&$messages): Envelope {
                 $messages[] = $message;
 
                 return new Envelope($message);
@@ -76,7 +76,7 @@ final class OzonDailySyncCommandTest extends TestCase
         $bus
             ->expects(self::exactly(28))
             ->method('dispatch')
-            ->willReturnCallback(function (object $message) use (&$messagesByConnection): Envelope {
+            ->willReturnCallback(static function (object $message) use (&$messagesByConnection): Envelope {
                 self::assertInstanceOf(SyncOzonReportMessage::class, $message);
                 $messagesByConnection[$message->connectionId][] = $message;
 
@@ -136,7 +136,7 @@ final class OzonDailySyncCommandTest extends TestCase
     private static function assertDatesCoverRollingD1ToD14(array $messages, \DateTimeImmutable $referenceToday): void
     {
         $expectedDates = [];
-        for ($offset = 1; $offset <= 14; $offset++) {
+        for ($offset = 1; $offset <= 14; ++$offset) {
             $expectedDates[] = $referenceToday->modify(sprintf('-%d day', $offset))->format('Y-m-d');
         }
 

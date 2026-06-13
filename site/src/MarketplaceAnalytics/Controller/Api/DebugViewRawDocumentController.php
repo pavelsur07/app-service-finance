@@ -50,14 +50,14 @@ final class DebugViewRawDocumentController extends AbstractController
 
         // Файл на диске — добавляем URL для скачивания
         if (isset($rawData['file_path'])) {
-            $responseData['download_url'] = '/api/marketplace-analytics/debug/raw-document/' . $id . '/download';
+            $responseData['download_url'] = '/api/marketplace-analytics/debug/raw-document/'.$id.'/download';
         }
 
         // Legacy: бинарные/текстовые данные в base64
         if ((!empty($rawData['_binary']) || !empty($rawData['_text'])) && isset($rawData['content_base64'])) {
             $responseData['content_base64_preview'] = substr($rawData['content_base64'], 0, 500);
             unset($responseData['content_base64']);
-            $responseData['download_url'] = '/api/marketplace-analytics/debug/raw-document/' . $id . '/download';
+            $responseData['download_url'] = '/api/marketplace-analytics/debug/raw-document/'.$id.'/download';
         }
 
         return new JsonResponse([

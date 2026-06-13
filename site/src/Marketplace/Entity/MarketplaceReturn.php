@@ -84,92 +84,163 @@ class MarketplaceReturn
         $this->updatedAt = new \DateTimeImmutable();
     }
 
-    public function getId(): string { return $this->id; }
-    public function getCompany(): Company { return $this->company; }
-    public function getListing(): MarketplaceListing { return $this->listing; }
+    public function getId(): string
+    {
+        return $this->id;
+    }
 
-    public function getSale(): ?MarketplaceSale { return $this->sale; }
+    public function getCompany(): Company
+    {
+        return $this->company;
+    }
+
+    public function getListing(): MarketplaceListing
+    {
+        return $this->listing;
+    }
+
+    public function getSale(): ?MarketplaceSale
+    {
+        return $this->sale;
+    }
+
     public function setSale(?MarketplaceSale $sale): self
     {
         $this->sale = $sale;
         $this->updatedAt = new \DateTimeImmutable();
+
         return $this;
     }
 
-    public function getMarketplace(): MarketplaceType { return $this->marketplace; }
+    public function getMarketplace(): MarketplaceType
+    {
+        return $this->marketplace;
+    }
 
-    public function getExternalReturnId(): ?string { return $this->externalReturnId; }
+    public function getExternalReturnId(): ?string
+    {
+        return $this->externalReturnId;
+    }
+
     public function setExternalReturnId(?string $externalReturnId): self
     {
         $this->externalReturnId = $externalReturnId;
         $this->updatedAt = new \DateTimeImmutable();
+
         return $this;
     }
 
-    public function getReturnDate(): \DateTimeImmutable { return $this->returnDate; }
+    public function getReturnDate(): \DateTimeImmutable
+    {
+        return $this->returnDate;
+    }
+
     public function setReturnDate(\DateTimeImmutable $returnDate): self
     {
         $this->returnDate = $returnDate;
         $this->updatedAt = new \DateTimeImmutable();
+
         return $this;
     }
 
-    public function getQuantity(): int { return $this->quantity; }
+    public function getQuantity(): int
+    {
+        return $this->quantity;
+    }
+
     public function setQuantity(int $quantity): self
     {
         $this->quantity = $quantity;
         $this->updatedAt = new \DateTimeImmutable();
+
         return $this;
     }
 
-    public function getRefundAmount(): string { return $this->refundAmount; }
+    public function getRefundAmount(): string
+    {
+        return $this->refundAmount;
+    }
+
     public function setRefundAmount(string $refundAmount): self
     {
         $this->refundAmount = $refundAmount;
         $this->updatedAt = new \DateTimeImmutable();
+
         return $this;
     }
 
-    public function getCostPrice(): ?string { return $this->costPrice; }
+    public function getCostPrice(): ?string
+    {
+        return $this->costPrice;
+    }
+
     public function setCostPrice(?string $costPrice): self
     {
         $this->costPrice = $costPrice;
         $this->updatedAt = new \DateTimeImmutable();
+
         return $this;
     }
 
-    public function getReturnReason(): ?string { return $this->returnReason; }
+    public function getReturnReason(): ?string
+    {
+        return $this->returnReason;
+    }
+
     public function setReturnReason(?string $returnReason): self
     {
         $this->returnReason = $returnReason;
         $this->updatedAt = new \DateTimeImmutable();
+
         return $this;
     }
 
-    public function getRawData(): ?array { return $this->rawData; }
+    public function getRawData(): ?array
+    {
+        return $this->rawData;
+    }
+
     public function setRawData(?array $rawData): self
     {
         $this->rawData = $rawData;
         $this->updatedAt = new \DateTimeImmutable();
+
         return $this;
     }
 
-    public function getRawDocumentId(): ?string { return $this->rawDocumentId; }
+    public function getRawDocumentId(): ?string
+    {
+        return $this->rawDocumentId;
+    }
+
     public function setRawDocumentId(?string $rawDocumentId): self
     {
         $this->rawDocumentId = $rawDocumentId;
         $this->updatedAt = new \DateTimeImmutable();
+
         return $this;
     }
 
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
-    public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
 
-    public function getDocument(): ?Document { return $this->document; }
+    public function getUpdatedAt(): \DateTimeImmutable
+    {
+        return $this->updatedAt;
+    }
+
+    public function getDocument(): ?Document
+    {
+        return $this->document;
+    }
+
     public function setDocument(?Document $document): self
     {
         $this->document = $document;
         $this->updatedAt = new \DateTimeImmutable();
+
         return $this;
     }
 }

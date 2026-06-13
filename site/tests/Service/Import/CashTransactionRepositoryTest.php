@@ -88,5 +88,4 @@ class CashTransactionRepositoryTest extends ClientBank1CImportServiceTestCase
 
         self::assertSame($transaction->getId(), $foundId);
     }
-
 }

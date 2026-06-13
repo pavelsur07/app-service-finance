@@ -31,7 +31,8 @@ final class ListingDuplicatesDebugController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $companyService,
         private readonly Connection $connection,
-    ) {}
+    ) {
+    }
 
     /**
      * Полная диагностика дублей листингов для текущей компании.
@@ -42,7 +43,7 @@ final class ListingDuplicatesDebugController extends AbstractController
     #[Route('/duplicates', name: 'marketplace_listings_debug_duplicates', methods: ['GET'])]
     public function duplicates(Request $request): JsonResponse
     {
-        $company   = $this->companyService->getActiveCompany();
+        $company = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
         $filterSku = trim((string) $request->query->get('sku', ''));
 
@@ -83,7 +84,7 @@ final class ListingDuplicatesDebugController extends AbstractController
 
         // ── 4. Диагностика конкретного SKU (если передан ?sku=) ─────────────
         $skuDetail = null;
-        if ($filterSku !== '') {
+        if ('' !== $filterSku) {
             // Все листинги с этим SKU
             $skuListings = $this->connection->fetchAllAssociative(
                 'SELECT
@@ -106,10 +107,10 @@ final class ListingDuplicatesDebugController extends AbstractController
             $listingIds = array_column($skuListings, 'id');
             $costPrices = [];
             if (!empty($listingIds)) {
-                $placeholders = implode(',', array_map(static fn($i) => ':id' . $i, array_keys($listingIds)));
-                $params       = ['companyId' => $companyId];
+                $placeholders = implode(',', array_map(static fn ($i) => ':id'.$i, array_keys($listingIds)));
+                $params = ['companyId' => $companyId];
                 foreach ($listingIds as $i => $id) {
-                    $params['id' . $i] = $id;
+                    $params['id'.$i] = $id;
                 }
 
                 $costPrices = $this->connection->fetchAllAssociative(
@@ -134,60 +135,60 @@ final class ListingDuplicatesDebugController extends AbstractController
                  FROM marketplace_sales
                  WHERE listing_id = ANY(:ids)
                  GROUP BY listing_id',
-                ['ids' => '{' . implode(',', array_map(static fn($id) => '"' . $id . '"', $listingIds)) . '}']
+                ['ids' => '{'.implode(',', array_map(static fn ($id) => '"'.$id.'"', $listingIds)).'}']
             );
 
             $skuDetail = [
-                'sku'                     => $filterSku,
-                'listings_count'          => count($skuListings),
-                'is_duplicate'            => count($skuListings) > 1,
-                'cost_prices_same_listing'=> count(array_unique(array_column($costPrices, 'listing_id'))) <= 1,
-                'listings'                => $skuListings,
-                'cost_prices'             => $costPrices,
-                'sales_per_listing'       => $salesPerListing,
-                'conclusion'              => $this->buildConclusion($skuListings, $costPrices),
+                'sku' => $filterSku,
+                'listings_count' => count($skuListings),
+                'is_duplicate' => count($skuListings) > 1,
+                'cost_prices_same_listing' => count(array_unique(array_column($costPrices, 'listing_id'))) <= 1,
+                'listings' => $skuListings,
+                'cost_prices' => $costPrices,
+                'sales_per_listing' => $salesPerListing,
+                'conclusion' => $this->buildConclusion($skuListings, $costPrices),
             ];
         }
 
         return $this->json([
             'meta' => [
-                'company_id'   => $companyId,
+                'company_id' => $companyId,
                 'generated_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
-                'filter_sku'   => $filterSku ?: null,
+                'filter_sku' => $filterSku ?: null,
             ],
             'migration_status' => [
-                'applied'      => $migration !== false,
-                'executed_at'  => $migration['executed_at'] ?? null,
-                'duration_ms'  => $migration['execution_time'] ?? null,
+                'applied' => false !== $migration,
+                'executed_at' => $migration['executed_at'] ?? null,
+                'duration_ms' => $migration['execution_time'] ?? null,
             ],
             'unique_index' => [
-                'exists'       => $index !== false,
-                'definition'   => $index['indexdef'] ?? null,
+                'exists' => false !== $index,
+                'definition' => $index['indexdef'] ?? null,
             ],
             'duplicate_groups' => [
-                'total_groups'    => count($duplicateGroups),
-                'has_duplicates'  => count($duplicateGroups) > 0,
-                'groups'          => $duplicateGroups,
+                'total_groups' => count($duplicateGroups),
+                'has_duplicates' => count($duplicateGroups) > 0,
+                'groups' => $duplicateGroups,
             ],
             'sku_detail' => $skuDetail,
-        ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
+        ], 200, [], ['json_encode_options' => \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE]);
     }
 
     private function buildConclusion(array $listings, array $costPrices): string
     {
-        if (count($listings) === 0) {
+        if (0 === count($listings)) {
             return 'Листинг с таким SKU не найден.';
         }
 
-        if (count($listings) === 1) {
+        if (1 === count($listings)) {
             $uniqueListingIds = array_unique(array_column($costPrices, 'listing_id'));
-            if (count($costPrices) > 1 && count($uniqueListingIds) === 1) {
+            if (count($costPrices) > 1 && 1 === count($uniqueListingIds)) {
                 return 'ДУБЛЕЙ НЕТ. Один листинг, несколько записей себестоимости — это история изменения цены. Всё корректно.';
             }
 
-            return 'ДУБЛЕЙ НЕТ. Один листинг, ' . count($costPrices) . ' запис(ей) себестоимости.';
+            return 'ДУБЛЕЙ НЕТ. Один листинг, '.count($costPrices).' запис(ей) себестоимости.';
         }
 
-        return 'ДУБЛЬ ЛИСТИНГА: ' . count($listings) . ' записи с одинаковым SKU. Миграция не убрала их — нужен ручной анализ.';
+        return 'ДУБЛЬ ЛИСТИНГА: '.count($listings).' записи с одинаковым SKU. Миграция не убрала их — нужен ручной анализ.';
     }
 }

@@ -230,7 +230,7 @@ class MarketplaceConnection
     {
         $settings = $this->settings ?? [];
         $settings['project_direction_id'] = $projectDirectionId;
-        $this->settings  = $settings;
+        $this->settings = $settings;
         $this->updatedAt = new \DateTimeImmutable();
 
         return $this;

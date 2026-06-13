@@ -307,7 +307,7 @@ final class SyncWbFinancialReportDayHandler
                 $status,
                 $rawDocument->getId(),
                 $rawDocument->getRecordsCount(),
-                hash('sha256', json_encode($rows, JSON_THROW_ON_ERROR)),
+                hash('sha256', json_encode($rows, \JSON_THROW_ON_ERROR)),
             );
             $this->syncStatusUpdater->markProcessing($status);
             $connection->markSyncSuccess();

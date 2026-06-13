@@ -2,14 +2,14 @@
 
 namespace App\Marketplace\Controller;
 
-use App\Finance\Entity\PLCategory;
 use App\Company\Entity\ProjectDirection;
+use App\Company\Repository\ProjectDirectionRepository;
+use App\Finance\Entity\PLCategory;
+use App\Finance\Repository\PLCategoryRepository;
 use App\Marketplace\Entity\MarketplaceSaleMapping;
 use App\Marketplace\Enum\AmountSource;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceSaleMappingRepository;
-use App\Finance\Repository\PLCategoryRepository;
-use App\Company\Repository\ProjectDirectionRepository;
 use App\Shared\Service\CompanyContextService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -29,7 +29,8 @@ final class MarketplaceSaleMappingController extends AbstractController
         private readonly PLCategoryRepository $plCategoryRepository,
         private readonly ProjectDirectionRepository $projectDirectionRepository,
         private readonly EntityManagerInterface $em,
-    ) {}
+    ) {
+    }
 
     #[Route('', name: 'marketplace_pl_mappings_index')]
     public function index(Request $request): Response
@@ -44,7 +45,7 @@ final class MarketplaceSaleMappingController extends AbstractController
         $marketplaceFilterValue = (string) $request->query->get('marketplace', 'all');
 
         $marketplace = null;
-        if ($marketplaceFilterValue !== 'all') {
+        if ('all' !== $marketplaceFilterValue) {
             try {
                 $marketplace = MarketplaceType::from($marketplaceFilterValue);
             } catch (\ValueError) {
@@ -94,8 +95,9 @@ final class MarketplaceSaleMappingController extends AbstractController
         $amountSourceValue = (string) $request->request->get('amount_source', '');
         $plCategoryId = (string) $request->request->get('pl_category_id', '');
 
-        if ($marketplaceValue === '' || $amountSourceValue === '' || $plCategoryId === '') {
+        if ('' === $marketplaceValue || '' === $amountSourceValue || '' === $plCategoryId) {
             $this->addFlash('error', 'Заполните обязательные поля');
+
             return $this->redirectBackToIndex($request);
         }
 
@@ -104,6 +106,7 @@ final class MarketplaceSaleMappingController extends AbstractController
             $amountSource = AmountSource::from($amountSourceValue);
         } catch (\ValueError) {
             $this->addFlash('error', 'Неверные значения marketplace или amountSource');
+
             return $this->redirectBackToIndex($request);
         }
 
@@ -111,6 +114,7 @@ final class MarketplaceSaleMappingController extends AbstractController
         $plCategory = $this->plCategoryRepository->find($plCategoryId);
         if (!$plCategory || $plCategory->getCompany()->getId() !== $company->getId()) {
             $this->addFlash('error', 'Категория ОПиУ не найдена');
+
             return $this->redirectBackToIndex($request);
         }
 
@@ -129,7 +133,7 @@ final class MarketplaceSaleMappingController extends AbstractController
         $mapping->setIsActive($isActive);
 
         $projectDirectionId = trim((string) $request->request->get('project_direction_id', ''));
-        if ($projectDirectionId !== '') {
+        if ('' !== $projectDirectionId) {
             /** @var ProjectDirection|null $pd */
             $pd = $this->projectDirectionRepository->find($projectDirectionId);
             if ($pd && $pd->getCompany()->getId() === $company->getId()) {
@@ -170,8 +174,9 @@ final class MarketplaceSaleMappingController extends AbstractController
         }
 
         $plCategoryId = (string) $request->request->get('pl_category_id', '');
-        if ($plCategoryId === '') {
+        if ('' === $plCategoryId) {
             $this->addFlash('error', 'Выберите категорию ОПиУ');
+
             return $this->redirectBackToIndex($request);
         }
 
@@ -179,6 +184,7 @@ final class MarketplaceSaleMappingController extends AbstractController
         $plCategory = $this->plCategoryRepository->find($plCategoryId);
         if (!$plCategory || $plCategory->getCompany()->getId() !== $company->getId()) {
             $this->addFlash('error', 'Категория ОПиУ не найдена');
+
             return $this->redirectBackToIndex($request);
         }
 
@@ -189,7 +195,7 @@ final class MarketplaceSaleMappingController extends AbstractController
         $mapping->setIsNegative($isNegative);
 
         $projectDirectionId = trim((string) $request->request->get('project_direction_id', ''));
-        if ($projectDirectionId === '') {
+        if ('' === $projectDirectionId) {
             $mapping->setProjectDirection(null);
         } else {
             /** @var ProjectDirection|null $pd */
@@ -255,7 +261,7 @@ final class MarketplaceSaleMappingController extends AbstractController
         }
 
         $marketplace = (string) $request->request->get('redirect_marketplace', $request->query->get('marketplace', 'all'));
-        if ($marketplace === '') {
+        if ('' === $marketplace) {
             $marketplace = 'all';
         }
 

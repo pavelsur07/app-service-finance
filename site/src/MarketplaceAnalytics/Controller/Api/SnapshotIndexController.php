@@ -27,7 +27,8 @@ final class SnapshotIndexController extends AbstractController
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly ListingDailySnapshotRepositoryInterface $snapshotRepository,
         private readonly MarketplaceFacade $marketplaceFacade,
-    ) {}
+    ) {
+    }
 
     #[OA\Get(
         summary: 'Список снэпшотов аналитики',
@@ -107,13 +108,13 @@ final class SnapshotIndexController extends AbstractController
         $company = $this->activeCompanyService->getActiveCompany();
         $req = ListSnapshotsRequest::fromRequest($request);
 
-        $marketplace = ($req->marketplace !== null && $req->marketplace !== '')
+        $marketplace = (null !== $req->marketplace && '' !== $req->marketplace)
             ? $req->marketplace
             : null;
 
         try {
-            $dateFrom = $req->dateFrom !== null ? new \DateTimeImmutable($req->dateFrom) : null;
-            $dateTo = $req->dateTo !== null ? new \DateTimeImmutable($req->dateTo) : null;
+            $dateFrom = null !== $req->dateFrom ? new \DateTimeImmutable($req->dateFrom) : null;
+            $dateTo = null !== $req->dateTo ? new \DateTimeImmutable($req->dateTo) : null;
         } catch (\Exception) {
             return $this->json(
                 ['type' => 'BAD_REQUEST', 'message' => 'Неверный формат даты. Используйте YYYY-MM-DD.'],
@@ -132,7 +133,7 @@ final class SnapshotIndexController extends AbstractController
         );
 
         $listingMap = [];
-        if ($result['items'] !== []) {
+        if ([] !== $result['items']) {
             $listings = $this->marketplaceFacade->getActiveListings($company->getId(), $marketplace);
             foreach ($listings as $listing) {
                 $listingMap[$listing->id] = $listing;
@@ -140,7 +141,7 @@ final class SnapshotIndexController extends AbstractController
         }
 
         $data = array_map(
-            static fn($snapshot) => SnapshotResponse::fromEntity(
+            static fn ($snapshot) => SnapshotResponse::fromEntity(
                 $snapshot,
                 $listingMap[$snapshot->getListingId()]->name ?? '',
                 $listingMap[$snapshot->getListingId()]->marketplaceSku ?? '',

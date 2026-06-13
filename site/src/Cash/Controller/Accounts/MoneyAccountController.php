@@ -3,11 +3,11 @@
 namespace App\Cash\Controller\Accounts;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Form\Accounts\MoneyAccountType as MoneyAccountFormType;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Accounts\MoneyAccountService;
-use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Shared\Service\ActiveCompanyService;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

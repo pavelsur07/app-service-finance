@@ -18,7 +18,8 @@ final readonly class CostMappingResponse
         private string $costCategoryName,
         private string $createdAt,
         private string $updatedAt,
-    ) {}
+    ) {
+    }
 
     public static function fromEntity(UnitEconomyCostMapping $mapping): self
     {

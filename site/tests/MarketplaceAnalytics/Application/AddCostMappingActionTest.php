@@ -15,7 +15,7 @@ use PHPUnit\Framework\TestCase;
 
 final class AddCostMappingActionTest extends TestCase
 {
-    private const COMPANY_ID  = '11111111-1111-1111-1111-111111111111';
+    private const COMPANY_ID = '11111111-1111-1111-1111-111111111111';
     private const CATEGORY_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
     private const MARKETPLACE = 'wildberries';
 
@@ -25,7 +25,7 @@ final class AddCostMappingActionTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->repository    = $this->createMock(UnitEconomyCostMappingRepositoryInterface::class);
+        $this->repository = $this->createMock(UnitEconomyCostMappingRepositoryInterface::class);
         $this->entityManager = $this->createMock(EntityManagerInterface::class);
 
         $this->action = new AddCostMappingAction(

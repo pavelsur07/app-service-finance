@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Marketplace\MessageHandler;
 
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
-use App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdaterInterface;
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
+use App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdaterInterface;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\PipelineStep;
 use App\Marketplace\Message\ProcessRawDocumentStepMessage;
@@ -39,30 +39,24 @@ final class ProcessRawDocumentStepMessageHandler
     {
         $doc = $this->repository->find($message->rawDocumentId);
 
-        if ($doc === null) {
-            throw new UnrecoverableMessageHandlingException(
-                sprintf('MarketplaceRawDocument not found: %s', $message->rawDocumentId),
-            );
+        if (null === $doc) {
+            throw new UnrecoverableMessageHandlingException(sprintf('MarketplaceRawDocument not found: %s', $message->rawDocumentId));
         }
 
         if ((string) $doc->getCompany()->getId() !== $message->companyId) {
-            throw new UnrecoverableMessageHandlingException(
-                sprintf('IDOR: document %s does not belong to company %s', $message->rawDocumentId, $message->companyId),
-            );
+            throw new UnrecoverableMessageHandlingException(sprintf('IDOR: document %s does not belong to company %s', $message->rawDocumentId, $message->companyId));
         }
 
         $cmd = new ProcessMarketplaceRawDocumentCommand(
-            companyId:      $message->companyId,
-            rawDocId:       $message->rawDocumentId,
-            kind:           $message->step,
+            companyId: $message->companyId,
+            rawDocId: $message->rawDocumentId,
+            kind: $message->step,
             forceReprocess: $message->step === PipelineStep::COSTS->value,
         );
 
         $step = PipelineStep::tryFrom($message->step);
-        if ($step === null) {
-            throw new UnrecoverableMessageHandlingException(
-                sprintf('Invalid pipeline step "%s"', $message->step),
-            );
+        if (null === $step) {
+            throw new UnrecoverableMessageHandlingException(sprintf('Invalid pipeline step "%s"', $message->step));
         }
 
         try {
@@ -70,10 +64,8 @@ final class ProcessRawDocumentStepMessageHandler
             // Re-fetch: ProcessMarketplaceRawDocumentAction calls em->clear() after each batch,
             // which detaches $doc. Without re-fetch markStepSucceeded() would modify a ghost object.
             $doc = $this->repository->find($message->rawDocumentId);
-            if ($doc === null) {
-                throw new UnrecoverableMessageHandlingException(
-                    sprintf('MarketplaceRawDocument vanished after processing: %s', $message->rawDocumentId),
-                );
+            if (null === $doc) {
+                throw new UnrecoverableMessageHandlingException(sprintf('MarketplaceRawDocument vanished after processing: %s', $message->rawDocumentId));
             }
             $doc->markStepSucceeded($step);
         } catch (\Throwable $e) {
@@ -83,7 +75,7 @@ final class ProcessRawDocumentStepMessageHandler
 
         try {
             $context = $this->buildSyncStatusContext($message);
-            if ($context === null) {
+            if (null === $context) {
                 $this->statusUpdater->syncByRawPipelineResult($doc);
             } else {
                 $this->statusUpdater->syncByRawPipelineResult($doc, null, $context);
@@ -135,7 +127,7 @@ final class ProcessRawDocumentStepMessageHandler
             $repo = $em->getRepository(MarketplaceRawDocument::class);
             $doc = $repo->find($rawDocumentId);
 
-            if ($doc === null) {
+            if (null === $doc) {
                 $this->logger->error('Cannot mark step failed: raw document not found', [
                     'rawDocumentId' => $rawDocumentId,
                     'step' => $step->value,
@@ -149,7 +141,7 @@ final class ProcessRawDocumentStepMessageHandler
             try {
                 // Failure recording may run after the original EntityManager was reset; keep this
                 // path backward-compatible for legacy messages that do not carry exact status context.
-                if ($context === null) {
+                if (null === $context) {
                     $this->statusUpdater->syncByRawPipelineResult($doc, $originalException);
                 } else {
                     $this->statusUpdater->syncByRawPipelineResult($doc, $originalException, $context);

@@ -9,11 +9,13 @@ use Doctrine\DBAL\Connection;
 final class CounterpartyHistoryQuery
 {
     public function __construct(
-        private readonly Connection $connection
-    ) {}
+        private readonly Connection $connection,
+    ) {
+    }
 
     /**
      * Возвращает историю задержек, сгруппированную по контрагентам.
+     *
      * * @return array<string, list<int>> Формат: ['counterparty_uuid' => [0, 2, -1, 15]]
      */
     public function getDelaysGroupedByCounterparty(string $companyId, \DateTimeImmutable $since): array
@@ -51,12 +53,14 @@ SQL;
     }
 
     /**
-     * Возвращает список всех активных компаний для CLI Worker'а
+     * Возвращает список всех активных компаний для CLI Worker'а.
+     *
      * * @return list<string>
      */
     public function getAllActiveCompanyIds(): array
     {
         $sql = 'SELECT id FROM company WHERE is_active = true';
+
         return $this->connection->fetchFirstColumn($sql);
     }
 }

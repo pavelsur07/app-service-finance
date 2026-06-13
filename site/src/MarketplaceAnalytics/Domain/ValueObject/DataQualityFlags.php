@@ -13,7 +13,8 @@ final readonly class DataQualityFlags
      */
     public function __construct(
         public array $flags,
-    ) {}
+    ) {
+    }
 
     public function hasFlag(DataQualityFlag $flag): bool
     {
@@ -36,12 +37,12 @@ final readonly class DataQualityFlags
 
     public function toArray(): array
     {
-        return array_map(fn(DataQualityFlag $f) => $f->value, $this->flags);
+        return array_map(static fn (DataQualityFlag $f) => $f->value, $this->flags);
     }
 
     public static function fromArray(array $data): self
     {
-        return new self(array_map(fn($v) => DataQualityFlag::from($v), $data));
+        return new self(array_map(static fn ($v) => DataQualityFlag::from($v), $data));
     }
 
     public static function empty(): self

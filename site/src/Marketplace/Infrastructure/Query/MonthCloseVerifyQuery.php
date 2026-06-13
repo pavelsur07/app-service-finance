@@ -37,12 +37,12 @@ final class MonthCloseVerifyQuery
         string $periodTo,
     ): array {
         return [
-            'realization_coverage'   => $this->checkRealizationCoverage($companyId, $periodFrom, $periodTo),
-            'realization_totals'     => $this->realizationTotals($companyId, $periodFrom, $periodTo),
-            'sales_returns_totals'   => $this->salesReturnsTotals($companyId, $marketplace, $periodFrom, $periodTo),
-            'mapping_coverage'       => $this->mappingCoverage($companyId, $marketplace),
-            'month_close_status'     => $this->monthCloseStatus($companyId, $marketplace, $periodFrom, $periodTo),
-            'pl_documents'           => $this->plDocuments($companyId, $marketplace, $periodFrom, $periodTo),
+            'realization_coverage' => $this->checkRealizationCoverage($companyId, $periodFrom, $periodTo),
+            'realization_totals' => $this->realizationTotals($companyId, $periodFrom, $periodTo),
+            'sales_returns_totals' => $this->salesReturnsTotals($companyId, $marketplace, $periodFrom, $periodTo),
+            'mapping_coverage' => $this->mappingCoverage($companyId, $marketplace),
+            'month_close_status' => $this->monthCloseStatus($companyId, $marketplace, $periodFrom, $periodTo),
+            'pl_documents' => $this->plDocuments($companyId, $marketplace, $periodFrom, $periodTo),
         ];
     }
 
@@ -76,12 +76,12 @@ final class MonthCloseVerifyQuery
         $total = (int) ($row['total_rows'] ?? 0);
 
         return [
-            'total_rows'         => $total,
-            'rows_with_return'   => (int) ($row['rows_with_return'] ?? 0),
-            'rows_without_return'=> (int) ($row['rows_without_return'] ?? 0),
-            'rows_closed'        => (int) ($row['rows_closed'] ?? 0),
-            'rows_open'          => (int) ($row['rows_open'] ?? 0),
-            'status'             => $total === 0
+            'total_rows' => $total,
+            'rows_with_return' => (int) ($row['rows_with_return'] ?? 0),
+            'rows_without_return' => (int) ($row['rows_without_return'] ?? 0),
+            'rows_closed' => (int) ($row['rows_closed'] ?? 0),
+            'rows_open' => (int) ($row['rows_open'] ?? 0),
+            'status' => 0 === $total
                 ? 'NO_DATA — нет строк реализации за период. Нажмите «Применить выручку».'
                 : (((int) ($row['rows_with_return'] ?? 0)) > 0
                     ? 'OK — return_commission заполнен в строках где есть возврат'
@@ -149,21 +149,21 @@ final class MonthCloseVerifyQuery
             ['companyId' => $companyId, 'periodFrom' => $periodFrom, 'periodTo' => $periodTo],
         );
 
-        $totalSale        = (float) ($row['total_sale_amount'] ?? 0);
+        $totalSale = (float) ($row['total_sale_amount'] ?? 0);
         $totalSellerPrice = (float) ($row['total_seller_price_amount'] ?? 0);
 
         return [
-            'hint'                      => 'Сравни total_sale_amount с «Реализовано на сумму» и total_return_amount с «Возвращено на сумму» из xlsx-отчёта Ozon',
-            'total_rows'                => (int)   ($row['total_rows'] ?? 0),
-            'total_sale_amount'         => number_format($totalSale, 2, '.', ' '),
+            'hint' => 'Сравни total_sale_amount с «Реализовано на сумму» и total_return_amount с «Возвращено на сумму» из xlsx-отчёта Ozon',
+            'total_rows' => (int) ($row['total_rows'] ?? 0),
+            'total_sale_amount' => number_format($totalSale, 2, '.', ' '),
             'total_seller_price_amount' => number_format($totalSellerPrice, 2, '.', ' '),
-            'return_rows'               => (int)   ($row['return_rows'] ?? 0),
-            'total_return_amount'       => number_format((float) ($row['total_return_amount'] ?? 0), 2, '.', ' '),
+            'return_rows' => (int) ($row['return_rows'] ?? 0),
+            'total_return_amount' => number_format((float) ($row['total_return_amount'] ?? 0), 2, '.', ' '),
             'mapped_to_pl' => [
-                'sale_realization'   => number_format((float) $mappedSale, 2, '.', ' '),
+                'sale_realization' => number_format((float) $mappedSale, 2, '.', ' '),
                 'return_realization' => number_format((float) $mappedReturn, 2, '.', ' '),
-                'status_sale'        => $mappedSale > 0 ? 'OK' : 'WARNING — маппинг sale_realization не настроен или нет данных',
-                'status_return'      => $mappedReturn > 0 ? 'OK' : 'WARNING — маппинг return_realization не настроен или нет данных',
+                'status_sale' => $mappedSale > 0 ? 'OK' : 'WARNING — маппинг sale_realization не настроен или нет данных',
+                'status_return' => $mappedReturn > 0 ? 'OK' : 'WARNING — маппинг return_realization не настроен или нет данных',
             ],
         ];
     }
@@ -212,19 +212,19 @@ final class MonthCloseVerifyQuery
 
         return [
             'sales' => [
-                'total'        => (int)   ($sales['total'] ?? 0),
-                'closed'       => (int)   ($sales['closed'] ?? 0),
-                'open'         => (int)   ($sales['open'] ?? 0),
-                'total_revenue'=> number_format((float) ($sales['total_revenue'] ?? 0), 2, '.', ' '),
-                'without_cost' => (int)   ($sales['without_cost'] ?? 0),
-                'cost_status'  => ((int) ($sales['without_cost'] ?? 0)) === 0
+                'total' => (int) ($sales['total'] ?? 0),
+                'closed' => (int) ($sales['closed'] ?? 0),
+                'open' => (int) ($sales['open'] ?? 0),
+                'total_revenue' => number_format((float) ($sales['total_revenue'] ?? 0), 2, '.', ' '),
+                'without_cost' => (int) ($sales['without_cost'] ?? 0),
+                'cost_status' => ((int) ($sales['without_cost'] ?? 0)) === 0
                     ? 'OK — у всех продаж есть себестоимость'
                     : 'WARNING — есть продажи без себестоимости, запусти пересчёт',
             ],
             'returns' => [
-                'total'        => (int)   ($returns['total'] ?? 0),
-                'closed'       => (int)   ($returns['closed'] ?? 0),
-                'open'         => (int)   ($returns['open'] ?? 0),
+                'total' => (int) ($returns['total'] ?? 0),
+                'closed' => (int) ($returns['closed'] ?? 0),
+                'open' => (int) ($returns['open'] ?? 0),
                 'total_refund' => number_format((float) ($returns['total_refund'] ?? 0), 2, '.', ' '),
             ],
         ];
@@ -250,7 +250,7 @@ final class MonthCloseVerifyQuery
 
         $configured = array_column($rows, null, 'amount_source');
 
-        $required = $marketplace === 'ozon'
+        $required = 'ozon' === $marketplace
             ? ['sale_realization', 'return_realization', 'sale_cost_price', 'return_cost_price']
             : ['sale_gross', 'sale_cost_price', 'return_gross', 'return_cost_price'];
 
@@ -263,15 +263,15 @@ final class MonthCloseVerifyQuery
 
         return [
             'configured' => array_map(static fn (array $r) => [
-                'amount_source'    => $r['amount_source'],
-                'operation_type'   => $r['operation_type'],
-                'is_active'        => (bool) $r['is_active'],
+                'amount_source' => $r['amount_source'],
+                'operation_type' => $r['operation_type'],
+                'is_active' => (bool) $r['is_active'],
                 'pl_category_name' => $r['pl_category_name'],
             ], $rows),
             'missing_recommended' => $missing,
             'status' => empty($missing)
                 ? 'OK — все рекомендуемые маппинги настроены'
-                : 'WARNING — не хватает маппингов: ' . implode(', ', $missing),
+                : 'WARNING — не хватает маппингов: '.implode(', ', $missing),
         ];
     }
 
@@ -285,8 +285,8 @@ final class MonthCloseVerifyQuery
         string $periodTo,
     ): array {
         // period_from = 'YYYY-MM-01' → year и month отдельные колонки
-        $date  = new \DateTimeImmutable($periodFrom);
-        $year  = (int) $date->format('Y');
+        $date = new \DateTimeImmutable($periodFrom);
+        $year = (int) $date->format('Y');
         $month = (int) $date->format('n');
 
         $row = $this->connection->fetchAssociative(
@@ -313,14 +313,14 @@ final class MonthCloseVerifyQuery
 
         return [
             'stage_sales_returns' => [
-                'status'      => $row['stage_sales_returns_status'],
-                'closed_at'   => $row['stage_sales_returns_closed_at'],
-                'document_ids'=> json_decode((string) ($row['stage_sales_returns_pl_document_ids'] ?? 'null'), true) ?? [],
+                'status' => $row['stage_sales_returns_status'],
+                'closed_at' => $row['stage_sales_returns_closed_at'],
+                'document_ids' => json_decode((string) ($row['stage_sales_returns_pl_document_ids'] ?? 'null'), true) ?? [],
             ],
             'stage_costs' => [
-                'status'      => $row['stage_costs_status'],
-                'closed_at'   => $row['stage_costs_closed_at'],
-                'document_ids'=> json_decode((string) ($row['stage_costs_pl_document_ids'] ?? 'null'), true) ?? [],
+                'status' => $row['stage_costs_status'],
+                'closed_at' => $row['stage_costs_closed_at'],
+                'document_ids' => json_decode((string) ($row['stage_costs_pl_document_ids'] ?? 'null'), true) ?? [],
             ],
         ];
     }
@@ -354,10 +354,10 @@ final class MonthCloseVerifyQuery
             ORDER BY d.date DESC
             SQL,
             [
-                'companyId'  => $companyId,
+                'companyId' => $companyId,
                 'periodFrom' => $periodFrom,
-                'periodTo'   => $periodTo,
-                'sources'    => $this->resolveDocumentSources($marketplace),
+                'periodTo' => $periodTo,
+                'sources' => $this->resolveDocumentSources($marketplace),
             ],
             [
                 'sources' => \Doctrine\DBAL\ArrayParameterType::STRING,
@@ -365,13 +365,13 @@ final class MonthCloseVerifyQuery
         );
 
         return array_map(static fn (array $r) => [
-            'id'               => $r['id'],
-            'date'             => $r['date'],
-            'description'      => $r['description'],
-            'source'           => $r['source'],
-            'stream'           => $r['stream'],
+            'id' => $r['id'],
+            'date' => $r['date'],
+            'description' => $r['description'],
+            'source' => $r['source'],
+            'stream' => $r['stream'],
             'operations_count' => (int) $r['operations_count'],
-            'total_amount'     => number_format((float) $r['total_amount'], 2, '.', ' '),
+            'total_amount' => number_format((float) $r['total_amount'], 2, '.', ' '),
         ], $rows);
     }
 
@@ -379,10 +379,10 @@ final class MonthCloseVerifyQuery
     private function resolveDocumentSources(string $marketplace): array
     {
         return match ($marketplace) {
-            'ozon'          => ['marketplace_ozon'],
-            'wildberries'   => ['marketplace_wb'],
+            'ozon' => ['marketplace_ozon'],
+            'wildberries' => ['marketplace_wb'],
             'yandex_market' => ['marketplace_yandex'],
-            default         => ['marketplace_ozon', 'marketplace_wb', 'marketplace_yandex', 'marketplace_sber'],
+            default => ['marketplace_ozon', 'marketplace_wb', 'marketplace_yandex', 'marketplace_sber'],
         };
     }
 }

@@ -28,7 +28,7 @@ class CashTransactionAutoRuleType extends AbstractType
             ->add('action', EnumType::class, [
                 'class' => CashTransactionAutoRuleAction::class,
                 'label' => 'Действие с операцией ДДС',
-                'choice_label' => function (CashTransactionAutoRuleAction $choice) {
+                'choice_label' => static function (CashTransactionAutoRuleAction $choice) {
                     return match ($choice) {
                         CashTransactionAutoRuleAction::FILL => 'Заполнить поля операции',
                         CashTransactionAutoRuleAction::UPDATE => 'Изменить поля операции',
@@ -43,7 +43,7 @@ class CashTransactionAutoRuleType extends AbstractType
                     CashTransactionAutoRuleOperationType::INFLOW,
                     CashTransactionAutoRuleOperationType::ANY,
                 ],
-                'choice_label' => function (CashTransactionAutoRuleOperationType $choice) {
+                'choice_label' => static function (CashTransactionAutoRuleOperationType $choice) {
                     return match ($choice) {
                         CashTransactionAutoRuleOperationType::OUTFLOW => 'Отток',
                         CashTransactionAutoRuleOperationType::INFLOW => 'Приток',
@@ -54,7 +54,7 @@ class CashTransactionAutoRuleType extends AbstractType
             ->add('cashflowCategory', EntityType::class, [
                 'class' => CashflowCategory::class,
                 'choices' => $options['categories'],
-                'choice_label' => function (CashflowCategory $item) {
+                'choice_label' => static function (CashflowCategory $item) {
                     return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
                 },
                 'label' => 'Категория движения ДДС',
@@ -62,10 +62,10 @@ class CashTransactionAutoRuleType extends AbstractType
             ->add('projectDirection', ProjectDirectionPickerType::class, [
                 'class' => ProjectDirection::class,
                 'choices' => $options['projectDirections'],
-                'choice_label' => function (ProjectDirection $item) {
+                'choice_label' => static function (ProjectDirection $item) {
                     return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
                 },
-                'choice_attr' => fn (ProjectDirection $item) => !$item->getChildren()->isEmpty() ? ['disabled' => 'disabled'] : [],
+                'choice_attr' => static fn (ProjectDirection $item) => !$item->getChildren()->isEmpty() ? ['disabled' => 'disabled'] : [],
                 'placeholder' => 'Не выбрано',
                 'required' => false,
                 'label' => 'Направление / проект',
@@ -73,7 +73,7 @@ class CashTransactionAutoRuleType extends AbstractType
             ->add('counterparty', EntityType::class, [
                 'class' => Counterparty::class,
                 'choices' => $options['counterparties'],
-                'choice_label' => fn (Counterparty $item) => $item->getName(),
+                'choice_label' => static fn (Counterparty $item) => $item->getName(),
                 'placeholder' => 'Не выбран',
                 'required' => false,
                 'label' => 'Контрагент',

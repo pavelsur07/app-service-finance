@@ -37,13 +37,13 @@ final class ReprocessMarketplaceCommand extends Command
 
     protected function configure(): void
     {
-        $marketplaces = implode(', ', array_map(fn ($m) => $m->value, MarketplaceType::cases()));
+        $marketplaces = implode(', ', array_map(static fn ($m) => $m->value, MarketplaceType::cases()));
 
         $this
-            ->addArgument('companyId',   InputArgument::REQUIRED, 'UUID компании')
+            ->addArgument('companyId', InputArgument::REQUIRED, 'UUID компании')
             ->addArgument('marketplace', InputArgument::REQUIRED, "Маркетплейс: {$marketplaces}")
-            ->addArgument('periodFrom',  InputArgument::REQUIRED, 'Начало периода (Y-m-d)')
-            ->addArgument('periodTo',    InputArgument::REQUIRED, 'Конец периода (Y-m-d)')
+            ->addArgument('periodFrom', InputArgument::REQUIRED, 'Начало периода (Y-m-d)')
+            ->addArgument('periodTo', InputArgument::REQUIRED, 'Конец периода (Y-m-d)')
             ->addOption(
                 'only',
                 null,
@@ -63,18 +63,18 @@ final class ReprocessMarketplaceCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
 
-        $companyId   = $input->getArgument('companyId');
+        $companyId = $input->getArgument('companyId');
         $marketplace = $input->getArgument('marketplace');
-        $periodFrom  = $input->getArgument('periodFrom');
-        $periodTo    = $input->getArgument('periodTo');
-        $only        = $input->getOption('only');
-        $dryRun      = $input->getOption('dry-run');
+        $periodFrom = $input->getArgument('periodFrom');
+        $periodTo = $input->getArgument('periodTo');
+        $only = $input->getOption('only');
+        $dryRun = $input->getOption('dry-run');
 
-        if (MarketplaceType::tryFrom($marketplace) === null) {
+        if (null === MarketplaceType::tryFrom($marketplace)) {
             $io->error(sprintf(
                 'Неизвестный маркетплейс: %s. Допустимые: %s',
                 $marketplace,
-                implode(', ', array_map(fn ($m) => $m->value, MarketplaceType::cases())),
+                implode(', ', array_map(static fn ($m) => $m->value, MarketplaceType::cases())),
             ));
 
             return Command::FAILURE;
@@ -82,7 +82,7 @@ final class ReprocessMarketplaceCommand extends Command
 
         try {
             $dateFrom = new \DateTimeImmutable($periodFrom);
-            $dateTo   = new \DateTimeImmutable($periodTo);
+            $dateTo = new \DateTimeImmutable($periodTo);
         } catch (\Exception) {
             $io->error('Неверный формат даты. Используйте Y-m-d, например: 2026-01-01');
 
@@ -105,19 +105,19 @@ final class ReprocessMarketplaceCommand extends Command
 
         try {
             $result = ($this->reprocessAction)(
-                companyId:   $companyId,
+                companyId: $companyId,
                 marketplace: $marketplace,
-                periodFrom:  $dateFrom,
-                periodTo:    $dateTo,
-                type:        $only,
+                periodFrom: $dateFrom,
+                periodTo: $dateTo,
+                type: $only,
             );
         } catch (\Throwable $e) {
-            $io->error('Ошибка: ' . $e->getMessage());
+            $io->error('Ошибка: '.$e->getMessage());
 
             return Command::FAILURE;
         }
 
-        if ($result['docs'] === 0) {
+        if (0 === $result['docs']) {
             $io->warning('Не найдено raw-документов за указанный период.');
 
             return Command::SUCCESS;
@@ -126,10 +126,18 @@ final class ReprocessMarketplaceCommand extends Command
         $io->section('Итог');
         $io->text(sprintf('  Документов обработано: %d', $result['docs']));
 
-        if ($result['sales'] > 0)       { $io->text(sprintf('  Продажи:    %d', $result['sales'])); }
-        if ($result['returns'] > 0)     { $io->text(sprintf('  Возвраты:   %d', $result['returns'])); }
-        if ($result['costs'] > 0)       { $io->text(sprintf('  Затраты:    %d', $result['costs'])); }
-        if ($result['realization'] > 0) { $io->text(sprintf('  Реализация: %d строк', $result['realization'])); }
+        if ($result['sales'] > 0) {
+            $io->text(sprintf('  Продажи:    %d', $result['sales']));
+        }
+        if ($result['returns'] > 0) {
+            $io->text(sprintf('  Возвраты:   %d', $result['returns']));
+        }
+        if ($result['costs'] > 0) {
+            $io->text(sprintf('  Затраты:    %d', $result['costs']));
+        }
+        if ($result['realization'] > 0) {
+            $io->text(sprintf('  Реализация: %d строк', $result['realization']));
+        }
 
         $io->success('Переобработка завершена.');
 

@@ -4,7 +4,6 @@ namespace App\DataFixtures;
 
 use App\Company\Entity\Company;
 use App\Finance\Entity\PLCategory;
-use App\Finance\Enum\PLCategoryType;
 use App\Finance\Enum\PLExpenseType;
 use App\Finance\Enum\PLFlow;
 use Doctrine\Bundle\FixturesBundle\Fixture;

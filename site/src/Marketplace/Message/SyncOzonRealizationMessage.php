@@ -7,7 +7,7 @@ namespace App\Marketplace\Message;
 /**
  * Загрузка отчёта о реализации Ozon за конкретный месяц.
  * Источник: POST /v2/finance/realization
- * documentType: 'realization'
+ * documentType: 'realization'.
  */
 final readonly class SyncOzonRealizationMessage
 {

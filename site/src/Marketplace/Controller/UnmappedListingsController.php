@@ -10,7 +10,7 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * Страница unmapped листингов (без привязки к продуктам)
+ * Страница unmapped листингов (без привязки к продуктам).
  */
 #[Route('/marketplace/unmapped')]
 #[IsGranted('ROLE_USER')]
@@ -18,12 +18,12 @@ class UnmappedListingsController extends AbstractController
 {
     public function __construct(
         private readonly UnmappedListingsQuery $unmappedListingsQuery,
-        private readonly ActiveCompanyService $activeCompanyService
+        private readonly ActiveCompanyService $activeCompanyService,
     ) {
     }
 
     /**
-     * Список unmapped листингов
+     * Список unmapped листингов.
      */
     #[Route('', name: 'marketplace_unmapped_listings_index', methods: ['GET'])]
     public function index(): Response

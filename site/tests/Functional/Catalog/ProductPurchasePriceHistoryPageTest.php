@@ -85,4 +85,3 @@ final class ProductPurchasePriceHistoryPageTest extends WebTestCaseBase
         self::assertStringContainsString('Старая цена', $secondRow);
     }
 }
-
