@@ -179,9 +179,7 @@ final class OzonAdLoadRangeControllerTest extends WebTestCaseBase
     {
         $owner = $this->em()->getRepository(\App\Company\Entity\User::class)->find(self::OWNER_ID);
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
     }
 
     private function getAsyncAdsTransport(\Symfony\Bundle\FrameworkBundle\KernelBrowser $client): InMemoryTransport

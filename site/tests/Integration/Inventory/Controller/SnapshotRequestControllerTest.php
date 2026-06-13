@@ -14,7 +14,7 @@ use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Messenger\Transport\InMemoryTransport;
+use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 final class SnapshotRequestControllerTest extends WebTestCaseBase
 {
@@ -30,19 +30,19 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
         $this->persistActiveOzonConnection($company->getId(), $company);
         $this->login($client, $owner, self::COMPANY_ID);
 
-        $transport = $this->getSyncTransport($client);
-        $token = static::getContainer()->get('security.csrf.token_manager')->getToken('inventory_snapshots_request')->getValue();
+        $token = $this->fetchRequestToken($client);
 
         $client->request('POST', '/inventory/snapshots/request', ['_token' => $token]);
 
         self::assertResponseRedirects('/inventory/snapshots');
+        $transport = $this->getSyncTransport($client);
         self::assertCount(1, $transport->getSent());
 
         $sessionRepo = static::getContainer()->get('doctrine')->getRepository(InventorySnapshotSession::class);
         self::assertCount(1, $sessionRepo->findBy(['companyId' => self::COMPANY_ID]));
 
         $client->followRedirect();
-        self::assertSelectorTextContains('.alert-success', 'Задача синхронизации остатков запущена.');
+        self::assertSelectorTextContains('.toast.text-bg-success', 'Задача синхронизации остатков запущена.');
     }
 
     public function testInvalidCsrfRedirectsWithDangerFlashAndDoesNotDispatch(): void
@@ -54,15 +54,14 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
         $this->persistActiveOzonConnection($company->getId(), $company);
         $this->login($client, $owner, self::COMPANY_ID);
 
-        $transport = $this->getSyncTransport($client);
-
         $client->request('POST', '/inventory/snapshots/request', ['_token' => 'invalid-token']);
 
         self::assertResponseRedirects('/inventory/snapshots');
+        $transport = $this->getSyncTransport($client);
         self::assertCount(0, $transport->getSent());
 
         $client->followRedirect();
-        self::assertSelectorTextContains('.alert-danger', 'Неверный CSRF-токен.');
+        self::assertSelectorTextContains('.toast.text-bg-danger', 'Неверный CSRF-токен.');
     }
 
     public function testNoActiveConnectionShowsWarningFlash(): void
@@ -73,16 +72,16 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
         [$owner] = $this->seedOwnerAndCompany('inventory-request-no-connection@example.test');
         $this->login($client, $owner, self::COMPANY_ID);
 
-        $token = static::getContainer()->get('security.csrf.token_manager')->getToken('inventory_snapshots_request')->getValue();
-        $transport = $this->getSyncTransport($client);
+        $token = $this->fetchRequestToken($client);
 
         $client->request('POST', '/inventory/snapshots/request', ['_token' => $token]);
 
         self::assertResponseRedirects('/inventory/snapshots');
+        $transport = $this->getSyncTransport($client);
         self::assertCount(0, $transport->getSent());
 
         $client->followRedirect();
-        self::assertSelectorTextContains('.alert-warning', 'Нет активного Ozon-подключения');
+        self::assertSelectorTextContains('.toast.text-bg-warning', 'Нет активного Ozon-подключения');
     }
 
     public function testActiveSessionExistsShowsAlreadyRunningWarning(): void
@@ -95,14 +94,14 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
         $this->persistActiveSession();
         $this->login($client, $owner, self::COMPANY_ID);
 
-        $token = static::getContainer()->get('security.csrf.token_manager')->getToken('inventory_snapshots_request')->getValue();
+        $token = $this->fetchRequestToken($client);
 
         $client->request('POST', '/inventory/snapshots/request', ['_token' => $token]);
 
         self::assertResponseRedirects('/inventory/snapshots');
 
         $client->followRedirect();
-        self::assertSelectorTextContains('.alert-warning', 'Синхронизация уже выполняется.');
+        self::assertSelectorTextContains('.toast.text-bg-warning', 'Синхронизация уже выполняется.');
     }
 
     public function testRouteRequiresAuthenticatedOwnerWithActiveCompany(): void
@@ -149,9 +148,15 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
     private function login(KernelBrowser $client, User $user, string $companyId): void
     {
         $client->loginUser($user);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', $companyId);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', $companyId);
+    }
+
+    private function fetchRequestToken(KernelBrowser $client): string
+    {
+        $crawler = $client->request('GET', '/inventory/snapshots');
+        self::assertResponseIsSuccessful();
+
+        return (string) $crawler->filter('input[name="_token"]')->attr('value');
     }
 
     private function persistActiveOzonConnection(string $connectionId, \App\Company\Entity\Company $company): void

@@ -5,18 +5,22 @@ declare(strict_types=1);
 namespace App\Tests\Support\Kernel;
 
 use App\Tests\Support\Db\DbReset;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 abstract class IntegrationTestCase extends KernelTestCase
 {
     protected EntityManagerInterface $em;
+    protected Connection $connection;
 
     protected function setUp(): void
     {
         self::bootKernel();
 
         $this->em = self::getContainer()->get(EntityManagerInterface::class);
+        $this->connection = $this->em->getConnection();
+        $this->resetDb();
     }
 
     protected function tearDown(): void
@@ -32,12 +36,6 @@ abstract class IntegrationTestCase extends KernelTestCase
 
     protected function resetDb(): void
     {
-        if (class_exists(\DAMA\DoctrineTestBundle\PHPUnit\PHPUnitExtension::class)
-            && \DAMA\DoctrineTestBundle\PHPUnit\PHPUnitExtension::$transactionStarted
-        ) {
-            return;
-        }
-
         (new DbReset())->reset($this->em);
     }
 }

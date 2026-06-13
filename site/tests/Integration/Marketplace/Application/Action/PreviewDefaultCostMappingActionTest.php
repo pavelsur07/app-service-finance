@@ -49,7 +49,7 @@ final class PreviewDefaultCostMappingActionTest extends IntegrationTestCase
         $beforeCount = (int) $this->em->getConnection()->fetchOne('SELECT COUNT(*) FROM marketplace_cost_pl_mappings WHERE company_id = :companyId', ['companyId' => $companyId]);
 
         $action = new PreviewDefaultCostMappingAction(
-            new DefaultCostMappingYamlProvider(__DIR__ . '/../../../../Fixtures/Marketplace/default_cost_mapping_preview.yaml'),
+            new DefaultCostMappingYamlProvider(__DIR__.'/../../../../Fixtures/Marketplace/default_cost_mapping_preview.yaml'),
             new MarketplaceCostCategoriesByCodeQuery($this->em->getConnection()),
             new PLCategoriesByCodeQuery($this->em->getConnection()),
             new MarketplaceCostPLMappingsByCostCategoryQuery($this->em->getConnection()),
@@ -85,7 +85,6 @@ final class PreviewDefaultCostMappingActionTest extends IntegrationTestCase
         self::assertSame(DefaultCostMappingPreviewStatus::MISSING_PL_CATEGORY, $missingPlItem->getStatus());
         self::assertSame('Категория ОПиУ не найдена у компании.', $missingPlItem->getMessage());
 
-
         $afterCount = (int) $this->em->getConnection()->fetchOne('SELECT COUNT(*) FROM marketplace_cost_pl_mappings WHERE company_id = :companyId', ['companyId' => $companyId]);
         self::assertSame($beforeCount, $afterCount);
         self::assertNotNull($create);
@@ -100,7 +99,7 @@ final class PreviewDefaultCostMappingActionTest extends IntegrationTestCase
         $this->createCompany($companyId);
 
         $action = new PreviewDefaultCostMappingAction(
-            new DefaultCostMappingYamlProvider(__DIR__ . '/../../../../Fixtures/Marketplace/empty_default_cost_mapping.yaml'),
+            new DefaultCostMappingYamlProvider(__DIR__.'/../../../../Fixtures/Marketplace/empty_default_cost_mapping.yaml'),
             new MarketplaceCostCategoriesByCodeQuery($this->em->getConnection()),
             new PLCategoriesByCodeQuery($this->em->getConnection()),
             new MarketplaceCostPLMappingsByCostCategoryQuery($this->em->getConnection()),
@@ -110,14 +109,13 @@ final class PreviewDefaultCostMappingActionTest extends IntegrationTestCase
         self::assertSame(0, $result->getTotal());
     }
 
-
     public function testInvalidMarketplaceThrows(): void
     {
         $companyId = '11111111-1111-1111-1111-111111111113';
         $this->createCompany($companyId);
 
         $action = new PreviewDefaultCostMappingAction(
-            new DefaultCostMappingYamlProvider(__DIR__ . '/../../../../Fixtures/Marketplace/default_cost_mapping_preview.yaml'),
+            new DefaultCostMappingYamlProvider(__DIR__.'/../../../../Fixtures/Marketplace/default_cost_mapping_preview.yaml'),
             new MarketplaceCostCategoriesByCodeQuery($this->em->getConnection()),
             new PLCategoriesByCodeQuery($this->em->getConnection()),
             new MarketplaceCostPLMappingsByCostCategoryQuery($this->em->getConnection()),
@@ -126,7 +124,6 @@ final class PreviewDefaultCostMappingActionTest extends IntegrationTestCase
         $this->expectException(\DomainException::class);
         $action(new PreviewDefaultCostMappingCommand($companyId, 'invalid_marketplace'));
     }
-
 
     private function findByCostCode(
         \App\Marketplace\Application\DTO\DefaultCostMappingPreviewResult $result,

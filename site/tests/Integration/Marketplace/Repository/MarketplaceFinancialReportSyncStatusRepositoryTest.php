@@ -64,7 +64,6 @@ final class MarketplaceFinancialReportSyncStatusRepositoryTest extends Integrati
         self::assertSame([FinancialReportSyncMode::MISSING, FinancialReportSyncMode::MISSING], array_map(static fn (array $item): FinancialReportSyncMode => $item['mode'], $days));
     }
 
-
     public function testFindRetryDueDaysReturnsStuckQueuedAndLoadingOlderThanReclaimInterval(): void
     {
         $companyId = '11111111-1111-1111-1111-111111111111';
@@ -174,7 +173,6 @@ final class MarketplaceFinancialReportSyncStatusRepositoryTest extends Integrati
             array_map(static fn (MarketplaceFinancialReportSyncStatus $status): string => $status->getBusinessDate()->format('Y-m-d'), $statuses),
         );
     }
-
 
     public function testClaimForQueueCreatesQueuedStatusForMissingDay(): void
     {
@@ -289,7 +287,6 @@ final class MarketplaceFinancialReportSyncStatusRepositoryTest extends Integrati
         self::assertSame(FinancialReportSyncMode::MANUAL, $status->getMode());
     }
 
-
     public function testFindByBusinessDayIgnoresConnectionAndReturnsCanonicalStatus(): void
     {
         $companyId = '11111111-1111-1111-1111-111111111111';
@@ -382,7 +379,6 @@ final class MarketplaceFinancialReportSyncStatusRepositoryTest extends Integrati
         self::assertSame(1, $count);
     }
 
-
     public function testFindOrCreateForDayReusesCanonicalBusinessStatusWithNewConnection(): void
     {
         $companyId = '11111111-1111-1111-1111-111111111111';
@@ -450,7 +446,6 @@ final class MarketplaceFinancialReportSyncStatusRepositoryTest extends Integrati
         $this->repository->save($entity);
         $this->em->flush();
     }
-
 
     private function backdateStatusUpdatedAt(string $companyId, string $day, string $modify = '-3 hours'): void
     {

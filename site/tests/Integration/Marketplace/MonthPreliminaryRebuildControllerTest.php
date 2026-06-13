@@ -7,12 +7,13 @@ namespace App\Tests\Integration\Marketplace;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use Psr\Cache\CacheItemPoolInterface;
 use Symfony\Component\HttpFoundation\Response;
 
 final class MonthPreliminaryRebuildControllerTest extends WebTestCaseBase
 {
     private const COMPANY_ID = '11111111-1111-1111-1111-b00000000001';
-    private const OWNER_ID   = '22222222-2222-2222-2222-b00000000001';
+    private const OWNER_ID = '22222222-2222-2222-2222-b00000000001';
 
     public function testHappyPathQueuesMessage(): void
     {
@@ -120,9 +121,11 @@ final class MonthPreliminaryRebuildControllerTest extends WebTestCaseBase
         $em->persist($company);
         $em->flush();
 
+        /** @var CacheItemPoolInterface $rateLimiterCache */
+        $rateLimiterCache = static::getContainer()->get('cache.rate_limiter');
+        $rateLimiterCache->clear();
+
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
     }
 }

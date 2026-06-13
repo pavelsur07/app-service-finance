@@ -79,8 +79,8 @@ final class AdBatchSchedulerCommandTest extends PostgresResetTestCase
             ->with(
                 self::COMPANY_ID,
                 $batch->getCampaignIds(),
-                self::callback(fn (\DateTimeImmutable $d): bool => '2026-03-01' === $d->format('Y-m-d')),
-                self::callback(fn (\DateTimeImmutable $d): bool => '2026-03-10' === $d->format('Y-m-d')),
+                self::callback(static fn (\DateTimeImmutable $d): bool => '2026-03-01' === $d->format('Y-m-d')),
+                self::callback(static fn (\DateTimeImmutable $d): bool => '2026-03-10' === $d->format('Y-m-d')),
             )
             ->willReturn('ozon-uuid-abc-123');
 
@@ -133,7 +133,7 @@ final class AdBatchSchedulerCommandTest extends PostgresResetTestCase
         // использует default PHP TZ — в тестах из docker это Europe/Moscow).
         $deltaSeconds = (int) $this->em->getConnection()->fetchOne(
             'SELECT EXTRACT(EPOCH FROM (scheduled_at - NOW()))::bigint '
-            . 'FROM marketplace_ad_scheduled_batches WHERE id = :id',
+            .'FROM marketplace_ad_scheduled_batches WHERE id = :id',
             ['id' => $batch->getId()],
         );
         self::assertGreaterThanOrEqual(4 * 60, $deltaSeconds, 'scheduled_at сдвинулся на >= 4 мин');

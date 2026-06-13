@@ -11,7 +11,7 @@ use App\Tests\Support\Kernel\WebTestCaseBase;
 final class OzonAdInitialLoadControllerTest extends WebTestCaseBase
 {
     private const COMPANY_ID = '11111111-1111-1111-1111-a00000000001';
-    private const OWNER_ID   = '22222222-2222-2222-2222-a00000000001';
+    private const OWNER_ID = '22222222-2222-2222-2222-a00000000001';
 
     // После Task-11.9a happy-path для initial-load контроллера проверяется
     // не здесь: период Jan 1 → yesterday в календарное большинство года
@@ -39,9 +39,7 @@ final class OzonAdInitialLoadControllerTest extends WebTestCaseBase
         $em->flush();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
         $client->request('POST', '/api/marketplace-ads/ozon/initial-load', [], [], [
             'HTTP_X-Requested-With' => 'XMLHttpRequest',

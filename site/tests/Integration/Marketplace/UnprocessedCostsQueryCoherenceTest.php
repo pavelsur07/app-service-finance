@@ -28,12 +28,12 @@ use Ramsey\Uuid\Uuid;
  */
 final class UnprocessedCostsQueryCoherenceTest extends IntegrationTestCase
 {
-    private const COMPANY_ID        = '77777777-7777-7777-7777-000000000001';
-    private const OWNER_ID          = '88888888-8888-8888-8888-000000000001';
-    private const MARKETPLACE       = MarketplaceType::OZON;
+    private const COMPANY_ID = '77777777-7777-7777-7777-000000000001';
+    private const OWNER_ID = '88888888-8888-8888-8888-000000000001';
+    private const MARKETPLACE = MarketplaceType::OZON;
     private const MARKETPLACE_VALUE = 'ozon';
-    private const PERIOD_FROM       = '2026-05-01';
-    private const PERIOD_TO         = '2026-05-31';
+    private const PERIOD_FROM = '2026-05-01';
+    private const PERIOD_TO = '2026-05-31';
 
     private Company $company;
     private UnprocessedCostsQuery $query;
@@ -65,13 +65,13 @@ final class UnprocessedCostsQueryCoherenceTest extends IntegrationTestCase
 
         // 5 regular costs (100.00 each) + 3 ozon_other_service costs (50.00 each)
         $regular = $this->createMappedCategory('coherence_logistic', 'Логистика', $plCategory);
-        $other   = $this->createMappedCategory('ozon_other_service', 'Прочие услуги Ozon', $plCategory);
+        $other = $this->createMappedCategory('ozon_other_service', 'Прочие услуги Ozon', $plCategory);
 
-        for ($i = 0; $i < 5; $i++) {
-            $this->createCost($regular, '100.00', '2026-05-0' . ($i + 1));
+        for ($i = 0; $i < 5; ++$i) {
+            $this->createCost($regular, '100.00', '2026-05-0'.($i + 1));
         }
-        for ($i = 0; $i < 3; $i++) {
-            $this->createCost($other, '50.00', '2026-05-1' . $i);
+        for ($i = 0; $i < 3; ++$i) {
+            $this->createCost($other, '50.00', '2026-05-1'.$i);
         }
 
         $this->em->flush();
@@ -92,7 +92,7 @@ final class UnprocessedCostsQueryCoherenceTest extends IntegrationTestCase
         $executeSum = $this->sumFromExecute(preliminary: true);
 
         self::assertEqualsWithDelta(500.0, $controlSum, 0.01, 'getControlSum(preliminary) должен быть 500');
-        self::assertEqualsWithDelta(500.0, $executeSum,  0.01, 'execute(preliminary) сумма должна быть 500');
+        self::assertEqualsWithDelta(500.0, $executeSum, 0.01, 'execute(preliminary) сумма должна быть 500');
         self::assertEqualsWithDelta(
             0.0,
             abs($controlSum - $executeSum),
@@ -115,7 +115,7 @@ final class UnprocessedCostsQueryCoherenceTest extends IntegrationTestCase
         $executeSum = $this->sumFromExecute(preliminary: false);
 
         self::assertEqualsWithDelta(650.0, $controlSum, 0.01, 'getControlSum(final) должен быть 650');
-        self::assertEqualsWithDelta(650.0, $executeSum,  0.01, 'execute(final) сумма должна быть 650');
+        self::assertEqualsWithDelta(650.0, $executeSum, 0.01, 'execute(final) сумма должна быть 650');
         self::assertEqualsWithDelta(
             0.0,
             abs($controlSum - $executeSum),
@@ -162,7 +162,7 @@ final class UnprocessedCostsQueryCoherenceTest extends IntegrationTestCase
         $cost->setAmount($amount);
         $cost->setCostDate(new \DateTimeImmutable($costDate));
         $cost->setOperationType(MarketplaceCostOperationType::CHARGE);
-        $cost->setExternalId('ext-' . Uuid::uuid4()->toString());
+        $cost->setExternalId('ext-'.Uuid::uuid4()->toString());
         $this->em->persist($cost);
     }
 

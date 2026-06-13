@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\MarketplaceAds\Controller;
 
-use App\MarketplaceAds\Enum\AdLoadJobStatus;
 use App\MarketplaceAds\Enum\AdRawDocumentStatus;
 use App\MarketplaceAds\Enum\AdScheduledBatchState;
 use App\MarketplaceAds\Message\ProcessAdRawDocumentMessage;
@@ -101,7 +100,7 @@ final class ExtractBatchesControllerTest extends WebTestCaseBase
         self::assertCount(1, $docs);
         self::assertSame(AdRawDocumentStatus::DRAFT, $docs[0]->getStatus());
         self::assertStringStartsWith(
-            "batch_id=".$batch->getId()."\nfilename=happy-path-batch.csv\n---\n",
+            'batch_id='.$batch->getId()."\nfilename=happy-path-batch.csv\n---\n",
             $docs[0]->getRawPayload(),
         );
 
@@ -334,9 +333,6 @@ final class ExtractBatchesControllerTest extends WebTestCaseBase
     private function login($client, object $owner, string $activeCompanyId): void
     {
         $client->loginUser($owner);
-
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', $activeCompanyId);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', $activeCompanyId);
     }
 }

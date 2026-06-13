@@ -38,7 +38,7 @@ final class UnitExtendedQueryOzonRawReprocessRegressionTest extends IntegrationT
         $this->seedCompanyAndListing();
     }
 
-    public function test_reprocessing_same_raw_document_does_not_double_revenue_or_sales_rows(): void
+    public function testReprocessingSameRawDocumentDoesNotDoubleRevenueOrSalesRows(): void
     {
         $rawDocument = $this->createRawDocument();
         $rawRows = $this->buildRawSalesRows();
@@ -90,7 +90,6 @@ final class UnitExtendedQueryOzonRawReprocessRegressionTest extends IntegrationT
         );
     }
 
-
     private function cleanupTestData(): void
     {
         $connection = $this->em->getConnection();
@@ -111,13 +110,13 @@ final class UnitExtendedQueryOzonRawReprocessRegressionTest extends IntegrationT
         );
 
         $company = $this->em->find(Company::class, self::COMPANY_ID);
-        if ($company !== null) {
+        if (null !== $company) {
             $this->em->remove($company);
             $this->em->flush();
         }
 
         $owner = $this->em->find(User::class, self::OWNER_ID);
-        if ($owner !== null) {
+        if (null !== $owner) {
             $this->em->remove($owner);
             $this->em->flush();
         }
@@ -195,7 +194,6 @@ final class UnitExtendedQueryOzonRawReprocessRegressionTest extends IntegrationT
             ['companyId' => self::COMPANY_ID, 'rawDocId' => $rawDocId],
         );
     }
-
 
     /**
      * @return list<string>

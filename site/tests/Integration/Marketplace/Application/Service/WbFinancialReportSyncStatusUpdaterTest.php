@@ -117,7 +117,7 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
         $persisted = $this->findStatus();
         self::assertNotNull($persisted);
         self::assertSame(FinancialReportSyncStatus::FAILED, $persisted->getStatus());
-        self::assertSame($nextRetryAt->format(DATE_ATOM), $persisted->getNextRetryAt()?->format(DATE_ATOM));
+        self::assertSame($nextRetryAt->format(\DATE_ATOM), $persisted->getNextRetryAt()?->format(\DATE_ATOM));
 
         $errors = $this->errorRepository->findBy(['syncStatusId' => $persisted->getId()]);
         self::assertCount(1, $errors);
@@ -171,7 +171,6 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
         self::assertContainsOnlyInstancesOf(MarketplaceFinancialReportSyncError::class, $errors);
     }
 
-
     public function testSyncByRawPipelineResultMarksSuccessForCompletedWbSalesReport(): void
     {
         $status = $this->startLoadingStatus();
@@ -182,7 +181,7 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
         $raw = new \App\Marketplace\Entity\MarketplaceRawDocument(
             $this->rawId(),
             $company,
-            \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
+            MarketplaceType::WILDBERRIES,
             'sales_report',
         );
         $raw->markCompleted();
@@ -198,7 +197,6 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
         self::assertNotNull($persisted->getLastSuccessAt());
     }
 
-
     public function testSyncByRawPipelineResultMarksFailedFinalAndSavesError(): void
     {
         $status = $this->startLoadingStatus();
@@ -209,7 +207,7 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
         $raw = new \App\Marketplace\Entity\MarketplaceRawDocument(
             $this->rawId(),
             $company,
-            \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
+            MarketplaceType::WILDBERRIES,
             'sales_report',
         );
         $raw->markStepFailed(\App\Marketplace\Enum\PipelineStep::SALES);
@@ -236,7 +234,7 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
         $raw = new \App\Marketplace\Entity\MarketplaceRawDocument(
             '00000000-0000-0000-0000-000000000100',
             $company,
-            \App\Marketplace\Enum\MarketplaceType::OZON,
+            MarketplaceType::OZON,
             'sales_report',
         );
         $raw->markCompleted();
@@ -249,7 +247,6 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
         self::assertNotNull($persisted);
         self::assertSame(FinancialReportSyncStatus::PROCESSING, $persisted->getStatus());
     }
-
 
     public function testSyncByRawPipelineResultUsesBusinessContextWithoutConnectionIdPredicate(): void
     {
@@ -276,7 +273,7 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
         $raw = new \App\Marketplace\Entity\MarketplaceRawDocument(
             $rawId,
             $company,
-            \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
+            MarketplaceType::WILDBERRIES,
             'sales_report',
         );
         $raw->markCompleted();
@@ -285,7 +282,7 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
             'sync_status_id' => $status->getId(),
             'company_id' => $this->companyId(),
             'connection_id' => $newConnectionId,
-            'marketplace' => \App\Marketplace\Enum\MarketplaceType::WILDBERRIES->value,
+            'marketplace' => MarketplaceType::WILDBERRIES->value,
             'report_type' => 'sales_report',
             'mode' => FinancialReportSyncMode::INITIAL->value,
             'business_date' => $this->businessDate()->format('Y-m-d'),
@@ -324,8 +321,23 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
         );
     }
 
-    private function companyId(): string { return '00000000-0000-0000-0000-000000000001'; }
-    private function connectionId(): string { return '00000000-0000-0000-0000-000000000002'; }
-    private function rawId(): string { return '00000000-0000-0000-0000-000000000099'; }
-    private function businessDate(): \DateTimeImmutable { return new \DateTimeImmutable('2026-05-01'); }
+    private function companyId(): string
+    {
+        return '00000000-0000-0000-0000-000000000001';
+    }
+
+    private function connectionId(): string
+    {
+        return '00000000-0000-0000-0000-000000000002';
+    }
+
+    private function rawId(): string
+    {
+        return '00000000-0000-0000-0000-000000000099';
+    }
+
+    private function businessDate(): \DateTimeImmutable
+    {
+        return new \DateTimeImmutable('2026-05-01');
+    }
 }

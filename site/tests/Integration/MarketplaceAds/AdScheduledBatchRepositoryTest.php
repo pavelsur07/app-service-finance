@@ -262,7 +262,7 @@ final class AdScheduledBatchRepositoryTest extends PostgresResetTestCase
             ->withJobId($job->getId())
             ->withCompanyId(self::COMPANY_ID)
             ->withIndex(0)
-            ->withScheduledAt((new \DateTimeImmutable())->modify('+1 hour'))
+            ->withScheduledAt((new \DateTimeImmutable())->modify('+1 day'))
             ->build();
 
         $this->repository->save($future);
@@ -536,6 +536,7 @@ final class AdScheduledBatchRepositoryTest extends PostgresResetTestCase
             ->withJobId($jobB->getId())
             ->withCompanyId('bbbbbbbb-bbbb-aaaa-aaaa-222222222222')
             ->withIndex(0)
+            ->withId('bbbbbbbb-bbbb-bbbb-bbbb-000000000010')
             ->build();
 
         $this->repository->save($a1);

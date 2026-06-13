@@ -150,9 +150,6 @@ final class MarketplaceFacadeTest extends IntegrationTestCase
     {
         $company = $this->seedCompany(self::COMPANY_A_ID, 'batch@example.test');
 
-        $productMappedId = '33333333-3333-3333-3333-000000000b01';
-        $productMapped = $this->seedProduct($company, $productMappedId, 'SKU-MAPPED', 'Mapped Product');
-
         $listingIds = [];
         $expectedMap = [];
 
@@ -161,7 +158,14 @@ final class MarketplaceFacadeTest extends IntegrationTestCase
             $listingId = sprintf('66666666-6666-6666-6666-%012d', $i);
             $listingIds[] = $listingId;
 
-            $product = $i <= 60 ? $productMapped : null;
+            $product = $i <= 60
+                ? $this->seedProduct(
+                    $company,
+                    sprintf('33333333-3333-3333-3333-%012d', 1000 + $i),
+                    sprintf('SKU-MAPPED-%03d', $i),
+                    sprintf('Mapped Product %03d', $i),
+                )
+                : null;
             $this->seedListing(
                 $company,
                 $product,
@@ -314,7 +318,7 @@ final class MarketplaceFacadeTest extends IntegrationTestCase
         ?string $ownerId = null,
     ): Company {
         $userBuilder = UserBuilder::aUser()->withEmail($ownerEmail);
-        if ($ownerId !== null) {
+        if (null !== $ownerId) {
             $userBuilder = $userBuilder->withId($ownerId);
         }
         $owner = $userBuilder->build();
@@ -322,7 +326,7 @@ final class MarketplaceFacadeTest extends IntegrationTestCase
         $company = CompanyBuilder::aCompany()
             ->withId($companyId)
             ->withOwner($owner)
-            ->withName('Company ' . $companyId)
+            ->withName('Company '.$companyId)
             ->build();
 
         $this->em->persist($owner);

@@ -24,6 +24,7 @@ final class TriggerInitialSyncHandlerTest extends IntegrationTestCase
     public function testWbStartDateFromPastPlansInitialDailySyncWithoutCap(): void
     {
         $company = CompanyBuilder::aCompany()->build();
+        $this->em->persist($company->getUser());
         $this->em->persist($company);
 
         $connection = new MarketplaceConnection(
@@ -38,7 +39,7 @@ final class TriggerInitialSyncHandlerTest extends IntegrationTestCase
         $this->em->persist($connection);
         $this->em->flush();
 
-        $bus = new class() implements MessageBusInterface {
+        $bus = new class implements MessageBusInterface {
             public function dispatch(object $message, array $stamps = []): Envelope
             {
                 return new Envelope($message, $stamps);
@@ -49,7 +50,6 @@ final class TriggerInitialSyncHandlerTest extends IntegrationTestCase
             self::getContainer()->get(MarketplaceRawDocumentRepository::class),
             new MockClock('2026-05-10 00:00:00'),
         );
-
 
         $planner = $this->createMock(WbFinancialReportSyncPlannerInterface::class);
         $planner->expects(self::once())
@@ -74,6 +74,5 @@ final class TriggerInitialSyncHandlerTest extends IntegrationTestCase
         );
 
         $handler(new TriggerInitialSyncMessage($company->getId(), $connection->getId(), MarketplaceType::WILDBERRIES->value));
-
     }
 }

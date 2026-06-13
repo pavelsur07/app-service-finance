@@ -7,6 +7,7 @@ namespace App\Tests\Builders\Marketplace;
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\PipelineStatus;
 use Ramsey\Uuid\Uuid;
 
 final class MarketplaceRawDocumentBuilder
@@ -19,12 +20,14 @@ final class MarketplaceRawDocumentBuilder
     private \DateTimeImmutable $periodTo;
     private array $rawData = [];
     private string $apiEndpoint = '/test/endpoint';
+    private ?PipelineStatus $processingStatus = null;
+    private ?\DateTimeImmutable $syncedAt = null;
 
     private function __construct()
     {
-        $this->id         = Uuid::uuid4()->toString();
+        $this->id = Uuid::uuid4()->toString();
         $this->periodFrom = new \DateTimeImmutable('2026-01-01');
-        $this->periodTo   = new \DateTimeImmutable('2026-01-31');
+        $this->periodTo = new \DateTimeImmutable('2026-01-31');
     }
 
     public static function aDocument(): self
@@ -34,12 +37,11 @@ final class MarketplaceRawDocumentBuilder
 
     public function forCompany(Company $company): self
     {
-        $clone          = clone $this;
+        $clone = clone $this;
         $clone->company = $company;
 
         return $clone;
     }
-
 
     public function withId(string $id): self
     {
@@ -53,13 +55,14 @@ final class MarketplaceRawDocumentBuilder
     {
         $clone = clone $this;
         $clone->id = sprintf('22222222-2222-2222-2222-%012d', $index);
+        $clone->apiEndpoint = sprintf('/test/endpoint/%d', $index);
 
         return $clone;
     }
 
     public function withMarketplace(MarketplaceType $marketplace): self
     {
-        $clone              = clone $this;
+        $clone = clone $this;
         $clone->marketplace = $marketplace;
 
         return $clone;
@@ -67,7 +70,7 @@ final class MarketplaceRawDocumentBuilder
 
     public function withDocumentType(string $documentType): self
     {
-        $clone               = clone $this;
+        $clone = clone $this;
         $clone->documentType = $documentType;
 
         return $clone;
@@ -75,9 +78,9 @@ final class MarketplaceRawDocumentBuilder
 
     public function withPeriod(\DateTimeImmutable $from, \DateTimeImmutable $to): self
     {
-        $clone             = clone $this;
+        $clone = clone $this;
         $clone->periodFrom = $from;
-        $clone->periodTo   = $to;
+        $clone->periodTo = $to;
 
         return $clone;
     }
@@ -90,9 +93,27 @@ final class MarketplaceRawDocumentBuilder
         return $clone;
     }
 
+    public function withProcessingStatus(string|PipelineStatus $processingStatus): self
+    {
+        $clone = clone $this;
+        $clone->processingStatus = is_string($processingStatus)
+            ? PipelineStatus::from($processingStatus)
+            : $processingStatus;
+
+        return $clone;
+    }
+
+    public function withSyncedAt(\DateTimeImmutable $syncedAt): self
+    {
+        $clone = clone $this;
+        $clone->syncedAt = $syncedAt;
+
+        return $clone;
+    }
+
     public function build(): MarketplaceRawDocument
     {
-        if ($this->company === null) {
+        if (null === $this->company) {
             throw new \LogicException('Company is required. Call forCompany().');
         }
 
@@ -107,6 +128,20 @@ final class MarketplaceRawDocumentBuilder
         $doc->setPeriodTo($this->periodTo);
         $doc->setRawData($this->rawData);
         $doc->setApiEndpoint($this->apiEndpoint);
+
+        if (null !== $this->syncedAt) {
+            $syncedAt = new \ReflectionProperty($doc, 'syncedAt');
+            $syncedAt->setValue($doc, $this->syncedAt);
+        }
+
+        if (null !== $this->processingStatus) {
+            match ($this->processingStatus) {
+                PipelineStatus::COMPLETED => $doc->markCompleted(),
+                PipelineStatus::LOADING, PipelineStatus::RUNNING => $doc->markLoading(),
+                PipelineStatus::FAILED => $doc->markFailed(),
+                PipelineStatus::PENDING => $doc->resetProcessingStatus(),
+            };
+        }
 
         return $doc;
     }

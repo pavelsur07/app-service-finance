@@ -10,13 +10,6 @@ use DAMA\DoctrineTestBundle\PHPUnit\SkipDatabaseRollback;
 #[SkipDatabaseRollback]
 abstract class PostgresResetTestCase extends IntegrationTestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->resetDb();
-    }
-
     protected function resetDb(): void
     {
         (new DbReset())->reset($this->em);

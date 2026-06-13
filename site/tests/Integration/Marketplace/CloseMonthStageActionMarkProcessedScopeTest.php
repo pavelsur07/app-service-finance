@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Marketplace;
 
 use App\Company\Entity\Company;
+use App\Finance\Entity\Document;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\PLFlow;
 use App\Marketplace\Application\CloseMonthStageAction;
@@ -125,7 +126,7 @@ final class CloseMonthStageActionMarkProcessedScopeTest extends IntegrationTestC
         $markProcessedQuery->markCosts(
             self::COMPANY_ID,
             self::MARKETPLACE_VALUE,
-            Uuid::uuid4()->toString(),
+            $this->createDocumentId(),
             '2026-02-01',
             '2026-02-28',
             false,
@@ -152,7 +153,7 @@ final class CloseMonthStageActionMarkProcessedScopeTest extends IntegrationTestC
         $markProcessedQuery->markCosts(
             self::COMPANY_ID,
             self::MARKETPLACE_VALUE,
-            Uuid::uuid4()->toString(),
+            $this->createDocumentId(),
             '2026-02-01',
             '2026-02-28',
             false,
@@ -196,13 +197,13 @@ final class CloseMonthStageActionMarkProcessedScopeTest extends IntegrationTestC
             self::YEAR,
             self::MONTH,
         );
-        if ($monthClose !== null) {
+        if (null !== $monthClose) {
             self::assertFalse($monthClose->isStageClosed(CloseStage::COSTS));
             self::assertSame([], $monthClose->getStagePLDocumentIds(CloseStage::COSTS));
         }
     }
 
-    public function testSalesPreliminaryDoesNotMarkRowsWithoutCostPrice(): void
+    public function testSalesPreliminaryCloseBlocksAndDoesNotMarkRowsWithoutCostPrice(): void
     {
         $plCategory = $this->createPlCategory('Sale cost price');
         $this->createSaleMapping($plCategory, AmountSource::SALE_GROSS);
@@ -213,13 +214,13 @@ final class CloseMonthStageActionMarkProcessedScopeTest extends IntegrationTestC
 
         $this->em->flush();
 
-        $this->closeStage(CloseStage::SALES_RETURNS, preliminary: true);
+        $this->expectCloseStageException(CloseStage::SALES_RETURNS, preliminary: true);
 
-        $this->assertMarked($saleWithCost->getId(), 'marketplace_sales', true);
+        $this->assertMarked($saleWithCost->getId(), 'marketplace_sales', false);
         $this->assertMarked($saleWithoutCost->getId(), 'marketplace_sales', false);
     }
 
-    public function testReturnsPreliminaryDoesNotMarkRowsWithoutCostPrice(): void
+    public function testReturnsPreliminaryCloseBlocksAndDoesNotMarkRowsWithoutCostPrice(): void
     {
         $plCategory = $this->createPlCategory('Return cost price');
         $this->createSaleMapping($plCategory, AmountSource::RETURN_COST_PRICE);
@@ -230,9 +231,9 @@ final class CloseMonthStageActionMarkProcessedScopeTest extends IntegrationTestC
 
         $this->em->flush();
 
-        $this->closeStage(CloseStage::SALES_RETURNS, preliminary: true);
+        $this->expectCloseStageException(CloseStage::SALES_RETURNS, preliminary: true);
 
-        $this->assertMarked($returnWithCost->getId(), 'marketplace_returns', true);
+        $this->assertMarked($returnWithCost->getId(), 'marketplace_returns', false);
         $this->assertMarked($returnWithoutCost->getId(), 'marketplace_returns', false);
     }
 
@@ -269,6 +270,25 @@ final class CloseMonthStageActionMarkProcessedScopeTest extends IntegrationTestC
         ));
 
         $this->em->clear();
+    }
+
+    private function expectCloseStageException(CloseStage $stage, bool $preliminary): void
+    {
+        try {
+            $this->closeStage($stage, $preliminary);
+            self::fail('Expected DomainException for blocking preflight error.');
+        } catch (\DomainException) {
+            // expected
+        }
+    }
+
+    private function createDocumentId(): string
+    {
+        $document = new Document(Uuid::uuid4()->toString(), $this->company);
+        $this->em->persist($document);
+        $this->em->flush();
+
+        return (string) $document->getId();
     }
 
     private function createPlCategory(string $name): PLCategory
@@ -320,7 +340,7 @@ final class CloseMonthStageActionMarkProcessedScopeTest extends IntegrationTestC
             $listing,
             self::MARKETPLACE,
         );
-        $sale->setExternalOrderId('sale-' . Uuid::uuid4()->toString());
+        $sale->setExternalOrderId('sale-'.Uuid::uuid4()->toString());
         $sale->setSaleDate(new \DateTimeImmutable($saleDate));
         $sale->setQuantity(1);
         $sale->setPricePerUnit($totalRevenue);
@@ -343,7 +363,7 @@ final class CloseMonthStageActionMarkProcessedScopeTest extends IntegrationTestC
             $listing,
             self::MARKETPLACE,
         );
-        $return->setExternalReturnId('return-' . Uuid::uuid4()->toString());
+        $return->setExternalReturnId('return-'.Uuid::uuid4()->toString());
         $return->setReturnDate(new \DateTimeImmutable($returnDate));
         $return->setQuantity(1);
         $return->setRefundAmount($refundAmount);
@@ -390,7 +410,7 @@ final class CloseMonthStageActionMarkProcessedScopeTest extends IntegrationTestC
         $cost->setAmount($amount);
         $cost->setCostDate(new \DateTimeImmutable($costDate));
         $cost->setOperationType(MarketplaceCostOperationType::CHARGE);
-        $cost->setExternalId('cost-' . Uuid::uuid4()->toString());
+        $cost->setExternalId('cost-'.Uuid::uuid4()->toString());
         $this->em->persist($cost);
 
         return $cost;

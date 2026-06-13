@@ -72,8 +72,7 @@ final class ProductCreateTest extends WebTestCaseBase
 
         $existingProduct = (new Product('33333333-3333-3333-3333-333333333335', $company))
             ->setName('Existing Product')
-            ->setSku('SKU-DUP-001')
-            ->setPurchasePrice('10.00');
+            ->setSku('SKU-DUP-001');
 
         $em->persist($owner);
         $em->persist($company);
@@ -99,7 +98,6 @@ final class ProductCreateTest extends WebTestCaseBase
         );
     }
 
-
     public function testSkuMustBeUniquePerCompanyAtDatabaseLevel(): void
     {
         $this->resetDb();
@@ -114,13 +112,11 @@ final class ProductCreateTest extends WebTestCaseBase
 
         $firstProduct = (new Product('33333333-3333-3333-3333-333333333336', $company))
             ->setName('First Product')
-            ->setSku('SKU-DB-001')
-            ->setPurchasePrice('10.00');
+            ->setSku('SKU-DB-001');
 
         $duplicateProduct = (new Product('33333333-3333-3333-3333-333333333337', $company))
             ->setName('Duplicate Product')
-            ->setSku('SKU-DB-001')
-            ->setPurchasePrice('11.00');
+            ->setSku('SKU-DB-001');
 
         $em->persist($owner);
         $em->persist($company);
@@ -152,13 +148,11 @@ final class ProductCreateTest extends WebTestCaseBase
 
         $productA = (new Product('33333333-3333-3333-3333-333333333338', $companyA))
             ->setName('Product A')
-            ->setSku('SKU-SHARED-001')
-            ->setPurchasePrice('10.00');
+            ->setSku('SKU-SHARED-001');
 
         $productB = (new Product('33333333-3333-3333-3333-333333333339', $companyB))
             ->setName('Product B')
-            ->setSku('SKU-SHARED-001')
-            ->setPurchasePrice('12.00');
+            ->setSku('SKU-SHARED-001');
 
         $em->persist($owner);
         $em->persist($companyA);
@@ -174,8 +168,6 @@ final class ProductCreateTest extends WebTestCaseBase
     private function loginWithActiveCompany($client, object $owner, Company $company): void
     {
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', $company->getId());
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
     }
 }

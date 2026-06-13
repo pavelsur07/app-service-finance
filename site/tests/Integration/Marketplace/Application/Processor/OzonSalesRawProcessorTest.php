@@ -8,6 +8,7 @@ use App\Finance\Entity\Document;
 use App\Marketplace\Application\Processor\OzonSalesRawProcessor;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceRawDocumentBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceSaleBuilder;
@@ -18,15 +19,19 @@ final class OzonSalesRawProcessorTest extends IntegrationTestCase
 {
     public function testCleanupDeletesOnlyStaleOpenRowsWithinSameCompanyMarketplaceAndPeriod(): void
     {
-        $companyA = CompanyBuilder::aCompany()->withIndex(101)->build();
-        $companyB = CompanyBuilder::aCompany()->withIndex(102)->build();
+        $companyA = CompanyBuilder::aCompany()->withIndex(101)->withOwner(UserBuilder::aUser()->withIndex(101)->build())->build();
+        $companyB = CompanyBuilder::aCompany()->withIndex(102)->withOwner(UserBuilder::aUser()->withIndex(102)->build())->build();
+        $this->em->persist($companyA->getUser());
+        $this->em->persist($companyB->getUser());
         $this->em->persist($companyA);
         $this->em->persist($companyB);
 
         $listingA = MarketplaceListingBuilder::aListing()->withIndex(1)->forCompany($companyA)->withMarketplace(MarketplaceType::OZON)->withMarketplaceSku('oz-a')->build();
         $listingB = MarketplaceListingBuilder::aListing()->withIndex(2)->forCompany($companyB)->withMarketplace(MarketplaceType::OZON)->withMarketplaceSku('oz-b')->build();
         $listingWb = MarketplaceListingBuilder::aListing()->withIndex(3)->forCompany($companyA)->withMarketplace(MarketplaceType::WILDBERRIES)->withMarketplaceSku('wb-a')->build();
-        $this->em->persist($listingA); $this->em->persist($listingB); $this->em->persist($listingWb);
+        $this->em->persist($listingA);
+        $this->em->persist($listingB);
+        $this->em->persist($listingWb);
 
         $day = new \DateTimeImmutable('2026-03-10');
         $outside = new \DateTimeImmutable('2026-03-15');

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Infrastructure\Writer;
 
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\ParameterType;
 use Ramsey\Uuid\Uuid;
 
 final readonly class DefaultCostMappingWriter
@@ -36,6 +37,11 @@ final readonly class DefaultCostMappingWriter
                 'created_at' => $now,
                 'updated_at' => $now,
             ],
+            [
+                'include_in_pl' => ParameterType::BOOLEAN,
+                'is_negative' => ParameterType::BOOLEAN,
+                'sort_order' => ParameterType::INTEGER,
+            ],
         );
     }
 
@@ -52,6 +58,10 @@ final readonly class DefaultCostMappingWriter
                 'updated_at' => $now,
                 'id' => $mappingId,
                 'company_id' => $companyId,
+            ],
+            [
+                'include_in_pl' => ParameterType::BOOLEAN,
+                'is_negative' => ParameterType::BOOLEAN,
             ],
         );
     }

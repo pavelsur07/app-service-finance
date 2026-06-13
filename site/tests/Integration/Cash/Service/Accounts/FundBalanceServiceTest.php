@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Integration\Fund;
+namespace App\Tests\Integration\Cash\Service\Accounts;
 
 use App\Cash\Entity\Accounts\MoneyFund;
 use App\Cash\Entity\Accounts\MoneyFundMovement;

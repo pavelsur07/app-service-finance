@@ -18,20 +18,23 @@ final class OzonRawDuplicatesCleanupExecutorTest extends IntegrationTestCase
     public function testRollbackOnFailureKeepsDataUnchanged(): void
     {
         $company = CompanyBuilder::aCompany()->withIndex(1200)->build();
+        $this->em->persist($company->getUser());
         $this->em->persist($company);
         $listing = MarketplaceListingBuilder::aListing()->withIndex(1200)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->build();
         $this->em->persist($listing);
         $day = new \DateTimeImmutable('2026-04-15');
 
-        $rawA = MarketplaceRawDocumentBuilder::aDocument()->withIndex(1201)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withDocumentType('sales_report')->withPeriod($day, $day)->withProcessingStatus('completed')->build();
+        $rawA = MarketplaceRawDocumentBuilder::aDocument()->withIndex(1201)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withDocumentType('sales_report')->withPeriod($day, $day)->withProcessingStatus('failed')->build();
         $rawB = MarketplaceRawDocumentBuilder::aDocument()->withIndex(1202)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withDocumentType('sales_report')->withPeriod($day, $day)->withProcessingStatus('completed')->withSyncedAt($day->modify('+1 day'))->build();
-        $this->em->persist($rawA); $this->em->persist($rawB);
+        $this->em->persist($rawA);
+        $this->em->persist($rawB);
 
         $saleA = MarketplaceSaleBuilder::aSale()->withIndex(1203)->forCompany($company)->forListing($listing)->withMarketplace(MarketplaceType::OZON)->withSaleDate($day)->build();
         $saleA->setRawDocumentId($rawA->getId());
         $saleB = MarketplaceSaleBuilder::aSale()->withIndex(1204)->forCompany($company)->forListing($listing)->withMarketplace(MarketplaceType::OZON)->withSaleDate($day)->build();
         $saleB->setRawDocumentId($rawB->getId());
-        $this->em->persist($saleA); $this->em->persist($saleB);
+        $this->em->persist($saleA);
+        $this->em->persist($saleB);
         $this->em->flush();
 
         $this->em->getConnection()->insert('marketplace_returns', [

@@ -25,7 +25,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
 {
     private const LEGACY_RAW_DOC_ID = '99999999-9999-4999-8999-999999999999';
 
-    private Connection $connection;
+    protected Connection $connection;
 
     protected function setUp(): void
     {
@@ -78,7 +78,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
 
         self::assertSame(0, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM marketplace_costs WHERE external_id='stale-cost'"));
         self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM marketplace_costs WHERE external_id='closed-cost' AND document_id IS NOT NULL"));
-        self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM marketplace_costs WHERE raw_document_id=:raw", ['raw' => $rawDocB]));
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_costs WHERE raw_document_id=:raw', ['raw' => $rawDocB]));
         self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM marketplace_costs WHERE external_id='foreign-cost'"));
         self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM marketplace_costs WHERE external_id='outside-cost'"));
         self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM marketplace_costs WHERE external_id='wb-cost'"));
@@ -115,7 +115,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
         }
 
         self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM marketplace_costs WHERE external_id='locked-stale-cost'"));
-        self::assertSame(0, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM marketplace_costs WHERE raw_document_id=:raw", ['raw' => $rawDocId]));
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_costs WHERE raw_document_id=:raw', ['raw' => $rawDocId]));
     }
 
     public function testReprocessAllowedWhenFinanceLockIsNull(): void
@@ -134,7 +134,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
             'amount' => 0, 'type' => 'orders', 'items' => [['sku' => 'sku-1', 'name' => 'N']], 'services' => [],
         ]], $rawDocId);
 
-        self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM marketplace_costs WHERE raw_document_id=:raw", ['raw' => $rawDocId]));
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_costs WHERE raw_document_id=:raw', ['raw' => $rawDocId]));
     }
 
     public function testReprocessAllowedWhenFinanceLockBeforeRawDocPeriod(): void
@@ -154,7 +154,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
             'amount' => 0, 'type' => 'orders', 'items' => [['sku' => 'sku-2', 'name' => 'N']], 'services' => [],
         ]], $rawDocId);
 
-        self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM marketplace_costs WHERE raw_document_id=:raw", ['raw' => $rawDocId]));
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_costs WHERE raw_document_id=:raw', ['raw' => $rawDocId]));
     }
 
     public function testCostsReprocessSameRawDocIsIdempotent(): void
@@ -252,12 +252,10 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
 
         $action($command);
 
-        self::assertSame('350.00', (string) $this->connection->fetchOne("SELECT CAST(COALESCE(SUM(amount),0) AS DECIMAL(12,2)) FROM marketplace_costs WHERE company_id = :companyId AND document_id IS NULL", ['companyId' => $company->getId()]));
+        self::assertSame('350.00', (string) $this->connection->fetchOne('SELECT CAST(COALESCE(SUM(amount),0) AS DECIMAL(12,2)) FROM marketplace_costs WHERE company_id = :companyId AND document_id IS NULL', ['companyId' => $company->getId()]));
         self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM marketplace_costs WHERE company_id = :companyId AND document_id IS NULL AND external_id LIKE 'B_%' AND amount = 250", ['companyId' => $company->getId()]));
         self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM marketplace_costs WHERE company_id = :companyId AND document_id IS NOT NULL AND external_id = 'closed-legacy-row'", ['companyId' => $company->getId()]));
     }
-
-
 
     private function buildCompanyWithOwnerIndex(int $index): Company
     {
@@ -347,6 +345,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
 
     /**
      * @param list<array{id: string, commission: float}> $rows
+     *
      * @return list<array<string, mixed>>
      */
     private function buildOrderOperations(array $rows): array
@@ -363,7 +362,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
                 'return_delivery_charge' => 0,
                 'amount' => 0,
                 'type' => 'orders',
-                'items' => [['sku' => 'sku-' . $row['id'], 'name' => 'SKU ' . $row['id']]],
+                'items' => [['sku' => 'sku-'.$row['id'], 'name' => 'SKU '.$row['id']]],
                 'services' => [],
             ];
         }

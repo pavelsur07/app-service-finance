@@ -167,7 +167,7 @@ final class AdDailySyncCommandTest extends IntegrationTestCase
 
         // Для failing-компании Ozon возвращает пустой список → Planner бросает.
         $this->clientMock->method('listAllSkuCampaigns')
-            ->willReturnCallback(function (string $companyId): array {
+            ->willReturnCallback(static function (string $companyId): array {
                 if (self::COMPANY_WITH_CONN === $companyId) {
                     return [];
                 }

@@ -15,13 +15,16 @@ final class OzonRawDuplicatesCleanupPlannerTest extends IntegrationTestCase
     public function testCanonicalSelectionPrefersFreshCompletedDaily(): void
     {
         $company = CompanyBuilder::aCompany()->withIndex(401)->build();
+        $this->em->persist($company->getUser());
         $this->em->persist($company);
 
         $day = new \DateTimeImmutable('2026-04-10');
-        $dailyOld = MarketplaceRawDocumentBuilder::aDocument()->withIndex(401)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withDocumentType('sales_report')->withPeriod($day, $day)->withProcessingStatus('completed')->withSyncedAt(new \DateTimeImmutable('2026-04-10 09:00:00'))->build();
+        $dailyOld = MarketplaceRawDocumentBuilder::aDocument()->withIndex(401)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withDocumentType('sales_report')->withPeriod($day, $day)->withProcessingStatus('failed')->withSyncedAt(new \DateTimeImmutable('2026-04-10 09:00:00'))->build();
         $range = MarketplaceRawDocumentBuilder::aDocument()->withIndex(402)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withDocumentType('sales_report')->withPeriod(new \DateTimeImmutable('2026-04-01'), new \DateTimeImmutable('2026-04-30'))->withProcessingStatus('completed')->withSyncedAt(new \DateTimeImmutable('2026-04-11 10:00:00'))->build();
         $dailyFresh = MarketplaceRawDocumentBuilder::aDocument()->withIndex(403)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withDocumentType('sales_report')->withPeriod($day, $day)->withProcessingStatus('completed')->withSyncedAt(new \DateTimeImmutable('2026-04-12 11:00:00'))->build();
-        $this->em->persist($dailyOld); $this->em->persist($range); $this->em->persist($dailyFresh);
+        $this->em->persist($dailyOld);
+        $this->em->persist($range);
+        $this->em->persist($dailyFresh);
         $this->em->flush();
 
         $planner = self::getContainer()->get(OzonRawDuplicatesCleanupPlanner::class);

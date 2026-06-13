@@ -140,7 +140,7 @@ final class OzonPollReportsCommandTest extends IntegrationTestCase
         // B: OK → state=OK без finalize (download отдельно).
         $this->clientMock
             ->method('pollOneReport')
-            ->willReturnCallback(function (string $companyId, string $uuid) use ($companyA): array {
+            ->willReturnCallback(static function (string $companyId, string $uuid) use ($companyA): array {
                 if ($companyId === $companyA) {
                     throw new \RuntimeException('network blip for company A');
                 }

@@ -45,6 +45,7 @@ final class MiniTreeFactory
         $c->setSortOrder($sort);
         if ($parent) {
             $c->setParent($parent);
+            $parent->getChildren()->add($c);
         }
         if ($formula) {
             $c->setFormula($formula);

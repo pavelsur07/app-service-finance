@@ -19,8 +19,8 @@ final class AdSpendByListingQueryTest extends IntegrationTestCase
 {
     private const COMPANY_A_ID = '11111111-1111-1111-1111-000000000001';
     private const COMPANY_B_ID = '11111111-1111-1111-1111-000000000002';
-    private const OWNER_A_ID   = '22222222-2222-2222-2222-000000000001';
-    private const OWNER_B_ID   = '22222222-2222-2222-2222-000000000002';
+    private const OWNER_A_ID = '22222222-2222-2222-2222-000000000001';
+    private const OWNER_B_ID = '22222222-2222-2222-2222-000000000002';
 
     private const LISTING_1_ID = '55555555-5555-5555-5555-000000000001';
     private const LISTING_2_ID = '55555555-5555-5555-5555-000000000002';
@@ -28,7 +28,7 @@ final class AdSpendByListingQueryTest extends IntegrationTestCase
     private const LISTING_B_ID = '55555555-5555-5555-5555-00000000000B';
 
     private const PERIOD_FROM = '2026-04-01';
-    private const PERIOD_TO   = '2026-04-30';
+    private const PERIOD_TO = '2026-04-30';
 
     private AdSpendByListingQuery $query;
     private Company $companyA;
@@ -47,35 +47,35 @@ final class AdSpendByListingQueryTest extends IntegrationTestCase
         $this->seedListings();
 
         $this->persistAdDocumentWithLine(
-            companyId:   self::COMPANY_A_ID,
+            companyId: self::COMPANY_A_ID,
             marketplace: MarketplaceType::OZON,
-            reportDate:  '2026-04-10',
-            campaignId:  'CAMP-L1-A',
-            parentSku:   'SKU-001',
-            totalCost:   '100.00',
-            listingId:   self::LISTING_1_ID,
-            lineCost:    '100.00',
+            reportDate: '2026-04-10',
+            campaignId: 'CAMP-L1-A',
+            parentSku: 'SKU-001',
+            totalCost: '100.00',
+            listingId: self::LISTING_1_ID,
+            lineCost: '100.00',
         );
         // Второе документ-строка по тому же листингу — суммируется
         $this->persistAdDocumentWithLine(
-            companyId:   self::COMPANY_A_ID,
+            companyId: self::COMPANY_A_ID,
             marketplace: MarketplaceType::OZON,
-            reportDate:  '2026-04-15',
-            campaignId:  'CAMP-L1-B',
-            parentSku:   'SKU-001',
-            totalCost:   '50.00',
-            listingId:   self::LISTING_1_ID,
-            lineCost:    '50.00',
+            reportDate: '2026-04-15',
+            campaignId: 'CAMP-L1-B',
+            parentSku: 'SKU-001',
+            totalCost: '50.00',
+            listingId: self::LISTING_1_ID,
+            lineCost: '50.00',
         );
         $this->persistAdDocumentWithLine(
-            companyId:   self::COMPANY_A_ID,
+            companyId: self::COMPANY_A_ID,
             marketplace: MarketplaceType::OZON,
-            reportDate:  '2026-04-20',
-            campaignId:  'CAMP-L2',
-            parentSku:   'SKU-002',
-            totalCost:   '70.50',
-            listingId:   self::LISTING_2_ID,
-            lineCost:    '70.50',
+            reportDate: '2026-04-20',
+            campaignId: 'CAMP-L2',
+            parentSku: 'SKU-002',
+            totalCost: '70.50',
+            listingId: self::LISTING_2_ID,
+            lineCost: '70.50',
         );
         $this->em->flush();
         $this->em->clear();
@@ -99,24 +99,24 @@ final class AdSpendByListingQueryTest extends IntegrationTestCase
         $this->seedListings();
 
         $this->persistAdDocumentWithLine(
-            companyId:   self::COMPANY_A_ID,
+            companyId: self::COMPANY_A_ID,
             marketplace: MarketplaceType::OZON,
-            reportDate:  '2026-04-10',
-            campaignId:  'CAMP-OZON',
-            parentSku:   'SKU-001',
-            totalCost:   '100.00',
-            listingId:   self::LISTING_1_ID,
-            lineCost:    '100.00',
+            reportDate: '2026-04-10',
+            campaignId: 'CAMP-OZON',
+            parentSku: 'SKU-001',
+            totalCost: '100.00',
+            listingId: self::LISTING_1_ID,
+            lineCost: '100.00',
         );
         $this->persistAdDocumentWithLine(
-            companyId:   self::COMPANY_A_ID,
+            companyId: self::COMPANY_A_ID,
             marketplace: MarketplaceType::WILDBERRIES,
-            reportDate:  '2026-04-12',
-            campaignId:  'CAMP-WB',
-            parentSku:   'WB-001',
-            totalCost:   '40.00',
-            listingId:   self::LISTING_WB_ID,
-            lineCost:    '40.00',
+            reportDate: '2026-04-12',
+            campaignId: 'CAMP-WB',
+            parentSku: 'WB-001',
+            totalCost: '40.00',
+            listingId: self::LISTING_WB_ID,
+            lineCost: '40.00',
         );
         $this->em->flush();
         $this->em->clear();
@@ -154,14 +154,14 @@ final class AdSpendByListingQueryTest extends IntegrationTestCase
 
         // Запись ВНЕ периода — не должна попасть в результат
         $this->persistAdDocumentWithLine(
-            companyId:   self::COMPANY_A_ID,
+            companyId: self::COMPANY_A_ID,
             marketplace: MarketplaceType::OZON,
-            reportDate:  '2026-03-15',
-            campaignId:  'CAMP-OUT',
-            parentSku:   'SKU-001',
-            totalCost:   '100.00',
-            listingId:   self::LISTING_1_ID,
-            lineCost:    '100.00',
+            reportDate: '2026-03-15',
+            campaignId: 'CAMP-OUT',
+            parentSku: 'SKU-001',
+            totalCost: '100.00',
+            listingId: self::LISTING_1_ID,
+            lineCost: '100.00',
         );
         $this->em->flush();
         $this->em->clear();
@@ -186,24 +186,24 @@ final class AdSpendByListingQueryTest extends IntegrationTestCase
         $orphanListingId = '99999999-9999-9999-9999-000000000001';
 
         $this->persistAdDocumentWithLine(
-            companyId:   self::COMPANY_A_ID,
+            companyId: self::COMPANY_A_ID,
             marketplace: MarketplaceType::OZON,
-            reportDate:  '2026-04-10',
-            campaignId:  'CAMP-LIVE',
-            parentSku:   'SKU-001',
-            totalCost:   '100.00',
-            listingId:   self::LISTING_1_ID,
-            lineCost:    '100.00',
+            reportDate: '2026-04-10',
+            campaignId: 'CAMP-LIVE',
+            parentSku: 'SKU-001',
+            totalCost: '100.00',
+            listingId: self::LISTING_1_ID,
+            lineCost: '100.00',
         );
         $this->persistAdDocumentWithLine(
-            companyId:   self::COMPANY_A_ID,
+            companyId: self::COMPANY_A_ID,
             marketplace: MarketplaceType::OZON,
-            reportDate:  '2026-04-12',
-            campaignId:  'CAMP-ORPHAN',
-            parentSku:   'SKU-ORPHAN',
-            totalCost:   '42.00',
-            listingId:   $orphanListingId,
-            lineCost:    '42.00',
+            reportDate: '2026-04-12',
+            campaignId: 'CAMP-ORPHAN',
+            parentSku: 'SKU-ORPHAN',
+            totalCost: '42.00',
+            listingId: $orphanListingId,
+            lineCost: '42.00',
         );
         $this->em->flush();
         $this->em->clear();
@@ -226,24 +226,24 @@ final class AdSpendByListingQueryTest extends IntegrationTestCase
         $this->seedListings();
 
         $this->persistAdDocumentWithLine(
-            companyId:   self::COMPANY_A_ID,
+            companyId: self::COMPANY_A_ID,
             marketplace: MarketplaceType::OZON,
-            reportDate:  '2026-04-10',
-            campaignId:  'CAMP-A',
-            parentSku:   'SKU-001',
-            totalCost:   '100.00',
-            listingId:   self::LISTING_1_ID,
-            lineCost:    '100.00',
+            reportDate: '2026-04-10',
+            campaignId: 'CAMP-A',
+            parentSku: 'SKU-001',
+            totalCost: '100.00',
+            listingId: self::LISTING_1_ID,
+            lineCost: '100.00',
         );
         $this->persistAdDocumentWithLine(
-            companyId:   self::COMPANY_B_ID,
+            companyId: self::COMPANY_B_ID,
             marketplace: MarketplaceType::OZON,
-            reportDate:  '2026-04-15',
-            campaignId:  'CAMP-B',
-            parentSku:   'SKU-B',
-            totalCost:   '999.00',
-            listingId:   self::LISTING_B_ID,
-            lineCost:    '999.00',
+            reportDate: '2026-04-15',
+            campaignId: 'CAMP-B',
+            parentSku: 'SKU-B',
+            totalCost: '999.00',
+            listingId: self::LISTING_B_ID,
+            lineCost: '999.00',
         );
         $this->em->flush();
         $this->em->clear();

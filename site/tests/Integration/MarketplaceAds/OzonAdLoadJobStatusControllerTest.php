@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Integration\MarketplaceAds;
 
 use App\Marketplace\Enum\MarketplaceType;
-use App\MarketplaceAds\Entity\AdLoadJob;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\MarketplaceAds\AdLoadJobBuilder;
@@ -14,9 +13,9 @@ use App\Tests\Support\Kernel\WebTestCaseBase;
 
 final class OzonAdLoadJobStatusControllerTest extends WebTestCaseBase
 {
-    private const COMPANY_ID       = '11111111-1111-1111-1111-b00000000001';
+    private const COMPANY_ID = '11111111-1111-1111-1111-b00000000001';
     private const OTHER_COMPANY_ID = '11111111-1111-1111-1111-b00000000002';
-    private const OWNER_ID         = '22222222-2222-2222-2222-b00000000001';
+    private const OWNER_ID = '22222222-2222-2222-2222-b00000000001';
 
     public function testReturns200WithCorrectCounts(): void
     {
@@ -66,11 +65,9 @@ final class OzonAdLoadJobStatusControllerTest extends WebTestCaseBase
         $em->flush();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
-        $client->request('GET', '/api/marketplace-ads/ozon/load-jobs/' . $job->getId() . '/status');
+        $client->request('GET', '/api/marketplace-ads/ozon/load-jobs/'.$job->getId().'/status');
 
         self::assertResponseIsSuccessful();
 
@@ -108,9 +105,7 @@ final class OzonAdLoadJobStatusControllerTest extends WebTestCaseBase
         $em->flush();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
         $client->request('GET', '/api/marketplace-ads/ozon/load-jobs/99999999-9999-9999-9999-999999999999/status');
 
@@ -157,11 +152,9 @@ final class OzonAdLoadJobStatusControllerTest extends WebTestCaseBase
 
         // Logged in as owner of company (not otherCompany)
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
-        $client->request('GET', '/api/marketplace-ads/ozon/load-jobs/' . $job->getId() . '/status');
+        $client->request('GET', '/api/marketplace-ads/ozon/load-jobs/'.$job->getId().'/status');
 
         self::assertResponseStatusCodeSame(404);
     }

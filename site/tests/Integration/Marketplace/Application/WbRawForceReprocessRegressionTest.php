@@ -6,6 +6,7 @@ namespace App\Tests\Integration\Marketplace\Application;
 
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
+use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceRawDocumentBuilder;
@@ -16,6 +17,7 @@ final class WbRawForceReprocessRegressionTest extends IntegrationTestCase
     public function testForceReprocessReplacesWbSalesAndReturnsByRawDocument(): void
     {
         $company = CompanyBuilder::aCompany()->withIndex(401)->build();
+        $this->em->persist($company->getUser());
         $this->em->persist($company);
 
         $rawDocId = '99999999-aaaa-4aaa-8aaa-111111111111';
@@ -41,11 +43,14 @@ final class WbRawForceReprocessRegressionTest extends IntegrationTestCase
         self::assertSame(1000.0, $this->saleAmount($company->getId(), $rawDocId, 'SRID-SALE-1'));
         self::assertSame(500.0, $this->returnAmount($company->getId(), $rawDocId, 'SRID-RETURN-1'));
 
+        $rawDoc = $this->em->getRepository(MarketplaceRawDocument::class)->find($rawDocId);
+        self::assertInstanceOf(MarketplaceRawDocument::class, $rawDoc);
         $rawDoc->setRawData([
             $this->makeWbSaleRow('SRID-SALE-1', 1700.0),
             $this->makeWbReturnRow('SRID-RETURN-1', 900.0),
         ]);
         $this->em->flush();
+        $this->em->clear();
 
         $action(new ProcessMarketplaceRawDocumentCommand((string) $company->getId(), $rawDocId, 'sales', true));
         $action(new ProcessMarketplaceRawDocumentCommand((string) $company->getId(), $rawDocId, 'returns', true));

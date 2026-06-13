@@ -103,9 +103,9 @@ final class ProcessCostsNewCategoryTest extends IntegrationTestCase
         /** @var MarketplaceCostCategoryRepository $categoryRepo */
         $categoryRepo = self::getContainer()->get(MarketplaceCostCategoryRepository::class);
         $found = $categoryRepo->findBy([
-            'company'     => $company,
+            'company' => $company,
             'marketplace' => MarketplaceType::OZON,
-            'code'        => 'ozon_sale_commission',
+            'code' => 'ozon_sale_commission',
         ]);
 
         self::assertCount(1, $found, 'Exactly one category must be persisted for the code.');

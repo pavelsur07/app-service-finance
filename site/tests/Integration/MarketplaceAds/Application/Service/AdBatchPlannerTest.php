@@ -164,7 +164,7 @@ final class AdBatchPlannerTest extends IntegrationTestCase
         $conn = $this->em->getConnection();
         $rows = $conn->fetchAllAssociative(
             'SELECT batch_index, EXTRACT(EPOCH FROM scheduled_at)::bigint AS ts '
-            . 'FROM marketplace_ad_scheduled_batches WHERE job_id = :jobId ORDER BY batch_index',
+            .'FROM marketplace_ad_scheduled_batches WHERE job_id = :jobId ORDER BY batch_index',
             ['jobId' => $job->getId()],
         );
 
@@ -200,8 +200,8 @@ final class AdBatchPlannerTest extends IntegrationTestCase
         $conn = $this->em->getConnection();
         $deltaSeconds = (int) $conn->fetchOne(
             'SELECT EXTRACT(EPOCH FROM (scheduled_at - NOW()))::bigint '
-            . 'FROM marketplace_ad_scheduled_batches '
-            . 'WHERE job_id = :jobId AND batch_index = 0',
+            .'FROM marketplace_ad_scheduled_batches '
+            .'WHERE job_id = :jobId AND batch_index = 0',
             ['jobId' => $job->getId()],
         );
 

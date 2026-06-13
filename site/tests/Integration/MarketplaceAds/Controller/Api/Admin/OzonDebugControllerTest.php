@@ -361,7 +361,7 @@ final class OzonDebugControllerTest extends WebTestCaseBase
     private function setHttpClient(KernelBrowser $client, array $responses): void
     {
         $i = 0;
-        $callable = function (string $method, string $url, array $options) use ($responses, &$i): ResponseInterface {
+        $callable = static function (string $method, string $url, array $options) use ($responses, &$i): ResponseInterface {
             if (!isset($responses[$i])) {
                 throw new \LogicException(sprintf('MockHttpClient: no scripted response for #%d (%s %s)', $i + 1, $method, $url));
             }
@@ -427,9 +427,7 @@ final class OzonDebugControllerTest extends WebTestCaseBase
     private function loginAs(KernelBrowser $client, \App\Company\Entity\User $user): void
     {
         $client->loginUser($user);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
     }
 
     /**

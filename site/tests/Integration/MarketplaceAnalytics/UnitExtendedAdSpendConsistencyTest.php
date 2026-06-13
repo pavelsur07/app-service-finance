@@ -28,16 +28,16 @@ use Ramsey\Uuid\Uuid;
 final class UnitExtendedAdSpendConsistencyTest extends IntegrationTestCase
 {
     private const TEST_COMPANY_ID = '11111111-1111-1111-1111-000000000001';
-    private const OWNER_ID        = '22222222-2222-2222-2222-000000000001';
+    private const OWNER_ID = '22222222-2222-2222-2222-000000000001';
 
     private const LISTING_OZON_1_ID = '55555555-5555-5555-5555-000000000001';
     private const LISTING_OZON_2_ID = '55555555-5555-5555-5555-000000000002';
     private const LISTING_OZON_3_ID = '55555555-5555-5555-5555-000000000003';
-    private const LISTING_WB_ID     = '55555555-5555-5555-5555-000000000004';
+    private const LISTING_WB_ID = '55555555-5555-5555-5555-000000000004';
     private const ORPHAN_LISTING_ID = '99999999-9999-9999-9999-000000000077';
 
     private const PERIOD_FROM = '2025-01-01';
-    private const PERIOD_TO   = '2025-01-31';
+    private const PERIOD_TO = '2025-01-31';
 
     private const ORPHAN_AD_SPEND = '777.00';
 
@@ -54,11 +54,11 @@ final class UnitExtendedAdSpendConsistencyTest extends IntegrationTestCase
         $this->seedFixtures();
     }
 
-    public function test_totals_adSpend_matches_efficiency_for_same_period(): void
+    public function testTotalsAdSpendMatchesEfficiencyForSamePeriod(): void
     {
         $companyId = self::TEST_COMPANY_ID;
         $from = self::PERIOD_FROM;
-        $to   = self::PERIOD_TO;
+        $to = self::PERIOD_TO;
         $marketplace = null;
 
         $efficiencyResult = $this->adEfficiencyQuery->getPage(
@@ -103,11 +103,11 @@ final class UnitExtendedAdSpendConsistencyTest extends IntegrationTestCase
         );
     }
 
-    public function test_totals_adSpend_matches_efficiency_with_marketplace_filter(): void
+    public function testTotalsAdSpendMatchesEfficiencyWithMarketplaceFilter(): void
     {
         $companyId = self::TEST_COMPANY_ID;
         $from = self::PERIOD_FROM;
-        $to   = self::PERIOD_TO;
+        $to = self::PERIOD_TO;
 
         // OZON: содержит non-attributed РР (orphan размещён в Ozon-доке)
         $efficiencyOzon = $this->adEfficiencyQuery->getPage(
@@ -200,17 +200,17 @@ final class UnitExtendedAdSpendConsistencyTest extends IntegrationTestCase
         $listingOzon1 = $this->newListing(self::LISTING_OZON_1_ID, $company, MarketplaceType::OZON, 'SKU-O-1', 'Ozon товар 1');
         $listingOzon2 = $this->newListing(self::LISTING_OZON_2_ID, $company, MarketplaceType::OZON, 'SKU-O-2', 'Ozon товар 2');
         $listingOzon3 = $this->newListing(self::LISTING_OZON_3_ID, $company, MarketplaceType::OZON, 'SKU-O-3', 'Ozon товар 3');
-        $listingWb    = $this->newListing(self::LISTING_WB_ID,    $company, MarketplaceType::WILDBERRIES, 'WB-1', 'WB товар');
+        $listingWb = $this->newListing(self::LISTING_WB_ID, $company, MarketplaceType::WILDBERRIES, 'WB-1', 'WB товар');
 
         foreach ([$listingOzon1, $listingOzon2, $listingOzon3, $listingWb] as $l) {
             $this->em->persist($l);
         }
 
         // --- Sales (для построения строк unit-extended) ---
-        $this->persistSale($company, $listingOzon1, MarketplaceType::OZON,        '2025-01-10', '1000.00', 1, 'ORD-O-1');
-        $this->persistSale($company, $listingOzon2, MarketplaceType::OZON,        '2025-01-12', '500.00',  1, 'ORD-O-2');
-        $this->persistSale($company, $listingOzon3, MarketplaceType::OZON,        '2025-01-15', '300.00',  1, 'ORD-O-3');
-        $this->persistSale($company, $listingWb,    MarketplaceType::WILDBERRIES, '2025-01-20', '600.00',  1, 'ORD-WB-1');
+        $this->persistSale($company, $listingOzon1, MarketplaceType::OZON, '2025-01-10', '1000.00', 1, 'ORD-O-1');
+        $this->persistSale($company, $listingOzon2, MarketplaceType::OZON, '2025-01-12', '500.00', 1, 'ORD-O-2');
+        $this->persistSale($company, $listingOzon3, MarketplaceType::OZON, '2025-01-15', '300.00', 1, 'ORD-O-3');
+        $this->persistSale($company, $listingWb, MarketplaceType::WILDBERRIES, '2025-01-20', '600.00', 1, 'ORD-WB-1');
 
         $this->em->flush();
 
