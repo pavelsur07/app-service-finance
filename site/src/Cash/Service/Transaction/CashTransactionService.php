@@ -3,6 +3,7 @@
 namespace App\Cash\Service\Transaction;
 
 use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
+use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
@@ -12,12 +13,11 @@ use App\Cash\Service\PaymentPlan\PaymentPlanMatcher;
 use App\Cash\Service\Vat\VatCalculator;
 use App\Cash\Service\Vat\VatPolicy;
 use App\Company\Entity\Company;
-use App\Cash\DTO\CashTransactionDTO;
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
-use App\Exception\CurrencyMismatchException;
-use App\Message\ApplyAutoRulesForTransaction;
-use App\Service\DailyBalanceRecalculator;
+use App\Cash\Exception\CurrencyMismatchException;
+use App\Cash\Message\ApplyAutoRulesForTransaction;
+use App\Cash\Application\Service\DailyBalanceRecalculator;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Exception\ORMException;
 use Ramsey\Uuid\Uuid;

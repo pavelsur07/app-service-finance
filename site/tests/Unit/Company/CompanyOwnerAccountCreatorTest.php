@@ -9,7 +9,7 @@ use App\Company\Entity\CompanyMember;
 use App\Company\Entity\User;
 use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Service\CompanyOwnerAccountCreator;
-use App\Message\SendRegistrationEmailMessage;
+use App\Company\Message\SendRegistrationEmailMessage;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;

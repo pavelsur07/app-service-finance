@@ -3,13 +3,13 @@
 namespace App\Tests\Unit\Cash\Service;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
-use App\Cash\Enum\Accounts\MoneyAccountType;
-use App\Service\DailyBalanceRecalculator;
+use App\Cash\Application\Service\DailyBalanceRecalculator;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
@@ -60,7 +60,7 @@ class DailyBalanceRecalculatorTest extends TestCase
         $txQb->method('setParameter')->willReturnSelf();
         $txWhere = [];
         $txQb->method('andWhere')
-            ->willReturnCallback(function (string $expr) use (&$txWhere, $txQb): QueryBuilder {
+            ->willReturnCallback(static function (string $expr) use (&$txWhere, $txQb): QueryBuilder {
                 $txWhere[] = $expr;
 
                 return $txQb;

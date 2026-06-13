@@ -7,7 +7,7 @@ namespace App\Admin\Controller;
 use App\Admin\Form\AdminAccountCreateType;
 use App\Admin\Service\UserDeletionService;
 use App\Company\Entity\User;
-use App\Repository\UserRepository;
+use App\Company\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

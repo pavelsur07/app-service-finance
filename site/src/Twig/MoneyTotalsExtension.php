@@ -3,7 +3,7 @@
 namespace App\Twig;
 
 use App\Cash\Service\Accounts\MoneyTotalsWidgetProvider;
-use App\Service\FeatureFlagService;
+use App\Shared\Service\FeatureFlagService;
 use App\Shared\Service\ActiveCompanyService;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;

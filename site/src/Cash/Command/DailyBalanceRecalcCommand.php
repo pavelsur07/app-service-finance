@@ -3,7 +3,7 @@
 namespace App\Cash\Command;
 
 use App\Company\Infrastructure\Repository\CompanyRepository;
-use App\Service\DailyBalanceRecalculator;
+use App\Cash\Application\Service\DailyBalanceRecalculator;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;

@@ -10,7 +10,7 @@ use App\Cash\Repository\Accounts\MoneyFundRepository;
 use App\Cash\Service\Accounts\FundBalanceService;
 use App\Cash\Service\Accounts\FundService;
 use App\Company\Entity\User;
-use App\Service\FeatureFlagService;
+use App\Shared\Service\FeatureFlagService;
 use App\Shared\Service\ActiveCompanyService;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

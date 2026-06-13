@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Admin;
 
 use App\Company\Entity\Company;
-use App\Repository\UserRepository;
+use App\Company\Repository\UserRepository;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Symfony\Component\HttpFoundation\Response;

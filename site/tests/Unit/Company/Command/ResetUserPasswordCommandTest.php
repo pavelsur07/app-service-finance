@@ -6,7 +6,7 @@ namespace App\Tests\Unit\Company\Command;
 
 use App\Company\Command\ResetUserPasswordCommand;
 use App\Company\Entity\User;
-use App\Repository\UserRepository;
+use App\Company\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;

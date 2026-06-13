@@ -2,7 +2,7 @@
 
 namespace App\Cash\Command;
 
-use App\Message\EnqueueAutoRulesForRange;
+use App\Cash\Message\EnqueueAutoRulesForRange;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
