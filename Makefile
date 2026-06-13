@@ -54,7 +54,7 @@ site-test-unit:
 site-test-int: site-test-integration
 
 site-test-integration: site-test-wait-db
-	$(DOCKER_COMPOSE) run --rm site-php-cli composer test:integration
+	$(DOCKER_COMPOSE) run --rm -e COMPOSER_PROCESS_TIMEOUT=0 site-php-cli composer test:integration
 
 # Все тесты
 site-test: site-test-prepare
