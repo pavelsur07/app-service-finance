@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace App\Company\Command;
 
 use App\Company\Entity\User;
-use App\Repository\UserRepository;
+use App\Company\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 #[AsCommand(
@@ -39,7 +39,7 @@ final class ResetUserPasswordCommand extends Command
         $email = User::normalizeEmail((string) $input->getArgument('email'));
         $escapedEmail = OutputFormatter::escape($email);
 
-        if (false === filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        if (false === filter_var($email, \FILTER_VALIDATE_EMAIL)) {
             $output->writeln(sprintf('<error>Invalid email format: "%s".</error>', $escapedEmail));
 
             return Command::FAILURE;

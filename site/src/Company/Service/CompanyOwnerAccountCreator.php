@@ -8,7 +8,7 @@ use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
 use App\Company\Entity\User;
 use App\Company\Repository\CompanyMemberRepository;
-use App\Message\SendRegistrationEmailMessage;
+use App\Company\Message\SendRegistrationEmailMessage;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Messenger\MessageBusInterface;

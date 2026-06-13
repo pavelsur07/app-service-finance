@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Finance\Controller;
 
+use App\Company\Repository\ProjectDirectionRepository;
+use App\Finance\Application\Service\PLRegisterUpdater;
 use App\Finance\Report\PlReportGridBuilder;
 use App\Finance\Report\PlReportPeriod;
 use App\Finance\Report\PlReportProjectsCompareBuilder;
-use App\Company\Repository\ProjectDirectionRepository;
-use App\Service\Onboarding\AccountBootstrapper;
-use App\Finance\Application\Service\PLRegisterUpdater;
+use App\Company\Application\Service\AccountBootstrapper;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -148,7 +148,7 @@ final class PlReportPreviewController extends AbstractController
     /**
      * Экспорт отчёта P&L в JSON для отладки и проверки.
      * Принимает те же query-параметры, что и /finance/report/preview.
-     * Скачивает файл вида pl_report_2024-01-01_2024-03-31.json
+     * Скачивает файл вида pl_report_2024-01-01_2024-03-31.json.
      */
     #[Route('/finance/report/preview/json', name: 'finance_report_preview_json', methods: ['GET'])]
     public function exportJson(

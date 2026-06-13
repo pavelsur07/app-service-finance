@@ -3,8 +3,8 @@
 namespace App\Cash\EventSubscriber\Transaction;
 
 use App\Cash\Entity\Transaction\CashTransaction;
-use App\Message\EnqueueAutoRulesForRange;
-use App\Service\DebouncedRangeEnqueuer;
+use App\Cash\Message\EnqueueAutoRulesForRange;
+use App\Cash\Application\Service\DebouncedRangeEnqueuer;
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
 use Doctrine\Common\EventSubscriber;
 use Doctrine\ORM\Events;

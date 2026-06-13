@@ -7,7 +7,7 @@ namespace App\Admin\Controller;
 use App\Admin\Application\CreateAccountAction;
 use App\Admin\Form\AdminAccountCreateType;
 use App\Company\Entity\User;
-use App\Repository\UserRepository;
+use App\Company\Repository\UserRepository;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormInterface;

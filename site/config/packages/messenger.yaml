@@ -52,7 +52,7 @@ framework:
             'App\Marketplace\Application\Command\FetchMarketplaceDataCommand': async_sync
             'App\Cash\Message\Import\BankImportMessage': async_sync
             'App\Cash\Message\Import\CashFileImportMessage': async_sync
-            'App\Message\SendRegistrationEmailMessage': async_sync
+            'App\Company\Message\SendRegistrationEmailMessage': async_sync
             'Symfony\Component\Mailer\Messenger\SendEmailMessage': async_sync
             'Symfony\Component\Notifier\Message\ChatMessage': async_sync
             'Symfony\Component\Notifier\Message\SmsMessage': async_sync
@@ -66,8 +66,8 @@ framework:
             'App\Marketplace\Message\RebuildPreliminaryForPeriodMessage': async_pipeline
             'App\Marketplace\Message\ImportInventoryCostPriceMessage': async_pipeline
             'App\Catalog\Message\ImportProductsMessage': async_pipeline
-            'App\Message\ApplyAutoRulesForTransaction': async_pipeline
-            'App\Message\EnqueueAutoRulesForRange': async_pipeline
+            'App\Cash\Message\ApplyAutoRulesForTransaction': async_pipeline
+            'App\Cash\Message\EnqueueAutoRulesForRange': async_pipeline
             'App\MarketplaceAnalytics\Message\RecalcSnapshotsMessage': async_pipeline
             'App\MarketplaceAds\Message\ProcessAdRawDocumentMessage': async_pipeline
             'App\MarketplaceAds\Message\DownloadOzonAdReportMessage': async_pipeline

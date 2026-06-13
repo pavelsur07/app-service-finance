@@ -71,7 +71,7 @@ services:
         arguments:
             $financeRetryDelaySeconds: '%wb_finance.rate_limit_interval_seconds%'
 
-    App\Service\FeatureFlagService:
+    App\Shared\Service\FeatureFlagService:
         arguments:
             $fundsAndWidgetEnabled: '%feature_funds_and_widget%'
 
