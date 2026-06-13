@@ -6,7 +6,7 @@ use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Category\CashflowSystemCategoryService;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
-use App\Message\ApplyAutoRulesForTransaction;
+use App\Cash\Message\ApplyAutoRulesForTransaction;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
