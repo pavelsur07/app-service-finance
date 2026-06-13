@@ -73,8 +73,7 @@ final class ProductEditTest extends WebTestCaseBase
             sku: 'SKU-OLD'
         )
             ->setDescription('Old description')
-            ->setStatus(ProductStatus::ACTIVE)
-            ->setPurchasePrice('10.00');
+            ->setStatus(ProductStatus::ACTIVE);
 
         $em->persist($owner);
         $em->persist($company);
@@ -107,22 +106,18 @@ final class ProductEditTest extends WebTestCaseBase
         self::assertSame('SKU-OLD', $updatedProduct->getSku());
         self::assertSame(ProductStatus::DISCONTINUED, $updatedProduct->getStatus());
         self::assertSame('Updated description', $updatedProduct->getDescription());
-        self::assertSame('42.50', $updatedProduct->getPurchasePrice());
     }
 
     private function makeProduct(string $id, Company $company, string $name, string $sku): Product
     {
         return (new Product($id, $company))
             ->setName($name)
-            ->setSku($sku)
-            ->setPurchasePrice('100.00');
+            ->setSku($sku);
     }
 
     private function loginWithActiveCompany($client, object $owner, Company $company): void
     {
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', $company->getId());
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
     }
 }

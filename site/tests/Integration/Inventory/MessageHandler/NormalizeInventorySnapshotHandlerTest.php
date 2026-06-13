@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Inventory\MessageHandler;
 
 use App\Company\Entity\Company;
-use App\Inventory\Entity\InventoryRawSnapshot;
 use App\Inventory\Entity\InventorySnapshotSession;
 use App\Inventory\Entity\StockSnapshot;
 use App\Inventory\Enum\SnapshotSessionStatus;
@@ -78,7 +77,6 @@ final class NormalizeInventorySnapshotHandlerTest extends IntegrationTestCase
         self::assertSame(SnapshotSessionStatus::Completed, $session->getStatus());
     }
 
-
     public function testTechnicalExceptionIsRethrownForMessengerRetry(): void
     {
         $company = $this->createCompany(953);
@@ -88,6 +86,7 @@ final class NormalizeInventorySnapshotHandlerTest extends IntegrationTestCase
         $this->expectException(\Throwable::class);
         $handler(new NormalizeInventorySnapshotMessage($company->getId(), 'not-a-uuid', MarketplaceType::OZON->value));
     }
+
     private function createCompany(int $index): Company
     {
         $user = UserBuilder::aUser()->withIndex($index)->build();
@@ -99,4 +98,3 @@ final class NormalizeInventorySnapshotHandlerTest extends IntegrationTestCase
         return $company;
     }
 }
-

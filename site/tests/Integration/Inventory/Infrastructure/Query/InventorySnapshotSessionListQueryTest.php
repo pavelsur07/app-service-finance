@@ -17,7 +17,7 @@ final class InventorySnapshotSessionListQueryTest extends IntegrationTestCase
     private const OTHER_COMPANY_ID = '11111111-1111-1111-1111-000000000602';
 
     private InventorySnapshotSessionListQuery $query;
-    private Connection $connection;
+    protected Connection $connection;
 
     protected function setUp(): void
     {

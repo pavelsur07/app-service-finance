@@ -208,10 +208,14 @@ final class AdJobFinalizerCommandTest extends IntegrationTestCase
 
     private function persistBatch(AdLoadJob $job, int $batchIndex, AdScheduledBatchState $state): void
     {
+        $jobIndex = (int) substr($job->getId(), -12);
+        $batchId = sprintf('bbbbbbbb-bbbb-bbbb-bbbb-%012d', ($jobIndex * 1000) + $batchIndex);
+
         $batch = AdScheduledBatchBuilder::aBatch()
             ->withJobId($job->getId())
             ->withCompanyId(self::COMPANY_ID)
             ->withIndex($batchIndex)
+            ->withId($batchId)
             ->withState($state)
             ->build();
 

@@ -268,8 +268,6 @@ final class DownloadBronzeControllerTest extends WebTestCaseBase
     private function loginAs($client, $user, string $companyId): void
     {
         $client->loginUser($user);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', $companyId);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', $companyId);
     }
 }

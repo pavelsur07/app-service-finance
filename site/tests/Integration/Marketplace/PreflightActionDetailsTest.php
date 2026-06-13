@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Marketplace;
 
 use App\Company\Entity\Company;
-use App\Finance\Entity\PLCategory;
-use App\Finance\Enum\PLFlow;
+use App\Finance\Entity\Document;
 use App\Marketplace\Application\Command\PreflightMonthCloseCommand;
 use App\Marketplace\Application\MonthClosePreflightAction;
 use App\Marketplace\Entity\MarketplaceCost;
@@ -30,14 +29,14 @@ use Ramsey\Uuid\Uuid;
  */
 final class PreflightActionDetailsTest extends IntegrationTestCase
 {
-    private const COMPANY_ID  = '33333333-3333-3333-3333-000000000001';
-    private const OWNER_ID    = '44444444-4444-4444-4444-000000000001';
+    private const COMPANY_ID = '33333333-3333-3333-3333-000000000001';
+    private const OWNER_ID = '44444444-4444-4444-4444-000000000001';
     private const MARKETPLACE = MarketplaceType::OZON;
     private const MARKETPLACE_VALUE = 'ozon';
-    private const YEAR  = 2026;
+    private const YEAR = 2026;
     private const MONTH = 3;
     private const PERIOD_FROM = '2026-03-01';
-    private const PERIOD_TO   = '2026-03-31';
+    private const PERIOD_TO = '2026-03-31';
 
     private Company $company;
     private MonthClosePreflightAction $action;
@@ -163,12 +162,12 @@ final class PreflightActionDetailsTest extends IntegrationTestCase
         // session_replication_role=replica disables FK trigger checks so we can
         // point listing_id at a UUID that doesn't exist in marketplace_listings.
         $conn = $this->em->getConnection();
-        $conn->executeStatement("SET session_replication_role = replica");
+        $conn->executeStatement('SET session_replication_role = replica');
         $conn->executeStatement(
             'UPDATE marketplace_sales SET listing_id = :fakeId WHERE id = :id',
-            ['fakeId' => \Ramsey\Uuid\Uuid::uuid4()->toString(), 'id' => $orphanSaleId],
+            ['fakeId' => Uuid::uuid4()->toString(), 'id' => $orphanSaleId],
         );
-        $conn->executeStatement("SET session_replication_role = DEFAULT");
+        $conn->executeStatement('SET session_replication_role = DEFAULT');
 
         $result = ($this->action)($this->makeSalesCommand());
 
@@ -177,8 +176,8 @@ final class PreflightActionDetailsTest extends IntegrationTestCase
         self::assertFalse($check->passed);
         self::assertCount(2, $check->details, 'details должен содержать SKU-элемент и orphan-элемент');
 
-        $skuItems    = array_values(array_filter($check->details, static fn($d) => !($d['orphan'] ?? false)));
-        $orphanItems = array_values(array_filter($check->details, static fn($d) => $d['orphan'] ?? false));
+        $skuItems = array_values(array_filter($check->details, static fn ($d) => !($d['orphan'] ?? false)));
+        $orphanItems = array_values(array_filter($check->details, static fn ($d) => $d['orphan'] ?? false));
 
         self::assertCount(1, $skuItems);
         self::assertSame('SKU-WITH-LISTING', $skuItems[0]['marketplace_sku']);
@@ -193,13 +192,13 @@ final class PreflightActionDetailsTest extends IntegrationTestCase
     public function testSalesAlreadyProcessedBlocksCloseAndCanCloseIsFalse(): void
     {
         $listing = $this->createListing('SKU-PROCESSED-SALE');
-        $sale    = $this->createSale($listing, costPrice: '100.00', date: '2026-03-10');
+        $sale = $this->createSale($listing, costPrice: '100.00', date: '2026-03-10');
         $this->em->flush();
 
         $this->markRowAsProcessed('marketplace_sales', $sale->getId());
 
         $result = ($this->action)($this->makeSalesCommand());
-        $check  = $this->findCheck($result->checks, 'sales_already_processed');
+        $check = $this->findCheck($result->checks, 'sales_already_processed');
 
         self::assertNotNull($check, 'Проверка sales_already_processed должна присутствовать');
         self::assertFalse($check->passed);
@@ -211,13 +210,13 @@ final class PreflightActionDetailsTest extends IntegrationTestCase
     public function testReturnsAlreadyProcessedBlocksCloseAndCanCloseIsFalse(): void
     {
         $listing = $this->createListing('SKU-PROCESSED-RETURN');
-        $return  = $this->createReturn($listing, costPrice: '120.00', date: '2026-03-10');
+        $return = $this->createReturn($listing, costPrice: '120.00', date: '2026-03-10');
         $this->em->flush();
 
         $this->markRowAsProcessed('marketplace_returns', $return->getId());
 
         $result = ($this->action)($this->makeSalesCommand());
-        $check  = $this->findCheck($result->checks, 'returns_already_processed');
+        $check = $this->findCheck($result->checks, 'returns_already_processed');
 
         self::assertNotNull($check, 'Проверка returns_already_processed должна присутствовать');
         self::assertFalse($check->passed);
@@ -290,12 +289,12 @@ final class PreflightActionDetailsTest extends IntegrationTestCase
             $listing,
             self::MARKETPLACE,
         );
-        $sale->setExternalOrderId('ext-' . Uuid::uuid4()->toString());
+        $sale->setExternalOrderId('ext-'.Uuid::uuid4()->toString());
         $sale->setSaleDate(new \DateTimeImmutable($date));
         $sale->setQuantity(1);
         $sale->setPricePerUnit('500.00');
         $sale->setTotalRevenue('500.00');
-        if ($costPrice !== null) {
+        if (null !== $costPrice) {
             $sale->setCostPrice($costPrice);
         }
         $this->em->persist($sale);
@@ -314,7 +313,7 @@ final class PreflightActionDetailsTest extends IntegrationTestCase
         $return->setReturnDate(new \DateTimeImmutable($date));
         $return->setQuantity(1);
         $return->setRefundAmount('500.00');
-        if ($costPrice !== null) {
+        if (null !== $costPrice) {
             $return->setCostPrice($costPrice);
         }
         $this->em->persist($return);
@@ -350,7 +349,7 @@ final class PreflightActionDetailsTest extends IntegrationTestCase
         $cost->setAmount('100.00');
         $cost->setCostDate(new \DateTimeImmutable($date));
         $cost->setOperationType(MarketplaceCostOperationType::CHARGE);
-        $cost->setExternalId('ext-' . Uuid::uuid4()->toString());
+        $cost->setExternalId('ext-'.Uuid::uuid4()->toString());
         $cost->setDescription($description);
         $this->em->persist($cost);
 
@@ -360,22 +359,22 @@ final class PreflightActionDetailsTest extends IntegrationTestCase
     private function makeSalesCommand(): PreflightMonthCloseCommand
     {
         return new PreflightMonthCloseCommand(
-            companyId:   self::COMPANY_ID,
+            companyId: self::COMPANY_ID,
             marketplace: self::MARKETPLACE_VALUE,
-            year:        self::YEAR,
-            month:       self::MONTH,
-            stage:       CloseStage::SALES_RETURNS,
+            year: self::YEAR,
+            month: self::MONTH,
+            stage: CloseStage::SALES_RETURNS,
         );
     }
 
     private function makeCostsCommand(): PreflightMonthCloseCommand
     {
         return new PreflightMonthCloseCommand(
-            companyId:   self::COMPANY_ID,
+            companyId: self::COMPANY_ID,
             marketplace: self::MARKETPLACE_VALUE,
-            year:        self::YEAR,
-            month:       self::MONTH,
-            stage:       CloseStage::COSTS,
+            year: self::YEAR,
+            month: self::MONTH,
+            stage: CloseStage::COSTS,
         );
     }
 
@@ -394,7 +393,16 @@ final class PreflightActionDetailsTest extends IntegrationTestCase
     {
         $this->em->getConnection()->executeStatement(
             sprintf('UPDATE %s SET document_id = :documentId WHERE id = :id', $table),
-            ['documentId' => Uuid::uuid4()->toString(), 'id' => $id],
+            ['documentId' => $this->createDocumentId(), 'id' => $id],
         );
+    }
+
+    private function createDocumentId(): string
+    {
+        $document = new Document(Uuid::uuid4()->toString(), $this->company);
+        $this->em->persist($document);
+        $this->em->flush();
+
+        return (string) $document->getId();
     }
 }

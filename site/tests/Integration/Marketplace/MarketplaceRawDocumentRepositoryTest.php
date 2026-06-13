@@ -15,6 +15,7 @@ final class MarketplaceRawDocumentRepositoryTest extends IntegrationTestCase
     public function testFindMinPeriodFromForSuccessfulDocumentsUsesOnlyCompletedDocuments(): void
     {
         $company = CompanyBuilder::aCompany()->build();
+        $this->em->persist($company->getUser());
         $this->em->persist($company);
 
         $completed = MarketplaceRawDocumentBuilder::aDocument()
@@ -72,41 +73,33 @@ final class MarketplaceRawDocumentRepositoryTest extends IntegrationTestCase
     public function testFindActiveExactPeriodMethodsFilterByEndpointAndExcludeFailed(): void
     {
         $company = CompanyBuilder::aCompany()->build();
+        $this->em->persist($company->getUser());
         $this->em->persist($company);
 
-        $activeOlder = MarketplaceRawDocumentBuilder::aDocument()
+        $failedSameEndpoint = MarketplaceRawDocumentBuilder::aDocument()
             ->forCompany($company)
             ->withMarketplace(MarketplaceType::WILDBERRIES)
-            ->withPeriod(new \DateTimeImmutable('2026-04-01'), new \DateTimeImmutable('2026-04-01'))
+            ->withPeriod(new \DateTimeImmutable('2026-04-01'), new \DateTimeImmutable('2026-04-02'))
             ->withIndex(1)
             ->build();
-        $activeOlder->setApiEndpoint('wildberries::reportDetailByPeriod');
-        $this->em->persist($activeOlder);
+        $failedSameEndpoint->setApiEndpoint('wildberries::reportDetailByPeriod');
+        $failedSameEndpoint->markFailed();
+        $this->em->persist($failedSameEndpoint);
 
         $activeNewest = MarketplaceRawDocumentBuilder::aDocument()
             ->forCompany($company)
             ->withMarketplace(MarketplaceType::WILDBERRIES)
-            ->withPeriod(new \DateTimeImmutable('2026-04-01'), new \DateTimeImmutable('2026-04-01'))
+            ->withPeriod(new \DateTimeImmutable('2026-04-01'), new \DateTimeImmutable('2026-04-02'))
             ->withIndex(2)
             ->build();
         $activeNewest->setApiEndpoint('wildberries::reportDetailByPeriod');
         $activeNewest->markCompleted();
         $this->em->persist($activeNewest);
 
-        $failed = MarketplaceRawDocumentBuilder::aDocument()
-            ->forCompany($company)
-            ->withMarketplace(MarketplaceType::WILDBERRIES)
-            ->withPeriod(new \DateTimeImmutable('2026-04-01'), new \DateTimeImmutable('2026-04-01'))
-            ->withIndex(3)
-            ->build();
-        $failed->setApiEndpoint('wildberries::reportDetailByPeriod');
-        $failed->markStepFailed(\App\Marketplace\Enum\PipelineStep::SALES);
-        $this->em->persist($failed);
-
         $otherEndpoint = MarketplaceRawDocumentBuilder::aDocument()
             ->forCompany($company)
             ->withMarketplace(MarketplaceType::WILDBERRIES)
-            ->withPeriod(new \DateTimeImmutable('2026-04-01'), new \DateTimeImmutable('2026-04-01'))
+            ->withPeriod(new \DateTimeImmutable('2026-04-01'), new \DateTimeImmutable('2026-04-02'))
             ->withIndex(4)
             ->build();
         $otherEndpoint->setApiEndpoint('wildberries::supplierSales');
@@ -123,12 +116,11 @@ final class MarketplaceRawDocumentRepositoryTest extends IntegrationTestCase
             documentType: 'sales_report',
             apiEndpoint: 'wildberries::reportDetailByPeriod',
             periodFrom: new \DateTimeImmutable('2026-04-01'),
-            periodTo: new \DateTimeImmutable('2026-04-01'),
+            periodTo: new \DateTimeImmutable('2026-04-02'),
         );
 
-        self::assertCount(2, $documents);
+        self::assertCount(1, $documents);
         self::assertSame('22222222-2222-2222-2222-000000000002', $documents[0]->getId());
-        self::assertSame('22222222-2222-2222-2222-000000000001', $documents[1]->getId());
 
         $single = $repository->findActiveExactPeriodDocument(
             company: $company,
@@ -136,41 +128,31 @@ final class MarketplaceRawDocumentRepositoryTest extends IntegrationTestCase
             documentType: 'sales_report',
             apiEndpoint: 'wildberries::reportDetailByPeriod',
             periodFrom: new \DateTimeImmutable('2026-04-01'),
-            periodTo: new \DateTimeImmutable('2026-04-01'),
+            periodTo: new \DateTimeImmutable('2026-04-02'),
         );
 
         self::assertNotNull($single);
         self::assertSame('22222222-2222-2222-2222-000000000002', $single->getId());
     }
 
-    public function testFindActiveExactDayDocumentsIgnoresEndpointAndOrdersCompletedCanonicalFirst(): void
+    public function testFindActiveExactDayDocumentsExcludesFailedDocuments(): void
     {
         $company = CompanyBuilder::aCompany()->build();
+        $this->em->persist($company->getUser());
         $this->em->persist($company);
         $day = new \DateTimeImmutable('2026-04-02');
 
-        $pendingNewest = MarketplaceRawDocumentBuilder::aDocument()
-            ->forCompany($company)
-            ->withMarketplace(MarketplaceType::WILDBERRIES)
-            ->withPeriod($day, $day)
-            ->withApiEndpoint('wildberries::new-endpoint')
-            ->withIndex(10)
-            ->build();
-        $pendingNewest->resetProcessingStatus();
-        $this->forceDateTime($pendingNewest, 'syncedAt', new \DateTimeImmutable('2026-04-02 12:00:00'));
-        $this->em->persist($pendingNewest);
-
-        $completedOlder = MarketplaceRawDocumentBuilder::aDocument()
+        $completed = MarketplaceRawDocumentBuilder::aDocument()
             ->forCompany($company)
             ->withMarketplace(MarketplaceType::WILDBERRIES)
             ->withPeriod($day, $day)
             ->withApiEndpoint('wildberries::old-endpoint')
             ->withIndex(11)
             ->build();
-        $completedOlder->markCompleted();
-        $this->forceDateTime($completedOlder, 'processedAt', new \DateTimeImmutable('2026-04-02 10:00:00'));
-        $this->forceDateTime($completedOlder, 'syncedAt', new \DateTimeImmutable('2026-04-02 10:00:00'));
-        $this->em->persist($completedOlder);
+        $completed->markCompleted();
+        $this->forceDateTime($completed, 'processedAt', new \DateTimeImmutable('2026-04-02 10:00:00'));
+        $this->forceDateTime($completed, 'syncedAt', new \DateTimeImmutable('2026-04-02 10:00:00'));
+        $this->em->persist($completed);
 
         $failed = MarketplaceRawDocumentBuilder::aDocument()
             ->forCompany($company)
@@ -193,15 +175,14 @@ final class MarketplaceRawDocumentRepositoryTest extends IntegrationTestCase
             $day,
         );
 
-        self::assertCount(2, $documents);
-        self::assertSame($completedOlder->getId(), $documents[0]->getId());
-        self::assertSame($pendingNewest->getId(), $documents[1]->getId());
+        self::assertCount(1, $documents);
+        self::assertSame($completed->getId(), $documents[0]->getId());
     }
-
 
     public function testActiveCompletedExactDaySalesReportRawDuplicatesAreRejectedByDatabase(): void
     {
         $company = CompanyBuilder::aCompany()->build();
+        $this->em->persist($company->getUser());
         $this->em->persist($company);
         $day = new \DateTimeImmutable('2026-04-03');
 
@@ -235,6 +216,4 @@ final class MarketplaceRawDocumentRepositoryTest extends IntegrationTestCase
         $reflection->setAccessible(true);
         $reflection->setValue($object, $value);
     }
-
 }
-

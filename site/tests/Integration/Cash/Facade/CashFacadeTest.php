@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Integration;
+namespace App\Tests\Integration\Cash\Facade;
 
 use App\Cash\Application\DTO\CreateCashTransactionCommand;
 use App\Cash\Entity\Accounts\MoneyAccount;
@@ -66,7 +66,6 @@ final class CashFacadeTest extends IntegrationTestCase
         self::assertSame('Facade tx', $saved->getDescription());
         self::assertSame($counterparty->getId(), $saved->getCounterparty()?->getId());
     }
-
 
     public function testCreateTransactionPersistsImportAndTelegramDedupFields(): void
     {
@@ -305,5 +304,4 @@ final class CashFacadeTest extends IntegrationTestCase
 
         self::assertCount(1, $rows);
     }
-
 }

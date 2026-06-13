@@ -10,6 +10,7 @@ use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceRawDocumentBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceSaleBuilder;
@@ -85,7 +86,8 @@ final class OzonRawDuplicatesCleanupCommandTest extends IntegrationTestCase
 
     public function testApplyDoesNotTouchRowsOutsideDateRange(): void
     {
-        $company = CompanyBuilder::aCompany()->withIndex(1100)->build();
+        $company = CompanyBuilder::aCompany()->withIndex(1100)->withOwner(UserBuilder::aUser()->withIndex(1100)->build())->build();
+        $this->em->persist($company->getUser());
         $this->em->persist($company);
         $this->seedDuplicateDay(true, 1110, $company, new \DateTimeImmutable('2026-04-15'));
         $this->seedDuplicateDay(true, 1120, $company, new \DateTimeImmutable('2026-04-20'));
@@ -101,14 +103,20 @@ final class OzonRawDuplicatesCleanupCommandTest extends IntegrationTestCase
 
     private function seedDuplicateDay(bool $open, int $baseIndex = 600, ?Company $company = null, ?\DateTimeImmutable $day = null): array
     {
-        $company ??= CompanyBuilder::aCompany()->withIndex($baseIndex)->build();
+        $company ??= CompanyBuilder::aCompany()
+            ->withIndex($baseIndex)
+            ->withOwner(UserBuilder::aUser()->withIndex($baseIndex)->build())
+            ->build();
+        if (!$this->em->contains($company->getUser())) {
+            $this->em->persist($company->getUser());
+        }
         $this->em->persist($company);
         $day ??= new \DateTimeImmutable('2026-04-15');
 
         $listing = MarketplaceListingBuilder::aListing()->withIndex($baseIndex)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withMarketplaceSku(sprintf('oz-cleanup-%d', $baseIndex))->build();
         $this->em->persist($listing);
 
-        $staleRaw = MarketplaceRawDocumentBuilder::aDocument()->withIndex($baseIndex + 1)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withDocumentType('sales_report')->withPeriod($day, $day)->withProcessingStatus('completed')->build();
+        $staleRaw = MarketplaceRawDocumentBuilder::aDocument()->withIndex($baseIndex + 1)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withDocumentType('sales_report')->withPeriod($day, $day)->withProcessingStatus('failed')->build();
         $canonicalRaw = MarketplaceRawDocumentBuilder::aDocument()->withIndex($baseIndex + 2)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withDocumentType('sales_report')->withPeriod($day, $day)->withProcessingStatus('completed')->withSyncedAt($day->modify('+1 day'))->build();
         $this->em->persist($staleRaw);
         $this->em->persist($canonicalRaw);
@@ -121,7 +129,9 @@ final class OzonRawDuplicatesCleanupCommandTest extends IntegrationTestCase
 
         $sale1 = MarketplaceSaleBuilder::aSale()->withIndex($baseIndex + 3)->forCompany($company)->forListing($listing)->withMarketplace(MarketplaceType::OZON)->withSaleDate($day)->withExternalOrderId(sprintf('cleanup-stale-%d', $baseIndex))->build();
         $sale1->setRawDocumentId($staleRaw->getId());
-        if ($doc !== null) { $sale1->setDocument($doc); }
+        if (null !== $doc) {
+            $sale1->setDocument($doc);
+        }
 
         $sale2 = MarketplaceSaleBuilder::aSale()->withIndex($baseIndex + 4)->forCompany($company)->forListing($listing)->withMarketplace(MarketplaceType::OZON)->withSaleDate($day)->withExternalOrderId(sprintf('cleanup-canonical-%d', $baseIndex))->build();
         $sale2->setRawDocumentId($canonicalRaw->getId());
@@ -130,12 +140,16 @@ final class OzonRawDuplicatesCleanupCommandTest extends IntegrationTestCase
 
         $return = new MarketplaceReturn(sprintf('66666666-6666-4666-8666-%012d', $baseIndex), $company, $listing, MarketplaceType::OZON);
         $return->setExternalReturnId(sprintf('cleanup-return-%d', $baseIndex))->setReturnDate($day)->setQuantity(1)->setRefundAmount('1.00')->setRawDocumentId($staleRaw->getId());
-        if ($doc !== null) { $return->setDocument($doc); }
+        if (null !== $doc) {
+            $return->setDocument($doc);
+        }
         $this->em->persist($return);
 
         $cost = new MarketplaceCost(sprintf('55555555-5555-4555-8555-%012d', $baseIndex), $company, MarketplaceType::OZON);
         $cost->setExternalId(sprintf('cleanup-cost-%d', $baseIndex))->setCostDate($day)->setAmount('1.00')->setRawDocumentId($staleRaw->getId());
-        if ($doc !== null) { $cost->setDocument($doc); }
+        if (null !== $doc) {
+            $cost->setDocument($doc);
+        }
         $this->em->persist($cost);
 
         $this->em->flush();

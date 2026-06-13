@@ -13,7 +13,6 @@ use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceCostCategory;
 use App\Marketplace\Entity\MarketplaceCostPLMapping;
 use App\Marketplace\Entity\MarketplaceListing;
-use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Entity\MarketplaceSaleMapping;
 use App\Marketplace\Enum\AmountSource;
@@ -30,12 +29,12 @@ use Ramsey\Uuid\Uuid;
  */
 final class DataSourcePreliminaryModeTest extends IntegrationTestCase
 {
-    private const COMPANY_ID  = '55555555-5555-5555-5555-000000000001';
-    private const OWNER_ID    = '66666666-6666-6666-6666-000000000001';
+    private const COMPANY_ID = '55555555-5555-5555-5555-000000000001';
+    private const OWNER_ID = '66666666-6666-6666-6666-000000000001';
     private const MARKETPLACE = MarketplaceType::WILDBERRIES;
     private const MARKETPLACE_VALUE = 'wildberries';
     private const PERIOD_FROM = '2026-04-01';
-    private const PERIOD_TO   = '2026-04-30';
+    private const PERIOD_TO = '2026-04-30';
 
     private Company $company;
     private PLCategory $plCategory;
@@ -56,7 +55,7 @@ final class DataSourcePreliminaryModeTest extends IntegrationTestCase
 
         $plCategory = new PLCategory(Uuid::uuid4()->toString(), $this->company);
         $plCategory->setName('Выручка тест');
-        $plCategory->setFlow(PLFlow::REVENUE);
+        $plCategory->setFlow(PLFlow::INCOME);
         $this->plCategory = $plCategory;
 
         $this->em->persist($owner);
@@ -95,7 +94,7 @@ final class DataSourcePreliminaryModeTest extends IntegrationTestCase
         );
 
         $prelimTotal = array_sum(array_column($preliminaryEntries, 'total_amount'));
-        $finalTotal  = array_sum(array_column($finalEntries, 'total_amount'));
+        $finalTotal = array_sum(array_column($finalEntries, 'total_amount'));
 
         // В preliminary — только продажа с cost_price: 200
         self::assertEqualsWithDelta(200.0, $prelimTotal, 0.01,
@@ -119,7 +118,7 @@ final class DataSourcePreliminaryModeTest extends IntegrationTestCase
         $this->createSaleMapping(AmountSource::SALE_GROSS);
 
         $this->createSale($listing, costPrice: '100.00', date: '2026-04-05', totalRevenue: '500.00');
-        $this->createSale($listing, costPrice: null,     date: '2026-04-10', totalRevenue: '300.00');
+        $this->createSale($listing, costPrice: null, date: '2026-04-10', totalRevenue: '300.00');
 
         $this->em->flush();
         $this->em->clear();
@@ -138,7 +137,7 @@ final class DataSourcePreliminaryModeTest extends IntegrationTestCase
             true,
         );
 
-        $finalTotal      = (float) array_sum(array_column($finalEntries, 'total_amount'));
+        $finalTotal = (float) array_sum(array_column($finalEntries, 'total_amount'));
         $preliminaryTotal = (float) array_sum(array_column($preliminaryEntries, 'total_amount'));
 
         // Финальный режим: обе продажи: 500 + 300 = 800
@@ -154,8 +153,8 @@ final class DataSourcePreliminaryModeTest extends IntegrationTestCase
 
     public function testCostsExcludesUnknownServiceNamesInPreliminaryMode(): void
     {
-        $knownCategory   = $this->createCostCategory('ozon_logistic_direct', 'Логистика');
-        $unknownCategory = $this->createCostCategory('ozon_other_service',   'Прочее Ozon');
+        $knownCategory = $this->createCostCategory('ozon_logistic_direct', 'Логистика');
+        $unknownCategory = $this->createCostCategory('ozon_other_service', 'Прочее Ozon');
 
         $plCategory2 = new PLCategory(Uuid::uuid4()->toString(), $this->company);
         $plCategory2->setName('Затраты тест');
@@ -203,7 +202,7 @@ final class DataSourcePreliminaryModeTest extends IntegrationTestCase
         );
 
         $prelimTotal = (float) array_sum(array_column($preliminaryEntries, 'total_amount'));
-        $finalTotal  = (float) array_sum(array_column($finalEntries, 'total_amount'));
+        $finalTotal = (float) array_sum(array_column($finalEntries, 'total_amount'));
 
         self::assertEqualsWithDelta(1000.0, $prelimTotal, 0.01,
             'В preliminary-режиме затраты ozon_other_service должны быть исключены.');
@@ -254,12 +253,12 @@ final class DataSourcePreliminaryModeTest extends IntegrationTestCase
             $listing,
             self::MARKETPLACE,
         );
-        $sale->setExternalOrderId('ext-' . Uuid::uuid4()->toString());
+        $sale->setExternalOrderId('ext-'.Uuid::uuid4()->toString());
         $sale->setSaleDate(new \DateTimeImmutable($date));
         $sale->setQuantity(1);
         $sale->setPricePerUnit($totalRevenue);
         $sale->setTotalRevenue($totalRevenue);
-        if ($costPrice !== null) {
+        if (null !== $costPrice) {
             $sale->setCostPrice($costPrice);
         }
         $this->em->persist($sale);
@@ -295,7 +294,7 @@ final class DataSourcePreliminaryModeTest extends IntegrationTestCase
         $cost->setAmount($amount);
         $cost->setCostDate(new \DateTimeImmutable($date));
         $cost->setOperationType(MarketplaceCostOperationType::CHARGE);
-        $cost->setExternalId('ext-' . Uuid::uuid4()->toString());
+        $cost->setExternalId('ext-'.Uuid::uuid4()->toString());
         $this->em->persist($cost);
 
         return $cost;

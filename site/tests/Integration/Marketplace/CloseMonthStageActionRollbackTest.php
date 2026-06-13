@@ -38,13 +38,13 @@ use Ramsey\Uuid\Uuid;
 final class CloseMonthStageActionRollbackTest extends IntegrationTestCase
 {
     private const COMPANY_ID = '11111111-1111-1111-1111-000000000088';
-    private const OWNER_ID   = '22222222-2222-2222-2222-000000000088';
+    private const OWNER_ID = '22222222-2222-2222-2222-000000000088';
     private const MARKETPLACE = MarketplaceType::OZON;
     private const MARKETPLACE_VALUE = 'ozon';
-    private const YEAR  = 2026;
+    private const YEAR = 2026;
     private const MONTH = 1;
     private const PERIOD_FROM = '2026-01-01';
-    private const PERIOD_TO   = '2026-01-31';
+    private const PERIOD_TO = '2026-01-31';
 
     private Company $company;
 
@@ -94,23 +94,23 @@ final class CloseMonthStageActionRollbackTest extends IntegrationTestCase
 
         // Два charge-строки; они замаппены, в периоде, document_id IS NULL.
         $this->createCost($costCategory, '1000.00', MarketplaceCostOperationType::CHARGE, '2026-01-10');
-        $this->createCost($costCategory, '500.00',  MarketplaceCostOperationType::CHARGE, '2026-01-20');
+        $this->createCost($costCategory, '500.00', MarketplaceCostOperationType::CHARGE, '2026-01-20');
         $this->em->flush();
         $this->em->clear();
 
         // Override UnprocessedCostsQuery so getControlSum намеренно расходится с
         // handler-ом (он агрегирует execute()). Формула А = реальная + 9999,
         // формула В (handler) считается из execute() как есть → delta ≈ 9999.
-        $real = self::getContainer()->get(UnprocessedCostsQuery::class);
+        $real = new UnprocessedCostsQuery($this->em->getConnection());
         $stub = new class($real) extends UnprocessedCostsQuery {
             public function __construct(private readonly UnprocessedCostsQuery $real)
             {
                 // intentionally skip parent ctor: we delegate all work to $real
             }
 
-            public function execute(string $companyId, string $marketplace, string $periodFrom, string $periodTo): array
+            public function execute(string $companyId, string $marketplace, string $periodFrom, string $periodTo, bool $preliminary = false): array
             {
-                return $this->real->execute($companyId, $marketplace, $periodFrom, $periodTo);
+                return $this->real->execute($companyId, $marketplace, $periodFrom, $periodTo, $preliminary);
             }
 
             public function getControlSum(string $companyId, string $marketplace, string $periodFrom, string $periodTo, bool $preliminary = false): string
@@ -128,11 +128,11 @@ final class CloseMonthStageActionRollbackTest extends IntegrationTestCase
         $action = self::getContainer()->get(CloseMonthStageAction::class);
 
         $command = new CloseMonthStageCommand(
-            companyId:   self::COMPANY_ID,
+            companyId: self::COMPANY_ID,
             marketplace: self::MARKETPLACE_VALUE,
-            year:        self::YEAR,
-            month:       self::MONTH,
-            stage:       CloseStage::COSTS->value,
+            year: self::YEAR,
+            month: self::MONTH,
+            stage: CloseStage::COSTS->value,
             actorUserId: self::OWNER_ID,
         );
 
@@ -188,7 +188,7 @@ final class CloseMonthStageActionRollbackTest extends IntegrationTestCase
         $cost->setAmount($amount);
         $cost->setCostDate(new \DateTimeImmutable($costDate));
         $cost->setOperationType($operationType);
-        $cost->setExternalId('ext-' . Uuid::uuid4()->toString());
+        $cost->setExternalId('ext-'.Uuid::uuid4()->toString());
         $this->em->persist($cost);
 
         return $cost;

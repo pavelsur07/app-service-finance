@@ -6,7 +6,6 @@ namespace App\Tests\Integration\Marketplace\Inventory\Infrastructure\Query;
 
 use App\Catalog\Entity\Product;
 use App\Company\Entity\Company;
-use App\Company\Entity\User;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Inventory\Infrastructure\Query\InventoryCostListingQuery;
@@ -19,8 +18,8 @@ final class InventoryCostListingQueryTest extends IntegrationTestCase
 {
     private const COMPANY_A_ID = '11111111-1111-1111-1111-00000000000a';
     private const COMPANY_B_ID = '11111111-1111-1111-1111-00000000000b';
-    private const OWNER_A_ID   = '22222222-2222-2222-2222-00000000000a';
-    private const OWNER_B_ID   = '22222222-2222-2222-2222-00000000000b';
+    private const OWNER_A_ID = '22222222-2222-2222-2222-00000000000a';
+    private const OWNER_B_ID = '22222222-2222-2222-2222-00000000000b';
 
     private InventoryCostListingQuery $query;
 
@@ -37,7 +36,7 @@ final class InventoryCostListingQueryTest extends IntegrationTestCase
 
         $this->seedListing($companyA, 'sku-001', 'Foo Bar', null, MarketplaceType::OZON);
         $this->seedListing($companyA, 'sku-002', 'Baz Qux', null, MarketplaceType::WILDBERRIES);
-        $this->seedListing($companyA, 'sku-003', 'Quux',    null, MarketplaceType::OZON);
+        $this->seedListing($companyA, 'sku-003', 'Quux', null, MarketplaceType::OZON);
 
         $this->em->flush();
 
@@ -51,7 +50,7 @@ final class InventoryCostListingQueryTest extends IntegrationTestCase
         $companyA = $this->seedCompany(self::COMPANY_A_ID, self::OWNER_A_ID, 'a@example.test');
 
         $this->seedListing($companyA, 'sku-001', 'Кружка зелёная', null, MarketplaceType::OZON);
-        $this->seedListing($companyA, 'sku-002', 'Тарелка синяя',  null, MarketplaceType::OZON);
+        $this->seedListing($companyA, 'sku-002', 'Тарелка синяя', null, MarketplaceType::OZON);
 
         $this->em->flush();
 
@@ -97,7 +96,7 @@ final class InventoryCostListingQueryTest extends IntegrationTestCase
 
         $product = $this->seedProduct($companyA, 'PRD-001', 'Карандаш красный');
         $this->seedListing($companyA, 'sku-mp-1', 'Listing Title', null, MarketplaceType::OZON, $product);
-        $this->seedListing($companyA, 'sku-mp-2', 'Other Title',   null, MarketplaceType::OZON);
+        $this->seedListing($companyA, 'sku-mp-2', 'Other Title', null, MarketplaceType::OZON);
 
         $this->em->flush();
 
@@ -113,7 +112,7 @@ final class InventoryCostListingQueryTest extends IntegrationTestCase
 
         $product = $this->seedProduct($companyA, 'PRD-99-XYZ', 'Some product');
         $this->seedListing($companyA, 'sku-with-prd', 'L1', null, MarketplaceType::OZON, $product);
-        $this->seedListing($companyA, 'sku-without',  'L2', null, MarketplaceType::OZON);
+        $this->seedListing($companyA, 'sku-without', 'L2', null, MarketplaceType::OZON);
 
         $this->em->flush();
 
@@ -128,7 +127,7 @@ final class InventoryCostListingQueryTest extends IntegrationTestCase
         $companyA = $this->seedCompany(self::COMPANY_A_ID, self::OWNER_A_ID, 'a@example.test');
 
         $this->seedListing($companyA, 'sku-1', 'lower-case-name', null, MarketplaceType::OZON);
-        $this->seedListing($companyA, 'sku-2', 'Other',           null, MarketplaceType::OZON);
+        $this->seedListing($companyA, 'sku-2', 'Other', null, MarketplaceType::OZON);
 
         $this->em->flush();
 
@@ -194,7 +193,7 @@ final class InventoryCostListingQueryTest extends IntegrationTestCase
 
         $this->seedListing($companyA, 'sku-1', 'Match Word', null, MarketplaceType::OZON);
         $this->seedListing($companyA, 'sku-2', 'Match Word', null, MarketplaceType::WILDBERRIES);
-        $this->seedListing($companyA, 'sku-3', 'Other',      null, MarketplaceType::OZON);
+        $this->seedListing($companyA, 'sku-3', 'Other', null, MarketplaceType::OZON);
 
         $this->em->flush();
 
@@ -209,11 +208,11 @@ final class InventoryCostListingQueryTest extends IntegrationTestCase
         $companyA = $this->seedCompany(self::COMPANY_A_ID, self::OWNER_A_ID, 'a@example.test');
 
         $this->seedListing($companyA, 'sku-1', 'Alpha', null, MarketplaceType::OZON);
-        $this->seedListing($companyA, 'sku-2', 'Beta',  null, MarketplaceType::OZON);
+        $this->seedListing($companyA, 'sku-2', 'Beta', null, MarketplaceType::OZON);
 
         $this->em->flush();
 
-        $rowsNull  = $this->fetch(self::COMPANY_A_ID, null, null);
+        $rowsNull = $this->fetch(self::COMPANY_A_ID, null, null);
         $rowsEmpty = $this->fetch(self::COMPANY_A_ID, null, '');
 
         self::assertCount(2, $rowsNull);
@@ -278,7 +277,7 @@ final class InventoryCostListingQueryTest extends IntegrationTestCase
 
         $listing->setName($name);
         $listing->setSupplierSku($supplierSku);
-        if ($product !== null) {
+        if (null !== $product) {
             $listing->setProduct($product);
         }
 

@@ -47,7 +47,10 @@ final class NormalizeInventorySnapshotActionTest extends IntegrationTestCase
         $amb1->setMarketplaceSku('SKU-A')->setSize('L')->setPrice('100.00');
         $amb2 = new MarketplaceListing('50000000-0000-4000-8000-000000000904', $company, null, MarketplaceType::OZON);
         $amb2->setMarketplaceSku('SKU-A')->setSize('XL')->setPrice('100.00');
-        $this->em->persist($mapped);$this->em->persist($orphan);$this->em->persist($amb1);$this->em->persist($amb2);
+        $this->em->persist($mapped);
+        $this->em->persist($orphan);
+        $this->em->persist($amb1);
+        $this->em->persist($amb2);
         $this->em->flush();
 
         $action = self::getContainer()->get(NormalizeInventorySnapshotAction::class);
@@ -59,7 +62,9 @@ final class NormalizeInventorySnapshotActionTest extends IntegrationTestCase
         self::assertSame(2, $this->em->getRepository(Location::class)->count(['companyId' => $company->getId(), 'externalSystem' => MarketplaceType::OZON]));
 
         $bySku = [];
-        foreach ($rows as $row) { $bySku[$row->getSourceSku()] = $row; }
+        foreach ($rows as $row) {
+            $bySku[$row->getSourceSku()] = $row;
+        }
 
         self::assertSame(StockSnapshotMappingStatus::Unmapped, $bySku['SKU-U']->getMappingStatus());
         self::assertNull($bySku['SKU-U']->getListingId());
@@ -109,8 +114,6 @@ final class NormalizeInventorySnapshotActionTest extends IntegrationTestCase
         ]));
     }
 
-
-
     public function testCompletedSessionWithEmptyStocksMarksRawProcessedAndCreatesNoSnapshots(): void
     {
         $company = $this->createCompany(902);
@@ -134,6 +137,7 @@ final class NormalizeInventorySnapshotActionTest extends IntegrationTestCase
         self::assertTrue($raw->isProcessed());
         self::assertSame(0, $this->em->getRepository(StockSnapshot::class)->count(['companyId' => $company->getId()]));
     }
+
     private function raw(string $companyId, string $sessionId, string $sku, int $present, int $reserved, string $type, string $offerId): InventoryRawSnapshot
     {
         return InventoryRawSnapshotBuilder::aRawSnapshot()
@@ -146,7 +150,10 @@ final class NormalizeInventorySnapshotActionTest extends IntegrationTestCase
     {
         $user = UserBuilder::aUser()->withIndex($index)->build();
         $company = CompanyBuilder::aCompany()->withIndex($index)->withOwner($user)->build();
-        $this->em->persist($user); $this->em->persist($company); $this->em->flush();
+        $this->em->persist($user);
+        $this->em->persist($company);
+        $this->em->flush();
+
         return $company;
     }
 }

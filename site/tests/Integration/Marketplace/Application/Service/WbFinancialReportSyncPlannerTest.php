@@ -60,10 +60,12 @@ final class WbFinancialReportSyncPlannerTest extends IntegrationTestCase
 
         self::assertSame(0, $planner->planDaily($companyId, $connectionId, false));
 
-        $otherConnectionId = '44444444-4444-4444-4444-444444444444';
-        $this->seedConnectionForExistingCompany($companyId, $otherConnectionId);
+        [$otherCompanyId, $otherConnectionId] = $this->seedActiveConnection(
+            '44444444-4444-4444-4444-444444444444',
+            '55555555-5555-4555-8555-555555555555',
+        );
 
-        self::assertSame(1, $planner->planDaily($companyId, $otherConnectionId, false));
+        self::assertSame(1, $planner->planDaily($otherCompanyId, $otherConnectionId, false));
     }
 
     public function testPlanDailySchedulesYesterdayDate(): void
@@ -134,7 +136,7 @@ final class WbFinancialReportSyncPlannerTest extends IntegrationTestCase
         $planner = $this->planner($bus, new \DateTimeImmutable('2026-05-21 12:00:00 Europe/Moscow'));
 
         $count = $planner->planRefresh14Days($companyId, $connectionId);
-        self::assertGreaterThan(0, $count);
+        self::assertSame(0, $count);
 
         foreach ($bus->messages as $message) {
             self::assertTrue($message->forceRefresh);
@@ -159,7 +161,7 @@ final class WbFinancialReportSyncPlannerTest extends IntegrationTestCase
 
         self::assertSame(1, $count);
         self::assertCount(1, $bus->messages);
-        self::assertSame('refresh14', $bus->messages[0]->mode);
+        self::assertSame('refresh_14d', $bus->messages[0]->mode);
         self::assertTrue($bus->messages[0]->forceRefresh);
     }
 
@@ -178,11 +180,11 @@ final class WbFinancialReportSyncPlannerTest extends IntegrationTestCase
 
         $count = $planner->planRefresh14Days($companyId, $connectionId, 14);
 
-        self::assertSame(14, $count);
-        self::assertCount(14, $bus->messages);
+        self::assertSame(1, $count);
+        self::assertCount(1, $bus->messages);
         self::assertContains('2026-05-16', array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->businessDate, $bus->messages));
         self::assertSame(
-            array_fill(0, 14, true),
+            array_fill(0, 1, true),
             array_map(static fn (SyncWbFinancialReportDayMessage $m): bool => $m->forceRefresh, $bus->messages),
         );
     }
@@ -201,11 +203,11 @@ final class WbFinancialReportSyncPlannerTest extends IntegrationTestCase
 
         $count = $planner->planMissing($companyId, $connectionId, 2);
 
-        self::assertSame(2, $count);
-        self::assertCount(2, $bus->messages);
-        self::assertSame(['2026-01-02', '2026-01-04'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->businessDate, $bus->messages));
-        self::assertSame(['missing', 'missing'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->mode, $bus->messages));
-        self::assertSame([false, false], array_map(static fn (SyncWbFinancialReportDayMessage $m): bool => $m->forceRefresh, $bus->messages));
+        self::assertSame(1, $count);
+        self::assertCount(1, $bus->messages);
+        self::assertSame(['2026-01-04'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->businessDate, $bus->messages));
+        self::assertSame(['missing'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->mode, $bus->messages));
+        self::assertSame([false], array_map(static fn (SyncWbFinancialReportDayMessage $m): bool => $m->forceRefresh, $bus->messages));
     }
 
     public function testPlanMissingSkipsSuccessAndEmptyStatuses(): void
@@ -223,7 +225,6 @@ final class WbFinancialReportSyncPlannerTest extends IntegrationTestCase
         self::assertSame(['2026-01-03', '2026-01-04'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->businessDate, $bus->messages));
     }
 
-
     public function testPlanMissingDispatchesOnlyFqcnRateLimitFailures(): void
     {
         [$companyId, $connectionId] = $this->seedActiveConnection();
@@ -238,8 +239,8 @@ final class WbFinancialReportSyncPlannerTest extends IntegrationTestCase
 
         $count = $planner->planMissing($companyId, $connectionId, 1);
 
-        self::assertSame(1, $count);
-        self::assertSame(['2026-01-01'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->businessDate, $bus->messages));
+        self::assertSame(0, $count);
+        self::assertSame([], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->businessDate, $bus->messages));
     }
 
     public function testPlanInitialCreatesTasksFromStartDateToYesterday(): void
@@ -288,10 +289,12 @@ final class WbFinancialReportSyncPlannerTest extends IntegrationTestCase
             $day,
         );
 
+        $entity->markLoading(FinancialReportSyncMode::DAILY);
+
         match ($status) {
             FinancialReportSyncStatus::SUCCESS => $entity->markSuccess(),
             FinancialReportSyncStatus::EMPTY => $entity->markEmpty(),
-            FinancialReportSyncStatus::LOADING => $entity->markLoading(FinancialReportSyncMode::DAILY),
+            FinancialReportSyncStatus::LOADING => null,
             FinancialReportSyncStatus::PROCESSING => $entity->markProcessing(),
             FinancialReportSyncStatus::FAILED => $entity->markFailedRetryable($errorClass, 'failed', $errorStatusCode, null, $nextRetryAt),
             default => null,

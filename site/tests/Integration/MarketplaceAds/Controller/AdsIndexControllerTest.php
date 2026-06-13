@@ -37,9 +37,7 @@ final class AdsIndexControllerTest extends WebTestCaseBase
         $em->flush();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
         $client->request('GET', '/marketplace-ads');
 
@@ -80,9 +78,7 @@ final class AdsIndexControllerTest extends WebTestCaseBase
         $em->flush();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
         $client->request('GET', '/marketplace-ads');
 
@@ -99,7 +95,7 @@ final class AdsIndexControllerTest extends WebTestCaseBase
         $response = $client->getResponse();
         self::assertTrue(
             $response->isRedirect() || 401 === $response->getStatusCode() || 403 === $response->getStatusCode(),
-            'Unauthenticated access must be redirected or denied, got ' . $response->getStatusCode(),
+            'Unauthenticated access must be redirected or denied, got '.$response->getStatusCode(),
         );
     }
 }

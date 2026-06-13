@@ -32,11 +32,11 @@ use Ramsey\Uuid\Uuid;
  */
 final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
 {
-    private const COMPANY_ID  = '11111111-1111-1111-1111-0000000000aa';
-    private const OWNER_ID    = '22222222-2222-2222-2222-0000000000aa';
+    private const COMPANY_ID = '11111111-1111-1111-1111-0000000000aa';
+    private const OWNER_ID = '22222222-2222-2222-2222-0000000000aa';
     private const MARKETPLACE = MarketplaceType::OZON;
     private const MARKETPLACE_VALUE = 'ozon';
-    private const YEAR  = 2026;
+    private const YEAR = 2026;
     private const MONTH = 3;
 
     private Company $company;
@@ -60,7 +60,7 @@ final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
         $this->em->flush();
     }
 
-    public function testHappyPath_PendingToPreliminary(): void
+    public function testHappyPathPendingToPreliminary(): void
     {
         $this->seedCostsForCosts();
 
@@ -85,7 +85,7 @@ final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
         self::assertSame(1, $documentRows, 'Должен быть создан 1 PLDocument.');
     }
 
-    public function testReopensAndCloses_WhenPreviousWasPreliminary(): void
+    public function testReopensAndClosesWhenPreviousWasPreliminary(): void
     {
         $this->seedCostsForCosts();
 
@@ -115,7 +115,7 @@ final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
         self::assertSame(1, $documentRows, 'Должен быть ровно 1 PLDocument после повторного rebuild.');
     }
 
-    public function testSkips_WhenStageClosedManually(): void
+    public function testSkipsWhenStageClosedManually(): void
     {
         $this->seedCostsForCosts();
 
@@ -146,7 +146,7 @@ final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
         );
     }
 
-    public function testSkips_WhenPreflightFails(): void
+    public function testSkipsWhenPreflightFails(): void
     {
         // Создаём затрату с маппингом, помеченным include_in_pl=true,
         // но категорию делаем «ozon_other_service» — это блокирующий preflight error.
@@ -181,7 +181,7 @@ final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
 
         // Этап должен остаться в исходном PENDING состоянии (или вовсе без записи).
         $monthClose = $this->reloadMonthClose();
-        if ($monthClose !== null) {
+        if (null !== $monthClose) {
             self::assertNotSame(
                 MonthCloseStageStatus::CLOSED,
                 $monthClose->getStageStatus(CloseStage::COSTS),
@@ -224,7 +224,7 @@ final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
         $this->em->persist($mapping);
 
         $this->createCost($costCategory, '1000.00', MarketplaceCostOperationType::CHARGE, '2026-03-10');
-        $this->createCost($costCategory, '500.00',  MarketplaceCostOperationType::CHARGE, '2026-03-20');
+        $this->createCost($costCategory, '500.00', MarketplaceCostOperationType::CHARGE, '2026-03-20');
 
         $this->em->flush();
         $this->em->clear();
@@ -236,10 +236,10 @@ final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
         $action = self::getContainer()->get(RebuildPreliminaryForPeriodAction::class);
 
         ($action)(new RebuildPreliminaryForPeriodCommand(
-            companyId:   self::COMPANY_ID,
+            companyId: self::COMPANY_ID,
             marketplace: self::MARKETPLACE_VALUE,
-            year:        self::YEAR,
-            month:       self::MONTH,
+            year: self::YEAR,
+            month: self::MONTH,
             actorUserId: self::OWNER_ID,
         ));
 
@@ -252,11 +252,11 @@ final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
         $action = self::getContainer()->get(CloseMonthStageAction::class);
 
         ($action)(new CloseMonthStageCommand(
-            companyId:   self::COMPANY_ID,
+            companyId: self::COMPANY_ID,
             marketplace: self::MARKETPLACE_VALUE,
-            year:        self::YEAR,
-            month:       self::MONTH,
-            stage:       CloseStage::COSTS->value,
+            year: self::YEAR,
+            month: self::MONTH,
+            stage: CloseStage::COSTS->value,
             actorUserId: self::OWNER_ID,
             preliminary: false,
         ));
@@ -292,7 +292,7 @@ final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
         $cost->setAmount($amount);
         $cost->setCostDate(new \DateTimeImmutable($costDate));
         $cost->setOperationType($operationType);
-        $cost->setExternalId('ext-' . Uuid::uuid4()->toString());
+        $cost->setExternalId('ext-'.Uuid::uuid4()->toString());
         $this->em->persist($cost);
 
         return $cost;

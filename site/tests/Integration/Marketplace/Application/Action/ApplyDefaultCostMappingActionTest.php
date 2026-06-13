@@ -99,7 +99,7 @@ final class ApplyDefaultCostMappingActionTest extends IntegrationTestCase
     {
         $connection = $this->em->getConnection();
         $previewAction = new PreviewDefaultCostMappingAction(
-            new DefaultCostMappingYamlProvider(__DIR__ . '/../../../../Fixtures/Marketplace/' . $fixture),
+            new DefaultCostMappingYamlProvider(__DIR__.'/../../../../Fixtures/Marketplace/'.$fixture),
             new MarketplaceCostCategoriesByCodeQuery($connection),
             new PLCategoriesByCodeQuery($connection),
             new MarketplaceCostPLMappingsByCostCategoryQuery($connection),

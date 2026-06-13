@@ -7,6 +7,7 @@ namespace App\Tests\Integration\Catalog;
 use App\Catalog\Entity\Product;
 use App\Catalog\Entity\ProductPurchasePrice;
 use App\Catalog\Facade\ProductPurchasePriceFacade;
+use App\Catalog\Infrastructure\Query\ProductPurchasePriceQuery;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
@@ -24,15 +25,14 @@ final class ProductPurchasePriceFacadeTest extends IntegrationTestCase
 
         $product = (new Product('33333333-3333-3333-3333-333333333394', $company))
             ->setName('Facade Product')
-            ->setSku('SKU-FACADE-001')
-            ->setPurchasePrice('500.00');
+            ->setSku('SKU-FACADE-001');
 
         $purchasePrice = new ProductPurchasePrice(
             id: '44444444-4444-4444-4444-444444444494',
-            company: $company,
+            companyId: $company->getId(),
             product: $product,
             effectiveFrom: new \DateTimeImmutable('2026-03-01'),
-            priceAmount: 145000,
+            priceAmount: '145000.00',
             priceCurrency: 'RUB',
             note: 'Контрактная цена поставщика',
         );
@@ -43,7 +43,7 @@ final class ProductPurchasePriceFacadeTest extends IntegrationTestCase
         $this->em->persist($purchasePrice);
         $this->em->flush();
 
-        $facade = self::getContainer()->get(ProductPurchasePriceFacade::class);
+        $facade = new ProductPurchasePriceFacade(self::getContainer()->get(ProductPurchasePriceQuery::class));
         $dto = $facade->getPurchasePriceAt(
             '11111111-1111-1111-1111-111111111194',
             '33333333-3333-3333-3333-333333333394',
@@ -53,7 +53,7 @@ final class ProductPurchasePriceFacadeTest extends IntegrationTestCase
         self::assertNotNull($dto);
         self::assertSame('2026-03-01', $dto->effectiveFrom);
         self::assertNull($dto->effectiveTo);
-        self::assertSame(145000, $dto->amount);
+        self::assertSame('145000.00', $dto->amount);
         self::assertSame('RUB', $dto->currency);
         self::assertSame('Контрактная цена поставщика', $dto->note);
     }

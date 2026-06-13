@@ -200,11 +200,10 @@ final class SyncOzonInventorySnapshotHandlerTest extends IntegrationTestCase
         return $this->em->getRepository(InventoryRawSnapshot::class)->count([]);
     }
 
-
     private function countNormalizeMessages(string $sessionId, string $companyId): int
     {
         $cnt = (int) $this->em->getConnection()->fetchOne(
-            "SELECT COUNT(*) FROM messenger_messages WHERE body LIKE :needle1 AND body LIKE :needle2 AND body LIKE :needle3",
+            'SELECT COUNT(*) FROM messenger_messages WHERE body LIKE :needle1 AND body LIKE :needle2 AND body LIKE :needle3',
             [
                 'needle1' => '%NormalizeInventorySnapshotMessage%',
                 'needle2' => '%"snapshotSessionId":"'.$sessionId.'"%',
@@ -213,10 +212,10 @@ final class SyncOzonInventorySnapshotHandlerTest extends IntegrationTestCase
         );
 
         $body = (string) $this->em->getConnection()->fetchOne(
-            "SELECT body FROM messenger_messages WHERE body LIKE :needle ORDER BY available_at DESC LIMIT 1",
+            'SELECT body FROM messenger_messages WHERE body LIKE :needle ORDER BY available_at DESC LIMIT 1',
             ['needle' => '%NormalizeInventorySnapshotMessage%'],
         );
-        if ($body !== '') {
+        if ('' !== $body) {
             self::assertStringContainsString('"source":"ozon"', $body);
             self::assertStringNotContainsString('api_key', $body);
             self::assertStringNotContainsString('client_id', $body);
@@ -224,5 +223,4 @@ final class SyncOzonInventorySnapshotHandlerTest extends IntegrationTestCase
 
         return $cnt;
     }
-
 }

@@ -75,9 +75,7 @@ final class AdRawDocumentDownloadControllerTest extends WebTestCaseBase
         $docId = $doc->getId();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
         $client->request('GET', '/marketplace-ads/raw-documents/'.$docId.'/download');
 
@@ -150,9 +148,7 @@ final class AdRawDocumentDownloadControllerTest extends WebTestCaseBase
         $foreignId = $foreignDoc->getId();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
         $client->request('GET', '/marketplace-ads/raw-documents/'.$foreignId.'/download');
 
@@ -194,9 +190,7 @@ final class AdRawDocumentDownloadControllerTest extends WebTestCaseBase
         $docId = $doc->getId();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
         $client->request('GET', '/marketplace-ads/raw-documents/'.$docId.'/download');
 
@@ -241,9 +235,7 @@ final class AdRawDocumentDownloadControllerTest extends WebTestCaseBase
         $docId = $doc->getId();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
         $client->request('GET', '/marketplace-ads/raw-documents/'.$docId.'/download');
 

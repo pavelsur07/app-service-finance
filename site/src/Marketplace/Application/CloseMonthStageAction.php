@@ -39,19 +39,20 @@ final class CloseMonthStageAction
 {
     /** @param iterable<MarketplaceDataSourceInterface> $dataSources */
     public function __construct(
-        private readonly MonthClosePreflightAction          $preflightAction,
-        private readonly MarketplaceMonthCloseRepository    $monthCloseRepository,
-        private readonly MarketplaceConnectionRepository    $connectionRepository,
-        private readonly FinanceFacade                      $financeFacade,
-        private readonly UnprocessedCostsQuery              $unprocessedCostsQuery,
-        private readonly EntityManagerInterface             $entityManager,
-        private readonly LoggerInterface                    $logger,
-        private readonly iterable                           $dataSources,
+        private readonly MonthClosePreflightAction $preflightAction,
+        private readonly MarketplaceMonthCloseRepository $monthCloseRepository,
+        private readonly MarketplaceConnectionRepository $connectionRepository,
+        private readonly FinanceFacade $financeFacade,
+        private readonly UnprocessedCostsQuery $unprocessedCostsQuery,
+        private readonly EntityManagerInterface $entityManager,
+        private readonly LoggerInterface $logger,
+        private readonly iterable $dataSources,
     ) {
     }
 
     /**
      * @return array{monthCloseId: string, plDocumentIds: string[], preflightResult: PreflightResult}
+     *
      * @throws \DomainException если preflight не пройден
      */
     public function __invoke(CloseMonthStageCommand $command): array
@@ -61,9 +62,23 @@ final class CloseMonthStageAction
         // MarkProcessedQuery::markCosts (DBAL Connection того же EM).
         // При любом throw — автоматический rollback, ничего не коммитится,
         // ретраи Messenger стартуют с чистого состояния БД.
-        return $this->entityManager->wrapInTransaction(function () use ($command): array {
-            return $this->doInvoke($command);
-        });
+        $connection = $this->entityManager->getConnection();
+        $connection->beginTransaction();
+
+        try {
+            $result = $this->doInvoke($command);
+            $connection->commit();
+
+            return $result;
+        } catch (\Throwable $e) {
+            if ($connection->isTransactionActive()) {
+                $connection->rollBack();
+            }
+
+            $this->entityManager->clear();
+
+            throw $e;
+        }
     }
 
     /**
@@ -71,11 +86,11 @@ final class CloseMonthStageAction
      */
     private function doInvoke(CloseMonthStageCommand $command): array
     {
-        $stage       = CloseStage::from($command->stage);
+        $stage = CloseStage::from($command->stage);
         $marketplace = MarketplaceType::from($command->marketplace);
 
         $periodFrom = sprintf('%d-%02d-01', $command->year, $command->month);
-        $periodTo   = (new \DateTimeImmutable($periodFrom))->modify('last day of this month')->format('Y-m-d');
+        $periodTo = (new \DateTimeImmutable($periodFrom))->modify('last day of this month')->format('Y-m-d');
 
         // Один таймстемп на всё закрытие — у всех операций предварительного
         // документа одинаковая метка времени, чтобы их можно было сгруппировать
@@ -83,29 +98,29 @@ final class CloseMonthStageAction
         $closedAt = new \DateTimeImmutable();
 
         $this->logger->info('[MonthClose] Stage close started', [
-            'company_id'  => $command->companyId,
+            'company_id' => $command->companyId,
             'marketplace' => $command->marketplace,
-            'year'        => $command->year,
-            'month'       => $command->month,
-            'stage'       => $command->stage,
+            'year' => $command->year,
+            'month' => $command->month,
+            'stage' => $command->stage,
             'preliminary' => $command->preliminary,
         ]);
 
         // 1. Повторный Preflight
         $preflightResult = ($this->preflightAction)(new PreflightMonthCloseCommand(
-            companyId:   $command->companyId,
+            companyId: $command->companyId,
             marketplace: $command->marketplace,
-            year:        $command->year,
-            month:       $command->month,
-            stage:       $stage,
+            year: $command->year,
+            month: $command->month,
+            stage: $stage,
         ));
 
         if (!$preflightResult->canClose()) {
             $errors = implode('; ', array_map(
-                static fn($c) => $c->message,
+                static fn ($c) => $c->message,
                 $preflightResult->getErrors(),
             ));
-            throw new \DomainException('Закрытие невозможно: ' . $errors);
+            throw new \DomainException('Закрытие невозможно: '.$errors);
         }
 
         // 2. Найти или создать запись закрытия
@@ -116,7 +131,7 @@ final class CloseMonthStageAction
             $command->month,
         );
 
-        if ($monthClose === null) {
+        if (null === $monthClose) {
             $monthClose = new \App\Marketplace\Entity\MarketplaceMonthClose(
                 Uuid::uuid4()->toString(),
                 $command->companyId,
@@ -127,11 +142,11 @@ final class CloseMonthStageAction
         }
 
         // 3. Собрать entries со всех Source-ов этапа → один PLDocument
-        $plDocumentIds    = [];
-        $source           = $this->resolveSource($marketplace);
-        $stream           = $this->resolveStream($stage);
-        $allPlEntries     = [];
-        $sourcesUsed      = [];
+        $plDocumentIds = [];
+        $source = $this->resolveSource($marketplace);
+        $stream = $this->resolveStream($stage);
+        $allPlEntries = [];
+        $sourcesUsed = [];
 
         // Читаем проект ОПиУ из настроек подключения маркетплейса
         $projectDirectionId = null;
@@ -140,7 +155,7 @@ final class CloseMonthStageAction
             $marketplace,
             MarketplaceConnectionType::SELLER,
         );
-        if ($connection !== null) {
+        if (null !== $connection) {
             $projectDirectionId = $connection->getProjectDirectionId();
         }
 
@@ -172,24 +187,24 @@ final class CloseMonthStageAction
 
                 $allPlEntries[] = new PLEntryDTO(
                     plCategoryId: $row['pl_category_id'],
-                    projectId:    $row['project_direction_id'] ?? $projectDirectionId,
-                    amount:       $row['total_amount'],
-                    periodDate:   $periodTo,
-                    description:  $description,
-                    isNegative:   (bool) ($row['is_negative'] ?? false),
-                    sortOrder:    (int) ($row['sort_order'] ?? 0),
+                    projectId: $row['project_direction_id'] ?? $projectDirectionId,
+                    amount: $row['total_amount'],
+                    periodDate: $periodTo,
+                    description: $description,
+                    isNegative: (bool) ($row['is_negative'] ?? false),
+                    sortOrder: (int) ($row['sort_order'] ?? 0),
                 );
             }
 
             $sourcesUsed[] = $dataSource;
 
             $this->logger->info('[MonthClose] Entries collected from source', [
-                'source'  => $dataSource->getSourceId(),
+                'source' => $dataSource->getSourceId(),
                 'entries' => count($entries),
             ]);
         }
 
-        if ($allPlEntries === []) {
+        if ([] === $allPlEntries) {
             throw new \DomainException('Закрытие невозможно: нет строк для создания документа ОПиУ по этапу.');
         }
 
@@ -200,7 +215,7 @@ final class CloseMonthStageAction
             // считались на одном подмножестве строк — иначе в preliminary-режиме
             // исключение ozon_other_service создаёт дельту и бросает RuntimeException.
             $controlSumBefore = null;
-            if ($stage === CloseStage::COSTS) {
+            if (CloseStage::COSTS === $stage) {
                 $controlSumBefore = $this->unprocessedCostsQuery->getControlSum(
                     $command->companyId,
                     $command->marketplace,
@@ -211,12 +226,12 @@ final class CloseMonthStageAction
             }
 
             $documentId = $this->financeFacade->createPLDocument(
-                companyId:          $command->companyId,
-                source:             $source,
-                stream:             $stream,
-                periodFrom:         $periodFrom,
-                periodTo:           $periodTo,
-                entries:            $allPlEntries,
+                companyId: $command->companyId,
+                source: $source,
+                stream: $stream,
+                periodFrom: $periodFrom,
+                periodTo: $periodTo,
+                entries: $allPlEntries,
                 projectDirectionId: $projectDirectionId,
             );
 
@@ -233,13 +248,13 @@ final class CloseMonthStageAction
                     );
                 } catch (\Throwable $e) {
                     $this->logger->error('[MonthClose] markProcessed failed', [
-                        'company_id'        => $command->companyId,
-                        'marketplace'       => $command->marketplace,
-                        'stage'             => $command->stage,
-                        'source'            => $dataSource->getSourceId(),
-                        'document_id'       => $documentId,
-                        'preliminary'       => $command->preliminary,
-                        'exception_class'   => $e::class,
+                        'company_id' => $command->companyId,
+                        'marketplace' => $command->marketplace,
+                        'stage' => $command->stage,
+                        'source' => $dataSource->getSourceId(),
+                        'document_id' => $documentId,
+                        'preliminary' => $command->preliminary,
+                        'exception_class' => $e::class,
                         'exception_message' => $e->getMessage(),
                     ]);
 
@@ -248,7 +263,7 @@ final class CloseMonthStageAction
             }
 
             // Контрольная сумма строк PLDocument vs marketplace_costs (только для COSTS)
-            if ($stage === CloseStage::COSTS && $controlSumBefore !== null) {
+            if (CloseStage::COSTS === $stage && null !== $controlSumBefore) {
                 $plDocumentSum = array_reduce(
                     $allPlEntries,
                     static function (string $carry, PLEntryDTO $entry): string {
@@ -256,6 +271,7 @@ final class CloseMonthStageAction
                         if (!$entry->isNegative) {
                             return bcsub($carry, $entry->amount, 2);
                         }
+
                         return bcadd($carry, $entry->amount, 2);
                     },
                     '0',
@@ -269,18 +285,13 @@ final class CloseMonthStageAction
                     // marketplace_costs.document_id (ручной deletePLDocument
                     // больше не нужен — раньше он оставлял висящий document_id,
                     // т.к. DELETE коммитился отдельно от UPDATE).
-                    throw new \RuntimeException(sprintf(
-                        '[MonthClose] Контрольная сумма не сошлась: marketplace_costs=%s, PLDocument=%s, delta=%s. Документ удалён, закрытие отменено.',
-                        $controlSumBefore,
-                        $plDocumentSum,
-                        $delta,
-                    ));
+                    throw new \RuntimeException(sprintf('[MonthClose] Контрольная сумма не сошлась: marketplace_costs=%s, PLDocument=%s, delta=%s. Документ удалён, закрытие отменено.', $controlSumBefore, $plDocumentSum, $delta));
                 }
 
                 $this->logger->info('[MonthClose] Control sum verified', [
-                    'control_sum_costs'    => $controlSumBefore,
+                    'control_sum_costs' => $controlSumBefore,
                     'control_sum_document' => $plDocumentSum,
-                    'delta'                => $delta,
+                    'delta' => $delta,
                 ]);
             }
 
@@ -288,8 +299,8 @@ final class CloseMonthStageAction
 
             $this->logger->info('[MonthClose] PLDocument created', [
                 'document_id' => $documentId,
-                'entries'     => count($allPlEntries),
-                'sources'     => array_map(fn($s) => $s->getSourceId(), $sourcesUsed),
+                'entries' => count($allPlEntries),
+                'sources' => array_map(static fn ($s) => $s->getSourceId(), $sourcesUsed),
             ]);
         }
 
@@ -331,13 +342,13 @@ final class CloseMonthStageAction
 
         $this->logger->info('[MonthClose] Stage closed', [
             'month_close_id' => $monthClose->getId(),
-            'stage'          => $command->stage,
-            'pl_documents'   => count($plDocumentIds),
+            'stage' => $command->stage,
+            'pl_documents' => count($plDocumentIds),
         ]);
 
         return [
-            'monthCloseId'    => $monthClose->getId(),
-            'plDocumentIds'   => $plDocumentIds,
+            'monthCloseId' => $monthClose->getId(),
+            'plDocumentIds' => $plDocumentIds,
             'preflightResult' => $preflightResult,
         ];
     }
@@ -360,9 +371,9 @@ final class CloseMonthStageAction
     private function resolveSource(MarketplaceType $marketplace): PLDocumentSource
     {
         return match ($marketplace) {
-            MarketplaceType::WILDBERRIES    => PLDocumentSource::MARKETPLACE_WB,
-            MarketplaceType::OZON           => PLDocumentSource::MARKETPLACE_OZON,
-            MarketplaceType::YANDEX_MARKET  => PLDocumentSource::MARKETPLACE_YANDEX,
+            MarketplaceType::WILDBERRIES => PLDocumentSource::MARKETPLACE_WB,
+            MarketplaceType::OZON => PLDocumentSource::MARKETPLACE_OZON,
+            MarketplaceType::YANDEX_MARKET => PLDocumentSource::MARKETPLACE_YANDEX,
             MarketplaceType::SBER_MEGAMARKET => PLDocumentSource::MARKETPLACE_SBER,
         };
     }
@@ -371,7 +382,7 @@ final class CloseMonthStageAction
     {
         return match ($stage) {
             CloseStage::SALES_RETURNS => PLDocumentStream::REVENUE,
-            CloseStage::COSTS         => PLDocumentStream::COSTS,
+            CloseStage::COSTS => PLDocumentStream::COSTS,
         };
     }
 }

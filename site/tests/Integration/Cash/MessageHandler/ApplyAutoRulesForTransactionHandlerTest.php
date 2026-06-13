@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Integration\MessageHandler;
+namespace App\Tests\Integration\Cash\MessageHandler;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;

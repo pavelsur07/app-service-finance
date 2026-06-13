@@ -48,7 +48,7 @@ final class MarkAdLoadJobFailedControllerTest extends WebTestCaseBase
 
         $client->request(
             'POST',
-            '/api/marketplace-ads/admin/load-jobs/' . $job->getId() . '/mark-failed',
+            '/api/marketplace-ads/admin/load-jobs/'.$job->getId().'/mark-failed',
             [],
             [],
             ['CONTENT_TYPE' => 'application/json', 'HTTP_X-Requested-With' => 'XMLHttpRequest'],
@@ -99,7 +99,7 @@ final class MarkAdLoadJobFailedControllerTest extends WebTestCaseBase
 
         $client->request(
             'POST',
-            '/api/marketplace-ads/admin/load-jobs/' . $job->getId() . '/mark-failed',
+            '/api/marketplace-ads/admin/load-jobs/'.$job->getId().'/mark-failed',
             [],
             [],
             ['CONTENT_TYPE' => 'application/json', 'HTTP_X-Requested-With' => 'XMLHttpRequest'],
@@ -142,7 +142,7 @@ final class MarkAdLoadJobFailedControllerTest extends WebTestCaseBase
 
         $client->request(
             'POST',
-            '/api/marketplace-ads/admin/load-jobs/' . $job->getId() . '/mark-failed',
+            '/api/marketplace-ads/admin/load-jobs/'.$job->getId().'/mark-failed',
             [],
             [],
             ['CONTENT_TYPE' => 'application/json', 'HTTP_X-Requested-With' => 'XMLHttpRequest'],
@@ -196,7 +196,7 @@ final class MarkAdLoadJobFailedControllerTest extends WebTestCaseBase
 
         $client->request(
             'POST',
-            '/api/marketplace-ads/admin/load-jobs/' . $otherJob->getId() . '/mark-failed',
+            '/api/marketplace-ads/admin/load-jobs/'.$otherJob->getId().'/mark-failed',
             [],
             [],
             ['CONTENT_TYPE' => 'application/json', 'HTTP_X-Requested-With' => 'XMLHttpRequest'],
@@ -245,7 +245,7 @@ final class MarkAdLoadJobFailedControllerTest extends WebTestCaseBase
 
         $client->request(
             'POST',
-            '/api/marketplace-ads/admin/load-jobs/' . $job->getId() . '/mark-failed',
+            '/api/marketplace-ads/admin/load-jobs/'.$job->getId().'/mark-failed',
             [],
             [],
             ['CONTENT_TYPE' => 'application/json', 'HTTP_X-Requested-With' => 'XMLHttpRequest'],
@@ -299,7 +299,7 @@ final class MarkAdLoadJobFailedControllerTest extends WebTestCaseBase
 
         $client->request(
             'POST',
-            '/api/marketplace-ads/admin/load-jobs/' . $job->getId() . '/mark-failed',
+            '/api/marketplace-ads/admin/load-jobs/'.$job->getId().'/mark-failed',
             [],
             [],
             ['CONTENT_TYPE' => 'application/json', 'HTTP_X-Requested-With' => 'XMLHttpRequest'],
@@ -345,8 +345,6 @@ final class MarkAdLoadJobFailedControllerTest extends WebTestCaseBase
     private function loginAs($client, $user, string $companyId): void
     {
         $client->loginUser($user);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', $companyId);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', $companyId);
     }
 }

@@ -19,7 +19,7 @@ use App\Tests\Support\Kernel\IntegrationTestCase;
 final class ProcessAdRawDocumentActionTest extends IntegrationTestCase
 {
     private const COMPANY_ID = '11111111-1111-1111-1111-000000000001';
-    private const OWNER_ID   = '22222222-2222-2222-2222-000000000001';
+    private const OWNER_ID = '22222222-2222-2222-2222-000000000001';
 
     public function testProcessesRawDocumentAndCreatesAdDocuments(): void
     {
@@ -30,7 +30,7 @@ final class ProcessAdRawDocumentActionTest extends IntegrationTestCase
 
         $rawDocumentId = $this->seedOzonRawDocument([
             ['campaign_id' => 'CAMP-A', 'campaign_name' => 'Осенняя', 'sku' => 'SKU-PARENT-1',
-             'spend' => 100.00, 'views' => 1000, 'clicks' => 40],
+                'spend' => 100.00, 'views' => 1000, 'clicks' => 40],
         ]);
 
         ($this->action())(self::COMPANY_ID, $rawDocumentId);
@@ -72,9 +72,9 @@ final class ProcessAdRawDocumentActionTest extends IntegrationTestCase
 
         $rawDocumentId = $this->seedOzonRawDocument([
             ['campaign_id' => 'CAMP-1', 'campaign_name' => 'Кампания 1', 'sku' => 'SKU-KNOWN',
-             'spend' => 50.00, 'views' => 500, 'clicks' => 25],
+                'spend' => 50.00, 'views' => 500, 'clicks' => 25],
             ['campaign_id' => 'CAMP-2', 'campaign_name' => 'Кампания 2', 'sku' => 'SKU-MISSING',
-             'spend' => 80.00, 'views' => 800, 'clicks' => 30],
+                'spend' => 80.00, 'views' => 800, 'clicks' => 30],
         ]);
 
         ($this->action())(self::COMPANY_ID, $rawDocumentId);
@@ -106,9 +106,9 @@ final class ProcessAdRawDocumentActionTest extends IntegrationTestCase
         // Action это ловит и не ломает обработку первой записи.
         $rawDocumentId = $this->seedOzonRawDocument([
             ['campaign_id' => 'CAMP-OK', 'campaign_name' => 'OK', 'sku' => 'SKU-GOOD',
-             'spend' => 30.00, 'views' => 300, 'clicks' => 10],
+                'spend' => 30.00, 'views' => 300, 'clicks' => 10],
             ['campaign_id' => 'CAMP-NONAME', 'sku' => 'SKU-NONAME',
-             'spend' => 40.00, 'views' => 400, 'clicks' => 20],
+                'spend' => 40.00, 'views' => 400, 'clicks' => 20],
         ]);
 
         ($this->action())(self::COMPANY_ID, $rawDocumentId);
@@ -135,7 +135,7 @@ final class ProcessAdRawDocumentActionTest extends IntegrationTestCase
 
         $rawDocumentId = $this->seedOzonRawDocument([
             ['campaign_id' => 'CAMP-X', 'campaign_name' => 'X', 'sku' => 'SKU-IDEM',
-             'spend' => 10.00, 'views' => 100, 'clicks' => 5],
+                'spend' => 10.00, 'views' => 100, 'clicks' => 5],
         ]);
 
         $action = $this->action();
@@ -164,7 +164,7 @@ final class ProcessAdRawDocumentActionTest extends IntegrationTestCase
 
         $rawDocumentId = $this->seedOzonRawDocument([
             ['campaign_id' => 'C', 'campaign_name' => 'N', 'sku' => 'SKU-Y',
-             'spend' => 1.00, 'views' => 1, 'clicks' => 0],
+                'spend' => 1.00, 'views' => 1, 'clicks' => 0],
         ]);
 
         $action = $this->action();
@@ -263,13 +263,13 @@ final class ProcessAdRawDocumentActionTest extends IntegrationTestCase
      */
     private function seedOzonRawDocument(array $rows): string
     {
-        $payload = json_encode(['rows' => $rows], JSON_THROW_ON_ERROR);
+        $payload = json_encode(['rows' => $rows], \JSON_THROW_ON_ERROR);
 
         $rawDocument = new AdRawDocument(
-            companyId:   self::COMPANY_ID,
+            companyId: self::COMPANY_ID,
             marketplace: MarketplaceType::OZON,
-            reportDate:  new \DateTimeImmutable('2026-04-10'),
-            rawPayload:  $payload,
+            reportDate: new \DateTimeImmutable('2026-04-10'),
+            rawPayload: $payload,
         );
 
         $this->em->persist($rawDocument);
@@ -283,13 +283,13 @@ final class ProcessAdRawDocumentActionTest extends IntegrationTestCase
      */
     private function seedOzonRawDocumentWithNestedPayload(array $campaigns): string
     {
-        $payload = json_encode(['campaigns' => $campaigns], JSON_THROW_ON_ERROR);
+        $payload = json_encode(['campaigns' => $campaigns], \JSON_THROW_ON_ERROR);
 
         $rawDocument = new AdRawDocument(
-            companyId:   self::COMPANY_ID,
+            companyId: self::COMPANY_ID,
             marketplace: MarketplaceType::OZON,
-            reportDate:  new \DateTimeImmutable('2026-04-11'),
-            rawPayload:  $payload,
+            reportDate: new \DateTimeImmutable('2026-04-11'),
+            rawPayload: $payload,
         );
 
         $this->em->persist($rawDocument);

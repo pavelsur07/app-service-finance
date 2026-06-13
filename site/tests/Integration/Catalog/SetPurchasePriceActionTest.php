@@ -48,7 +48,7 @@ final class SetPurchasePriceActionTest extends IntegrationTestCase
         self::assertNull($prices[1]->getEffectiveTo());
     }
 
-    public function testInsertOverlappingFutureRecordThrowsDomainException(): void
+    public function testBackdatedInsertBeforeFutureRecordThrowsDomainException(): void
     {
         [$companyId, $productId] = $this->createBaseFixtures(
             'owner-set-price-c@example.test',
@@ -59,9 +59,9 @@ final class SetPurchasePriceActionTest extends IntegrationTestCase
         $this->action()($this->makeCommand($companyId, $productId, '2026-05-10', 15000, 'Будущая цена'));
 
         $this->expectException(\DomainException::class);
-        $this->expectExceptionMessage('Нельзя установить цену с даты 2026-05-10, потому что уже есть цена начиная с 2026-05-10.');
+        $this->expectExceptionMessage('Нельзя установить цену с даты 2026-05-01, потому что уже есть цена начиная с 2026-05-10.');
 
-        $this->action()($this->makeCommand($companyId, $productId, '2026-05-10', 11000, 'Конфликтная цена'));
+        $this->action()($this->makeCommand($companyId, $productId, '2026-05-01', 11000, 'Конфликтная цена'));
     }
 
     private function makeCommand(string $companyId, string $productId, string $effectiveFrom, int $amount, ?string $note): SetPurchasePriceCommand
@@ -70,7 +70,7 @@ final class SetPurchasePriceActionTest extends IntegrationTestCase
         $command->companyId = $companyId;
         $command->productId = $productId;
         $command->effectiveFrom = new \DateTimeImmutable($effectiveFrom);
-        $command->priceAmount = $amount;
+        $command->priceAmount = (string) $amount;
         $command->currency = 'RUB';
         $command->note = $note;
 
@@ -88,8 +88,7 @@ final class SetPurchasePriceActionTest extends IntegrationTestCase
 
         $product = (new Product($productId, $company))
             ->setName('Product for purchase price tests')
-            ->setSku('SKU-'.$productId)
-            ->setPurchasePrice('100.00');
+            ->setSku('SKU-'.$productId);
 
         $this->em->persist($owner);
         $this->em->persist($company);

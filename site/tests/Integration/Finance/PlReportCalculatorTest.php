@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Finance;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\ProjectDirection;
 use App\Finance\Facts\FactsProviderInterface;
 use App\Finance\Report\PlReportCalculator;
 use App\Finance\Report\PlReportPeriod;
@@ -25,7 +26,7 @@ final class PlReportCalculatorTest extends TestCase
 
         // Факты: REV_WB = 500, COGS = 100
         $facts = new class implements FactsProviderInterface {
-            public function value(Company $company, PlReportPeriod $period, string $code): float
+            public function value(Company $company, PlReportPeriod $period, string $code, ?ProjectDirection $projectDirection = null): float
             {
                 return match ($code) {
                     'REV_WB' => 500.0,

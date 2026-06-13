@@ -10,7 +10,6 @@ use App\Finance\Application\Service\PLRegisterUpdater;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
 use App\Finance\Entity\PLCategory;
-use App\Finance\Entity\PLDailyTotal;
 use App\Finance\Enum\DocumentStatus;
 use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\PLFlow;
@@ -223,7 +222,7 @@ final class PLRegisterUpdaterStornoSymmetryTest extends IntegrationTestCase
             ],
         );
 
-        self::assertIsArray($row, 'pl_daily_totals row must exist for category ' . (string) $category->getId());
+        self::assertIsArray($row, 'pl_daily_totals row must exist for category '.(string) $category->getId());
 
         return [
             'amount_income' => (string) $row['amount_income'],

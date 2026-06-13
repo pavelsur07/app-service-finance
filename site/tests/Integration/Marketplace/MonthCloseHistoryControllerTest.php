@@ -10,14 +10,14 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
-use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\HttpFoundation\Response;
 
 final class MonthCloseHistoryControllerTest extends WebTestCaseBase
 {
     private const COMPANY_ID = '11111111-1111-1111-1111-c00000000001';
-    private const OWNER_ID   = '22222222-2222-2222-2222-c00000000001';
+    private const OWNER_ID = '22222222-2222-2222-2222-c00000000001';
 
     public function testHistoryKeepsFullyPreliminaryFinalAndMixedPeriodsVisible(): void
     {
@@ -129,9 +129,7 @@ final class MonthCloseHistoryControllerTest extends WebTestCaseBase
         $em->flush();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
     }
 
     private function persistMonthClose(
@@ -178,7 +176,7 @@ final class MonthCloseHistoryControllerTest extends WebTestCaseBase
         $rows = $crawler->filter('table tbody tr')->reduce(
             static function (Crawler $row) use ($year, $month): bool {
                 $link = $row->filter('a[href*="marketplace/month-close"]');
-                if ($link->count() === 0) {
+                if (0 === $link->count()) {
                     return false;
                 }
 

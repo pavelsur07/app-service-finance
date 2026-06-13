@@ -431,7 +431,7 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
         $company = $this->createCompany(9216);
         $connection = $this->createWbSellerConnection($company, 9216);
         $firstPageRows = $this->pageRows(1, WbFinanceSalesReportClient::PAGE_SIZE);
-        $this->swapWbClient([new MockResponse(json_encode($firstPageRows, JSON_THROW_ON_ERROR), ['http_code' => 200])]);
+        $this->swapWbClient([new MockResponse(json_encode($firstPageRows, \JSON_THROW_ON_ERROR), ['http_code' => 200])]);
 
         $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
         $handler($this->message($company->getId(), $connection->getId(), false));
@@ -459,7 +459,7 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
         $company = $this->createCompany(9217);
         $connection = $this->createWbSellerConnection($company, 9217);
         $firstPageRows = $this->pageRows(1, WbFinanceSalesReportClient::PAGE_SIZE);
-        $this->swapWbClient([new MockResponse(json_encode($firstPageRows, JSON_THROW_ON_ERROR), ['http_code' => 200])]);
+        $this->swapWbClient([new MockResponse(json_encode($firstPageRows, \JSON_THROW_ON_ERROR), ['http_code' => 200])]);
 
         $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
         $handler($this->message($company->getId(), $connection->getId(), false));

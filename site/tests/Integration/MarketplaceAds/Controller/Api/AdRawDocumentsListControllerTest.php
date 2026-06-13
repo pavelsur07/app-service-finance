@@ -63,9 +63,7 @@ final class AdRawDocumentsListControllerTest extends WebTestCaseBase
         $em->flush();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
         $client->request('GET', '/api/marketplace-ads/raw-documents?dateFrom=2026-03-01&dateTo=2026-03-31');
 
@@ -121,9 +119,7 @@ final class AdRawDocumentsListControllerTest extends WebTestCaseBase
         $em->flush();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
         $client->request('GET', '/api/marketplace-ads/raw-documents');
 
@@ -154,9 +150,7 @@ final class AdRawDocumentsListControllerTest extends WebTestCaseBase
         $em->flush();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
         $client->request('GET', '/api/marketplace-ads/raw-documents?dateFrom=2026/03/01&dateTo=2026/03/31');
 
@@ -200,9 +194,7 @@ final class AdRawDocumentsListControllerTest extends WebTestCaseBase
         $em->flush();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
         $client->request('GET', '/api/marketplace-ads/raw-documents?dateFrom=2026-03-01&dateTo=2026-03-31');
 
@@ -253,9 +245,7 @@ final class AdRawDocumentsListControllerTest extends WebTestCaseBase
         $em->flush();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
         $client->request('GET', '/api/marketplace-ads/raw-documents?dateFrom=2026-03-01&dateTo=2026-03-31');
 

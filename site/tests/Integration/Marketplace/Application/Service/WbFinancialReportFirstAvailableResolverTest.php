@@ -27,12 +27,16 @@ final class WbFinancialReportFirstAvailableResolverTest extends IntegrationTestC
 
     private MarketplaceFinancialReportSyncStatusRepository $statusRepository;
 
-    protected function setUp(): void { parent::setUp(); $this->statusRepository = self::getContainer()->get(MarketplaceFinancialReportSyncStatusRepository::class); }
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->statusRepository = self::getContainer()->get(MarketplaceFinancialReportSyncStatusRepository::class);
+    }
 
     public function testLocalKnownDataReturnsFirstDateAndIgnoresLoading(): void
     {
         $this->persistStatus('2026-01-02', static function (MarketplaceFinancialReportSyncStatus $s): void { $s->markLoading(FinancialReportSyncMode::INITIAL); });
-        $this->persistStatus('2026-01-03', static function (MarketplaceFinancialReportSyncStatus $s): void { $s->markRawLoaded('raw-id', 10, 'hash'); });
+        $this->persistStatus('2026-01-03', static function (MarketplaceFinancialReportSyncStatus $s): void { $s->markRawLoaded('33333333-3333-4333-8333-333333333333', 10, 'hash'); });
 
         $resolver = $this->resolverWithResponses([]);
         $result = $resolver->resolve(self::CONNECTION_ID, self::COMPANY_ID, 'token');
@@ -49,7 +53,6 @@ final class WbFinancialReportFirstAvailableResolverTest extends IntegrationTestC
         self::assertFalse($result->hasData());
         self::assertFalse($result->needsRetry());
     }
-
 
     public function testFullRangeContinuationAfterRateLimitGoesToMonthScan(): void
     {
@@ -149,6 +152,6 @@ final class WbFinancialReportFirstAvailableResolverTest extends IntegrationTestC
 
     private function rateLimiter(): WbFinanceRateLimiter
     {
-        return new WbFinanceRateLimiter(new RateLimiterFactory(['id' => 'wb_finance', 'policy' => 'token_bucket', 'limit' => 1, 'rate' => ['interval' => '61 seconds', 'amount' => 1]], new InMemoryStorage()), new MockClock('2026-03-15 10:00:00 Europe/Moscow'));
+        return new WbFinanceRateLimiter(new RateLimiterFactory(['id' => 'wb_finance', 'policy' => 'token_bucket', 'limit' => 100, 'rate' => ['interval' => '1 second', 'amount' => 100]], new InMemoryStorage()), new MockClock('2026-03-15 10:00:00 Europe/Moscow'));
     }
 }

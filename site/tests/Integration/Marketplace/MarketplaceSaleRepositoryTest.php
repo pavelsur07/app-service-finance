@@ -8,6 +8,7 @@ use App\Finance\Entity\Document;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceSaleBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
@@ -17,8 +18,16 @@ final class MarketplaceSaleRepositoryTest extends IntegrationTestCase
 {
     public function testDeleteByRawDocumentDeletesOnlyTargetRows(): void
     {
-        $company1 = CompanyBuilder::aCompany()->withIndex(1)->build();
-        $company2 = CompanyBuilder::aCompany()->withIndex(2)->build();
+        $company1 = CompanyBuilder::aCompany()
+            ->withIndex(1)
+            ->withOwner(UserBuilder::aUser()->withIndex(1)->build())
+            ->build();
+        $company2 = CompanyBuilder::aCompany()
+            ->withIndex(2)
+            ->withOwner(UserBuilder::aUser()->withIndex(2)->build())
+            ->build();
+        $this->em->persist($company1->getUser());
+        $this->em->persist($company2->getUser());
         $this->em->persist($company1);
         $this->em->persist($company2);
 

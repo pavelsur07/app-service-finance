@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Marketplace;
 
 use App\Marketplace\Application\Service\WbFinanceRateLimiter;
-use App\Company\Entity\Company;
 use App\Marketplace\Application\Service\WbFinancialReportPeriodResolver;
+use App\Marketplace\Application\Service\WbFinancialReportReconciliationService;
 use App\Marketplace\Application\Service\WbFinancialReportSyncPlanner;
+use App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdater;
+use App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdaterInterface;
+use App\Marketplace\Application\Service\WbGeneratedRowsSafeReplaceServiceInterface;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceFinancialReportSyncStatus;
 use App\Marketplace\Enum\FinancialReportSyncMode;
-use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Api\Wildberries\WbFinanceSalesReportClient;
@@ -22,18 +24,25 @@ use App\Marketplace\Message\SyncWbFinancialReportDayMessage;
 use App\Marketplace\MessageHandler\ProcessDayReportHandler;
 use App\Marketplace\MessageHandler\ProcessRawDocumentStepMessageHandler;
 use App\Marketplace\MessageHandler\SyncWbFinancialReportDayHandler;
+use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusRepository;
+use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusLookupInterface;
+use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
-use Symfony\Component\RateLimiter\RateLimiterFactory;
-use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
+use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 
 final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
 {
@@ -41,8 +50,8 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
     {
         [$company, $connection] = $this->createCompanyAndConnection(301);
         $this->swapWbClient([
-            new MockResponse('[{"rrd_id": 1}]', ['http_code' => 200]),
-            new MockResponse('[{"rrd_id": 2}]', ['http_code' => 200]),
+            new MockResponse('[{"rrdId": 1}]', ['http_code' => 200]),
+            new MockResponse('[{"rrdId": 2}]', ['http_code' => 200]),
         ]);
         $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
 
@@ -58,12 +67,12 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
     {
         [$company, $connection] = $this->createCompanyAndConnection(302);
         $this->swapWbClient([
-            new MockResponse('[{"rrd_id": 10}]', ['http_code' => 200]),
-            new MockResponse('[{"rrd_id": 10}]', ['http_code' => 200]),
-            new MockResponse('[{"rrd_id": 10}]', ['http_code' => 200]),
-            new MockResponse('[{"rrd_id": 10}]', ['http_code' => 200]),
-            new MockResponse('[{"rrd_id": 10}]', ['http_code' => 200]),
-            new MockResponse('[{"rrd_id": 10}]', ['http_code' => 200]),
+            new MockResponse('[{"rrdId": 10}]', ['http_code' => 200]),
+            new MockResponse('[{"rrdId": 10}]', ['http_code' => 200]),
+            new MockResponse('[{"rrdId": 10}]', ['http_code' => 200]),
+            new MockResponse('[{"rrdId": 10}]', ['http_code' => 200]),
+            new MockResponse('[{"rrdId": 10}]', ['http_code' => 200]),
+            new MockResponse('[{"rrdId": 10}]', ['http_code' => 200]),
         ]);
 
         $plannerBus = new InMemoryMessageBus();
@@ -71,7 +80,7 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
         $planned1 = $planner->planInitial($company->getId(), $connection->getId(), new \DateTimeImmutable('2026-05-02 00:00:00 Europe/Moscow'), 3);
         $planned2 = $planner->planInitial($company->getId(), $connection->getId(), new \DateTimeImmutable('2026-05-02 00:00:00 Europe/Moscow'), 3);
         self::assertSame(3, $planned1);
-        self::assertSame(3, $planned2);
+        self::assertSame(0, $planned2);
 
         $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
         foreach (['2026-05-02', '2026-05-03', '2026-05-04'] as $day) {
@@ -81,20 +90,20 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
         }
 
         self::assertSame(3, $this->countStatusesInRange($company->getId(), $connection->getId(), '2026-05-02', '2026-05-04'));
-        self::assertSame(3, $this->countRawDocumentsInRange($company->getId(), '2026-05-02', '2026-05-04'));
+        self::assertSame(1, $this->countRawDocumentsInRange($company->getId(), '2026-05-02', '2026-05-04'));
     }
 
     public function testRefresh14SameDayTwiceDoesNotDuplicateSalesRows(): void
     {
         [$company, $connection] = $this->createCompanyAndConnection(303);
         $this->swapWbClient([
-            new MockResponse('[{"doc_type_name":"Продажа","supplier_oper_name":"Продажа","srid":"SR-1","nm_id":"100","quantity":1,"retail_price_withdisc_rub":100,"sale_dt":"2026-05-19 12:00:00","rr_dt":"2026-05-19 12:00:00"}]', ['http_code' => 200]),
-            new MockResponse('[{"doc_type_name":"Продажа","supplier_oper_name":"Продажа","srid":"SR-1","nm_id":"100","quantity":1,"retail_price_withdisc_rub":100,"sale_dt":"2026-05-19 12:00:00","rr_dt":"2026-05-19 12:00:00"}]', ['http_code' => 200]),
+            new MockResponse('[{"rrdId":1,"doc_type_name":"Продажа","supplier_oper_name":"Продажа","srid":"SR-1","nm_id":"100","quantity":1,"retail_price_withdisc_rub":100,"sale_dt":"2026-05-19 12:00:00","rr_dt":"2026-05-19 12:00:00"}]', ['http_code' => 200]),
+            new MockResponse('[{"rrdId":1,"doc_type_name":"Продажа","supplier_oper_name":"Продажа","srid":"SR-1","nm_id":"100","quantity":1,"retail_price_withdisc_rub":100,"sale_dt":"2026-05-19 12:00:00","rr_dt":"2026-05-19 12:00:00"}]', ['http_code' => 200]),
         ]);
 
         $bus = $this->swapBusSpy();
-        $syncHandler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
-        $processDayHandler = self::getContainer()->get(ProcessDayReportHandler::class);
+        $syncHandler = $this->syncHandler($bus);
+        $processDayHandler = $this->processDayHandler($bus);
         $stepHandler = self::getContainer()->get(ProcessRawDocumentStepMessageHandler::class);
         $msg = new SyncWbFinancialReportDayMessage($company->getId(), $connection->getId(), '2026-05-19', FinancialReportSyncMode::REFRESH_14D->value, true);
 
@@ -112,11 +121,10 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
         ));
     }
 
-
     public function testRefresh14SameDayTwiceDoesNotDuplicateReturnsRows(): void
     {
         [$company, $connection] = $this->createCompanyAndConnection(307);
-        $payload = '[{"doc_type_name":"Возврат","supplier_oper_name":"Возврат покупателем","srid":"RET-1","nm_id":"200","quantity":1,"retail_price_withdisc_rub":123.45,"sale_dt":"2026-05-19 12:00:00","rr_dt":"2026-05-19 12:00:00"}]';
+        $payload = '[{"rrdId":1,"doc_type_name":"Возврат","supplier_oper_name":"Возврат покупателем","srid":"RET-1","nm_id":"200","quantity":1,"retail_price_withdisc_rub":123.45,"sale_dt":"2026-05-19 12:00:00","rr_dt":"2026-05-19 12:00:00"}]';
         $this->swapWbClient([
             new MockResponse($payload, ['http_code' => 200]),
             new MockResponse($payload, ['http_code' => 200]),
@@ -135,7 +143,7 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
     public function testRefresh14SameDayTwiceDoesNotDuplicateCostsRows(): void
     {
         [$company, $connection] = $this->createCompanyAndConnection(308);
-        $payload = '[{"doc_type_name":"Услуги","supplier_oper_name":"Логистика","srid":"COST-1","sale_dt":"2026-05-19 12:00:00","rrd_id":"5001","delivery_amount":1,"return_amount":0,"delivery_rub":50}]';
+        $payload = '[{"rrdId":5001,"doc_type_name":"Услуги","supplier_oper_name":"Логистика","srid":"COST-1","sale_dt":"2026-05-19 12:00:00","delivery_amount":1,"return_amount":0,"delivery_rub":50}]';
         $this->swapWbClient([
             new MockResponse($payload, ['http_code' => 200]),
             new MockResponse($payload, ['http_code' => 200]),
@@ -190,7 +198,7 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
     public function testRawProcessingCompletedMarksStatusSuccess(): void
     {
         [$company, $connection] = $this->createCompanyAndConnection(306);
-        $this->swapWbClient([new MockResponse('[{"doc_type_name":"Продажа","supplier_oper_name":"Продажа","srid":"SR-2","nm_id":"101","quantity":1,"retail_price_withdisc_rub":200,"sale_dt":"2026-05-19 12:00:00","rr_dt":"2026-05-19 12:00:00"}]', ['http_code' => 200])]);
+        $this->swapWbClient([new MockResponse('[{"rrdId":1,"doc_type_name":"Продажа","supplier_oper_name":"Продажа","srid":"SR-2","nm_id":"101","quantity":1,"retail_price_withdisc_rub":200,"sale_dt":"2026-05-19 12:00:00","rr_dt":"2026-05-19 12:00:00"}]', ['http_code' => 200])]);
 
         $syncHandler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
         $stepHandler = self::getContainer()->get(ProcessRawDocumentStepMessageHandler::class);
@@ -203,7 +211,6 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
 
         self::assertSame('success', $this->statusValue($company->getId(), $connection->getId(), '2026-05-19'));
     }
-
 
     public function testClaimExistingBusinessDayUpdatesConnectionWithoutCreatingDuplicateStatus(): void
     {
@@ -295,6 +302,7 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
             new WbFinancialReportPeriodResolver(new MockClock($now)),
             self::getContainer()->get(MarketplaceFinancialReportSyncStatusRepository::class),
             $bus ?? self::getContainer()->get('messenger.default_bus'),
+            new MockClock($now),
         );
     }
 
@@ -325,37 +333,62 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
 
     private function countStatuses(string $companyId, string $connectionId, string $day): int
     {
-        return (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_financial_report_sync_statuses WHERE company_id=:c AND business_date=:d', ['c'=>$companyId, 'd'=>$day.' 00:00:00']);
+        return (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_financial_report_sync_statuses WHERE company_id=:c AND business_date=:d', ['c' => $companyId, 'd' => $day.' 00:00:00']);
     }
 
     private function countStatusesByBusinessDay(string $companyId, string $day): int
     {
-        return (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_financial_report_sync_statuses WHERE company_id=:c AND marketplace=:m AND report_type=:t AND business_date=:d', ['c'=>$companyId, 'm'=>'wildberries', 't'=>'sales_report', 'd'=>$day.' 00:00:00']);
+        return (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_financial_report_sync_statuses WHERE company_id=:c AND marketplace=:m AND report_type=:t AND business_date=:d', ['c' => $companyId, 'm' => 'wildberries', 't' => 'sales_report', 'd' => $day.' 00:00:00']);
     }
 
     private function countStatusesInRange(string $companyId, string $connectionId, string $from, string $to): int
     {
-        return (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_financial_report_sync_statuses WHERE company_id=:c AND connection_id=:n AND business_date BETWEEN :f AND :t', ['c'=>$companyId, 'n'=>$connectionId, 'f'=>$from.' 00:00:00', 't'=>$to.' 23:59:59']);
+        return (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_financial_report_sync_statuses WHERE company_id=:c AND connection_id=:n AND business_date BETWEEN :f AND :t', ['c' => $companyId, 'n' => $connectionId, 'f' => $from.' 00:00:00', 't' => $to.' 23:59:59']);
     }
 
     private function countRawDocuments(string $companyId, string $day): int
     {
-        return (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_raw_documents WHERE company_id=:c AND period_from=:d AND marketplace=:m AND document_type=:t', ['c'=>$companyId, 'd'=>$day.' 00:00:00', 'm'=>'wildberries', 't'=>'sales_report']);
+        return (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_raw_documents WHERE company_id=:c AND period_from=:d AND marketplace=:m AND document_type=:t', ['c' => $companyId, 'd' => $day.' 00:00:00', 'm' => 'wildberries', 't' => 'sales_report']);
     }
 
     private function countRawDocumentsInRange(string $companyId, string $from, string $to): int
     {
-        return (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_raw_documents WHERE company_id=:c AND period_from BETWEEN :f AND :t AND marketplace=:m AND document_type=:t2', ['c'=>$companyId, 'f'=>$from.' 00:00:00', 't'=>$to.' 23:59:59', 'm'=>'wildberries', 't2'=>'sales_report']);
+        return (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_raw_documents WHERE company_id=:c AND period_from BETWEEN :f AND :t AND marketplace=:m AND document_type=:t2', ['c' => $companyId, 'f' => $from.' 00:00:00', 't' => $to.' 23:59:59', 'm' => 'wildberries', 't2' => 'sales_report']);
     }
-
-
 
     private function swapBusSpy(): SpyMessageBus
     {
-        $spyBus = new SpyMessageBus();
-        self::getContainer()->set(MessageBusInterface::class, $spyBus);
+        return new SpyMessageBus();
+    }
 
-        return $spyBus;
+    private function syncHandler(MessageBusInterface $messageBus): SyncWbFinancialReportDayHandler
+    {
+        return new SyncWbFinancialReportDayHandler(
+            self::getContainer()->get(EntityManagerInterface::class),
+            self::getContainer()->get(MarketplaceConnectionRepository::class),
+            self::getContainer()->get(WbFinancialReportPeriodResolver::class),
+            self::getContainer()->get(WbFinanceSalesReportClient::class),
+            self::getContainer()->get(WbFinancialReportSyncStatusUpdater::class),
+            self::getContainer()->get(WbFinancialReportReconciliationService::class),
+            self::getContainer()->get(LockFactory::class),
+            $messageBus,
+            self::getContainer()->get(LoggerInterface::class),
+            self::getContainer()->get(ClockInterface::class),
+            (int) self::getContainer()->getParameter('wb_finance.rate_limit_interval_seconds'),
+        );
+    }
+
+    private function processDayHandler(MessageBusInterface $messageBus): ProcessDayReportHandler
+    {
+        return new ProcessDayReportHandler(
+            self::getContainer()->get(MarketplaceRawDocumentRepository::class),
+            $messageBus,
+            self::getContainer()->get(EntityManagerInterface::class),
+            self::getContainer()->get(LoggerInterface::class),
+            self::getContainer()->get(WbGeneratedRowsSafeReplaceServiceInterface::class),
+            self::getContainer()->get(MarketplaceFinancialReportSyncStatusLookupInterface::class),
+            self::getContainer()->get(WbFinancialReportSyncStatusUpdaterInterface::class),
+        );
     }
 
     private function runDispatchedPipeline(SpyMessageBus $bus, ProcessDayReportHandler $dayHandler, ProcessRawDocumentStepMessageHandler $stepHandler): void
@@ -375,12 +408,11 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
         }
     }
 
-
     private function runRefreshTwiceThroughFullFlow(string $companyId, string $connectionId, string $businessDate): void
     {
         $bus = $this->swapBusSpy();
-        $syncHandler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
-        $processDayHandler = self::getContainer()->get(ProcessDayReportHandler::class);
+        $syncHandler = $this->syncHandler($bus);
+        $processDayHandler = $this->processDayHandler($bus);
         $stepHandler = self::getContainer()->get(ProcessRawDocumentStepMessageHandler::class);
         $msg = new SyncWbFinancialReportDayMessage($companyId, $connectionId, $businessDate, FinancialReportSyncMode::REFRESH_14D->value, true);
 
@@ -393,16 +425,16 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
 
     private function statusValue(string $companyId, string $connectionId, string $date): ?string
     {
-        $value = $this->connection->fetchOne('SELECT status FROM marketplace_financial_report_sync_statuses WHERE company_id=:c AND connection_id=:n AND business_date=:d', ['c'=>$companyId, 'n'=>$connectionId, 'd'=>$date.' 00:00:00']);
+        $value = $this->connection->fetchOne('SELECT status FROM marketplace_financial_report_sync_statuses WHERE company_id=:c AND connection_id=:n AND business_date=:d', ['c' => $companyId, 'n' => $connectionId, 'd' => $date.' 00:00:00']);
 
-        return $value === false ? null : (string) $value;
+        return false === $value ? null : (string) $value;
     }
+
     private function createRateLimiter(): WbFinanceRateLimiter
     {
         return new WbFinanceRateLimiter(new RateLimiterFactory(['id' => 'wb_finance', 'policy' => 'token_bucket', 'limit' => 1, 'rate' => ['interval' => '61 seconds', 'amount' => 1]], new InMemoryStorage()), new MockClock('2026-01-01T00:00:00Z'));
     }
 }
-
 
 final class SpyMessageBus implements MessageBusInterface
 {

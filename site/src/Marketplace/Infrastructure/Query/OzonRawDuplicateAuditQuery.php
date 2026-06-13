@@ -17,7 +17,7 @@ final class OzonRawDuplicateAuditQuery
     public function findExactRawDocumentDuplicates(?string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
         $params = $this->buildBaseParams($companyId, $from, $to);
-        $companyFilter = $companyId !== null ? ' AND rd.company_id = :companyId' : '';
+        $companyFilter = null !== $companyId ? ' AND rd.company_id = :companyId' : '';
 
         return $this->connection->fetchAllAssociative(
             <<<SQL
@@ -49,7 +49,7 @@ final class OzonRawDuplicateAuditQuery
     public function findOverlappingRawDocuments(?string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
         $params = $this->buildBaseParams($companyId, $from, $to);
-        $companyFilter = $companyId !== null ? ' AND daily.company_id = :companyId' : '';
+        $companyFilter = null !== $companyId ? ' AND daily.company_id = :companyId' : '';
 
         return $this->connection->fetchAllAssociative(
             <<<SQL
@@ -133,41 +133,42 @@ final class OzonRawDuplicateAuditQuery
         \DateTimeImmutable $to,
     ): array {
         $params = $this->buildBaseParams($companyId, $from, $to);
-        $companyFilter = $companyId !== null ? sprintf(' AND %s.company_id = :companyId', $alias) : '';
+        $companyFilter = null !== $companyId ? sprintf(' AND %s.company_id = :companyId', $alias) : '';
 
-        return $this->connection->fetchAllAssociative(
-            sprintf(
-                <<<SQL
-                SELECT
-                    %1$s.company_id,
-                    %1$s.%2$s,
-                    COUNT(DISTINCT %1$s.raw_document_id) AS raw_docs_count,
-                    COUNT(*) AS row_count,
-                    COALESCE(SUM(%1$s.%3$s), 0) AS amount_sum,
-                    ARRAY_AGG(DISTINCT %1$s.raw_document_id) AS raw_document_ids,
-                    BOOL_OR(%1$s.document_id IS NOT NULL) AS has_closed_rows
-                FROM %4$s %1$s
-                WHERE %1$s.marketplace = 'ozon'
-                  AND %1$s.%2$s BETWEEN :fromDate AND :toDate
-                  AND %1$s.raw_document_id IS NOT NULL
-                  %5$s
-                GROUP BY %1$s.company_id, %1$s.%2$s
-                HAVING COUNT(DISTINCT %1$s.raw_document_id) > 1
-                ORDER BY %1$s.company_id, %1$s.%2$s
-                SQL,
-                $alias,
-                $dateField,
-                $amountField,
-                $table,
-                $companyFilter,
-            ),
-            $params,
+        $sql = strtr(
+            <<<'SQL'
+            SELECT
+                __ALIAS__.company_id,
+                __ALIAS__.__DATE_FIELD__,
+                COUNT(DISTINCT __ALIAS__.raw_document_id) AS raw_docs_count,
+                COUNT(*) AS row_count,
+                COALESCE(SUM(__ALIAS__.__AMOUNT_FIELD__), 0) AS amount_sum,
+                ARRAY_AGG(DISTINCT __ALIAS__.raw_document_id) AS raw_document_ids,
+                BOOL_OR(__ALIAS__.document_id IS NOT NULL) AS has_closed_rows
+            FROM __TABLE__ __ALIAS__
+            WHERE __ALIAS__.marketplace = 'ozon'
+              AND __ALIAS__.__DATE_FIELD__ BETWEEN :fromDate AND :toDate
+              AND __ALIAS__.raw_document_id IS NOT NULL
+              __COMPANY_FILTER__
+            GROUP BY __ALIAS__.company_id, __ALIAS__.__DATE_FIELD__
+            HAVING COUNT(DISTINCT __ALIAS__.raw_document_id) > 1
+            ORDER BY __ALIAS__.company_id, __ALIAS__.__DATE_FIELD__
+            SQL,
+            [
+                '__ALIAS__' => $alias,
+                '__DATE_FIELD__' => $dateField,
+                '__AMOUNT_FIELD__' => $amountField,
+                '__TABLE__' => $table,
+                '__COMPANY_FILTER__' => $companyFilter,
+            ],
         );
+
+        return $this->connection->fetchAllAssociative($sql, $params);
     }
 
     private function buildBaseParams(?string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
-        if ($companyId !== null) {
+        if (null !== $companyId) {
             Assert::uuid($companyId);
         }
 
@@ -176,7 +177,7 @@ final class OzonRawDuplicateAuditQuery
             'toDate' => $to->format('Y-m-d'),
         ];
 
-        if ($companyId !== null) {
+        if (null !== $companyId) {
             $params['companyId'] = $companyId;
         }
 

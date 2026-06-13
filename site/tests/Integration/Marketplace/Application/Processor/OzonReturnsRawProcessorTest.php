@@ -9,6 +9,7 @@ use App\Marketplace\Application\Processor\OzonReturnsRawProcessor;
 use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceRawDocumentBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
@@ -18,8 +19,10 @@ final class OzonReturnsRawProcessorTest extends IntegrationTestCase
 {
     public function testCleanupRemovesOnlyStaleOpenReturns(): void
     {
-        $company = CompanyBuilder::aCompany()->withIndex(201)->build();
-        $foreignCompany = CompanyBuilder::aCompany()->withIndex(202)->build();
+        $company = CompanyBuilder::aCompany()->withIndex(201)->withOwner(UserBuilder::aUser()->withIndex(201)->build())->build();
+        $foreignCompany = CompanyBuilder::aCompany()->withIndex(202)->withOwner(UserBuilder::aUser()->withIndex(202)->build())->build();
+        $this->em->persist($company->getUser());
+        $this->em->persist($foreignCompany->getUser());
         $this->em->persist($company);
         $this->em->persist($foreignCompany);
         $listing = MarketplaceListingBuilder::aListing()->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withMarketplaceSku('oz-ret')->build();

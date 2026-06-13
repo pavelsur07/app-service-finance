@@ -57,9 +57,7 @@ final class ReprocessAdRawDocumentControllerTest extends WebTestCaseBase
         $docId = $failed->getId();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
         $client->request('POST', '/api/marketplace-ads/raw-documents/'.$docId.'/reprocess');
 
@@ -130,9 +128,7 @@ final class ReprocessAdRawDocumentControllerTest extends WebTestCaseBase
 
         // Залогинены как owner COMPANY_ID, пытаемся тронуть документ OTHER_COMPANY_ID.
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
         $client->request('POST', '/api/marketplace-ads/raw-documents/'.$foreignId.'/reprocess');
 
@@ -173,9 +169,7 @@ final class ReprocessAdRawDocumentControllerTest extends WebTestCaseBase
         $em->flush();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
         $nonexistentId = '99999999-9999-9999-9999-999999999999';
         $client->request('POST', '/api/marketplace-ads/raw-documents/'.$nonexistentId.'/reprocess');
@@ -224,9 +218,7 @@ final class ReprocessAdRawDocumentControllerTest extends WebTestCaseBase
         $docId = $draft->getId();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
         $client->request('POST', '/api/marketplace-ads/raw-documents/'.$docId.'/reprocess');
 

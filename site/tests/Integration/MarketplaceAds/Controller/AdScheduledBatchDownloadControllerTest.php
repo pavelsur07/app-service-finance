@@ -84,9 +84,7 @@ final class AdScheduledBatchDownloadControllerTest extends WebTestCaseBase
         $batchId = $batch->getId();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
         $client->request('GET', '/marketplace-ads/batches/'.$batchId.'/download');
 
@@ -157,9 +155,7 @@ final class AdScheduledBatchDownloadControllerTest extends WebTestCaseBase
         $foreignId = $foreignBatch->getId();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
         $client->request('GET', '/marketplace-ads/batches/'.$foreignId.'/download');
 
@@ -206,9 +202,7 @@ final class AdScheduledBatchDownloadControllerTest extends WebTestCaseBase
         $batchId = $batch->getId();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
         $client->request('GET', '/marketplace-ads/batches/'.$batchId.'/download');
 
@@ -257,9 +251,7 @@ final class AdScheduledBatchDownloadControllerTest extends WebTestCaseBase
         $batchId = $batch->getId();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
         $client->request('GET', '/marketplace-ads/batches/'.$batchId.'/download');
 

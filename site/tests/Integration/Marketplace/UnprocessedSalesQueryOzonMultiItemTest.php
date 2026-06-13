@@ -185,8 +185,8 @@ final class UnprocessedSalesQueryOzonMultiItemTest extends IntegrationTestCase
     {
         $this->createSaleMapping(MarketplaceType::OZON, AmountSource::SALE_GROSS);
         $this->createOzonSale(quantity: 1, pricePerUnit: '100000.00', totalRevenue: '100000.00', externalOrderId: 'POST-A');
-        $this->createOzonSale(quantity: 2, pricePerUnit: '50000.00',  totalRevenue: '50000.00',  externalOrderId: 'POST-B');
-        $this->createOzonSale(quantity: 3, pricePerUnit: '30000.00',  totalRevenue: '30000.00',  externalOrderId: 'POST-C');
+        $this->createOzonSale(quantity: 2, pricePerUnit: '50000.00', totalRevenue: '50000.00', externalOrderId: 'POST-B');
+        $this->createOzonSale(quantity: 3, pricePerUnit: '30000.00', totalRevenue: '30000.00', externalOrderId: 'POST-C');
         $this->em->flush();
 
         $pnl = $this->getSaleGrossTotal('ozon');
@@ -298,7 +298,7 @@ final class UnprocessedSalesQueryOzonMultiItemTest extends IntegrationTestCase
             $listing,
             $marketplace,
         );
-        $sale->setExternalOrderId($externalOrderId ?? ('ext-' . Uuid::uuid4()->toString()));
+        $sale->setExternalOrderId($externalOrderId ?? ('ext-'.Uuid::uuid4()->toString()));
         $sale->setSaleDate($saleDate ?? new \DateTimeImmutable('2026-01-15'));
         $sale->setQuantity($quantity);
         $sale->setPricePerUnit($pricePerUnit);

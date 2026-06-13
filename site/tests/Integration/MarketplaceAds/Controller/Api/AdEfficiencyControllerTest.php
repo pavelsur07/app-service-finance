@@ -167,9 +167,7 @@ final class AdEfficiencyControllerTest extends WebTestCaseBase
         $ownerB = $em->getRepository(\App\Company\Entity\User::class)->find(self::OWNER_B_ID);
         self::assertNotNull($ownerB);
         $client->loginUser($ownerB);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_B_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_B_ID);
 
         $client->request(
             'GET',
@@ -192,9 +190,7 @@ final class AdEfficiencyControllerTest extends WebTestCaseBase
         $owner = $em->getRepository(\App\Company\Entity\User::class)->find(self::OWNER_A_ID);
         self::assertNotNull($owner);
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', self::COMPANY_A_ID);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_A_ID);
     }
 
     private function seedCompanyA(EntityManagerInterface $em): void

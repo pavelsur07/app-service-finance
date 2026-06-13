@@ -196,11 +196,11 @@ final class WbFinancialReportsReconcileLegacyCommandTest extends IntegrationTest
         $raw = new MarketplaceRawDocument(Uuid::uuid7()->toString(), $company, MarketplaceType::WILDBERRIES, 'sales_report');
         $date = new \DateTimeImmutable($day);
         $raw->setPeriodFrom($date)->setPeriodTo($date)->setApiEndpoint($apiEndpoint)->setRecordsCount($records)->setRawData([['k' => 'v']]);
-        if ($status === PipelineStatus::COMPLETED) {
+        if (PipelineStatus::COMPLETED === $status) {
             $raw->markCompleted();
-        } elseif ($status === PipelineStatus::FAILED) {
+        } elseif (PipelineStatus::FAILED === $status) {
             $raw->markFailed(['sales']);
-        } elseif ($status === PipelineStatus::RUNNING) {
+        } elseif (PipelineStatus::RUNNING === $status) {
             $raw->markRunning();
         } else {
             $raw->resetProcessingStatus();

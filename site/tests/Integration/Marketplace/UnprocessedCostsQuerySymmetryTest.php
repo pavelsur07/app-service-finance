@@ -112,7 +112,7 @@ final class UnprocessedCostsQuerySymmetryTest extends IntegrationTestCase
         );
         $stornoOnlyRows = array_values(array_filter(
             $rows,
-            static fn (array $r): bool => $r['cost_category_code'] === 'only_storno_cat' && $r['is_storno'] === true,
+            static fn (array $r): bool => 'only_storno_cat' === $r['cost_category_code'] && true === $r['is_storno'],
         ));
         self::assertCount(1, $stornoOnlyRows);
         self::assertFalse($stornoOnlyRows[0]['is_negative'], 'Standalone storno row must have is_negative=false to subtract from PL sum.');
@@ -278,7 +278,7 @@ final class UnprocessedCostsQuerySymmetryTest extends IntegrationTestCase
         $cost->setAmount($amount);
         $cost->setCostDate(new \DateTimeImmutable($costDate));
         $cost->setOperationType($operationType);
-        $cost->setExternalId('ext-' . Uuid::uuid4()->toString());
+        $cost->setExternalId('ext-'.Uuid::uuid4()->toString());
         $this->em->persist($cost);
 
         return $cost;

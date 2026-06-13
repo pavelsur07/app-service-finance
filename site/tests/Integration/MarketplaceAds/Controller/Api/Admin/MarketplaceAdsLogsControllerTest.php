@@ -100,7 +100,7 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
         $response = $client->getResponse();
         self::assertTrue(
             $response->isRedirect() || 401 === $response->getStatusCode() || 403 === $response->getStatusCode(),
-            'Unauthenticated access must be redirected or denied, got ' . $response->getStatusCode(),
+            'Unauthenticated access must be redirected or denied, got '.$response->getStatusCode(),
         );
     }
 
@@ -162,11 +162,11 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
 
         $this->loginAs($client, $admin, self::COMPANY_ID);
 
-        $client->request('GET', self::URL . '?lines=10');
+        $client->request('GET', self::URL.'?lines=10');
 
         self::assertResponseIsSuccessful();
         $body = $client->getResponse()->getContent();
-        $returned = $body === '' ? [] : explode("\n", $body);
+        $returned = '' === $body ? [] : explode("\n", $body);
         self::assertLessThanOrEqual(10, count($returned));
         self::assertStringContainsString('row-050', $body);
         self::assertStringNotContainsString('row-001', $body);
@@ -201,7 +201,7 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
 
         $this->loginAs($client, $admin, self::COMPANY_ID);
 
-        $client->request('GET', self::URL . '?search=ozon');
+        $client->request('GET', self::URL.'?search=ozon');
 
         self::assertResponseIsSuccessful();
         $body = $client->getResponse()->getContent();
@@ -260,8 +260,8 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
         if (!is_dir($dir)) {
             mkdir($dir, 0o777, true);
         }
-        $path = $dir . '/' . $name;
-        file_put_contents($path, implode("\n", $lines) . "\n");
+        $path = $dir.'/'.$name;
+        file_put_contents($path, implode("\n", $lines)."\n");
 
         return $path;
     }
@@ -272,7 +272,7 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
         if (!is_dir($dir)) {
             return;
         }
-        $matches = glob($dir . '/marketplace_ads*.log');
+        $matches = glob($dir.'/marketplace_ads*.log');
         if (false === $matches) {
             return;
         }
@@ -286,8 +286,6 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
     private function loginAs($client, $user, string $companyId): void
     {
         $client->loginUser($user);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', $companyId);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', $companyId);
     }
 }

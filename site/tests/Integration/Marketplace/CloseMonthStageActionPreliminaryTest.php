@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Marketplace;
 
 use App\Company\Entity\Company;
+use App\Finance\Entity\Document;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\PLFlow;
 use App\Marketplace\Application\CloseMonthStageAction;
@@ -38,11 +39,11 @@ use Ramsey\Uuid\Uuid;
  */
 final class CloseMonthStageActionPreliminaryTest extends IntegrationTestCase
 {
-    private const COMPANY_ID  = '11111111-1111-1111-1111-000000000099';
-    private const OWNER_ID    = '22222222-2222-2222-2222-000000000099';
+    private const COMPANY_ID = '11111111-1111-1111-1111-000000000099';
+    private const OWNER_ID = '22222222-2222-2222-2222-000000000099';
     private const MARKETPLACE = MarketplaceType::OZON;
     private const MARKETPLACE_VALUE = 'ozon';
-    private const YEAR  = 2026;
+    private const YEAR = 2026;
     private const MONTH = 2;
 
     private Company $company;
@@ -89,9 +90,9 @@ final class CloseMonthStageActionPreliminaryTest extends IntegrationTestCase
         self::assertSame(1, $documentRows, 'PLDocument должен быть создан при предзакрытии.');
 
         $operationComments = $conn->fetchFirstColumn(
-            'SELECT do.comment
-               FROM document_operations do
-               JOIN documents d ON d.id = do.document_id
+            'SELECT dop.comment
+               FROM document_operations dop
+               JOIN documents d ON d.id = dop.document_id
               WHERE d.company_id = :c',
             ['c' => self::COMPANY_ID],
         );
@@ -180,18 +181,16 @@ final class CloseMonthStageActionPreliminaryTest extends IntegrationTestCase
             'После финального закрытия флаг этапа COSTS должен быть сброшен.',
         );
 
-        $settings = $finalMonthClose->getSettings();
-        self::assertIsArray($settings['preliminary_calculated_at'] ?? null);
         self::assertNull(
-            $settings['preliminary_calculated_at'][CloseStage::COSTS->value] ?? 'unset',
+            $finalMonthClose->getStagePreliminaryCalculatedAt(CloseStage::COSTS),
             'preliminary_calculated_at[costs] должен быть null после финального закрытия.',
         );
 
         $conn = $this->em->getConnection();
         $operationComments = $conn->fetchFirstColumn(
-            'SELECT do.comment
-               FROM document_operations do
-               JOIN documents d ON d.id = do.document_id
+            'SELECT dop.comment
+               FROM document_operations dop
+               JOIN documents d ON d.id = dop.document_id
               WHERE d.company_id = :c',
             ['c' => self::COMPANY_ID],
         );
@@ -218,9 +217,9 @@ final class CloseMonthStageActionPreliminaryTest extends IntegrationTestCase
 
         $conn = $this->em->getConnection();
         $operationComments = $conn->fetchFirstColumn(
-            'SELECT do.comment
-               FROM document_operations do
-               JOIN documents d ON d.id = do.document_id
+            'SELECT dop.comment
+               FROM document_operations dop
+               JOIN documents d ON d.id = dop.document_id
               WHERE d.company_id = :c',
             ['c' => self::COMPANY_ID],
         );
@@ -247,11 +246,11 @@ final class CloseMonthStageActionPreliminaryTest extends IntegrationTestCase
         $action = self::getContainer()->get(CloseMonthStageAction::class);
 
         $command = new CloseMonthStageCommand(
-            companyId:   self::COMPANY_ID,
+            companyId: self::COMPANY_ID,
             marketplace: self::MARKETPLACE_VALUE,
-            year:        self::YEAR,
-            month:       self::MONTH,
-            stage:       CloseStage::COSTS->value,
+            year: self::YEAR,
+            month: self::MONTH,
+            stage: CloseStage::COSTS->value,
             actorUserId: self::OWNER_ID,
             preliminary: $preliminary,
         );
@@ -291,7 +290,7 @@ final class CloseMonthStageActionPreliminaryTest extends IntegrationTestCase
      * Любая preflight-ошибка блокирует preliminary-закрытие — soft-режим удалён.
      * Тест использует сценарий costs_already_processed как представительный кейс.
      */
-    public function testPreliminaryClose_BlocksOnAnyPreflightError(): void
+    public function testPreliminaryCloseBlocksOnAnyPreflightError(): void
     {
         $plCategory = new PLCategory(Uuid::uuid4()->toString(), $this->company);
         $plCategory->setName('Логистика блок');
@@ -322,17 +321,17 @@ final class CloseMonthStageActionPreliminaryTest extends IntegrationTestCase
         // Вручную проставляем document_id — симулируем уже обработанную затрату
         $this->em->getConnection()->executeStatement(
             'UPDATE marketplace_costs SET document_id = :docId WHERE id = :id',
-            ['docId' => Uuid::uuid4()->toString(), 'id' => $cost->getId()],
+            ['docId' => $this->createDocumentId(), 'id' => $cost->getId()],
         );
         $this->em->clear();
 
         $action = self::getContainer()->get(CloseMonthStageAction::class);
         $command = new CloseMonthStageCommand(
-            companyId:   self::COMPANY_ID,
+            companyId: self::COMPANY_ID,
             marketplace: self::MARKETPLACE_VALUE,
-            year:        self::YEAR,
-            month:       self::MONTH,
-            stage:       CloseStage::COSTS->value,
+            year: self::YEAR,
+            month: self::MONTH,
+            stage: CloseStage::COSTS->value,
             actorUserId: self::OWNER_ID,
             preliminary: true,
         );
@@ -344,7 +343,7 @@ final class CloseMonthStageActionPreliminaryTest extends IntegrationTestCase
     /**
      * Финальное закрытие по-прежнему блокируется на sales_without_cost.
      */
-    public function testFinalCloseUnchanged_StillBlocksOnSalesWithoutCost(): void
+    public function testFinalCloseUnchangedStillBlocksOnSalesWithoutCost(): void
     {
         $plCategory = new PLCategory(Uuid::uuid4()->toString(), $this->company);
         $plCategory->setName('Себестоимость регрессия');
@@ -378,11 +377,11 @@ final class CloseMonthStageActionPreliminaryTest extends IntegrationTestCase
 
         $action = self::getContainer()->get(CloseMonthStageAction::class);
         $command = new CloseMonthStageCommand(
-            companyId:   self::COMPANY_ID,
+            companyId: self::COMPANY_ID,
             marketplace: self::MARKETPLACE_VALUE,
-            year:        self::YEAR,
-            month:       self::MONTH,
-            stage:       CloseStage::SALES_RETURNS->value,
+            year: self::YEAR,
+            month: self::MONTH,
+            stage: CloseStage::SALES_RETURNS->value,
             actorUserId: self::OWNER_ID,
             preliminary: false,
         );
@@ -401,6 +400,15 @@ final class CloseMonthStageActionPreliminaryTest extends IntegrationTestCase
         return $this->createSaleEntityWithRevenue($listing, $costPrice, $date, '500.00');
     }
 
+    private function createDocumentId(): string
+    {
+        $document = new Document(Uuid::uuid4()->toString(), $this->company);
+        $this->em->persist($document);
+        $this->em->flush();
+
+        return (string) $document->getId();
+    }
+
     private function createSaleEntityWithRevenue(
         MarketplaceListing $listing,
         ?string $costPrice,
@@ -413,12 +421,12 @@ final class CloseMonthStageActionPreliminaryTest extends IntegrationTestCase
             $listing,
             self::MARKETPLACE,
         );
-        $sale->setExternalOrderId('ext-' . Uuid::uuid4()->toString());
+        $sale->setExternalOrderId('ext-'.Uuid::uuid4()->toString());
         $sale->setSaleDate(new \DateTimeImmutable($date));
         $sale->setQuantity(1);
         $sale->setPricePerUnit($totalRevenue);
         $sale->setTotalRevenue($totalRevenue);
-        if ($costPrice !== null) {
+        if (null !== $costPrice) {
             $sale->setCostPrice($costPrice);
         }
         $this->em->persist($sale);
@@ -452,7 +460,7 @@ final class CloseMonthStageActionPreliminaryTest extends IntegrationTestCase
         $this->em->persist($mapping);
 
         $this->createCost($costCategory, '1000.00', MarketplaceCostOperationType::CHARGE, '2026-02-10');
-        $this->createCost($costCategory, '500.00',  MarketplaceCostOperationType::CHARGE, '2026-02-20');
+        $this->createCost($costCategory, '500.00', MarketplaceCostOperationType::CHARGE, '2026-02-20');
 
         $this->em->flush();
         $this->em->clear();
@@ -464,11 +472,11 @@ final class CloseMonthStageActionPreliminaryTest extends IntegrationTestCase
         $action = self::getContainer()->get(CloseMonthStageAction::class);
 
         $command = new CloseMonthStageCommand(
-            companyId:   self::COMPANY_ID,
+            companyId: self::COMPANY_ID,
             marketplace: self::MARKETPLACE_VALUE,
-            year:        self::YEAR,
-            month:       self::MONTH,
-            stage:       CloseStage::COSTS->value,
+            year: self::YEAR,
+            month: self::MONTH,
+            stage: CloseStage::COSTS->value,
             actorUserId: self::OWNER_ID,
             preliminary: $preliminary,
         );
@@ -484,11 +492,11 @@ final class CloseMonthStageActionPreliminaryTest extends IntegrationTestCase
         $action = self::getContainer()->get(ReopenMonthStageAction::class);
 
         ($action)(new ReopenMonthStageCommand(
-            companyId:   self::COMPANY_ID,
+            companyId: self::COMPANY_ID,
             marketplace: self::MARKETPLACE_VALUE,
-            year:        self::YEAR,
-            month:       self::MONTH,
-            stage:       CloseStage::COSTS,
+            year: self::YEAR,
+            month: self::MONTH,
+            stage: CloseStage::COSTS,
         ));
 
         $this->em->clear();
@@ -522,7 +530,7 @@ final class CloseMonthStageActionPreliminaryTest extends IntegrationTestCase
         $cost->setAmount($amount);
         $cost->setCostDate(new \DateTimeImmutable($costDate));
         $cost->setOperationType($operationType);
-        $cost->setExternalId('ext-' . Uuid::uuid4()->toString());
+        $cost->setExternalId('ext-'.Uuid::uuid4()->toString());
         $this->em->persist($cost);
 
         return $cost;

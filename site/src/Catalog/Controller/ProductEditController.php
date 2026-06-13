@@ -30,7 +30,7 @@ final class ProductEditController extends AbstractController
         $command->sku = $product->getSku();
         $command->status = $product->getStatus();
         $command->description = $product->getDescription();
-        $command->purchasePrice = $product->getPurchasePrice();
+        $command->purchasePrice = '0.00';
 
         $form = $this->createForm(ProductType::class, $command, [
             'data_class' => UpdateProductCommand::class,

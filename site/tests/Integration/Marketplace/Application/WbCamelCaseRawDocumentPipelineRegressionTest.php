@@ -17,6 +17,7 @@ final class WbCamelCaseRawDocumentPipelineRegressionTest extends IntegrationTest
     public function testPipelineProcessesCamelCaseWbRawDocumentForSalesReturnsAndCosts(): void
     {
         $company = CompanyBuilder::aCompany()->withIndex(410)->build();
+        $this->em->persist($company->getUser());
         $this->em->persist($company);
 
         $listing = MarketplaceListingBuilder::aListing()
@@ -139,6 +140,7 @@ final class WbCamelCaseRawDocumentPipelineRegressionTest extends IntegrationTest
     public function testPipelineStillProcessesSnakeCaseWbRawDocument(): void
     {
         $company = CompanyBuilder::aCompany()->withIndex(411)->build();
+        $this->em->persist($company->getUser());
         $this->em->persist($company);
         $rawDocId = '99999999-aaaa-4aaa-8aaa-333333333333';
 
@@ -194,8 +196,7 @@ final class WbCamelCaseRawDocumentPipelineRegressionTest extends IntegrationTest
         string $rawDocId,
         string $categoryCode,
         string $operationType,
-    ): float
-    {
+    ): float {
         return (float) $this->connection->fetchOne(
             'SELECT COALESCE(SUM(c.amount), 0)
             FROM marketplace_costs c
@@ -221,20 +222,20 @@ final class WbCamelCaseRawDocumentPipelineRegressionTest extends IntegrationTest
             ['c' => $companyId, 'r' => $rawDocId, 'code' => $categoryCode],
         );
 
-        return $value === false ? null : (string) $value;
+        return false === $value ? null : (string) $value;
     }
 
     private function salesListingId(string $companyId, string $rawDocId): ?string
     {
         $value = $this->connection->fetchOne('SELECT listing_id FROM marketplace_sales WHERE company_id=:c AND raw_document_id=:r LIMIT 1', ['c' => $companyId, 'r' => $rawDocId]);
 
-        return $value === false ? null : (string) $value;
+        return false === $value ? null : (string) $value;
     }
 
     private function returnsListingId(string $companyId, string $rawDocId): ?string
     {
         $value = $this->connection->fetchOne('SELECT listing_id FROM marketplace_returns WHERE company_id=:c AND raw_document_id=:r LIMIT 1', ['c' => $companyId, 'r' => $rawDocId]);
 
-        return $value === false ? null : (string) $value;
+        return false === $value ? null : (string) $value;
     }
 }

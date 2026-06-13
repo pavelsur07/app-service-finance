@@ -2,20 +2,20 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Integration\PaymentPlan;
+namespace App\Tests\Integration\Cash\Service\PaymentPlan;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Enum\Accounts\MoneyAccountType;
+use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Repository\PaymentPlan\PaymentPlanMatchRepository;
 use App\Cash\Service\PaymentPlan\PaymentPlanMatcher;
 use App\Company\Entity\Company;
-use App\Company\Enum\CounterpartyType;
 use App\Company\Entity\Counterparty;
-use App\Cash\Enum\Accounts\MoneyAccountType;
-use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
+use App\Company\Enum\CounterpartyType;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;

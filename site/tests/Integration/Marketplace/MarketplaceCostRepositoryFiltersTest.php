@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Marketplace;
 
 use App\Company\Entity\Company;
-use App\Company\Entity\User;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceCostCategory;
 use App\Marketplace\Entity\MarketplaceListing;
@@ -80,8 +79,6 @@ final class MarketplaceCostRepositoryFiltersTest extends IntegrationTestCase
         self::assertCount(2, $generalOnly);
         self::assertSame([null], array_values(array_unique(array_column($generalOnly, 'listing_id'))));
     }
-
-
 
     public function testGetByCompanyQueryBuilderAppliesCompanyMarketplaceAndDateFilters(): void
     {
