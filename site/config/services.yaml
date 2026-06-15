@@ -90,6 +90,12 @@ services:
     App\Marketplace\Repository\MarketplaceAdvertisingCostRepositoryInterface: '@App\Marketplace\Repository\MarketplaceAdvertisingCostRepository'
     App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface: '@App\Marketplace\Application\Service\WbFinancialReportSyncPlanner'
     App\Marketplace\Infrastructure\Api\Ozon\OzonSellerCredentialValidatorInterface: '@App\Marketplace\Infrastructure\Api\Ozon\OzonSellerCredentialValidator'
+    App\Ingestion\Domain\Contract\SecretCodec: '@App\Ingestion\Infrastructure\Security\PlaintextSecretCodec'
+
+    App\Ingestion\Facade\CredentialFacade:
+        public: true
+        arguments:
+            $activeKeyVersion: 0
 
     App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdaterInterface: '@App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdater'
     App\Marketplace\Application\Service\WbGeneratedRowsSafeReplaceServiceInterface: '@App\Marketplace\Application\Service\WbGeneratedRowsSafeReplaceService'
