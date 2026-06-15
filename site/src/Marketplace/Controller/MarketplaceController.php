@@ -15,9 +15,11 @@ use App\Marketplace\Application\Command\SyncConnectionCommand;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\FinancialReportSyncStatus;
+use App\Marketplace\Infrastructure\Api\Ozon\OzonCredentialValidationStatus;
 use App\Marketplace\Infrastructure\Query\OzonRealizationStatusQuery;
 use App\Marketplace\Infrastructure\Query\RawDocumentsListQuery;
 use App\Marketplace\Infrastructure\Query\WbFinanceSyncStatusListQuery;
+use App\Marketplace\Infrastructure\Api\Ozon\OzonSellerCredentialValidatorInterface;
 use App\Marketplace\Message\ReprocessCostsMessage;
 use App\Marketplace\Message\SyncOzonRealizationMessage;
 use App\Marketplace\Message\TriggerInitialSyncMessage;
@@ -57,6 +59,7 @@ class MarketplaceController extends AbstractController
         private readonly WbInitialSyncStartDateResolver   $wbInitialSyncStartDateResolver,
         private readonly WbFinancialReportSyncPlannerInterface $wbFinancialReportSyncPlanner,
         private readonly WbFinanceSyncStatusListQuery     $wbFinanceSyncStatusListQuery,
+        private readonly OzonSellerCredentialValidatorInterface $ozonCredentialValidator,
     ) {
     }
 
@@ -101,8 +104,8 @@ class MarketplaceController extends AbstractController
         $company = $this->companyService->getActiveCompany();
 
         $marketplace = MarketplaceType::from($request->request->get('marketplace'));
-        $apiKey      = $request->request->get('api_key');
-        $clientId    = $request->request->get('client_id');
+        $apiKey      = trim((string) $request->request->get('api_key', ''));
+        $clientId    = trim((string) $request->request->get('client_id', ''));
 
         $existing = $this->connectionRepository->findByMarketplace(
             $company,
@@ -127,6 +130,19 @@ class MarketplaceController extends AbstractController
             $connection->setClientId($clientId);
         }
 
+        $ozonValidation = null;
+        if (MarketplaceType::OZON === $marketplace) {
+            $ozonValidation = $this->ozonCredentialValidator->validate($clientId, $apiKey);
+
+            if ($ozonValidation->isValid()) {
+                $connection->setIsActive(true);
+                $connection->setLastSyncError(null);
+            } else {
+                $connection->setIsActive(false);
+                $connection->setLastSyncError($ozonValidation->message);
+            }
+        }
+
         $this->em->persist($connection);
         $this->em->flush();
 
@@ -136,7 +152,7 @@ class MarketplaceController extends AbstractController
                 connectionId: $connection->getId(),
                 startFrom: $this->wbInitialSyncStartDateResolver->resolve($company, $connection),
             );
-        } else {
+        } elseif (null === $ozonValidation || $ozonValidation->isValid()) {
             $this->messageBus->dispatch(new TriggerInitialSyncMessage(
                 companyId:    (string) $company->getId(),
                 connectionId: $connection->getId(),
@@ -144,7 +160,11 @@ class MarketplaceController extends AbstractController
             ));
         }
 
-        $this->addFlash('success', 'Подключение к ' . $marketplace->getDisplayName() . ' создано');
+        if (null !== $ozonValidation && !$ozonValidation->isValid()) {
+            $this->addFlash('error', 'Подключение к ' . $marketplace->getDisplayName() . ' создано, но ключ не прошёл проверку: ' . $ozonValidation->message);
+        } else {
+            $this->addFlash('success', 'Подключение к ' . $marketplace->getDisplayName() . ' создано');
+        }
 
         return $this->redirectToRoute('marketplace_index');
     }
@@ -187,13 +207,35 @@ class MarketplaceController extends AbstractController
             throw $this->createNotFoundException('Подключение не найдено');
         }
 
-        $success = false;
-        $error   = null;
+        if ($connection->getMarketplace() === MarketplaceType::OZON
+            && $connection->getConnectionType() === MarketplaceConnectionType::SELLER
+        ) {
+            $result = $this->ozonCredentialValidator->validate($connection->getClientId(), $connection->getApiKey());
+
+            if ($result->isValid()) {
+                $connection->setIsActive(true);
+                $connection->setLastSyncError(null);
+                $this->em->flush();
+
+                $this->addFlash('success', 'Подключение работает корректно');
+            } else {
+                if (OzonCredentialValidationStatus::INVALID_CREDENTIALS === $result->status) {
+                    $connection->setIsActive(false);
+                }
+                $connection->setLastSyncError($result->message);
+                $this->em->flush();
+
+                $this->addFlash('error', 'Ошибка подключения: ' . $result->message);
+            }
+
+            return $this->redirectToRoute('marketplace_index');
+        }
 
         try {
             $adapter = $this->adapterRegistry->get($connection->getMarketplace());
             $success = $adapter->authenticate($company);
         } catch (\Exception $e) {
+            $success = false;
             $error = $e->getMessage();
         }
 
@@ -210,6 +252,17 @@ class MarketplaceController extends AbstractController
     public function syncConnection(string $id): Response
     {
         $company = $this->companyService->getActiveCompany();
+        $connection = $this->connectionRepository->find($id);
+
+        if (!$connection || (string) $connection->getCompany()->getId() !== (string) $company->getId()) {
+            throw $this->createNotFoundException('Подключение не найдено');
+        }
+
+        if (!$this->canRunManualSync($connection)) {
+            $this->addFlash('error', $this->manualSyncBlockedMessage($connection));
+
+            return $this->redirectToRoute('marketplace_index');
+        }
 
         try {
             $cmd   = new SyncConnectionCommand(
@@ -220,7 +273,6 @@ class MarketplaceController extends AbstractController
             );
             $count = ($this->syncConnectionAction)($cmd);
 
-            $connection = $this->connectionRepository->find($id);
             if ($connection?->getMarketplace() === MarketplaceType::WILDBERRIES) {
                 $this->addFlash('success', sprintf(
                     'Запланировано %d задач синхронизации WB.',
@@ -250,6 +302,12 @@ class MarketplaceController extends AbstractController
 
         if (!$connection || (string) $connection->getCompany()->getId() !== (string) $company->getId()) {
             throw $this->createNotFoundException('Подключение не найдено');
+        }
+
+        if (!$this->canRunManualSync($connection)) {
+            $this->addFlash('error', $this->manualSyncBlockedMessage($connection));
+
+            return $this->redirectToRoute('marketplace_index');
         }
 
         $dateFromStr = $request->query->get('date_from');
@@ -322,6 +380,12 @@ class MarketplaceController extends AbstractController
 
         if ($connection->getMarketplace() !== MarketplaceType::OZON) {
             $this->addFlash('warning', 'Загрузка реализации доступна только для Ozon.');
+
+            return $this->redirectToRoute('marketplace_index');
+        }
+
+        if (!$this->canRunManualSync($connection)) {
+            $this->addFlash('error', $this->manualSyncBlockedMessage($connection));
 
             return $this->redirectToRoute('marketplace_index');
         }
@@ -609,11 +673,37 @@ class MarketplaceController extends AbstractController
             throw $this->createAccessDeniedException('Invalid CSRF token.');
         }
 
-        $connection->setIsActive(!$connection->isActive());
+        if ($connection->isActive()) {
+            $connection->setIsActive(false);
+            $this->em->flush();
+
+            $this->addFlash('success', 'Подключение деактивировано');
+
+            return $this->redirectToRoute('marketplace_index');
+        }
+
+        if ($connection->getMarketplace() === MarketplaceType::OZON
+            && $connection->getConnectionType() === MarketplaceConnectionType::SELLER
+        ) {
+            $result = $this->ozonCredentialValidator->validate($connection->getClientId(), $connection->getApiKey());
+
+            if (!$result->isValid()) {
+                $connection->setIsActive(false);
+                $connection->setLastSyncError($result->message);
+                $this->em->flush();
+
+                $this->addFlash('error', 'Подключение не активировано: ' . $result->message);
+
+                return $this->redirectToRoute('marketplace_index');
+            }
+
+            $connection->setLastSyncError(null);
+        }
+
+        $connection->setIsActive(true);
         $this->em->flush();
 
-        $status = $connection->isActive() ? 'активировано' : 'деактивировано';
-        $this->addFlash('success', 'Подключение ' . $status);
+        $this->addFlash('success', 'Подключение активировано');
 
         return $this->redirectToRoute('marketplace_index');
     }
@@ -737,6 +827,20 @@ class MarketplaceController extends AbstractController
         }
 
         return $date;
+    }
+
+    private function canRunManualSync(MarketplaceConnection $connection): bool
+    {
+        return $connection->isActive();
+    }
+
+    private function manualSyncBlockedMessage(MarketplaceConnection $connection): string
+    {
+        if (!$connection->isActive()) {
+            return 'Синхронизация недоступна: подключение неактивно.';
+        }
+
+        return 'Синхронизация недоступна.';
     }
 
     /**

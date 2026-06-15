@@ -12,6 +12,9 @@ use App\Marketplace\Controller\MarketplaceController;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Api\Ozon\OzonCredentialValidationResult;
+use App\Marketplace\Infrastructure\Api\Ozon\OzonCredentialValidationStatus;
+use App\Marketplace\Infrastructure\Api\Ozon\OzonSellerCredentialValidatorInterface;
 use App\Marketplace\Infrastructure\Query\OzonRealizationStatusQuery;
 use App\Marketplace\Infrastructure\Query\RawDocumentsListQuery;
 use App\Marketplace\Infrastructure\Query\WbFinanceSyncStatusListQuery;
@@ -129,7 +132,7 @@ final class MarketplaceControllerCreateConnectionTest extends TestCase
         self::assertSame($createdConnection->getId(), $plannedConnectionId);
     }
 
-    public function testCreateNonWbConnectionStillDispatchesLegacyInitialTrigger(): void
+    public function testCreateValidOzonConnectionStoresActiveConnectionAndDispatchesInitialTrigger(): void
     {
         $company = CompanyBuilder::aCompany()->build();
         $createdConnection = null;
@@ -168,8 +171,217 @@ final class MarketplaceControllerCreateConnectionTest extends TestCase
         $planner = $this->createMock(WbFinancialReportSyncPlannerInterface::class);
         $planner->expects(self::never())->method('planInitial');
 
-        $this->controller($companyService, $connectionRepository, $em, $messageBus, $startDateResolver, $planner)
+        $validator = $this->createMock(OzonSellerCredentialValidatorInterface::class);
+        $validator->expects(self::once())
+            ->method('validate')
+            ->with('client-id', 'api-key')
+            ->willReturn(OzonCredentialValidationResult::valid());
+
+        $this->controller($companyService, $connectionRepository, $em, $messageBus, $startDateResolver, $planner, $validator)
             ->createConnection($this->request(MarketplaceType::OZON, 'client-id'));
+
+        self::assertInstanceOf(MarketplaceConnection::class, $createdConnection);
+        self::assertTrue($createdConnection->isActive());
+        self::assertNull($createdConnection->getLastSyncError());
+    }
+
+    public function testCreateInvalidOzonConnectionStoresInactiveConnectionWithErrorAndDoesNotDispatchInitialTrigger(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $createdConnection = null;
+
+        $companyService = $this->createMock(ActiveCompanyService::class);
+        $companyService->method('getActiveCompany')->willReturn($company);
+
+        $connectionRepository = $this->createMock(MarketplaceConnectionRepository::class);
+        $connectionRepository->method('findByMarketplace')->willReturn(null);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('persist')
+            ->with(self::callback(static function (MarketplaceConnection $connection) use (&$createdConnection): bool {
+                $createdConnection = $connection;
+
+                return true;
+            }));
+        $em->expects(self::once())->method('flush');
+
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $startDateResolver = $this->createMock(WbInitialSyncStartDateResolver::class);
+        $startDateResolver->expects(self::never())->method('resolve');
+
+        $planner = $this->createMock(WbFinancialReportSyncPlannerInterface::class);
+        $planner->expects(self::never())->method('planInitial');
+
+        $validator = $this->createMock(OzonSellerCredentialValidatorInterface::class);
+        $validator->expects(self::once())
+            ->method('validate')
+            ->with('client-id', 'api-key')
+            ->willReturn(new OzonCredentialValidationResult(
+                OzonCredentialValidationStatus::INVALID_CREDENTIALS,
+                'Ozon отклонил Client-Id или Api-Key. Проверьте ключ Seller API.',
+                403,
+            ));
+
+        $this->controller($companyService, $connectionRepository, $em, $messageBus, $startDateResolver, $planner, $validator)
+            ->createConnection($this->request(MarketplaceType::OZON, 'client-id'));
+
+        self::assertInstanceOf(MarketplaceConnection::class, $createdConnection);
+        self::assertFalse($createdConnection->isActive());
+        self::assertSame('Ozon отклонил Client-Id или Api-Key. Проверьте ключ Seller API.', $createdConnection->getLastSyncError());
+    }
+
+    public function testManualSyncDoesNotStartForInactiveConnectionWithStoredError(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $connection = new MarketplaceConnection('11111111-1111-4111-8111-111111111111', $company, MarketplaceType::OZON);
+        $connection->setApiKey('api-key');
+        $connection->setClientId('client-id');
+        $connection->setIsActive(false);
+        $connection->setLastSyncError('Ozon отклонил ключ.');
+
+        $companyService = $this->createMock(ActiveCompanyService::class);
+        $companyService->method('getActiveCompany')->willReturn($company);
+
+        $connectionRepository = $this->createMock(MarketplaceConnectionRepository::class);
+        $connectionRepository->method('find')->with($connection->getId())->willReturn($connection);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $messageBus = $this->createMock(MessageBusInterface::class);
+
+        $response = $this->controller(
+            $companyService,
+            $connectionRepository,
+            $em,
+            $messageBus,
+            $this->createMock(WbInitialSyncStartDateResolver::class),
+            $this->createMock(WbFinancialReportSyncPlannerInterface::class),
+        )->syncConnection($connection->getId());
+
+        self::assertInstanceOf(RedirectResponse::class, $response);
+    }
+
+    public function testTestConnectionActivatesValidOzonConnectionAndClearsError(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $connection = new MarketplaceConnection('22222222-2222-4222-8222-222222222222', $company, MarketplaceType::OZON);
+        $connection->setApiKey('api-key');
+        $connection->setClientId('client-id');
+        $connection->setIsActive(false);
+        $connection->setLastSyncError('old error');
+
+        $companyService = $this->createMock(ActiveCompanyService::class);
+        $companyService->method('getActiveCompany')->willReturn($company);
+
+        $connectionRepository = $this->createMock(MarketplaceConnectionRepository::class);
+        $connectionRepository->method('find')->with($connection->getId())->willReturn($connection);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('flush');
+
+        $validator = $this->createMock(OzonSellerCredentialValidatorInterface::class);
+        $validator->expects(self::once())
+            ->method('validate')
+            ->with('client-id', 'api-key')
+            ->willReturn(OzonCredentialValidationResult::valid());
+
+        $response = $this->controller(
+            $companyService,
+            $connectionRepository,
+            $em,
+            $this->createMock(MessageBusInterface::class),
+            $this->createMock(WbInitialSyncStartDateResolver::class),
+            $this->createMock(WbFinancialReportSyncPlannerInterface::class),
+            $validator,
+        )->testConnection($connection->getId());
+
+        self::assertInstanceOf(RedirectResponse::class, $response);
+        self::assertTrue($connection->isActive());
+        self::assertNull($connection->getLastSyncError());
+    }
+
+    public function testTestConnectionDeactivatesInvalidOzonConnectionAndStoresError(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $connection = new MarketplaceConnection('33333333-3333-4333-8333-333333333333', $company, MarketplaceType::OZON);
+        $connection->setApiKey('api-key');
+        $connection->setClientId('client-id');
+
+        $companyService = $this->createMock(ActiveCompanyService::class);
+        $companyService->method('getActiveCompany')->willReturn($company);
+
+        $connectionRepository = $this->createMock(MarketplaceConnectionRepository::class);
+        $connectionRepository->method('find')->with($connection->getId())->willReturn($connection);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('flush');
+
+        $validator = $this->createMock(OzonSellerCredentialValidatorInterface::class);
+        $validator->expects(self::once())
+            ->method('validate')
+            ->with('client-id', 'api-key')
+            ->willReturn(new OzonCredentialValidationResult(
+                OzonCredentialValidationStatus::INVALID_CREDENTIALS,
+                'Ozon отклонил Client-Id или Api-Key. Проверьте ключ Seller API.',
+                403,
+            ));
+
+        $response = $this->controller(
+            $companyService,
+            $connectionRepository,
+            $em,
+            $this->createMock(MessageBusInterface::class),
+            $this->createMock(WbInitialSyncStartDateResolver::class),
+            $this->createMock(WbFinancialReportSyncPlannerInterface::class),
+            $validator,
+        )->testConnection($connection->getId());
+
+        self::assertInstanceOf(RedirectResponse::class, $response);
+        self::assertFalse($connection->isActive());
+        self::assertSame('Ozon отклонил Client-Id или Api-Key. Проверьте ключ Seller API.', $connection->getLastSyncError());
+    }
+
+    public function testTestConnectionPreservesActiveOzonConnectionOnTemporaryValidationError(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $connection = new MarketplaceConnection('44444444-4444-4444-8444-444444444444', $company, MarketplaceType::OZON);
+        $connection->setApiKey('api-key');
+        $connection->setClientId('client-id');
+        $connection->setIsActive(true);
+
+        $companyService = $this->createMock(ActiveCompanyService::class);
+        $companyService->method('getActiveCompany')->willReturn($company);
+
+        $connectionRepository = $this->createMock(MarketplaceConnectionRepository::class);
+        $connectionRepository->method('find')->with($connection->getId())->willReturn($connection);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('flush');
+
+        $validator = $this->createMock(OzonSellerCredentialValidatorInterface::class);
+        $validator->expects(self::once())
+            ->method('validate')
+            ->with('client-id', 'api-key')
+            ->willReturn(new OzonCredentialValidationResult(
+                OzonCredentialValidationStatus::TEMPORARY_ERROR,
+                'Ozon Seller API временно недоступен. Повторите проверку позже.',
+                500,
+            ));
+
+        $response = $this->controller(
+            $companyService,
+            $connectionRepository,
+            $em,
+            $this->createMock(MessageBusInterface::class),
+            $this->createMock(WbInitialSyncStartDateResolver::class),
+            $this->createMock(WbFinancialReportSyncPlannerInterface::class),
+            $validator,
+        )->testConnection($connection->getId());
+
+        self::assertInstanceOf(RedirectResponse::class, $response);
+        self::assertTrue($connection->isActive());
+        self::assertSame('Ozon Seller API временно недоступен. Повторите проверку позже.', $connection->getLastSyncError());
     }
 
     private function request(MarketplaceType $marketplace, ?string $clientId = null): Request
@@ -188,7 +400,10 @@ final class MarketplaceControllerCreateConnectionTest extends TestCase
         MessageBusInterface $messageBus,
         WbInitialSyncStartDateResolver $startDateResolver,
         WbFinancialReportSyncPlannerInterface $planner,
+        ?OzonSellerCredentialValidatorInterface $ozonCredentialValidator = null,
     ): MarketplaceController {
+        $ozonCredentialValidator ??= $this->createMock(OzonSellerCredentialValidatorInterface::class);
+
         return new class(
             $companyService,
             $connectionRepository,
@@ -204,6 +419,7 @@ final class MarketplaceControllerCreateConnectionTest extends TestCase
             $startDateResolver,
             $planner,
             self::uninitialized(WbFinanceSyncStatusListQuery::class),
+            $ozonCredentialValidator,
         ) extends MarketplaceController {
             protected function addFlash(string $type, mixed $message): void
             {
