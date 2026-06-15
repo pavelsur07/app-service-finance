@@ -29,6 +29,8 @@
                     <div class="list-group list-group-flush">
                         {% for connection in connections %}
                             {% set isSeller = connection.connectionType.value == 'seller' %}
+                            {% set hasConnectionError = connection.lastSyncError is not empty and not connection.isActive %}
+                            {% set canManualSync = isSeller and connection.isActive %}
                             <div class="list-group-item">
                                 <div class="row align-items-center">
                                     <div class="col-auto">
@@ -50,9 +52,13 @@
                                             <div class="d-block text-muted mt-1"
                                                  data-connection-id="{{ connection.id }}"
                                                  data-status-url="{{ path('marketplace_connection_status', {id: connection.id}) }}"
-                                                 data-synced="{{ connection.lastSyncAt ? '1' : '0' }}"
+                                                 data-synced="{{ connection.lastSyncAt or hasConnectionError or not connection.isActive ? '1' : '0' }}"
                                                  id="connection-status-{{ connection.id }}">
-                                                {% if connection.lastSyncAt %}
+                                                {% if hasConnectionError %}
+                                                    <small class="text-danger">Ошибка: {{ connection.lastSyncError|slice(0, 100) }}</small>
+                                                {% elseif not connection.isActive %}
+                                                    <small>Последняя синхронизация: —</small>
+                                                {% elseif connection.lastSyncAt %}
                                                     <small>Последняя синхронизация: {{ connection.lastSyncAt|date('d.m.Y H:i') }}</small>
                                                 {% else %}
                                                     <small class="text-warning">
@@ -66,15 +72,10 @@
                                                 <small>Последняя синхронизация: —</small>
                                             </div>
                                         {% endif %}
-                                        {% if connection.lastSyncError %}
-                                            <div class="text-danger mt-1">
-                                                <small>Ошибка: {{ connection.lastSyncError|slice(0, 100) }}</small>
-                                            </div>
-                                        {% endif %}
                                     </div>
                                     <div class="col-auto">
-                                        <span class="badge bg-{{ connection.isActive ? 'success' : 'secondary' }}">
-                                            {{ connection.isActive ? 'Активно' : 'Неактивно' }}
+                                        <span class="badge bg-{{ hasConnectionError ? 'danger' : (connection.isActive ? 'success' : 'secondary') }}">
+                                            {{ hasConnectionError ? 'Ошибка подключения' : (connection.isActive ? 'Активно' : 'Неактивно') }}
                                         </span>
                                     </div>
                                     <div class="col-auto">
@@ -82,20 +83,29 @@
                                             <a href="{{ path('marketplace_connection_edit', {id: connection.id}) }}" class="btn btn-sm btn-outline-secondary">Настройки</a>
                                             <a href="{{ path('marketplace_connection_test', {id: connection.id}) }}" class="btn btn-sm btn-outline-info">Проверить</a>
                                             {% if isSeller %}
-                                                <a href="{{ path('marketplace_connection_sync', {id: connection.id}) }}" class="btn btn-sm btn-primary">Синхронизировать</a>
-                                                <a href="#" class="btn btn-sm btn-outline-primary"
-                                                   data-bs-toggle="modal"
-                                                   data-bs-target="#modal-sync-period"
-                                                   data-connection-id="{{ connection.id }}">За период</a>
+                                                {% if canManualSync %}
+                                                    <a href="{{ path('marketplace_connection_sync', {id: connection.id}) }}" class="btn btn-sm btn-primary">Синхронизировать</a>
+                                                    <a href="#" class="btn btn-sm btn-outline-primary"
+                                                       data-bs-toggle="modal"
+                                                       data-bs-target="#modal-sync-period"
+                                                       data-connection-id="{{ connection.id }}">За период</a>
+                                                {% else %}
+                                                    <button type="button" class="btn btn-sm btn-primary" disabled>Синхронизировать</button>
+                                                    <button type="button" class="btn btn-sm btn-outline-primary" disabled>За период</button>
+                                                {% endif %}
                                                 {% if connection.marketplace.value == 'ozon' %}
-                                                    <button type="button"
-                                                            class="btn btn-sm btn-outline-teal"
-                                                            data-bs-toggle="modal"
-                                                            data-bs-target="#modal-sync-realization"
-                                                            data-connection-id="{{ connection.id }}"
-                                                            data-action="{{ path('marketplace_connection_sync_realization', {id: connection.id}) }}">
-                                                        Реализация
-                                                    </button>
+                                                    {% if canManualSync %}
+                                                        <button type="button"
+                                                                class="btn btn-sm btn-outline-teal"
+                                                                data-bs-toggle="modal"
+                                                                data-bs-target="#modal-sync-realization"
+                                                                data-connection-id="{{ connection.id }}"
+                                                                data-action="{{ path('marketplace_connection_sync_realization', {id: connection.id}) }}">
+                                                            Реализация
+                                                        </button>
+                                                    {% else %}
+                                                        <button type="button" class="btn btn-sm btn-outline-teal" disabled>Реализация</button>
+                                                    {% endif %}
                                                 {% endif %}
                                                 <button type="button"
                                                         class="btn btn-sm btn-outline-warning"

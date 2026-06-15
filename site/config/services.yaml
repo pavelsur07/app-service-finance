@@ -89,6 +89,7 @@ services:
 
     App\Marketplace\Repository\MarketplaceAdvertisingCostRepositoryInterface: '@App\Marketplace\Repository\MarketplaceAdvertisingCostRepository'
     App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface: '@App\Marketplace\Application\Service\WbFinancialReportSyncPlanner'
+    App\Marketplace\Infrastructure\Api\Ozon\OzonSellerCredentialValidatorInterface: '@App\Marketplace\Infrastructure\Api\Ozon\OzonSellerCredentialValidator'
 
     App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdaterInterface: '@App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdater'
     App\Marketplace\Application\Service\WbGeneratedRowsSafeReplaceServiceInterface: '@App\Marketplace\Application\Service\WbGeneratedRowsSafeReplaceService'
