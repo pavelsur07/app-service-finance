@@ -71,6 +71,8 @@ final class CompanyFilterMiddleware implements MiddlewareInterface
         static $property = null;
 
         if (!$property instanceof \ReflectionProperty) {
+            // Doctrine ORM has no public API to snapshot SQLFilter parameters.
+            // Re-check this internal property access on Doctrine ORM upgrades.
             $property = new \ReflectionProperty(SQLFilter::class, 'parameters');
         }
 

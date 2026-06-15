@@ -17,7 +17,7 @@ use Webmozart\Assert\Assert;
 class IngestionTenantProbe implements TenantOwnedInterface
 {
     #[ORM\Id]
-    #[ORM\Column(type: Types::GUID, unique: true)]
+    #[ORM\Column(type: Types::GUID)]
     private string $id;
 
     #[ORM\Column(type: Types::GUID)]

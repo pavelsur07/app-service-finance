@@ -1,0 +1,7 @@
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    App\Tests\Integration\Ingestion\Fixtures\:
+        resource: '../tests/Integration/Ingestion/Fixtures/'

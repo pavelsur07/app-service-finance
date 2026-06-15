@@ -78,10 +78,12 @@
 
 ### Ingestion: tenant isolation
 
-- Новые tenant-owned Ingestion entity должны лежать в `App\Ingestion\Entity`, иметь scalar `string $companyId` и реализовывать `App\Ingestion\Domain\TenantOwnedInterface`.
-- Doctrine SQL Filter `company` применяется только к `App\Ingestion\Entity\*`, которые реализуют marker-интерфейс. Legacy-модули и Ingestion entity без marker-интерфейса фильтр не затрагивает.
-- В HTTP filter включается для authenticated main requests через `ActiveCompanyService`. В Messenger filter включается middleware для сообщений `App\Ingestion\Message\CompanyAwareMessage` и восстанавливается после обработки сообщения.
-- Системные запросы без tenant-контекста должны явно выполнять `disable('company')` или не включать filter.
+- Новые tenant-owned Ingestion entity должны лежать в `App\Ingestion\Entity`, иметь scalar `string $companyId` и реализовывать marker-интерфейс `App\Ingestion\Domain\TenantOwnedInterface`.
+- Doctrine SQL Filter `company` применяется только если одновременно выполняются два условия: entity находится в namespace `App\Ingestion\Entity\*` и реализует `TenantOwnedInterface`. Legacy-модули и Ingestion entity без marker-интерфейса фильтр не затрагивает.
+- HTTP-контекст с активной компанией: `CompanyFilterRequestSubscriber` включает filter и задаёт `companyId` из `ActiveCompanyService`.
+- HTTP-контекст без активной компании: admin, неавторизованные страницы, страница выбора компании и другие non-workspace запросы не включают filter и не должны падать с 500 из-за отсутствия компании.
+- Messenger-контекст: `CompanyFilterMiddleware` включает filter для сообщений `App\Ingestion\Message\CompanyAwareMessage`, берёт `companyId` из сообщения и восстанавливает прежнее состояние filter после обработки.
+- Системные запросы без tenant-контекста должны осознанно выполнять `$em->getFilters()->disable('company')` или не включать filter. Это допустимо для maintenance/admin/batch операций, где требуется видеть данные всех компаний.
 
 ### Marketplace: WB financial report sync status (дневной статус)
 

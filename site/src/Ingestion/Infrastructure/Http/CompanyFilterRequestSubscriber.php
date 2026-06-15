@@ -8,6 +8,7 @@ use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 
@@ -37,7 +38,12 @@ final class CompanyFilterRequestSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $company = $this->activeCompanyService->getActiveCompany();
+        try {
+            $company = $this->activeCompanyService->getActiveCompany();
+        } catch (NotFoundHttpException) {
+            return;
+        }
+
         $filters = $this->entityManager->getFilters();
 
         if (!$filters->isEnabled('company')) {
