@@ -5,3 +5,5 @@ framework:
             async_pipeline: 'in-memory://'
             async_wb_finance: 'in-memory://'
             async_ads: 'in-memory://'
+        routing:
+            'App\Tests\Integration\Ingestion\Fixtures\TenantVisibilityMessage': async_pipeline

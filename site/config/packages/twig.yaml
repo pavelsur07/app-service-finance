@@ -12,6 +12,7 @@ twig:
         '%kernel.project_dir%/templates/moy_sklad': MoySklad
         '%kernel.project_dir%/templates/finance': Finance
         '%kernel.project_dir%/templates/inventory': Inventory
+        '%kernel.project_dir%/templates/ingestion': Ingestion
         '%kernel.project_dir%/templates/partials': Partials
 
 when@test:

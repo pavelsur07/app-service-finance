@@ -96,6 +96,12 @@ doctrine:
                 dir: '%kernel.project_dir%/src/Inventory/Entity'
                 prefix: 'App\Inventory\Entity'
                 alias: Inventory
+            Ingestion:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Ingestion/Entity'
+                prefix: 'App\Ingestion\Entity'
+                alias: Ingestion
             Marketplace:
                 type: attribute
                 is_bundle: false
@@ -122,6 +128,10 @@ doctrine:
                 alias: MoySklad
         controller_resolver:
             auto_mapping: false
+        filters:
+            company:
+                class: App\Ingestion\Infrastructure\Doctrine\CompanyFilter
+                enabled: false
 
 when@test:
     doctrine:

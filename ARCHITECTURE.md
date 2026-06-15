@@ -26,6 +26,7 @@
 | `MarketplaceAnalytics` | Аналитика маркетплейсов (витрина) | — |
 | `MarketplaceAds` | Рекламные отчёты WB/Ozon: загрузка raw → распределение затрат | `string $companyId` ✅ |
 | `Inventory` | Загрузка raw-остатков маркетплейсов, нормализация в StockSnapshot, UI-отчёт остатков | `string $companyId` ✅ |
+| `Ingestion` | Каркас для будущих ingestion-пайплайнов и tenant-isolation foundation | `string $companyId` + Doctrine `company` filter ✅ |
 | `Notification` | Каналы уведомлений (email и др.) | — |
 | `Shared` | Общий код: ActiveCompanyService, аудит, безопасность, storage | — |
 | `Admin` | Административная панель (отдельный firewall) | — |
@@ -66,6 +67,7 @@
 | `InventoryRawSnapshot` | Inventory | `string $companyId` ✅ |
 | `Location` | Inventory | `string $companyId` ✅ |
 | `StockSnapshot` | Inventory | `string $companyId` ✅ |
+| `IngestionTenantProbe` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
 | `ProductImport` | Catalog | `string $companyId` ✅ |
 | `ProductBarcode` | Catalog | `string $companyId` ✅ |
 | `ProductPurchasePrice` | Catalog | `string $companyId` ✅ |
@@ -73,6 +75,15 @@
 | `CashTransaction`, `MoneyAccount` и др. | Cash | `Company $company` (legacy) |
 | `Deal`, `ChargeType` | Deals | `Company $company` (legacy) |
 | `PLCategory`, `Document` и др. | legacy `src/Entity/` | `Company $company` (legacy) |
+
+### Ingestion: tenant isolation
+
+- Новые tenant-owned Ingestion entity должны лежать в `App\Ingestion\Entity`, иметь scalar `string $companyId` и реализовывать marker-интерфейс `App\Ingestion\Domain\TenantOwnedInterface`.
+- Doctrine SQL Filter `company` применяется только если одновременно выполняются два условия: entity находится в namespace `App\Ingestion\Entity\*` и реализует `TenantOwnedInterface`. Legacy-модули и Ingestion entity без marker-интерфейса фильтр не затрагивает.
+- HTTP-контекст с активной компанией: `CompanyFilterRequestSubscriber` включает filter и задаёт `companyId` из `ActiveCompanyService`.
+- HTTP-контекст без активной компании: admin, неавторизованные страницы, страница выбора компании и другие non-workspace запросы не включают filter и не должны падать с 500 из-за отсутствия компании.
+- Messenger-контекст: `CompanyFilterMiddleware` включает filter для сообщений `App\Ingestion\Message\CompanyAwareMessage`, берёт `companyId` из сообщения и восстанавливает прежнее состояние filter после обработки.
+- Системные запросы без tenant-контекста должны осознанно выполнять `$em->getFilters()->disable('company')` или не включать filter. Это допустимо для maintenance/admin/batch операций, где требуется видеть данные всех компаний.
 
 ### Marketplace: WB financial report sync status (дневной статус)
 
