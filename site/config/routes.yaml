@@ -77,6 +77,12 @@ inventory_controllers:
         namespace: App\Inventory\Controller
     type: attribute
 
+ingestion_controllers:
+    resource:
+        path: ../src/Ingestion/Controller/
+        namespace: App\Ingestion\Controller
+    type: attribute
+
 
 shared_controllers:
     resource:

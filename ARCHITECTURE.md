@@ -26,6 +26,7 @@
 | `MarketplaceAnalytics` | Аналитика маркетплейсов (витрина) | — |
 | `MarketplaceAds` | Рекламные отчёты WB/Ozon: загрузка raw → распределение затрат | `string $companyId` ✅ |
 | `Inventory` | Загрузка raw-остатков маркетплейсов, нормализация в StockSnapshot, UI-отчёт остатков | `string $companyId` ✅ |
+| `Ingestion` | Каркас для будущих ingestion-пайплайнов и tenant-isolation foundation | `string $companyId` + Doctrine `company` filter ✅ |
 | `Notification` | Каналы уведомлений (email и др.) | — |
 | `Shared` | Общий код: ActiveCompanyService, аудит, безопасность, storage | — |
 | `Admin` | Административная панель (отдельный firewall) | — |
@@ -66,6 +67,7 @@
 | `InventoryRawSnapshot` | Inventory | `string $companyId` ✅ |
 | `Location` | Inventory | `string $companyId` ✅ |
 | `StockSnapshot` | Inventory | `string $companyId` ✅ |
+| `IngestionTenantProbe` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
 | `ProductImport` | Catalog | `string $companyId` ✅ |
 | `ProductBarcode` | Catalog | `string $companyId` ✅ |
 | `ProductPurchasePrice` | Catalog | `string $companyId` ✅ |
@@ -73,6 +75,13 @@
 | `CashTransaction`, `MoneyAccount` и др. | Cash | `Company $company` (legacy) |
 | `Deal`, `ChargeType` | Deals | `Company $company` (legacy) |
 | `PLCategory`, `Document` и др. | legacy `src/Entity/` | `Company $company` (legacy) |
+
+### Ingestion: tenant isolation
+
+- Новые tenant-owned Ingestion entity должны лежать в `App\Ingestion\Entity`, иметь scalar `string $companyId` и реализовывать `App\Ingestion\Domain\TenantOwnedInterface`.
+- Doctrine SQL Filter `company` применяется только к `App\Ingestion\Entity\*`, которые реализуют marker-интерфейс. Legacy-модули и Ingestion entity без marker-интерфейса фильтр не затрагивает.
+- В HTTP filter включается для authenticated main requests через `ActiveCompanyService`. В Messenger filter включается middleware для сообщений `App\Ingestion\Message\CompanyAwareMessage` и восстанавливается после обработки сообщения.
+- Системные запросы без tenant-контекста должны явно выполнять `disable('company')` или не включать filter.
 
 ### Marketplace: WB financial report sync status (дневной статус)
 
