@@ -1,6 +1,8 @@
-# CLAUDE.md — Frontend UI Rules for Symfony + Twig + React + Vite
+# CLAUDE.frontend.md — Frontend UI Rules for Symfony + Twig + React + Vite
 
 This file defines coding standards, patterns, and architecture rules for all React TypeScript UI development in this project. Follow these rules strictly on every task.
+
+> **Режим работы — автономный.** Claude выполняет задачу этапами, каждый этап завершает self-review + Stage Report. Высокорисковые этапы — обязательная остановка для ревью Владельцем. Общий workflow совпадает с `CLAUDE.md` (backend), специфика этапов фронта — в разделе «🤖 Автономный режим — Frontend workflow» ниже.
 
 ---
 
@@ -14,6 +16,152 @@ This file defines coding standards, patterns, and architecture rules for all Rea
 - **Styling**: Tabler CSS variables + CSS Modules for custom overrides
 - **Icons**: `@tabler/icons-react`
 - **HTTP**: Native `fetch` via centralized `apiClient.ts`
+
+---
+
+## 🤖 Автономный режим — Frontend workflow
+
+### Источник задачи
+
+Каждая задача начинается со **спецификации**:
+- либо `docs/tasks/<id>/TASK.md` в ветке,
+- либо чёткий бриф от Владельца в чате (scope + ограничения + acceptance).
+
+Нет спецификации → **STOP**, попросить её. Догадки и расширение scope автономно — запрещены.
+
+### Фазы работы над задачей
+
+```
+Phase 0 (Plan)  →  Phase 1..N (Execute by Stages)  →  Phase Final (Handoff)
+                          ↑
+              после каждого этапа: self-review + Stage Report
+              если этап high-risk → 🛑 STOP, ждать Владельца
+              если self-review red → fix или 🛑 STOP, не идти дальше
+```
+
+### Phase 0 — Plan (всегда первая, всегда заканчивается ревью)
+
+1. Прочитать: `CLAUDE.frontend.md`, спецификацию задачи. Если есть backend-зависимость — согласовать DTO/контракт с backend-веткой.
+2. Найти 2–3 похожих feature-слайса в `assets/react/features/`, опереться на их паттерны.
+3. Составить план:
+   - **Дерево компонентов:** Widget (smart) → View (dumb) → atoms из Tabler / `components/shared`.
+   - **Список новых vs переиспользуемых** компонентов. Каждый новый компонент — обоснование (почему не подошёл Tabler / `components/shared`).
+   - **API-интеграция:** какие эндпоинты, какие хуки (`useX`, `useUpdateX`), какие типы.
+   - **Mount-контракт:** новый Vite entry / новый Twig mount point — да / нет; если да, какие `data-*` атрибуты.
+   - **Список этапов** (типовая декомпозиция F1..F5 ниже) с риск-классом.
+   - **Тесты,** которые потребуются.
+4. Сохранить план в `docs/tasks/<id>/plan.md`.
+5. 🛑 **STOP. Дождаться одобрения плана Владельцем.** Без подтверждения — не писать код.
+
+### Типовая декомпозиция этапов (frontend)
+
+Подгоняется под задачу; не все этапы всегда нужны. Для расширения существующей фичи F4 обычно пропускается.
+
+| Stage | Цель | Типовой риск |
+|---|---|---|
+| **F1 — Types & API** | `feature.types.ts`, Zod-схемы (если формы), хуки на React Query (`useX`, `useUpdateX`). Безопасные дефолты. | 🟡 MEDIUM |
+| **F2 — UI components** | Только **новые** atoms/molecules. Сначала проверить Tabler + `components/shared`. Каждый компонент тестируется только пропсами. | 🟢 LOW / 🟡 MEDIUM |
+| **F3 — Widget + View** | Smart-контейнер использует hook из F1, View рендерит UI. Loading / error / empty состояния через Tabler spinner / alert / empty state. | 🟡 MEDIUM |
+| **F4 — Entrypoint + Twig integration** | Новый файл в `entrypoints/`, запись в `vite.config.ts` rollupOptions, Twig mount point с `\|e('html_attr')`, `vite_entry_script_tags`, `ErrorBoundary` оборачивает виджет. | 🔴 **HIGH** |
+| **F5 — Tests + final review** | Unit-тесты на dumb-компоненты и хуки. Smoke на entrypoint, если есть. Финальный handoff. | 🟢 LOW (но финальный STOP всегда) |
+
+### Классификация этапов по риску (frontend)
+
+| Риск | Примеры | Поведение после self-review |
+|---|---|---|
+| 🟢 **LOW** | Рефакторинг внутри одного dumb-компонента; добавление иконки / empty-state текста; добавление feature-scoped CSS Module override; добавление unit-тестов; обновление документации | Self-review зелёный → **продолжать автономно** |
+| 🟡 **MEDIUM** | Новый feature-слайс (Widget+View+hook+types) внутри существующего entrypoint; новая форма с Zod; новый hook на React Query; новая Modal/Card композиция | Self-review зелёный → **продолжать автономно**, Stage Report в `docs/tasks/<id>/stages/` |
+| 🔴 **HIGH** | Новый Vite entry / новый widget mount point; изменения в `apiClient.ts` / `queryClient.ts` / `vite.config.ts`; правки глобальных Tabler overrides (`:root` CSS variables); новые npm-зависимости; изменения Twig-шаблонов (mount-контракт); удаление/переименование публичного widget/hook/type; изменения CSRF / auth flow | Self-review зелёный → 🛑 **STOP, обязательное ревью Владельцем перед следующим этапом** |
+
+Если затрудняешься классифицировать — считай **HIGH** и остановись.
+
+### Обязательные точки STOP (никогда не продолжать без Владельца)
+
+- Перед добавлением нового Vite entry в `rollupOptions.input`
+- Перед изменением `vite.config.ts`, `tsconfig.json`
+- Перед изменением `services/apiClient.ts` (касается всех фич)
+- Перед изменением `services/queryClient.ts` (касается всех запросов)
+- Перед изменением Twig-шаблона с mount point виджета
+- Перед изменением CSRF / auth-флоу
+- Перед глобальными Tabler overrides (`:root { --tblr-* }`)
+- Перед `npm install` любой новой зависимости
+- Перед удалением: компонента, хука, типа, entrypoint, mount point
+- Перед изменением публичного API виджета (data-attrs контракт, props виджета)
+- Если self-review нашёл проблему, которую не удалось починить за 1 итерацию
+- Если задача требует выйти за изначальный scope
+- Финальный handoff (всегда STOP)
+
+### Формат Stage Report (заполняется в конце каждого этапа)
+
+```markdown
+## Stage F<N>: <название> — DONE
+
+**Риск:** 🟢 LOW | 🟡 MEDIUM | 🔴 HIGH
+**Следующее действие:** continue autonomously | 🛑 STOP, ждать Владельца
+
+### Что сделано
+- ...
+
+### Затронутые файлы
+- `assets/react/features/orders/useOrders.ts` — new
+- `assets/react/features/orders/OrdersWidget.tsx` — new
+- `assets/react/features/orders/OrdersView.tsx` — new
+- `assets/react/entrypoints/orders.tsx` — new (HIGH-risk)
+- `vite.config.ts` — modified (new entry)
+- `templates/order/list.html.twig` — modified (mount point)
+
+### Self-review
+- [x] Project Structure / Naming
+- [x] TypeScript strict (no any, no @ts-ignore, no `!`)
+- [x] Tabler-first (нет хардкода цветов / spacing)
+- [x] Smart/Dumb split
+- [x] Hook возвращает безопасные дефолты
+- [x] apiFetch через `apiClient.ts` (не raw fetch)
+- [x] ErrorBoundary оборачивает виджет в entrypoint
+- [x] Twig `data-*` экранированы через `|e('html_attr')`
+- [x] Bundle size — не вырос неожиданно
+- [x] `npm run lint && npm run typecheck && npm run test` — green
+
+### Команды для проверки
+- `npm run dev` + ручной smoke `/orders`
+- `npm run build` — нет warning, manifest сгенерирован
+
+### Риски / на что обратить внимание ревьюеру
+- Добавлен новый Vite entry — проверить, что Symfony `vite_entry_script_tags('orders')` подтягивает корректный manifest.
+
+### Открытые вопросы
+- нет
+```
+
+### Phase Final — Handoff (всегда STOP)
+
+В конце последнего этапа:
+1. Прогнать полный набор: `npm run lint && npm run typecheck && npm run test && npm run build`.
+2. Сверить построчно «Self-review checklist на каждом этапе» (раздел ниже) и «What NOT To Do».
+3. Заполнить `docs/tasks/<id>/handoff.md`:
+   - summary всех этапов,
+   - список новых Vite entries + Twig mount points,
+   - список изменений в shared-инфраструктуре (`apiClient.ts`, `queryClient.ts`, `vite.config.ts`, глобальных Tabler overrides),
+   - список новых npm-зависимостей (с обоснованием),
+   - размер бандла до/после,
+   - риски,
+   - follow-ups, которые сознательно вынесены за scope.
+4. 🛑 **STOP. Final Owner review.** Merge — только после одобрения Владельцем.
+
+### Запрещено в автономном режиме
+
+```
+самовольно расширять scope                              — STOP и спросить
+коммитить незакрытый этап                               — self-review red == этап не закрыт
+пропускать self-review «потому что очевидно»            — checklist обязателен
+пропускать STOP на high-risk этапе «ради скорости»     — Владелец сам решит, что пропустить
+переписывать существующие фичи по дороге («заодно»)    — отдельная задача
+делать новый Vite entry / Twig mount без STOP           — обязательная остановка
+npm install без STOP                                    — обязательная остановка
+правки apiClient.ts / queryClient.ts без STOP           — обязательная остановка
+merge в основную ветку                                  — никогда, только PR
+force-push в shared-ветки                               — никогда
+```
 
 ---
 
@@ -124,6 +272,7 @@ export default defineConfig({
 - One Vite entry per widget/page — load only what the page needs.
 - Always enable `manifest: true` so Symfony can reference hashed filenames.
 - Use `@` alias for all internal imports (`@/components/ui/Button`).
+- **Изменения `vite.config.ts` — 🔴 HIGH risk, обязательный STOP перед коммитом.**
 
 ---
 
@@ -475,6 +624,7 @@ import styles from './OrdersTable.module.css';
 - CSS Modules only for component-specific overrides — not for layout already covered by Tabler.
 - Never write custom CSS for spacing — use Tabler's Bootstrap-based spacing (`m-*`, `p-*`, `gap-*`).
 - Never override Tabler classes with `!important`.
+- **Изменения `:root { --tblr-* }` (глобальные overrides) — 🔴 HIGH risk, STOP перед коммитом.** Feature-scoped overrides через CSS Modules — 🟢 LOW.
 
 ---
 
@@ -569,6 +719,7 @@ if (el) {
 - Always wrap with `ErrorBoundary` — one widget crashing must not break the page.
 - Parse `data-*` values immediately at the entrypoint; never pass raw strings to components.
 - Use `json_encode|e('html_attr')` in Twig to prevent XSS.
+- **Изменения mount-контракта (имя `id`, набор `data-*`) — 🔴 HIGH risk, STOP перед коммитом** (фронт + Twig + Symfony controller связаны).
 
 ---
 
@@ -711,6 +862,7 @@ export async function apiFetch<T>(url: string, options: RequestInit = {}): Promi
 - Always send CSRF token on non-GET requests.
 - Throw `ApiError` with status code — hooks and query error handlers can discriminate by status.
 - Never hardcode base URL — Symfony handles routing.
+- **Изменения `apiClient.ts` — 🔴 HIGH risk, STOP перед коммитом** (касается всех фич).
 
 ---
 
@@ -849,6 +1001,8 @@ export const queryClient = new QueryClient({
 });
 ```
 
+**Изменения `queryClient.ts` — 🔴 HIGH risk, STOP перед коммитом** (касается поведения всех запросов в приложении).
+
 ---
 
 ## Naming Conventions
@@ -861,6 +1015,7 @@ export const queryClient = new QueryClient({
 | CSS Module | camelCase | `styles.module.css` |
 | Entrypoint file | kebab-case | `product-configurator.tsx` |
 | API route constants | SCREAMING_SNAKE | `const API_CART = '/api/cart'` |
+| Task plan / reports | kebab-case | `docs/tasks/<id>/plan.md`, `docs/tasks/<id>/stages/stage-1.md` |
 
 ---
 
@@ -898,21 +1053,95 @@ const modal = new bootstrap.Modal(el); // NO — causes conflicts with React DOM
 import * as Icons from '@tabler/icons-react'; // Kills tree-shaking, massive bundle
 ```
 
+**Дополнительно в автономном режиме запрещено:**
+
+```
+расширять scope задачи самовольно                     — STOP и спросить
+менять apiClient.ts / queryClient.ts / vite.config.ts без STOP — обязательная остановка
+добавлять Vite entry / Twig mount без STOP             — обязательная остановка
+npm install / npm uninstall без STOP                  — обязательная остановка
+менять глобальные :root { --tblr-* } overrides без STOP — обязательная остановка
+коммитить незакрытый этап (красный self-review)        — нельзя
+merge / force-push                                     — никогда автономно
+```
+
 ---
 
-## Checklist Before Every PR
+## Self-review checklist (выполнять в конце КАЖДОГО этапа)
 
-- [ ] No `any`, no `@ts-ignore`, no non-null assertions
-- [ ] Every new widget has `ErrorBoundary` in its entrypoint
-- [ ] New Vite entry added to `vite.config.ts` if new page widget
-- [ ] Twig `data-*` values use `|e('html_attr')`
-- [ ] All fetch calls go through `apiFetch`, not raw `fetch`
-- [ ] Smart/Dumb component split in place for non-trivial features
-- [ ] Hook returns safe defaults (no `undefined` leaking to JSX)
-- [ ] Form uses Zod schema + React Hook Form
-- [ ] `isPending` / `isLoading` handled in UI (no frozen buttons)
-- [ ] Form inputs use `is-invalid` class + `invalid-feedback` div from Tabler
-- [ ] Status/label colors use Tabler semantic tokens (`bg-green-lt`, `text-red`, etc.)
-- [ ] Icons imported individually from `@tabler/icons-react` with explicit `size` and `stroke`
-- [ ] No Bootstrap JS used for UI state — modals/dropdowns controlled via React state
-- [ ] No hardcoded hex/rgb colors in JSX or inline styles
+Запускать в строгом порядке. Если хоть один пункт красный — этап **не закрыт**, fix или 🛑 STOP.
+
+**Структура и архитектура:**
+- [ ] Изменения строго в рамках цели этапа (нет out-of-scope правок)
+- [ ] Структура файлов и naming соблюдены (см. «Project Structure», «Naming Conventions»)
+- [ ] Нет импортов из `features/X` внутри `features/Y` — общее через `components/shared`
+- [ ] `entrypoints/` содержат **только** mount-логику
+- [ ] Smart/Dumb split соблюдён для нетривиальной фичи
+
+**TypeScript:**
+- [ ] Нет `any`, нет `@ts-ignore`, нет non-null `!`
+- [ ] Props через `interface`, не inline
+- [ ] Hook возвращает безопасные дефолты (`?? []`, `?? 0`)
+- [ ] `npm run typecheck` — green
+
+**UI (Tabler):**
+- [ ] Использованы Tabler utility-классы вместо custom CSS для spacing/layout
+- [ ] Нет hardcoded hex/rgb цветов в JSX или inline styles
+- [ ] Status/label цвета через семантические Tabler-токены (`bg-green-lt`, `text-red`)
+- [ ] Иконки импортированы поштучно из `@tabler/icons-react` с явным `size` и `stroke`
+- [ ] Loading-состояния через Tabler spinner / skeleton, не custom
+- [ ] Alerts/feedback — через `alert alert-*`, не custom div
+- [ ] Modals/dropdowns управляются React-стейтом, не Bootstrap JS
+- [ ] Формы используют `is-invalid` + `invalid-feedback` от Tabler
+- [ ] CSS Modules только для component-scoped overrides (не для layout)
+
+**Data & API:**
+- [ ] Все запросы через `apiFetch` из `services/apiClient.ts`, не raw `fetch`
+- [ ] `useQuery` / `useMutation` использованы корректно, `invalidateQueries` после мутаций
+- [ ] Формы используют React Hook Form + Zod, тип через `z.infer`
+- [ ] `isPending` / `isLoading` обработаны в UI (нет залипающих кнопок)
+- [ ] 401 → redirect на login; 422 → показ валидационных ошибок
+
+**Mount-контракт (если затронут):**
+- [ ] Новый Vite entry добавлен в `rollupOptions.input`
+- [ ] Twig `data-*` экранированы `|e('html_attr')`
+- [ ] Mount защищён `if (el)`
+- [ ] Виджет обёрнут в `QueryClientProvider` + `ErrorBoundary`
+- [ ] CSRF meta-тег присутствует в Twig
+
+**Качество кода:**
+- [ ] `npm run lint` — green
+- [ ] `npm run test` — green
+- [ ] `npm run build` — green, бандл не вырос неожиданно (>10% — обосновать)
+- [ ] Нет `console.log` в коммитах (только `console.error` в `ErrorBoundary` / `catch`)
+
+**Stage Report:**
+- [ ] Stage Report создан и сохранён в `docs/tasks/<id>/stages/stage-F<N>.md`
+- [ ] Коммит сделан с Conventional Commits префиксом, сообщение отражает цель этапа
+
+---
+
+## Закрытие этапа
+
+В конце каждого этапа — строго по порядку:
+
+1. Прогнать `npm run lint && npm run typecheck && npm run test`. Если затронуты mount/build — также `npm run build`.
+2. Пройти **Self-review checklist** выше. Любой красный пункт — этап не закрыт.
+3. Сделать коммит: Conventional Commits, сообщение отражает цель этапа.
+4. Сохранить **Stage Report** в `docs/tasks/<id>/stages/stage-F<N>.md`.
+5. Решить по риск-классу:
+   - 🟢 LOW / 🟡 MEDIUM → продолжать к следующему этапу автономно.
+   - 🔴 HIGH → 🛑 STOP, ждать Владельца.
+
+## Закрытие задачи (Phase Final)
+
+1. Прогнать полный набор: `npm run lint && npm run typecheck && npm run test && npm run build`.
+2. Сверить построчно «What NOT To Do» и Self-review checklist.
+3. Собрать `docs/tasks/<id>/handoff.md`:
+   - summary всех этапов,
+   - список новых Vite entries + Twig mount points,
+   - список изменений в shared-инфраструктуре (`apiClient.ts`, `queryClient.ts`, `vite.config.ts`, глобальные Tabler overrides),
+   - список новых npm-зависимостей с обоснованием,
+   - размер бандла до/после,
+   - риски и follow-ups, вынесенные за scope.
+4. 🛑 **STOP. Final Owner review.** Merge — только после одобрения Владельцем.
