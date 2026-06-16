@@ -28,9 +28,11 @@ final readonly class UnitExtendedQuery
         string $periodFrom,
         string $periodTo,
         int $limit = 500,
+        ?string $search = null,
     ): array {
         $from = new \DateTimeImmutable($periodFrom);
         $to = new \DateTimeImmutable($periodTo);
+        $normalizedSearch = $this->normalizeSearch($search);
 
         $sales = $this->marketplaceFacade->getSalesAggregatesByListing($companyId, $marketplace, $from, $to);
         $returns = $this->marketplaceFacade->getReturnAggregatesByListing($companyId, $marketplace, $from, $to);
@@ -152,7 +154,7 @@ final readonly class UnitExtendedQuery
             $otherBreakdown = $this->buildBreakdown($allCategoriesRaw, true);
             $allBreakdown = $this->buildBreakdown($allCategoriesRaw, false);
 
-            $items[] = [
+            $row = [
                 'listingId' => $listingId,
                 'title' => $title,
                 'sku' => $sku,
@@ -190,6 +192,10 @@ final readonly class UnitExtendedQuery
             $totals['commission'] += $commission;
             $totals['logistics'] += $logistics;
             $totals['otherCosts'] += $otherCosts;
+
+            if ($normalizedSearch === null || $this->matchesSearch($row, $normalizedSearch)) {
+                $items[] = $row;
+            }
         }
 
         // Sort by revenue DESC
@@ -234,6 +240,35 @@ final readonly class UnitExtendedQuery
         $items = \array_slice($items, 0, $limit);
 
         return ['items' => $items, 'totals' => $totals];
+    }
+
+    private function normalizeSearch(?string $search): ?string
+    {
+        $normalized = trim((string) $search);
+        if ($normalized === '') {
+            return null;
+        }
+
+        return \mb_strtolower($normalized);
+    }
+
+    /**
+     * @param array<string, mixed> $item
+     */
+    private function matchesSearch(array $item, string $normalizedSearch): bool
+    {
+        foreach (['sku', 'sellerArticle', 'title'] as $field) {
+            $value = $item[$field] ?? '';
+            if (!is_scalar($value)) {
+                continue;
+            }
+
+            if (str_contains(\mb_strtolower((string) $value), $normalizedSearch)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -32,6 +32,7 @@ interface UnitExtendedTableProps {
     items: UnitExtendedItem[];
     totals: UnitExtendedTotals | null;
     isLoading: boolean;
+    emptyMessage?: string;
 }
 
 const TABLE_STYLES = `
@@ -189,7 +190,12 @@ function formatPercent(v: number | null): React.ReactNode {
     return `${v.toFixed(1)}%`;
 }
 
-const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, isLoading }) => {
+const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
+    items,
+    totals,
+    isLoading,
+    emptyMessage = 'Нет данных за выбранный период',
+}) => {
     const [sortField, setSortField] = useState<SortField>('revenue');
     const [sortDir, setSortDir] = useState<SortDir>('desc');
     const [expanded, setExpanded] = useState<ExpandedState | null>(null);
@@ -412,7 +418,7 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
                 <div className="empty-img">
                     <i className="ti ti-package text-muted fs-1" />
                 </div>
-                <p className="empty-title">Нет данных за выбранный период</p>
+                <p className="empty-title">{emptyMessage}</p>
             </div>
         );
     }

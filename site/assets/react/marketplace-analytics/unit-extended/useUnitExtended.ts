@@ -6,6 +6,7 @@ interface UseUnitExtendedParams {
     marketplace: string;
     periodFrom: string;
     periodTo: string;
+    search?: string;
 }
 
 interface UseUnitExtendedResult {
@@ -33,11 +34,16 @@ export function useUnitExtended(params: UseUnitExtendedParams): UseUnitExtendedR
             query.marketplace = params.marketplace;
         }
 
+        const search = params.search?.trim();
+        if (search) {
+            query.search = search;
+        }
+
         void run({
             url: '/api/marketplace-analytics/unit-extended',
             query,
         });
-    }, [params.marketplace, params.periodFrom, params.periodTo, run]);
+    }, [params.marketplace, params.periodFrom, params.periodTo, params.search, run]);
 
     useEffect(() => {
         load();

@@ -22,6 +22,20 @@ interface Filters {
     period: PeriodKey;
 }
 
+const UNIT_EXTENDED_WIDGET_STYLES = `
+    .ue-ext-listing-search {
+        width: 320px;
+        max-width: 100%;
+    }
+
+    @media (max-width: 767.98px) {
+        .ue-ext-listing-search {
+            width: 100%;
+            margin-left: 0 !important;
+        }
+    }
+`;
+
 function getFiltersFromUrl(): Filters {
     const params = new URLSearchParams(window.location.search);
     const currentMonth = getMonthRange(0);
@@ -71,15 +85,26 @@ function setFiltersToUrl(filters: Filters): void {
 
 const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces }) => {
     const [filters, setFilters] = useState<Filters>(getFiltersFromUrl);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
 
     useEffect(() => {
         setFiltersToUrl(filters);
     }, [filters]);
 
+    useEffect(() => {
+        const timerId = window.setTimeout(() => {
+            setDebouncedSearchQuery(searchQuery);
+        }, 300);
+
+        return () => window.clearTimeout(timerId);
+    }, [searchQuery]);
+
     const { items, totals, isLoading, isError, errorMessage } = useUnitExtended({
         marketplace: filters.marketplace,
         periodFrom: filters.dateFrom,
         periodTo: filters.dateTo,
+        search: debouncedSearchQuery,
     });
 
     const widgets = useWidgets({
@@ -87,6 +112,11 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces })
         periodFrom: filters.dateFrom,
         periodTo: filters.dateTo,
     });
+
+    const isSearchActive = searchQuery.trim() !== '';
+    const tableEmptyMessage = isSearchActive
+        ? 'Ничего не найдено'
+        : 'Нет данных за выбранный период';
 
     const handleMarketplaceChange = useCallback((mp: string) => {
         setFilters((prev) => ({ ...prev, marketplace: mp }));
@@ -106,6 +136,8 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces })
 
     return (
         <>
+            <style>{UNIT_EXTENDED_WIDGET_STYLES}</style>
+
             <div className="page-header d-print-none mb-3">
                 <div className="row g-2 align-items-center">
                     <div className="col">
@@ -144,8 +176,19 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces })
             )}
 
             <div className="card">
-                <div className="card-header">
+                <div className="card-header flex-wrap">
                     <h3 className="card-title">Юнит-экономика по листингам</h3>
+                    <div className="ms-3 ue-ext-listing-search">
+                        <input
+                            type="search"
+                            className="form-control"
+                            value={searchQuery}
+                            maxLength={255}
+                            placeholder="Поиск SKU / Артикул / Наименование"
+                            aria-label="Поиск по SKU, артикулу или наименованию"
+                            onChange={(event) => setSearchQuery(event.target.value)}
+                        />
+                    </div>
                     <div className="card-options">
                         <ExportXlsButton
                             marketplace={filters.marketplace}
@@ -165,6 +208,7 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces })
                     items={items}
                     totals={totals}
                     isLoading={isLoading}
+                    emptyMessage={tableEmptyMessage}
                 />
             </div>
         </>
