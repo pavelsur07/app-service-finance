@@ -1,7 +1,7 @@
 /***** CONFIG *****/
 var CFG = {
   SHEET_CFG: 'Config',
-  BASE_URL_CELL: 'B1',  // https://app.2bstock.ru
+  BASE_URL_CELL: 'B1',  // https://app.vashfindir.ru
   COMPANY_CELL:  'B2',  // Название компании
   YEAR_CELL:     'B3',  // Год (например 2025)
   MONTH_CELL:    'B4',  // Месяц по-русски (январь, февраль, ...)
