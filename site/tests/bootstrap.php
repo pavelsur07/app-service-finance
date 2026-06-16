@@ -23,6 +23,7 @@ DG\BypassFinals::allowPaths([
     '*/src/MarketplaceAds/Repository/AdScheduledBatchRepository.php',
     '*/src/MarketplaceAds/Repository/AdRawDocumentRepository.php',
     '*/src/Shared/Service/Storage/StorageService.php',
+    '*/src/Ingestion/Repository/IngestRawRecordRepository.php',
 ]);
 
 if (method_exists(Dotenv::class, 'bootEnv')) {

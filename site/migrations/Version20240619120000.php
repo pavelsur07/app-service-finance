@@ -24,7 +24,7 @@ final class Version20240619120000 extends AbstractMigration
         $this->addSql('DROP INDEX IF EXISTS IDX_DACD6ED979B1AD6');
         $this->addSql('ALTER TABLE telegram_bots DROP COLUMN IF EXISTS company_id');
 
-        $this->addSql("ALTER TABLE telegram_bots ADD updated_at TIMESTAMP(0) WITHOUT TIME ZONE DEFAULT NOW()");
+        $this->addSql("ALTER TABLE telegram_bots ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP(0) WITHOUT TIME ZONE DEFAULT NOW()");
         $this->addSql('UPDATE telegram_bots SET updated_at = created_at WHERE updated_at IS NULL');
         $this->addSql('ALTER TABLE telegram_bots ALTER COLUMN updated_at SET NOT NULL');
         $this->addSql("COMMENT ON COLUMN telegram_bots.updated_at IS '(DC2Type:datetime_immutable)'");
