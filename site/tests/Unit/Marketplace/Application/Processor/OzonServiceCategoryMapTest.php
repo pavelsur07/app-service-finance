@@ -170,10 +170,26 @@ final class OzonServiceCategoryMapTest extends TestCase
         $logger = new WarningCapturingLogger();
 
         $cases = [
+            'OperationMarketplaceSendingPushNotifications' => 'ozon_sending_push_notifications',
+            'OperationLabelOriginal' => 'ozon_original_label',
+            'OperationMarketplaceServicePartialCompensationToClient' => 'ozon_partial_compensation_to_client',
+            'MarketplaceServiceItemTemporaryStorage' => 'ozon_temporary_storage',
+            'OperationMarketplaceSubscriptionMarketingServicesCost' => 'ozon_marketing_services_subscription',
+            'DefectFineShipmentDelayRatedCancelled' => 'ozon_fines_shipment_delay_rated_cancelled',
+            'Charity' => 'ozon_charity',
+            'OperationMarketplaceInternetSiteAdvertising' => 'ozon_site_advertising',
+            'MarketplaceMarketingActionCostOperation' => 'ozon_marketing_action_operation',
+            'OperationMarketplaceItemPinReview' => 'ozon_pin_review',
+            'DefectFineIncomplete' => 'ozon_fines_incomplete',
+            'DefectFineWrongItem' => 'ozon_fines_wrong_item',
+            'DefectRateShipmentDelay' => 'ozon_defect_rate_shipment_delay',
+            'DefectRateIncomplete' => 'ozon_defect_rate_incomplete',
+            'DefectRateWrongItem' => 'ozon_defect_rate_wrong_item',
+            'DefectRateCancellation' => 'ozon_defect_rate_cancellation',
+            'OperationMarketplaceItemAdditionalPackagingAtWarehouse' => 'ozon_additional_packaging_warehouse',
             'DefectFineShipmentDelayRated' => 'ozon_fines_shipment_delay_rated',
             'DefectFineCancellation' => 'ozon_fines_cancellation',
             'MarketplaceServiceItemServiceFeeRFBS' => 'ozon_service_fee_rfbs',
-            'OperationMarketplaceItemAdditionalPackagingAtWarehouse' => 'ozon_package_materials',
             'DefectFineShipmentDelay' => 'ozon_fines_shipment_delay',
         ];
 

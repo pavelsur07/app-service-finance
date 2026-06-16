@@ -19,10 +19,27 @@ use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 final class CostPLMappingDefaultSetupControllerTest extends WebTestCaseBase
 {
     private const NEW_OZON_COST_MAPPINGS = [
+        'ozon_temporary_storage' => 'OPEX_WH_STORAGE',
+        'ozon_additional_packaging_warehouse' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_site_advertising' => 'PROMO_INTERNAL',
+        'ozon_sending_push_notifications' => 'PROMO_INTERNAL',
+        'ozon_pin_review' => 'PROMO_INTERNAL',
+        'ozon_marketing_action_operation' => 'PROMO_INTERNAL',
+        'ozon_marketing_services_subscription' => 'PROMO_INTERNAL',
         'ozon_fines_shipment_delay_rated' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_fines_shipment_delay_rated_cancelled' => 'OPEX_WH_MP_DEDUCTIONS',
         'ozon_fines_cancellation' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_fines_incomplete' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_fines_wrong_item' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_defect_rate_shipment_delay' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_defect_rate_incomplete' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_defect_rate_wrong_item' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_defect_rate_cancellation' => 'OPEX_WH_MP_DEDUCTIONS',
         'ozon_service_fee_rfbs' => 'COGS_DELIVERY',
         'ozon_fines_shipment_delay' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_original_label' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_charity' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_partial_compensation_to_client' => 'OPEX_WH_MP_DEDUCTIONS',
     ];
 
     public function testPreviewReturnsOkAndIsReadOnly(): void
@@ -191,7 +208,9 @@ final class CostPLMappingDefaultSetupControllerTest extends WebTestCaseBase
             $em->persist($cost);
         }
 
-        $plCodes = $withAllPlCodes ? ['COGS_MP_COMMISSION', 'COGS_DELIVERY', 'OPEX_WH_MP_DEDUCTIONS'] : ['COGS_MP_COMMISSION'];
+        $plCodes = $withAllPlCodes
+            ? ['COGS_MP_COMMISSION', 'COGS_DELIVERY', 'OPEX_WH_MP_DEDUCTIONS', 'OPEX_WH_STORAGE', 'PROMO_INTERNAL']
+            : ['COGS_MP_COMMISSION'];
         foreach ($plCodes as $code) {
             $pl = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName($code)->build();
             $pl->setCode($code);

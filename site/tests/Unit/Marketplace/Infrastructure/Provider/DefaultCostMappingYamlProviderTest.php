@@ -14,6 +14,29 @@ final class DefaultCostMappingYamlProviderTest extends TestCase
 {
     private const DEFAULT_CONFIG_PATH = __DIR__ . '/../../../../../config/marketplace/default_cost_mapping.yaml';
     private const FIXTURES_DIR = __DIR__ . '/../../../../Fixtures/Marketplace/Provider';
+    private const NEW_OZON_COST_MAPPINGS = [
+        'ozon_temporary_storage' => 'OPEX_WH_STORAGE',
+        'ozon_additional_packaging_warehouse' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_site_advertising' => 'PROMO_INTERNAL',
+        'ozon_sending_push_notifications' => 'PROMO_INTERNAL',
+        'ozon_pin_review' => 'PROMO_INTERNAL',
+        'ozon_marketing_action_operation' => 'PROMO_INTERNAL',
+        'ozon_marketing_services_subscription' => 'PROMO_INTERNAL',
+        'ozon_fines_shipment_delay_rated' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_fines_shipment_delay_rated_cancelled' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_fines_cancellation' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_fines_incomplete' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_fines_wrong_item' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_defect_rate_shipment_delay' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_defect_rate_incomplete' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_defect_rate_wrong_item' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_defect_rate_cancellation' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_service_fee_rfbs' => 'COGS_DELIVERY',
+        'ozon_fines_shipment_delay' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_original_label' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_charity' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_partial_compensation_to_client' => 'OPEX_WH_MP_DEDUCTIONS',
+    ];
 
     public function testItReadsDefaultConfigSuccessfully(): void
     {
@@ -50,6 +73,21 @@ final class DefaultCostMappingYamlProviderTest extends TestCase
 
         self::assertSame(0, $ruleSet->count());
         self::assertSame(MarketplaceType::YANDEX_MARKET, $ruleSet->getMarketplace());
+    }
+
+    public function testNewOzonCostCodesHaveDefaultPlMappings(): void
+    {
+        $provider = new DefaultCostMappingYamlProvider(self::DEFAULT_CONFIG_PATH);
+
+        $ruleSet = $provider->getForMarketplace(MarketplaceType::OZON);
+
+        foreach (self::NEW_OZON_COST_MAPPINGS as $costCode => $expectedPlCode) {
+            $rule = $ruleSet->getByCostCode($costCode);
+
+            self::assertNotNull($rule, sprintf('Missing default PL mapping for "%s".', $costCode));
+            self::assertSame($expectedPlCode, $rule->getPlCode(), sprintf('Unexpected PL mapping for "%s".', $costCode));
+            self::assertTrue($rule->isIncludeInPl(), sprintf('"%s" must affect P&L.', $costCode));
+        }
     }
 
     public function testDuplicateCostCodeThrowsException(): void

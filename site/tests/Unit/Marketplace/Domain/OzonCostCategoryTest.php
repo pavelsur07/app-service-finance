@@ -22,6 +22,33 @@ use PHPUnit\Framework\TestCase;
 final class OzonCostCategoryTest extends TestCase
 {
     /**
+     * @var array<string, string>
+     */
+    private const NEW_OZON_TYPES = [
+        'OperationMarketplaceSendingPushNotifications' => 'ozon_sending_push_notifications',
+        'OperationLabelOriginal' => 'ozon_original_label',
+        'OperationMarketplaceServicePartialCompensationToClient' => 'ozon_partial_compensation_to_client',
+        'MarketplaceServiceItemTemporaryStorage' => 'ozon_temporary_storage',
+        'OperationMarketplaceSubscriptionMarketingServicesCost' => 'ozon_marketing_services_subscription',
+        'DefectFineShipmentDelayRatedCancelled' => 'ozon_fines_shipment_delay_rated_cancelled',
+        'Charity' => 'ozon_charity',
+        'OperationMarketplaceInternetSiteAdvertising' => 'ozon_site_advertising',
+        'MarketplaceMarketingActionCostOperation' => 'ozon_marketing_action_operation',
+        'OperationMarketplaceItemPinReview' => 'ozon_pin_review',
+        'DefectFineIncomplete' => 'ozon_fines_incomplete',
+        'DefectFineWrongItem' => 'ozon_fines_wrong_item',
+        'DefectRateShipmentDelay' => 'ozon_defect_rate_shipment_delay',
+        'DefectRateIncomplete' => 'ozon_defect_rate_incomplete',
+        'DefectRateWrongItem' => 'ozon_defect_rate_wrong_item',
+        'DefectRateCancellation' => 'ozon_defect_rate_cancellation',
+        'OperationMarketplaceItemAdditionalPackagingAtWarehouse' => 'ozon_additional_packaging_warehouse',
+        'DefectFineShipmentDelayRated' => 'ozon_fines_shipment_delay_rated',
+        'MarketplaceServiceItemServiceFeeRFBS' => 'ozon_service_fee_rfbs',
+        'DefectFineCancellation' => 'ozon_fines_cancellation',
+        'DefectFineShipmentDelay' => 'ozon_fines_shipment_delay',
+    ];
+
+    /**
      * Каждый код уникален.
      */
     public function testNoDuplicateCodes(): void
@@ -247,25 +274,20 @@ final class OzonCostCategoryTest extends TestCase
 
     public function testNewOperationTypesAndServiceNameResolveToDedicatedCategories(): void
     {
-        $this->assertSame(
-            'ozon_fines_shipment_delay_rated',
-            OzonCostCategory::findByOperationType('DefectFineShipmentDelayRated')?->code,
-        );
-        $this->assertSame(
-            'ozon_fines_cancellation',
-            OzonCostCategory::findByOperationType('DefectFineCancellation')?->code,
-        );
-        $this->assertSame(
-            'ozon_service_fee_rfbs',
-            OzonCostCategory::findByServiceName('MarketplaceServiceItemServiceFeeRFBS')?->code,
-        );
-        $this->assertSame(
-            'ozon_package_materials',
-            OzonCostCategory::findByServiceName('OperationMarketplaceItemAdditionalPackagingAtWarehouse')?->code,
-        );
-        $this->assertSame(
-            'ozon_fines_shipment_delay',
-            OzonCostCategory::findByOperationType('DefectFineShipmentDelay')?->code,
-        );
+        $names = [];
+
+        foreach (self::NEW_OZON_TYPES as $input => $expectedCode) {
+            $category = OzonCostCategory::findByServiceName($input)
+                ?? OzonCostCategory::findByOperationType($input);
+
+            $this->assertNotNull($category, sprintf('"%s" должен быть заведён в OzonCostCategory', $input));
+            $this->assertSame($expectedCode, $category->code, sprintf('"%s" должен иметь dedicated category code', $input));
+            $this->assertNotSame('ozon_other_service', $category->code, sprintf('"%s" не должен попадать в прочие', $input));
+            $this->assertNotSame('Прочие услуги Ozon', $category->name, sprintf('"%s" должен иметь читаемое имя', $input));
+            $this->assertStringNotContainsString('Проч', $category->name, sprintf('"%s" не должен иметь имя из группы прочих', $input));
+            $this->assertArrayNotHasKey($category->name, $names, sprintf('"%s" должен иметь уникальное имя', $input));
+
+            $names[$category->name] = $input;
+        }
     }
 }
