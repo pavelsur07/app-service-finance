@@ -21,6 +21,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted('ROLE_COMPANY_USER')]
 final class UnitExtendedController extends AbstractController
 {
+    private const MAX_SEARCH_LENGTH = 255;
+
     public function __construct(
         private readonly ActiveCompanyService $companyService,
         private readonly UnitExtendedQuery $unitExtendedQuery,
@@ -59,7 +61,11 @@ final class UnitExtendedController extends AbstractController
         }
 
         $search = $request->query->get('search');
-        $search = is_string($search) && trim($search) !== '' ? $search : null;
+        $search = is_string($search) ? trim($search) : '';
+        if (\mb_strlen($search) > self::MAX_SEARCH_LENGTH) {
+            return $this->json(['error' => 'search must be <= 255 characters'], 422);
+        }
+        $search = $search !== '' ? $search : null;
 
         $result = $this->unitExtendedQuery->execute(
             $companyId,

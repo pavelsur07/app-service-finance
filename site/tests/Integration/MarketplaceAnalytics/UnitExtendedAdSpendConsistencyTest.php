@@ -182,7 +182,7 @@ final class UnitExtendedAdSpendConsistencyTest extends IntegrationTestCase
         );
     }
 
-    public function testSearchFiltersRowsBeforeLimitAcrossFullDataset(): void
+    public function testSearchReturnsMatchingRowsBeforeLimitWhilePreservingTotals(): void
     {
         $bySku = $this->unitExtendedQuery->execute(
             self::TEST_COMPANY_ID,

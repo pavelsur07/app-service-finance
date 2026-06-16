@@ -183,6 +183,7 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces })
                             type="search"
                             className="form-control"
                             value={searchQuery}
+                            maxLength={255}
                             placeholder="Поиск SKU / Артикул / Наименование"
                             aria-label="Поиск по SKU, артикулу или наименованию"
                             onChange={(event) => setSearchQuery(event.target.value)}
