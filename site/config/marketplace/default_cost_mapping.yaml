@@ -29,6 +29,11 @@ marketplaces:
       - cost_code: ozon_storage_partner
         pl_code: OPEX_WH_STORAGE
         include_in_pl: true
+      - cost_code: ozon_temporary_storage
+        pl_code: OPEX_WH_STORAGE
+        include_in_pl: true
+        confidence: medium
+        note: "По аналогии с ozon_storage"
       - cost_code: ozon_logistic_pickup
         pl_code: COGS_DELIVERY
         include_in_pl: true
@@ -42,7 +47,27 @@ marketplaces:
         include_in_pl: true
         confidence: medium
         note: "Маппинг требует бизнес-подтверждения"
+      - cost_code: ozon_additional_packaging_warehouse
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: medium
+        note: "По аналогии с ozon_package_materials"
       - cost_code: ozon_cpc
+        pl_code: PROMO_INTERNAL
+        include_in_pl: true
+      - cost_code: ozon_site_advertising
+        pl_code: PROMO_INTERNAL
+        include_in_pl: true
+      - cost_code: ozon_sending_push_notifications
+        pl_code: PROMO_INTERNAL
+        include_in_pl: true
+      - cost_code: ozon_pin_review
+        pl_code: PROMO_INTERNAL
+        include_in_pl: true
+      - cost_code: ozon_marketing_action_operation
+        pl_code: PROMO_INTERNAL
+        include_in_pl: true
+      - cost_code: ozon_marketing_services_subscription
         pl_code: PROMO_INTERNAL
         include_in_pl: true
       - cost_code: ozon_delivery_to_handover_place
@@ -72,11 +97,46 @@ marketplaces:
         include_in_pl: true
         confidence: low
         note: "Гипотеза: штраф Ozon за просрочку отгрузки относится к удержаниям/штрафам маркетплейса до финальной сверки с фин.методологией"
+      - cost_code: ozon_fine_shipment_delay_rated_cancelled
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: low
+        note: "По аналогии с ozon_fines_shipment_delay_rated"
       - cost_code: ozon_fines_cancellation
         pl_code: OPEX_WH_MP_DEDUCTIONS
         include_in_pl: true
         confidence: low
         note: "Гипотеза: штраф Ozon за отмену относится к удержаниям/штрафам маркетплейса до финальной сверки с фин.методологией"
+      - cost_code: ozon_fine_incomplete
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: low
+        note: "По аналогии со штрафами Ozon"
+      - cost_code: ozon_fine_wrong_item
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: low
+        note: "По аналогии со штрафами Ozon"
+      - cost_code: ozon_defect_rate_shipment_delay
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: low
+        note: "По аналогии со штрафами и индексами ошибок Ozon"
+      - cost_code: ozon_defect_rate_incomplete
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: low
+        note: "По аналогии со штрафами и индексами ошибок Ozon"
+      - cost_code: ozon_defect_rate_wrong_item
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: low
+        note: "По аналогии со штрафами и индексами ошибок Ozon"
+      - cost_code: ozon_defect_rate_cancellation
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: low
+        note: "По аналогии со штрафами и индексами ошибок Ozon"
       - cost_code: ozon_service_fee_rfbs
         pl_code: COGS_DELIVERY
         include_in_pl: true
@@ -87,6 +147,21 @@ marketplaces:
         include_in_pl: true
         confidence: low
         note: "Гипотеза: штраф Ozon за просрочку отгрузки относится к удержаниям/штрафам маркетплейса до финальной сверки с фин.методологией"
+      - cost_code: ozon_original_label
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: medium
+        note: "По аналогии с операционными удержаниями Ozon"
+      - cost_code: ozon_charity
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: low
+        note: "Гипотеза до финальной сверки с фин.методологией"
+      - cost_code: ozon_partial_compensation_to_client
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: low
+        note: "Гипотеза: компенсация клиенту отнесена к удержаниям маркетплейса до финальной сверки с фин.методологией"
 
   wildberries:
     cost_mappings: []
