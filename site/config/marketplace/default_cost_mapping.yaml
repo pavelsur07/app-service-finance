@@ -97,7 +97,7 @@ marketplaces:
         include_in_pl: true
         confidence: low
         note: "Гипотеза: штраф Ozon за просрочку отгрузки относится к удержаниям/штрафам маркетплейса до финальной сверки с фин.методологией"
-      - cost_code: ozon_fine_shipment_delay_rated_cancelled
+      - cost_code: ozon_fines_shipment_delay_rated_cancelled
         pl_code: OPEX_WH_MP_DEDUCTIONS
         include_in_pl: true
         confidence: low
@@ -107,12 +107,12 @@ marketplaces:
         include_in_pl: true
         confidence: low
         note: "Гипотеза: штраф Ozon за отмену относится к удержаниям/штрафам маркетплейса до финальной сверки с фин.методологией"
-      - cost_code: ozon_fine_incomplete
+      - cost_code: ozon_fines_incomplete
         pl_code: OPEX_WH_MP_DEDUCTIONS
         include_in_pl: true
         confidence: low
         note: "По аналогии со штрафами Ozon"
-      - cost_code: ozon_fine_wrong_item
+      - cost_code: ozon_fines_wrong_item
         pl_code: OPEX_WH_MP_DEDUCTIONS
         include_in_pl: true
         confidence: low

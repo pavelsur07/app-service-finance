@@ -432,7 +432,7 @@ final readonly class OzonCostCategory
                 name: 'Закрепление отзыва Ozon',
                 widgetGroup: 'Продвижение и реклама',
                 xlsxGroup: 'Продвижение и реклама',
-                operationTypes: ['OperationMarketPlaceItemPinReview'],
+                operationTypes: ['OperationMarketplaceItemPinReview'],
             ),
             new self(
                 code: 'ozon_seller_bonus',
@@ -629,7 +629,7 @@ final readonly class OzonCostCategory
                 operationTypes: ['DefectFineShipmentDelayRated'],
             ),
             new self(
-                code: 'ozon_fine_shipment_delay_rated_cancelled',
+                code: 'ozon_fines_shipment_delay_rated_cancelled',
                 name: 'Штраф за отмену отгрузки в нерекомендованный слот Ozon',
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Другие услуги и штрафы',
@@ -643,14 +643,14 @@ final readonly class OzonCostCategory
                 operationTypes: ['DefectFineCancellation'],
             ),
             new self(
-                code: 'ozon_fine_incomplete',
+                code: 'ozon_fines_incomplete',
                 name: 'Штраф за недовложение Ozon',
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Другие услуги и штрафы',
                 operationTypes: ['DefectFineIncomplete'],
             ),
             new self(
-                code: 'ozon_fine_wrong_item',
+                code: 'ozon_fines_wrong_item',
                 name: 'Штраф за неверный товар Ozon',
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Другие услуги и штрафы',
