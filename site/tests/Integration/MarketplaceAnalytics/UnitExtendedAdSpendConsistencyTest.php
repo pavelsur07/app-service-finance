@@ -182,6 +182,44 @@ final class UnitExtendedAdSpendConsistencyTest extends IntegrationTestCase
         );
     }
 
+    public function testSearchFiltersRowsBeforeLimitAcrossFullDataset(): void
+    {
+        $bySku = $this->unitExtendedQuery->execute(
+            self::TEST_COMPANY_ID,
+            MarketplaceType::OZON->value,
+            self::PERIOD_FROM,
+            self::PERIOD_TO,
+            1,
+            'sku-o-3',
+        );
+        $byTitle = $this->unitExtendedQuery->execute(
+            self::TEST_COMPANY_ID,
+            MarketplaceType::OZON->value,
+            self::PERIOD_FROM,
+            self::PERIOD_TO,
+            1,
+            'ozon товар 3',
+        );
+        $byArticle = $this->unitExtendedQuery->execute(
+            self::TEST_COMPANY_ID,
+            MarketplaceType::OZON->value,
+            self::PERIOD_FROM,
+            self::PERIOD_TO,
+            1,
+            'art-o-3',
+        );
+
+        self::assertSame(self::LISTING_OZON_3_ID, $bySku['items'][0]['listingId']);
+        self::assertSame(self::LISTING_OZON_3_ID, $byTitle['items'][0]['listingId']);
+        self::assertSame(self::LISTING_OZON_3_ID, $byArticle['items'][0]['listingId']);
+        self::assertSame(
+            1800.0,
+            $bySku['totals']['revenue'],
+            'Search filters response rows only; backend totals keep report accounting semantics.',
+        );
+        self::assertSame(925.0, $bySku['totals']['adSpend']);
+    }
+
     private function seedFixtures(): void
     {
         $owner = UserBuilder::aUser()
@@ -199,7 +237,7 @@ final class UnitExtendedAdSpendConsistencyTest extends IntegrationTestCase
 
         $listingOzon1 = $this->newListing(self::LISTING_OZON_1_ID, $company, MarketplaceType::OZON, 'SKU-O-1', 'Ozon товар 1');
         $listingOzon2 = $this->newListing(self::LISTING_OZON_2_ID, $company, MarketplaceType::OZON, 'SKU-O-2', 'Ozon товар 2');
-        $listingOzon3 = $this->newListing(self::LISTING_OZON_3_ID, $company, MarketplaceType::OZON, 'SKU-O-3', 'Ozon товар 3');
+        $listingOzon3 = $this->newListing(self::LISTING_OZON_3_ID, $company, MarketplaceType::OZON, 'SKU-O-3', 'Ozon товар 3', 'ART-O-3');
         $listingWb = $this->newListing(self::LISTING_WB_ID, $company, MarketplaceType::WILDBERRIES, 'WB-1', 'WB товар');
 
         foreach ([$listingOzon1, $listingOzon2, $listingOzon3, $listingWb] as $l) {
@@ -262,12 +300,14 @@ final class UnitExtendedAdSpendConsistencyTest extends IntegrationTestCase
         MarketplaceType $marketplace,
         string $sku,
         string $name,
+        ?string $supplierSku = null,
     ): MarketplaceListing {
         $listing = new MarketplaceListing($id, $company, null, $marketplace);
         $listing->setMarketplaceSku($sku);
         $listing->setSize('UNKNOWN');
         $listing->setPrice('0.00');
         $listing->setName($name);
+        $listing->setSupplierSku($supplierSku);
 
         return $listing;
     }

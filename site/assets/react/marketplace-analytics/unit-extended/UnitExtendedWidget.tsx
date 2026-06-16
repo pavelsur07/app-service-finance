@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useUnitExtended } from './useUnitExtended';
 import { useWidgets } from './widgets/useWidgets';
 import WidgetsGrid from './widgets/WidgetsGrid';
@@ -10,7 +10,6 @@ import type { MarketplaceOption } from '../types/analytics.types';
 import UnitExtendedFilters from './UnitExtendedFilters';
 import UnitExtendedTable from './UnitExtendedTable';
 import ExportXlsButton from './ExportXlsButton';
-import type { UnitExtendedItem, UnitExtendedTotals } from './unitExtended.types';
 
 interface UnitExtendedWidgetProps {
     marketplaces: MarketplaceOption[];
@@ -22,18 +21,6 @@ interface Filters {
     dateTo: string;
     period: PeriodKey;
 }
-
-type TotalSumField =
-    | 'revenue'
-    | 'quantity'
-    | 'returnsTotal'
-    | 'costPriceTotal'
-    | 'commission'
-    | 'adSpend'
-    | 'logistics'
-    | 'otherCosts'
-    | 'totalCosts'
-    | 'profit';
 
 const UNIT_EXTENDED_WIDGET_STYLES = `
     .ue-ext-listing-search {
@@ -96,61 +83,28 @@ function setFiltersToUrl(filters: Filters): void {
     window.history.replaceState(null, '', window.location.pathname + (search ? `?${search}` : ''));
 }
 
-function normalizeSearchValue(value: string | null | undefined): string {
-    return (value ?? '').trim().toLocaleLowerCase('ru-RU');
-}
-
-function matchesSearch(item: UnitExtendedItem, normalizedQuery: string): boolean {
-    if (normalizedQuery === '') {
-        return true;
-    }
-
-    return [
-        item.sku,
-        item.sellerArticle,
-        item.title,
-    ].some((value) => normalizeSearchValue(value).includes(normalizedQuery));
-}
-
-function sumField(items: UnitExtendedItem[], field: TotalSumField): number {
-    return items.reduce((sum, item) => sum + (item[field] ?? 0), 0);
-}
-
-function buildFilteredTotals(items: UnitExtendedItem[]): UnitExtendedTotals {
-    const revenue = sumField(items, 'revenue');
-    const costPriceTotal = sumField(items, 'costPriceTotal');
-    const adSpend = sumField(items, 'adSpend');
-    const profit = sumField(items, 'profit');
-
-    return {
-        revenue,
-        quantity: sumField(items, 'quantity'),
-        returnsTotal: sumField(items, 'returnsTotal'),
-        costPriceTotal,
-        commission: sumField(items, 'commission'),
-        adSpend,
-        drrPercent: revenue > 0 ? (adSpend / revenue) * 100 : null,
-        logistics: sumField(items, 'logistics'),
-        otherCosts: sumField(items, 'otherCosts'),
-        totalCosts: sumField(items, 'totalCosts'),
-        profit,
-        marginPercent: revenue > 0 ? (profit / revenue) * 100 : null,
-        roiPercent: costPriceTotal > 0 ? (profit / costPriceTotal) * 100 : null,
-    };
-}
-
 const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces }) => {
     const [filters, setFilters] = useState<Filters>(getFiltersFromUrl);
     const [searchQuery, setSearchQuery] = useState('');
+    const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
 
     useEffect(() => {
         setFiltersToUrl(filters);
     }, [filters]);
 
+    useEffect(() => {
+        const timerId = window.setTimeout(() => {
+            setDebouncedSearchQuery(searchQuery);
+        }, 300);
+
+        return () => window.clearTimeout(timerId);
+    }, [searchQuery]);
+
     const { items, totals, isLoading, isError, errorMessage } = useUnitExtended({
         marketplace: filters.marketplace,
         periodFrom: filters.dateFrom,
         periodTo: filters.dateTo,
+        search: debouncedSearchQuery,
     });
 
     const widgets = useWidgets({
@@ -159,17 +113,8 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces })
         periodTo: filters.dateTo,
     });
 
-    const normalizedSearchQuery = useMemo(() => normalizeSearchValue(searchQuery), [searchQuery]);
-    const isSearchActive = normalizedSearchQuery !== '';
-    const filteredItems = useMemo(
-        () => items.filter((item) => matchesSearch(item, normalizedSearchQuery)),
-        [items, normalizedSearchQuery],
-    );
-    const visibleTotals = useMemo(
-        () => (isSearchActive ? buildFilteredTotals(filteredItems) : totals),
-        [filteredItems, isSearchActive, totals],
-    );
-    const tableEmptyMessage = isSearchActive && items.length > 0
+    const isSearchActive = searchQuery.trim() !== '';
+    const tableEmptyMessage = isSearchActive
         ? 'Ничего не найдено'
         : 'Нет данных за выбранный период';
 
@@ -252,18 +197,15 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces })
                         />
                         {items.length > 0 && (
                             <span className="text-muted ms-3">
-                                Товаров: {filteredItems.length.toLocaleString('ru-RU')}
-                                {isSearchActive && filteredItems.length !== items.length && (
-                                    <> из {items.length.toLocaleString('ru-RU')}</>
-                                )}
+                                Товаров: {items.length.toLocaleString('ru-RU')}
                             </span>
                         )}
                     </div>
                 </div>
 
                 <UnitExtendedTable
-                    items={filteredItems}
-                    totals={visibleTotals}
+                    items={items}
+                    totals={totals}
                     isLoading={isLoading}
                     emptyMessage={tableEmptyMessage}
                 />
