@@ -16,7 +16,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Entity(repositoryClass: IngestRawRecordRepository::class)]
 #[ORM\Table(name: 'ingest_raw_records')]
 #[ORM\Index(columns: ['company_id', 'source', 'resource_type', 'fetched_at'], name: 'idx_ingest_raw_company_source_resource_fetched')]
-#[ORM\UniqueConstraint(name: 'uniq_ingest_raw_company_source_external_hash', columns: ['company_id', 'source', 'external_id', 'hash'])]
+#[ORM\UniqueConstraint(name: 'uniq_ingest_raw_company_source_resource_external_hash', columns: ['company_id', 'source', 'resource_type', 'external_id', 'hash'])]
 class IngestRawRecord implements TenantOwnedInterface
 {
     #[ORM\Id]

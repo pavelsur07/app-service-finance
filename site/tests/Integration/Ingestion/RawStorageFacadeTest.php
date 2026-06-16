@@ -157,6 +157,39 @@ final class RawStorageFacadeTest extends IntegrationTestCase
         self::assertEquals($secondRows, iterator_to_array($facade->read($second->getId(), $companyId)));
     }
 
+    public function testSameExternalIdAndHashAcrossResourceTypesCreatesSeparateRecords(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $rows = [['sku' => 'SKU-SHARED', 'qty' => 1]];
+
+        /** @var RawStorageFacade $facade */
+        $facade = self::getContainer()->get(RawStorageFacade::class);
+
+        $sellerReport = $facade->store($this->batch(
+            companyId: $companyId,
+            syncJobId: 'sync-job-seller',
+            externalId: 'external-shared',
+            resourceType: 'seller-report',
+            rows: $rows,
+        ))[0];
+        $analyticsReport = $facade->store($this->batch(
+            companyId: $companyId,
+            syncJobId: 'sync-job-analytics',
+            externalId: 'external-shared',
+            resourceType: 'analytics-report',
+            rows: $rows,
+        ))[0];
+
+        self::assertNotSame($sellerReport->getId(), $analyticsReport->getId());
+        self::assertSame($sellerReport->getHash(), $analyticsReport->getHash());
+        self::assertStringContainsString('/seller-report/', $sellerReport->getStoragePath());
+        self::assertStringContainsString('/analytics-report/', $analyticsReport->getStoragePath());
+        self::assertSame(2, (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM ingest_raw_records WHERE company_id = :company_id AND external_id = :external_id',
+            ['company_id' => $companyId, 'external_id' => 'external-shared'],
+        ));
+    }
+
     /**
      * @param list<array<string, mixed>> $rows
      */
@@ -164,6 +197,7 @@ final class RawStorageFacadeTest extends IntegrationTestCase
         string $companyId,
         string $syncJobId = 'sync-job-1',
         string $externalId = 'external-report-1',
+        string $resourceType = 'seller-report',
         array $rows = [['sku' => 'SKU-1']],
     ): RawBatch {
         return new RawBatch(
@@ -171,7 +205,7 @@ final class RawStorageFacadeTest extends IntegrationTestCase
             connectionRef: 'connection-1',
             shopRef: 'shop-main',
             source: IngestSource::OZON,
-            resourceType: 'seller-report',
+            resourceType: $resourceType,
             externalId: $externalId,
             syncJobId: $syncJobId,
             fetchedAt: new \DateTimeImmutable('2026-06-15 10:20:30'),

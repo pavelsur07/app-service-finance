@@ -92,7 +92,7 @@
 - `RawStorageFacade` — единая точка записи/чтения raw payload для нового Ingestion-модуля. Legacy raw-сущности Marketplace/Inventory/Ads не меняются.
 - `IngestRawRecord` хранит только metadata: company/connection/shop/source/resource/external id, storage path, hash, byte size, fetched/sync timestamps и normalization status. Payload в БД не хранится.
 - Payload записывается как canonical NDJSON, gzip-compressed, один файл на `RawBatch` chunk. Путь: `{company}/{source}/{shop}/{resource}/{yyyy}/{mm}/{dd}/{syncJobId}/{externalId}/{hash}.ndjson.gz`, чтобы несколько batch внутри одного sync job не перезаписывали друг друга.
-- Dedup: перед записью сверяется SHA-256 hash canonical uncompressed NDJSON по `(companyId, source, externalId)`. Совпавший hash обновляет `lastSeenAt`; новый object не создаётся.
+- Dedup: перед записью сверяется SHA-256 hash canonical uncompressed NDJSON по `(companyId, source, resourceType, externalId)`. Совпавший hash обновляет `lastSeenAt`; новый object не создаётся.
 - Storage seam общий для проекта: `App\Shared\Service\Storage\ObjectStorageInterface`. Default driver — `local`, он делегирует запись в существующий `StorageService`; S3 driver через Flysystem включается только явным `APP_OBJECT_STORAGE_DRIVER=s3` и `APP_OBJECT_STORAGE_S3_*`.
 - Legacy-модули пока продолжают использовать `StorageService` напрямую. Их переезд на `ObjectStorageInterface` выполняется отдельными задачами, по одному модулю.
 

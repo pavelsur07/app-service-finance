@@ -33,14 +33,17 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
     public function findLatestByCompanySourceExternalId(
         string $companyId,
         IngestSource $source,
+        string $resourceType,
         string $externalId,
     ): ?IngestRawRecord {
         return $this->createQueryBuilder('record')
             ->andWhere('record.companyId = :companyId')
             ->andWhere('record.source = :source')
+            ->andWhere('record.resourceType = :resourceType')
             ->andWhere('record.externalId = :externalId')
             ->setParameter('companyId', $companyId)
             ->setParameter('source', $source)
+            ->setParameter('resourceType', $resourceType)
             ->setParameter('externalId', $externalId)
             ->orderBy('record.fetchedAt', 'DESC')
             ->addOrderBy('record.createdAt', 'DESC')
@@ -52,16 +55,19 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
     public function findOneByCompanySourceExternalIdAndHash(
         string $companyId,
         IngestSource $source,
+        string $resourceType,
         string $externalId,
         string $hash,
     ): ?IngestRawRecord {
         return $this->createQueryBuilder('record')
             ->andWhere('record.companyId = :companyId')
             ->andWhere('record.source = :source')
+            ->andWhere('record.resourceType = :resourceType')
             ->andWhere('record.externalId = :externalId')
             ->andWhere('record.hash = :hash')
             ->setParameter('companyId', $companyId)
             ->setParameter('source', $source)
+            ->setParameter('resourceType', $resourceType)
             ->setParameter('externalId', $externalId)
             ->setParameter('hash', $hash)
             ->getQuery()

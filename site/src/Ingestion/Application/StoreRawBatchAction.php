@@ -11,7 +11,9 @@ use App\Ingestion\Infrastructure\Storage\RawNdjsonCodec;
 use App\Ingestion\Infrastructure\Storage\RawStoragePathBuilder;
 use App\Ingestion\Repository\IngestRawRecordRepository;
 use App\Shared\Service\Storage\ObjectStorageInterface;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 
 final readonly class StoreRawBatchAction
 {
@@ -21,6 +23,7 @@ final readonly class StoreRawBatchAction
         private RawNdjsonCodec $ndjsonCodec,
         private RawStoragePathBuilder $pathBuilder,
         private EntityManagerInterface $entityManager,
+        private ManagerRegistry $managerRegistry,
     ) {
     }
 
@@ -35,6 +38,7 @@ final readonly class StoreRawBatchAction
         $latestRecord = $this->rawRecordRepository->findLatestByCompanySourceExternalId(
             $batch->companyId,
             $batch->source,
+            $batch->resourceType,
             $batch->externalId,
         );
 
@@ -48,6 +52,7 @@ final readonly class StoreRawBatchAction
         $existingRecord = $this->rawRecordRepository->findOneByCompanySourceExternalIdAndHash(
             $batch->companyId,
             $batch->source,
+            $batch->resourceType,
             $batch->externalId,
             $hash,
         );
@@ -82,8 +87,55 @@ final readonly class StoreRawBatchAction
         );
 
         $this->entityManager->persist($record);
-        $this->entityManager->flush();
+        try {
+            $this->entityManager->flush();
+        } catch (UniqueConstraintViolationException $exception) {
+            return [$this->recoverConcurrentDuplicate($batch, $hash, $exception)];
+        }
 
         return [$record];
+    }
+
+    private function recoverConcurrentDuplicate(
+        RawBatch $batch,
+        string $hash,
+        UniqueConstraintViolationException $exception,
+    ): IngestRawRecord {
+        $entityManager = $this->entityManager;
+        $repository = $this->rawRecordRepository;
+
+        if ($entityManager->isOpen()) {
+            $entityManager->clear();
+        } else {
+            $resetManager = $this->managerRegistry->resetManager();
+            if (!$resetManager instanceof EntityManagerInterface) {
+                throw $exception;
+            }
+
+            $entityManager = $resetManager;
+            $resetRepository = $entityManager->getRepository(IngestRawRecord::class);
+            if (!$resetRepository instanceof IngestRawRecordRepository) {
+                throw $exception;
+            }
+
+            $repository = $resetRepository;
+        }
+
+        $existingRecord = $repository->findOneByCompanySourceExternalIdAndHash(
+            $batch->companyId,
+            $batch->source,
+            $batch->resourceType,
+            $batch->externalId,
+            $hash,
+        );
+
+        if (null === $existingRecord) {
+            throw $exception;
+        }
+
+        $existingRecord->markSeen();
+        $entityManager->flush();
+
+        return $existingRecord;
     }
 }
