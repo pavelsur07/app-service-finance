@@ -26,7 +26,7 @@
 | `MarketplaceAnalytics` | Аналитика маркетплейсов (витрина) | — |
 | `MarketplaceAds` | Рекламные отчёты WB/Ozon: загрузка raw → распределение затрат | `string $companyId` ✅ |
 | `Inventory` | Загрузка raw-остатков маркетплейсов, нормализация в StockSnapshot, UI-отчёт остатков | `string $companyId` ✅ |
-| `Ingestion` | Каркас для будущих ingestion-пайплайнов и tenant-isolation foundation | `string $companyId` + Doctrine `company` filter ✅ |
+| `Ingestion` | Каркас для будущих ingestion-пайплайнов, credential seam и unified raw-слой | `string $companyId` + Doctrine `company` filter ✅ |
 | `Notification` | Каналы уведомлений (email и др.) | — |
 | `Shared` | Общий код: ActiveCompanyService, аудит, безопасность, storage | — |
 | `Admin` | Административная панель (отдельный firewall) | — |
@@ -68,6 +68,8 @@
 | `Location` | Inventory | `string $companyId` ✅ |
 | `StockSnapshot` | Inventory | `string $companyId` ✅ |
 | `IngestionTenantProbe` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
+| `IngestionCredential` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
+| `IngestRawRecord` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
 | `ProductImport` | Catalog | `string $companyId` ✅ |
 | `ProductBarcode` | Catalog | `string $companyId` ✅ |
 | `ProductPurchasePrice` | Catalog | `string $companyId` ✅ |
@@ -84,6 +86,15 @@
 - HTTP-контекст без активной компании: admin, неавторизованные страницы, страница выбора компании и другие non-workspace запросы не включают filter и не должны падать с 500 из-за отсутствия компании.
 - Messenger-контекст: `CompanyFilterMiddleware` включает filter для сообщений `App\Ingestion\Message\CompanyAwareMessage`, берёт `companyId` из сообщения и восстанавливает прежнее состояние filter после обработки.
 - Системные запросы без tenant-контекста должны осознанно выполнять `$em->getFilters()->disable('company')` или не включать filter. Это допустимо для maintenance/admin/batch операций, где требуется видеть данные всех компаний.
+
+### Ingestion: raw storage
+
+- `RawStorageFacade` — единая точка записи/чтения raw payload для нового Ingestion-модуля. Legacy raw-сущности Marketplace/Inventory/Ads не меняются.
+- `IngestRawRecord` хранит только metadata: company/connection/shop/source/resource/external id, storage path, hash, byte size, fetched/sync timestamps и normalization status. Payload в БД не хранится.
+- Payload записывается как canonical NDJSON, gzip-compressed, один файл на `RawBatch` chunk. Путь: `{company}/{source}/{shop}/{resource}/{yyyy}/{mm}/{dd}/{syncJobId}/{externalId}/{hash}.ndjson.gz`, чтобы несколько batch внутри одного sync job не перезаписывали друг друга.
+- Dedup: перед записью сверяется SHA-256 hash canonical uncompressed NDJSON по `(companyId, source, externalId)`. Совпавший hash обновляет `lastSeenAt`; новый object не создаётся.
+- Storage seam общий для проекта: `App\Shared\Service\Storage\ObjectStorageInterface`. Default driver — `local`, он делегирует запись в существующий `StorageService`; S3 driver через Flysystem включается только явным `APP_OBJECT_STORAGE_DRIVER=s3` и `APP_OBJECT_STORAGE_S3_*`.
+- Legacy-модули пока продолжают использовать `StorageService` напрямую. Их переезд на `ObjectStorageInterface` выполняется отдельными задачами, по одному модулю.
 
 ### Marketplace: WB financial report sync status (дневной статус)
 

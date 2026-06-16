@@ -8,6 +8,13 @@ parameters:
     app.storage_root: '%kernel.project_dir%/var/storage'
     app.encryption.key_file: '%env(string:APP_ENCRYPTION_KEY_FILE)%'
     app.encryption.current_key_version: '%env(string:APP_ENCRYPTION_CURRENT_KEY_VERSION)%'
+    app.object_storage_driver_default: 'local'
+    app.object_storage_s3_bucket_default: ''
+    app.object_storage_s3_region_default: 'us-east-1'
+    app.object_storage_s3_endpoint_default: ''
+    app.object_storage_s3_access_key_default: ''
+    app.object_storage_s3_secret_key_default: ''
+    app.object_storage_s3_path_style_endpoint_default: '0'
     wb_finance.rate_limit_interval_seconds: 70
     wb_finance.retry_delay_ms: 70000
 
@@ -91,11 +98,32 @@ services:
     App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface: '@App\Marketplace\Application\Service\WbFinancialReportSyncPlanner'
     App\Marketplace\Infrastructure\Api\Ozon\OzonSellerCredentialValidatorInterface: '@App\Marketplace\Infrastructure\Api\Ozon\OzonSellerCredentialValidator'
     App\Ingestion\Domain\Contract\SecretCodec: '@App\Ingestion\Infrastructure\Security\PlaintextSecretCodec'
+    App\Shared\Service\Storage\ObjectStorageInterface:
+        factory: ['@App\Shared\Service\Storage\ObjectStorageFactory', 'create']
+
+    App\Shared\Service\Storage\ObjectStorageFactory:
+        arguments:
+            $driver: '%env(default:app.object_storage_driver_default:APP_OBJECT_STORAGE_DRIVER)%'
+            $storages: !service_locator
+                local: '@App\Shared\Service\Storage\LocalObjectStorage'
+                s3: '@App\Shared\Service\Storage\FlysystemS3ObjectStorage'
+
+    App\Shared\Service\Storage\FlysystemS3ObjectStorage:
+        arguments:
+            $bucket: '%env(default:app.object_storage_s3_bucket_default:APP_OBJECT_STORAGE_S3_BUCKET)%'
+            $region: '%env(default:app.object_storage_s3_region_default:APP_OBJECT_STORAGE_S3_REGION)%'
+            $endpoint: '%env(default:app.object_storage_s3_endpoint_default:APP_OBJECT_STORAGE_S3_ENDPOINT)%'
+            $accessKey: '%env(default:app.object_storage_s3_access_key_default:APP_OBJECT_STORAGE_S3_ACCESS_KEY)%'
+            $secretKey: '%env(default:app.object_storage_s3_secret_key_default:APP_OBJECT_STORAGE_S3_SECRET_KEY)%'
+            $pathStyleEndpoint: '%env(default:app.object_storage_s3_path_style_endpoint_default:APP_OBJECT_STORAGE_S3_PATH_STYLE_ENDPOINT)%'
 
     App\Ingestion\Facade\CredentialFacade:
         public: true
         arguments:
             $activeKeyVersion: 0
+
+    App\Ingestion\Facade\RawStorageFacade:
+        public: true
 
     App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdaterInterface: '@App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdater'
     App\Marketplace\Application\Service\WbGeneratedRowsSafeReplaceServiceInterface: '@App\Marketplace\Application\Service\WbGeneratedRowsSafeReplaceService'
