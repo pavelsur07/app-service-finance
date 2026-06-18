@@ -62,6 +62,8 @@ Autonomy mode
 Work autonomously, but only inside a clear task scope or inside the currently approved stage.
 Autonomy means: inspect, plan, edit, test, self-review, and report without asking for every small step.
 Autonomy does not mean: expand scope, skip review gates, rewrite working modules, or implement a large task end-to-end in one unsafe pass.
+If work stops for any reason (mandatory STOP point, blocker, failed check that cannot be fixed safely, missing input, or environment issue), explicitly notify the owner with the reason, current stage, completed work, and the next possible action.
+When there is a useful choice between implementation approaches, propose simple best-practice options that fit the current project rules and do not add unnecessary complexity. Prefer the existing project pattern unless there is a clear reason to deviate.
 Task source
 Every task must start from one of these sources:
 `docs/tasks/<id>/TASK.md` in the current branch, or
