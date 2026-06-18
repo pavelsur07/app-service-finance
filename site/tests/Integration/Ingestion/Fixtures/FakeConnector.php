@@ -20,6 +20,44 @@ final class FakeConnector implements SourceConnectorInterface
 {
     public const RESOURCE_TYPE = 'fake_sales';
 
+    /**
+     * @var list<PullRequest>
+     */
+    private array $pullRequests = [];
+
+    /**
+     * @var list<array{externalId: string, nextCursorValue: ?string, hasMore: bool, rowExternalId: string}>
+     */
+    private array $queuedPullResults = [];
+
+    public function reset(): void
+    {
+        $this->pullRequests = [];
+        $this->queuedPullResults = [];
+    }
+
+    public function enqueuePullResult(
+        string $externalId,
+        ?string $nextCursorValue,
+        bool $hasMore,
+        string $rowExternalId = 'fake-sale-1',
+    ): void {
+        $this->queuedPullResults[] = [
+            'externalId' => $externalId,
+            'nextCursorValue' => $nextCursorValue,
+            'hasMore' => $hasMore,
+            'rowExternalId' => $rowExternalId,
+        ];
+    }
+
+    /**
+     * @return list<PullRequest>
+     */
+    public function pullRequests(): array
+    {
+        return $this->pullRequests;
+    }
+
     public function source(): IngestSource
     {
         return IngestSource::WILDBERRIES;
@@ -50,6 +88,13 @@ final class FakeConnector implements SourceConnectorInterface
 
     public function pull(PullRequest $request): PullResult
     {
+        $this->pullRequests[] = $request;
+        $result = array_shift($this->queuedPullResults) ?? [
+            'externalId' => sprintf('fake-report-%s', $request->syncJobId),
+            'nextCursorValue' => 'cursor-after-fake-sale-1',
+            'hasMore' => false,
+            'rowExternalId' => 'fake-sale-1',
+        ];
         $operationGroupId = Uuid::uuid7()->toString();
 
         return new PullResult(
@@ -59,11 +104,11 @@ final class FakeConnector implements SourceConnectorInterface
                 shopRef: $request->shopRef,
                 source: $this->source(),
                 resourceType: $request->resourceType,
-                externalId: sprintf('fake-report-%s', $request->syncJobId),
+                externalId: $result['externalId'],
                 syncJobId: $request->syncJobId,
                 fetchedAt: new \DateTimeImmutable('2026-06-18 10:00:00'),
                 rows: [[
-                    'externalId' => 'fake-sale-1',
+                    'externalId' => $result['rowExternalId'],
                     'externalUpdatedAt' => '2026-06-18T10:00:00+00:00',
                     'operationGroupId' => $operationGroupId,
                     'amountMinor' => 12345,
@@ -75,8 +120,8 @@ final class FakeConnector implements SourceConnectorInterface
                     'counterpartyName' => 'Fake Buyer',
                 ]],
             ),
-            nextCursorValue: 'cursor-after-fake-sale-1',
-            hasMore: false,
+            nextCursorValue: $result['nextCursorValue'],
+            hasMore: $result['hasMore'],
         );
     }
 

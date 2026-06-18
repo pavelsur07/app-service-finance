@@ -11,6 +11,7 @@ use App\Ingestion\Application\Command\UpdateCursorCommand;
 use App\Ingestion\Application\DTO\PullRequest;
 use App\Ingestion\Application\Service\IngestRateLimitGuard;
 use App\Ingestion\Domain\Service\ConnectorRegistry;
+use App\Ingestion\Entity\SyncJob;
 use App\Ingestion\Exception\ConnectorAuthException;
 use App\Ingestion\Exception\ConnectorTransientException;
 use App\Ingestion\Exception\SyncJobNotFoundException;
@@ -58,14 +59,9 @@ final readonly class RunSyncChunkHandler
             return;
         }
 
-        $cursor = $this->cursorRepository->findOne(
-            $job->getCompanyId(),
-            $job->getConnectionRef(),
-            $job->getResourceType(),
-            $job->getShopRef(),
-        );
-        $cursorValue = $cursor?->getCursorValue();
-        $cursorSnapshot = null === $job->getStartedAt() && null !== $cursorValue && '' !== $cursorValue
+        $isWindowed = $this->isWindowed($job);
+        $cursorValue = $isWindowed ? null : $this->sharedCursorValue($job);
+        $cursorSnapshot = !$isWindowed && null === $job->getStartedAt() && null !== $cursorValue && '' !== $cursorValue
             ? $cursorValue
             : null;
 
@@ -80,33 +76,42 @@ final readonly class RunSyncChunkHandler
         try {
             $connector = $this->connectorRegistry->get($job->getSource());
             $lock = $this->rateLimitGuard->acquire(sprintf('%s:%s', $job->getSource()->value, $job->getConnectionRef()));
-            $result = $connector->pull(new PullRequest(
-                companyId: $job->getCompanyId(),
-                connectionRef: $job->getConnectionRef(),
-                shopRef: $job->getShopRef(),
-                resourceType: $job->getResourceType(),
-                cursorValue: $cursorValue,
-                windowFrom: $job->getWindowFrom(),
-                windowTo: $job->getWindowTo(),
-                syncJobId: $job->getId(),
-            ));
 
-            $records = $this->rawStorageFacade->store($result->rawBatch);
-            foreach ($records as $record) {
-                $this->messageBus->dispatch(new NormalizeRawRecordMessage($record->getId(), $record->getCompanyId()));
-            }
-
-            if (null !== $result->nextCursorValue && '' !== $result->nextCursorValue) {
-                $this->syncFacade->updateCursor(new UpdateCursorCommand(
+            do {
+                $result = $connector->pull(new PullRequest(
                     companyId: $job->getCompanyId(),
                     connectionRef: $job->getConnectionRef(),
-                    resourceType: $job->getResourceType(),
                     shopRef: $job->getShopRef(),
-                    newCursorValue: $result->nextCursorValue,
+                    resourceType: $job->getResourceType(),
+                    cursorValue: $cursorValue,
+                    windowFrom: $job->getWindowFrom(),
+                    windowTo: $job->getWindowTo(),
                     syncJobId: $job->getId(),
-                    fetchedAt: new \DateTimeImmutable(),
                 ));
-            }
+
+                $records = $this->rawStorageFacade->store($result->rawBatch);
+                foreach ($records as $record) {
+                    $this->messageBus->dispatch(new NormalizeRawRecordMessage($record->getId(), $record->getCompanyId()));
+                }
+
+                if (null !== $result->nextCursorValue && '' !== $result->nextCursorValue) {
+                    if (!$isWindowed) {
+                        $this->syncFacade->updateCursor(new UpdateCursorCommand(
+                            companyId: $job->getCompanyId(),
+                            connectionRef: $job->getConnectionRef(),
+                            resourceType: $job->getResourceType(),
+                            shopRef: $job->getShopRef(),
+                            newCursorValue: $result->nextCursorValue,
+                            syncJobId: $job->getId(),
+                            fetchedAt: new \DateTimeImmutable(),
+                        ));
+                    }
+
+                    $cursorValue = $result->nextCursorValue;
+                } elseif ($result->hasMore) {
+                    throw new \RuntimeException('Ingestion connector returned hasMore without next cursor.');
+                }
+            } while ($result->hasMore);
 
             $this->syncFacade->markJobCompleted(new MarkJobCompletedCommand($job->getId(), $job->getCompanyId()));
         } catch (ConnectorAuthException $exception) {
@@ -129,6 +134,23 @@ final readonly class RunSyncChunkHandler
         } finally {
             $this->releaseLock($lock);
         }
+    }
+
+    private function sharedCursorValue(SyncJob $job): ?string
+    {
+        $cursor = $this->cursorRepository->findOne(
+            $job->getCompanyId(),
+            $job->getConnectionRef(),
+            $job->getResourceType(),
+            $job->getShopRef(),
+        );
+
+        return $cursor?->getCursorValue();
+    }
+
+    private function isWindowed(SyncJob $job): bool
+    {
+        return null !== $job->getWindowFrom() || null !== $job->getWindowTo();
     }
 
     private function markJobFailed(string $jobId, string $companyId, string $reason): void

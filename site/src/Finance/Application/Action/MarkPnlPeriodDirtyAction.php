@@ -35,7 +35,11 @@ final readonly class MarkPnlPeriodDirtyAction
             return;
         }
 
-        if (PLDirtyPeriodStatus::DONE === $period->getStatus() || PLDirtyPeriodStatus::FAILED === $period->getStatus()) {
+        if (
+            PLDirtyPeriodStatus::DONE === $period->getStatus()
+            || PLDirtyPeriodStatus::FAILED === $period->getStatus()
+            || PLDirtyPeriodStatus::BLOCKED_BY_CLOSE === $period->getStatus()
+        ) {
             $period->reopen();
             $this->entityManager->flush();
         }

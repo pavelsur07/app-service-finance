@@ -14,7 +14,7 @@ use Ramsey\Uuid\Uuid;
 
 final class MarkPnlPeriodDirtyActionTest extends IntegrationTestCase
 {
-    public function testMarkDirtyIsIdempotentAndReopensFailedPeriod(): void
+    public function testMarkDirtyIsIdempotentAndReopensFailedOrBlockedPeriod(): void
     {
         $companyId = Uuid::uuid7()->toString();
         /** @var MarkPnlPeriodDirtyAction $action */
@@ -32,6 +32,16 @@ final class MarkPnlPeriodDirtyActionTest extends IntegrationTestCase
         self::assertNotNull($period);
         $period->markRebuilding();
         $period->markFailed('temporary');
+        $this->em->flush();
+
+        $action($command);
+        $this->em->clear();
+
+        self::assertSame(PLDirtyPeriodStatus::PENDING, $repository->findOne($companyId, 2026, 2, '')?->getStatus());
+
+        $period = $repository->findOne($companyId, 2026, 2, '');
+        self::assertNotNull($period);
+        $period->markBlockedByClose('closed month');
         $this->em->flush();
 
         $action($command);
