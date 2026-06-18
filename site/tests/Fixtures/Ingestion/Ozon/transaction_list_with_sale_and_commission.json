@@ -1,0 +1,28 @@
+{
+  "rows": [
+    {
+      "operation_id": "1234567890",
+      "operation_type": "OperationAgentDeliveredToCustomer",
+      "operation_type_name": "Доставка покупателю",
+      "operation_date": "2026-02-18T09:30:00+00:00",
+      "posting": {
+        "posting_number": "12345-0001-1"
+      },
+      "items": [
+        {
+          "sku": "100200300",
+          "name": "Anonymized product"
+        }
+      ],
+      "accruals_for_sale": "1200.50",
+      "sale_commission_amount": "-120.05",
+      "deliv_charge_amount": "-35.00",
+      "services_amounts": {
+        "MarketplaceServiceItemDelivToCustomer": "-25.00",
+        "MarketplaceServiceItemDropoffPVZ": "-10.00"
+      },
+      "acquiring": "-18.00",
+      "currency": "RUB"
+    }
+  ]
+}

@@ -5,3 +5,27 @@ services:
 
     App\Tests\Integration\Ingestion\Fixtures\:
         resource: '../tests/Integration/Ingestion/Fixtures/'
+
+    App\Tests\Integration\Ingestion\Fixtures\FakeConnector:
+        tags: ['app.ingestion.connector']
+
+    App\Tests\Integration\Ingestion\Fixtures\FakeMapper:
+        tags: ['app.ingestion.mapper']
+
+    App\Ingestion\Infrastructure\Api\Ozon\OzonClientAdapterInterface: '@App\Tests\Integration\Ingestion\Fixtures\FakeOzonClientAdapter'
+
+    test.ingestion_lock_store:
+        class: Symfony\Component\Lock\Store\InMemoryStore
+
+    test.ingestion_lock_factory:
+        class: Symfony\Component\Lock\LockFactory
+        arguments:
+            - '@test.ingestion_lock_store'
+
+    App\Ingestion\Application\Service\IngestRateLimitGuard:
+        arguments:
+            $lockFactory: '@test.ingestion_lock_factory'
+
+    App\Finance\Application\Action\RebuildPnlPeriodAction:
+        arguments:
+            $lockFactory: '@test.ingestion_lock_factory'

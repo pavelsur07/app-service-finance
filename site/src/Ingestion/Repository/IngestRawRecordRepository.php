@@ -30,6 +30,11 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    public function findByIdAndCompany(string $rawRecordId, string $companyId): ?IngestRawRecord
+    {
+        return $this->findOneByIdAndCompany($companyId, $rawRecordId);
+    }
+
     public function findLatestByCompanySourceExternalId(
         string $companyId,
         IngestSource $source,

@@ -1,0 +1,26 @@
+{
+  "rows": [
+    {
+      "operation_id": "1234567890",
+      "operation_type": "OperationAgentDeliveredToCustomer",
+      "operation_type_name": "Финальная реализация",
+      "sale_date": "2026-02-18T09:30:00+00:00",
+      "report_date": "2026-03-05T00:00:00+00:00",
+      "posting_number": "12345-0001-1",
+      "sku": "100200300",
+      "seller_price": "1210.00",
+      "commission_amount": "-121.00",
+      "delivery_commission": "-35.00",
+      "services_amounts": {
+        "MarketplaceServiceItemDelivToCustomer": "-25.00",
+        "MarketplaceServiceItemDropoffPVZ": "-10.00"
+      },
+      "acquiring": "-18.50",
+      "currency": "RUB",
+      "_header": {
+        "doc_number": "OZON-REAL-2026-02",
+        "stop_date": "2026-02-28T23:59:59+00:00"
+      }
+    }
+  ]
+}
