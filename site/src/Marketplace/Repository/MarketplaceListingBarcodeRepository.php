@@ -38,6 +38,14 @@ class MarketplaceListingBarcodeRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    public function findListingIdByBarcode(
+        string $companyId,
+        string $barcode,
+        MarketplaceType $marketplace,
+    ): ?string {
+        return $this->findByBarcode($companyId, $barcode, $marketplace)?->getListing()->getId();
+    }
+
     /**
      * Массовая загрузка по списку barcodes — индексировано по barcode.
      *

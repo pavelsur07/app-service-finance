@@ -128,10 +128,68 @@ final class UpsertFinancialTransactionActionTest extends IntegrationTestCase
         self::assertEquals(new \DateTimeImmutable('2026-06-19 09:00:00'), $transaction->getOccurredAt());
     }
 
+    public function testStoresListingReferenceOnCreateAndNewerUpdate(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $rawRecordId = Uuid::uuid7()->toString();
+        $operationGroupId = Uuid::uuid7()->toString();
+        $listingId = Uuid::uuid7()->toString();
+        $updatedListingId = Uuid::uuid7()->toString();
+
+        /** @var UpsertFinancialTransactionAction $action */
+        $action = self::getContainer()->get(UpsertFinancialTransactionAction::class);
+
+        $action($this->command(
+            companyId: $companyId,
+            rawRecordId: $rawRecordId,
+            mapped: $this->mapped(
+                operationGroupId: $operationGroupId,
+                externalUpdatedAt: new \DateTimeImmutable('2026-06-18 10:00:00'),
+                occurredAt: new \DateTimeImmutable('2026-06-18 09:00:00'),
+                amountMinor: 10000,
+            ),
+            listingId: $listingId,
+            listingSku: 'sku-1',
+        ));
+        $this->em->flush();
+        $this->em->clear();
+
+        /** @var FinancialTransactionRepository $repository */
+        $repository = self::getContainer()->get(FinancialTransactionRepository::class);
+        $created = $repository->findByNaturalKey($companyId, IngestSource::OZON, 'external-tx-1', TransactionType::SALE);
+
+        self::assertNotNull($created);
+        self::assertSame($listingId, $created->getListingId());
+        self::assertSame('sku-1', $created->getListingSku());
+
+        $action($this->command(
+            companyId: $companyId,
+            rawRecordId: $rawRecordId,
+            mapped: $this->mapped(
+                operationGroupId: $operationGroupId,
+                externalUpdatedAt: new \DateTimeImmutable('2026-06-18 11:00:00'),
+                occurredAt: new \DateTimeImmutable('2026-06-18 09:00:00'),
+                amountMinor: 10000,
+            ),
+            listingId: $updatedListingId,
+            listingSku: 'sku-2',
+        ));
+        $this->em->flush();
+        $this->em->clear();
+
+        $updated = $repository->findByNaturalKey($companyId, IngestSource::OZON, 'external-tx-1', TransactionType::SALE);
+
+        self::assertNotNull($updated);
+        self::assertSame($updatedListingId, $updated->getListingId());
+        self::assertSame('sku-2', $updated->getListingSku());
+    }
+
     private function command(
         string $companyId,
         string $rawRecordId,
         MappedTransaction $mapped,
+        ?string $listingId = null,
+        ?string $listingSku = null,
     ): UpsertFinancialTransactionCommand {
         return new UpsertFinancialTransactionCommand(
             companyId: $companyId,
@@ -141,6 +199,8 @@ final class UpsertFinancialTransactionActionTest extends IntegrationTestCase
             mapped: $mapped,
             rawRecordId: $rawRecordId,
             counterpartyId: null,
+            listingId: $listingId,
+            listingSku: $listingSku,
         );
     }
 

@@ -9,6 +9,7 @@ use App\Ingestion\Application\Command\NormalizeRawRecordCommand;
 use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Entity\FinancialTransaction;
 use App\Ingestion\Entity\IngestRawRecord;
+use App\Ingestion\Entity\SystemCounterparty;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\NormalizationIssueKind;
 use App\Ingestion\Enum\RawNormalizationStatus;
@@ -28,6 +29,14 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
     {
         $companyId = Uuid::uuid7()->toString();
         $operationGroupId = Uuid::uuid7()->toString();
+        $systemCounterparty = new SystemCounterparty(
+            id: '95d09265-b44f-5b95-a12c-f1e3332c657d',
+            source: IngestSource::WILDBERRIES,
+            name: 'Wildberries',
+        );
+        $this->em->persist($systemCounterparty);
+        $this->em->flush();
+
         $record = $this->storeRawRecord($companyId, [[
             'externalId' => 'sale-1',
             'externalUpdatedAt' => '2026-06-18T10:00:00+00:00',
@@ -61,7 +70,7 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
         self::assertSame('sale-1', $transactions[0]->getExternalId());
         self::assertSame(10000, $transactions[0]->getAmountMinor());
         self::assertSame('RUB', $transactions[0]->getCurrency());
-        self::assertNotNull($transactions[0]->getCounterpartyId());
+        self::assertSame($systemCounterparty->getId(), $transactions[0]->getCounterpartyId());
 
         /** @var IngestionFacade $facade */
         $facade = self::getContainer()->get(IngestionFacade::class);

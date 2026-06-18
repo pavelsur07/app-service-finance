@@ -8,6 +8,8 @@ use App\Ingestion\Application\Command\NormalizeRawRecordCommand;
 use App\Ingestion\Application\Command\RecordNormalizationIssueCommand;
 use App\Ingestion\Application\Command\UpsertFinancialTransactionCommand;
 use App\Ingestion\Application\DTO\MappedControlSum;
+use App\Ingestion\Application\Service\ListingResolverRegistry;
+use App\Ingestion\Application\Service\SystemCounterpartyResolver;
 use App\Ingestion\Domain\Contract\RawRecordAwareControlSumMapperInterface;
 use App\Ingestion\Domain\Event\AffectedPeriod;
 use App\Ingestion\Domain\Event\NormalizationCompletedEvent;
@@ -16,10 +18,10 @@ use App\Ingestion\Enum\NormalizationIssueKind;
 use App\Ingestion\Enum\RawNormalizationStatus;
 use App\Ingestion\Exception\RawRecordNotFoundException;
 use App\Ingestion\Facade\RawStorageFacade;
-use App\Ingestion\Repository\CounterpartyRepository;
 use App\Ingestion\Repository\FinancialTransactionRepository;
 use App\Ingestion\Repository\IngestRawRecordRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 final readonly class NormalizeRawRecordAction
@@ -28,12 +30,14 @@ final readonly class NormalizeRawRecordAction
         private IngestRawRecordRepository $rawRecordRepository,
         private RawStorageFacade $rawStorageFacade,
         private MapperRegistry $mapperRegistry,
-        private CounterpartyRepository $counterpartyRepository,
+        private SystemCounterpartyResolver $systemCounterpartyResolver,
+        private ListingResolverRegistry $listingResolverRegistry,
         private FinancialTransactionRepository $financialTransactionRepository,
         private UpsertFinancialTransactionAction $upsertFinancialTransactionAction,
         private RecordNormalizationIssueAction $recordNormalizationIssueAction,
         private EntityManagerInterface $entityManager,
         private EventDispatcherInterface $eventDispatcher,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -83,16 +87,29 @@ final readonly class NormalizeRawRecordAction
             }
 
             $affectedPeriods = [];
+            $counterpartyId = $this->systemCounterpartyResolver->resolve($rawRecord->getSource());
+            if (null === $counterpartyId) {
+                $this->logger->warning('System counterparty was not found for ingestion source.', [
+                    'companyId' => $command->companyId,
+                    'rawRecordId' => $rawRecord->getId(),
+                    'source' => $rawRecord->getSource()->value,
+                ]);
+            }
+
             foreach ($mappedTransactions as $mappedTransaction) {
-                $counterpartyId = null;
-                if (null !== $mappedTransaction->counterpartyExternalKey) {
-                    $counterparty = $this->counterpartyRepository->getOrCreate(
-                        $command->companyId,
-                        $rawRecord->getSource(),
-                        $mappedTransaction->counterpartyExternalKey,
-                        $mappedTransaction->counterpartyName ?? $mappedTransaction->counterpartyExternalKey,
-                    );
-                    $counterpartyId = $counterparty->getId();
+                $listingResolution = $this->listingResolverRegistry->resolve(
+                    $rawRecord->getSource(),
+                    $command->companyId,
+                    $mappedTransaction->sourceData,
+                );
+
+                if (null !== $listingResolution?->listingSku && null === $listingResolution->listingId) {
+                    $this->logger->warning('Marketplace listing was not found for ingestion transaction.', [
+                        'companyId' => $command->companyId,
+                        'rawRecordId' => $rawRecord->getId(),
+                        'source' => $rawRecord->getSource()->value,
+                        'listingSku' => $listingResolution->listingSku,
+                    ]);
                 }
 
                 $result = ($this->upsertFinancialTransactionAction)(new UpsertFinancialTransactionCommand(
@@ -103,6 +120,8 @@ final readonly class NormalizeRawRecordAction
                     mapped: $mappedTransaction,
                     rawRecordId: $rawRecord->getId(),
                     counterpartyId: $counterpartyId,
+                    listingId: $listingResolution?->listingId,
+                    listingSku: $listingResolution?->listingSku,
                 ));
 
                 if (null !== $result) {

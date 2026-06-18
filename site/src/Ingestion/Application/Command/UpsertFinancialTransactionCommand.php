@@ -18,6 +18,8 @@ final readonly class UpsertFinancialTransactionCommand
         public MappedTransaction $mapped,
         public string $rawRecordId,
         public ?string $counterpartyId,
+        public ?string $listingId = null,
+        public ?string $listingSku = null,
     ) {
         Assert::uuid($this->companyId);
         Assert::notEmpty($this->connectionRef);
@@ -25,6 +27,14 @@ final readonly class UpsertFinancialTransactionCommand
 
         if (null !== $this->counterpartyId) {
             Assert::uuid($this->counterpartyId);
+        }
+
+        if (null !== $this->listingId) {
+            Assert::uuid($this->listingId);
+        }
+
+        if (null !== $this->listingSku) {
+            Assert::notEmpty($this->listingSku);
         }
     }
 }

@@ -24,6 +24,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Index(name: 'idx_ftx_company_group', columns: ['company_id', 'operation_group_id'])]
 #[ORM\Index(name: 'idx_ftx_company_type_occurred', columns: ['company_id', 'type', 'occurred_at'])]
 #[ORM\Index(name: 'idx_ftx_company_raw', columns: ['company_id', 'raw_record_id'])]
+#[ORM\Index(name: 'idx_ftx_company_listing', columns: ['company_id', 'listing_id'])]
 class FinancialTransaction implements TenantOwnedInterface
 {
     #[ORM\Id]
@@ -78,6 +79,12 @@ class FinancialTransaction implements TenantOwnedInterface
     #[ORM\Column(type: Types::GUID, nullable: true)]
     private ?string $counterpartyId;
 
+    #[ORM\Column(type: Types::GUID, nullable: true)]
+    private ?string $listingId;
+
+    #[ORM\Column(type: Types::STRING, length: 255, nullable: true)]
+    private ?string $listingSku;
+
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $description;
 
@@ -124,6 +131,8 @@ class FinancialTransaction implements TenantOwnedInterface
         ?string $description = null,
         array $sourceData = [],
         string $sourceTz = 'UTC',
+        ?string $listingId = null,
+        ?string $listingSku = null,
     ) {
         Assert::uuid($companyId);
         Assert::notEmpty($connectionRef);
@@ -135,6 +144,8 @@ class FinancialTransaction implements TenantOwnedInterface
         if (null !== $counterpartyId) {
             Assert::uuid($counterpartyId);
         }
+
+        $this->assertListing($listingId, $listingSku);
 
         $now = new \DateTimeImmutable();
 
@@ -155,6 +166,8 @@ class FinancialTransaction implements TenantOwnedInterface
         $this->orderRef = $orderRef;
         $this->payoutRef = $payoutRef;
         $this->counterpartyId = $counterpartyId;
+        $this->listingId = $listingId;
+        $this->listingSku = $listingSku;
         $this->description = $description;
         $this->sourceData = $sourceData;
         $this->sourceTz = $sourceTz;
@@ -176,6 +189,8 @@ class FinancialTransaction implements TenantOwnedInterface
         ?string $counterpartyId,
         ?string $description,
         array $sourceData,
+        ?string $listingId = null,
+        ?string $listingSku = null,
     ): void {
         if ($externalUpdatedAt <= $this->externalUpdatedAt) {
             throw new StaleTransactionUpdateException('Incoming transaction version is not newer than existing version.');
@@ -184,6 +199,8 @@ class FinancialTransaction implements TenantOwnedInterface
         if (null !== $counterpartyId) {
             Assert::uuid($counterpartyId);
         }
+
+        $this->assertListing($listingId, $listingSku);
 
         $this->oldOccurredAt = $this->occurredAt;
         $this->amountMinor = (string) $money->amountMinor();
@@ -195,6 +212,8 @@ class FinancialTransaction implements TenantOwnedInterface
         $this->orderRef = $orderRef;
         $this->payoutRef = $payoutRef;
         $this->counterpartyId = $counterpartyId;
+        $this->listingId = $listingId;
+        $this->listingSku = $listingSku;
         $this->description = $description;
         $this->sourceData = $sourceData;
         $this->updatedAt = new \DateTimeImmutable();
@@ -290,6 +309,25 @@ class FinancialTransaction implements TenantOwnedInterface
         return $this->counterpartyId;
     }
 
+    public function setListing(string $listingId, string $listingSku): void
+    {
+        $this->assertListing($listingId, $listingSku);
+
+        $this->listingId = $listingId;
+        $this->listingSku = $listingSku;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function getListingId(): ?string
+    {
+        return $this->listingId;
+    }
+
+    public function getListingSku(): ?string
+    {
+        return $this->listingSku;
+    }
+
     public function getDescription(): ?string
     {
         return $this->description;
@@ -321,5 +359,16 @@ class FinancialTransaction implements TenantOwnedInterface
     public function getUpdatedAt(): \DateTimeImmutable
     {
         return $this->updatedAt;
+    }
+
+    private function assertListing(?string $listingId, ?string $listingSku): void
+    {
+        if (null !== $listingId) {
+            Assert::uuid($listingId);
+        }
+
+        if (null !== $listingSku) {
+            Assert::notEmpty($listingSku);
+        }
     }
 }
