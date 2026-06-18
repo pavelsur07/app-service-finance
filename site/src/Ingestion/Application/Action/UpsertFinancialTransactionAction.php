@@ -52,6 +52,7 @@ final readonly class UpsertFinancialTransactionAction
             );
 
             $this->entityManager->persist($transaction);
+            $this->financialTransactionRepository->cache($transaction);
 
             return new UpsertResult(
                 transactionId: $transaction->getId(),

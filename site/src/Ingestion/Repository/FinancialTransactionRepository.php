@@ -9,12 +9,18 @@ use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\TransactionType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
+use Symfony\Contracts\Service\ResetInterface;
 
 /**
  * @extends ServiceEntityRepository<FinancialTransaction>
  */
-final class FinancialTransactionRepository extends ServiceEntityRepository
+final class FinancialTransactionRepository extends ServiceEntityRepository implements ResetInterface
 {
+    /**
+     * @var array<string, FinancialTransaction>
+     */
+    private array $registryCache = [];
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, FinancialTransaction::class);
@@ -26,7 +32,17 @@ final class FinancialTransactionRepository extends ServiceEntityRepository
         string $externalId,
         TransactionType $type,
     ): ?FinancialTransaction {
-        return $this->createQueryBuilder('transaction')
+        $cacheKey = $this->naturalKey($companyId, $source, $externalId, $type);
+        if (isset($this->registryCache[$cacheKey])) {
+            $transaction = $this->registryCache[$cacheKey];
+            if ($this->getEntityManager()->contains($transaction)) {
+                return $transaction;
+            }
+
+            unset($this->registryCache[$cacheKey]);
+        }
+
+        $transaction = $this->createQueryBuilder('transaction')
             ->andWhere('transaction.companyId = :companyId')
             ->andWhere('transaction.source = :source')
             ->andWhere('transaction.externalId = :externalId')
@@ -37,6 +53,27 @@ final class FinancialTransactionRepository extends ServiceEntityRepository
             ->setParameter('type', $type->value)
             ->getQuery()
             ->getOneOrNullResult();
+
+        if ($transaction instanceof FinancialTransaction) {
+            $this->cache($transaction);
+        }
+
+        return $transaction;
+    }
+
+    public function cache(FinancialTransaction $transaction): void
+    {
+        $this->registryCache[$this->naturalKey(
+            $transaction->getCompanyId(),
+            $transaction->getSource(),
+            $transaction->getExternalId(),
+            $transaction->getType(),
+        )] = $transaction;
+    }
+
+    public function reset(): void
+    {
+        $this->registryCache = [];
     }
 
     /**
@@ -97,5 +134,14 @@ final class FinancialTransactionRepository extends ServiceEntityRepository
             ->addOrderBy('transaction.id', 'ASC')
             ->getQuery()
             ->getResult();
+    }
+
+    private function naturalKey(
+        string $companyId,
+        IngestSource $source,
+        string $externalId,
+        TransactionType $type,
+    ): string {
+        return implode(':', [$companyId, $source->value, $externalId, $type->value]);
     }
 }

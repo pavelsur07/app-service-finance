@@ -17,6 +17,52 @@ use Ramsey\Uuid\Uuid;
 
 final class UpsertFinancialTransactionActionTest extends IntegrationTestCase
 {
+    public function testReusesPendingTransactionByNaturalKeyBeforeFlush(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $rawRecordId = Uuid::uuid7()->toString();
+        $operationGroupId = Uuid::uuid7()->toString();
+
+        /** @var UpsertFinancialTransactionAction $action */
+        $action = self::getContainer()->get(UpsertFinancialTransactionAction::class);
+
+        $created = $action($this->command(
+            companyId: $companyId,
+            rawRecordId: $rawRecordId,
+            mapped: $this->mapped(
+                operationGroupId: $operationGroupId,
+                externalUpdatedAt: new \DateTimeImmutable('2026-06-18 10:00:00'),
+                occurredAt: new \DateTimeImmutable('2026-06-18 09:00:00'),
+                amountMinor: 10000,
+            ),
+        ));
+        $updated = $action($this->command(
+            companyId: $companyId,
+            rawRecordId: $rawRecordId,
+            mapped: $this->mapped(
+                operationGroupId: $operationGroupId,
+                externalUpdatedAt: new \DateTimeImmutable('2026-06-18 11:00:00'),
+                occurredAt: new \DateTimeImmutable('2026-06-18 09:30:00'),
+                amountMinor: 15000,
+            ),
+        ));
+
+        self::assertNotNull($created);
+        self::assertNotNull($updated);
+        self::assertSame($created->transactionId, $updated->transactionId);
+
+        $this->em->flush();
+        $this->em->clear();
+
+        /** @var FinancialTransactionRepository $repository */
+        $repository = self::getContainer()->get(FinancialTransactionRepository::class);
+        $transactions = $repository->findByRawRecordId($companyId, $rawRecordId);
+
+        self::assertCount(1, $transactions);
+        self::assertSame(15000, $transactions[0]->getAmountMinor());
+        self::assertEquals(new \DateTimeImmutable('2026-06-18 09:30:00'), $transactions[0]->getOccurredAt());
+    }
+
     public function testCreatesSkipsStaleAndUpdatesOnlyNewerTransactionVersion(): void
     {
         $companyId = Uuid::uuid7()->toString();
