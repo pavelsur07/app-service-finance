@@ -3,7 +3,13 @@ framework:
         transports:
             async_sync: 'in-memory://'
             async_pipeline: 'in-memory://'
+            ingest_fetch: 'in-memory://'
+            ingest_normalize: 'in-memory://'
+            pnl_rebuild: 'in-memory://'
             async_wb_finance: 'in-memory://'
             async_ads: 'in-memory://'
         routing:
             'App\Tests\Integration\Ingestion\Fixtures\TenantVisibilityMessage': async_pipeline
+            'App\Ingestion\Message\NormalizeRawRecordMessage': ingest_normalize
+            'App\Finance\Message\MarkPnlPeriodDirtyMessage': ingest_normalize
+            'App\Finance\Message\RebuildPnlPeriodMessage': pnl_rebuild

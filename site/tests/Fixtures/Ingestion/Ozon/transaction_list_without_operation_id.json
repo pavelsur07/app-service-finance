@@ -1,0 +1,20 @@
+{
+  "rows": [
+    {
+      "operation_type": "MarketplaceServiceCorrection",
+      "operation_type_name": "Корректировка услуги",
+      "operation_date": "2026-02-20T11:00:00+00:00",
+      "posting": {
+        "posting_number": "fallback-posting-1"
+      },
+      "items": [
+        {
+          "sku": "fallback-sku-1",
+          "name": "Anonymized fallback product"
+        }
+      ],
+      "amount": "42.10",
+      "currency": "RUB"
+    }
+  ]
+}
