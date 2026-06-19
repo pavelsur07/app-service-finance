@@ -44,6 +44,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ingestion/verification/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ingestion coverage heatmap */
+        get: operations["get_api_ingestion_verification_coverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ingestion/verification/financial-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ingestion financial summary */
+        get: operations["get_api_ingestion_verification_financial_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ingestion/verification/issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Open ingestion normalization issues */
+        get: operations["get_api_ingestion_verification_issues"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ingestion/verification/reconciliation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ingestion reconciliation summary */
+        get: operations["get_api_ingestion_verification_reconciliation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/marketplaceanalytics": {
         parameters: {
             query?: never;
@@ -388,6 +456,268 @@ export interface operations {
                             postgres?: boolean;
                             /** @example true */
                             redis_cache?: boolean;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    get_api_ingestion_verification_coverage: {
+        parameters: {
+            query: {
+                shop_ref?: string;
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Coverage heatmap and shop options */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        cells?: {
+                            /**
+                             * Format: date
+                             * @example 2026-06-01
+                             */
+                            date?: string;
+                            /** @example ozon-shop-123 */
+                            shop_ref?: string;
+                            /** @example ozon_seller_daily_report */
+                            resource_type?: string;
+                            /** @example 1 */
+                            raw_count?: number;
+                            /** @example 287 */
+                            tx_count?: number;
+                            /** @example 0 */
+                            issue_count?: number;
+                            /** @example 2026-06-02T03:14:00Z */
+                            last_fetched_at?: string | null;
+                        }[];
+                        shops?: {
+                            /** @example ozon-shop-123 */
+                            shop_ref?: string;
+                            /** @example ozon-shop-123 */
+                            label?: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Invalid period */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: {
+                            /** @example invalid_period_range */
+                            code?: string;
+                            /** @example Некорректный диапазон периода */
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    get_api_ingestion_verification_financial_summary: {
+        parameters: {
+            query: {
+                shop_ref?: string;
+                year_from: number;
+                month_from: number;
+                year_to: number;
+                month_to: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Financial summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        by_month?: {
+                            /** @example 2026 */
+                            year?: number;
+                            /** @example 5 */
+                            month?: number;
+                            /** @example 1500000000 */
+                            income_minor?: number;
+                            /** @example 800000000 */
+                            expense_minor?: number;
+                            /** @example 700000000 */
+                            net_minor?: number;
+                            /** @example RUB */
+                            currency?: string;
+                        }[];
+                        by_category?: {
+                            /** Format: uuid */
+                            category_id?: string;
+                            /** @example Продажи */
+                            category_name?: string;
+                            /** @example income */
+                            flow?: string;
+                            /** @example 1500000000 */
+                            amount_minor?: number;
+                        }[];
+                    };
+                };
+            };
+            /** @description Invalid period range */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: {
+                            /** @example invalid_period_range */
+                            code?: string;
+                            /** @example Некорректный диапазон периода */
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    get_api_ingestion_verification_issues: {
+        parameters: {
+            query?: {
+                shop_ref?: string;
+                year?: number;
+                month?: number;
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Open issues */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items?: {
+                            /** Format: uuid */
+                            id?: string;
+                            /** @example sum_mismatch */
+                            kind?: string;
+                            human_description?: string;
+                            /** @example 2026-06-15T10:00:00Z */
+                            created_at?: string;
+                        }[];
+                        meta?: {
+                            /** @example 1 */
+                            page?: number;
+                            /** @example 50 */
+                            limit?: number;
+                            /** @example 0 */
+                            total?: number;
+                            /** @example 0 */
+                            total_pages?: number;
+                        };
+                    };
+                };
+            };
+            /** @description Invalid period */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: {
+                            /** @example invalid_period */
+                            code?: string;
+                            /** @example Некорректный период */
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    get_api_ingestion_verification_reconciliation: {
+        parameters: {
+            query: {
+                shop_ref: string;
+                year: number;
+                month: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reconciliation summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        summary?: {
+                            /** @example 2026-05 */
+                            period?: string;
+                            /** @example 1234567800 */
+                            canon_total_minor?: number;
+                            /** @example 1234566800 */
+                            ozon_control_total_minor?: number | null;
+                            /** @example RUB */
+                            currency?: string;
+                            /** @example 1000 */
+                            canon_vs_ozon_delta_minor?: number | null;
+                            /** @example 100 */
+                            threshold_minor?: number;
+                            /** @example 2026-06-15T10:00:00Z */
+                            recomputed_at?: string;
+                        };
+                        by_type?: {
+                            /** @example sale */
+                            type?: string;
+                            /** @example Продажа */
+                            type_label?: string;
+                            /** @example 1500000000 */
+                            canon_amount_minor?: number;
+                            /** @example 240 */
+                            tx_count?: number;
+                        }[];
+                    };
+                };
+            };
+            /** @description Invalid period */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: {
+                            /** @example invalid_period */
+                            code?: string;
+                            /** @example Некорректный период */
+                            message?: string;
                         };
                     };
                 };

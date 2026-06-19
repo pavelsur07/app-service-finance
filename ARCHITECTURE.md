@@ -131,6 +131,19 @@
 - `NormalizeRawRecordAction` reads NDJSON raw payload, calls the mapper, upserts canonical transactions, records `NormalizationIssue` on mapper/control-sum problems, marks the raw record `DONE`/`FAILED`, and dispatches `NormalizationCompletedEvent` after successful flush.
 - `NormalizationCompletedEvent` carries affected periods for future P&L dirty-period marking. Stage 4 only publishes the event; subscribers for P&L rebuild are added later.
 
+### Ingestion: verification client API
+
+- Client verification API lives under `/api/ingestion/verification/*` and is exposed through `App\Ingestion\Facade\IngestionFacade`.
+- Endpoints:
+  - `GET /api/ingestion/verification/coverage` — raw/canonical/open-issue coverage heatmap plus shop options.
+  - `GET /api/ingestion/verification/reconciliation` — canonical transaction totals by shop vs latest legacy `OzonTransactionTotalsCheck` company-period control total.
+  - `GET /api/ingestion/verification/issues` — unresolved normalization issues with human-readable descriptions only.
+  - `GET /api/ingestion/verification/financial-summary` — rebuilt P&L monthly/category summary from `pl_monthly_snapshots`.
+- All controllers resolve `companyId` from `ActiveCompanyService`; DBAL read queries also include explicit `company_id` predicates and do not rely only on Doctrine filters.
+- API period validation errors use `IngestionExceptionListener` and return `{ "error": { "code": "...", "message": "..." } }` with HTTP 422.
+- Reconciliation reads `OzonTransactionTotalsCheck::getOzonTotals()["total_minor"]`; missing or invalid legacy totals are returned as `null`.
+- `pl_monthly_snapshots` has no shop dimension, so financial summary currently accepts `shop_ref` for API compatibility but returns company-level rebuilt P&L until Finance source/shop linking exists.
+
 ### Finance: P&L dirty-period projection infrastructure
 
 - `PLDirtyPeriod` is the Ingestion-side pipeline marker for month-level P&L projection rebuilds from canonical Ingestion transactions. It uses scalar `companyId`, `periodYear`, `periodMonth`, `shopRef`, `status`, `reason`, attempts, and audit timestamps.
