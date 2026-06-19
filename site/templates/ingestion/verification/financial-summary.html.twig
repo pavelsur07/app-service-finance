@@ -1,12 +1,9 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Финансовая сводка ingestion{% endblock %}
+{% block title %}Финансы — Финансовая сводка{% endblock %}
 
 {% block content %}
-    {% include 'ingestion/verification/_tabs.html.twig' with {
-        title: 'Финансовая сводка ingestion',
-        activeTab: 'ingestion_verification_financial_summary',
-    } %}
+    {% include 'ingestion/verification/_finance_tabs.html.twig' %}
 
     <div
         id="ingestion-verification-financial-summary-root"

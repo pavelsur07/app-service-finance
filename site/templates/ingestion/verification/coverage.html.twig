@@ -1,12 +1,9 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Покрытие ingestion{% endblock %}
+{% block title %}Финансы — Покрытие{% endblock %}
 
 {% block content %}
-    {% include 'ingestion/verification/_tabs.html.twig' with {
-        title: 'Покрытие ingestion',
-        activeTab: 'ingestion_verification_coverage',
-    } %}
+    {% include 'ingestion/verification/_finance_tabs.html.twig' %}
 
     <div
         id="ingestion-verification-coverage-root"

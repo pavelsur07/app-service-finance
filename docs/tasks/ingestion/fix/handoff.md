@@ -151,13 +151,26 @@ None. No database schema changes.
 - Financial summary still reflects the backend limitation documented earlier: `shop_ref` is accepted but current P&L snapshots are company-level.
 - Normal build output ownership should be fixed outside this code change so `npm run build` can write to `site/public/build`.
 
+## TASK-FIX-MENU follow-up
+
+- Sidebar now exposes one item: `Загрузка данных -> Финансы`, linked to `/ingestion/verification`.
+- `GET /ingestion/verification` redirects to `/ingestion/verification/coverage`.
+- The four finance verification pages include `ingestion/verification/_finance_tabs.html.twig`.
+- Tabs use Tabler `nav nav-tabs`; active state is based on the current Symfony route.
+- Tab switching remains normal page navigation.
+
+Additional checks:
+
+- `docker compose run --rm site-php-cli ./vendor/bin/phpunit -c phpunit.xml --filter VerificationPageControllerTest` — passed, 2 tests / 36 assertions; PHPUnit reported 3 deprecations.
+- `docker compose run --rm site-php-cli php bin/console lint:twig templates/ingestion/verification templates/partials/_sidebar.html.twig` — passed.
+- `docker compose run --rm site-php-cli php -l src/Ingestion/Controller/Page/VerificationIndexPageController.php` — passed.
+
 ## Follow-ups intentionally left out
 
 - New backend endpoints or response fields.
 - New npm dependencies.
 - XLSX export.
 - Legacy P&L page changes.
-- Global layout/sidebar changes.
 
 ## Reviewer focus
 

@@ -1,12 +1,9 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Сверка ingestion{% endblock %}
+{% block title %}Финансы — Сверка сумм{% endblock %}
 
 {% block content %}
-    {% include 'ingestion/verification/_tabs.html.twig' with {
-        title: 'Сверка ingestion',
-        activeTab: 'ingestion_verification_reconciliation',
-    } %}
+    {% include 'ingestion/verification/_finance_tabs.html.twig' %}
 
     <div
         id="ingestion-verification-reconciliation-root"

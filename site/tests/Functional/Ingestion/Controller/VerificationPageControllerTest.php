@@ -31,7 +31,10 @@ final class VerificationPageControllerTest extends WebTestCaseBase
 
         $this->loginWithActiveCompany($client, $owner, $company);
 
-        foreach ($this->pages() as [$url, $mountId, $entryKey]) {
+        $client->request('GET', '/ingestion/verification');
+        self::assertResponseRedirects('/ingestion/verification/coverage');
+
+        foreach ($this->pages() as [$url, $mountId, $entryKey, $activeTabLabel]) {
             $crawler = $client->request('GET', $url);
 
             self::assertResponseIsSuccessful();
@@ -39,6 +42,20 @@ final class VerificationPageControllerTest extends WebTestCaseBase
             self::assertSame(
                 $entryKey,
                 $crawler->filter(sprintf('#%s', $mountId))->attr('data-vite-entry'),
+            );
+            self::assertSame(1, $crawler->filter('aside a[href="/ingestion/verification"]')->count());
+            self::assertStringContainsString(
+                'Финансы',
+                trim($crawler->filter('aside a[href="/ingestion/verification"]')->text()),
+            );
+            self::assertSame(4, $crawler->filter('.nav-tabs .nav-link')->count());
+            self::assertSame(
+                $url,
+                $crawler->filter('.nav-tabs .nav-link.active')->attr('href'),
+            );
+            self::assertSame(
+                $activeTabLabel,
+                trim($crawler->filter('.nav-tabs .nav-link.active')->text()),
             );
         }
     }
@@ -62,7 +79,7 @@ final class VerificationPageControllerTest extends WebTestCaseBase
     }
 
     /**
-     * @return iterable<array{0: string, 1: string, 2: string}>
+     * @return iterable<array{0: string, 1: string, 2: string, 3: string}>
      */
     private function pages(): iterable
     {
@@ -70,21 +87,25 @@ final class VerificationPageControllerTest extends WebTestCaseBase
             '/ingestion/verification/coverage',
             'ingestion-verification-coverage-root',
             'ingestion_verification_coverage_page',
+            'Покрытие',
         ];
         yield [
             '/ingestion/verification/reconciliation',
             'ingestion-verification-reconciliation-root',
             'ingestion_verification_reconciliation_page',
+            'Сверка сумм',
         ];
         yield [
             '/ingestion/verification/issues',
             'ingestion-verification-issues-root',
             'ingestion_verification_issues_page',
+            'Проблемы',
         ];
         yield [
             '/ingestion/verification/financial-summary',
             'ingestion-verification-financial-summary-root',
             'ingestion_verification_financial_summary_page',
+            'Финансовая сводка',
         ];
     }
 
