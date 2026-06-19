@@ -30,6 +30,10 @@ export default defineConfig({
                 reconciliation_page: "./assets/react/reconciliation-page.tsx",
                 unit_extended_page: "./assets/react/unit-extended-page.tsx",
                 ad_efficiency_page: "./assets/react/ad-efficiency-page.tsx",
+                ingestion_verification_coverage_page: "./assets/react/ingestion-verification-coverage-page.tsx",
+                ingestion_verification_reconciliation_page: "./assets/react/ingestion-verification-reconciliation-page.tsx",
+                ingestion_verification_issues_page: "./assets/react/ingestion-verification-issues-page.tsx",
+                ingestion_verification_financial_summary_page: "./assets/react/ingestion-verification-financial-summary-page.tsx",
             },
         }
     },

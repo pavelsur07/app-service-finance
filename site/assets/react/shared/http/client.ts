@@ -65,6 +65,21 @@ async function parseJsonSafe(res: Response): Promise<any> {
     }
 }
 
+function extractPayloadErrorMessage(payload: unknown): string | null {
+    if (typeof payload !== "object" || payload === null) {
+        return null;
+    }
+
+    const error = (payload as { error?: unknown }).error;
+    if (typeof error !== "object" || error === null) {
+        return null;
+    }
+
+    const message = (error as { message?: unknown }).message;
+
+    return typeof message === "string" && message.trim() !== "" ? message : null;
+}
+
 /**
  * Универсальный HTTP клиент для JSON API
  *
@@ -159,7 +174,7 @@ export async function httpJson<T>(
 
         case 422:
             throw new ApiError(
-                "Проверьте корректность данных.",
+                extractPayloadErrorMessage(payload) ?? "Проверьте корректность данных.",
                 "validation",
                 422,
                 payload

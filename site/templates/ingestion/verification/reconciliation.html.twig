@@ -1,0 +1,20 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Сверка ingestion{% endblock %}
+
+{% block content %}
+    {% include 'ingestion/verification/_tabs.html.twig' with {
+        title: 'Сверка ingestion',
+        activeTab: 'ingestion_verification_reconciliation',
+    } %}
+
+    <div
+        id="ingestion-verification-reconciliation-root"
+        data-vite-entry="ingestion_verification_reconciliation_page"
+    ></div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    {{ vite_entry_script_tags('ingestion_verification_reconciliation_page') }}
+{% endblock %}

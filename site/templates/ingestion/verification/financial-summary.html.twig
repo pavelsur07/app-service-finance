@@ -1,0 +1,20 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Финансовая сводка ingestion{% endblock %}
+
+{% block content %}
+    {% include 'ingestion/verification/_tabs.html.twig' with {
+        title: 'Финансовая сводка ingestion',
+        activeTab: 'ingestion_verification_financial_summary',
+    } %}
+
+    <div
+        id="ingestion-verification-financial-summary-root"
+        data-vite-entry="ingestion_verification_financial_summary_page"
+    ></div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    {{ vite_entry_script_tags('ingestion_verification_financial_summary_page') }}
+{% endblock %}

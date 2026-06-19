@@ -1,0 +1,20 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Проблемы ingestion{% endblock %}
+
+{% block content %}
+    {% include 'ingestion/verification/_tabs.html.twig' with {
+        title: 'Проблемы ingestion',
+        activeTab: 'ingestion_verification_issues',
+    } %}
+
+    <div
+        id="ingestion-verification-issues-root"
+        data-vite-entry="ingestion_verification_issues_page"
+    ></div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    {{ vite_entry_script_tags('ingestion_verification_issues_page') }}
+{% endblock %}

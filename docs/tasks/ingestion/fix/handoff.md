@@ -88,3 +88,80 @@ None. No database schema changes and no destructive migration.
 - Explicit `company_id` filters in DBAL queries.
 - Tenant-leak functional test coverage.
 - Reconciliation assumptions around legacy checksum scope and JSON shape.
+
+---
+
+# Frontend Final Handoff — TASK-UI-CLIENT-FRONTEND
+
+## Summary
+
+Implemented 4 Twig + React island pages for Ingestion verification:
+
+- `/ingestion/verification/coverage`
+- `/ingestion/verification/reconciliation`
+- `/ingestion/verification/issues`
+- `/ingestion/verification/financial-summary`
+
+The frontend uses the existing `useAbortableQuery` + `httpJson` pattern, generated `schema.d.ts` aliases, flat Vite entries, and no new npm dependencies.
+
+## Files changed
+
+- `site/assets/react/ingestion-verification/` — new feature slice with API hooks, generated-type aliases, shared UI, widgets, views, and date helpers.
+- `site/assets/react/ingestion-verification-*-page.tsx` — 4 new flat Vite entries.
+- `site/vite.config.js` — 4 new rollup inputs.
+- `site/templates/ingestion/verification/` — 4 Twig pages plus shared tabs partial.
+- `site/src/Ingestion/Controller/Page/` — 4 thin page controllers with `ROLE_COMPANY_USER`.
+- `site/tests/Functional/Ingestion/Controller/VerificationPageControllerTest.php` — focused page route tests.
+- `site/assets/react/shared/http/client.ts` — 422 responses now surface backend `error.message` when present.
+- `ARCHITECTURE.md`, `docs/tasks/ingestion/fix/plan.md`, `docs/tasks/ingestion/fix/stages/stage-F*.md` — docs updated.
+
+## Public API / contract changes
+
+- No backend API changes.
+- No `config/routes.yaml` changes.
+- Added frontend page routes only:
+  - `GET /ingestion/verification/coverage`
+  - `GET /ingestion/verification/reconciliation`
+  - `GET /ingestion/verification/issues`
+  - `GET /ingestion/verification/financial-summary`
+
+## Migrations
+
+None. No database schema changes.
+
+## Checks
+
+- `docker compose run --rm site-php-cli ./vendor/bin/phpunit -c phpunit.xml --filter VerificationPageControllerTest` — passed, 2 tests / 14 assertions; PHPUnit reported 3 deprecations.
+- `make site-test-unit` — passed, 1082 tests / 6457 assertions; PHPUnit reported 1 warning and 1 deprecation.
+- `cd site && npx vite build --configLoader runner --outDir /tmp/app-service-finance-vite-build --emptyOutDir` — passed and generated all 4 `ingestion_verification_*_page` chunks.
+- `docker compose run --rm site-php-cli php bin/console lint:twig templates/ingestion/verification` — passed.
+- `docker compose run --rm site-php-cli php -l src/Ingestion/Controller/Page/*PageController.php` — passed for all 4 controllers.
+- `rg -n "byType|byMonth|byCategory" site/assets/react/ingestion-verification site/assets/react/ingestion-verification-*.tsx` — no matches.
+- `cd site && npx tsc --noEmit` — failed on existing non-ingestion TS errors:
+  - `assets/react/Dashboard/DashboardGrid.tsx`
+  - `assets/react/dashboard_started.tsx`
+  - `assets/react/marketplace_analytics_kpi.tsx`
+  - `assets/react/reconciliation/widgets/ReconciliationWidget.tsx`
+- `cd site && npm run build` — failed in this workspace because `site/node_modules/.vite-temp` and `site/public/build` are root-owned; equivalent Vite build to `/tmp/app-service-finance-vite-build` passed.
+
+## Risks and limitations
+
+- Reconciliation requires a concrete shop; the UI does not call the reconciliation API until a shop is selected.
+- Shop options are loaded through the coverage endpoint because the backend verification API has no standalone shop-options endpoint.
+- Financial summary still reflects the backend limitation documented earlier: `shop_ref` is accepted but current P&L snapshots are company-level.
+- Normal build output ownership should be fixed outside this code change so `npm run build` can write to `site/public/build`.
+
+## Follow-ups intentionally left out
+
+- New backend endpoints or response fields.
+- New npm dependencies.
+- XLSX export.
+- Legacy P&L page changes.
+- Global layout/sidebar changes.
+
+## Reviewer focus
+
+- New Vite entry keys and Twig mount ids.
+- Generated OpenAPI type alias usage in `types.ts`.
+- Reconciliation no-shop empty guidance.
+- Error handling for backend 422 `error.message`.
