@@ -92,3 +92,66 @@
 - Financial summary remains a DBAL read model in Ingestion and does not extend `PnlFacade`, because current `PnlFacade` has no summary read contract.
 - `financial-summary.by_category` uses the last month of the requested range, as specified.
 - Existing user changes in `docs/tasks/fix/*`, `.mimocode/`, and `docs/tasks/s3/` are unrelated and must not be touched.
+
+---
+
+# План TASK-UI-CLIENT-FRONTEND
+
+## Summary
+
+Реализовать 4 React island-страницы для Ingestion verification поверх готовых backend API:
+
+- `/ingestion/verification/coverage`
+- `/ingestion/verification/reconciliation`
+- `/ingestion/verification/issues`
+- `/ingestion/verification/financial-summary`
+
+## Implementation Decisions
+
+- Не добавлять `@tanstack/react-query`; использовать текущий repo pattern: `useAbortableQuery` + `httpJson`.
+- Не создавать новую директорию `assets/react/entrypoints/`; использовать существующий flat Vite pattern: `site/assets/react/*-page.tsx`.
+- Backend API не менять.
+- `config/routes.yaml` не менять: `src/Ingestion/Controller/` уже импортируется attribute routing.
+
+## Stages
+
+1. **Stage F0 — Plan docs, LOW**
+   - Добавить frontend plan addendum в `docs/tasks/ingestion/fix/plan.md`.
+
+2. **Stage F1 — Types/API hooks, MEDIUM**
+   - Добавить type aliases из `schema.d.ts`.
+   - Добавить 4 hooks поверх `useAbortableQuery`, safe defaults, retry callback через `reload`.
+
+3. **Stage F2 — Shared UI, MEDIUM**
+   - Добавить `ShopSelector`, `PeriodPicker`, money/delta/status/state components.
+   - Использовать существующий Tabler/class pattern and `shared/components/Pagination`.
+
+4. **Stage F3 — Widgets/Views, MEDIUM**
+   - Реализовать 4 smart widgets and dumb views.
+   - Loading/empty/error/success states for each page.
+   - Debounce 500ms перед запросами после изменения периода.
+
+5. **Stage F4 — Page controllers, Twig, Vite entries, HIGH**
+   - Добавить controllers, templates, flat entry files, Vite inputs.
+   - No backend API/routes.yaml changes.
+
+6. **Stage F5 — Tests/docs/final, LOW/MEDIUM**
+   - Functional page tests.
+   - Frontend build/type checks.
+   - Architecture docs, stage reports, final handoff.
+
+## Test Plan
+
+- PHP functional page tests for authenticated and unauthenticated access.
+- Rendered HTML contains correct mount ids and Vite entry keys.
+- `cd site && npx tsc --noEmit`.
+- `cd site && npm run build`; if root-owned build artifacts block it, verify bundling with temporary Vite outDir.
+- `make site-test-unit`.
+- No stale `byType`, `byMonth`, or `byCategory` references in the ingestion verification slice.
+
+## Assumptions
+
+- Backend API from `TASK-UI-CLIENT-BACKEND` remains the source of truth.
+- Coverage API response is the only current source of shop options and can be reused by the other pages.
+- No npm dependencies are added.
+- Existing P&L legacy page, global layout, auth flow, CSRF flow, and backend financial logic are unchanged.

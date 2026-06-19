@@ -1,0 +1,17 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Финансы — Проблемы{% endblock %}
+
+{% block content %}
+    {% include 'ingestion/verification/_finance_tabs.html.twig' %}
+
+    <div
+        id="ingestion-verification-issues-root"
+        data-vite-entry="ingestion_verification_issues_page"
+    ></div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    {{ vite_entry_script_tags('ingestion_verification_issues_page') }}
+{% endblock %}

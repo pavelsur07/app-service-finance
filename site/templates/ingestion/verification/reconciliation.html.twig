@@ -1,0 +1,17 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Финансы — Сверка сумм{% endblock %}
+
+{% block content %}
+    {% include 'ingestion/verification/_finance_tabs.html.twig' %}
+
+    <div
+        id="ingestion-verification-reconciliation-root"
+        data-vite-entry="ingestion_verification_reconciliation_page"
+    ></div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    {{ vite_entry_script_tags('ingestion_verification_reconciliation_page') }}
+{% endblock %}

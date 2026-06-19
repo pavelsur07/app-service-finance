@@ -144,6 +144,19 @@
 - Reconciliation reads `OzonTransactionTotalsCheck::getOzonTotals()["total_minor"]`; missing or invalid legacy totals are returned as `null`.
 - `pl_monthly_snapshots` has no shop dimension, so financial summary currently accepts `shop_ref` for API compatibility but returns company-level rebuilt P&L until Finance source/shop linking exists.
 
+### Ingestion: verification client UI
+
+- Client verification pages are Twig + React islands under `/ingestion/verification/*`:
+  - `GET /ingestion/verification/coverage` — coverage heatmap island.
+  - `GET /ingestion/verification/reconciliation` — shop-scoped reconciliation island.
+  - `GET /ingestion/verification/issues` — open normalization issues island.
+  - `GET /ingestion/verification/financial-summary` — rebuilt P&L summary island.
+- Page controllers live in `App\Ingestion\Controller\Page`, require `ROLE_COMPANY_USER`, and only render Twig templates.
+- React source lives in `site/assets/react/ingestion-verification/`; flat Vite entries live in `site/assets/react/ingestion-verification-*-page.tsx`.
+- Data loading uses the existing `useAbortableQuery` + `httpJson` pattern and generated `site/assets/api/schema.d.ts` aliases. No TanStack Query dependency is added.
+- `ShopSelector` persists the selected shop in `localStorage` key `ingestion.selected_shop`; reconciliation requires a concrete shop and does not call its API until one is selected.
+- Coverage is also used as the current shop-options source because the backend verification API exposes shop options only through the coverage response.
+
 ### Finance: P&L dirty-period projection infrastructure
 
 - `PLDirtyPeriod` is the Ingestion-side pipeline marker for month-level P&L projection rebuilds from canonical Ingestion transactions. It uses scalar `companyId`, `periodYear`, `periodMonth`, `shopRef`, `status`, `reason`, attempts, and audit timestamps.
@@ -416,6 +429,19 @@ getTransactions(string $companyId, DateTimeImmutable $from, DateTimeImmutable $t
 
 // Количество открытых normalization issues по компании.
 countOpenIssues(string $companyId): int
+
+// Verification UI/API read models.
+// @return array{cells: list<CoverageCellView>, shops: list<ShopOptionView>}
+getCoverage(string $companyId, ?string $shopRef, DateTimeImmutable $from, DateTimeImmutable $to): array
+
+// @return array{summary: ReconciliationSummaryView, byType: list<ReconciliationByTypeView>}
+getReconciliation(string $companyId, string $shopRef, int $year, int $month): array
+
+// @return array{items: list<IssueListItemView>, meta: PaginationMeta}
+listIssues(string $companyId, ?string $shopRef, ?int $year, ?int $month, int $page, int $limit): array
+
+// @return array{byMonth: list<FinancialSummaryMonthView>, byCategory: list<FinancialSummaryCategoryView>}
+getFinancialSummary(string $companyId, ?string $shopRef, int $yearFrom, int $monthFrom, int $yearTo, int $monthTo): array
 ```
 
 ### `MarketplaceListingFacade` (`src/Ingestion/Facade/MarketplaceListingFacade.php`)

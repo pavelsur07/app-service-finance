@@ -1,0 +1,17 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Финансы — Покрытие{% endblock %}
+
+{% block content %}
+    {% include 'ingestion/verification/_finance_tabs.html.twig' %}
+
+    <div
+        id="ingestion-verification-coverage-root"
+        data-vite-entry="ingestion_verification_coverage_page"
+    ></div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    {{ vite_entry_script_tags('ingestion_verification_coverage_page') }}
+{% endblock %}
