@@ -12,6 +12,7 @@ import CoverageHeatmapView from '../views/CoverageHeatmapView';
 const CoverageHeatmapWidget: React.FC = () => {
     const [period, setPeriod] = useState<DateRangePeriod>(currentMonthDateRange);
     const [shopRef, setShopRef] = useState<string | null>(initialStoredShop);
+    const isInvalidPeriod = period.from !== '' && period.to !== '' && period.from > period.to;
 
     const queryParams = useMemo(() => ({
         from: period.from,
@@ -19,7 +20,7 @@ const CoverageHeatmapWidget: React.FC = () => {
         shopRef,
     }), [period.from, period.to, shopRef]);
     const debouncedParams = useDebouncedValue(queryParams, 500);
-    const coverage = useCoverageData(debouncedParams);
+    const coverage = useCoverageData(debouncedParams, !isInvalidPeriod);
     const cells = coverage.data.cells ?? [];
     const shops = coverage.data.shops ?? [];
 
@@ -44,17 +45,24 @@ const CoverageHeatmapWidget: React.FC = () => {
                 </div>
             </div>
 
-            {coverage.isError && (
+            {isInvalidPeriod && (
+                <EmptyState
+                    title="Некорректный период"
+                    message="Дата окончания не может быть раньше даты начала"
+                />
+            )}
+
+            {!isInvalidPeriod && coverage.isError && (
                 <ErrorState message={coverage.errorMessage} onRetry={coverage.reload} />
             )}
 
-            {!coverage.isError && coverage.isLoading && <LoadingState />}
+            {!isInvalidPeriod && !coverage.isError && coverage.isLoading && <LoadingState />}
 
-            {!coverage.isError && !coverage.isLoading && cells.length === 0 && (
+            {!isInvalidPeriod && !coverage.isError && !coverage.isLoading && cells.length === 0 && (
                 <EmptyState message="Нет загруженных ingestion-данных за выбранный период" />
             )}
 
-            {!coverage.isError && !coverage.isLoading && cells.length > 0 && (
+            {!isInvalidPeriod && !coverage.isError && !coverage.isLoading && cells.length > 0 && (
                 <CoverageHeatmapView cells={cells} from={period.from} to={period.to} />
             )}
         </div>

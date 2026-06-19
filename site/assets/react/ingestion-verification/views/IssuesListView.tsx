@@ -22,6 +22,15 @@ function issueLabel(kind: string | undefined): string {
     return kind.replaceAll('_', ' ');
 }
 
+function issueKey(item: IssueListItemDto): string {
+    return item.id ?? JSON.stringify([
+        'issue',
+        item.kind ?? null,
+        item.created_at ?? null,
+        item.human_description ?? null,
+    ]);
+}
+
 const IssuesListView: React.FC<IssuesListViewProps> = ({
     items,
     meta,
@@ -52,8 +61,8 @@ const IssuesListView: React.FC<IssuesListViewProps> = ({
                         </tr>
                     </thead>
                     <tbody>
-                        {items.map((item, index) => (
-                            <tr key={item.id ?? `${item.kind ?? 'issue'}-${item.created_at ?? index}`}>
+                        {items.map((item) => (
+                            <tr key={issueKey(item)}>
                                 <td className="text-nowrap">
                                     {item.created_at ? formatDateTime(item.created_at) : '—'}
                                 </td>

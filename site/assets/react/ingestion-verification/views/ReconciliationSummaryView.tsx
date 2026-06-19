@@ -29,6 +29,15 @@ function reconciliationStatus(summary: ReconciliationSummaryDto): React.ReactNod
     return <StatusBadge status="error" label="Есть расхождение" />;
 }
 
+function reconciliationTypeKey(item: ReconciliationByTypeDto): string {
+    return item.type ?? JSON.stringify([
+        'type',
+        item.type_label ?? null,
+        item.canon_amount_minor ?? null,
+        item.tx_count ?? null,
+    ]);
+}
+
 const ReconciliationSummaryView: React.FC<ReconciliationSummaryViewProps> = ({
     summary,
     by_type,
@@ -110,7 +119,7 @@ const ReconciliationSummaryView: React.FC<ReconciliationSummaryViewProps> = ({
                         </thead>
                         <tbody>
                             {by_type.map((item) => (
-                                <tr key={item.type ?? item.type_label ?? 'unknown'}>
+                                <tr key={reconciliationTypeKey(item)}>
                                     <td>{item.type_label ?? item.type ?? '—'}</td>
                                     <td className="text-end">
                                         <MoneyCell amountMinor={item.canon_amount_minor} currency={currency} />

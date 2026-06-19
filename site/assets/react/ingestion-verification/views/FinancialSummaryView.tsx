@@ -29,6 +29,15 @@ function flowBadge(flow: string | undefined): React.ReactNode {
     return <StatusBadge status="neutral" label={flow ?? '—'} />;
 }
 
+function categoryKey(item: FinancialSummaryCategoryDto): string {
+    return item.category_id ?? JSON.stringify([
+        'category',
+        item.flow ?? null,
+        item.category_name ?? null,
+        item.amount_minor ?? null,
+    ]);
+}
+
 const FinancialSummaryView: React.FC<FinancialSummaryViewProps> = ({
     by_month,
     by_category,
@@ -145,8 +154,8 @@ const FinancialSummaryView: React.FC<FinancialSummaryViewProps> = ({
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {by_category.map((item, index) => (
-                                        <tr key={item.category_id ?? `${item.category_name ?? 'category'}-${index}`}>
+                                    {by_category.map((item) => (
+                                        <tr key={categoryKey(item)}>
                                             <td>{item.category_name ?? 'Без категории'}</td>
                                             <td>{flowBadge(item.flow)}</td>
                                             <td className="text-end">

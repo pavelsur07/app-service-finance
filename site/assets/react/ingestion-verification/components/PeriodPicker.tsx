@@ -49,6 +49,9 @@ const PeriodPicker: React.FC<PeriodPickerProps> = (props) => {
     }
 
     if (props.mode === 'date-range') {
+        const isInvalidRange = props.value.from !== ''
+            && props.value.to !== ''
+            && props.value.from > props.value.to;
         const handleFromChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
             props.onChange({ ...props.value, from: event.target.value });
         };
@@ -62,8 +65,10 @@ const PeriodPicker: React.FC<PeriodPickerProps> = (props) => {
                     <label className="form-label">{props.labelFrom ?? 'С'}</label>
                     <input
                         type="date"
-                        className="form-control"
+                        className={`form-control ${isInvalidRange ? 'is-invalid' : ''}`}
                         value={props.value.from}
+                        max={props.value.to || undefined}
+                        aria-invalid={isInvalidRange}
                         onChange={handleFromChange}
                     />
                 </div>
@@ -71,10 +76,17 @@ const PeriodPicker: React.FC<PeriodPickerProps> = (props) => {
                     <label className="form-label">{props.labelTo ?? 'По'}</label>
                     <input
                         type="date"
-                        className="form-control"
+                        className={`form-control ${isInvalidRange ? 'is-invalid' : ''}`}
                         value={props.value.to}
+                        min={props.value.from || undefined}
+                        aria-invalid={isInvalidRange}
                         onChange={handleToChange}
                     />
+                    {isInvalidRange && (
+                        <div className="invalid-feedback">
+                            Дата окончания не может быть раньше даты начала.
+                        </div>
+                    )}
                 </div>
             </>
         );
