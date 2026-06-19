@@ -94,9 +94,10 @@ final class RunIncrementalCommand extends Command
         }
 
         $connections = $this->connectionsQuery->execute();
-        $processedCompanies = [];
+        $eligibleWork = [];
         $dispatched = 0;
         $skippedWithoutCursor = 0;
+        $skippedNotDue = 0;
         $skippedActive = 0;
         $failed = 0;
 
@@ -108,14 +109,6 @@ final class RunIncrementalCommand extends Command
             $connectionCompanyId = (string) $connection['company_id'];
             if (null !== $companyId && $connectionCompanyId !== $companyId) {
                 continue;
-            }
-
-            if (!isset($processedCompanies[$connectionCompanyId])) {
-                if (count($processedCompanies) >= $limit) {
-                    break;
-                }
-
-                $processedCompanies[$connectionCompanyId] = true;
             }
 
             $connectionRef = (string) $connection['id'];
@@ -133,36 +126,69 @@ final class RunIncrementalCommand extends Command
                         continue;
                     }
 
-                    try {
-                        $this->syncFacade->startIncremental(new StartIncrementalApplicationCommand(
-                            companyId: $connectionCompanyId,
-                            connectionRef: $connectionRef,
-                            source: IngestSource::OZON,
-                            resourceType: $resourceType,
-                            shopRef: $cursor->getShopRef(),
-                        ));
-
-                        ++$dispatched;
-                    } catch (ActiveBackfillExistsException) {
-                        ++$skippedActive;
-                        $io->warning(sprintf(
-                            'Incremental already running for companyId=%s resourceType=%s shopRef=%s.',
-                            $connectionCompanyId,
-                            $resourceType,
-                            $cursor->getShopRef(),
-                        ));
-                    } catch (\Throwable $exception) {
-                        ++$failed;
-                        $this->logger->warning('Failed to dispatch ingestion incremental job.', [
-                            'companyId' => $connectionCompanyId,
-                            'connectionRef' => $connectionRef,
-                            'source' => IngestSource::OZON->value,
-                            'resourceType' => $resourceType,
-                            'shopRef' => $cursor->getShopRef(),
-                            'exceptionClass' => $exception::class,
-                            'errorMessage' => $exception->getMessage(),
-                        ]);
+                    if (!$this->cursorHasDueWork($resourceType, $cursor->getCursorValue())) {
+                        ++$skippedNotDue;
+                        continue;
                     }
+
+                    $sortAt = $cursor->getLastFetchedAt() ?? $cursor->getUpdatedAt();
+                    $eligibleWork[$connectionCompanyId] ??= [
+                        'companyId' => $connectionCompanyId,
+                        'sortAt' => $sortAt,
+                        'jobs' => [],
+                    ];
+                    if ($sortAt < $eligibleWork[$connectionCompanyId]['sortAt']) {
+                        $eligibleWork[$connectionCompanyId]['sortAt'] = $sortAt;
+                    }
+                    $eligibleWork[$connectionCompanyId]['jobs'][] = [
+                        'connectionRef' => $connectionRef,
+                        'resourceType' => $resourceType,
+                        'shopRef' => $cursor->getShopRef(),
+                    ];
+                }
+            }
+        }
+
+        $eligibleWork = array_values($eligibleWork);
+        usort(
+            $eligibleWork,
+            static fn (array $left, array $right): int => $left['sortAt'] <=> $right['sortAt']
+                ?: $left['companyId'] <=> $right['companyId'],
+        );
+
+        foreach (array_slice($eligibleWork, 0, $limit) as $companyWork) {
+            $connectionCompanyId = $companyWork['companyId'];
+
+            foreach ($companyWork['jobs'] as $job) {
+                try {
+                    $this->syncFacade->startIncremental(new StartIncrementalApplicationCommand(
+                        companyId: $connectionCompanyId,
+                        connectionRef: $job['connectionRef'],
+                        source: IngestSource::OZON,
+                        resourceType: $job['resourceType'],
+                        shopRef: $job['shopRef'],
+                    ));
+
+                    ++$dispatched;
+                } catch (ActiveBackfillExistsException) {
+                    ++$skippedActive;
+                    $io->warning(sprintf(
+                        'Incremental already running for companyId=%s resourceType=%s shopRef=%s.',
+                        $connectionCompanyId,
+                        $job['resourceType'],
+                        $job['shopRef'],
+                    ));
+                } catch (\Throwable $exception) {
+                    ++$failed;
+                    $this->logger->warning('Failed to dispatch ingestion incremental job.', [
+                        'companyId' => $connectionCompanyId,
+                        'connectionRef' => $job['connectionRef'],
+                        'source' => IngestSource::OZON->value,
+                        'resourceType' => $job['resourceType'],
+                        'shopRef' => $job['shopRef'],
+                        'exceptionClass' => $exception::class,
+                        'errorMessage' => $exception->getMessage(),
+                    ]);
                 }
             }
         }
@@ -171,6 +197,7 @@ final class RunIncrementalCommand extends Command
             'dispatched' => $dispatched,
             'failed' => $failed,
             'skippedWithoutCursor' => $skippedWithoutCursor,
+            'skippedNotDue' => $skippedNotDue,
             'skippedActive' => $skippedActive,
             'companyLimit' => $limit,
             'companyId' => $companyId,
@@ -178,9 +205,10 @@ final class RunIncrementalCommand extends Command
         ]);
 
         $io->success(sprintf(
-            'Dispatched %d incremental jobs (skipped without cursor: %d, active: %d, failed: %d).',
+            'Dispatched %d incremental jobs (skipped without cursor: %d, not due: %d, active: %d, failed: %d).',
             $dispatched,
             $skippedWithoutCursor,
+            $skippedNotDue,
             $skippedActive,
             $failed,
         ));
@@ -228,5 +256,22 @@ final class RunIncrementalCommand extends Command
         }
 
         return $limit;
+    }
+
+    private function cursorHasDueWork(string $resourceType, string $cursorValue): bool
+    {
+        if (OzonResourceType::DAILY_REPORT !== $resourceType) {
+            return true;
+        }
+
+        try {
+            $cursorDate = (new \DateTimeImmutable($cursorValue))->setTime(0, 0);
+        } catch (\Throwable) {
+            return true;
+        }
+
+        $yesterday = (new \DateTimeImmutable('today'))->modify('-1 day')->setTime(0, 0);
+
+        return $cursorDate <= $yesterday;
     }
 }

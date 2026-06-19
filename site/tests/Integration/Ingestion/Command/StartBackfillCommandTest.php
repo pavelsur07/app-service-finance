@@ -37,12 +37,12 @@ final class StartBackfillCommandTest extends IntegrationTestCase
         self::assertSame(Command::SUCCESS, $exit);
         self::assertStringContainsString('DRY-RUN ingestion backfill', $tester->getDisplay());
         self::assertStringContainsString(OzonResourceType::DAILY_REPORT, $tester->getDisplay());
-        self::assertStringContainsString(OzonResourceType::REALIZATION, $tester->getDisplay());
+        self::assertStringNotContainsString(OzonResourceType::REALIZATION, $tester->getDisplay());
         self::assertSame(0, $this->syncJobCount($companyId));
         self::assertCount(0, $transport->getSent());
     }
 
-    public function testStartsBackfillForAllOzonResourceTypes(): void
+    public function testStartsBackfillForDefaultOzonResourceType(): void
     {
         $companyId = Uuid::uuid7()->toString();
         $connectionRef = Uuid::uuid7()->toString();
@@ -59,7 +59,7 @@ final class StartBackfillCommandTest extends IntegrationTestCase
 
         self::assertSame(Command::SUCCESS, $exit);
         self::assertStringContainsString(OzonResourceType::DAILY_REPORT, $tester->getDisplay());
-        self::assertStringContainsString(OzonResourceType::REALIZATION, $tester->getDisplay());
+        self::assertStringNotContainsString(OzonResourceType::REALIZATION, $tester->getDisplay());
 
         $parentJobs = $this->connection->fetchAllAssociative(
             'SELECT resource_type, shop_ref, progress_total
@@ -69,21 +69,19 @@ final class StartBackfillCommandTest extends IntegrationTestCase
             ['companyId' => $companyId],
         );
 
-        self::assertCount(2, $parentJobs);
-        self::assertSame([OzonResourceType::DAILY_REPORT, OzonResourceType::REALIZATION], array_column($parentJobs, 'resource_type'));
+        self::assertCount(1, $parentJobs);
+        self::assertSame([OzonResourceType::DAILY_REPORT], array_column($parentJobs, 'resource_type'));
         self::assertSame($connectionRef, $parentJobs[0]['shop_ref']);
-        self::assertSame($connectionRef, $parentJobs[1]['shop_ref']);
         self::assertSame(5, (int) $parentJobs[0]['progress_total']);
-        self::assertSame(5, (int) $parentJobs[1]['progress_total']);
 
         $envelopes = $transport->getSent();
-        self::assertCount(10, $envelopes);
+        self::assertCount(5, $envelopes);
         foreach ($envelopes as $envelope) {
             self::assertInstanceOf(RunSyncChunkMessage::class, $envelope->getMessage());
         }
     }
 
-    public function testActiveBackfillWarningSkipsResourceAndContinuesOthers(): void
+    public function testActiveBackfillWarningSkipsDefaultResource(): void
     {
         $companyId = Uuid::uuid7()->toString();
         $connectionRef = Uuid::uuid7()->toString();
@@ -113,7 +111,6 @@ final class StartBackfillCommandTest extends IntegrationTestCase
 
         self::assertSame(Command::SUCCESS, $exit);
         self::assertStringContainsString('Backfill already running', $tester->getDisplay());
-        self::assertStringContainsString(OzonResourceType::REALIZATION, $tester->getDisplay());
 
         $newParentJobs = $this->connection->fetchAllAssociative(
             'SELECT resource_type
@@ -123,8 +120,22 @@ final class StartBackfillCommandTest extends IntegrationTestCase
             ['companyId' => $companyId],
         );
 
-        self::assertSame([OzonResourceType::DAILY_REPORT, OzonResourceType::REALIZATION], array_column($newParentJobs, 'resource_type'));
-        self::assertCount(5, $transport->getSent());
+        self::assertSame([OzonResourceType::DAILY_REPORT], array_column($newParentJobs, 'resource_type'));
+        self::assertCount(0, $transport->getSent());
+    }
+
+    public function testRealizationBackfillIsNotSupportedUntilMonthAlignedChunkingExists(): void
+    {
+        $tester = $this->tester('app:ingestion:start-backfill');
+        $exit = $tester->execute([
+            '--company-id' => Uuid::uuid7()->toString(),
+            '--connection-ref' => Uuid::uuid7()->toString(),
+            '--source' => 'ozon',
+            '--resource-type' => OzonResourceType::REALIZATION,
+        ]);
+
+        self::assertSame(Command::FAILURE, $exit);
+        self::assertStringContainsString('Unsupported resource type', $tester->getDisplay());
     }
 
     public function testInvalidCompanyUuidFails(): void

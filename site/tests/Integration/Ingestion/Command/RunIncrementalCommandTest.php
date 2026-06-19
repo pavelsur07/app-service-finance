@@ -86,6 +86,42 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
         self::assertCount(1, $transport->getSent());
     }
 
+    public function testLimitSelectsOldestEligibleCursorWorkInsteadOfFirstActiveCompanies(): void
+    {
+        $newerCompany = $this->seedCompany(1005);
+        $newerConnection = $this->seedConnection($newerCompany, '77777777-7777-7777-7777-000000001005');
+        $this->seedCursor(
+            $newerCompany->getId(),
+            $newerConnection->getId(),
+            OzonResourceType::DAILY_REPORT,
+            'shop-newer',
+            '2026-06-18',
+            new \DateTimeImmutable('2026-06-18 10:00:00'),
+        );
+
+        $olderCompany = $this->seedCompany(1006);
+        $olderConnection = $this->seedConnection($olderCompany, '77777777-7777-7777-7777-000000001006');
+        $this->seedCursor(
+            $olderCompany->getId(),
+            $olderConnection->getId(),
+            OzonResourceType::DAILY_REPORT,
+            'shop-older',
+            '2026-06-18',
+            new \DateTimeImmutable('2026-06-01 10:00:00'),
+        );
+
+        $transport = $this->getIngestFetchTransport();
+        $transport->reset();
+
+        $tester = $this->tester('app:ingestion:run-incremental');
+        $exit = $tester->execute(['--limit' => '1']);
+
+        self::assertSame(Command::SUCCESS, $exit);
+        self::assertSame(0, $this->incrementalJobCount($newerCompany->getId()));
+        self::assertSame(1, $this->incrementalJobCount($olderCompany->getId()));
+        self::assertCount(1, $transport->getSent());
+    }
+
     public function testWildberriesSourceIsSkipped(): void
     {
         $tester = $this->tester('app:ingestion:run-incremental');
@@ -131,11 +167,12 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
         string $resourceType,
         string $shopRef,
         string $cursorValue,
+        ?\DateTimeImmutable $lastFetchedAt = null,
     ): void {
         /** @var IngestCursorRepository $cursorRepository */
         $cursorRepository = self::getContainer()->get(IngestCursorRepository::class);
         $cursor = $cursorRepository->getOrCreate($companyId, $connectionRef, $resourceType, $shopRef);
-        $cursor->advance($cursorValue, Uuid::uuid7()->toString(), new \DateTimeImmutable('2026-06-18 10:00:00'));
+        $cursor->advance($cursorValue, Uuid::uuid7()->toString(), $lastFetchedAt ?? new \DateTimeImmutable('2026-06-18 10:00:00'));
         $this->em->flush();
     }
 

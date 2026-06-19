@@ -112,7 +112,7 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
         }
 
         $windowHasMore = null !== $request->windowTo && $to < $request->windowTo;
-        $nextCursor = $windowHasMore ? $to->modify('+1 day')->format('Y-m-d') : null;
+        $nextCursor = $windowHasMore || $this->isIncremental($request) ? $to->modify('+1 day')->format('Y-m-d') : null;
 
         return new PullResult(
             rawBatch: new RawBatch(
@@ -161,7 +161,7 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
                 fetchedAt: new \DateTimeImmutable(),
                 rows: $rows,
             ),
-            nextCursorValue: $windowHasMore ? $nextMonth->format('Y-m-01') : null,
+            nextCursorValue: $windowHasMore || $this->isIncremental($request) ? $nextMonth->format('Y-m-01') : null,
             hasMore: $windowHasMore,
         );
     }
@@ -180,6 +180,14 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
         $to = null !== $request->windowTo && $request->windowTo < $maxTo
             ? $request->windowTo
             : $maxTo;
+
+        if (null === $request->windowTo && null !== $request->cursorValue && '' !== $request->cursorValue) {
+            $yesterday = (new \DateTimeImmutable('today'))->modify('-1 day')->setTime(23, 59, 59);
+            if ($yesterday < $to) {
+                $to = $yesterday;
+            }
+        }
+
         $to = $to->setTime(23, 59, 59);
 
         if ($from > $to) {
@@ -196,5 +204,13 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
             : ($request->windowFrom ?? new \DateTimeImmutable('first day of previous month'));
 
         return $date->modify('first day of this month')->setTime(0, 0);
+    }
+
+    private function isIncremental(PullRequest $request): bool
+    {
+        return null !== $request->cursorValue
+            && '' !== $request->cursorValue
+            && null === $request->windowFrom
+            && null === $request->windowTo;
     }
 }

@@ -32,7 +32,6 @@ final class StartBackfillCommand extends Command
     private const RESOURCE_TYPES_BY_SOURCE = [
         'ozon' => [
             OzonResourceType::DAILY_REPORT,
-            OzonResourceType::REALIZATION,
         ],
     ];
 
