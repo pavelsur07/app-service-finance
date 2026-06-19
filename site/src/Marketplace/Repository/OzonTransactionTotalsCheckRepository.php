@@ -39,6 +39,27 @@ final class OzonTransactionTotalsCheckRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    public function findLatestByCompanyAndPeriod(
+        string $companyId,
+        \DateTimeImmutable $periodFrom,
+        \DateTimeImmutable $periodTo,
+    ): ?OzonTransactionTotalsCheck {
+        Assert::uuid($companyId);
+
+        return $this->createQueryBuilder('c')
+            ->where('c.companyId = :companyId')
+            ->andWhere('c.periodFrom <= :periodTo')
+            ->andWhere('c.periodTo >= :periodFrom')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('periodFrom', $periodFrom)
+            ->setParameter('periodTo', $periodTo)
+            ->orderBy('c.checkedAt', 'DESC')
+            ->addOrderBy('c.createdAt', 'DESC')
+            ->getQuery()
+            ->setMaxResults(1)
+            ->getOneOrNullResult();
+    }
+
     /**
      * Возвращает только актуальные FAILED-проверки (latest by rawDocumentId).
      *
