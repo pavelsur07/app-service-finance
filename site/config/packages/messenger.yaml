@@ -17,6 +17,27 @@ framework:
                     delay: 5000
                     multiplier: 2
 
+            ingest_fetch:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN_SYNC)%'
+                retry_strategy:
+                    max_retries: 3
+                    delay: 10000
+                    multiplier: 2
+
+            ingest_normalize:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN_PIPELINE)%'
+                retry_strategy:
+                    max_retries: 3
+                    delay: 5000
+                    multiplier: 2
+
+            pnl_rebuild:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN_PIPELINE)%'
+                retry_strategy:
+                    max_retries: 3
+                    delay: 30000
+                    multiplier: 2
+
             async_wb_finance:
                 dsn: '%env(MESSENGER_TRANSPORT_DSN_WB_FINANCE)%'
                 retry_strategy:
@@ -58,6 +79,7 @@ framework:
             'Symfony\Component\Notifier\Message\ChatMessage': async_sync
             'Symfony\Component\Notifier\Message\SmsMessage': async_sync
             'App\Inventory\Message\SyncOzonInventorySnapshotMessage': async_sync
+            'App\Ingestion\Message\RunSyncChunkMessage': ingest_fetch
 
             # --- async_pipeline: local CPU/DB processing of already-fetched data ---
             'App\Marketplace\Message\ProcessDayReportMessage': async_pipeline
@@ -73,6 +95,9 @@ framework:
             'App\MarketplaceAds\Message\ProcessAdRawDocumentMessage': async_pipeline
             'App\MarketplaceAds\Message\DownloadOzonAdReportMessage': async_pipeline
             'App\Inventory\Message\NormalizeInventorySnapshotMessage': async_pipeline
+            'App\Ingestion\Message\NormalizeRawRecordMessage': ingest_normalize
+            'App\Finance\Message\MarkPnlPeriodDirtyMessage': ingest_normalize
+            'App\Finance\Message\RebuildPnlPeriodMessage': pnl_rebuild
 
             # --- async_ads: Ozon Performance polling (may block up to 10 min per message) ---
             'App\MarketplaceAds\Message\LoadOzonAdStatisticsRangeMessage': async_ads

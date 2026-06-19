@@ -6,6 +6,7 @@ namespace App\Ingestion\Repository;
 
 use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Enum\IngestSource;
+use App\Ingestion\Enum\RawNormalizationStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -28,6 +29,11 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
             ->setParameter('rawRecordId', $rawRecordId)
             ->getQuery()
             ->getOneOrNullResult();
+    }
+
+    public function findByIdAndCompany(string $rawRecordId, string $companyId): ?IngestRawRecord
+    {
+        return $this->findOneByIdAndCompany($companyId, $rawRecordId);
     }
 
     public function findLatestByCompanySourceExternalId(
@@ -72,5 +78,24 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
             ->setParameter('hash', $hash)
             ->getQuery()
             ->getOneOrNullResult();
+    }
+
+    /**
+     * @return list<IngestRawRecord>
+     */
+    public function findStuckPending(\DateTimeImmutable $olderThan, int $limit): array
+    {
+        $limit = max(1, min(200, $limit));
+
+        return $this->createQueryBuilder('record')
+            ->andWhere('record.normalizationStatus = :status')
+            ->andWhere('record.fetchedAt < :olderThan')
+            ->setParameter('status', RawNormalizationStatus::PENDING->value)
+            ->setParameter('olderThan', $olderThan)
+            ->orderBy('record.fetchedAt', 'ASC')
+            ->addOrderBy('record.createdAt', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
     }
 }

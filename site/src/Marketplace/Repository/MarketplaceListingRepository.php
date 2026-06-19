@@ -76,6 +76,32 @@ class MarketplaceListingRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    public function findBySupplierSku(
+        Company|string $company,
+        MarketplaceType $marketplace,
+        string $supplierSku,
+    ): ?MarketplaceListing {
+        $qb = $this->createQueryBuilder('l')
+            ->andWhere('l.marketplace = :marketplace')
+            ->andWhere('l.supplierSku = :supplierSku')
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('supplierSku', $supplierSku)
+            ->orderBy('l.id', 'ASC')
+            ->setMaxResults(2);
+
+        if ($company instanceof Company) {
+            $qb->andWhere('l.company = :company');
+        } else {
+            $qb->andWhere('IDENTITY(l.company) = :company');
+        }
+
+        $qb->setParameter('company', $company);
+
+        $matches = $qb->getQuery()->getResult();
+
+        return 1 === count($matches) ? $matches[0] : null;
+    }
+
     public function save(MarketplaceListing $listing): void
     {
         $this->getEntityManager()->persist($listing);
@@ -123,19 +149,29 @@ class MarketplaceListingRepository extends ServiceEntityRepository
     }
 
     public function findByMarketplaceSku(
-        Company $company,
+        Company|string $company,
         MarketplaceType $marketplace,
         string $marketplaceSku,
     ): ?MarketplaceListing {
-        return $this->createQueryBuilder('l')
-            ->where('l.company = :company')
+        $qb = $this->createQueryBuilder('l')
             ->andWhere('l.marketplace = :marketplace')
             ->andWhere('l.marketplaceSku = :sku')
-            ->setParameter('company', $company)
             ->setParameter('marketplace', $marketplace)
             ->setParameter('sku', $marketplaceSku)
-            ->getQuery()
-            ->getOneOrNullResult();
+            ->orderBy('l.id', 'ASC')
+            ->setMaxResults(2);
+
+        if ($company instanceof Company) {
+            $qb->andWhere('l.company = :company');
+        } else {
+            $qb->andWhere('IDENTITY(l.company) = :company');
+        }
+
+        $qb->setParameter('company', $company);
+
+        $matches = $qb->getQuery()->getResult();
+
+        return 1 === count($matches) ? $matches[0] : null;
     }
 
     public function findByNmIdAndSize(

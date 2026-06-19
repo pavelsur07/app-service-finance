@@ -70,6 +70,12 @@
 | `IngestionTenantProbe` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
 | `IngestionCredential` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
 | `IngestRawRecord` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
+| `IngestCursor` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
+| `SyncJob` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
+| `FinancialTransaction` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
+| `SystemCounterparty` | Ingestion | global dictionary, no company filter |
+| `NormalizationIssue` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
+| `PLDirtyPeriod` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
 | `ProductImport` | Catalog | `string $companyId` ✅ |
 | `ProductBarcode` | Catalog | `string $companyId` ✅ |
 | `ProductPurchasePrice` | Catalog | `string $companyId` ✅ |
@@ -93,8 +99,49 @@
 - `IngestRawRecord` хранит только metadata: company/connection/shop/source/resource/external id, storage path, hash, byte size, fetched/sync timestamps и normalization status. Payload в БД не хранится.
 - Payload записывается как canonical NDJSON, gzip-compressed, один файл на `RawBatch` chunk. Путь: `{company}/{source}/{shop}/{resource}/{yyyy}/{mm}/{dd}/{syncJobId}/{externalId}/{hash}.ndjson.gz`, чтобы несколько batch внутри одного sync job не перезаписывали друг друга.
 - Dedup: перед записью сверяется SHA-256 hash canonical uncompressed NDJSON по `(companyId, source, resourceType, externalId)`. Совпавший hash обновляет `lastSeenAt`; новый object не создаётся.
+- `app:ingestion:normalize-pending` is the cron safety net for raw records that remain `PENDING` after fetch/dispatch interruptions. It scans stale pending rows by `(normalization_status, fetched_at)` and re-dispatches `NormalizeRawRecordMessage`; it does not normalize inline.
 - Storage seam общий для проекта: `App\Shared\Service\Storage\ObjectStorageInterface`. Default driver — `local`, он делегирует запись в существующий `StorageService`; S3 driver через Flysystem включается только явным `APP_OBJECT_STORAGE_DRIVER=s3` и `APP_OBJECT_STORAGE_S3_*`.
 - Legacy-модули пока продолжают использовать `StorageService` напрямую. Их переезд на `ObjectStorageInterface` выполняется отдельными задачами, по одному модулю.
+
+### Ingestion: cursor and sync jobs
+
+- `IngestCursor` stores opaque cursor state for `(companyId, connectionRef, resourceType, shopRef)` and advances only through `UpdateCursorAction` / `SyncFacade::updateCursor`.
+- `SyncJob` stores orchestration state for backfill, incremental, and manual sync runs. Parent backfill jobs are split into child chunk jobs; children are dispatched as `RunSyncChunkMessage` through `ingest_fetch`.
+- `SyncJobStatus` owns the explicit state transition matrix. Entity methods reject invalid transitions and terminal jobs cannot be reopened.
+- Repository reads require explicit `companyId`; the Doctrine `company` filter is an additional guard, not the only tenant boundary.
+- `SyncFacade::startBackfill()` creates a parent job, splits it into 7-day chunks by default, and dispatches chunk messages after DB flush.
+- `RunSyncChunkHandler` resolves a `SourceConnectorInterface` through `ConnectorRegistry`, pulls one chunk, stores raw payload through `RawStorageFacade`, dispatches `NormalizeRawRecordMessage`, advances cursor, and finalizes the job.
+- `ingest_fetch` uses the sync transport DSN for external source fetches; `ingest_normalize` uses the pipeline DSN for local normalization work.
+
+### Ingestion: canonical finance layer
+
+- `FinancialTransaction` is the canonical transaction record produced from normalized raw source rows. Natural key: `(companyId, source, externalId, type)`.
+- Amounts are stored in minor units. Shared `Money` is signed and can represent positive, negative, or zero values; `TransactionDirection` (`IN`/`OUT`) remains the normalized flow classification. `Money` enforces one ISO-4217 currency per arithmetic operation.
+- `operationGroupId` groups decomposed transactions from one source operation for audit and sum-control checks.
+- `SystemCounterparty` is a global source dictionary (`source`, `name`, optional `inn`) for marketplace/system counterparties. It is not tenant-owned and is resolved by source during normalization; missing source rows leave `FinancialTransaction.counterpartyId = null` and are logged.
+- `FinancialTransaction.listingId` and `listingSku` are nullable marketplace listing attribution fields. Missing or ambiguous listing matches must not block normalization.
+- `ListingResolverInterface` resolves source-specific listing attribution from `MappedTransaction.sourceData`; implementations are registered with `app.ingestion.listing_resolver`. `OzonListingResolver` uses supplier SKU (`offer_id`/`item_code`) and marketplace SKU fallbacks; WB resolver is intentionally a warning-only stub until WB ingestion mapping is defined.
+- `MarketplaceListingFacade` is the Ingestion-facing boundary to legacy Marketplace listing repositories. Ingestion must not query Marketplace entities directly outside this facade.
+- `NormalizationIssue` is append-only for mapper failures, control-sum mismatches, unknown fields, and currency mismatches; resolving sets `resolvedAt`.
+- Repository reads require explicit `companyId`; period reads use `toIterable()` for future P&L rebuilds over large months.
+- `SourceConnectorInterface` is the per-source boundary for `discoverShops`, `pull`, and future `push`. Production connectors must be registered with `app.ingestion.connector`.
+- `SourceMapperInterface` maps raw rows to `MappedTransaction` DTOs and control sums. Mappers are pure and registered with `app.ingestion.mapper`.
+- `OzonSellerReportConnector` is the first production source connector. It supports `ozon_seller_daily_report` (`/v3/finance/transaction/list`) and `ozon_seller_realization` (`/v2/finance/realization`) through the Ingestion Ozon adapter. Legacy Marketplace Ozon jobs remain enabled until a later shadow/switch task.
+- `OzonSellerReportMapper` and `OzonRealizationMapper` decompose one Ozon operation into multiple canonical transactions with a shared `operationGroupId`. External ids use `ozon:operation:{operation_id}:{component}` so multiple same-type Ozon components can coexist under the current `(companyId, source, externalId, type)` natural key.
+- `NormalizeRawRecordAction` reads NDJSON raw payload, calls the mapper, upserts canonical transactions, records `NormalizationIssue` on mapper/control-sum problems, marks the raw record `DONE`/`FAILED`, and dispatches `NormalizationCompletedEvent` after successful flush.
+- `NormalizationCompletedEvent` carries affected periods for future P&L dirty-period marking. Stage 4 only publishes the event; subscribers for P&L rebuild are added later.
+
+### Finance: P&L dirty-period projection infrastructure
+
+- `PLDirtyPeriod` is the Ingestion-side pipeline marker for month-level P&L projection rebuilds from canonical Ingestion transactions. It uses scalar `companyId`, `periodYear`, `periodMonth`, `shopRef`, `status`, `reason`, attempts, and audit timestamps.
+- Status flow is explicit: `pending -> rebuilding -> done|failed|blocked_by_close`; terminal statuses can be reopened to `pending` when a later import/remap needs another rebuild.
+- `PLDailyTotal` and `PLMonthlySnapshot` now have nullable `rebuiltAt` audit columns. Legacy writers leave them `NULL`; future canonical rebuild code sets them when it owns the recalculation.
+- Existing P&L aggregate tables do not store `shop_ref` and must not receive a source/shop dimension. Repository delete methods support all-shop monthly cleanup (`shopRef = ''`) and reject non-empty `shopRef`; source linkage should be decided later at `Document` / `DocumentOperation` level under `docs/tasks/ingestion/FOLLOWUP-finance-source-linking.md`.
+- `NormalizationCompletedSubscriber` listens to Ingestion normalization events and dispatches `MarkPnlPeriodDirtyMessage`; it does not rebuild P&L inline.
+- `MarkPnlPeriodDirtyAction` is idempotent. Existing `DONE`/`FAILED` periods are reopened to `PENDING`; already pending/rebuilding/blocked periods are left unchanged.
+- `RebuildPnlPeriodAction` owns the Redis/Symfony Lock, close-period guard, delete-then-upsert rebuild, and `rebuiltAt` audit marking. It supports only all-source/all-shop rebuild (`shopRef = ''`) until Finance source-linking is decided.
+- `RebuildDirtyPnlPeriodsCommand` only dispatches `RebuildPnlPeriodMessage` jobs for pending dirty periods. No production cron entry is added by Ingestion Stage 8.
+- `pnl_rebuild` Messenger transport uses `MESSENGER_TRANSPORT_DSN_PIPELINE`. `MarkPnlPeriodDirtyMessage` routes to `ingest_normalize`; `RebuildPnlPeriodMessage` routes to `pnl_rebuild`.
 
 ### Marketplace: WB financial report sync status (дневной статус)
 
@@ -347,6 +394,36 @@ Dead code на Task-11.2: Repository ещё никем не вызывается
 
 > Используй **только** эти методы. Не выдумывай новые без обновления этого файла.
 > Нет нужного метода — спроси, не создавай самостоятельно.
+
+### `IngestionFacade` (`src/Ingestion/Facade/IngestionFacade.php`)
+```php
+// Канонические финансовые транзакции за период для P&L rebuild.
+// @return iterable<FinancialTransaction>
+getTransactions(string $companyId, DateTimeImmutable $from, DateTimeImmutable $to, ?string $shopRef = null): iterable
+
+// Количество открытых normalization issues по компании.
+countOpenIssues(string $companyId): int
+```
+
+### `MarketplaceListingFacade` (`src/Ingestion/Facade/MarketplaceListingFacade.php`)
+```php
+findBySupplierSku(string $companyId, string $marketplace, string $supplierSku): ?string
+findByMarketplaceSku(string $companyId, string $marketplace, string $marketplaceSku): ?string
+findByBarcode(string $companyId, string $marketplace, string $barcode): ?string
+```
+
+### `PnlFacade` (`src/Finance/Facade/PnlFacade.php`)
+```php
+markPeriodDirty(MarkPnlPeriodDirtyCommand $command): void
+rebuildPeriod(RebuildPnlPeriodCommand $command): void
+
+// Dirty-period views for future UI/admin blocks.
+// @return list<PLDirtyPeriodView>
+getDirtyPeriods(string $companyId): array
+
+// Counters by status: pending/rebuilding/done/failed/blocked.
+getProgress(string $companyId): PnlProgressView
+```
 
 ### `CompanyFacade` (`src/Company/Facade/CompanyFacade.php`)
 ```php

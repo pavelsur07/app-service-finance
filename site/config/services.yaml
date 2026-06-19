@@ -125,6 +125,52 @@ services:
     App\Ingestion\Facade\RawStorageFacade:
         public: true
 
+    App\Ingestion\Facade\SyncFacade:
+        public: true
+
+    App\Ingestion\Facade\IngestionFacade:
+        public: true
+
+    App\Ingestion\Facade\MarketplaceListingFacade:
+        public: true
+
+    App\Finance\Facade\PnlFacade:
+        public: true
+
+    App\Ingestion\Infrastructure\Api\Ozon\OzonCredentialProviderInterface: '@App\Ingestion\Infrastructure\Api\Ozon\CredentialFacadeOzonCredentialProvider'
+    App\Ingestion\Infrastructure\Api\Ozon\OzonClientAdapterInterface: '@App\Ingestion\Infrastructure\Api\Ozon\LegacyOzonClientAdapter'
+
+    App\Ingestion\Application\Source\Ozon\OzonSellerReportConnector:
+        arguments:
+            $chunkSizeDays: 7
+            $hotRewindDays: 14
+            $rateLimitRpm: 60
+        tags: ['app.ingestion.connector']
+
+    App\Ingestion\Application\Source\Ozon\OzonSellerReportMapper:
+        tags: ['app.ingestion.mapper']
+
+    App\Ingestion\Application\Source\Ozon\OzonRealizationMapper:
+        tags: ['app.ingestion.mapper']
+
+    App\Ingestion\Domain\Service\ConnectorRegistry:
+        arguments:
+            $connectors: !tagged_iterator app.ingestion.connector
+
+    App\Ingestion\Domain\Service\MapperRegistry:
+        arguments:
+            $mappers: !tagged_iterator app.ingestion.mapper
+
+    App\Ingestion\Application\Service\ListingResolverRegistry:
+        arguments:
+            $resolvers: !tagged_iterator app.ingestion.listing_resolver
+
+    App\Ingestion\Application\Source\Ozon\OzonListingResolver:
+        tags: ['app.ingestion.listing_resolver']
+
+    App\Ingestion\Application\Source\Wildberries\WbListingResolver:
+        tags: ['app.ingestion.listing_resolver']
+
     App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdaterInterface: '@App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdater'
     App\Marketplace\Application\Service\WbGeneratedRowsSafeReplaceServiceInterface: '@App\Marketplace\Application\Service\WbGeneratedRowsSafeReplaceService'
     App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusLookupInterface: '@App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusRepository'

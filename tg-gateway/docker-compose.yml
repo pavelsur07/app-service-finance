@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+    traefik:
+        image: traefik:v3.7.5
+        container_name: tg-traefik
+        restart: always
+        environment:
+            - TZ=Europe/Moscow
+            - DOCKER_API_VERSION=1.40
+        command:
+            - --api.dashboard=true
+            - --api.insecure=true
+            - --providers.docker=true
+            - --providers.docker.exposedByDefault=false
+            - --entrypoints.http.address=:80
+            - --entrypoints.https.address=:443
+            - --certificatesresolvers.letsEncrypt.acme.httpChallenge=true
+            - --certificatesresolvers.letsEncrypt.acme.httpChallenge.entryPoint=http
+            - --certificatesresolvers.letsEncrypt.acme.email=support@vashfindir.ru
+            - --certificatesresolvers.letsEncrypt.acme.storage=/certs/acme.json
+            - --log.level=INFO
+            - --providers.docker.defaultRule=
+        ports:
+            - "80:80"
+            - "443:443"
+            - "127.0.0.1:8080:8080"
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+            - tg-traefik-certs:/certs
+        networks:
+            - traefik-public
+        labels:
+            - traefik.enable=true
+
+            # HTTP -> HTTPS
+            - traefik.http.routers.http-catchall.rule=Host(`tg.vashfindir.ru`)
+            - traefik.http.routers.http-catchall.entrypoints=http
+            - traefik.http.routers.http-catchall.middlewares=redirect-to-https
+            - traefik.http.routers.http-catchall.priority=1
+
+            - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+            - traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true
+
+    tg-nginx:
+        image: nginx:1.25-alpine
+        container_name: tg-gateway-nginx
+        restart: always
+        expose:
+            - "80"
+        networks:
+            - traefik-public
+            - default
+        volumes:
+            - ./nginx/tg.conf:/etc/nginx/conf.d/default.conf:ro
+        healthcheck:
+            test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
+            interval: 5s
+            timeout: 3s
+            retries: 5
+            start_period: 5s
+        labels:
+            - traefik.enable=true
+
+            # HTTPS router только для webhook
+            - traefik.http.routers.tg-webhook.rule=Host(`tg.vashfindir.ru`) && Path(`/telegram/webhook`)
+            - traefik.http.routers.tg-webhook.entrypoints=https
+            - traefik.http.routers.tg-webhook.tls=true
+            - traefik.http.routers.tg-webhook.tls.certresolver=letsEncrypt
+            - traefik.http.services.tg-webhook.loadbalancer.server.port=80
+            - traefik.http.routers.tg-webhook.priority=10
+            - traefik.docker.network=traefik-public
+
+volumes:
+    tg-traefik-certs:
+
+networks:
+    traefik-public:
+        name: traefik-public
+        driver: bridge

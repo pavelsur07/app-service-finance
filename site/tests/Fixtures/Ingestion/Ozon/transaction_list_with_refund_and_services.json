@@ -1,0 +1,33 @@
+{
+  "rows": [
+    {
+      "operation_id": "refund-1001",
+      "operation_type": "ClientReturnAgentOperation",
+      "operation_type_name": "Возврат покупателя",
+      "operation_date": "2026-02-19T10:15:00+00:00",
+      "posting": {
+        "posting_number": "12345-0002-1"
+      },
+      "items": [
+        {
+          "sku": "100200301",
+          "name": "Anonymized returned product"
+        }
+      ],
+      "amount": "-550.40",
+      "sale_commission_amount": "55.04",
+      "return_delivery_charge_amount": "-20.00",
+      "services": [
+        {
+          "name": "MarketplaceServiceItemReturnAfterDelivToCustomer",
+          "price": "-15.00"
+        },
+        {
+          "name": "Premium placement",
+          "price": "-7.50"
+        }
+      ],
+      "currency": "RUB"
+    }
+  ]
+}

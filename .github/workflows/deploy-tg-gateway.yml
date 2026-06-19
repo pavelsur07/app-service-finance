@@ -1,0 +1,63 @@
+name: 🚀 Deploy TG Gateway
+
+on:
+    workflow_dispatch:
+
+    push:
+        branches: [ master ]
+        paths:
+            - 'tg-gateway/**'
+            - '.github/workflows/deploy-tg-gateway.yml'
+
+jobs:
+    deploy-tg-gateway:
+        name: 🚀 Deploy tg.vashfindir.ru gateway
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: 📦 Checkout repository
+              uses: actions/checkout@v4
+
+            - name: 🛠 Install zip
+              run: sudo apt-get update && sudo apt-get install -y zip
+
+            - name: 🔐 Setup SSH key
+              uses: webfactory/ssh-agent@v0.8.0
+              with:
+                  ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+            - name: 📦 Create tg-gateway archive
+              run: |
+                  zip -r tg-gateway.zip tg-gateway/
+
+            - name: 📤 Upload archive to Spain VPS
+              run: |
+                  scp -o StrictHostKeyChecking=no \
+                    tg-gateway.zip \
+                    ${{ secrets.TG_SERVER_USER }}@${{ secrets.TG_SERVER_HOST }}:${{ secrets.TG_SERVER_DIR }}
+
+            - name: 🚀 Deploy tg-gateway
+              run: |
+                  ssh -o StrictHostKeyChecking=no \
+                    ${{ secrets.TG_SERVER_USER }}@${{ secrets.TG_SERVER_HOST }} << 'EOF'
+                      set -e
+                  
+                      cd ${{ secrets.TG_SERVER_DIR }}
+                  
+                      echo "📦 Распаковка tg-gateway"
+                      rm -rf ./current
+                      mkdir -p ./current
+                      unzip -o tg-gateway.zip -d ./current
+                      rm tg-gateway.zip
+                  
+                      cd ./current/tg-gateway
+                  
+                      echo "🐳 Запуск tg-gateway"
+                      docker compose pull
+                      docker compose up -d --remove-orphans
+                  
+                      echo "🧹 Очистка старых образов"
+                      docker image prune -f
+                  
+                      echo "✅ tg-gateway deploy completed"
+                  EOF
