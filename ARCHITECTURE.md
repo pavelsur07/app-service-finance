@@ -110,6 +110,7 @@
 - `SyncJobStatus` owns the explicit state transition matrix. Entity methods reject invalid transitions and terminal jobs cannot be reopened.
 - Repository reads require explicit `companyId`; the Doctrine `company` filter is an additional guard, not the only tenant boundary.
 - `SyncFacade::startBackfill()` creates a parent job, splits it into 7-day chunks by default, and dispatches chunk messages after DB flush.
+- `SyncFacade::startIncremental()` creates one non-windowed incremental job and dispatches one `RunSyncChunkMessage` after DB flush; the worker reads the shared cursor for that `(companyId, connectionRef, resourceType, shopRef)`.
 - `RunSyncChunkHandler` resolves a `SourceConnectorInterface` through `ConnectorRegistry`, pulls one chunk, stores raw payload through `RawStorageFacade`, dispatches `NormalizeRawRecordMessage`, advances cursor, and finalizes the job.
 - `ingest_fetch` uses the sync transport DSN for external source fetches; `ingest_normalize` uses the pipeline DSN for local normalization work.
 
