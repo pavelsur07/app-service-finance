@@ -132,21 +132,6 @@
 
             {% include "partials/_sidebar_report.html.twig" %}
 
-            {% set ingestion_verification_active = current_route starts with 'ingestion_verification_' %}
-            <li class="nav-item dropdown {{ ingestion_verification_active ? 'show' : '' }}">
-                <a class="nav-link dropdown-toggle {{ ingestion_verification_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ ingestion_verification_active ? 'true' : 'false' }}">
-                    <span class="nav-link-icon"><i class="ti ti-cloud-upload"></i></span>
-                    <span class="nav-link-title">Загрузка данных</span>
-                </a>
-                <div class="dropdown-menu {{ ingestion_verification_active ? 'show' : '' }}">
-                    <div class="dropdown-menu-column">
-                        <a class="dropdown-item {{ ingestion_verification_active ? 'active' : '' }}" href="{{ path('ingestion_verification_index') }}">
-                            <span>Финансы</span>
-                        </a>
-                    </div>
-                </div>
-            </li>
-
             <!-- Справочники -->
             <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle" href="#navbar-base" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
@@ -294,15 +279,15 @@
                             <div class="dropdown-menu {{ reports_debug_show }}">
                                 {% set report_statement_active = current_route starts with 'report_transactions_statement_' %}
                                 <a class="dropdown-item {{ report_statement_active ? 'active' : '' }}" href="{{ path('report_transactions_statement_index') }}">
-                                    <spam>Выписка/Стейтмент</span>
+                                    <span>Выписка/Стейтмент</span>
                                 </a>
 {#                                {% set report_debug_active = current_route starts with 'report_transactions_debug_' %}
                                 <a class="dropdown-item {{ report_debug_active ? 'active' : '' }}" href="{{ path('report_transactions_debug_index') }}">
-                                    <span>Отчёт отладка</spam>
+                                    <span>Отчёт отладка</span>
                                 </a>#}
                                {# {% set report_raw_transactions_active = current_route starts with 'report_debug_transactions_raw' %}
                                 <a class="dropdown-item {{ report_raw_transactions_active ? 'active' : '' }}" href="{{ path('report_debug_transactions_raw') }}">
-                                    <span>Отчёт «Сырые транзакции»</spam>
+                                    <span>Отчёт «Сырые транзакции»</span>
                                 </a>#}
                                 {#{% set report_daily_facts_active = current_route starts with 'report_debug_daily_facts' %}
                                 <a class="dropdown-item {{ report_daily_facts_active ? 'active' : '' }}" href="{{ path('report_debug_daily_facts') }}">
@@ -310,7 +295,7 @@
                                 </a>#}
                                 {% set finance_report_raw_active = current_route starts with 'finance_report_raw' %}
                                 <a class="dropdown-item {{ finance_report_raw_active ? 'active' : '' }}" href="{{ path('finance_report_raw') }}">
-                                    <span>Сырые транзакции ОПиУ</spam>
+                                    <span>Сырые транзакции ОПиУ</span>
                                 </a>
                                 {% set finance_report_pl_raw_active = current_route starts with 'finance_report_pl_raw' %}
                                 <a class="dropdown-item {{ finance_report_pl_raw_active ? 'active' : '' }}" href="{{ path('finance_report_pl_raw') }}">

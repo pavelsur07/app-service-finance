@@ -12,7 +12,7 @@
 - Extended the page functional test to cover redirect, sidebar link, tab count, active tab href, and active tab label.
 
 #### Files changed
-- `site/templates/partials/_sidebar.html.twig` — modified
+- `site/templates/partials/_sidebar_report.html.twig` — modified
 - `site/templates/ingestion/verification/_finance_tabs.html.twig` — new
 - `site/templates/ingestion/verification/_tabs.html.twig` — compatibility include
 - `site/templates/ingestion/verification/{coverage,reconciliation,issues,financial-summary}.html.twig` — modified

@@ -86,4 +86,18 @@
 </li>
 <!-- Справочники -->
 
+{% set ingestion_verification_active = current_route starts with 'ingestion_verification_' %}
+<li class="nav-item dropdown {{ ingestion_verification_active ? 'show' : '' }}">
+    <a class="nav-link dropdown-toggle {{ ingestion_verification_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ ingestion_verification_active ? 'true' : 'false' }}">
+        <span class="nav-link-icon"><i class="ti ti-cloud-upload"></i></span>
+        <span class="nav-link-title">Загрузка данных</span>
+    </a>
+    <div class="dropdown-menu {{ ingestion_verification_active ? 'show' : '' }}">
+        <div class="dropdown-menu-column">
+            <a class="dropdown-item {{ ingestion_verification_active ? 'active' : '' }}" href="{{ path('ingestion_verification_index') }}">
+                <span>Финансы</span>
+            </a>
+        </div>
+    </div>
+</li>
 
