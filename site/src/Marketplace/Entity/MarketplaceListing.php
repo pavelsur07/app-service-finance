@@ -13,6 +13,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Table(name: 'marketplace_listings')]
 #[ORM\Index(columns: ['company_id', 'marketplace'], name: 'idx_company_marketplace')]
 #[ORM\Index(columns: ['marketplace', 'marketplace_sku'], name: 'idx_marketplace_sku')]
+#[ORM\Index(columns: ['company_id', 'marketplace', 'supplier_sku'], name: 'idx_marketplace_listing_company_supplier_sku')]
 #[ORM\UniqueConstraint(
     name: 'uniq_company_marketplace_sku_size',
     columns: ['company_id', 'marketplace', 'marketplace_sku', 'size']

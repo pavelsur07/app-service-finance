@@ -26,6 +26,8 @@ final class FinancialTransactionTest extends TestCase
         self::assertSame('RUB', $transaction->getCurrency());
         self::assertSame('Europe/Moscow', $transaction->getSourceTz());
         self::assertSame(['row' => 1], $transaction->getSourceData());
+        self::assertSame('44444444-4444-4444-8444-444444444444', $transaction->getListingId());
+        self::assertSame('sku-1', $transaction->getListingSku());
     }
 
     public function testReplaceFromNewerVersionUpdatesMutableFieldsAndKeepsOldOccurredAt(): void
@@ -45,6 +47,8 @@ final class FinancialTransactionTest extends TestCase
             counterpartyId: null,
             description: 'updated',
             sourceData: ['row' => 2],
+            listingId: '55555555-5555-4555-8555-555555555555',
+            listingSku: 'sku-2',
         );
 
         self::assertSame(15000, $transaction->getAmountMinor());
@@ -52,6 +56,8 @@ final class FinancialTransactionTest extends TestCase
         self::assertSame($oldOccurredAt, $transaction->oldOccurredAt());
         self::assertSame('order-2', $transaction->getOrderRef());
         self::assertSame(['row' => 2], $transaction->getSourceData());
+        self::assertSame('55555555-5555-4555-8555-555555555555', $transaction->getListingId());
+        self::assertSame('sku-2', $transaction->getListingSku());
     }
 
     public function testReplaceRejectsStaleVersion(): void
@@ -95,6 +101,8 @@ final class FinancialTransactionTest extends TestCase
             description: 'sale',
             sourceData: ['row' => 1],
             sourceTz: 'Europe/Moscow',
+            listingId: '44444444-4444-4444-8444-444444444444',
+            listingSku: 'sku-1',
         );
     }
 }

@@ -81,9 +81,11 @@
 # Раз в час: пересчёт оперативных P&L-агрегатов
 #5 * * * * php /app/bin/console app:pl:rebuild --no-interaction
 
+# Страховка для зависших PENDING raw-records: повторно ставит нормализацию в очередь.
+*/10 * * * * cd /app && php bin/console app:ingestion:normalize-pending --limit=50 --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Ежедневно в 02:10: снапшоты остатков по счетам
 #10 2 * * * php /app/bin/console app:money-account:snapshot --no-interaction
 
 # Ежедневно в 03:00: чистка логов/временных таблиц
 #0 3 * * * php /app/bin/console app:maintenance:cleanup --env=prod
-

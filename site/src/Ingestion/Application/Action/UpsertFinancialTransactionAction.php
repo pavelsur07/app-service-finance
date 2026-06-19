@@ -49,6 +49,8 @@ final readonly class UpsertFinancialTransactionAction
                 description: $mapped->description,
                 sourceData: $mapped->sourceData,
                 sourceTz: $mapped->sourceTz,
+                listingId: $command->listingId,
+                listingSku: $command->listingSku,
             );
 
             $this->entityManager->persist($transaction);
@@ -76,6 +78,8 @@ final readonly class UpsertFinancialTransactionAction
                 counterpartyId: $command->counterpartyId,
                 description: $mapped->description,
                 sourceData: $mapped->sourceData,
+                listingId: $command->listingId,
+                listingSku: $command->listingSku,
             );
         } catch (StaleTransactionUpdateException) {
             return null;

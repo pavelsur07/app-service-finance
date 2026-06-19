@@ -131,6 +131,9 @@ services:
     App\Ingestion\Facade\IngestionFacade:
         public: true
 
+    App\Ingestion\Facade\MarketplaceListingFacade:
+        public: true
+
     App\Finance\Facade\PnlFacade:
         public: true
 
@@ -157,6 +160,16 @@ services:
     App\Ingestion\Domain\Service\MapperRegistry:
         arguments:
             $mappers: !tagged_iterator app.ingestion.mapper
+
+    App\Ingestion\Application\Service\ListingResolverRegistry:
+        arguments:
+            $resolvers: !tagged_iterator app.ingestion.listing_resolver
+
+    App\Ingestion\Application\Source\Ozon\OzonListingResolver:
+        tags: ['app.ingestion.listing_resolver']
+
+    App\Ingestion\Application\Source\Wildberries\WbListingResolver:
+        tags: ['app.ingestion.listing_resolver']
 
     App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdaterInterface: '@App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdater'
     App\Marketplace\Application\Service\WbGeneratedRowsSafeReplaceServiceInterface: '@App\Marketplace\Application\Service\WbGeneratedRowsSafeReplaceService'
