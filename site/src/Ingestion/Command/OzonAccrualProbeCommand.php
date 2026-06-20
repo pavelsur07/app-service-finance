@@ -31,10 +31,10 @@ final class OzonAccrualProbeCommand extends Command
             ->addOption('company-id', null, InputOption::VALUE_REQUIRED, 'Company UUID.')
             ->addOption('connection-ref', null, InputOption::VALUE_REQUIRED, 'Marketplace connection UUID.')
             ->addOption('endpoint', null, InputOption::VALUE_REQUIRED, 'Endpoint: postings, by-day, or types.', 'postings')
-            ->addOption('from', null, InputOption::VALUE_REQUIRED, 'Start date YYYY-MM-DD. Required for postings and by-day.')
-            ->addOption('to', null, InputOption::VALUE_REQUIRED, 'End date YYYY-MM-DD. Required for postings and by-day.')
+            ->addOption('posting-number', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Ozon posting number. Repeat up to 200 times for postings endpoint.')
+            ->addOption('from', null, InputOption::VALUE_REQUIRED, 'Start date YYYY-MM-DD. Required for by-day.')
+            ->addOption('to', null, InputOption::VALUE_REQUIRED, 'End date YYYY-MM-DD. Required for by-day.')
             ->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Sample rows to show, 1..20.', 5)
-            ->addOption('page-size', null, InputOption::VALUE_REQUIRED, 'Postings page size, 1..1000.', 100)
             ->addOption('with-values', null, InputOption::VALUE_NONE, 'Print truncated sample JSON values. By default only keys are shown.');
     }
 
@@ -47,12 +47,10 @@ final class OzonAccrualProbeCommand extends Command
             $connectionRef = $this->requiredUuidOption($input, 'connection-ref');
             $endpoint = $this->endpoint($input);
             $limit = $this->intOption($input, 'limit', 1, 20);
-            $pageSize = $this->intOption($input, 'page-size', 1, 1000);
-            [$from, $to] = 'types' === $endpoint ? [null, null] : $this->requiredDateWindow($input);
 
             $page = match ($endpoint) {
-                'postings' => $this->client->fetchPostings($companyId, $connectionRef, $from, $to, 1, $pageSize),
-                'by-day' => $this->client->fetchByDay($companyId, $connectionRef, $from, $to),
+                'postings' => $this->client->fetchPostings($companyId, $connectionRef, $this->postingNumbers($input)),
+                'by-day' => $this->fetchByDay($input, $companyId, $connectionRef),
                 'types' => $this->client->fetchTypes($companyId, $connectionRef),
             };
         } catch (\Throwable $exception) {
@@ -125,6 +123,45 @@ final class OzonAccrualProbeCommand extends Command
         }
 
         return $date;
+    }
+
+    private function fetchByDay(InputInterface $input, string $companyId, string $connectionRef): OzonRawPage
+    {
+        [$from, $to] = $this->requiredDateWindow($input);
+
+        return $this->client->fetchByDay($companyId, $connectionRef, $from, $to);
+    }
+
+    /**
+     * @return non-empty-list<string>
+     */
+    private function postingNumbers(InputInterface $input): array
+    {
+        $values = $input->getOption('posting-number');
+        if (!is_array($values)) {
+            $values = [$values];
+        }
+
+        $postingNumbers = [];
+        foreach ($values as $value) {
+            $postingNumber = trim((string) $value);
+            if ('' === $postingNumber) {
+                continue;
+            }
+
+            $postingNumbers[$postingNumber] = $postingNumber;
+        }
+
+        $postingNumbers = array_values($postingNumbers);
+        if ([] === $postingNumbers) {
+            throw new \InvalidArgumentException('The --posting-number option is required for postings endpoint.');
+        }
+
+        if (count($postingNumbers) > 200) {
+            throw new \InvalidArgumentException('The postings endpoint supports at most 200 --posting-number values.');
+        }
+
+        return $postingNumbers;
     }
 
     private function intOption(InputInterface $input, string $name, int $min, int $max): int

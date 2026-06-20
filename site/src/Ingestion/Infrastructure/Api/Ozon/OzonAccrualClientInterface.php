@@ -6,13 +6,13 @@ namespace App\Ingestion\Infrastructure\Api\Ozon;
 
 interface OzonAccrualClientInterface
 {
+    /**
+     * @param list<string> $postingNumbers Ozon posting numbers, 1..200 per request.
+     */
     public function fetchPostings(
         string $companyId,
         string $connectionRef,
-        \DateTimeImmutable $from,
-        \DateTimeImmutable $to,
-        int $page,
-        int $pageSize,
+        array $postingNumbers,
     ): OzonRawPage;
 
     public function fetchByDay(

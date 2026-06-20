@@ -124,7 +124,7 @@ final class StartBackfillCommandTest extends IntegrationTestCase
         self::assertCount(0, $transport->getSent());
     }
 
-    public function testStartsBackfillForExplicitAccrualResourceType(): void
+    public function testStartsBackfillForExplicitAccrualByDayResourceType(): void
     {
         $companyId = Uuid::uuid7()->toString();
         $connectionRef = Uuid::uuid7()->toString();
@@ -137,11 +137,11 @@ final class StartBackfillCommandTest extends IntegrationTestCase
             '--connection-ref' => $connectionRef,
             '--source' => 'ozon',
             '--days-back' => '30',
-            '--resource-type' => OzonResourceType::ACCRUAL_POSTINGS,
+            '--resource-type' => OzonResourceType::ACCRUAL_BY_DAY,
         ]);
 
         self::assertSame(Command::SUCCESS, $exit);
-        self::assertStringContainsString(OzonResourceType::ACCRUAL_POSTINGS, $tester->getDisplay());
+        self::assertStringContainsString(OzonResourceType::ACCRUAL_BY_DAY, $tester->getDisplay());
 
         $parentJobs = $this->connection->fetchAllAssociative(
             'SELECT resource_type, progress_total
@@ -152,9 +152,23 @@ final class StartBackfillCommandTest extends IntegrationTestCase
         );
 
         self::assertCount(1, $parentJobs);
-        self::assertSame([OzonResourceType::ACCRUAL_POSTINGS], array_column($parentJobs, 'resource_type'));
+        self::assertSame([OzonResourceType::ACCRUAL_BY_DAY], array_column($parentJobs, 'resource_type'));
         self::assertSame(5, (int) $parentJobs[0]['progress_total']);
         self::assertCount(5, $transport->getSent());
+    }
+
+    public function testAccrualPostingsBackfillIsNotSupported(): void
+    {
+        $tester = $this->tester('app:ingestion:start-backfill');
+        $exit = $tester->execute([
+            '--company-id' => Uuid::uuid7()->toString(),
+            '--connection-ref' => Uuid::uuid7()->toString(),
+            '--source' => 'ozon',
+            '--resource-type' => OzonResourceType::ACCRUAL_POSTINGS,
+        ]);
+
+        self::assertSame(Command::FAILURE, $exit);
+        self::assertStringContainsString('Unsupported resource type', $tester->getDisplay());
     }
 
     public function testRealizationBackfillIsNotSupportedUntilMonthAlignedChunkingExists(): void

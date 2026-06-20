@@ -28,30 +28,17 @@ final readonly class OzonAccrualClient implements OzonAccrualClientInterface
     public function fetchPostings(
         string $companyId,
         string $connectionRef,
-        \DateTimeImmutable $from,
-        \DateTimeImmutable $to,
-        int $page,
-        int $pageSize,
+        array $postingNumbers,
     ): OzonRawPage {
-        $page = max(1, $page);
-        $pageSize = max(1, min(1000, $pageSize));
-        $offset = ($page - 1) * $pageSize;
+        $postingNumbers = $this->normalizePostingNumbers($postingNumbers);
 
         return $this->requestPage(
             companyId: $companyId,
             connectionRef: $connectionRef,
             endpoint: self::POSTINGS_ENDPOINT,
             json: [
-                'date' => [
-                    'from' => $from->format('Y-m-d'),
-                    'to' => $to->format('Y-m-d'),
-                ],
-                'limit' => $pageSize,
-                'offset' => $offset,
+                'posting_numbers' => $postingNumbers,
             ],
-            page: $page,
-            pageSize: $pageSize,
-            offset: $offset,
         );
     }
 
@@ -222,6 +209,35 @@ final readonly class OzonAccrualClient implements OzonAccrualClientInterface
     }
 
     /**
+     * @param list<string> $postingNumbers
+     *
+     * @return non-empty-list<string>
+     */
+    private function normalizePostingNumbers(array $postingNumbers): array
+    {
+        $normalized = [];
+        foreach ($postingNumbers as $postingNumber) {
+            $postingNumber = trim((string) $postingNumber);
+            if ('' === $postingNumber) {
+                continue;
+            }
+
+            $normalized[$postingNumber] = $postingNumber;
+        }
+
+        $normalized = array_values($normalized);
+        if ([] === $normalized) {
+            throw new \InvalidArgumentException('At least one Ozon posting number is required.');
+        }
+
+        if (\count($normalized) > 200) {
+            throw new \InvalidArgumentException('Ozon accrual postings request supports at most 200 posting numbers.');
+        }
+
+        return $normalized;
+    }
+
+    /**
      * @return array{api_key: string, client_id: string}
      */
     private function credentials(string $companyId, string $connectionRef): array
@@ -277,11 +293,8 @@ final readonly class OzonAccrualClient implements OzonAccrualClientInterface
             return false;
         }
 
-        $code = $payload['code'] ?? null;
-        if (3 === $code || '3' === $code) {
-            return true;
-        }
-
+        // Ozon uses code=3 both for credential problems and ordinary request validation
+        // errors, for example invalid accrual posting_numbers. Classify only by text.
         return $this->containsCredentialError($payload);
     }
 

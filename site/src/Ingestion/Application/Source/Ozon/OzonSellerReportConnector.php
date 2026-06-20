@@ -173,66 +173,7 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
 
     private function pullAccrualPostings(PullRequest $request): PullResult
     {
-        [$from, $to] = $this->resolveDailyWindow($request);
-        $rows = [];
-        $page = 1;
-        $hasRemoteMore = false;
-
-        do {
-            $pageResult = $this->accrualClient->fetchPostings(
-                $request->companyId,
-                $request->connectionRef,
-                $from,
-                $to,
-                $page,
-                self::PAGE_SIZE,
-            );
-
-            if ([] !== $pageResult->rows) {
-                array_push($rows, ...$pageResult->rows);
-            }
-
-            $hasRemoteMore = $pageResult->hasMore;
-            ++$page;
-        } while ($hasRemoteMore && $page <= self::MAX_PAGES_PER_PULL);
-
-        if ($hasRemoteMore) {
-            $this->logger->warning('Ozon accrual postings pagination cap reached.', [
-                'companyId' => $request->companyId,
-                'connectionRef' => $request->connectionRef,
-                'from' => $from->format('Y-m-d'),
-                'to' => $to->format('Y-m-d'),
-                'maxPages' => self::MAX_PAGES_PER_PULL,
-            ]);
-
-            throw new \RuntimeException('Ozon accrual postings pagination cap reached before all rows were fetched.');
-        }
-
-        $windowHasMore = null !== $request->windowTo && $to < $request->windowTo;
-        $nextCursor = $windowHasMore || $this->isIncremental($request) ? $to->modify('+1 day')->format('Y-m-d') : null;
-
-        return new PullResult(
-            rawBatch: new RawBatch(
-                companyId: $request->companyId,
-                connectionRef: $request->connectionRef,
-                shopRef: $request->shopRef,
-                source: IngestSource::OZON,
-                resourceType: OzonResourceType::ACCRUAL_POSTINGS,
-                externalId: sprintf('accrual-postings:%s:%s', $from->format('Y-m-d'), $to->format('Y-m-d')),
-                syncJobId: $request->syncJobId,
-                fetchedAt: new \DateTimeImmutable(),
-                rows: $this->rowsOrEmptyMarker(
-                    $rows,
-                    OzonResourceType::ACCRUAL_POSTINGS,
-                    [
-                        'windowFrom' => $from->format('Y-m-d'),
-                        'windowTo' => $to->format('Y-m-d'),
-                    ],
-                ),
-            ),
-            nextCursorValue: $nextCursor,
-            hasMore: $windowHasMore,
-        );
+        throw new \LogicException('Ozon accrual postings require explicit posting_numbers and cannot be loaded by date backfill.');
     }
 
     private function pullAccrualByDay(PullRequest $request): PullResult
