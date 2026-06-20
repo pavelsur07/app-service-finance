@@ -24,7 +24,7 @@ final class OzonAccrualClientTest extends TestCase
             $capturedOptions = $options;
 
             return new MockResponse(
-                '{"result":{"postings":[{"posting_number":"posting-1"}],"total":12}}',
+                '{"result":{"postings":[{"posting_number":"posting-1"}]}}',
                 ['http_code' => 200],
             );
         });
@@ -33,23 +33,17 @@ final class OzonAccrualClientTest extends TestCase
         $page = $client->fetchPostings(
             '0192f0c2-0000-7000-8000-000000000001',
             '0192f0c2-0000-7000-8000-000000000002',
-            new \DateTimeImmutable('2026-06-13'),
-            new \DateTimeImmutable('2026-06-19'),
-            3,
-            5,
+            ['posting-1', ' posting-2 ', 'posting-1'],
         );
 
         self::assertSame('https://api-seller.ozon.ru/v1/finance/accrual/postings', $capturedUrl);
         $requestPayload = $capturedOptions['json'] ?? json_decode((string) ($capturedOptions['body'] ?? ''), true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame('2026-06-13', $requestPayload['date']['from']);
-        self::assertSame('2026-06-19', $requestPayload['date']['to']);
-        self::assertSame(5, $requestPayload['limit']);
-        self::assertSame(10, $requestPayload['offset']);
+        self::assertSame(['posting-1', 'posting-2'], $requestPayload['posting_numbers']);
         self::assertSame(['Client-Id: client-id'], $capturedOptions['normalized_headers']['client-id'] ?? null);
         self::assertSame(['Api-Key: api-key'], $capturedOptions['normalized_headers']['api-key'] ?? null);
         self::assertSame([['posting_number' => 'posting-1']], $page->rows);
-        self::assertTrue($page->hasMore);
-        self::assertSame('4', $page->nextPageToken);
+        self::assertFalse($page->hasMore);
+        self::assertNull($page->nextPageToken);
     }
 
     public function testFetchByDayExtractsResultListRows(): void
@@ -72,6 +66,24 @@ final class OzonAccrualClientTest extends TestCase
 
         self::assertSame([['date' => '2026-06-13', 'accruals' => [['accrual_id' => 1]]]], $page->rows);
         self::assertFalse($page->hasMore);
+    }
+
+    public function testFetchPostingsRequiresPostingNumbers(): void
+    {
+        $client = new OzonAccrualClient(
+            new MockHttpClient(new MockResponse('{}', ['http_code' => 200])),
+            $this->credentialProvider(),
+            new NullLogger(),
+        );
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('posting number');
+
+        $client->fetchPostings(
+            '0192f0c2-0000-7000-8000-000000000001',
+            '0192f0c2-0000-7000-8000-000000000002',
+            ['', '  '],
+        );
     }
 
     public function testUnauthorizedStatusBecomesAuthException(): void
@@ -107,7 +119,10 @@ final class OzonAccrualClientTest extends TestCase
     public function testGenericBadRequestStatusStaysRuntimeException(): void
     {
         $client = new OzonAccrualClient(
-            new MockHttpClient(new MockResponse('{"message":"bad date range"}', ['http_code' => 400])),
+            new MockHttpClient(new MockResponse(
+                '{"code":3,"message":"Request validation error: invalid GetFinanceAccrualPostingsRequest.PostingNumbers: value must contain between 1 and 200 items, inclusive"}',
+                ['http_code' => 400],
+            )),
             $this->credentialProvider(),
             new NullLogger(),
         );
