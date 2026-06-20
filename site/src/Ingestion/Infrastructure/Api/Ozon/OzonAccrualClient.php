@@ -144,9 +144,8 @@ final readonly class OzonAccrualClient implements OzonAccrualClientInterface
             ]);
 
             $statusCode = $response->getStatusCode();
-            $this->classifyStatus($statusCode, $endpoint);
-
             $content = $response->getContent(false);
+            $this->classifyStatus($statusCode, $endpoint, $content);
         } catch (TransportExceptionInterface $exception) {
             throw new ConnectorTransientException(sprintf('Ozon accrual transport error for %s.', $endpoint), previous: $exception);
         } finally {
@@ -243,9 +242,13 @@ final readonly class OzonAccrualClient implements OzonAccrualClientInterface
         return ['api_key' => $apiKey, 'client_id' => $clientId];
     }
 
-    private function classifyStatus(int $statusCode, string $endpoint): void
+    private function classifyStatus(int $statusCode, string $endpoint, string $content): void
     {
         if (401 === $statusCode || 403 === $statusCode) {
+            throw new ConnectorAuthException(sprintf('Ozon accrual API auth failed for %s.', $endpoint));
+        }
+
+        if (400 === $statusCode && $this->isCredentialBadRequest($content)) {
             throw new ConnectorAuthException(sprintf('Ozon accrual API auth failed for %s.', $endpoint));
         }
 
@@ -260,5 +263,50 @@ final readonly class OzonAccrualClient implements OzonAccrualClientInterface
         if ($statusCode < 200 || $statusCode >= 300) {
             throw new \RuntimeException(sprintf('Ozon accrual API returned HTTP %d for %s.', $statusCode, $endpoint));
         }
+    }
+
+    private function isCredentialBadRequest(string $content): bool
+    {
+        try {
+            $payload = json_decode($content, true, 512, \JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return false;
+        }
+
+        if (!is_array($payload)) {
+            return false;
+        }
+
+        $code = $payload['code'] ?? null;
+        if (3 === $code || '3' === $code) {
+            return true;
+        }
+
+        return $this->containsCredentialError($payload);
+    }
+
+    /**
+     * @param array<mixed> $payload
+     */
+    private function containsCredentialError(array $payload): bool
+    {
+        foreach ($payload as $value) {
+            if (is_array($value) && $this->containsCredentialError($value)) {
+                return true;
+            }
+
+            if (!is_scalar($value)) {
+                continue;
+            }
+
+            $text = strtolower((string) $value);
+            foreach (['client-id', 'client id', 'api-key', 'api key', 'credential', 'auth', 'unauthorized', 'forbidden'] as $needle) {
+                if (str_contains($text, $needle)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }

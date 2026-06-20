@@ -171,6 +171,20 @@ final class StartBackfillCommandTest extends IntegrationTestCase
         self::assertStringContainsString('Unsupported resource type', $tester->getDisplay());
     }
 
+    public function testStaticAccrualTypesBackfillIsNotSupported(): void
+    {
+        $tester = $this->tester('app:ingestion:start-backfill');
+        $exit = $tester->execute([
+            '--company-id' => Uuid::uuid7()->toString(),
+            '--connection-ref' => Uuid::uuid7()->toString(),
+            '--source' => 'ozon',
+            '--resource-type' => OzonResourceType::ACCRUAL_TYPES,
+        ]);
+
+        self::assertSame(Command::FAILURE, $exit);
+        self::assertStringContainsString('Unsupported resource type', $tester->getDisplay());
+    }
+
     public function testInvalidCompanyUuidFails(): void
     {
         $tester = $this->tester('app:ingestion:start-backfill');

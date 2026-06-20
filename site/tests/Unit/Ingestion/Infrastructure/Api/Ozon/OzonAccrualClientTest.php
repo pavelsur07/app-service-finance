@@ -89,6 +89,42 @@ final class OzonAccrualClientTest extends TestCase
         );
     }
 
+    public function testCredentialBadRequestStatusBecomesAuthException(): void
+    {
+        $client = new OzonAccrualClient(
+            new MockHttpClient(new MockResponse('{"code":3,"message":"Client-Id is invalid"}', ['http_code' => 400])),
+            $this->credentialProvider(),
+            new NullLogger(),
+        );
+
+        $this->expectException(ConnectorAuthException::class);
+        $client->fetchTypes(
+            '0192f0c2-0000-7000-8000-000000000001',
+            '0192f0c2-0000-7000-8000-000000000002',
+        );
+    }
+
+    public function testGenericBadRequestStatusStaysRuntimeException(): void
+    {
+        $client = new OzonAccrualClient(
+            new MockHttpClient(new MockResponse('{"message":"bad date range"}', ['http_code' => 400])),
+            $this->credentialProvider(),
+            new NullLogger(),
+        );
+
+        try {
+            $client->fetchTypes(
+                '0192f0c2-0000-7000-8000-000000000001',
+                '0192f0c2-0000-7000-8000-000000000002',
+            );
+            self::fail('Expected generic runtime exception.');
+        } catch (ConnectorAuthException) {
+            self::fail('Generic bad request must not be classified as auth.');
+        } catch (\RuntimeException $exception) {
+            self::assertStringContainsString('HTTP 400', $exception->getMessage());
+        }
+    }
+
     public function testRateLimitStatusBecomesTransientException(): void
     {
         $client = new OzonAccrualClient(

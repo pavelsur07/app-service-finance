@@ -43,7 +43,6 @@ final class StartBackfillCommand extends Command
             OzonResourceType::DAILY_REPORT,
             OzonResourceType::ACCRUAL_POSTINGS,
             OzonResourceType::ACCRUAL_BY_DAY,
-            OzonResourceType::ACCRUAL_TYPES,
         ],
     ];
 
