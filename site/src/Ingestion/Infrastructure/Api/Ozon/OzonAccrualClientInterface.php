@@ -18,8 +18,7 @@ interface OzonAccrualClientInterface
     public function fetchByDay(
         string $companyId,
         string $connectionRef,
-        \DateTimeImmutable $from,
-        \DateTimeImmutable $to,
+        \DateTimeImmutable $date,
     ): OzonRawPage;
 
     public function fetchTypes(string $companyId, string $connectionRef): OzonRawPage;
