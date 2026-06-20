@@ -124,6 +124,39 @@ final class StartBackfillCommandTest extends IntegrationTestCase
         self::assertCount(0, $transport->getSent());
     }
 
+    public function testStartsBackfillForExplicitAccrualResourceType(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+        $transport = $this->getIngestFetchTransport();
+        $transport->reset();
+
+        $tester = $this->tester('app:ingestion:start-backfill');
+        $exit = $tester->execute([
+            '--company-id' => $companyId,
+            '--connection-ref' => $connectionRef,
+            '--source' => 'ozon',
+            '--days-back' => '30',
+            '--resource-type' => OzonResourceType::ACCRUAL_POSTINGS,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exit);
+        self::assertStringContainsString(OzonResourceType::ACCRUAL_POSTINGS, $tester->getDisplay());
+
+        $parentJobs = $this->connection->fetchAllAssociative(
+            'SELECT resource_type, progress_total
+             FROM ingest_sync_jobs
+             WHERE company_id = :companyId AND parent_job_id IS NULL
+             ORDER BY resource_type',
+            ['companyId' => $companyId],
+        );
+
+        self::assertCount(1, $parentJobs);
+        self::assertSame([OzonResourceType::ACCRUAL_POSTINGS], array_column($parentJobs, 'resource_type'));
+        self::assertSame(5, (int) $parentJobs[0]['progress_total']);
+        self::assertCount(5, $transport->getSent());
+    }
+
     public function testRealizationBackfillIsNotSupportedUntilMonthAlignedChunkingExists(): void
     {
         $tester = $this->tester('app:ingestion:start-backfill');
@@ -132,6 +165,20 @@ final class StartBackfillCommandTest extends IntegrationTestCase
             '--connection-ref' => Uuid::uuid7()->toString(),
             '--source' => 'ozon',
             '--resource-type' => OzonResourceType::REALIZATION,
+        ]);
+
+        self::assertSame(Command::FAILURE, $exit);
+        self::assertStringContainsString('Unsupported resource type', $tester->getDisplay());
+    }
+
+    public function testStaticAccrualTypesBackfillIsNotSupported(): void
+    {
+        $tester = $this->tester('app:ingestion:start-backfill');
+        $exit = $tester->execute([
+            '--company-id' => Uuid::uuid7()->toString(),
+            '--connection-ref' => Uuid::uuid7()->toString(),
+            '--source' => 'ozon',
+            '--resource-type' => OzonResourceType::ACCRUAL_TYPES,
         ]);
 
         self::assertSame(Command::FAILURE, $exit);

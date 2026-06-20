@@ -29,9 +29,20 @@ final class StartBackfillCommand extends Command
     /**
      * @var array<string, list<string>>
      */
-    private const RESOURCE_TYPES_BY_SOURCE = [
+    private const DEFAULT_RESOURCE_TYPES_BY_SOURCE = [
         'ozon' => [
             OzonResourceType::DAILY_REPORT,
+        ],
+    ];
+
+    /**
+     * @var array<string, list<string>>
+     */
+    private const ALLOWED_RESOURCE_TYPES_BY_SOURCE = [
+        'ozon' => [
+            OzonResourceType::DAILY_REPORT,
+            OzonResourceType::ACCRUAL_POSTINGS,
+            OzonResourceType::ACCRUAL_BY_DAY,
         ],
     ];
 
@@ -161,7 +172,7 @@ final class StartBackfillCommand extends Command
         Assert::notEmpty($value, 'The --source option is required.');
 
         $source = IngestSource::tryFrom($value);
-        if (null === $source || !isset(self::RESOURCE_TYPES_BY_SOURCE[$source->value])) {
+        if (null === $source || !isset(self::ALLOWED_RESOURCE_TYPES_BY_SOURCE[$source->value])) {
             throw new \InvalidArgumentException(sprintf('Unsupported ingestion source "%s".', $value));
         }
 
@@ -188,14 +199,15 @@ final class StartBackfillCommand extends Command
      */
     private function resourceTypes(IngestSource $source, InputInterface $input): array
     {
-        $resourceTypes = self::RESOURCE_TYPES_BY_SOURCE[$source->value];
+        $defaultResourceTypes = self::DEFAULT_RESOURCE_TYPES_BY_SOURCE[$source->value];
+        $allowedResourceTypes = self::ALLOWED_RESOURCE_TYPES_BY_SOURCE[$source->value];
         $requested = trim((string) $input->getOption('resource-type'));
 
         if ('' === $requested) {
-            return $resourceTypes;
+            return $defaultResourceTypes;
         }
 
-        if (!in_array($requested, $resourceTypes, true)) {
+        if (!in_array($requested, $allowedResourceTypes, true)) {
             throw new \InvalidArgumentException(sprintf('Unsupported resource type "%s" for source "%s".', $requested, $source->value));
         }
 
