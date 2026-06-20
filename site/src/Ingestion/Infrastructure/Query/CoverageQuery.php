@@ -34,7 +34,7 @@ final class CoverageQuery
                 'ft.shop_ref',
                 'r.resource_type',
                 'COUNT(DISTINCT r.id) AS raw_count',
-                'COUNT(ft.id) AS tx_count',
+                'COUNT(DISTINCT ft.id) AS tx_count',
                 'COUNT(DISTINCT ni.id) AS issue_count',
                 'MAX(r.fetched_at) AS last_fetched_at',
             )

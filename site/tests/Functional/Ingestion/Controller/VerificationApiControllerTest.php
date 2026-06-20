@@ -126,6 +126,13 @@ final class VerificationApiControllerTest extends WebTestCaseBase
             NormalizationIssueKind::SUM_MISMATCH,
             [],
         ));
+        $em->persist(new NormalizationIssue(
+            $company->getId(),
+            $firstRaw->getId(),
+            null,
+            NormalizationIssueKind::MAPPER_FAILURE,
+            [],
+        ));
         $em->persist($resolvedIssue);
         $em->flush();
 
@@ -136,7 +143,7 @@ final class VerificationApiControllerTest extends WebTestCaseBase
         $coverage = $this->json($client);
         self::assertCount(7, $coverage['cells']);
         self::assertSame($dates, array_column($coverage['cells'], 'date'));
-        self::assertSame([1, 0, 0, 0, 0, 0, 0], array_column($coverage['cells'], 'issue_count'));
+        self::assertSame([2, 0, 0, 0, 0, 0, 0], array_column($coverage['cells'], 'issue_count'));
 
         foreach ($coverage['cells'] as $cell) {
             self::assertSame('shop-backfill', $cell['shop_ref']);
