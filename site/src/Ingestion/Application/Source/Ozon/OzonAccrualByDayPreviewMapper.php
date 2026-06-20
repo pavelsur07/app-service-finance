@@ -19,8 +19,12 @@ final readonly class OzonAccrualByDayPreviewMapper
      *
      * @return list<OzonAccrualPreviewTransaction>
      */
-    public function preview(string $companyId, iterable $rows): array
-    {
+    public function preview(
+        string $companyId,
+        iterable $rows,
+        ?\DateTimeImmutable $from = null,
+        ?\DateTimeImmutable $to = null,
+    ): array {
         $transactions = [];
         $rowIndex = 0;
 
@@ -28,6 +32,10 @@ final readonly class OzonAccrualByDayPreviewMapper
             ++$rowIndex;
 
             $date = $this->stringValue($row['date'] ?? 'unknown');
+            if (!$this->dateInWindow($date, $from, $to)) {
+                continue;
+            }
+
             $category = $this->stringValue($row['accrued_category'] ?? 'unknown');
             $accrualId = $this->accrualId($row, $rowIndex);
             $operationGroupId = Uuid::uuid5(Uuid::NAMESPACE_URL, sprintf('%s:ozon:accrual-by-day:%s', $companyId, $accrualId))->toString();
@@ -364,6 +372,23 @@ final readonly class OzonAccrualByDayPreviewMapper
     private function directionFromSigned(int $amountMinor): TransactionDirection
     {
         return $amountMinor >= 0 ? TransactionDirection::IN : TransactionDirection::OUT;
+    }
+
+    private function dateInWindow(string $date, ?\DateTimeImmutable $from, ?\DateTimeImmutable $to): bool
+    {
+        if (null === $from && null === $to) {
+            return true;
+        }
+
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            return false;
+        }
+
+        if (null !== $from && $date < $from->format('Y-m-d')) {
+            return false;
+        }
+
+        return null === $to || $date <= $to->format('Y-m-d');
     }
 
     private function optionalString(mixed $value): ?string

@@ -130,6 +130,25 @@ final class OzonAccrualByDayPreviewMapperTest extends TestCase
         self::assertSame([], $rows);
     }
 
+    public function testFiltersRowsOutsideRequestedDateWindow(): void
+    {
+        $rows = $this->mapper()->preview(
+            '19621cff-b028-45d9-9193-11f47ad9a8b2',
+            [
+                $this->postingCommissionRow(53675409100, '2026-06-14', '-10'),
+                $this->postingCommissionRow(53675409101, '2026-06-15', '-20'),
+                $this->postingCommissionRow(53675409102, '2026-06-16', '-30'),
+            ],
+            new \DateTimeImmutable('2026-06-15'),
+            new \DateTimeImmutable('2026-06-15'),
+        );
+
+        self::assertCount(1, $rows);
+        self::assertSame('2026-06-15', $rows[0]->date);
+        self::assertSame(2000, $rows[0]->amountMinor);
+        self::assertSame('ozon:accrual-by-day:53675409101:commission:product-0', $rows[0]->sourceKey);
+    }
+
     /**
      * @param list<OzonAccrualPreviewTransaction> $rows
      */
@@ -147,5 +166,24 @@ final class OzonAccrualByDayPreviewMapperTest extends TestCase
     private function mapper(): OzonAccrualByDayPreviewMapper
     {
         return new OzonAccrualByDayPreviewMapper(new OzonMoneyParser());
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function postingCommissionRow(int $accrualId, string $date, string $amount): array
+    {
+        return [
+            'accrual_id' => $accrualId,
+            'date' => $date,
+            'accrued_category' => 'POSTING',
+            'posting' => [
+                'products' => [[
+                    'commission' => [
+                        'commission' => ['amount' => $amount, 'currency' => 'RUB'],
+                    ],
+                ]],
+            ],
+        ];
     }
 }

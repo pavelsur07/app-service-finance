@@ -26,6 +26,7 @@ Add a safe dry-run view that shows which canonical financial transactions could 
 - Exact candidate: existing canonical transaction with the preview source key and transaction type.
 - Potential legacy candidate: existing canonical transaction on the same date with the same type, direction, and amount.
 - Aggregate comparison: preview totals vs canonical totals by date, type, and direction.
+- Raw rows are filtered by the requested `--from/--to` window before preview mapping, because stored raw records can cover a wider ingestion chunk than the CLI window.
 
 ## Checks
 

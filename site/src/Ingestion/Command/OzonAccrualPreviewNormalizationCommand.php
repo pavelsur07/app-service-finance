@@ -61,7 +61,7 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
         }
 
         $rawRecords = $this->rawRecords($companyId, $from, $to, $rawLimit);
-        $previewRows = $this->previewMapper->preview($companyId, $this->rawRows($companyId, $rawRecords, $rawRowLimit));
+        $previewRows = $this->previewMapper->preview($companyId, $this->rawRows($companyId, $rawRecords, $rawRowLimit, $from, $to), $from, $to);
         $exactMatches = $this->exactNaturalKeyMatches($companyId, $previewRows);
         $sameAmountCandidates = $this->sameAmountCandidateCounts($companyId, $from, $to);
         $canonicalGroups = $this->canonicalGroups($companyId, $from, $to);
@@ -140,8 +140,13 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
      *
      * @return \Generator<int, array<string, mixed>>
      */
-    private function rawRows(string $companyId, array $rawRecords, int $rowLimit): \Generator
-    {
+    private function rawRows(
+        string $companyId,
+        array $rawRecords,
+        int $rowLimit,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+    ): \Generator {
         foreach ($rawRecords as $rawRecord) {
             $recordRows = 0;
             foreach ($this->rawStorageFacade->read((string) $rawRecord['id'], $companyId) as $row) {
@@ -150,9 +155,26 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
                 }
 
                 ++$recordRows;
+                if (!$this->rowDateInWindow($row, $from, $to)) {
+                    continue;
+                }
+
                 yield $row;
             }
         }
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private function rowDateInWindow(array $row, \DateTimeImmutable $from, \DateTimeImmutable $to): bool
+    {
+        $date = trim((string) ($row['date'] ?? ''));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            return false;
+        }
+
+        return $date >= $from->format('Y-m-d') && $date <= $to->format('Y-m-d');
     }
 
     /**
