@@ -39,17 +39,17 @@ final class VerificationApiControllerTest extends WebTestCaseBase
         $coverage = $this->json($client);
         self::assertSame('shop-1', $coverage['cells'][0]['shop_ref']);
         self::assertSame(1, $coverage['cells'][0]['raw_count']);
-        self::assertSame(2, $coverage['cells'][0]['tx_count']);
+        self::assertSame(3, $coverage['cells'][0]['tx_count']);
         self::assertSame(1, $coverage['cells'][0]['issue_count']);
         self::assertSame('shop-1', $coverage['shops'][0]['shop_ref']);
 
         $client->request('GET', '/api/ingestion/verification/reconciliation?shop_ref=shop-1&year=2026&month=6');
         self::assertResponseIsSuccessful();
         $reconciliation = $this->json($client);
-        self::assertSame(800, $reconciliation['summary']['canon_total_minor']);
+        self::assertSame(500, $reconciliation['summary']['canon_total_minor']);
         self::assertSame(750, $reconciliation['summary']['ozon_control_total_minor']);
-        self::assertSame(50, $reconciliation['summary']['canon_vs_ozon_delta_minor']);
-        self::assertSame('sale', $reconciliation['by_type'][1]['type']);
+        self::assertSame(-250, $reconciliation['summary']['canon_vs_ozon_delta_minor']);
+        self::assertSame(['sale', 'refund', 'commission'], array_column($reconciliation['by_type'], 'type'));
 
         $client->request('GET', '/api/ingestion/verification/issues?shop_ref=shop-1&page=1&limit=50');
         self::assertResponseIsSuccessful();
@@ -173,6 +173,7 @@ final class VerificationApiControllerTest extends WebTestCaseBase
         $em->persist($company);
         $em->persist($raw);
         $em->persist($this->transaction($companyId, $raw->getId(), 'api-sale-1', 1000, TransactionType::SALE));
+        $em->persist($this->transaction($companyId, $raw->getId(), 'api-refund-1', -300, TransactionType::REFUND));
         $em->persist($this->transaction($companyId, $raw->getId(), 'api-commission-1', -200, TransactionType::COMMISSION));
         $em->persist(new NormalizationIssue(
             $companyId,

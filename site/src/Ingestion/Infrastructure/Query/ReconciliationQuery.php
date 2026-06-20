@@ -95,7 +95,15 @@ final class ReconciliationQuery
             ->setParameter('from', $from, Types::DATETIME_IMMUTABLE)
             ->setParameter('toExclusive', $toExclusive, Types::DATETIME_IMMUTABLE)
             ->groupBy('ft.type')
-            ->orderBy('ft.type', 'ASC')
+            ->orderBy(
+                sprintf(
+                    "CASE ft.type WHEN '%s' THEN 0 WHEN '%s' THEN 1 ELSE 2 END",
+                    TransactionType::SALE->value,
+                    TransactionType::REFUND->value,
+                ),
+                'ASC',
+            )
+            ->addOrderBy('ft.type', 'ASC')
             ->executeQuery()
             ->fetchAllAssociative();
 

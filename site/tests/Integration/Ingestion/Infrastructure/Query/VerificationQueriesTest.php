@@ -89,6 +89,7 @@ final class VerificationQueriesTest extends IntegrationTestCase
         $rawRecordId = Uuid::uuid7()->toString();
 
         $this->em->persist($this->transaction($companyId, $rawRecordId, 'sale-1', 1000, TransactionType::SALE));
+        $this->em->persist($this->transaction($companyId, $rawRecordId, 'refund-1', -300, TransactionType::REFUND));
         $this->em->persist($this->transaction($companyId, $rawRecordId, 'commission-1', -200, TransactionType::COMMISSION));
         $this->em->persist($this->transaction($companyId, $rawRecordId, 'other-shop-sale', 999, TransactionType::SALE, 'shop-2'));
 
@@ -108,12 +109,13 @@ final class VerificationQueriesTest extends IntegrationTestCase
         $summary = $query->summary($companyId, 'shop-1', 2026, 6);
         $byType = $query->breakdownByType($companyId, 'shop-1', 2026, 6);
 
-        self::assertSame(800, $summary->canonTotalMinor);
+        self::assertSame(500, $summary->canonTotalMinor);
         self::assertSame(750, $summary->ozonControlTotalMinor);
-        self::assertSame(50, $summary->canonVsOzonDeltaMinor);
+        self::assertSame(-250, $summary->canonVsOzonDeltaMinor);
         self::assertSame('RUB', $summary->currency);
+        self::assertSame(['sale', 'refund', 'commission'], array_column($byType, 'type'));
         self::assertSame(
-            ['commission' => -200, 'sale' => 1000],
+            ['sale' => 1000, 'refund' => -300, 'commission' => -200],
             array_column($byType, 'canonAmountMinor', 'type'),
         );
     }
