@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Ingestion\Command;
 
+use App\Ingestion\Application\Source\Ozon\OzonAccrualByDayRawAggregate;
+use App\Ingestion\Application\Source\Ozon\OzonAccrualByDayRawAggregator;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Facade\RawStorageFacade;
@@ -34,6 +36,7 @@ final class OzonAccrualCompareCommand extends Command
     public function __construct(
         private readonly Connection $connection,
         private readonly RawStorageFacade $rawStorageFacade,
+        private readonly OzonAccrualByDayRawAggregator $byDayRawAggregator,
     ) {
         parent::__construct();
     }
@@ -70,6 +73,11 @@ final class OzonAccrualCompareCommand extends Command
         $rawRecords = $this->rawRecords($companyId, $resourceType, $from, $to, $rawLimit);
         $this->printRawRecords($io, $rawRecords);
         $this->printRawStructureSummary($io, $companyId, $rawRecords, $rawRowLimit);
+        if (OzonResourceType::ACCRUAL_BY_DAY === $resourceType) {
+            $aggregate = $this->byDayRawAggregator->aggregate($this->rawRows($companyId, $rawRecords, $rawRowLimit));
+            $this->printByDayAggregate($io, $aggregate);
+            $this->printDailyComparison($io, $aggregate, $this->canonicalDailyNetRows($companyId, $from, $to));
+        }
 
         return Command::SUCCESS;
     }
@@ -114,6 +122,41 @@ final class OzonAccrualCompareCommand extends Command
                 (string) $row['total_rub'],
             ], $rows),
         );
+    }
+
+    /**
+     * @return array<string, array{txCount: int, totalMinor: int}>
+     */
+    private function canonicalDailyNetRows(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        $rows = $this->connection->fetchAllAssociative(
+            "SELECT DATE(occurred_at) AS date,
+                    COUNT(*) AS tx_count,
+                    COALESCE(SUM(CASE WHEN direction = 'out' THEN -amount_minor ELSE amount_minor END), 0) AS total_minor
+             FROM ingest_financial_transactions
+             WHERE company_id = :companyId
+               AND source = :source
+               AND occurred_at >= :fromAt
+               AND occurred_at <= :toAt
+             GROUP BY DATE(occurred_at)
+             ORDER BY DATE(occurred_at)",
+            [
+                'companyId' => $companyId,
+                'source' => IngestSource::OZON->value,
+                'fromAt' => $from->format('Y-m-d 00:00:00'),
+                'toAt' => $to->format('Y-m-d 23:59:59'),
+            ],
+        );
+
+        $indexed = [];
+        foreach ($rows as $row) {
+            $indexed[(string) $row['date']] = [
+                'txCount' => (int) $row['tx_count'],
+                'totalMinor' => (int) $row['total_minor'],
+            ];
+        }
+
+        return $indexed;
     }
 
     /**
@@ -270,6 +313,114 @@ final class OzonAccrualCompareCommand extends Command
         }
 
         $io->table(['key', 'sum'], $rows);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rawRecords
+     *
+     * @return \Generator<int, array<string, mixed>>
+     */
+    private function rawRows(string $companyId, array $rawRecords, int $rowLimit): \Generator
+    {
+        foreach ($rawRecords as $rawRecord) {
+            $recordRows = 0;
+            foreach ($this->rawStorageFacade->read((string) $rawRecord['id'], $companyId) as $row) {
+                if ($recordRows >= $rowLimit) {
+                    break;
+                }
+
+                ++$recordRows;
+                yield $row;
+            }
+        }
+    }
+
+    private function printByDayAggregate(SymfonyStyle $io, OzonAccrualByDayRawAggregate $aggregate): void
+    {
+        $io->section('Accrual by-day raw aggregates');
+        $io->writeln(sprintf('Scanned rows: %d', $aggregate->scannedRows));
+
+        $this->printMinorRows($io, 'Raw totals by date/category', ['date', 'category', 'count', 'totalRub'], $aggregate->dateCategoryRows);
+        $this->printMinorRows($io, 'Delivery services by date/type_id', ['date', 'typeId', 'count', 'totalRub'], $aggregate->deliveryServiceRows);
+        $this->printMinorRows($io, 'Commission money fields by date/field', ['date', 'field', 'count', 'totalRub'], $aggregate->commissionRows);
+        $this->printMinorRows($io, 'Item fees by date/type_id', ['date', 'typeId', 'count', 'totalRub'], $aggregate->itemFeeRows);
+        $this->printMinorRows($io, 'Non-item fees by date/type_id', ['date', 'typeId', 'count', 'totalRub'], $aggregate->nonItemFeeRows);
+        $this->printMinorRows($io, 'Container fees by date/type_id', ['date', 'typeId', 'count', 'totalRub'], $aggregate->containerFeeRows);
+    }
+
+    /**
+     * @param list<string> $headers
+     * @param list<array<string, int|string>> $rows
+     */
+    private function printMinorRows(SymfonyStyle $io, string $title, array $headers, array $rows): void
+    {
+        $io->section($title);
+        if ([] === $rows) {
+            $io->writeln('No rows.');
+
+            return;
+        }
+
+        $io->table($headers, array_map(fn (array $row): array => $this->formatMinorRow($headers, $row), $rows));
+    }
+
+    /**
+     * @param list<string> $headers
+     * @param array<string, int|string> $row
+     *
+     * @return list<string>
+     */
+    private function formatMinorRow(array $headers, array $row): array
+    {
+        return array_map(function (string $header) use ($row): string {
+            if ('totalRub' === $header) {
+                return $this->minorToRub((int) $row['totalMinor']);
+            }
+
+            return (string) ($row[$header] ?? '');
+        }, $headers);
+    }
+
+    /**
+     * @param array<string, array{txCount: int, totalMinor: int}> $canonicalByDate
+     */
+    private function printDailyComparison(SymfonyStyle $io, OzonAccrualByDayRawAggregate $aggregate, array $canonicalByDate): void
+    {
+        $rawByDate = [];
+        foreach ($aggregate->dateCategoryRows as $row) {
+            $date = (string) $row['date'];
+            $rawByDate[$date] = ($rawByDate[$date] ?? 0) + (int) $row['totalMinor'];
+        }
+
+        $dates = array_values(array_unique(array_merge(array_keys($rawByDate), array_keys($canonicalByDate))));
+        sort($dates);
+
+        $io->section('Raw accrual net vs canonical net by date');
+        if ([] === $dates) {
+            $io->writeln('No rows.');
+
+            return;
+        }
+
+        $rows = [];
+        foreach ($dates as $date) {
+            $rawTotalMinor = (int) ($rawByDate[$date] ?? 0);
+            $canonicalTotalMinor = (int) ($canonicalByDate[$date]['totalMinor'] ?? 0);
+            $rows[] = [
+                $date,
+                $this->minorToRub($rawTotalMinor),
+                (string) ($canonicalByDate[$date]['txCount'] ?? 0),
+                $this->minorToRub($canonicalTotalMinor),
+                $this->minorToRub($rawTotalMinor - $canonicalTotalMinor),
+            ];
+        }
+
+        $io->table(['date', 'rawNetRub', 'canonicalTxCount', 'canonicalNetRub', 'deltaRub'], $rows);
+    }
+
+    private function minorToRub(int $minor): string
+    {
+        return number_format($minor / 100, 2, '.', '');
     }
 
     private function requiredUuidOption(InputInterface $input, string $name): string
