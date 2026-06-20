@@ -9,12 +9,14 @@ use App\Ingestion\Application\Action\MarkJobFailedAction;
 use App\Ingestion\Application\Action\MarkJobRunningAction;
 use App\Ingestion\Application\Action\SplitJobIntoChunksAction;
 use App\Ingestion\Application\Action\StartBackfillAction;
+use App\Ingestion\Application\Action\StartIncrementalAction;
 use App\Ingestion\Application\Action\UpdateCursorAction;
 use App\Ingestion\Application\Command\MarkJobCompletedCommand;
 use App\Ingestion\Application\Command\MarkJobFailedCommand;
 use App\Ingestion\Application\Command\MarkJobRunningCommand;
 use App\Ingestion\Application\Command\SplitJobCommand;
 use App\Ingestion\Application\Command\StartBackfillCommand;
+use App\Ingestion\Application\Command\StartIncrementalCommand;
 use App\Ingestion\Application\Command\UpdateCursorCommand;
 use App\Ingestion\Application\DTO\SyncJobProgressView;
 use App\Ingestion\Exception\SyncJobNotFoundException;
@@ -24,6 +26,7 @@ final readonly class SyncFacade
 {
     public function __construct(
         private StartBackfillAction $startBackfillAction,
+        private StartIncrementalAction $startIncrementalAction,
         private SplitJobIntoChunksAction $splitJobIntoChunksAction,
         private MarkJobRunningAction $markJobRunningAction,
         private MarkJobCompletedAction $markJobCompletedAction,
@@ -39,6 +42,11 @@ final readonly class SyncFacade
         ($this->splitJobIntoChunksAction)(new SplitJobCommand($parentJobId, $command->companyId));
 
         return $parentJobId;
+    }
+
+    public function startIncremental(StartIncrementalCommand $command): string
+    {
+        return ($this->startIncrementalAction)($command);
     }
 
     public function markJobRunning(MarkJobRunningCommand $command): void

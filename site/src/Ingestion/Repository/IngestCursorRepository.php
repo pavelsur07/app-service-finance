@@ -37,6 +37,26 @@ final class IngestCursorRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    /**
+     * @return list<IngestCursor>
+     */
+    public function findByResource(
+        string $companyId,
+        string $connectionRef,
+        string $resourceType,
+    ): array {
+        return $this->createQueryBuilder('cursor')
+            ->andWhere('cursor.companyId = :companyId')
+            ->andWhere('cursor.connectionRef = :connectionRef')
+            ->andWhere('cursor.resourceType = :resourceType')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('connectionRef', $connectionRef)
+            ->setParameter('resourceType', $resourceType)
+            ->orderBy('cursor.shopRef', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
     public function getOrCreate(
         string $companyId,
         string $connectionRef,
