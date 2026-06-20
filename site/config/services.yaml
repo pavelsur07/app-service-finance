@@ -139,6 +139,7 @@ services:
 
     App\Ingestion\Infrastructure\Api\Ozon\OzonCredentialProviderInterface: '@App\Ingestion\Infrastructure\Api\Ozon\CredentialFacadeOzonCredentialProvider'
     App\Ingestion\Infrastructure\Api\Ozon\OzonClientAdapterInterface: '@App\Ingestion\Infrastructure\Api\Ozon\LegacyOzonClientAdapter'
+    App\Ingestion\Infrastructure\Api\Ozon\OzonAccrualClientInterface: '@App\Ingestion\Infrastructure\Api\Ozon\OzonAccrualClient'
 
     App\Ingestion\Application\Source\Ozon\OzonSellerReportConnector:
         arguments:
@@ -151,6 +152,9 @@ services:
         tags: ['app.ingestion.mapper']
 
     App\Ingestion\Application\Source\Ozon\OzonRealizationMapper:
+        tags: ['app.ingestion.mapper']
+
+    App\Ingestion\Application\Source\Ozon\OzonAccrualShadowMapper:
         tags: ['app.ingestion.mapper']
 
     App\Ingestion\Domain\Service\ConnectorRegistry:

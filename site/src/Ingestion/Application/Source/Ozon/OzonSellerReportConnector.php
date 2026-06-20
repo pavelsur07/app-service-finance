@@ -14,6 +14,7 @@ use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Enum\Capability;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Exception\UnsupportedCapabilityException;
+use App\Ingestion\Infrastructure\Api\Ozon\OzonAccrualClientInterface;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonClientAdapterInterface;
 use Psr\Log\LoggerInterface;
 
@@ -24,6 +25,7 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
 
     public function __construct(
         private OzonClientAdapterInterface $client,
+        private OzonAccrualClientInterface $accrualClient,
         private LoggerInterface $logger,
         private int $chunkSizeDays = 7,
         private int $hotRewindDays = 14,
@@ -65,6 +67,9 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
         return match ($request->resourceType) {
             OzonResourceType::DAILY_REPORT => $this->pullDailyReport($request),
             OzonResourceType::REALIZATION => $this->pullRealization($request),
+            OzonResourceType::ACCRUAL_POSTINGS => $this->pullAccrualPostings($request),
+            OzonResourceType::ACCRUAL_BY_DAY => $this->pullAccrualByDay($request),
+            OzonResourceType::ACCRUAL_TYPES => $this->pullAccrualTypes($request),
             default => throw new \InvalidArgumentException(sprintf('Unsupported Ozon resource type "%s".', $request->resourceType)),
         };
     }
@@ -166,6 +171,133 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
         );
     }
 
+    private function pullAccrualPostings(PullRequest $request): PullResult
+    {
+        [$from, $to] = $this->resolveDailyWindow($request);
+        $rows = [];
+        $page = 1;
+        $hasRemoteMore = false;
+
+        do {
+            $pageResult = $this->accrualClient->fetchPostings(
+                $request->companyId,
+                $request->connectionRef,
+                $from,
+                $to,
+                $page,
+                self::PAGE_SIZE,
+            );
+
+            if ([] !== $pageResult->rows) {
+                array_push($rows, ...$pageResult->rows);
+            }
+
+            $hasRemoteMore = $pageResult->hasMore;
+            ++$page;
+        } while ($hasRemoteMore && $page <= self::MAX_PAGES_PER_PULL);
+
+        if ($hasRemoteMore) {
+            $this->logger->warning('Ozon accrual postings pagination cap reached.', [
+                'companyId' => $request->companyId,
+                'connectionRef' => $request->connectionRef,
+                'from' => $from->format('Y-m-d'),
+                'to' => $to->format('Y-m-d'),
+                'maxPages' => self::MAX_PAGES_PER_PULL,
+            ]);
+
+            throw new \RuntimeException('Ozon accrual postings pagination cap reached before all rows were fetched.');
+        }
+
+        $windowHasMore = null !== $request->windowTo && $to < $request->windowTo;
+        $nextCursor = $windowHasMore || $this->isIncremental($request) ? $to->modify('+1 day')->format('Y-m-d') : null;
+
+        return new PullResult(
+            rawBatch: new RawBatch(
+                companyId: $request->companyId,
+                connectionRef: $request->connectionRef,
+                shopRef: $request->shopRef,
+                source: IngestSource::OZON,
+                resourceType: OzonResourceType::ACCRUAL_POSTINGS,
+                externalId: sprintf('accrual-postings:%s:%s', $from->format('Y-m-d'), $to->format('Y-m-d')),
+                syncJobId: $request->syncJobId,
+                fetchedAt: new \DateTimeImmutable(),
+                rows: $this->rowsOrEmptyMarker(
+                    $rows,
+                    OzonResourceType::ACCRUAL_POSTINGS,
+                    [
+                        'windowFrom' => $from->format('Y-m-d'),
+                        'windowTo' => $to->format('Y-m-d'),
+                    ],
+                ),
+            ),
+            nextCursorValue: $nextCursor,
+            hasMore: $windowHasMore,
+        );
+    }
+
+    private function pullAccrualByDay(PullRequest $request): PullResult
+    {
+        [$from, $to] = $this->resolveDailyWindow($request);
+        $page = $this->accrualClient->fetchByDay(
+            $request->companyId,
+            $request->connectionRef,
+            $from,
+            $to,
+        );
+
+        $windowHasMore = null !== $request->windowTo && $to < $request->windowTo;
+        $nextCursor = $windowHasMore || $this->isIncremental($request) ? $to->modify('+1 day')->format('Y-m-d') : null;
+
+        return new PullResult(
+            rawBatch: new RawBatch(
+                companyId: $request->companyId,
+                connectionRef: $request->connectionRef,
+                shopRef: $request->shopRef,
+                source: IngestSource::OZON,
+                resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+                externalId: sprintf('accrual-by-day:%s:%s', $from->format('Y-m-d'), $to->format('Y-m-d')),
+                syncJobId: $request->syncJobId,
+                fetchedAt: new \DateTimeImmutable(),
+                rows: $this->rowsOrEmptyMarker(
+                    $page->rows,
+                    OzonResourceType::ACCRUAL_BY_DAY,
+                    [
+                        'windowFrom' => $from->format('Y-m-d'),
+                        'windowTo' => $to->format('Y-m-d'),
+                        'apiMetadata' => $page->metadata,
+                    ],
+                ),
+            ),
+            nextCursorValue: $nextCursor,
+            hasMore: $windowHasMore,
+        );
+    }
+
+    private function pullAccrualTypes(PullRequest $request): PullResult
+    {
+        $page = $this->accrualClient->fetchTypes($request->companyId, $request->connectionRef);
+
+        return new PullResult(
+            rawBatch: new RawBatch(
+                companyId: $request->companyId,
+                connectionRef: $request->connectionRef,
+                shopRef: $request->shopRef,
+                source: IngestSource::OZON,
+                resourceType: OzonResourceType::ACCRUAL_TYPES,
+                externalId: 'accrual-types',
+                syncJobId: $request->syncJobId,
+                fetchedAt: new \DateTimeImmutable(),
+                rows: $this->rowsOrEmptyMarker(
+                    $page->rows,
+                    OzonResourceType::ACCRUAL_TYPES,
+                    ['apiMetadata' => $page->metadata],
+                ),
+            ),
+            nextCursorValue: null,
+            hasMore: false,
+        );
+    }
+
     /**
      * @return array{0: \DateTimeImmutable, 1: \DateTimeImmutable}
      */
@@ -212,5 +344,24 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
             && '' !== $request->cursorValue
             && null === $request->windowFrom
             && null === $request->windowTo;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @param array<string, mixed> $metadata
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function rowsOrEmptyMarker(array $rows, string $resourceType, array $metadata): array
+    {
+        if ([] !== $rows) {
+            return $rows;
+        }
+
+        return [[
+            '_ingestion_empty' => true,
+            '_ingestion_resource' => $resourceType,
+            '_ingestion_metadata' => $metadata,
+        ]];
     }
 }
