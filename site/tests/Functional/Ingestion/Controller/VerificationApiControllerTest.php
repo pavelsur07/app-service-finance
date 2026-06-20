@@ -69,6 +69,91 @@ final class VerificationApiControllerTest extends WebTestCaseBase
         self::assertSame('income', $summary['by_category'][1]['flow']);
     }
 
+    public function testCoverageUsesTransactionOccurredDateForBackfillHeatmap(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $owner = UserBuilder::aUser()->withIndex(9150)->build();
+        $company = CompanyBuilder::aCompany()
+            ->withId('11111111-1111-4111-8111-111111119150')
+            ->withOwner($owner)
+            ->build();
+
+        $em = $this->em();
+        $em->persist($owner);
+        $em->persist($company);
+
+        $dates = [];
+        $firstRaw = null;
+        foreach (range(13, 19) as $day) {
+            $date = sprintf('2026-06-%02d', $day);
+            $dates[] = $date;
+            $raw = $this->rawRecord(
+                $company->getId(),
+                'shop-backfill',
+                'ozon_seller_daily_report',
+                'backfill-raw-'.$date,
+                new \DateTimeImmutable('2026-06-20 10:00:00+00:00'),
+            );
+            $firstRaw ??= $raw;
+
+            $em->persist($raw);
+            $em->persist($this->transaction(
+                $company->getId(),
+                $raw->getId(),
+                'backfill-sale-'.$date,
+                100,
+                TransactionType::SALE,
+                'shop-backfill',
+                new \DateTimeImmutable($date.' 12:00:00+00:00'),
+            ));
+        }
+
+        self::assertNotNull($firstRaw);
+        $resolvedIssue = new NormalizationIssue(
+            $company->getId(),
+            $firstRaw->getId(),
+            null,
+            NormalizationIssueKind::MAPPER_FAILURE,
+            [],
+        );
+        $resolvedIssue->markResolved(new \DateTimeImmutable('2026-06-20 11:00:00+00:00'));
+        $em->persist(new NormalizationIssue(
+            $company->getId(),
+            $firstRaw->getId(),
+            null,
+            NormalizationIssueKind::SUM_MISMATCH,
+            [],
+        ));
+        $em->persist(new NormalizationIssue(
+            $company->getId(),
+            $firstRaw->getId(),
+            null,
+            NormalizationIssueKind::MAPPER_FAILURE,
+            [],
+        ));
+        $em->persist($resolvedIssue);
+        $em->flush();
+
+        $this->loginWithActiveCompany($client, $owner, $company);
+        $client->request('GET', '/api/ingestion/verification/coverage?from=2026-06-13&to=2026-06-19&shop_ref=shop-backfill');
+
+        self::assertResponseIsSuccessful();
+        $coverage = $this->json($client);
+        self::assertCount(7, $coverage['cells']);
+        self::assertSame($dates, array_column($coverage['cells'], 'date'));
+        self::assertSame([2, 0, 0, 0, 0, 0, 0], array_column($coverage['cells'], 'issue_count'));
+
+        foreach ($coverage['cells'] as $cell) {
+            self::assertSame('shop-backfill', $cell['shop_ref']);
+            self::assertSame('ozon_seller_daily_report', $cell['resource_type']);
+            self::assertSame(1, $cell['raw_count']);
+            self::assertSame(1, $cell['tx_count']);
+            self::assertSame('2026-06-20T07:00:00Z', $cell['last_fetched_at']);
+        }
+    }
+
     public function testInvalidPeriodUsesUnifiedErrorFormat(): void
     {
         $client = static::createClient();
@@ -108,6 +193,7 @@ final class VerificationApiControllerTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         $coverage = $this->json($client);
         self::assertSame(['shop-a'], array_column($coverage['cells'], 'shop_ref'));
+        self::assertSame([1], array_column($coverage['cells'], 'issue_count'));
         self::assertSame(['shop-a'], array_column($coverage['shops'], 'shop_ref'));
 
         $client->request('GET', '/api/ingestion/verification/reconciliation?shop_ref=shop-a&year=2026&month=6');
@@ -265,6 +351,13 @@ final class VerificationApiControllerTest extends WebTestCaseBase
             NormalizationIssueKind::MAPPER_FAILURE,
             [],
         ));
+        $em->persist(new NormalizationIssue(
+            $companyB->getId(),
+            $rawA->getId(),
+            null,
+            NormalizationIssueKind::MAPPER_FAILURE,
+            [],
+        ));
         foreach ([$checkA, $checkB, $categoryA, $categoryB, $snapshotA, $snapshotB] as $entity) {
             $em->persist($entity);
         }
@@ -273,8 +366,13 @@ final class VerificationApiControllerTest extends WebTestCaseBase
         return [$ownerA, $companyA];
     }
 
-    private function rawRecord(string $companyId, string $shopRef, string $resourceType, string $externalId): IngestRawRecord
-    {
+    private function rawRecord(
+        string $companyId,
+        string $shopRef,
+        string $resourceType,
+        string $externalId,
+        ?\DateTimeImmutable $fetchedAt = null,
+    ): IngestRawRecord {
         return new IngestRawRecord(
             companyId: $companyId,
             connectionRef: 'connection-1',
@@ -285,7 +383,7 @@ final class VerificationApiControllerTest extends WebTestCaseBase
             storagePath: sprintf('%s/%s.ndjson.gz', $companyId, $externalId),
             hash: hash('sha256', $companyId.$externalId),
             byteSize: 100,
-            fetchedAt: new \DateTimeImmutable('2026-06-15 10:00:00+00:00'),
+            fetchedAt: $fetchedAt ?? new \DateTimeImmutable('2026-06-15 10:00:00+00:00'),
             syncJobId: 'job-'.$externalId,
         );
     }
@@ -297,6 +395,7 @@ final class VerificationApiControllerTest extends WebTestCaseBase
         int $amountMinor,
         TransactionType $type,
         string $shopRef = 'shop-1',
+        ?\DateTimeImmutable $occurredAt = null,
     ): FinancialTransaction {
         return new FinancialTransaction(
             companyId: $companyId,
@@ -309,7 +408,7 @@ final class VerificationApiControllerTest extends WebTestCaseBase
             type: $type,
             direction: $amountMinor >= 0 ? TransactionDirection::IN : TransactionDirection::OUT,
             money: Money::fromMinor($amountMinor, 'RUB'),
-            occurredAt: new \DateTimeImmutable('2026-06-15 10:00:00+00:00'),
+            occurredAt: $occurredAt ?? new \DateTimeImmutable('2026-06-15 10:00:00+00:00'),
             rawRecordId: $rawRecordId,
         );
     }

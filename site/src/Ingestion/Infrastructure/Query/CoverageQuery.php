@@ -30,40 +30,40 @@ final class CoverageQuery
 
         $qb = $this->connection->createQueryBuilder()
             ->select(
-                "TO_CHAR(r.fetched_at, 'YYYY-MM-DD') AS record_date",
-                'r.shop_ref',
+                "TO_CHAR(ft.occurred_at, 'YYYY-MM-DD') AS record_date",
+                'ft.shop_ref',
                 'r.resource_type',
                 'COUNT(DISTINCT r.id) AS raw_count',
                 'COUNT(DISTINCT ft.id) AS tx_count',
                 'COUNT(DISTINCT ni.id) AS issue_count',
                 'MAX(r.fetched_at) AS last_fetched_at',
             )
-            ->from('ingest_raw_records', 'r')
+            ->from('ingest_financial_transactions', 'ft')
             ->leftJoin(
-                'r',
-                'ingest_financial_transactions',
                 'ft',
-                'ft.company_id = r.company_id AND ft.raw_record_id = r.id',
+                'ingest_raw_records',
+                'r',
+                'r.company_id = :companyId AND r.company_id = ft.company_id AND r.id = ft.raw_record_id',
             )
             ->leftJoin(
-                'r',
+                'ft',
                 'ingest_normalization_issues',
                 'ni',
-                'ni.company_id = r.company_id AND ni.raw_record_id = r.id AND ni.resolved_at IS NULL',
+                'ni.company_id = :companyId AND ni.company_id = ft.company_id AND ni.raw_record_id = r.id AND ni.resolved_at IS NULL',
             )
-            ->where('r.company_id = :companyId')
-            ->andWhere('r.fetched_at >= :from')
-            ->andWhere('r.fetched_at < :toExclusive')
+            ->where('ft.company_id = :companyId')
+            ->andWhere('ft.occurred_at >= :from')
+            ->andWhere('ft.occurred_at < :toExclusive')
             ->setParameter('companyId', $companyId)
             ->setParameter('from', $from, Types::DATETIME_IMMUTABLE)
             ->setParameter('toExclusive', $to->modify('+1 day'), Types::DATETIME_IMMUTABLE)
-            ->groupBy('record_date', 'r.shop_ref', 'r.resource_type')
+            ->groupBy('record_date', 'ft.shop_ref', 'r.resource_type')
             ->orderBy('record_date', 'ASC')
-            ->addOrderBy('r.shop_ref', 'ASC')
+            ->addOrderBy('ft.shop_ref', 'ASC')
             ->addOrderBy('r.resource_type', 'ASC');
 
         if (null !== $shopRef && '' !== $shopRef) {
-            $qb->andWhere('r.shop_ref = :shopRef')
+            $qb->andWhere('ft.shop_ref = :shopRef')
                 ->setParameter('shopRef', $shopRef);
         }
 
