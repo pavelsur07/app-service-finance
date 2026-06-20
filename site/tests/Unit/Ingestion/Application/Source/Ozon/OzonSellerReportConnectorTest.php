@@ -233,8 +233,7 @@ final class OzonSellerReportConnectorTest extends TestCase
             public function fetchByDay(
                 string $companyId,
                 string $connectionRef,
-                \DateTimeImmutable $from,
-                \DateTimeImmutable $to,
+                \DateTimeImmutable $date,
             ): OzonRawPage {
                 throw new \LogicException('Not used.');
             }
@@ -269,6 +268,9 @@ final class OzonSellerReportConnectorTest extends TestCase
     public function testPullAccrualByDayStoresEmptyMarkerForEmptyResponse(): void
     {
         $accrualClient = new class implements OzonAccrualClientInterface {
+            /** @var list<string> */
+            public array $dates = [];
+
             public function fetchPostings(string $companyId, string $connectionRef, array $postingNumbers): OzonRawPage
             {
                 throw new \LogicException('Not used.');
@@ -277,9 +279,10 @@ final class OzonSellerReportConnectorTest extends TestCase
             public function fetchByDay(
                 string $companyId,
                 string $connectionRef,
-                \DateTimeImmutable $from,
-                \DateTimeImmutable $to,
+                \DateTimeImmutable $date,
             ): OzonRawPage {
+                $this->dates[] = $date->format('Y-m-d');
+
                 return new OzonRawPage(rows: [], hasMore: false, metadata: ['endpoint' => '/v1/finance/accrual/by-day']);
             }
 
@@ -303,6 +306,7 @@ final class OzonSellerReportConnectorTest extends TestCase
 
         self::assertSame(OzonResourceType::ACCRUAL_BY_DAY, $result->rawBatch->resourceType);
         self::assertSame('accrual-by-day:2026-06-01:2026-06-02', $result->rawBatch->externalId);
+        self::assertSame(['2026-06-01', '2026-06-02'], $accrualClient->dates);
         self::assertSame([
             [
                 '_ingestion_empty' => true,
@@ -310,12 +314,69 @@ final class OzonSellerReportConnectorTest extends TestCase
                 '_ingestion_metadata' => [
                     'windowFrom' => '2026-06-01',
                     'windowTo' => '2026-06-02',
-                    'apiMetadata' => ['endpoint' => '/v1/finance/accrual/by-day'],
+                    'apiMetadata' => [
+                        [
+                            'date' => '2026-06-01',
+                            'metadata' => ['endpoint' => '/v1/finance/accrual/by-day'],
+                        ],
+                        [
+                            'date' => '2026-06-02',
+                            'metadata' => ['endpoint' => '/v1/finance/accrual/by-day'],
+                        ],
+                    ],
                 ],
             ],
         ], $result->rawBatch->rows);
         self::assertNull($result->nextCursorValue);
         self::assertFalse($result->hasMore);
+    }
+
+    public function testPullAccrualByDayFetchesEachDateInWindow(): void
+    {
+        $accrualClient = new class implements OzonAccrualClientInterface {
+            /** @var list<string> */
+            public array $dates = [];
+
+            public function fetchPostings(string $companyId, string $connectionRef, array $postingNumbers): OzonRawPage
+            {
+                throw new \LogicException('Not used.');
+            }
+
+            public function fetchByDay(
+                string $companyId,
+                string $connectionRef,
+                \DateTimeImmutable $date,
+            ): OzonRawPage {
+                $dateString = $date->format('Y-m-d');
+                $this->dates[] = $dateString;
+
+                return new OzonRawPage(rows: [['date' => $dateString, 'accrual_id' => $dateString]], hasMore: false);
+            }
+
+            public function fetchTypes(string $companyId, string $connectionRef): OzonRawPage
+            {
+                throw new \LogicException('Not used.');
+            }
+        };
+
+        $connector = new OzonSellerReportConnector($this->unusedClient(), $accrualClient, new NullLogger());
+        $result = $connector->pull(new PullRequest(
+            companyId: Uuid::uuid7()->toString(),
+            connectionRef: 'connection-1',
+            shopRef: 'shop-1',
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            cursorValue: null,
+            windowFrom: new \DateTimeImmutable('2026-06-01'),
+            windowTo: new \DateTimeImmutable('2026-06-02'),
+            syncJobId: Uuid::uuid7()->toString(),
+        ));
+
+        self::assertSame(['2026-06-01', '2026-06-02'], $accrualClient->dates);
+        self::assertSame([
+            ['date' => '2026-06-01', 'accrual_id' => '2026-06-01'],
+            ['date' => '2026-06-02', 'accrual_id' => '2026-06-02'],
+        ], $result->rawBatch->rows);
+        self::assertSame('accrual-by-day:2026-06-01:2026-06-02', $result->rawBatch->externalId);
     }
 
     private function unusedClient(): OzonClientAdapterInterface
@@ -355,8 +416,7 @@ final class OzonSellerReportConnectorTest extends TestCase
             public function fetchByDay(
                 string $companyId,
                 string $connectionRef,
-                \DateTimeImmutable $from,
-                \DateTimeImmutable $to,
+                \DateTimeImmutable $date,
             ): OzonRawPage {
                 throw new \LogicException('Not used.');
             }

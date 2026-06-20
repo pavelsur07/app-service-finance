@@ -128,8 +128,32 @@ final class OzonAccrualProbeCommand extends Command
     private function fetchByDay(InputInterface $input, string $companyId, string $connectionRef): OzonRawPage
     {
         [$from, $to] = $this->requiredDateWindow($input);
+        $rows = [];
+        $metadata = [];
 
-        return $this->client->fetchByDay($companyId, $connectionRef, $from, $to);
+        foreach ($this->eachDay($from, $to) as $date) {
+            $page = $this->client->fetchByDay($companyId, $connectionRef, $date);
+            if ([] !== $page->rows) {
+                array_push($rows, ...$page->rows);
+            }
+
+            $metadata[] = [
+                'date' => $date->format('Y-m-d'),
+                'metadata' => $page->metadata,
+            ];
+        }
+
+        return new OzonRawPage(rows: $rows, hasMore: false, metadata: ['days' => $metadata]);
+    }
+
+    /**
+     * @return \Generator<int, \DateTimeImmutable>
+     */
+    private function eachDay(\DateTimeImmutable $from, \DateTimeImmutable $to): \Generator
+    {
+        for ($date = $from->setTime(0, 0); $date <= $to; $date = $date->modify('+1 day')) {
+            yield $date;
+        }
     }
 
     /**

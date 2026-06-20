@@ -48,11 +48,20 @@ final class OzonAccrualClientTest extends TestCase
 
     public function testFetchByDayExtractsResultListRows(): void
     {
-        $client = new OzonAccrualClient(
-            new MockHttpClient(new MockResponse(
-                '{"result":[{"date":"2026-06-13","accruals":[{"accrual_id":1}]}]}',
+        $capturedUrl = null;
+        $capturedOptions = null;
+        $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$capturedUrl, &$capturedOptions): MockResponse {
+            $capturedUrl = $url;
+            $capturedOptions = $options;
+
+            return new MockResponse(
+                '{"accruals":[{"date":"2026-06-13","accrual_id":1}],"last_id":""}',
                 ['http_code' => 200],
-            )),
+            );
+        });
+
+        $client = new OzonAccrualClient(
+            $http,
             $this->credentialProvider(),
             new NullLogger(),
         );
@@ -61,10 +70,12 @@ final class OzonAccrualClientTest extends TestCase
             '0192f0c2-0000-7000-8000-000000000001',
             '0192f0c2-0000-7000-8000-000000000002',
             new \DateTimeImmutable('2026-06-13'),
-            new \DateTimeImmutable('2026-06-19'),
         );
 
-        self::assertSame([['date' => '2026-06-13', 'accruals' => [['accrual_id' => 1]]]], $page->rows);
+        self::assertSame('https://api-seller.ozon.ru/v1/finance/accrual/by-day', $capturedUrl);
+        $requestPayload = $capturedOptions['json'] ?? json_decode((string) ($capturedOptions['body'] ?? ''), true, 512, \JSON_THROW_ON_ERROR);
+        self::assertSame('2026-06-13', $requestPayload['date']);
+        self::assertSame([['date' => '2026-06-13', 'accrual_id' => 1]], $page->rows);
         self::assertFalse($page->hasMore);
     }
 

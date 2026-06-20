@@ -45,18 +45,14 @@ final readonly class OzonAccrualClient implements OzonAccrualClientInterface
     public function fetchByDay(
         string $companyId,
         string $connectionRef,
-        \DateTimeImmutable $from,
-        \DateTimeImmutable $to,
+        \DateTimeImmutable $date,
     ): OzonRawPage {
         return $this->requestPage(
             companyId: $companyId,
             connectionRef: $connectionRef,
             endpoint: self::BY_DAY_ENDPOINT,
             json: [
-                'date' => [
-                    'from' => $from->format('Y-m-d'),
-                    'to' => $to->format('Y-m-d'),
-                ],
+                'date' => $date->format('Y-m-d'),
             ],
         );
     }

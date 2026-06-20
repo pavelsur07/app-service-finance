@@ -179,12 +179,25 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
     private function pullAccrualByDay(PullRequest $request): PullResult
     {
         [$from, $to] = $this->resolveDailyWindow($request);
-        $page = $this->accrualClient->fetchByDay(
-            $request->companyId,
-            $request->connectionRef,
-            $from,
-            $to,
-        );
+        $rows = [];
+        $apiMetadata = [];
+
+        foreach ($this->eachDay($from, $to) as $date) {
+            $page = $this->accrualClient->fetchByDay(
+                $request->companyId,
+                $request->connectionRef,
+                $date,
+            );
+
+            if ([] !== $page->rows) {
+                array_push($rows, ...$page->rows);
+            }
+
+            $apiMetadata[] = [
+                'date' => $date->format('Y-m-d'),
+                'metadata' => $page->metadata,
+            ];
+        }
 
         $windowHasMore = null !== $request->windowTo && $to < $request->windowTo;
         $nextCursor = $windowHasMore || $this->isIncremental($request) ? $to->modify('+1 day')->format('Y-m-d') : null;
@@ -200,12 +213,12 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
                 syncJobId: $request->syncJobId,
                 fetchedAt: new \DateTimeImmutable(),
                 rows: $this->rowsOrEmptyMarker(
-                    $page->rows,
+                    $rows,
                     OzonResourceType::ACCRUAL_BY_DAY,
                     [
                         'windowFrom' => $from->format('Y-m-d'),
                         'windowTo' => $to->format('Y-m-d'),
-                        'apiMetadata' => $page->metadata,
+                        'apiMetadata' => $apiMetadata,
                     ],
                 ),
             ),
@@ -268,6 +281,16 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
         }
 
         return [$from, $to];
+    }
+
+    /**
+     * @return \Generator<int, \DateTimeImmutable>
+     */
+    private function eachDay(\DateTimeImmutable $from, \DateTimeImmutable $to): \Generator
+    {
+        for ($date = $from->setTime(0, 0); $date <= $to; $date = $date->modify('+1 day')) {
+            yield $date;
+        }
     }
 
     private function resolveRealizationMonth(PullRequest $request): \DateTimeImmutable
