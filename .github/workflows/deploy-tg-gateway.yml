@@ -30,7 +30,7 @@ jobs:
               run: |
                   zip -r tg-gateway.zip tg-gateway/
 
-            - name: 📤 Upload archive to Spain VPS
+            - name: 📤 Upload archive to Kazakhstan VPS
               run: |
                   scp -o StrictHostKeyChecking=no \
                     tg-gateway.zip \
@@ -41,23 +41,61 @@ jobs:
                   ssh -o StrictHostKeyChecking=no \
                     ${{ secrets.TG_SERVER_USER }}@${{ secrets.TG_SERVER_HOST }} << 'EOF'
                       set -e
-                  
+
                       cd ${{ secrets.TG_SERVER_DIR }}
-                  
+
                       echo "📦 Распаковка tg-gateway"
                       rm -rf ./current
                       mkdir -p ./current
                       unzip -o tg-gateway.zip -d ./current
                       rm tg-gateway.zip
-                  
+
                       cd ./current/tg-gateway
-                  
+
+                      echo "🔐 Инициализация acme.json"
+                      CERTS_VOLUME="tg-gateway_tg-traefik-certs"
+                      VOLUME_PATH=$(docker volume inspect "$CERTS_VOLUME" --format '{{.Mountpoint}}' 2>/dev/null || echo "")
+                      if [ -n "$VOLUME_PATH" ]; then
+                          ACME_FILE="$VOLUME_PATH/acme.json"
+                          if [ -f "$ACME_FILE" ]; then
+                              CERT_DOMAINS=$(jq -r '(.letsEncrypt.Certificates // []) | length' "$ACME_FILE" 2>/dev/null || echo "0")
+                              if [ "$CERT_DOMAINS" = "0" ]; then
+                                  echo "⚠️  acme.json существует но сертификатов нет — сбрасываем для повторного запроса"
+                                  rm -f "$ACME_FILE"
+                              else
+                                  echo "✅ acme.json содержит $CERT_DOMAINS сертификат(а)"
+                                  chmod 600 "$ACME_FILE"
+                              fi
+                          else
+                              echo "ℹ️  acme.json не найден — Traefik создаст при старте"
+                          fi
+                      else
+                          echo "ℹ️  Volume $CERTS_VOLUME не существует — будет создан при старте"
+                      fi
+
                       echo "🐳 Запуск tg-gateway"
                       docker compose pull
                       docker compose up -d --remove-orphans
-                  
+
                       echo "🧹 Очистка старых образов"
                       docker image prune -f
-                  
+
+                      echo "⏳ Ожидание старта контейнеров (15s)"
+                      sleep 15
+
+                      echo "🔍 Статус контейнеров"
+                      docker compose ps
+
+                      echo "🔍 Проверка nginx /health"
+                      docker exec tg-gateway-nginx wget -qO- http://127.0.0.1/health && echo "" || echo "⚠️  nginx /health недоступен"
+
+                      echo "🔍 Проверка связи с upstream"
+                      docker exec tg-gateway-nginx wget -q --timeout=5 --spider https://app.vashfindir.ru/telegram/webhook 2>&1 \
+                          && echo "✅ upstream app.vashfindir.ru доступен" \
+                          || echo "⚠️  upstream app.vashfindir.ru недоступен с этого сервера — проверьте firewall"
+
+                      echo "🔍 Логи Traefik (ACME)"
+                      docker logs tg-traefik 2>&1 | grep -iE "acme|cert|level=error|ERR" | tail -20 || true
+
                       echo "✅ tg-gateway deploy completed"
                   EOF
