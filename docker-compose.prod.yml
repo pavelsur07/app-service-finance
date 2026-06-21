@@ -28,6 +28,10 @@ x-php-env: &php-env
     WB_LEGACY_RECONCILE_ENABLED: ${WB_LEGACY_RECONCILE_ENABLED:-0}
     LLM_API_URL: "https://example.com/v1/chat/completions"
     LLM_API_KEY: "change-me"
+    # Публичный URL вебхука Telegram — точка приёма апдейтов (шлюз tg-gateway)
+    TELEGRAM_WEBHOOK_URL: ${TELEGRAM_WEBHOOK_URL:-https://tg.vashfindir.ru/telegram/webhook}
+    # Секрет вебхука: задать случайным значением в host-env и переустановить webhook (пусто = проверка выключена)
+    TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
 
 services:
 

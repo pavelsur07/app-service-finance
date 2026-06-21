@@ -3,11 +3,15 @@
 namespace App\Cash\Service\Transaction;
 
 use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
+use App\Cash\Application\Service\DailyBalanceRecalculator;
 use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Exception\CurrencyMismatchException;
+use App\Cash\Exception\FinancePeriodLockedException;
+use App\Cash\Message\ApplyAutoRulesForTransaction;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\PaymentPlan\PaymentPlanMatcher;
 use App\Cash\Service\Vat\VatCalculator;
@@ -15,9 +19,6 @@ use App\Cash\Service\Vat\VatPolicy;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
-use App\Cash\Exception\CurrencyMismatchException;
-use App\Cash\Message\ApplyAutoRulesForTransaction;
-use App\Cash\Application\Service\DailyBalanceRecalculator;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Exception\ORMException;
 use Ramsey\Uuid\Uuid;
@@ -318,7 +319,7 @@ class CashTransactionService
             : \DateTimeImmutable::createFromInterface($date)->setTime(0, 0);
 
         if ($current < $lock) {
-            throw new \DomainException(sprintf('Период закрыт. Операции с датами ранее %s запрещены.', $lock->format('d.m.Y')));
+            throw new FinancePeriodLockedException(sprintf('Период закрыт. Операции с датами ранее %s запрещены.', $lock->format('d.m.Y')));
         }
     }
 }

@@ -16,7 +16,8 @@ final readonly class CreateTelegramCashTransactionAction
     public function __construct(
         private CashFacade $cashFacade,
         private TelegramCashTransactionExternalIdGenerator $externalIdGenerator,
-    ) {}
+    ) {
+    }
 
     public function __invoke(CreateTelegramCashTransactionCommand $command): ?CreateTelegramCashTransactionActionResult
     {
@@ -97,7 +98,14 @@ final readonly class CreateTelegramCashTransactionAction
         $fractionalPart = substr($fractionalPart, 0, 2);
         $fractionalPart = str_pad($fractionalPart, 2, '0');
 
-        return sprintf('%s.%s', $integerPart, $fractionalPart);
+        $amount = sprintf('%s.%s', $integerPart, $fractionalPart);
+
+        // Нулевая сумма — не операция: возвращаем null, чтобы контроллер показал подсказку формата
+        if ('0.00' === $amount) {
+            return null;
+        }
+
+        return $amount;
     }
 
     private function detectDirection(string $text): CashDirection

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Telegram\Controller\Admin;
 
 use App\Telegram\Entity\TelegramBot;
@@ -14,10 +16,15 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 #[Route('/admin/telegram/bots', name: 'admin_telegram_bot_')]
-class TelegramBotController extends AbstractController
+final class TelegramBotController extends AbstractController
 {
-    // Для MVP вебхук всегда должен указывать на продакшн-домен, поэтому URL захардкожен
-    private const TARGET_WEBHOOK_URL = 'https://app.vashfindir.ru/telegram/webhook';
+    public function __construct(
+        // Публичный URL вебхука берём из конфигурации (.env: TELEGRAM_WEBHOOK_URL), а не из хардкода
+        private readonly string $telegramWebhookUrl,
+        // Секрет вебхука: передаётся в Telegram при setWebhook (пусто = без секрета)
+        private readonly string $telegramWebhookSecret = '',
+    ) {
+    }
 
     #[Route('', name: 'index', methods: ['GET'])]
     public function index(TelegramBotRepository $repository): Response
@@ -147,12 +154,17 @@ class TelegramBotController extends AbstractController
         }
 
         try {
+            // Адрес вебхука берём из конфигурации (TELEGRAM_WEBHOOK_URL)
+            $body = ['url' => $this->telegramWebhookUrl];
+
+            // Если задан секрет — Telegram будет слать его в заголовке X-Telegram-Bot-Api-Secret-Token
+            if ('' !== $this->telegramWebhookSecret) {
+                $body['secret_token'] = $this->telegramWebhookSecret;
+            }
+
             // Запрашиваем Telegram API setWebhook, чтобы привязать бота к фиксированному URL
             $response = $httpClient->request('POST', sprintf('https://api.telegram.org/bot%s/setWebhook', $bot->getToken()), [
-                'body' => [
-                    // Для MVP жёстко задаём адрес вебхука на продакшн-домен
-                    'url' => self::TARGET_WEBHOOK_URL,
-                ],
+                'body' => $body,
             ]);
 
             if (200 !== $response->getStatusCode()) {
@@ -173,7 +185,7 @@ class TelegramBotController extends AbstractController
             $this->addFlash('success', 'Webhook установлен');
 
             // Сохраняем ожидаемый URL вебхука в базе, чтобы админ видел последнюю попытку установки
-            $bot->setWebhookUrl(self::TARGET_WEBHOOK_URL);
+            $bot->setWebhookUrl($this->telegramWebhookUrl);
             $bot->setUpdatedAt(new \DateTimeImmutable());
             $entityManager->flush();
         } else {
@@ -250,12 +262,12 @@ class TelegramBotController extends AbstractController
         $lastErrorMessage = $result['last_error_message'] ?? null;
 
         // Вебхук считаем установленным, когда Telegram возвращает ожидаемый адрес
-        $webhookInstalled = self::TARGET_WEBHOOK_URL === $url;
+        $webhookInstalled = $this->telegramWebhookUrl === $url;
         // Эвристика для MVP: webhook считаем живым, если он установлен и Telegram не сообщает об ошибках доставки
         $webhookAlive = $webhookInstalled && empty($lastErrorMessage);
 
         return [
-            'expectedUrl' => self::TARGET_WEBHOOK_URL,
+            'expectedUrl' => $this->telegramWebhookUrl,
             'actualUrl' => $url,
             'pendingUpdateCount' => $pending,
             'lastErrorDate' => $lastErrorDate,
