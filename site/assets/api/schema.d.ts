@@ -490,7 +490,7 @@ export interface operations {
                             date?: string;
                             /** @example ozon-shop-123 */
                             shop_ref?: string;
-                            /** @example ozon_seller_daily_report */
+                            /** @example ozon_finance_accrual_by_day */
                             resource_type?: string;
                             /** @example 1 */
                             raw_count?: number;
