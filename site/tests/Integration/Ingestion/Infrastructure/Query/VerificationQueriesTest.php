@@ -34,14 +34,14 @@ final class VerificationQueriesTest extends IntegrationTestCase
         $raw = $this->rawRecord(
             companyId: $companyId,
             shopRef: 'shop-1',
-            resourceType: 'ozon_seller_daily_report',
+            resourceType: 'ozon_finance_accrual_by_day',
             fetchedAt: new \DateTimeImmutable('2026-06-15 10:00:00+00:00'),
             externalId: 'raw-1',
         );
         $otherShop = $this->rawRecord(
             companyId: $companyId,
             shopRef: 'shop-2',
-            resourceType: 'ozon_seller_daily_report',
+            resourceType: 'ozon_finance_accrual_by_day',
             fetchedAt: new \DateTimeImmutable('2026-06-15 11:00:00+00:00'),
             externalId: 'raw-2',
         );
@@ -123,8 +123,8 @@ final class VerificationQueriesTest extends IntegrationTestCase
     public function testIssuesFacadeReturnsOnlyOpenHumanizedItemsWithPagination(): void
     {
         $companyId = Uuid::uuid7()->toString();
-        $raw = $this->rawRecord($companyId, 'shop-1', 'ozon_seller_daily_report', new \DateTimeImmutable(), 'issue-raw-1');
-        $otherShop = $this->rawRecord($companyId, 'shop-2', 'ozon_seller_daily_report', new \DateTimeImmutable(), 'issue-raw-2');
+        $raw = $this->rawRecord($companyId, 'shop-1', 'ozon_finance_accrual_by_day', new \DateTimeImmutable(), 'issue-raw-1');
+        $otherShop = $this->rawRecord($companyId, 'shop-2', 'ozon_finance_accrual_by_day', new \DateTimeImmutable(), 'issue-raw-2');
         $resolved = new NormalizationIssue(
             $companyId,
             $raw->getId(),

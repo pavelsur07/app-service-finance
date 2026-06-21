@@ -4,17 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Ingestion\Application\Source\Ozon;
 
-use App\Ingestion\Application\Action\NormalizeRawRecordAction;
-use App\Ingestion\Application\Command\NormalizeRawRecordCommand;
-use App\Ingestion\Application\Source\Ozon\OzonOperationKey;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
-use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Entity\SyncJob;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\SyncJobKind;
 use App\Ingestion\Enum\SyncJobStatus;
-use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Message\NormalizeRawRecordMessage;
 use App\Ingestion\Message\RunSyncChunkMessage;
 use App\Ingestion\MessageHandler\NormalizeRawRecordHandler;
@@ -29,14 +24,14 @@ use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 final class OzonIngestionFlowTest extends IntegrationTestCase
 {
-    public function testRunSyncChunkThroughFakeOzonAdapterStoresRawAndNormalizesCanon(): void
+    public function testRunSyncChunkThroughFakeOzonAccrualClientStoresRawAndNormalizesCanon(): void
     {
         $companyId = Uuid::uuid7()->toString();
         $job = new SyncJob(
             companyId: $companyId,
             connectionRef: 'marketplace:ozon:seller',
             source: IngestSource::OZON,
-            resourceType: OzonResourceType::DAILY_REPORT,
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
             kind: SyncJobKind::BACKFILL,
             windowFrom: new \DateTimeImmutable('2026-06-18'),
             windowTo: new \DateTimeImmutable('2026-06-18'),
@@ -67,8 +62,8 @@ final class OzonIngestionFlowTest extends IntegrationTestCase
         /** @var IngestRawRecordRepository $rawRecordRepository */
         $rawRecordRepository = self::getContainer()->get(IngestRawRecordRepository::class);
         $rawRecord = $rawRecordRepository->findByIdAndCompany($normalizeMessage->rawRecordId, $companyId);
-        self::assertNotNull($rawRecord);
-        self::assertSame(OzonResourceType::DAILY_REPORT, $rawRecord->getResourceType());
+        self::assertInstanceOf(IngestRawRecord::class, $rawRecord);
+        self::assertSame(OzonResourceType::ACCRUAL_BY_DAY, $rawRecord->getResourceType());
 
         /** @var NormalizeRawRecordHandler $normalizeHandler */
         $normalizeHandler = self::getContainer()->get(NormalizeRawRecordHandler::class);
@@ -79,104 +74,17 @@ final class OzonIngestionFlowTest extends IntegrationTestCase
         $transactionRepository = self::getContainer()->get(FinancialTransactionRepository::class);
         $transactions = $transactionRepository->findByRawRecordId($companyId, $normalizeMessage->rawRecordId);
 
-        self::assertCount(4, $transactions);
+        self::assertCount(2, $transactions);
         $externalIds = array_map(static fn ($transaction): string => $transaction->getExternalId(), $transactions);
         sort($externalIds);
-        $expectedExternalIds = [
-            'ozon:operation:fake-ozon-op-1:sale',
-            'ozon:operation:fake-ozon-op-1:commission',
-            'ozon:operation:fake-ozon-op-1:logistics_delivery',
-            'ozon:operation:fake-ozon-op-1:service_marketplaceserviceitemdelivtocustomer',
-        ];
-        sort($expectedExternalIds);
-        self::assertSame(
-            $expectedExternalIds,
-            $externalIds,
-        );
-    }
-
-    public function testRealizationUpdatesDailyTransactionsBySameNaturalKeys(): void
-    {
-        $companyId = Uuid::uuid7()->toString();
-        $dailyRows = $this->fixtureRows('transaction_list_with_sale_and_commission.json');
-        $realizationRows = $this->fixtureRows('realization_february_2026.json');
-        $dailyRecord = $this->storeRawRecord($companyId, OzonResourceType::DAILY_REPORT, 'daily-2026-02', $dailyRows);
-        $realizationRecord = $this->storeRawRecord($companyId, OzonResourceType::REALIZATION, 'realization-2026-02', $realizationRows);
-
-        $this->normalize($dailyRecord->getId(), $companyId);
-        $this->normalize($realizationRecord->getId(), $companyId);
-        $this->em->clear();
-
-        $operationGroupId = (new OzonOperationKey())->operationGroupId($companyId, $dailyRows[0]);
-        /** @var FinancialTransactionRepository $transactionRepository */
-        $transactionRepository = self::getContainer()->get(FinancialTransactionRepository::class);
-        $transactions = $transactionRepository->findByOperationGroup($companyId, $operationGroupId);
-
-        self::assertCount(6, $transactions);
-        $byExternalId = [];
-        foreach ($transactions as $transaction) {
-            $byExternalId[$transaction->getExternalId()] = $transaction;
-        }
-
-        self::assertSame(121000, $byExternalId['ozon:operation:1234567890:sale']->getAmountMinor());
-        self::assertSame(
-            '2026-03-05 00:00:00',
-            $byExternalId['ozon:operation:1234567890:sale']->getExternalUpdatedAt()->format('Y-m-d H:i:s'),
-        );
+        self::assertSame([
+            'ozon:accrual-by-day:53675409100:commission:product-0',
+            'ozon:accrual-by-day:53675409100:delivery:product-0:service-0:type-29',
+        ], $externalIds);
 
         /** @var NormalizationIssueRepository $issueRepository */
         $issueRepository = self::getContainer()->get(NormalizationIssueRepository::class);
-        self::assertSame([], $issueRepository->findOpenByRawRecord($companyId, $dailyRecord->getId()));
-        self::assertSame([], $issueRepository->findOpenByRawRecord($companyId, $realizationRecord->getId()));
-    }
-
-    /**
-     * @param list<array<string, mixed>> $rows
-     */
-    private function storeRawRecord(string $companyId, string $resourceType, string $externalId, array $rows): IngestRawRecord
-    {
-        /** @var RawStorageFacade $facade */
-        $facade = self::getContainer()->get(RawStorageFacade::class);
-
-        return $facade->store(new RawBatch(
-            companyId: $companyId,
-            connectionRef: 'marketplace:ozon:seller',
-            shopRef: 'ozon-shop',
-            source: IngestSource::OZON,
-            resourceType: $resourceType,
-            externalId: $externalId,
-            syncJobId: Uuid::uuid7()->toString(),
-            fetchedAt: new \DateTimeImmutable('2026-03-05T00:00:00+00:00'),
-            rows: $rows,
-        ))[0];
-    }
-
-    private function normalize(string $rawRecordId, string $companyId): void
-    {
-        /** @var NormalizeRawRecordAction $action */
-        $action = self::getContainer()->get(NormalizeRawRecordAction::class);
-        $action(new NormalizeRawRecordCommand($rawRecordId, $companyId));
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    private function fixtureRows(string $fileName): array
-    {
-        $payload = json_decode(
-            (string) file_get_contents(__DIR__.'/../../../../../Fixtures/Ingestion/Ozon/'.$fileName),
-            true,
-            512,
-            \JSON_THROW_ON_ERROR,
-        );
-
-        self::assertIsArray($payload);
-        self::assertIsArray($payload['rows'] ?? null);
-
-        /** @var list<array<string, mixed>> $rows */
-        $rows = $payload['rows'];
-
-        return $rows;
+        self::assertSame([], $issueRepository->findOpenByRawRecord($companyId, $normalizeMessage->rawRecordId));
     }
 
     private function getNormalizeTransport(): InMemoryTransport

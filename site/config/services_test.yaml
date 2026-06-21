@@ -12,7 +12,7 @@ services:
     App\Tests\Integration\Ingestion\Fixtures\FakeMapper:
         tags: ['app.ingestion.mapper']
 
-    App\Ingestion\Infrastructure\Api\Ozon\OzonClientAdapterInterface: '@App\Tests\Integration\Ingestion\Fixtures\FakeOzonClientAdapter'
+    App\Ingestion\Infrastructure\Api\Ozon\OzonAccrualClientInterface: '@App\Tests\Integration\Ingestion\Fixtures\FakeOzonAccrualClient'
 
     test.ingestion_lock_store:
         class: Symfony\Component\Lock\Store\InMemoryStore

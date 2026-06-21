@@ -138,20 +138,15 @@ services:
         public: true
 
     App\Ingestion\Infrastructure\Api\Ozon\OzonCredentialProviderInterface: '@App\Ingestion\Infrastructure\Api\Ozon\CredentialFacadeOzonCredentialProvider'
-    App\Ingestion\Infrastructure\Api\Ozon\OzonClientAdapterInterface: '@App\Ingestion\Infrastructure\Api\Ozon\LegacyOzonClientAdapter'
     App\Ingestion\Infrastructure\Api\Ozon\OzonAccrualClientInterface: '@App\Ingestion\Infrastructure\Api\Ozon\OzonAccrualClient'
 
     App\Ingestion\Application\Source\Ozon\OzonSellerReportConnector:
         arguments:
             $chunkSizeDays: 7
             $hotRewindDays: 14
-            $rateLimitRpm: 60
         tags: ['app.ingestion.connector']
 
-    App\Ingestion\Application\Source\Ozon\OzonSellerReportMapper:
-        tags: ['app.ingestion.mapper']
-
-    App\Ingestion\Application\Source\Ozon\OzonRealizationMapper:
+    App\Ingestion\Application\Source\Ozon\OzonAccrualByDayMapper:
         tags: ['app.ingestion.mapper']
 
     App\Ingestion\Application\Source\Ozon\OzonAccrualShadowMapper:

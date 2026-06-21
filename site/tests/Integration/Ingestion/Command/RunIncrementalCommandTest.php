@@ -23,10 +23,11 @@ use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 final class RunIncrementalCommandTest extends IntegrationTestCase
 {
-    public function testSkipsConnectionsWithoutCursor(): void
+    public function testSeedsAccrualCursorFromLegacyCursorAndDispatches(): void
     {
         $company = $this->seedCompany(1001);
-        $this->seedConnection($company, '77777777-7777-7777-7777-000000001001');
+        $connection = $this->seedConnection($company, '77777777-7777-7777-7777-000000001001');
+        $this->seedCursor($company->getId(), $connection->getId(), 'ozon_seller_daily_report', 'legacy-shop', '2026-06-18');
 
         $transport = $this->getIngestFetchTransport();
         $transport->reset();
@@ -35,17 +36,23 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
         $exit = $tester->execute([]);
 
         self::assertSame(Command::SUCCESS, $exit);
-        self::assertStringContainsString('Dispatched 0 incremental jobs', $tester->getDisplay());
-        self::assertSame(0, $this->incrementalJobCount($company->getId()));
-        self::assertCount(0, $transport->getSent());
+        self::assertStringContainsString('Dispatched 1 incremental jobs', $tester->getDisplay());
+        self::assertSame(1, $this->incrementalJobCount($company->getId()));
+        self::assertCount(1, $transport->getSent());
+
+        /** @var IngestCursorRepository $cursorRepository */
+        $cursorRepository = self::getContainer()->get(IngestCursorRepository::class);
+        $cursor = $cursorRepository->findOne($company->getId(), $connection->getId(), OzonResourceType::ACCRUAL_BY_DAY, $connection->getId());
+
+        self::assertNotNull($cursor);
+        self::assertSame('2026-06-18', $cursor->getCursorValue());
     }
 
     public function testDispatchesOneIncrementalJobPerExistingCursor(): void
     {
         $company = $this->seedCompany(1002);
         $connection = $this->seedConnection($company, '77777777-7777-7777-7777-000000001002');
-        $this->seedCursor($company->getId(), $connection->getId(), OzonResourceType::DAILY_REPORT, 'shop-a', '2026-06-18');
-        $this->seedCursor($company->getId(), $connection->getId(), OzonResourceType::REALIZATION, 'shop-a', '2026-06-01');
+        $this->seedCursor($company->getId(), $connection->getId(), OzonResourceType::ACCRUAL_BY_DAY, 'shop-a', '2026-06-18');
 
         $transport = $this->getIngestFetchTransport();
         $transport->reset();
@@ -54,11 +61,11 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
         $exit = $tester->execute([]);
 
         self::assertSame(Command::SUCCESS, $exit);
-        self::assertStringContainsString('Dispatched 2 incremental jobs', $tester->getDisplay());
-        self::assertSame(2, $this->incrementalJobCount($company->getId()));
+        self::assertStringContainsString('Dispatched 1 incremental jobs', $tester->getDisplay());
+        self::assertSame(1, $this->incrementalJobCount($company->getId()));
 
         $envelopes = $transport->getSent();
-        self::assertCount(2, $envelopes);
+        self::assertCount(1, $envelopes);
         foreach ($envelopes as $envelope) {
             self::assertInstanceOf(RunSyncChunkMessage::class, $envelope->getMessage());
         }
@@ -68,11 +75,11 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
     {
         $companyA = $this->seedCompany(1003);
         $connectionA = $this->seedConnection($companyA, '77777777-7777-7777-7777-000000001003');
-        $this->seedCursor($companyA->getId(), $connectionA->getId(), OzonResourceType::DAILY_REPORT, 'shop-a', '2026-06-18');
+        $this->seedCursor($companyA->getId(), $connectionA->getId(), OzonResourceType::ACCRUAL_BY_DAY, 'shop-a', '2026-06-18');
 
         $companyB = $this->seedCompany(1004);
         $connectionB = $this->seedConnection($companyB, '77777777-7777-7777-7777-000000001004');
-        $this->seedCursor($companyB->getId(), $connectionB->getId(), OzonResourceType::DAILY_REPORT, 'shop-b', '2026-06-18');
+        $this->seedCursor($companyB->getId(), $connectionB->getId(), OzonResourceType::ACCRUAL_BY_DAY, 'shop-b', '2026-06-18');
 
         $transport = $this->getIngestFetchTransport();
         $transport->reset();
@@ -93,7 +100,7 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
         $this->seedCursor(
             $newerCompany->getId(),
             $newerConnection->getId(),
-            OzonResourceType::DAILY_REPORT,
+            OzonResourceType::ACCRUAL_BY_DAY,
             'shop-newer',
             '2026-06-18',
             new \DateTimeImmutable('2026-06-18 10:00:00'),
@@ -104,7 +111,7 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
         $this->seedCursor(
             $olderCompany->getId(),
             $olderConnection->getId(),
-            OzonResourceType::DAILY_REPORT,
+            OzonResourceType::ACCRUAL_BY_DAY,
             'shop-older',
             '2026-06-18',
             new \DateTimeImmutable('2026-06-01 10:00:00'),
@@ -120,6 +127,30 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
         self::assertSame(0, $this->incrementalJobCount($newerCompany->getId()));
         self::assertSame(1, $this->incrementalJobCount($olderCompany->getId()));
         self::assertCount(1, $transport->getSent());
+    }
+
+    public function testSkipsAccrualCursorThatIsNotDueYet(): void
+    {
+        $company = $this->seedCompany(1007);
+        $connection = $this->seedConnection($company, '77777777-7777-7777-7777-000000001007');
+        $this->seedCursor(
+            $company->getId(),
+            $connection->getId(),
+            OzonResourceType::ACCRUAL_BY_DAY,
+            'shop-future',
+            (new \DateTimeImmutable('tomorrow'))->format('Y-m-d'),
+        );
+
+        $transport = $this->getIngestFetchTransport();
+        $transport->reset();
+
+        $tester = $this->tester('app:ingestion:run-incremental');
+        $exit = $tester->execute([]);
+
+        self::assertSame(Command::SUCCESS, $exit);
+        self::assertStringContainsString('not due: 1', $tester->getDisplay());
+        self::assertSame(0, $this->incrementalJobCount($company->getId()));
+        self::assertCount(0, $transport->getSent());
     }
 
     public function testWildberriesSourceIsSkipped(): void

@@ -43,7 +43,7 @@ final class GetCoverageController extends AbstractController
                         properties: [
                             new OA\Property(property: 'date', type: 'string', format: 'date', example: '2026-06-01'),
                             new OA\Property(property: 'shop_ref', type: 'string', example: 'ozon-shop-123'),
-                            new OA\Property(property: 'resource_type', type: 'string', example: 'ozon_seller_daily_report'),
+                            new OA\Property(property: 'resource_type', type: 'string', example: 'ozon_finance_accrual_by_day'),
                             new OA\Property(property: 'raw_count', type: 'integer', example: 1),
                             new OA\Property(property: 'tx_count', type: 'integer', example: 287),
                             new OA\Property(property: 'issue_count', type: 'integer', example: 0),

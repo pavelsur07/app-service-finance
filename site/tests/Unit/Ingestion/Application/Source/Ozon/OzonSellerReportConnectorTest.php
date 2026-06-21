@@ -11,210 +11,46 @@ use App\Ingestion\Application\Source\Ozon\OzonSellerReportConnector;
 use App\Ingestion\Enum\Capability;
 use App\Ingestion\Exception\UnsupportedCapabilityException;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonAccrualClientInterface;
-use App\Ingestion\Infrastructure\Api\Ozon\OzonClientAdapterInterface;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonRawPage;
-use App\Ingestion\Infrastructure\Api\Ozon\OzonShopDescriptor;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
 
 final class OzonSellerReportConnectorTest extends TestCase
 {
-    public function testPullDailyReportUsesSevenDayWindowAndReturnsRawBatch(): void
-    {
-        $client = new class implements OzonClientAdapterInterface {
-            public ?\DateTimeImmutable $from = null;
-            public ?\DateTimeImmutable $to = null;
-
-            public function fetchTransactionList(
-                string $companyId,
-                string $connectionRef,
-                \DateTimeImmutable $from,
-                \DateTimeImmutable $to,
-                int $page,
-                int $pageSize,
-            ): OzonRawPage {
-                $this->from = $from;
-                $this->to = $to;
-
-                return new OzonRawPage(rows: [['operation_id' => 'op-1']], hasMore: false);
-            }
-
-            public function fetchRealization(string $companyId, string $connectionRef, int $year, int $month): OzonRawPage
-            {
-                throw new \LogicException('Not used.');
-            }
-
-            public function listClusters(string $companyId, string $connectionRef): array
-            {
-                return [new OzonShopDescriptor('shop-1', 'Shop 1')];
-            }
-        };
-
-        $connector = new OzonSellerReportConnector($client, $this->unusedAccrualClient(), new NullLogger());
-        $companyId = Uuid::uuid7()->toString();
-        $syncJobId = Uuid::uuid7()->toString();
-
-        $result = $connector->pull(new PullRequest(
-            companyId: $companyId,
-            connectionRef: 'connection-1',
-            shopRef: 'shop-1',
-            resourceType: OzonResourceType::DAILY_REPORT,
-            cursorValue: null,
-            windowFrom: new \DateTimeImmutable('2026-06-01'),
-            windowTo: new \DateTimeImmutable('2026-06-18'),
-            syncJobId: $syncJobId,
-        ));
-
-        self::assertEquals(new \DateTimeImmutable('2026-06-01 00:00:00'), $client->from);
-        self::assertEquals(new \DateTimeImmutable('2026-06-07 23:59:59'), $client->to);
-        self::assertSame('daily:2026-06-01:2026-06-07', $result->rawBatch->externalId);
-        self::assertSame('2026-06-08', $result->nextCursorValue);
-        self::assertTrue($result->hasMore);
-        self::assertSame([['operation_id' => 'op-1']], $result->rawBatch->rows);
-    }
-
-    public function testPullDailyReportAdvancesCursorForNonWindowedIncremental(): void
-    {
-        $client = new class implements OzonClientAdapterInterface {
-            public ?\DateTimeImmutable $from = null;
-            public ?\DateTimeImmutable $to = null;
-
-            public function fetchTransactionList(
-                string $companyId,
-                string $connectionRef,
-                \DateTimeImmutable $from,
-                \DateTimeImmutable $to,
-                int $page,
-                int $pageSize,
-            ): OzonRawPage {
-                $this->from = $from;
-                $this->to = $to;
-
-                return new OzonRawPage(rows: [['operation_id' => 'op-1']], hasMore: false);
-            }
-
-            public function fetchRealization(string $companyId, string $connectionRef, int $year, int $month): OzonRawPage
-            {
-                throw new \LogicException('Not used.');
-            }
-
-            public function listClusters(string $companyId, string $connectionRef): array
-            {
-                return [new OzonShopDescriptor('shop-1', 'Shop 1')];
-            }
-        };
-
-        $connector = new OzonSellerReportConnector($client, $this->unusedAccrualClient(), new NullLogger());
-        $companyId = Uuid::uuid7()->toString();
-
-        $result = $connector->pull(new PullRequest(
-            companyId: $companyId,
-            connectionRef: 'connection-1',
-            shopRef: 'shop-1',
-            resourceType: OzonResourceType::DAILY_REPORT,
-            cursorValue: '2026-06-12',
-            windowFrom: null,
-            windowTo: null,
-            syncJobId: Uuid::uuid7()->toString(),
-        ));
-
-        self::assertEquals(new \DateTimeImmutable('2026-06-12 00:00:00'), $client->from);
-        self::assertEquals(new \DateTimeImmutable('2026-06-18 23:59:59'), $client->to);
-        self::assertSame('2026-06-19', $result->nextCursorValue);
-        self::assertFalse($result->hasMore);
-    }
-
-    public function testPullRealizationAdvancesCursorForNonWindowedIncremental(): void
-    {
-        $client = new class implements OzonClientAdapterInterface {
-            public ?int $year = null;
-            public ?int $month = null;
-
-            public function fetchTransactionList(
-                string $companyId,
-                string $connectionRef,
-                \DateTimeImmutable $from,
-                \DateTimeImmutable $to,
-                int $page,
-                int $pageSize,
-            ): OzonRawPage {
-                throw new \LogicException('Not used.');
-            }
-
-            public function fetchRealization(string $companyId, string $connectionRef, int $year, int $month): OzonRawPage
-            {
-                $this->year = $year;
-                $this->month = $month;
-
-                return new OzonRawPage(
-                    rows: [['operation_id' => 'op-1']],
-                    hasMore: false,
-                    metadata: ['header' => ['doc_number' => 'doc-1']],
-                );
-            }
-
-            public function listClusters(string $companyId, string $connectionRef): array
-            {
-                return [new OzonShopDescriptor('shop-1', 'Shop 1')];
-            }
-        };
-
-        $connector = new OzonSellerReportConnector($client, $this->unusedAccrualClient(), new NullLogger());
-
-        $result = $connector->pull(new PullRequest(
-            companyId: Uuid::uuid7()->toString(),
-            connectionRef: 'connection-1',
-            shopRef: 'shop-1',
-            resourceType: OzonResourceType::REALIZATION,
-            cursorValue: '2026-05-01',
-            windowFrom: null,
-            windowTo: null,
-            syncJobId: Uuid::uuid7()->toString(),
-        ));
-
-        self::assertSame(2026, $client->year);
-        self::assertSame(5, $client->month);
-        self::assertSame('2026-06-01', $result->nextCursorValue);
-        self::assertFalse($result->hasMore);
-    }
-
     public function testCapabilitiesDiscoverAndUnsupportedPush(): void
     {
-        $client = new class implements OzonClientAdapterInterface {
-            public function fetchTransactionList(
-                string $companyId,
-                string $connectionRef,
-                \DateTimeImmutable $from,
-                \DateTimeImmutable $to,
-                int $page,
-                int $pageSize,
-            ): OzonRawPage {
-                throw new \LogicException('Not used.');
-            }
+        $connector = new OzonSellerReportConnector($this->unusedAccrualClient());
+        $connectionRef = Uuid::uuid7()->toString();
 
-            public function fetchRealization(string $companyId, string $connectionRef, int $year, int $month): OzonRawPage
-            {
-                throw new \LogicException('Not used.');
-            }
-
-            public function listClusters(string $companyId, string $connectionRef): array
-            {
-                return [new OzonShopDescriptor('shop-1', 'Shop 1')];
-            }
-        };
-
-        $connector = new OzonSellerReportConnector($client, $this->unusedAccrualClient(), new NullLogger());
         self::assertSame([Capability::CAN_DISCOVER_SHOPS, Capability::CAN_PULL], $connector->capabilities());
-        self::assertSame('shop-1', $connector->discoverShops(Uuid::uuid7()->toString(), 'connection-1')[0]->externalId);
+        self::assertSame($connectionRef, $connector->discoverShops(Uuid::uuid7()->toString(), $connectionRef)[0]->externalId);
 
         $this->expectException(UnsupportedCapabilityException::class);
         $connector->push(new PushRequest(
             companyId: Uuid::uuid7()->toString(),
-            connectionRef: 'connection-1',
+            connectionRef: $connectionRef,
             documentType: 'doc',
             payload: [],
             idempotencyKey: 'key-1',
+        ));
+    }
+
+    public function testLegacyOzonResourcesAreUnsupported(): void
+    {
+        $connector = new OzonSellerReportConnector($this->unusedAccrualClient());
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unsupported Ozon resource type');
+
+        $connector->pull(new PullRequest(
+            companyId: Uuid::uuid7()->toString(),
+            connectionRef: 'connection-1',
+            shopRef: 'shop-1',
+            resourceType: 'ozon_seller_daily_report',
+            cursorValue: null,
+            windowFrom: new \DateTimeImmutable('2026-06-01'),
+            windowTo: new \DateTimeImmutable('2026-06-18'),
+            syncJobId: Uuid::uuid7()->toString(),
         ));
     }
 
@@ -230,11 +66,8 @@ final class OzonSellerReportConnectorTest extends TestCase
                 throw new \LogicException('Not used.');
             }
 
-            public function fetchByDay(
-                string $companyId,
-                string $connectionRef,
-                \DateTimeImmutable $date,
-            ): OzonRawPage {
+            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date): OzonRawPage
+            {
                 throw new \LogicException('Not used.');
             }
 
@@ -244,7 +77,7 @@ final class OzonSellerReportConnectorTest extends TestCase
             }
         };
 
-        $connector = new OzonSellerReportConnector($this->unusedClient(), $accrualClient, new NullLogger());
+        $connector = new OzonSellerReportConnector($accrualClient);
 
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('posting_numbers');
@@ -268,7 +101,9 @@ final class OzonSellerReportConnectorTest extends TestCase
     public function testPullAccrualByDayStoresEmptyMarkerForEmptyResponse(): void
     {
         $accrualClient = new class implements OzonAccrualClientInterface {
-            /** @var list<string> */
+            /**
+             * @var list<string>
+             */
             public array $dates = [];
 
             public function fetchPostings(string $companyId, string $connectionRef, array $postingNumbers): OzonRawPage
@@ -276,11 +111,8 @@ final class OzonSellerReportConnectorTest extends TestCase
                 throw new \LogicException('Not used.');
             }
 
-            public function fetchByDay(
-                string $companyId,
-                string $connectionRef,
-                \DateTimeImmutable $date,
-            ): OzonRawPage {
+            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date): OzonRawPage
+            {
                 $this->dates[] = $date->format('Y-m-d');
 
                 return new OzonRawPage(rows: [], hasMore: false, metadata: ['endpoint' => '/v1/finance/accrual/by-day']);
@@ -292,7 +124,7 @@ final class OzonSellerReportConnectorTest extends TestCase
             }
         };
 
-        $connector = new OzonSellerReportConnector($this->unusedClient(), $accrualClient, new NullLogger());
+        $connector = new OzonSellerReportConnector($accrualClient);
         $result = $connector->pull(new PullRequest(
             companyId: Uuid::uuid7()->toString(),
             connectionRef: 'connection-1',
@@ -334,7 +166,9 @@ final class OzonSellerReportConnectorTest extends TestCase
     public function testPullAccrualByDayFetchesEachDateInWindow(): void
     {
         $accrualClient = new class implements OzonAccrualClientInterface {
-            /** @var list<string> */
+            /**
+             * @var list<string>
+             */
             public array $dates = [];
 
             public function fetchPostings(string $companyId, string $connectionRef, array $postingNumbers): OzonRawPage
@@ -342,11 +176,8 @@ final class OzonSellerReportConnectorTest extends TestCase
                 throw new \LogicException('Not used.');
             }
 
-            public function fetchByDay(
-                string $companyId,
-                string $connectionRef,
-                \DateTimeImmutable $date,
-            ): OzonRawPage {
+            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date): OzonRawPage
+            {
                 $dateString = $date->format('Y-m-d');
                 $this->dates[] = $dateString;
 
@@ -359,7 +190,7 @@ final class OzonSellerReportConnectorTest extends TestCase
             }
         };
 
-        $connector = new OzonSellerReportConnector($this->unusedClient(), $accrualClient, new NullLogger());
+        $connector = new OzonSellerReportConnector($accrualClient);
         $result = $connector->pull(new PullRequest(
             companyId: Uuid::uuid7()->toString(),
             connectionRef: 'connection-1',
@@ -379,30 +210,46 @@ final class OzonSellerReportConnectorTest extends TestCase
         self::assertSame('accrual-by-day:2026-06-01:2026-06-02', $result->rawBatch->externalId);
     }
 
-    private function unusedClient(): OzonClientAdapterInterface
+    public function testPullAccrualTypesFetchesStaticDictionaryOnce(): void
     {
-        return new class implements OzonClientAdapterInterface {
-            public function fetchTransactionList(
-                string $companyId,
-                string $connectionRef,
-                \DateTimeImmutable $from,
-                \DateTimeImmutable $to,
-                int $page,
-                int $pageSize,
-            ): OzonRawPage {
-                throw new \LogicException('Not used.');
-            }
+        $accrualClient = new class implements OzonAccrualClientInterface {
+            public int $calls = 0;
 
-            public function fetchRealization(string $companyId, string $connectionRef, int $year, int $month): OzonRawPage
+            public function fetchPostings(string $companyId, string $connectionRef, array $postingNumbers): OzonRawPage
             {
                 throw new \LogicException('Not used.');
             }
 
-            public function listClusters(string $companyId, string $connectionRef): array
+            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date): OzonRawPage
             {
-                return [new OzonShopDescriptor('shop-1', 'Shop 1')];
+                throw new \LogicException('Not used.');
+            }
+
+            public function fetchTypes(string $companyId, string $connectionRef): OzonRawPage
+            {
+                ++$this->calls;
+
+                return new OzonRawPage(rows: [['type_id' => 29, 'name' => 'Delivery']], hasMore: false, metadata: ['endpoint' => '/v1/finance/accrual/types']);
             }
         };
+
+        $connector = new OzonSellerReportConnector($accrualClient);
+        $result = $connector->pull(new PullRequest(
+            companyId: Uuid::uuid7()->toString(),
+            connectionRef: 'connection-1',
+            shopRef: 'shop-1',
+            resourceType: OzonResourceType::ACCRUAL_TYPES,
+            cursorValue: null,
+            windowFrom: new \DateTimeImmutable('2026-06-01'),
+            windowTo: new \DateTimeImmutable('2026-06-30'),
+            syncJobId: Uuid::uuid7()->toString(),
+        ));
+
+        self::assertSame(1, $accrualClient->calls);
+        self::assertSame('accrual-types', $result->rawBatch->externalId);
+        self::assertSame([['type_id' => 29, 'name' => 'Delivery']], $result->rawBatch->rows);
+        self::assertNull($result->nextCursorValue);
+        self::assertFalse($result->hasMore);
     }
 
     private function unusedAccrualClient(): OzonAccrualClientInterface
@@ -413,11 +260,8 @@ final class OzonSellerReportConnectorTest extends TestCase
                 throw new \LogicException('Not used.');
             }
 
-            public function fetchByDay(
-                string $companyId,
-                string $connectionRef,
-                \DateTimeImmutable $date,
-            ): OzonRawPage {
+            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date): OzonRawPage
+            {
                 throw new \LogicException('Not used.');
             }
 
