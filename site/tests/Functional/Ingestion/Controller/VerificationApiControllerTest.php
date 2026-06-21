@@ -92,7 +92,7 @@ final class VerificationApiControllerTest extends WebTestCaseBase
             $raw = $this->rawRecord(
                 $company->getId(),
                 'shop-backfill',
-                'ozon_seller_daily_report',
+                'ozon_finance_accrual_by_day',
                 'backfill-raw-'.$date,
                 new \DateTimeImmutable('2026-06-20 10:00:00+00:00'),
             );
@@ -147,7 +147,7 @@ final class VerificationApiControllerTest extends WebTestCaseBase
 
         foreach ($coverage['cells'] as $cell) {
             self::assertSame('shop-backfill', $cell['shop_ref']);
-            self::assertSame('ozon_seller_daily_report', $cell['resource_type']);
+            self::assertSame('ozon_finance_accrual_by_day', $cell['resource_type']);
             self::assertSame(1, $cell['raw_count']);
             self::assertSame(1, $cell['tx_count']);
             self::assertSame('2026-06-20T07:00:00Z', $cell['last_fetched_at']);
@@ -225,7 +225,7 @@ final class VerificationApiControllerTest extends WebTestCaseBase
             ->withOwner($owner)
             ->build();
         $companyId = $company->getId();
-        $raw = $this->rawRecord($companyId, 'shop-1', 'ozon_seller_daily_report', 'raw-api-1');
+        $raw = $this->rawRecord($companyId, 'shop-1', 'ozon_finance_accrual_by_day', 'raw-api-1');
 
         $check = new OzonTransactionTotalsCheck(
             companyId: $companyId,
@@ -294,8 +294,8 @@ final class VerificationApiControllerTest extends WebTestCaseBase
             ->withOwner($ownerB)
             ->build();
 
-        $rawA = $this->rawRecord($companyA->getId(), 'shop-a', 'ozon_seller_daily_report', 'tenant-raw-a');
-        $rawB = $this->rawRecord($companyB->getId(), 'shop-b', 'ozon_seller_daily_report', 'tenant-raw-b');
+        $rawA = $this->rawRecord($companyA->getId(), 'shop-a', 'ozon_finance_accrual_by_day', 'tenant-raw-a');
+        $rawB = $this->rawRecord($companyB->getId(), 'shop-b', 'ozon_finance_accrual_by_day', 'tenant-raw-b');
 
         $checkA = new OzonTransactionTotalsCheck(
             companyId: $companyA->getId(),

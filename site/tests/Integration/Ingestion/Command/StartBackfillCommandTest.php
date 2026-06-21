@@ -36,8 +36,8 @@ final class StartBackfillCommandTest extends IntegrationTestCase
 
         self::assertSame(Command::SUCCESS, $exit);
         self::assertStringContainsString('DRY-RUN ingestion backfill', $tester->getDisplay());
-        self::assertStringContainsString(OzonResourceType::DAILY_REPORT, $tester->getDisplay());
-        self::assertStringNotContainsString(OzonResourceType::REALIZATION, $tester->getDisplay());
+        self::assertStringContainsString(OzonResourceType::ACCRUAL_BY_DAY, $tester->getDisplay());
+        self::assertStringNotContainsString('ozon_seller_daily_report', $tester->getDisplay());
         self::assertSame(0, $this->syncJobCount($companyId));
         self::assertCount(0, $transport->getSent());
     }
@@ -58,8 +58,8 @@ final class StartBackfillCommandTest extends IntegrationTestCase
         ]);
 
         self::assertSame(Command::SUCCESS, $exit);
-        self::assertStringContainsString(OzonResourceType::DAILY_REPORT, $tester->getDisplay());
-        self::assertStringNotContainsString(OzonResourceType::REALIZATION, $tester->getDisplay());
+        self::assertStringContainsString(OzonResourceType::ACCRUAL_BY_DAY, $tester->getDisplay());
+        self::assertStringNotContainsString('ozon_seller_daily_report', $tester->getDisplay());
 
         $parentJobs = $this->connection->fetchAllAssociative(
             'SELECT resource_type, shop_ref, progress_total
@@ -70,7 +70,7 @@ final class StartBackfillCommandTest extends IntegrationTestCase
         );
 
         self::assertCount(1, $parentJobs);
-        self::assertSame([OzonResourceType::DAILY_REPORT], array_column($parentJobs, 'resource_type'));
+        self::assertSame([OzonResourceType::ACCRUAL_BY_DAY], array_column($parentJobs, 'resource_type'));
         self::assertSame($connectionRef, $parentJobs[0]['shop_ref']);
         self::assertSame(5, (int) $parentJobs[0]['progress_total']);
 
@@ -92,7 +92,7 @@ final class StartBackfillCommandTest extends IntegrationTestCase
             companyId: $companyId,
             connectionRef: $connectionRef,
             source: IngestSource::OZON,
-            resourceType: OzonResourceType::DAILY_REPORT,
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
             kind: SyncJobKind::BACKFILL,
             windowFrom: new \DateTimeImmutable('2026-06-01'),
             windowTo: new \DateTimeImmutable('2026-06-18'),
@@ -120,7 +120,7 @@ final class StartBackfillCommandTest extends IntegrationTestCase
             ['companyId' => $companyId],
         );
 
-        self::assertSame([OzonResourceType::DAILY_REPORT], array_column($newParentJobs, 'resource_type'));
+        self::assertSame([OzonResourceType::ACCRUAL_BY_DAY], array_column($newParentJobs, 'resource_type'));
         self::assertCount(0, $transport->getSent());
     }
 
@@ -171,14 +171,28 @@ final class StartBackfillCommandTest extends IntegrationTestCase
         self::assertStringContainsString('Unsupported resource type', $tester->getDisplay());
     }
 
-    public function testRealizationBackfillIsNotSupportedUntilMonthAlignedChunkingExists(): void
+    public function testLegacyDailyBackfillIsNotSupported(): void
     {
         $tester = $this->tester('app:ingestion:start-backfill');
         $exit = $tester->execute([
             '--company-id' => Uuid::uuid7()->toString(),
             '--connection-ref' => Uuid::uuid7()->toString(),
             '--source' => 'ozon',
-            '--resource-type' => OzonResourceType::REALIZATION,
+            '--resource-type' => 'ozon_seller_daily_report',
+        ]);
+
+        self::assertSame(Command::FAILURE, $exit);
+        self::assertStringContainsString('Unsupported resource type', $tester->getDisplay());
+    }
+
+    public function testLegacyRealizationBackfillIsNotSupported(): void
+    {
+        $tester = $this->tester('app:ingestion:start-backfill');
+        $exit = $tester->execute([
+            '--company-id' => Uuid::uuid7()->toString(),
+            '--connection-ref' => Uuid::uuid7()->toString(),
+            '--source' => 'ozon',
+            '--resource-type' => 'ozon_seller_realization',
         ]);
 
         self::assertSame(Command::FAILURE, $exit);

@@ -20,7 +20,6 @@ final class OzonAccrualShadowMapperTest extends TestCase
         self::assertSame(IngestSource::OZON, $mapper->source());
         self::assertSame([
             OzonResourceType::ACCRUAL_POSTINGS,
-            OzonResourceType::ACCRUAL_BY_DAY,
             OzonResourceType::ACCRUAL_TYPES,
         ], $mapper->resourceTypes());
     }

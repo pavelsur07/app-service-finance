@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Ingestion\Command;
 
+use App\Ingestion\Application\Action\EnsureOzonAccrualCursorAction;
+use App\Ingestion\Application\Command\EnsureOzonAccrualCursorCommand;
 use App\Ingestion\Application\Command\StartIncrementalCommand as StartIncrementalApplicationCommand;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Enum\IngestSource;
@@ -33,14 +35,14 @@ final class RunIncrementalCommand extends Command
      * @var list<string>
      */
     private const OZON_RESOURCE_TYPES = [
-        OzonResourceType::DAILY_REPORT,
-        OzonResourceType::REALIZATION,
+        OzonResourceType::ACCRUAL_BY_DAY,
     ];
 
     public function __construct(
         private readonly ActiveSellerConnectionsQuery $connectionsQuery,
         private readonly IngestCursorRepository $cursorRepository,
         private readonly SyncFacade $syncFacade,
+        private readonly EnsureOzonAccrualCursorAction $ensureOzonAccrualCursorAction,
         private readonly LoggerInterface $logger,
     ) {
         parent::__construct();
@@ -112,6 +114,7 @@ final class RunIncrementalCommand extends Command
             }
 
             $connectionRef = (string) $connection['id'];
+            ($this->ensureOzonAccrualCursorAction)(new EnsureOzonAccrualCursorCommand($connectionCompanyId, $connectionRef));
 
             foreach (self::OZON_RESOURCE_TYPES as $resourceType) {
                 $cursors = $this->cursorRepository->findByResource($connectionCompanyId, $connectionRef, $resourceType);
@@ -260,18 +263,26 @@ final class RunIncrementalCommand extends Command
 
     private function cursorHasDueWork(string $resourceType, string $cursorValue): bool
     {
-        if (OzonResourceType::DAILY_REPORT !== $resourceType) {
+        if (OzonResourceType::ACCRUAL_BY_DAY !== $resourceType) {
             return true;
         }
 
-        try {
-            $cursorDate = (new \DateTimeImmutable($cursorValue))->setTime(0, 0);
-        } catch (\Throwable) {
+        $cursorDate = $this->normalizedCursorDate($cursorValue);
+        if (null === $cursorDate) {
             return true;
         }
 
         $yesterday = (new \DateTimeImmutable('today'))->modify('-1 day')->setTime(0, 0);
 
-        return $cursorDate <= $yesterday;
+        return new \DateTimeImmutable($cursorDate) <= $yesterday;
+    }
+
+    private function normalizedCursorDate(string $cursorValue): ?string
+    {
+        try {
+            return (new \DateTimeImmutable($cursorValue))->format('Y-m-d');
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

@@ -47,7 +47,7 @@ final class OzonAccrualCompareCommand extends Command
             ->addOption('company-id', null, InputOption::VALUE_REQUIRED, 'Company UUID.')
             ->addOption('from', null, InputOption::VALUE_REQUIRED, 'Start date YYYY-MM-DD.')
             ->addOption('to', null, InputOption::VALUE_REQUIRED, 'End date YYYY-MM-DD.')
-            ->addOption('resource-type', null, InputOption::VALUE_REQUIRED, 'Accrual resource type.', OzonResourceType::ACCRUAL_POSTINGS)
+            ->addOption('resource-type', null, InputOption::VALUE_REQUIRED, 'Accrual resource type.', OzonResourceType::ACCRUAL_BY_DAY)
             ->addOption('raw-limit', null, InputOption::VALUE_REQUIRED, 'Raw records to scan, 1..50.', 20)
             ->addOption('raw-row-limit', null, InputOption::VALUE_REQUIRED, 'Rows to scan per raw record, 1..50000.', 5000);
     }

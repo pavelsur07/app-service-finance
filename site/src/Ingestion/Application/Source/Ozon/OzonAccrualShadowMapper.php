@@ -24,7 +24,6 @@ final readonly class OzonAccrualShadowMapper implements SourceMapperInterface
     {
         return [
             OzonResourceType::ACCRUAL_POSTINGS,
-            OzonResourceType::ACCRUAL_BY_DAY,
             OzonResourceType::ACCRUAL_TYPES,
         ];
     }

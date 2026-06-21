@@ -31,7 +31,7 @@ final class StartBackfillCommand extends Command
      */
     private const DEFAULT_RESOURCE_TYPES_BY_SOURCE = [
         'ozon' => [
-            OzonResourceType::DAILY_REPORT,
+            OzonResourceType::ACCRUAL_BY_DAY,
         ],
     ];
 
@@ -40,7 +40,6 @@ final class StartBackfillCommand extends Command
      */
     private const ALLOWED_RESOURCE_TYPES_BY_SOURCE = [
         'ozon' => [
-            OzonResourceType::DAILY_REPORT,
             OzonResourceType::ACCRUAL_BY_DAY,
         ],
     ];
