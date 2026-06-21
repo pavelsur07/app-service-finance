@@ -23,6 +23,8 @@ final class TelegramBotController extends AbstractController
         private readonly string $telegramWebhookUrl,
         // Секрет вебхука: передаётся в Telegram при setWebhook (пусто = без секрета)
         private readonly string $telegramWebhookSecret = '',
+        // Базовый URL Telegram Bot API (в проде — через шлюз tg-gateway)
+        private readonly string $telegramApiBaseUrl = 'https://api.telegram.org',
     ) {
     }
 
@@ -163,7 +165,7 @@ final class TelegramBotController extends AbstractController
             }
 
             // Запрашиваем Telegram API setWebhook, чтобы привязать бота к фиксированному URL
-            $response = $httpClient->request('POST', sprintf('https://api.telegram.org/bot%s/setWebhook', $bot->getToken()), [
+            $response = $httpClient->request('POST', sprintf('%s/bot%s/setWebhook', $this->telegramApiBaseUrl, $bot->getToken()), [
                 'body' => $body,
             ]);
 
@@ -234,7 +236,7 @@ final class TelegramBotController extends AbstractController
     {
         try {
             // Вызываем Telegram API getWebhookInfo, чтобы узнать актуальный адрес и ошибки доставки
-            $response = $httpClient->request('GET', sprintf('https://api.telegram.org/bot%s/getWebhookInfo', $bot->getToken()));
+            $response = $httpClient->request('GET', sprintf('%s/bot%s/getWebhookInfo', $this->telegramApiBaseUrl, $bot->getToken()));
 
             if (200 !== $response->getStatusCode()) {
                 $this->addFlash('danger', sprintf('Telegram API вернул статус %d', $response->getStatusCode()));

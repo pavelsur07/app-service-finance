@@ -1365,6 +1365,12 @@ Telegram создаёт ДДС-транзакции только через це
 - `TelegramWebhookController` сверяет заголовок (`hash_equals`); несовпадение → HTTP 403, апдейт не обрабатывается.
 - Пустой секрет = проверка выключена (для совместимости при rollout). В проде задать случайным значением и переустановить вебхук.
 
+**Telegram Bot API base URL (исходящие вызовы):**
+- `TELEGRAM_API_BASE_URL` (параметр `telegram.api_base_url`, bind `string $telegramApiBaseUrl`), без завершающего слэша.
+- Используется во ВСЕХ исходящих вызовах: `sendMessage`/`editMessageText`/`getFile`/скачивание файла (`TelegramWebhookController`) и `setWebhook`/`getWebhookInfo` (`TelegramBotController`).
+- Дефолт `https://api.telegram.org`. В проде app-сервер не имеет прямого доступа к Telegram → значение `https://tg.vashfindir.ru/bot-api` (reverse-proxy на шлюзе `tg-gateway`, `location /bot-api/`, доступ по IP app-сервера).
+- Схема: вход — `tg.vashfindir.ru/telegram/webhook` → app; выход — app → `tg.vashfindir.ru/bot-api/` → `api.telegram.org`.
+
 **Политика обработки ошибок вебхука:**
 - `TelegramWebhookController` ВСЕГДА отвечает HTTP 200 (иначе Telegram ретраит апдейт).
 - Ошибки не глушатся: непойманные исключения и сбои создания ДДС логируются через `LoggerInterface::error` (→ Sentry).

@@ -56,6 +56,8 @@ final class TelegramBotWebhookSetTest extends WebTestCaseBase
         // Первый исходящий запрос — setWebhook на токен бота с URL из конфигурации
         self::assertNotEmpty($captured, 'setWebhook должен быть вызван');
         self::assertStringContainsString('/setWebhook', $captured[0]['url']);
+        // Базовый URL Telegram API берётся из конфигурации (.env.test: TELEGRAM_API_BASE_URL)
+        self::assertStringStartsWith('https://tg-proxy.example.test/bot', $captured[0]['url']);
         $body = $this->bodyAsString($captured[0]['options']);
         self::assertStringContainsString('tg.example.test', $body);
         self::assertStringNotContainsString('app.vashfindir.ru', $body);
