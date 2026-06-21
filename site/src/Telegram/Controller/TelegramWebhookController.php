@@ -36,6 +36,7 @@ final class TelegramWebhookController extends AbstractController
         private readonly LoggerInterface $logger,
         private readonly CreateTelegramCashTransactionAction $createTelegramCashTransactionAction,
         private readonly string $telegramWebhookSecret = '',
+        private readonly string $telegramApiBaseUrl = 'https://api.telegram.org',
     ) {
     }
 
@@ -622,7 +623,7 @@ final class TelegramWebhookController extends AbstractController
             try {
                 $response = $this->httpClient->request(
                     'POST',
-                    sprintf('https://api.telegram.org/bot%s/editMessageText', $bot->getToken()),
+                    sprintf('%s/bot%s/editMessageText', $this->telegramApiBaseUrl, $bot->getToken()),
                     [
                         'json' => [
                             'chat_id' => $chatId,
@@ -698,7 +699,7 @@ final class TelegramWebhookController extends AbstractController
             // Запрашиваем путь к файлу через Telegram API
             $fileInfoResponse = $this->httpClient->request(
                 'GET',
-                sprintf('https://api.telegram.org/bot%s/getFile', $bot->getToken()),
+                sprintf('%s/bot%s/getFile', $this->telegramApiBaseUrl, $bot->getToken()),
                 [
                     'query' => [
                         'file_id' => $fileId,
@@ -722,7 +723,7 @@ final class TelegramWebhookController extends AbstractController
             // Скачиваем содержимое файла
             $fileResponse = $this->httpClient->request(
                 'GET',
-                sprintf('https://api.telegram.org/file/bot%s/%s', $bot->getToken(), $filePath),
+                sprintf('%s/file/bot%s/%s', $this->telegramApiBaseUrl, $bot->getToken(), $filePath),
             );
             $fileContent = $fileResponse->getContent();
         } catch (\Throwable) {
@@ -1123,7 +1124,7 @@ final class TelegramWebhookController extends AbstractController
         try {
             $response = $this->httpClient->request(
                 'POST',
-                sprintf('https://api.telegram.org/bot%s/sendMessage', $bot->getToken()),
+                sprintf('%s/bot%s/sendMessage', $this->telegramApiBaseUrl, $bot->getToken()),
                 [
                     'json' => array_filter(
                         [
