@@ -25,6 +25,11 @@ use Webmozart\Assert\Assert;
 )]
 final class OzonAccrualPreviewNormalizationCommand extends Command
 {
+    /**
+     * @var list<string>
+     */
+    private const OMITTED_CANONICAL_TYPES = ['sale', 'refund'];
+
     public function __construct(
         private readonly Connection $connection,
         private readonly RawStorageFacade $rawStorageFacade,
@@ -41,7 +46,8 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
             ->addOption('to', null, InputOption::VALUE_REQUIRED, 'End date YYYY-MM-DD.')
             ->addOption('raw-limit', null, InputOption::VALUE_REQUIRED, 'Raw records to scan, 1..50.', 20)
             ->addOption('raw-row-limit', null, InputOption::VALUE_REQUIRED, 'Rows to scan per raw record, 1..50000.', 5000)
-            ->addOption('sample-limit', null, InputOption::VALUE_REQUIRED, 'Preview rows to print, 1..200.', 50);
+            ->addOption('sample-limit', null, InputOption::VALUE_REQUIRED, 'Preview rows to print, 1..200.', 50)
+            ->addOption('parity-only', null, InputOption::VALUE_NONE, 'Print only summary and parity report sections.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -54,6 +60,7 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
             $rawLimit = $this->intOption($input, 'raw-limit', 1, 50);
             $rawRowLimit = $this->intOption($input, 'raw-row-limit', 1, 50000);
             $sampleLimit = $this->intOption($input, 'sample-limit', 1, 200);
+            $parityOnly = (bool) $input->getOption('parity-only');
         } catch (\Throwable $exception) {
             $io->error($exception->getMessage());
 
@@ -65,12 +72,20 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
         $exactMatches = $this->exactNaturalKeyMatches($companyId, $previewRows);
         $sameAmountCandidates = $this->sameAmountCandidateCounts($companyId, $from, $to);
         $canonicalGroups = $this->canonicalGroups($companyId, $from, $to);
+        $parityRows = $this->parityRows($previewRows, $canonicalGroups);
 
         $io->title('Ozon accrual normalization preview');
         $io->writeln('Read-only: no canonical transactions are written.');
         $io->writeln('Preview intentionally omits sale/refund amount fields, bonus, coinvestment, sale_amount, and seller_price.');
         $this->printRawRecords($io, $rawRecords);
         $this->printSummary($io, $previewRows, $exactMatches, $sameAmountCandidates);
+        $this->printParityDecision($io, $previewRows, $exactMatches, $sameAmountCandidates, $parityRows);
+        $this->printParityRows($io, $parityRows);
+
+        if ($parityOnly) {
+            return Command::SUCCESS;
+        }
+
         $this->printPreviewSamples($io, $previewRows, $exactMatches, $sameAmountCandidates, $sampleLimit);
         $this->printGroupComparison($io, $previewRows, $canonicalGroups);
         $this->printDailyNetComparison($io, $previewRows, $canonicalGroups);
@@ -358,26 +373,162 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
     /**
      * @param list<OzonAccrualPreviewTransaction> $previewRows
      * @param array<string, array{count: int, totalMinor: int}> $canonicalGroups
+     *
+     * @return list<array{date: string, type: string, direction: string, previewCount: int, canonicalCount: int, previewTotalMinor: int, canonicalTotalMinor: int, countDelta: int, totalDeltaMinor: int}>
      */
-    private function printGroupComparison(SymfonyStyle $io, array $previewRows, array $canonicalGroups): void
+    private function parityRows(array $previewRows, array $canonicalGroups): array
     {
-        $previewGroups = [];
+        $previewGroups = $this->previewGroups($previewRows);
+        $keys = array_values(array_unique(array_merge(array_keys($previewGroups), array_keys($canonicalGroups))));
+        sort($keys);
+
+        $rows = [];
+        foreach ($keys as $key) {
+            [$date, $type, $direction] = explode('|', $key, 3);
+            if (in_array($type, self::OMITTED_CANONICAL_TYPES, true)) {
+                continue;
+            }
+
+            $previewCount = (int) ($previewGroups[$key]['count'] ?? 0);
+            $previewTotal = (int) ($previewGroups[$key]['totalMinor'] ?? 0);
+            $canonicalCount = (int) ($canonicalGroups[$key]['count'] ?? 0);
+            $canonicalTotal = (int) ($canonicalGroups[$key]['totalMinor'] ?? 0);
+
+            $rows[] = [
+                'date' => $date,
+                'type' => $type,
+                'direction' => $direction,
+                'previewCount' => $previewCount,
+                'canonicalCount' => $canonicalCount,
+                'previewTotalMinor' => $previewTotal,
+                'canonicalTotalMinor' => $canonicalTotal,
+                'countDelta' => $previewCount - $canonicalCount,
+                'totalDeltaMinor' => $previewTotal - $canonicalTotal,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param list<OzonAccrualPreviewTransaction> $previewRows
+     *
+     * @return array<string, array{count: int, totalMinor: int}>
+     */
+    private function previewGroups(array $previewRows): array
+    {
+        $groups = [];
         foreach ($previewRows as $row) {
             $key = $this->groupKey($row->date, $row->type->value, $row->direction->value);
-            if (!isset($previewGroups[$key])) {
-                $previewGroups[$key] = [
-                    'date' => $row->date,
-                    'type' => $row->type->value,
-                    'direction' => $row->direction->value,
+            if (!isset($groups[$key])) {
+                $groups[$key] = [
                     'count' => 0,
                     'totalMinor' => 0,
                 ];
             }
 
-            ++$previewGroups[$key]['count'];
-            $previewGroups[$key]['totalMinor'] += $row->amountMinor;
+            ++$groups[$key]['count'];
+            $groups[$key]['totalMinor'] += $row->amountMinor;
         }
 
+        return $groups;
+    }
+
+    /**
+     * @param list<OzonAccrualPreviewTransaction> $previewRows
+     * @param array<string, int> $exactMatches
+     * @param array<string, int> $sameAmountCandidates
+     * @param list<array{date: string, type: string, direction: string, previewCount: int, canonicalCount: int, previewTotalMinor: int, canonicalTotalMinor: int, countDelta: int, totalDeltaMinor: int}> $parityRows
+     */
+    private function printParityDecision(
+        SymfonyStyle $io,
+        array $previewRows,
+        array $exactMatches,
+        array $sameAmountCandidates,
+        array $parityRows,
+    ): void {
+        $exactMatchRows = 0;
+        $sameAmountCandidateRows = 0;
+        foreach ($previewRows as $row) {
+            if (($exactMatches[$this->exactMatchKey($row->sourceKey, $row->type->value)] ?? 0) > 0) {
+                ++$exactMatchRows;
+            }
+
+            if (($sameAmountCandidates[$this->sameAmountKey($row->date, $row->type->value, $row->direction->value, $row->amountMinor)] ?? 0) > 0) {
+                ++$sameAmountCandidateRows;
+            }
+        }
+
+        $amountMismatches = 0;
+        $countMismatches = 0;
+        foreach ($parityRows as $row) {
+            if (0 !== $row['totalDeltaMinor']) {
+                ++$amountMismatches;
+            }
+
+            if (0 !== $row['countDelta']) {
+                ++$countMismatches;
+            }
+        }
+
+        $status = 0 === $amountMismatches ? 'amount-parity-pass' : 'amount-parity-fail';
+        $recommendation = 0 === $amountMismatches
+            ? 'Use accrual by-day as shadow/replacement only; additive writes would duplicate existing canonical expense components.'
+            : 'Review amount mismatches before enabling accrual by-day normalization.';
+
+        $io->section('Parity decision');
+        $io->table(
+            ['metric', 'value'],
+            [
+                ['status', $status],
+                ['comparableGroups', (string) count($parityRows)],
+                ['amountMismatches', (string) $amountMismatches],
+                ['countMismatches', (string) $countMismatches],
+                ['exactNaturalKeyMatches', (string) $exactMatchRows],
+                ['sameAmountCandidateRows', sprintf('%d/%d', $sameAmountCandidateRows, count($previewRows))],
+                ['omittedCanonicalTypes', implode(', ', self::OMITTED_CANONICAL_TYPES)],
+                ['recommendation', $recommendation],
+            ],
+        );
+    }
+
+    /**
+     * @param list<array{date: string, type: string, direction: string, previewCount: int, canonicalCount: int, previewTotalMinor: int, canonicalTotalMinor: int, countDelta: int, totalDeltaMinor: int}> $parityRows
+     */
+    private function printParityRows(SymfonyStyle $io, array $parityRows): void
+    {
+        $io->section('Parity comparable rows');
+        if ([] === $parityRows) {
+            $io->writeln('No comparable rows.');
+
+            return;
+        }
+
+        $rows = [];
+        foreach ($parityRows as $row) {
+            $rows[] = [
+                $row['date'],
+                $row['type'],
+                $row['direction'],
+                (string) $row['previewCount'],
+                (string) $row['canonicalCount'],
+                (string) $row['countDelta'],
+                $this->minorToRub($row['previewTotalMinor']),
+                $this->minorToRub($row['canonicalTotalMinor']),
+                $this->minorToRub($row['totalDeltaMinor']),
+            ];
+        }
+
+        $io->table(['date', 'type', 'direction', 'previewCount', 'canonicalCount', 'countDelta', 'previewRub', 'canonicalRub', 'amountDeltaRub'], $rows);
+    }
+
+    /**
+     * @param list<OzonAccrualPreviewTransaction> $previewRows
+     * @param array<string, array{count: int, totalMinor: int}> $canonicalGroups
+     */
+    private function printGroupComparison(SymfonyStyle $io, array $previewRows, array $canonicalGroups): void
+    {
+        $previewGroups = $this->previewGroups($previewRows);
         $keys = array_values(array_unique(array_merge(array_keys($previewGroups), array_keys($canonicalGroups))));
         sort($keys);
 
