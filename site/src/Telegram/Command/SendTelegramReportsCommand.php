@@ -28,6 +28,7 @@ final class SendTelegramReportsCommand extends Command
         private readonly HttpClientInterface $httpClient,
         private readonly MoneyAccountRepository $moneyAccountRepository,
         private readonly CashTransactionRepository $cashTransactionRepository,
+        private readonly string $telegramApiBaseUrl = 'https://api.telegram.org',
     ) {
         parent::__construct();
     }
@@ -59,7 +60,7 @@ final class SendTelegramReportsCommand extends Command
                 $text = $this->buildReportText($subscription);
                 $chatId = $subscription->getTelegramUser()->getTgUserId();
 
-                $response = $this->httpClient->request('POST', sprintf('https://api.telegram.org/bot%s/sendMessage', $bot->getToken()), [
+                $response = $this->httpClient->request('POST', sprintf('%s/bot%s/sendMessage', $this->telegramApiBaseUrl, $bot->getToken()), [
                     'json' => [
                         'chat_id' => $chatId,
                         'text' => $text,

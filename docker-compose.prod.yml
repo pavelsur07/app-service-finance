@@ -32,6 +32,8 @@ x-php-env: &php-env
     TELEGRAM_WEBHOOK_URL: ${TELEGRAM_WEBHOOK_URL:-https://tg.vashfindir.ru/telegram/webhook}
     # Секрет вебхука: задать случайным значением в host-env и переустановить webhook (пусто = проверка выключена)
     TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+    # Базовый URL Telegram Bot API через шлюз tg-gateway (app-сервер не имеет прямого доступа к api.telegram.org)
+    TELEGRAM_API_BASE_URL: ${TELEGRAM_API_BASE_URL:-https://tg.vashfindir.ru/bot-api}
 
 services:
 
@@ -403,6 +405,8 @@ services:
             APP_MAIL_REPLY_TO: "support@vashfindir.ru"
             FEATURE_FUNDS_AND_WIDGET: ${FEATURE_FUNDS_AND_WIDGET:-1}
             WB_LEGACY_RECONCILE_ENABLED: ${WB_LEGACY_RECONCILE_ENABLED:-0}
+            # Нужно для app:telegram:send-reports (исходящие в Telegram через шлюз)
+            TELEGRAM_API_BASE_URL: ${TELEGRAM_API_BASE_URL:-https://tg.vashfindir.ru/bot-api}
         volumes:
             - ./docker/cron/app.cron:/etc/crontabs/app.cron:ro
             - site_storage:/app/var/storage
