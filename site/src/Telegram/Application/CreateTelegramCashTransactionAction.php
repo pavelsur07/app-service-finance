@@ -110,6 +110,13 @@ final readonly class CreateTelegramCashTransactionAction
 
     private function detectDirection(string $text): CashDirection
     {
+        // Явный знак перед суммой имеет приоритет над ключевыми словами:
+        // "+1000 оплата прочие" — доход, "-3500 реклама" — расход.
+        if (preg_match('/([+\-])\s*\d/u', $text, $matches)) {
+            return '+' === $matches[1] ? CashDirection::INFLOW : CashDirection::OUTFLOW;
+        }
+
+        // Без знака — эвристика по ключевым словам.
         $normalized = mb_strtolower($text);
 
         if (preg_match('/потрат|расход|купил|оплат/u', $normalized)) {

@@ -85,6 +85,40 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
         self::assertSame(1, $this->countCashTransactions());
     }
 
+    public function testPlusSignMeansInflowEvenWithPaymentWord(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        $this->seedBoundUserWithAccount(financeLockBefore: null);
+
+        $captured = [];
+        $this->captureTelegramCalls($client, $captured);
+
+        // "+" имеет приоритет над словом "оплата" (которое само по себе → расход)
+        $this->postUpdate($client, '+1000 оплата прочие');
+
+        self::assertResponseIsSuccessful();
+        $body = $this->lastSentMessageText($captured);
+        self::assertStringContainsString('доход', $body);
+        self::assertStringNotContainsString('расход', $body);
+    }
+
+    public function testMinusSignMeansOutflow(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        $this->seedBoundUserWithAccount(financeLockBefore: null);
+
+        $captured = [];
+        $this->captureTelegramCalls($client, $captured);
+
+        $this->postUpdate($client, '-500 поступление прочие');
+
+        self::assertResponseIsSuccessful();
+        $body = $this->lastSentMessageText($captured);
+        self::assertStringContainsString('расход', $body);
+    }
+
     private function seedBoundUserWithAccount(?\DateTimeImmutable $financeLockBefore): void
     {
         $em = $this->em();
