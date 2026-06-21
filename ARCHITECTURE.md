@@ -1353,6 +1353,11 @@ Telegram создаёт ДДС-транзакции только через це
 - webhook отвечает `ok`;
 - пишется warning.
 
+**Webhook URL (конфигурация):**
+- Публичный URL вебхука задаётся через `.env` → `TELEGRAM_WEBHOOK_URL` (параметр `telegram.webhook_url`, bind `string $telegramWebhookUrl`).
+- Используется в `TelegramBotController::webhookSet()` (вызов `setWebhook`) и проверке статуса.
+- Прод-дефолт — шлюз `tg-gateway`: `https://tg.vashfindir.ru/telegram/webhook`. Хардкод URL запрещён.
+
 
 ## Enum — актуальные значения
 
