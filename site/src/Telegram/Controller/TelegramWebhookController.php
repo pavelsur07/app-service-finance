@@ -1,14 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Telegram\Controller;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Exception\CurrencyMismatchException;
+use App\Telegram\Application\CreateTelegramCashTransactionAction;
+use App\Telegram\Application\DTO\CreateTelegramCashTransactionCommand;
 use App\Telegram\Entity\ClientBinding;
 use App\Telegram\Entity\ImportJob;
 use App\Telegram\Entity\ReportSubscription;
 use App\Telegram\Entity\TelegramBot;
-use App\Telegram\Application\CreateTelegramCashTransactionAction;
-use App\Telegram\Application\DTO\CreateTelegramCashTransactionCommand;
 use App\Telegram\Entity\TelegramUser;
 use App\Telegram\Repository\BotLinkRepository;
 use App\Telegram\Repository\TelegramBotRepository;
@@ -22,7 +25,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
-class TelegramWebhookController extends AbstractController
+final class TelegramWebhookController extends AbstractController
 {
     public function __construct(
         private readonly TelegramBotRepository $botRepository,
@@ -104,8 +107,11 @@ class TelegramWebhookController extends AbstractController
 
             return $this->handleTextMessage($bot, $update, $message, $text);
         } catch (\Throwable $e) {
-            error_log('[TELEGRAM_WEBHOOK_EXCEPTION] '.$e->getMessage());
-            error_log('[TELEGRAM_WEBHOOK_EXCEPTION] file='.$e->getFile().':'.$e->getLine());
+            // Telegram требует ответ 200, иначе апдейт будет ретраиться. Ошибку отдаём в Sentry через logger.
+            $this->logger->error('Telegram webhook unhandled exception', [
+                'exception' => $e,
+                'update_id' => $update['update_id'] ?? null,
+            ]);
 
             return new JsonResponse(['status' => 'ok']);
         }
@@ -824,23 +830,39 @@ class TelegramWebhookController extends AbstractController
             return $this->respondWithMessage($bot, $message, 'Сначала выберите кассу: /set_cash');
         }
 
-        $result = ($this->createTelegramCashTransactionAction)(new CreateTelegramCashTransactionCommand(
-            botId: $bot->getId(),
-            companyId: $clientBinding->getCompany()->getId(),
-            moneyAccountId: $moneyAccount->getId(),
-            currency: $moneyAccount->getCurrency(),
-            chatId: isset($message['chat']['id']) ? (string) $message['chat']['id'] : null,
-            messageId: isset($message['message_id']) ? (string) $message['message_id'] : null,
-            fromId: isset($message['from']['id']) ? (string) $message['from']['id'] : null,
-            updateId: isset($update['update_id']) ? (int) $update['update_id'] : null,
-            messageDate: isset($message['date']) ? (int) $message['date'] : null,
-            text: $text,
-        ));
+        try {
+            $result = ($this->createTelegramCashTransactionAction)(new CreateTelegramCashTransactionCommand(
+                botId: $bot->getId(),
+                companyId: $clientBinding->getCompany()->getId(),
+                moneyAccountId: $moneyAccount->getId(),
+                currency: $moneyAccount->getCurrency(),
+                chatId: isset($message['chat']['id']) ? (string) $message['chat']['id'] : null,
+                messageId: isset($message['message_id']) ? (string) $message['message_id'] : null,
+                fromId: isset($message['from']['id']) ? (string) $message['from']['id'] : null,
+                updateId: isset($update['update_id']) ? (int) $update['update_id'] : null,
+                messageDate: isset($message['date']) ? (int) $message['date'] : null,
+                text: $text,
+            ));
+        } catch (CurrencyMismatchException) {
+            // Валюта операции должна совпадать с валютой кассы (CurrencyMismatchException — наследник DomainException, ловим раньше)
+            return $this->respondWithMessage($bot, $message, 'Валюта операции не совпадает с валютой кассы.');
+        } catch (\DomainException $e) {
+            // Доменное ограничение (например, закрытый период) — показываем пользователю причину
+            return $this->respondWithMessage($bot, $message, $e->getMessage());
+        } catch (\Throwable $e) {
+            // Прочие сбои не глушим: пишем в Sentry и сообщаем пользователю, что операция не сохранена
+            $this->logger->error('Telegram cash transaction failed', [
+                'exception' => $e,
+                'company_id' => $clientBinding->getCompany()->getId(),
+                'money_account_id' => $moneyAccount->getId(),
+            ]);
+
+            return $this->respondWithMessage($bot, $message, 'Не удалось сохранить операцию, попробуйте позже.');
+        }
 
         if (null === $result) {
             return $this->respondWithMessage($bot, $message, 'Формат: потратил 2500 на рекламу');
         }
-
 
         if ($result->skippedMissingMessageIdentity) {
             $this->logger->warning('Telegram cash transaction skipped: message identity is incomplete.', [

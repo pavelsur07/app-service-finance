@@ -1357,6 +1357,13 @@ Telegram создаёт ДДС-транзакции только через це
 - Публичный URL вебхука задаётся через `.env` → `TELEGRAM_WEBHOOK_URL` (параметр `telegram.webhook_url`, bind `string $telegramWebhookUrl`).
 - Используется в `TelegramBotController::webhookSet()` (вызов `setWebhook`) и проверке статуса.
 - Прод-дефолт — шлюз `tg-gateway`: `https://tg.vashfindir.ru/telegram/webhook`. Хардкод URL запрещён.
+- В проде значение передаётся через `docker-compose.prod.yml` (якорь `x-php-env`), а не через репозиторный `.env`.
+
+**Политика обработки ошибок вебхука:**
+- `TelegramWebhookController` ВСЕГДА отвечает HTTP 200 (иначе Telegram ретраит апдейт).
+- Ошибки не глушатся: непойманные исключения и сбои создания ДДС логируются через `LoggerInterface::error` (→ Sentry).
+- Доменные ошибки создания операции (`\DomainException`, напр. закрытый период; `CurrencyMismatchException`) показываются пользователю текстом в чат; прочие сбои → сообщение «Не удалось сохранить операцию, попробуйте позже».
+- Нулевая сумма (`0.00`) операцией не считается — пользователю возвращается подсказка формата.
 
 
 ## Enum — актуальные значения
