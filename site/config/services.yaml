@@ -18,6 +18,7 @@ parameters:
     wb_finance.rate_limit_interval_seconds: 70
     wb_finance.retry_delay_ms: 70000
     telegram.webhook_url: '%env(string:TELEGRAM_WEBHOOK_URL)%'
+    telegram.webhook_secret: '%env(string:TELEGRAM_WEBHOOK_SECRET)%'
 
 services:
     # default configuration for services in *this* file
@@ -29,6 +30,8 @@ services:
             Predis\Client $redisClient: '@session.redis'
             # Публичный URL вебхука Telegram (берём из .env, см. TELEGRAM_WEBHOOK_URL)
             string $telegramWebhookUrl: '%telegram.webhook_url%'
+            # Секрет вебхука Telegram: проверяем заголовок X-Telegram-Bot-Api-Secret-Token (пусто = проверка выключена)
+            string $telegramWebhookSecret: '%telegram.webhook_secret%'
 
     # makes classes in src/ available to be used as services
     # this creates a service per class whose id is the fully-qualified class name

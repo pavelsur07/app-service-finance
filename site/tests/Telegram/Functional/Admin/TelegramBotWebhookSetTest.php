@@ -59,6 +59,9 @@ final class TelegramBotWebhookSetTest extends WebTestCaseBase
         $body = $this->bodyAsString($captured[0]['options']);
         self::assertStringContainsString('tg.example.test', $body);
         self::assertStringNotContainsString('app.vashfindir.ru', $body);
+        // Секрет из .env.test передаётся в Telegram при setWebhook
+        self::assertStringContainsString('secret_token', $body);
+        self::assertStringContainsString('test-secret-123', $body);
 
         // Сохранённый в БД webhookUrl совпадает с конфигурацией
         $this->em()->clear();

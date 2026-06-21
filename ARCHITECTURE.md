@@ -1359,6 +1359,12 @@ Telegram создаёт ДДС-транзакции только через це
 - Прод-дефолт — шлюз `tg-gateway`: `https://tg.vashfindir.ru/telegram/webhook`. Хардкод URL запрещён.
 - В проде значение передаётся через `docker-compose.prod.yml` (якорь `x-php-env`), а не через репозиторный `.env`.
 
+**Webhook secret_token (аутентификация):**
+- `TELEGRAM_WEBHOOK_SECRET` (параметр `telegram.webhook_secret`, bind `string $telegramWebhookSecret`).
+- При `setWebhook` передаётся как `secret_token`; Telegram шлёт его в заголовке `X-Telegram-Bot-Api-Secret-Token`.
+- `TelegramWebhookController` сверяет заголовок (`hash_equals`); несовпадение → HTTP 403, апдейт не обрабатывается.
+- Пустой секрет = проверка выключена (для совместимости при rollout). В проде задать случайным значением и переустановить вебхук.
+
 **Политика обработки ошибок вебхука:**
 - `TelegramWebhookController` ВСЕГДА отвечает HTTP 200 (иначе Telegram ретраит апдейт).
 - Ошибки не глушатся: непойманные исключения и сбои создания ДДС логируются через `LoggerInterface::error` (→ Sentry).

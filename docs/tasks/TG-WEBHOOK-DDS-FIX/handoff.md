@@ -23,10 +23,15 @@
 - Защита от нулевой суммы (`0.00` → подсказка формата).
 - `TelegramWebhookController`: `strict_types`, `final`.
 
+### Stage 3 (🔴 HIGH) — аутентификация вебхука по secret_token
+- Новая env `TELEGRAM_WEBHOOK_SECRET` (параметр `telegram.webhook_secret`, bind `string $telegramWebhookSecret`).
+- `setWebhook` передаёт `secret_token`; вебхук сверяет заголовок `X-Telegram-Bot-Api-Secret-Token` (`hash_equals`), несовпадение → HTTP 403.
+- Пустой секрет = проверка выключена (rollout-safe).
+
 ## Изменённые публичные контракты / конфигурация
-- Новая env-переменная **`TELEGRAM_WEBHOOK_URL`** (`.env`, `.env.test`, `docker-compose.prod.yml`).
-- Новый параметр контейнера `telegram.webhook_url` + bind `string $telegramWebhookUrl`.
-- Поведение endpoint `/telegram/webhook` не изменилось по контракту (всегда 200); изменились тексты ответов пользователю при ошибках.
+- Новые env-переменные **`TELEGRAM_WEBHOOK_URL`**, **`TELEGRAM_WEBHOOK_SECRET`** (`.env`, `.env.test`, `docker-compose.prod.yml`).
+- Новые параметры контейнера `telegram.webhook_url`, `telegram.webhook_secret` + бинды.
+- Endpoint `/telegram/webhook`: на валидных апдейтах по-прежнему 200; при неверном/отсутствующем secret_token (когда секрет задан) → **403**. Тексты ответов пользователю при ошибках изменились.
 
 ## Миграции
 - Нет.
@@ -40,8 +45,10 @@
 
 ## Действия для деплоя (ОБЯЗАТЕЛЬНО, вне кода)
 1. Убедиться, что в прод-окружении доступен `TELEGRAM_WEBHOOK_URL` (дефолт уже в compose).
-2. После деплоя: в админке вызвать `POST /admin/telegram/bots/webhook-set` (нужен активный бот с токеном), затем проверить `webhook-health` / `getWebhookInfo` (`url`, `last_error_message`, `pending_update_count`).
-3. Проверить, что шлюз `tg-gateway` (`tg.vashfindir.ru`) реально проксирует на живой апстрим.
+2. (Опц., но рекомендовано) задать `TELEGRAM_WEBHOOK_SECRET` случайным значением (1–256 симв. `A-Z a-z 0-9 _ -`). Пока пусто — проверка secret_token выключена.
+3. После деплоя: в админке вызвать `POST /admin/telegram/bots/webhook-set` (нужен активный бот с токеном). **Если задан секрет — этот шаг ОБЯЗАТЕЛЕН**, иначе Telegram продолжит слать апдейты без заголовка и получит 403.
+4. Проверить `webhook-health` / `getWebhookInfo` (`url`, `last_error_message`, `pending_update_count`).
+5. Проверить, что шлюз `tg-gateway` (`tg.vashfindir.ru`) реально проксирует на живой апстрим.
 
 ## Риски
 - `CurrencyMismatchException` в Telegram-потоке практически недостижим (валюта = валюта кассы), обрабатывается защитно.

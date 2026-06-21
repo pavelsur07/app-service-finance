@@ -34,6 +34,7 @@ final class TelegramWebhookController extends AbstractController
         private readonly HttpClientInterface $httpClient,
         private readonly LoggerInterface $logger,
         private readonly CreateTelegramCashTransactionAction $createTelegramCashTransactionAction,
+        private readonly string $telegramWebhookSecret = '',
     ) {
     }
 
@@ -52,6 +53,19 @@ final class TelegramWebhookController extends AbstractController
         try {
             if ($request->isMethod(Request::METHOD_GET)) {
                 return new JsonResponse(['status' => 'ok']);
+            }
+
+            // Проверяем подлинность запроса: Telegram шлёт заданный secret_token в заголовке.
+            // Это защищает публичный endpoint от поддельных апдейтов (создание чужих операций, спам).
+            if (!$this->isValidSecretToken($request)) {
+                $this->logger->warning('Telegram webhook: invalid secret token', [
+                    'update_id' => $update['update_id'] ?? null,
+                ]);
+
+                return new JsonResponse(
+                    ['error' => ['code' => 'forbidden', 'message' => 'Invalid secret token']],
+                    Response::HTTP_FORBIDDEN,
+                );
             }
 
             // Находим активного бота, чтобы принимать сообщения независимо от конкретного токена маршрута
@@ -1068,6 +1082,19 @@ final class TelegramWebhookController extends AbstractController
         }
 
         return null;
+    }
+
+    private function isValidSecretToken(Request $request): bool
+    {
+        // Пустой секрет = проверка выключена (безопасный rollout: приём не ломается до установки секрета)
+        if ('' === $this->telegramWebhookSecret) {
+            return true;
+        }
+
+        $provided = (string) $request->headers->get('X-Telegram-Bot-Api-Secret-Token', '');
+
+        // hash_equals — сравнение без утечки времени
+        return hash_equals($this->telegramWebhookSecret, $provided);
     }
 
     private function respondWithMessage(TelegramBot $bot, array $message, string $text, ?array $replyMarkup = null): Response

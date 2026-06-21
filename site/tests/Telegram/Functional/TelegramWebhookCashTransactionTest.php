@@ -143,7 +143,11 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
             '/telegram/webhook',
             [],
             [],
-            ['CONTENT_TYPE' => 'application/json'],
+            [
+                'CONTENT_TYPE' => 'application/json',
+                // Секрет из .env.test — иначе запрос отклонится как поддельный (403)
+                'HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN' => 'test-secret-123',
+            ],
             json_encode($payload, \JSON_THROW_ON_ERROR),
         );
     }

@@ -21,6 +21,8 @@ final class TelegramBotController extends AbstractController
     public function __construct(
         // Публичный URL вебхука берём из конфигурации (.env: TELEGRAM_WEBHOOK_URL), а не из хардкода
         private readonly string $telegramWebhookUrl,
+        // Секрет вебхука: передаётся в Telegram при setWebhook (пусто = без секрета)
+        private readonly string $telegramWebhookSecret = '',
     ) {
     }
 
@@ -152,12 +154,17 @@ final class TelegramBotController extends AbstractController
         }
 
         try {
+            // Адрес вебхука берём из конфигурации (TELEGRAM_WEBHOOK_URL)
+            $body = ['url' => $this->telegramWebhookUrl];
+
+            // Если задан секрет — Telegram будет слать его в заголовке X-Telegram-Bot-Api-Secret-Token
+            if ('' !== $this->telegramWebhookSecret) {
+                $body['secret_token'] = $this->telegramWebhookSecret;
+            }
+
             // Запрашиваем Telegram API setWebhook, чтобы привязать бота к фиксированному URL
             $response = $httpClient->request('POST', sprintf('https://api.telegram.org/bot%s/setWebhook', $bot->getToken()), [
-                'body' => [
-                    // Адрес вебхука берём из конфигурации (TELEGRAM_WEBHOOK_URL)
-                    'url' => $this->telegramWebhookUrl,
-                ],
+                'body' => $body,
             ]);
 
             if (200 !== $response->getStatusCode()) {
