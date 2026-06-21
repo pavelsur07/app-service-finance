@@ -28,6 +28,10 @@
 - `setWebhook` передаёт `secret_token`; вебхук сверяет заголовок `X-Telegram-Bot-Api-Secret-Token` (`hash_equals`), несовпадение → HTTP 403.
 - Пустой секрет = проверка выключена (rollout-safe).
 
+### Stage 4 (🟡 MEDIUM) — не раскрывать произвольные доменные ошибки
+- Маркер-интерфейс `App\Shared\Domain\Exception\UserFacingException`; типизированное `App\Cash\Exception\FinancePeriodLockedException`.
+- `CashTransactionService` бросает типизированное исключение; Telegram показывает текст только `UserFacingException`, прочее → лог + обобщённый ответ.
+
 ## Изменённые публичные контракты / конфигурация
 - Новые env-переменные **`TELEGRAM_WEBHOOK_URL`**, **`TELEGRAM_WEBHOOK_SECRET`** (`.env`, `.env.test`, `docker-compose.prod.yml`).
 - Новые параметры контейнера `telegram.webhook_url`, `telegram.webhook_secret` + бинды.

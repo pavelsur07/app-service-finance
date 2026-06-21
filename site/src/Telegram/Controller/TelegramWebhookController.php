@@ -6,6 +6,7 @@ namespace App\Telegram\Controller;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Exception\CurrencyMismatchException;
+use App\Shared\Domain\Exception\UserFacingException;
 use App\Telegram\Application\CreateTelegramCashTransactionAction;
 use App\Telegram\Application\DTO\CreateTelegramCashTransactionCommand;
 use App\Telegram\Entity\ClientBinding;
@@ -858,10 +859,10 @@ final class TelegramWebhookController extends AbstractController
                 text: $text,
             ));
         } catch (CurrencyMismatchException) {
-            // Валюта операции должна совпадать с валютой кассы (CurrencyMismatchException — наследник DomainException, ловим раньше)
+            // Валюта операции должна совпадать с валютой кассы (ловим раньше: своё сообщение)
             return $this->respondWithMessage($bot, $message, 'Валюта операции не совпадает с валютой кассы.');
-        } catch (\DomainException $e) {
-            // Доменное ограничение (например, закрытый период) — показываем пользователю причину
+        } catch (UserFacingException $e) {
+            // Только помеченные пользовательские исключения (напр. закрытый период) показываем как есть
             return $this->respondWithMessage($bot, $message, $e->getMessage());
         } catch (\Throwable $e) {
             // Прочие сбои не глушим: пишем в Sentry и сообщаем пользователю, что операция не сохранена
