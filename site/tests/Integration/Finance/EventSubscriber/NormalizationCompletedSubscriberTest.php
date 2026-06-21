@@ -43,7 +43,7 @@ final class NormalizationCompletedSubscriberTest extends IntegrationTestCase
 
         self::assertCount(2, $messages);
         self::assertContainsOnlyInstancesOf(MarkPnlPeriodDirtyMessage::class, $messages);
-        self::assertSame([2026, 2, 'ingest'], [$messages[0]->year, $messages[0]->month, $messages[0]->reasonValue]);
-        self::assertSame([2026, 1, 'month_change'], [$messages[1]->year, $messages[1]->month, $messages[1]->reasonValue]);
+        self::assertSame([2026, 2, '', 'ingest'], [$messages[0]->year, $messages[0]->month, $messages[0]->shopRef, $messages[0]->reasonValue]);
+        self::assertSame([2026, 1, '', 'month_change'], [$messages[1]->year, $messages[1]->month, $messages[1]->shopRef, $messages[1]->reasonValue]);
     }
 }
