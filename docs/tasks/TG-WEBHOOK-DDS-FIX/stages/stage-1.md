@@ -18,6 +18,7 @@
 - `site/.env.test` — modified (детерминированное тестовое значение tg.example.test)
 - `site/tests/Telegram/Functional/Admin/TelegramBotWebhookSetTest.php` — new
 - `ARCHITECTURE.md` — modified
+- `docker-compose.prod.yml` — modified (TELEGRAM_WEBHOOK_URL в якоре `x-php-env`)
 
 ### Self-review
 - [x] Scope compliance — только направление «а» из плана
@@ -35,7 +36,7 @@
 
 ### Риски / на что обратить внимание ревьюеру
 - 🔴 Это меняет ТОЛЬКО код установки вебхука. Чтобы фактически переключить приём на `tg.vashfindir.ru`, после деплоя нужно зайти в админку и вызвать `setWebhook` (POST `/admin/telegram/bots/webhook-set`), затем проверить `getWebhookInfo`.
-- На проде нужно прописать `TELEGRAM_WEBHOOK_URL` (через `compose dump-env prod` / реальное окружение) — `.env` даёт только дефолт.
+- Прод-env передаётся ТОЛЬКО через якорь `x-php-env` в `docker-compose.prod.yml` (репозиторный `.env` хоть и попадает в образ через `COPY ./ ./`, опираться на него в проде хрупко). Поэтому `TELEGRAM_WEBHOOK_URL` добавлен в `x-php-env` с дефолтом `https://tg.vashfindir.ru/telegram/webhook` и возможностью override через host-env `${TELEGRAM_WEBHOOK_URL:-...}`. Проверено: `docker compose -f docker-compose.prod.yml config` резолвит переменную во все PHP-сервисы (fpm/cli/workers).
 - Требуется подтверждение, что шлюз `tg-gateway` реально проксирует на работающий апстрим (отдельная инфраструктура).
 
 ### Предсуществующие проблемы (вне scope, НЕ вводились в этом этапе)
