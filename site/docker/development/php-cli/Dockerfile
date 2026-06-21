@@ -26,6 +26,11 @@ RUN mv $PHP_INI_DIR/php.ini-development $PHP_INI_DIR/php.ini
 COPY ./common/php/conf.d /usr/local/etc/php/conf.d
 COPY ./development/php/conf.d /usr/local/etc/php/conf.d
 
+# opcache.so на Alpine/musl не загружается из-за неэкспортированного символа zend_jit_status.
+# В dev-среде opcache не нужен — отключаем попытку динамической загрузки.
+RUN sed -i 's/^zend_extension=opcache/;zend_extension=opcache/' \
+    /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini
+
 COPY ./common/wait-for-it.sh /usr/local/bin/wait-for-it
 RUN chmod 555 /usr/local/bin/wait-for-it
 
