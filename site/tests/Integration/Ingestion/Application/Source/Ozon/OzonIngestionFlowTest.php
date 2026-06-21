@@ -74,12 +74,13 @@ final class OzonIngestionFlowTest extends IntegrationTestCase
         $transactionRepository = self::getContainer()->get(FinancialTransactionRepository::class);
         $transactions = $transactionRepository->findByRawRecordId($companyId, $normalizeMessage->rawRecordId);
 
-        self::assertCount(2, $transactions);
+        self::assertCount(3, $transactions);
         $externalIds = array_map(static fn ($transaction): string => $transaction->getExternalId(), $transactions);
         sort($externalIds);
         self::assertSame([
             'ozon:accrual-by-day:53675409100:commission:product-0',
             'ozon:accrual-by-day:53675409100:delivery:product-0:service-0:type-29',
+            'ozon:accrual-by-day:53675409100:sale:product-0',
         ], $externalIds);
 
         /** @var NormalizationIssueRepository $issueRepository */

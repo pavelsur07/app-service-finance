@@ -42,7 +42,7 @@ final readonly class OzonAccrualByDayMapper implements SourceMapperInterface, Ra
     {
         $transactions = [];
 
-        foreach ($this->previewMapper->preview($rawRecord->getCompanyId(), $rows) as $row) {
+        foreach ($this->previewMapper->preview($rawRecord->getCompanyId(), $rows, includeSaleRefund: true) as $row) {
             $transactions[] = new MappedTransaction(
                 externalId: $row->sourceKey,
                 externalUpdatedAt: $rawRecord->getFetchedAt(),
@@ -92,7 +92,7 @@ final readonly class OzonAccrualByDayMapper implements SourceMapperInterface, Ra
     public function controlSumForRawRecord(IngestRawRecord $rawRecord, iterable $rows): array
     {
         $amountsByGroup = [];
-        foreach ($this->previewMapper->preview($rawRecord->getCompanyId(), $rows) as $row) {
+        foreach ($this->previewMapper->preview($rawRecord->getCompanyId(), $rows, includeSaleRefund: true) as $row) {
             $amountsByGroup[$row->operationGroupId] ??= ['currency' => $row->currency, 'amountMinor' => 0];
             $amountsByGroup[$row->operationGroupId]['amountMinor'] += $row->amountMinor;
         }
