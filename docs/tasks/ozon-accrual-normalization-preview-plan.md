@@ -28,6 +28,13 @@ Add a safe dry-run view that shows which canonical financial transactions could 
 - Aggregate comparison: preview totals vs canonical totals by date, type, and direction.
 - Raw rows are filtered by the requested `--from/--to` window before preview mapping, because stored raw records can cover a wider ingestion chunk than the CLI window.
 
+## Parity report
+
+- `--parity-only` prints only raw-record metadata, summary, decision, and comparable parity rows.
+- `sale` and `refund` canonical rows are omitted from parity because accrual by-day preview intentionally does not create sale/refund rows.
+- Amount parity is considered pass when all comparable non-sale/non-refund date/type/direction totals have zero amount delta.
+- Count mismatches are reported separately as warnings/focus points, because equal financial totals can still have different row granularity.
+
 ## Checks
 
 - Focused unit tests for the preview mapper.
