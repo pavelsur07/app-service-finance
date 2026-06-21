@@ -76,6 +76,16 @@ services:
             - traefik.http.services.tg-webhook.loadbalancer.healthcheck.interval=10s
             - traefik.http.services.tg-webhook.loadbalancer.healthcheck.timeout=3s
 
+            # HTTPS router для исходящего прокси app → Telegram Bot API (только с IP app-сервера)
+            - traefik.http.routers.tg-bot-api.rule=Host(`tg.vashfindir.ru`) && PathPrefix(`/bot-api/`)
+            - traefik.http.routers.tg-bot-api.entrypoints=https
+            - traefik.http.routers.tg-bot-api.tls=true
+            - traefik.http.routers.tg-bot-api.tls.certresolver=letsEncrypt
+            - traefik.http.routers.tg-bot-api.service=tg-webhook
+            - traefik.http.routers.tg-bot-api.priority=10
+            - traefik.http.routers.tg-bot-api.middlewares=tg-bot-api-allow
+            - traefik.http.middlewares.tg-bot-api-allow.ipallowlist.sourcerange=217.198.13.171/32
+
 volumes:
     tg-traefik-certs:
 
