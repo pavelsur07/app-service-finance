@@ -13,62 +13,73 @@ use PHPUnit\Framework\TestCase;
 
 final class OzonAccrualByDayPreviewMapperTest extends TestCase
 {
-    public function testBuildsPreviewRowsForWritableAccrualComponentsOnly(): void
+    public function testBuildsPreviewRowsForWritableAccrualComponents(): void
     {
-        $rows = $this->mapper()->preview('19621cff-b028-45d9-9193-11f47ad9a8b2', [
+        $rows = $this->mapper()->preview(
+            '19621cff-b028-45d9-9193-11f47ad9a8b2',
             [
-                'accrual_id' => 53675409100,
-                'date' => '2026-06-13',
-                'unit_number' => '41774559-0885-1',
-                'accrued_category' => 'POSTING',
-                'posting' => [
-                    'products' => [[
-                        'delivery' => [
-                            'services' => [
-                                ['type_id' => 29, 'accrued' => ['amount' => '-7.86', 'currency' => 'RUB']],
-                                ['type_id' => 45, 'accrued' => ['amount' => '-15', 'currency' => 'RUB']],
+                [
+                    'accrual_id' => 53675409100,
+                    'date' => '2026-06-13',
+                    'unit_number' => '41774559-0885-1',
+                    'accrued_category' => 'POSTING',
+                    'posting' => [
+                        'products' => [[
+                            'delivery' => [
+                                'services' => [
+                                    ['type_id' => 29, 'accrued' => ['amount' => '-7.86', 'currency' => 'RUB']],
+                                    ['type_id' => 45, 'accrued' => ['amount' => '-15', 'currency' => 'RUB']],
+                                ],
                             ],
-                        ],
-                        'commission' => [
-                            'bonus' => ['amount' => '12.79', 'currency' => 'RUB'],
-                            'commission' => ['amount' => '-120.05', 'currency' => 'RUB'],
-                            'sale_amount' => ['amount' => '66718', 'currency' => 'RUB'],
-                            'sale_commission' => ['amount' => '-120.05', 'currency' => 'RUB'],
-                        ],
-                    ]],
+                            'commission' => [
+                                'bonus' => ['amount' => '12.79', 'currency' => 'RUB'],
+                                'commission' => ['amount' => '-120.05', 'currency' => 'RUB'],
+                                'sale_amount' => ['amount' => '66718', 'currency' => 'RUB'],
+                                'sale_commission' => ['amount' => '-120.05', 'currency' => 'RUB'],
+                            ],
+                        ]],
+                    ],
                 ],
-            ],
-            [
-                'accrual_id' => 53675409101,
-                'date' => '2026-06-13',
-                'accrued_category' => 'ITEM',
-                'item_fees' => [
-                    'fees' => [[
+                [
+                    'accrual_id' => 53675409101,
+                    'date' => '2026-06-13',
+                    'accrued_category' => 'ITEM',
+                    'item_fees' => [
+                        'fees' => [[
+                            'fees' => [
+                                ['type_id' => 1, 'accrued' => ['amount' => '18.66', 'currency' => 'RUB']],
+                            ],
+                        ]],
+                    ],
+                ],
+                [
+                    'accrual_id' => 53675409102,
+                    'date' => '2026-06-14',
+                    'accrued_category' => 'NON_ITEM',
+                    'non_item_fee' => ['type_id' => 46, 'accrued' => ['amount' => '-78.28', 'currency' => 'RUB']],
+                ],
+                [
+                    'accrual_id' => 53675409103,
+                    'date' => '2026-06-14',
+                    'accrued_category' => 'CONTAINER',
+                    'container_fees' => [
                         'fees' => [
-                            ['type_id' => 1, 'accrued' => ['amount' => '18.66', 'currency' => 'RUB']],
+                            ['type_id' => 77, 'accrued' => ['amount' => '-3.50', 'currency' => 'RUB']],
                         ],
-                    ]],
-                ],
-            ],
-            [
-                'accrual_id' => 53675409102,
-                'date' => '2026-06-14',
-                'accrued_category' => 'NON_ITEM',
-                'non_item_fee' => ['type_id' => 46, 'accrued' => ['amount' => '-78.28', 'currency' => 'RUB']],
-            ],
-            [
-                'accrual_id' => 53675409103,
-                'date' => '2026-06-14',
-                'accrued_category' => 'CONTAINER',
-                'container_fees' => [
-                    'fees' => [
-                        ['type_id' => 77, 'accrued' => ['amount' => '-3.50', 'currency' => 'RUB']],
                     ],
                 ],
             ],
-        ]);
+            includeSaleRefund: true,
+        );
 
-        self::assertCount(6, $rows);
+        self::assertCount(7, $rows);
+
+        $sale = $this->row($rows, 'sale:product-0');
+        self::assertSame(TransactionType::SALE, $sale->type);
+        self::assertSame(TransactionDirection::IN, $sale->direction);
+        self::assertSame(6671800, $sale->amountMinor);
+        self::assertSame('sale_amount', $sale->field);
+        self::assertSame('ozon:accrual-by-day:53675409100:sale:product-0', $sale->sourceKey);
 
         $commission = $this->row($rows, 'commission:product-0');
         self::assertSame(TransactionType::COMMISSION, $commission->type);
@@ -98,6 +109,59 @@ final class OzonAccrualByDayPreviewMapperTest extends TestCase
         self::assertSame(TransactionType::FEE, $container->type);
         self::assertSame(TransactionDirection::OUT, $container->direction);
         self::assertSame(350, $container->amountMinor);
+    }
+
+    public function testOmitsSaleAndRefundByDefaultForActiveNormalizationSafety(): void
+    {
+        $rows = $this->mapper()->preview('19621cff-b028-45d9-9193-11f47ad9a8b2', [[
+            'accrual_id' => 53675409100,
+            'date' => '2026-06-13',
+            'accrued_category' => 'POSTING',
+            'posting' => [
+                'products' => [[
+                    'commission' => [
+                        'commission' => ['amount' => '-120.05', 'currency' => 'RUB'],
+                        'sale_amount' => ['amount' => '66718', 'currency' => 'RUB'],
+                    ],
+                ]],
+            ],
+        ]]);
+
+        self::assertCount(1, $rows);
+        self::assertSame(TransactionType::COMMISSION, $rows[0]->type);
+    }
+
+    public function testBuildsRefundFromNegativeSaleAmountAndKeepsCommissionStorno(): void
+    {
+        $rows = $this->mapper()->preview('19621cff-b028-45d9-9193-11f47ad9a8b2', [[
+            'accrual_id' => 53675409104,
+            'date' => '2026-06-13',
+            'unit_number' => '41774559-0885-1',
+            'accrued_category' => 'POSTING',
+            'posting' => [
+                'products' => [[
+                    'commission' => [
+                        'commission' => ['amount' => '1305.02', 'currency' => 'RUB'],
+                        'sale_amount' => ['amount' => '-2837.00', 'currency' => 'RUB'],
+                    ],
+                ]],
+            ],
+        ]], includeSaleRefund: true);
+
+        self::assertCount(2, $rows);
+
+        $refund = $this->row($rows, 'refund:product-0');
+        self::assertSame(TransactionType::REFUND, $refund->type);
+        self::assertSame(TransactionDirection::OUT, $refund->direction);
+        self::assertSame(283700, $refund->amountMinor);
+        self::assertSame(-283700, $refund->signedAmountMinor());
+        self::assertSame('sale_amount', $refund->field);
+        self::assertSame('ozon:accrual-by-day:53675409104:refund:product-0', $refund->sourceKey);
+
+        $commission = $this->row($rows, 'commission:product-0');
+        self::assertSame(TransactionType::COMMISSION, $commission->type);
+        self::assertSame(TransactionDirection::IN, $commission->direction);
+        self::assertSame(130502, $commission->amountMinor);
     }
 
     public function testIgnoresUnknownCategoriesAndZeroAmounts(): void

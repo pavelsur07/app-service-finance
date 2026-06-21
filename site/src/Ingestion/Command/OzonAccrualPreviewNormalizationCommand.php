@@ -28,7 +28,7 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
     /**
      * @var list<string>
      */
-    private const OMITTED_CANONICAL_TYPES = ['sale', 'refund'];
+    private const SALE_REFUND_TYPES = ['sale', 'refund'];
 
     public function __construct(
         private readonly Connection $connection,
@@ -47,6 +47,7 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
             ->addOption('raw-limit', null, InputOption::VALUE_REQUIRED, 'Raw records to scan, 1..50.', 20)
             ->addOption('raw-row-limit', null, InputOption::VALUE_REQUIRED, 'Rows to scan per raw record, 1..50000.', 5000)
             ->addOption('sample-limit', null, InputOption::VALUE_REQUIRED, 'Preview rows to print, 1..200.', 50)
+            ->addOption('include-sale-refund', null, InputOption::VALUE_NONE, 'Read-only preview for sale/refund rows; active normalization still excludes them.')
             ->addOption('parity-only', null, InputOption::VALUE_NONE, 'Print only summary and parity report sections.');
     }
 
@@ -60,6 +61,7 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
             $rawLimit = $this->intOption($input, 'raw-limit', 1, 50);
             $rawRowLimit = $this->intOption($input, 'raw-row-limit', 1, 50000);
             $sampleLimit = $this->intOption($input, 'sample-limit', 1, 200);
+            $includeSaleRefund = (bool) $input->getOption('include-sale-refund');
             $parityOnly = (bool) $input->getOption('parity-only');
         } catch (\Throwable $exception) {
             $io->error($exception->getMessage());
@@ -68,18 +70,22 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
         }
 
         $rawRecords = $this->rawRecords($companyId, $from, $to, $rawLimit);
-        $previewRows = $this->previewMapper->preview($companyId, $this->rawRows($companyId, $rawRecords, $rawRowLimit, $from, $to), $from, $to);
+        $previewRows = $this->previewMapper->preview($companyId, $this->rawRows($companyId, $rawRecords, $rawRowLimit, $from, $to), $from, $to, $includeSaleRefund);
         $exactMatches = $this->exactNaturalKeyMatches($companyId, $previewRows);
         $sameAmountCandidates = $this->sameAmountCandidateCounts($companyId, $from, $to);
         $canonicalGroups = $this->canonicalGroups($companyId, $from, $to);
-        $parityRows = $this->parityRows($previewRows, $canonicalGroups);
+        $omittedTypes = $includeSaleRefund ? [] : self::SALE_REFUND_TYPES;
+        $parityRows = $this->parityRows($previewRows, $canonicalGroups, $omittedTypes);
 
         $io->title('Ozon accrual normalization preview');
         $io->writeln('Read-only: no canonical transactions are written.');
-        $io->writeln('Preview intentionally omits sale/refund amount fields, bonus, coinvestment, sale_amount, and seller_price.');
+        $io->writeln($includeSaleRefund
+            ? 'Preview includes sale/refund from sale_amount or seller_price, and intentionally omits bonus and coinvestment.'
+            : 'Preview intentionally omits sale/refund amount fields, bonus, coinvestment, sale_amount, and seller_price.'
+        );
         $this->printRawRecords($io, $rawRecords);
         $this->printSummary($io, $previewRows, $exactMatches, $sameAmountCandidates);
-        $this->printParityDecision($io, $previewRows, $exactMatches, $sameAmountCandidates, $parityRows);
+        $this->printParityDecision($io, $previewRows, $exactMatches, $sameAmountCandidates, $parityRows, $omittedTypes);
         $this->printParityRows($io, $parityRows);
 
         if ($parityOnly) {
@@ -300,8 +306,8 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
 
     /**
      * @param list<OzonAccrualPreviewTransaction> $previewRows
-     * @param array<string, int> $exactMatches
-     * @param array<string, int> $sameAmountCandidates
+     * @param array<string, int>                  $exactMatches
+     * @param array<string, int>                  $sameAmountCandidates
      */
     private function printSummary(SymfonyStyle $io, array $previewRows, array $exactMatches, array $sameAmountCandidates): void
     {
@@ -331,8 +337,8 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
 
     /**
      * @param list<OzonAccrualPreviewTransaction> $previewRows
-     * @param array<string, int> $exactMatches
-     * @param array<string, int> $sameAmountCandidates
+     * @param array<string, int>                  $exactMatches
+     * @param array<string, int>                  $sameAmountCandidates
      */
     private function printPreviewSamples(
         SymfonyStyle $io,
@@ -371,12 +377,12 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
     }
 
     /**
-     * @param list<OzonAccrualPreviewTransaction> $previewRows
+     * @param list<OzonAccrualPreviewTransaction>               $previewRows
      * @param array<string, array{count: int, totalMinor: int}> $canonicalGroups
      *
      * @return list<array{date: string, type: string, direction: string, previewCount: int, canonicalCount: int, previewTotalMinor: int, canonicalTotalMinor: int, countDelta: int, totalDeltaMinor: int}>
      */
-    private function parityRows(array $previewRows, array $canonicalGroups): array
+    private function parityRows(array $previewRows, array $canonicalGroups, array $omittedTypes): array
     {
         $previewGroups = $this->previewGroups($previewRows);
         $keys = array_values(array_unique(array_merge(array_keys($previewGroups), array_keys($canonicalGroups))));
@@ -385,7 +391,7 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
         $rows = [];
         foreach ($keys as $key) {
             [$date, $type, $direction] = explode('|', $key, 3);
-            if (in_array($type, self::OMITTED_CANONICAL_TYPES, true)) {
+            if (in_array($type, $omittedTypes, true)) {
                 continue;
             }
 
@@ -435,10 +441,11 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
     }
 
     /**
-     * @param list<OzonAccrualPreviewTransaction> $previewRows
-     * @param array<string, int> $exactMatches
-     * @param array<string, int> $sameAmountCandidates
+     * @param list<OzonAccrualPreviewTransaction>                                                                                                                                                         $previewRows
+     * @param array<string, int>                                                                                                                                                                          $exactMatches
+     * @param array<string, int>                                                                                                                                                                          $sameAmountCandidates
      * @param list<array{date: string, type: string, direction: string, previewCount: int, canonicalCount: int, previewTotalMinor: int, canonicalTotalMinor: int, countDelta: int, totalDeltaMinor: int}> $parityRows
+     * @param list<string>                                                                                                                                                                                $omittedTypes
      */
     private function printParityDecision(
         SymfonyStyle $io,
@@ -446,6 +453,7 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
         array $exactMatches,
         array $sameAmountCandidates,
         array $parityRows,
+        array $omittedTypes,
     ): void {
         $exactMatchRows = 0;
         $sameAmountCandidateRows = 0;
@@ -473,7 +481,7 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
 
         $status = 0 === $amountMismatches ? 'amount-parity-pass' : 'amount-parity-fail';
         $recommendation = 0 === $amountMismatches
-            ? 'Use accrual by-day as shadow/replacement only; additive writes would duplicate existing canonical expense components.'
+            ? 'Use accrual by-day as replacement source; additive writes would duplicate existing canonical components.'
             : 'Review amount mismatches before enabling accrual by-day normalization.';
 
         $io->section('Parity decision');
@@ -486,7 +494,7 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
                 ['countMismatches', (string) $countMismatches],
                 ['exactNaturalKeyMatches', (string) $exactMatchRows],
                 ['sameAmountCandidateRows', sprintf('%d/%d', $sameAmountCandidateRows, count($previewRows))],
-                ['omittedCanonicalTypes', implode(', ', self::OMITTED_CANONICAL_TYPES)],
+                ['omittedCanonicalTypes', [] === $omittedTypes ? 'none' : implode(', ', $omittedTypes)],
                 ['recommendation', $recommendation],
             ],
         );
@@ -523,7 +531,7 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
     }
 
     /**
-     * @param list<OzonAccrualPreviewTransaction> $previewRows
+     * @param list<OzonAccrualPreviewTransaction>               $previewRows
      * @param array<string, array{count: int, totalMinor: int}> $canonicalGroups
      */
     private function printGroupComparison(SymfonyStyle $io, array $previewRows, array $canonicalGroups): void
@@ -563,7 +571,7 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
     }
 
     /**
-     * @param list<OzonAccrualPreviewTransaction> $previewRows
+     * @param list<OzonAccrualPreviewTransaction>               $previewRows
      * @param array<string, array{count: int, totalMinor: int}> $canonicalGroups
      */
     private function printDailyNetComparison(SymfonyStyle $io, array $previewRows, array $canonicalGroups): void
