@@ -22,6 +22,7 @@ final readonly class PnlCategoryResolver
 {
     private const OTHER_INCOME_CODE = 'INGESTION_OTHER_INCOME';
     private const OTHER_EXPENSE_CODE = 'INGESTION_OTHER_EXPENSE';
+    private const REFUND_OUT_CODE = 'INGESTION_REFUND_OUT';
 
     public function __construct(
         private CompanyRepository $companyRepository,
@@ -37,7 +38,9 @@ final readonly class PnlCategoryResolver
             throw new PnlCategoryResolveException(sprintf('Company "%s" was not found for P&L category resolution.', $companyId));
         }
 
-        $category = $this->findByCode($company, $this->codeFor($type, $direction))
+        $categoryCode = $this->codeFor($type, $direction);
+        $category = $this->findByCode($company, $categoryCode)
+            ?? $this->createKnownIngestionCategory($company, $categoryCode)
             ?? $this->findByCode($company, $this->fallbackCode($direction))
             ?? $this->createFallback($company, $direction);
 
@@ -71,6 +74,7 @@ final readonly class PnlCategoryResolver
             TransactionType::ACQUIRING => 'INGESTION_ACQUIRING',
             TransactionType::TAX => 'INGESTION_TAX',
             TransactionType::FEE => 'INGESTION_FEE',
+            TransactionType::REFUND => self::REFUND_OUT_CODE,
             default => self::OTHER_EXPENSE_CODE,
         };
     }
@@ -88,16 +92,47 @@ final readonly class PnlCategoryResolver
         ]);
     }
 
+    private function createKnownIngestionCategory(Company $company, string $code): ?PLCategory
+    {
+        if (self::REFUND_OUT_CODE !== $code) {
+            return null;
+        }
+
+        return $this->createCategory(
+            company: $company,
+            name: 'Ingestion: возвраты',
+            code: self::REFUND_OUT_CODE,
+            flow: PLFlow::EXPENSE,
+            expenseType: PLExpenseType::VARIABLE,
+        );
+    }
+
     private function createFallback(Company $company, TransactionDirection $direction): PLCategory
     {
+        return $this->createCategory(
+            company: $company,
+            name: TransactionDirection::IN === $direction ? 'Ingestion: прочие доходы' : 'Ingestion: прочие расходы',
+            code: $this->fallbackCode($direction),
+            flow: TransactionDirection::IN === $direction ? PLFlow::INCOME : PLFlow::EXPENSE,
+            expenseType: TransactionDirection::IN === $direction ? PLExpenseType::OTHER : PLExpenseType::VARIABLE,
+        );
+    }
+
+    private function createCategory(
+        Company $company,
+        string $name,
+        string $code,
+        PLFlow $flow,
+        PLExpenseType $expenseType,
+    ): PLCategory {
         $category = new PLCategory(Uuid::uuid7()->toString(), $company);
         $category
-            ->setName(TransactionDirection::IN === $direction ? 'Ingestion: прочие доходы' : 'Ingestion: прочие расходы')
-            ->setCode($this->fallbackCode($direction))
+            ->setName($name)
+            ->setCode($code)
             ->setType(PLCategoryType::LEAF_INPUT)
             ->setFormat(PLValueFormat::MONEY)
-            ->setFlow(TransactionDirection::IN === $direction ? PLFlow::INCOME : PLFlow::EXPENSE)
-            ->setExpenseType(TransactionDirection::IN === $direction ? PLExpenseType::OTHER : PLExpenseType::VARIABLE)
+            ->setFlow($flow)
+            ->setExpenseType($expenseType)
             ->setSortOrder($this->categoryRepository->getNextSortOrder($company, null));
 
         $this->entityManager->persist($category);

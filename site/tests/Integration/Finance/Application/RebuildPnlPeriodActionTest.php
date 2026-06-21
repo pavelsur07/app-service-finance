@@ -44,6 +44,42 @@ final class RebuildPnlPeriodActionTest extends IntegrationTestCase
         self::assertSame(2, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM pl_daily_totals WHERE company_id = :company_id AND rebuilt_at IS NOT NULL', ['company_id' => $companyId]));
     }
 
+    public function testRebuildMapsOutboundRefundToRefundCategory(): void
+    {
+        $company = $this->createCompanyWithDefaultProject();
+        $companyId = (string) $company->getId();
+        $this->persistTransaction($companyId, TransactionType::REFUND, TransactionDirection::OUT, 283700, '2026-02-11 10:00:00 UTC', 'refund-1');
+        $this->em->flush();
+
+        /** @var RebuildPnlPeriodAction $action */
+        $action = self::getContainer()->get(RebuildPnlPeriodAction::class);
+        $action(new RebuildPnlPeriodCommand($companyId, 2026, 2));
+
+        $row = $this->connection->fetchAssociative(
+            'SELECT c.code,
+                    COALESCE(SUM(d.amount_income), 0)::numeric(18,2)::text AS amount_income,
+                    COALESCE(SUM(d.amount_expense), 0)::numeric(18,2)::text AS amount_expense
+             FROM pl_daily_totals d
+             INNER JOIN pl_categories c ON c.id = d.pl_category_id
+             WHERE d.company_id = :company_id
+             GROUP BY c.code',
+            ['company_id' => $companyId],
+        );
+
+        self::assertIsArray($row);
+        self::assertSame('INGESTION_REFUND_OUT', $row['code']);
+        self::assertSame('0.00', $row['amount_income']);
+        self::assertSame('2837.00', $row['amount_expense']);
+        self::assertSame(0, (int) $this->connection->fetchOne(
+            "SELECT COUNT(*)
+             FROM pl_daily_totals d
+             INNER JOIN pl_categories c ON c.id = d.pl_category_id
+             WHERE d.company_id = :company_id
+               AND c.code = 'INGESTION_OTHER_EXPENSE'",
+            ['company_id' => $companyId],
+        ));
+    }
+
     public function testSourceScopedRebuildIsFailedUntilFinanceSourceLinkingIsDecided(): void
     {
         $company = $this->createCompanyWithDefaultProject();

@@ -47,7 +47,8 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
             ->addOption('raw-limit', null, InputOption::VALUE_REQUIRED, 'Raw records to scan, 1..50.', 20)
             ->addOption('raw-row-limit', null, InputOption::VALUE_REQUIRED, 'Rows to scan per raw record, 1..50000.', 5000)
             ->addOption('sample-limit', null, InputOption::VALUE_REQUIRED, 'Preview rows to print, 1..200.', 50)
-            ->addOption('include-sale-refund', null, InputOption::VALUE_NONE, 'Read-only preview for sale/refund rows; active normalization still excludes them.')
+            ->addOption('include-sale-refund', null, InputOption::VALUE_NONE, 'Deprecated compatibility flag; sale/refund rows are included by default.')
+            ->addOption('expenses-only', null, InputOption::VALUE_NONE, 'Exclude sale/refund rows for expense-only parity diagnostics.')
             ->addOption('parity-only', null, InputOption::VALUE_NONE, 'Print only summary and parity report sections.');
     }
 
@@ -61,7 +62,7 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
             $rawLimit = $this->intOption($input, 'raw-limit', 1, 50);
             $rawRowLimit = $this->intOption($input, 'raw-row-limit', 1, 50000);
             $sampleLimit = $this->intOption($input, 'sample-limit', 1, 200);
-            $includeSaleRefund = (bool) $input->getOption('include-sale-refund');
+            $includeSaleRefund = !(bool) $input->getOption('expenses-only');
             $parityOnly = (bool) $input->getOption('parity-only');
         } catch (\Throwable $exception) {
             $io->error($exception->getMessage());
@@ -81,7 +82,7 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
         $io->writeln('Read-only: no canonical transactions are written.');
         $io->writeln($includeSaleRefund
             ? 'Preview includes sale/refund from sale_amount or seller_price, and intentionally omits bonus and coinvestment.'
-            : 'Preview intentionally omits sale/refund amount fields, bonus, coinvestment, sale_amount, and seller_price.'
+            : 'Preview excludes sale/refund amount fields for expense-only diagnostics, and intentionally omits bonus and coinvestment.'
         );
         $this->printRawRecords($io, $rawRecords);
         $this->printSummary($io, $previewRows, $exactMatches, $sameAmountCandidates);
@@ -306,8 +307,8 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
 
     /**
      * @param list<OzonAccrualPreviewTransaction> $previewRows
-     * @param array<string, int>                  $exactMatches
-     * @param array<string, int>                  $sameAmountCandidates
+     * @param array<string, int> $exactMatches
+     * @param array<string, int> $sameAmountCandidates
      */
     private function printSummary(SymfonyStyle $io, array $previewRows, array $exactMatches, array $sameAmountCandidates): void
     {
@@ -337,8 +338,8 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
 
     /**
      * @param list<OzonAccrualPreviewTransaction> $previewRows
-     * @param array<string, int>                  $exactMatches
-     * @param array<string, int>                  $sameAmountCandidates
+     * @param array<string, int> $exactMatches
+     * @param array<string, int> $sameAmountCandidates
      */
     private function printPreviewSamples(
         SymfonyStyle $io,
@@ -377,7 +378,7 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
     }
 
     /**
-     * @param list<OzonAccrualPreviewTransaction>               $previewRows
+     * @param list<OzonAccrualPreviewTransaction> $previewRows
      * @param array<string, array{count: int, totalMinor: int}> $canonicalGroups
      *
      * @return list<array{date: string, type: string, direction: string, previewCount: int, canonicalCount: int, previewTotalMinor: int, canonicalTotalMinor: int, countDelta: int, totalDeltaMinor: int}>
@@ -441,11 +442,11 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
     }
 
     /**
-     * @param list<OzonAccrualPreviewTransaction>                                                                                                                                                         $previewRows
-     * @param array<string, int>                                                                                                                                                                          $exactMatches
-     * @param array<string, int>                                                                                                                                                                          $sameAmountCandidates
+     * @param list<OzonAccrualPreviewTransaction> $previewRows
+     * @param array<string, int> $exactMatches
+     * @param array<string, int> $sameAmountCandidates
      * @param list<array{date: string, type: string, direction: string, previewCount: int, canonicalCount: int, previewTotalMinor: int, canonicalTotalMinor: int, countDelta: int, totalDeltaMinor: int}> $parityRows
-     * @param list<string>                                                                                                                                                                                $omittedTypes
+     * @param list<string> $omittedTypes
      */
     private function printParityDecision(
         SymfonyStyle $io,
@@ -531,7 +532,7 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
     }
 
     /**
-     * @param list<OzonAccrualPreviewTransaction>               $previewRows
+     * @param list<OzonAccrualPreviewTransaction> $previewRows
      * @param array<string, array{count: int, totalMinor: int}> $canonicalGroups
      */
     private function printGroupComparison(SymfonyStyle $io, array $previewRows, array $canonicalGroups): void
@@ -571,7 +572,7 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
     }
 
     /**
-     * @param list<OzonAccrualPreviewTransaction>               $previewRows
+     * @param list<OzonAccrualPreviewTransaction> $previewRows
      * @param array<string, array{count: int, totalMinor: int}> $canonicalGroups
      */
     private function printDailyNetComparison(SymfonyStyle $io, array $previewRows, array $canonicalGroups): void

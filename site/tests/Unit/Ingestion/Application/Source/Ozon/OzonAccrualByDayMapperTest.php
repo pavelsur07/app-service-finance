@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Ingestion\Application\Source\Ozon;
 
+use App\Ingestion\Application\DTO\MappedTransaction;
 use App\Ingestion\Application\Source\Ozon\OzonAccrualByDayMapper;
 use App\Ingestion\Application\Source\Ozon\OzonAccrualByDayPreviewMapper;
 use App\Ingestion\Application\Source\Ozon\OzonMoneyParser;
@@ -43,9 +44,16 @@ final class OzonAccrualByDayMapperTest extends TestCase
             ],
         ]]);
 
-        self::assertCount(2, $transactions);
+        self::assertCount(3, $transactions);
 
-        $commission = $transactions[0];
+        $sale = $this->transaction($transactions, 'ozon:accrual-by-day:53675409100:sale:product-0');
+        self::assertSame(TransactionType::SALE, $sale->type);
+        self::assertSame(TransactionDirection::IN, $sale->direction);
+        self::assertSame(6671800, $sale->money->amountMinor());
+        self::assertSame('sale:product-0', $sale->sourceData['_ingestion_component']);
+        self::assertSame('sale_amount', $sale->sourceData['_ingestion_field']);
+
+        $commission = $this->transaction($transactions, 'ozon:accrual-by-day:53675409100:commission:product-0');
         self::assertSame('ozon:accrual-by-day:53675409100:commission:product-0', $commission->externalId);
         self::assertSame(TransactionType::COMMISSION, $commission->type);
         self::assertSame(TransactionDirection::OUT, $commission->direction);
@@ -55,7 +63,7 @@ final class OzonAccrualByDayMapperTest extends TestCase
         self::assertSame(OzonResourceType::ACCRUAL_BY_DAY, $commission->sourceData['_ingestion_resource']);
         self::assertSame('commission:product-0', $commission->sourceData['_ingestion_component']);
 
-        $delivery = $transactions[1];
+        $delivery = $this->transaction($transactions, 'ozon:accrual-by-day:53675409100:delivery:product-0:service-0:type-29');
         self::assertSame('ozon:accrual-by-day:53675409100:delivery:product-0:service-0:type-29', $delivery->externalId);
         self::assertSame(TransactionType::FEE, $delivery->type);
         self::assertSame(TransactionDirection::OUT, $delivery->direction);
@@ -81,6 +89,7 @@ final class OzonAccrualByDayMapperTest extends TestCase
                     ],
                     'commission' => [
                         'commission' => ['amount' => '-120.05', 'currency' => 'RUB'],
+                        'sale_amount' => ['amount' => '66718', 'currency' => 'RUB'],
                     ],
                 ]],
             ],
@@ -88,10 +97,11 @@ final class OzonAccrualByDayMapperTest extends TestCase
 
         self::assertCount(1, $controlSums);
         self::assertSame('RUB', $controlSums[0]->currency);
-        self::assertSame(12791, $controlSums[0]->amountMinor);
+        // Sale/refund cutover includes all accrual components in the operation group control sum.
+        self::assertSame(6684591, $controlSums[0]->amountMinor);
     }
 
-    public function testOmitsSaleAndRefundInActiveMapper(): void
+    public function testMapsRefundInActiveMapper(): void
     {
         $companyId = '19621cff-b028-45d9-9193-11f47ad9a8b2';
         $rawRecord = $this->rawRecord($companyId);
@@ -110,12 +120,32 @@ final class OzonAccrualByDayMapperTest extends TestCase
             ],
         ]]);
 
-        self::assertCount(1, $transactions);
+        self::assertCount(2, $transactions);
 
-        $commission = $transactions[0];
+        $refund = $this->transaction($transactions, 'ozon:accrual-by-day:53675409104:refund:product-0');
+        self::assertSame(TransactionType::REFUND, $refund->type);
+        self::assertSame(TransactionDirection::OUT, $refund->direction);
+        self::assertSame(283700, $refund->money->amountMinor());
+        self::assertSame('sale_amount', $refund->sourceData['_ingestion_field']);
+
+        $commission = $this->transaction($transactions, 'ozon:accrual-by-day:53675409104:commission:product-0');
         self::assertSame(TransactionType::COMMISSION, $commission->type);
         self::assertSame(TransactionDirection::IN, $commission->direction);
         self::assertSame(130502, $commission->money->amountMinor());
+    }
+
+    /**
+     * @param list<MappedTransaction> $transactions
+     */
+    private function transaction(array $transactions, string $externalId): MappedTransaction
+    {
+        foreach ($transactions as $transaction) {
+            if ($externalId === $transaction->externalId) {
+                return $transaction;
+            }
+        }
+
+        self::fail(sprintf('Mapped transaction with external id "%s" was not found.', $externalId));
     }
 
     private function mapper(): OzonAccrualByDayMapper

@@ -111,21 +111,25 @@ final class OzonAccrualByDayPreviewMapperTest extends TestCase
         self::assertSame(350, $container->amountMinor);
     }
 
-    public function testOmitsSaleAndRefundByDefaultForActiveNormalizationSafety(): void
+    public function testOmitsSaleAndRefundWhenExplicitlyExcluded(): void
     {
-        $rows = $this->mapper()->preview('19621cff-b028-45d9-9193-11f47ad9a8b2', [[
-            'accrual_id' => 53675409100,
-            'date' => '2026-06-13',
-            'accrued_category' => 'POSTING',
-            'posting' => [
-                'products' => [[
-                    'commission' => [
-                        'commission' => ['amount' => '-120.05', 'currency' => 'RUB'],
-                        'sale_amount' => ['amount' => '66718', 'currency' => 'RUB'],
-                    ],
-                ]],
-            ],
-        ]]);
+        $rows = $this->mapper()->preview(
+            '19621cff-b028-45d9-9193-11f47ad9a8b2',
+            [[
+                'accrual_id' => 53675409100,
+                'date' => '2026-06-13',
+                'accrued_category' => 'POSTING',
+                'posting' => [
+                    'products' => [[
+                        'commission' => [
+                            'commission' => ['amount' => '-120.05', 'currency' => 'RUB'],
+                            'sale_amount' => ['amount' => '66718', 'currency' => 'RUB'],
+                        ],
+                    ]],
+                ],
+            ]],
+            includeSaleRefund: false,
+        );
 
         self::assertCount(1, $rows);
         self::assertSame(TransactionType::COMMISSION, $rows[0]->type);
