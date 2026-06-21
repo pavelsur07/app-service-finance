@@ -31,6 +31,7 @@ final class FakeOzonAccrualClient implements OzonAccrualClientInterface
                         ],
                         'commission' => [
                             'commission' => ['amount' => '-120.05', 'currency' => 'RUB'],
+                            'sale_amount' => ['amount' => '66718', 'currency' => 'RUB'],
                         ],
                     ]],
                 ],

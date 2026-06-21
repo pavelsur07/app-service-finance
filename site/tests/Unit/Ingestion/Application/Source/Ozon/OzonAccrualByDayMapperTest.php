@@ -91,6 +91,33 @@ final class OzonAccrualByDayMapperTest extends TestCase
         self::assertSame(12791, $controlSums[0]->amountMinor);
     }
 
+    public function testOmitsSaleAndRefundInActiveMapper(): void
+    {
+        $companyId = '19621cff-b028-45d9-9193-11f47ad9a8b2';
+        $rawRecord = $this->rawRecord($companyId);
+
+        $transactions = $this->mapper()->map($rawRecord, [[
+            'accrual_id' => 53675409104,
+            'date' => '2026-06-13',
+            'accrued_category' => 'POSTING',
+            'posting' => [
+                'products' => [[
+                    'commission' => [
+                        'commission' => ['amount' => '1305.02', 'currency' => 'RUB'],
+                        'sale_amount' => ['amount' => '-2837.00', 'currency' => 'RUB'],
+                    ],
+                ]],
+            ],
+        ]]);
+
+        self::assertCount(1, $transactions);
+
+        $commission = $transactions[0];
+        self::assertSame(TransactionType::COMMISSION, $commission->type);
+        self::assertSame(TransactionDirection::IN, $commission->direction);
+        self::assertSame(130502, $commission->money->amountMinor());
+    }
+
     private function mapper(): OzonAccrualByDayMapper
     {
         return new OzonAccrualByDayMapper(new OzonAccrualByDayPreviewMapper(new OzonMoneyParser()));

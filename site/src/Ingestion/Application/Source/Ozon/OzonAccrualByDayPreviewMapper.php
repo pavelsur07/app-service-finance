@@ -24,6 +24,7 @@ final readonly class OzonAccrualByDayPreviewMapper
         iterable $rows,
         ?\DateTimeImmutable $from = null,
         ?\DateTimeImmutable $to = null,
+        bool $includeSaleRefund = false,
     ): array {
         $transactions = [];
         $rowIndex = 0;
@@ -42,7 +43,7 @@ final readonly class OzonAccrualByDayPreviewMapper
             $unitNumber = $this->optionalString($row['unit_number'] ?? null);
 
             match ($category) {
-                'POSTING' => $this->collectPosting($transactions, $row, $operationGroupId, $date, $category, $accrualId, $unitNumber),
+                'POSTING' => $this->collectPosting($transactions, $row, $operationGroupId, $date, $category, $accrualId, $unitNumber, $includeSaleRefund),
                 'ITEM' => $this->collectItemFees($transactions, $row['item_fees'] ?? null, $operationGroupId, $date, $category, $accrualId, $unitNumber),
                 'NON_ITEM' => $this->collectNonItemFee($transactions, $row['non_item_fee'] ?? null, $operationGroupId, $date, $category, $accrualId, $unitNumber),
                 'CONTAINER' => $this->collectContainerFees($transactions, $row['container_fees'] ?? null, $operationGroupId, $date, $category, $accrualId, $unitNumber),
@@ -65,6 +66,7 @@ final readonly class OzonAccrualByDayPreviewMapper
         string $category,
         string $accrualId,
         ?string $unitNumber,
+        bool $includeSaleRefund,
     ): void {
         $posting = $row['posting'] ?? null;
         if (!is_array($posting)) {
@@ -81,9 +83,53 @@ final readonly class OzonAccrualByDayPreviewMapper
                 continue;
             }
 
+            if ($includeSaleRefund) {
+                $this->collectSaleOrRefund($transactions, $product['commission'] ?? null, $operationGroupId, $date, $category, $accrualId, (int) $productIndex, $unitNumber);
+            }
             $this->collectCommission($transactions, $product['commission'] ?? null, $operationGroupId, $date, $category, $accrualId, (int) $productIndex, $unitNumber);
             $this->collectDeliveryServices($transactions, $product['delivery']['services'] ?? null, $operationGroupId, $date, $category, $accrualId, (int) $productIndex, $unitNumber);
         }
+    }
+
+    /**
+     * @param list<OzonAccrualPreviewTransaction> $transactions
+     */
+    private function collectSaleOrRefund(
+        array &$transactions,
+        mixed $commission,
+        string $operationGroupId,
+        string $date,
+        string $category,
+        string $accrualId,
+        int $productIndex,
+        ?string $unitNumber,
+    ): void {
+        if (!is_array($commission)) {
+            return;
+        }
+
+        // Prefer sale_amount for sale/refund preview; seller_price is only a fallback.
+        $money = $this->moneyField($commission, ['sale_amount', 'seller_price']);
+        if (null === $money) {
+            return;
+        }
+
+        $field = $money['field'];
+        $amount = $money['amountMinor'];
+
+        $isRefund = $amount < 0;
+        $this->add(
+            transactions: $transactions,
+            operationGroupId: $operationGroupId,
+            date: $date,
+            category: $category,
+            accrualId: $accrualId,
+            component: sprintf('%s:product-%d', $isRefund ? 'refund' : 'sale', $productIndex),
+            type: $isRefund ? TransactionType::REFUND : TransactionType::SALE,
+            signedAmountMinor: $amount,
+            field: $field,
+            unitNumber: $unitNumber,
+        );
     }
 
     /**
@@ -367,6 +413,28 @@ final readonly class OzonAccrualByDayPreviewMapper
         }
 
         return $this->moneyParser->minor($value);
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     * @param list<string> $fields
+     *
+     * @return array{field: string, amountMinor: int}|null
+     */
+    private function moneyField(array $values, array $fields): ?array
+    {
+        foreach ($fields as $field) {
+            if (!array_key_exists($field, $values)) {
+                continue;
+            }
+
+            $amount = $this->moneyObjectMinor($values[$field]);
+            if (0 !== $amount) {
+                return ['field' => $field, 'amountMinor' => $amount];
+            }
+        }
+
+        return null;
     }
 
     private function directionFromSigned(int $amountMinor): TransactionDirection
