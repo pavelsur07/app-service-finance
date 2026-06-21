@@ -48,6 +48,33 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
         self::assertSame('2026-06-18', $cursor->getCursorValue());
     }
 
+    public function testSeedsAccrualCursorFromFirstDayOfCurrentMonthWithoutLegacyCursor(): void
+    {
+        $company = $this->seedCompany(1011);
+        $connection = $this->seedConnection($company, '77777777-7777-7777-7777-000000001011');
+
+        $transport = $this->getIngestFetchTransport();
+        $transport->reset();
+
+        $tester = $this->tester('app:ingestion:run-incremental');
+        $exit = $tester->execute(['--company-id' => $company->getId()]);
+
+        $expectedSeed = (new \DateTimeImmutable('first day of this month'))->format('Y-m-d');
+        $isSeedDue = new \DateTimeImmutable($expectedSeed) <= (new \DateTimeImmutable('today'))->modify('-1 day')->setTime(0, 0);
+
+        self::assertSame(Command::SUCCESS, $exit);
+        self::assertStringContainsString($isSeedDue ? 'Dispatched 1 incremental jobs' : 'not due: 1', $tester->getDisplay());
+        self::assertSame($isSeedDue ? 1 : 0, $this->incrementalJobCount($company->getId()));
+        self::assertCount($isSeedDue ? 1 : 0, $transport->getSent());
+
+        /** @var IngestCursorRepository $cursorRepository */
+        $cursorRepository = self::getContainer()->get(IngestCursorRepository::class);
+        $cursor = $cursorRepository->findOne($company->getId(), $connection->getId(), OzonResourceType::ACCRUAL_BY_DAY, $connection->getId());
+
+        self::assertNotNull($cursor);
+        self::assertSame($expectedSeed, $cursor->getCursorValue());
+    }
+
     public function testDispatchesOneIncrementalJobPerExistingCursor(): void
     {
         $company = $this->seedCompany(1002);

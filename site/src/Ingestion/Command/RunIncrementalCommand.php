@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Ingestion\Command;
 
+use App\Ingestion\Application\Action\EnsureOzonAccrualCursorAction;
+use App\Ingestion\Application\Command\EnsureOzonAccrualCursorCommand;
 use App\Ingestion\Application\Command\StartIncrementalCommand as StartIncrementalApplicationCommand;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Enum\IngestSource;
@@ -11,9 +13,7 @@ use App\Ingestion\Exception\ActiveBackfillExistsException;
 use App\Ingestion\Facade\SyncFacade;
 use App\Ingestion\Repository\IngestCursorRepository;
 use App\Marketplace\Infrastructure\Query\ActiveSellerConnectionsQuery;
-use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
-use Ramsey\Uuid\Uuid;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Command\LockableTrait;
@@ -38,19 +38,11 @@ final class RunIncrementalCommand extends Command
         OzonResourceType::ACCRUAL_BY_DAY,
     ];
 
-    /**
-     * @var list<string>
-     */
-    private const LEGACY_OZON_RESOURCE_TYPES = [
-        'ozon_seller_daily_report',
-        'ozon_seller_realization',
-    ];
-
     public function __construct(
         private readonly ActiveSellerConnectionsQuery $connectionsQuery,
         private readonly IngestCursorRepository $cursorRepository,
         private readonly SyncFacade $syncFacade,
-        private readonly EntityManagerInterface $entityManager,
+        private readonly EnsureOzonAccrualCursorAction $ensureOzonAccrualCursorAction,
         private readonly LoggerInterface $logger,
     ) {
         parent::__construct();
@@ -122,7 +114,7 @@ final class RunIncrementalCommand extends Command
             }
 
             $connectionRef = (string) $connection['id'];
-            $this->ensureAccrualCursor($connectionCompanyId, $connectionRef);
+            ($this->ensureOzonAccrualCursorAction)(new EnsureOzonAccrualCursorCommand($connectionCompanyId, $connectionRef));
 
             foreach (self::OZON_RESOURCE_TYPES as $resourceType) {
                 $cursors = $this->cursorRepository->findByResource($connectionCompanyId, $connectionRef, $resourceType);
@@ -267,44 +259,6 @@ final class RunIncrementalCommand extends Command
         }
 
         return $limit;
-    }
-
-    private function ensureAccrualCursor(string $companyId, string $connectionRef): void
-    {
-        if ([] !== $this->cursorRepository->findByResource($companyId, $connectionRef, OzonResourceType::ACCRUAL_BY_DAY)) {
-            return;
-        }
-
-        $seedValue = $this->legacySeedCursorValue($companyId, $connectionRef)
-            ?? (new \DateTimeImmutable('first day of this month'))->format('Y-m-d');
-
-        $cursor = $this->cursorRepository->getOrCreate(
-            $companyId,
-            $connectionRef,
-            OzonResourceType::ACCRUAL_BY_DAY,
-            $connectionRef,
-        );
-        $cursor->advance($seedValue, Uuid::uuid7()->toString());
-        $this->entityManager->flush();
-    }
-
-    private function legacySeedCursorValue(string $companyId, string $connectionRef): ?string
-    {
-        $seed = null;
-        foreach (self::LEGACY_OZON_RESOURCE_TYPES as $resourceType) {
-            foreach ($this->cursorRepository->findByResource($companyId, $connectionRef, $resourceType) as $cursor) {
-                $cursorValue = $this->normalizedCursorDate($cursor->getCursorValue());
-                if (null === $cursorValue) {
-                    continue;
-                }
-
-                if (null === $seed || $cursorValue < $seed) {
-                    $seed = $cursorValue;
-                }
-            }
-        }
-
-        return $seed;
     }
 
     private function cursorHasDueWork(string $resourceType, string $cursorValue): bool
