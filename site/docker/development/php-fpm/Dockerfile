@@ -28,6 +28,11 @@ COPY ./common/php/php-fpm.d /usr/local/etc/php-fpm.d
 COPY ./development/php/conf.d /usr/local/etc/php/conf.d
 COPY ./development/php-fpm/conf.d /usr/local/etc/php/conf.d
 
+# opcache.so на Alpine/musl не загружается из-за неэкспортированного символа zend_jit_status.
+# В dev-среде opcache не нужен — отключаем попытку динамической загрузки.
+RUN sed -i 's/^zend_extension=opcache/;zend_extension=opcache/' \
+    /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini
+
 WORKDIR /app
 
 COPY ./development/php-fpm/entrypoint.sh /usr/local/bin/docker-php-entrypoint
