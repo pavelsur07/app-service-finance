@@ -14,6 +14,8 @@ use Symfony\Component\Messenger\MessageBusInterface;
 
 final readonly class NormalizationCompletedSubscriber implements EventSubscriberInterface
 {
+    private const GLOBAL_SHOP_REF = '';
+
     public function __construct(
         private PnlPeriodResolver $periodResolver,
         private MessageBusInterface $messageBus,
@@ -40,7 +42,7 @@ final readonly class NormalizationCompletedSubscriber implements EventSubscriber
             }
 
             [$newYear, $newMonth] = $this->periodResolver->from($period->newOccurredAt);
-            $this->dispatchOnce($dispatched, $event->companyId, $newYear, $newMonth, $period->shopRef, PLDirtyPeriodReason::INGEST);
+            $this->dispatchOnce($dispatched, $event->companyId, $newYear, $newMonth, self::GLOBAL_SHOP_REF, PLDirtyPeriodReason::INGEST);
 
             if (null === $period->oldOccurredAt) {
                 continue;
@@ -48,7 +50,7 @@ final readonly class NormalizationCompletedSubscriber implements EventSubscriber
 
             [$oldYear, $oldMonth] = $this->periodResolver->from($period->oldOccurredAt);
             if ($oldYear !== $newYear || $oldMonth !== $newMonth) {
-                $this->dispatchOnce($dispatched, $event->companyId, $oldYear, $oldMonth, $period->shopRef, PLDirtyPeriodReason::MONTH_CHANGE);
+                $this->dispatchOnce($dispatched, $event->companyId, $oldYear, $oldMonth, self::GLOBAL_SHOP_REF, PLDirtyPeriodReason::MONTH_CHANGE);
             }
         }
     }
