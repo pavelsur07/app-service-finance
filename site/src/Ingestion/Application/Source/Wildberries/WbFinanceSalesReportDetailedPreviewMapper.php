@@ -197,7 +197,21 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
                 $component = 'logistics_correction';
             }
 
-            $this->addCost($transactions, $operationGroupId, $rowKey, $component, TransactionType::LOGISTICS, -$deliveryServiceMinor, $currency, $occurredAt, 'deliveryService', $sellerOperName, $docTypeName, 'WB logistics', $row);
+            $this->addCost(
+                transactions: $transactions,
+                operationGroupId: $operationGroupId,
+                rowKey: $rowKey,
+                component: $component,
+                type: TransactionType::LOGISTICS,
+                signedAmountMinor: $this->costSignedAmountMinor($deliveryServiceMinor),
+                currency: $currency,
+                occurredAt: $occurredAt,
+                field: 'deliveryService',
+                sellerOperName: $sellerOperName,
+                docTypeName: $docTypeName,
+                description: 'WB logistics',
+                row: $row,
+            );
         }
 
         $this->addCostField($transactions, $row, $operationGroupId, $rowKey, $currency, $occurredAt, $sellerOperName, $docTypeName, 'storage', TransactionType::STORAGE, 'paidStorage', 'storage_fee', 'WB storage fee');
@@ -279,7 +293,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
             rowKey: $rowKey,
             component: $component,
             type: $type,
-            signedAmountMinor: -$amountMinor,
+            signedAmountMinor: $this->costSignedAmountMinor($amountMinor),
             currency: $currency,
             occurredAt: $occurredAt,
             field: $camelField,
@@ -310,6 +324,11 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
         array $row,
     ): void {
         $this->add($transactions, $operationGroupId, $rowKey, $component, $type, $signedAmountMinor, $currency, $occurredAt, $field, $sellerOperName, $docTypeName, $description, $row);
+    }
+
+    private function costSignedAmountMinor(int $amountMinor): int
+    {
+        return -abs($amountMinor);
     }
 
     /**

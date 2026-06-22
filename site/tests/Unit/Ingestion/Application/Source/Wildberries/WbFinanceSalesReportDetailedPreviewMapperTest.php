@@ -99,12 +99,12 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
             'sellerOperName' => 'Логистика',
             'rrDate' => '2026-06-21',
             'deliveryAmount' => 1,
-            'deliveryService' => '149.03',
-            'paidStorage' => '10.00',
+            'deliveryService' => '-149.03',
+            'paidStorage' => '-10.00',
             'paidAcceptance' => '3.335',
             'penalty' => '-5.00',
-            'deduction' => '7',
-            'rebillLogisticCost' => '1.349',
+            'deduction' => '-7',
+            'rebillLogisticCost' => '-1.349',
             'additionalPayment' => '2.50',
         ]]);
 
@@ -115,14 +115,25 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
         self::assertSame(TransactionDirection::OUT, $logistics->direction);
         self::assertSame(14903, $logistics->amountMinor);
 
-        self::assertSame(1000, $this->transaction($result->transactions, 'wb:sales-report-detailed:103:storage')->amountMinor);
-        self::assertSame(334, $this->transaction($result->transactions, 'wb:sales-report-detailed:103:acceptance')->amountMinor);
-        self::assertSame(700, $this->transaction($result->transactions, 'wb:sales-report-detailed:103:deduction')->amountMinor);
-        self::assertSame(135, $this->transaction($result->transactions, 'wb:sales-report-detailed:103:warehouse_logistics')->amountMinor);
+        $storage = $this->transaction($result->transactions, 'wb:sales-report-detailed:103:storage');
+        self::assertSame(TransactionDirection::OUT, $storage->direction);
+        self::assertSame(1000, $storage->amountMinor);
+
+        $acceptance = $this->transaction($result->transactions, 'wb:sales-report-detailed:103:acceptance');
+        self::assertSame(TransactionDirection::OUT, $acceptance->direction);
+        self::assertSame(334, $acceptance->amountMinor);
+
+        $deduction = $this->transaction($result->transactions, 'wb:sales-report-detailed:103:deduction');
+        self::assertSame(TransactionDirection::OUT, $deduction->direction);
+        self::assertSame(700, $deduction->amountMinor);
+
+        $warehouseLogistics = $this->transaction($result->transactions, 'wb:sales-report-detailed:103:warehouse_logistics');
+        self::assertSame(TransactionDirection::OUT, $warehouseLogistics->direction);
+        self::assertSame(135, $warehouseLogistics->amountMinor);
 
         $penalty = $this->transaction($result->transactions, 'wb:sales-report-detailed:103:penalty');
         self::assertSame(TransactionType::PENALTY, $penalty->type);
-        self::assertSame(TransactionDirection::IN, $penalty->direction);
+        self::assertSame(TransactionDirection::OUT, $penalty->direction);
         self::assertSame(500, $penalty->amountMinor);
 
         $additionalPayment = $this->transaction($result->transactions, 'wb:sales-report-detailed:103:additional_payment');
@@ -139,7 +150,7 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
             'sellerOperName' => 'Возмещение за выдачу и возврат товаров на ПВЗ',
             'docTypeName' => 'Продажа',
             'rrDate' => '2026-06-21',
-            'ppvzReward' => '17.25',
+            'ppvzReward' => '-17.25',
         ]]);
 
         self::assertCount(1, $result->transactions);
@@ -151,7 +162,7 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
         self::assertSame(TransactionDirection::OUT, $transaction->direction);
         self::assertSame(1725, $transaction->amountMinor);
         self::assertSame('ppvzReward', $transaction->field);
-        self::assertSame('17.25', $transaction->sourceData['ppvzReward']);
+        self::assertSame('-17.25', $transaction->sourceData['ppvzReward']);
     }
 
     public function testMapsLoyaltyDiscountCompensationAsBonusIncome(): void
