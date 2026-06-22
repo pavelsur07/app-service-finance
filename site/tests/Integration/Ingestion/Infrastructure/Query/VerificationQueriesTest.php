@@ -9,8 +9,10 @@ use App\Finance\Enum\PLFlow;
 use App\Ingestion\Entity\FinancialTransaction;
 use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Entity\NormalizationIssue;
+use App\Ingestion\Entity\SyncJob;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\NormalizationIssueKind;
+use App\Ingestion\Enum\SyncJobKind;
 use App\Ingestion\Enum\TransactionDirection;
 use App\Ingestion\Enum\TransactionType;
 use App\Ingestion\Facade\IngestionFacade;
@@ -81,6 +83,101 @@ final class VerificationQueriesTest extends IntegrationTestCase
         self::assertSame(1, $cells[0]->rawCount);
         self::assertSame(2, $cells[0]->txCount);
         self::assertSame(1, $cells[0]->issueCount);
+    }
+
+    public function testCoverageIncludesRawOnlyIngestionRecordsByJobWindowDate(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+        $job = new SyncJob(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            source: IngestSource::WILDBERRIES,
+            resourceType: 'wildberries_finance_sales_report_detailed',
+            kind: SyncJobKind::BACKFILL,
+            windowFrom: new \DateTimeImmutable('2026-06-21'),
+            windowTo: new \DateTimeImmutable('2026-06-21'),
+            shopRef: $connectionRef,
+        );
+        $raw = $this->rawRecord(
+            companyId: $companyId,
+            shopRef: $connectionRef,
+            resourceType: 'wildberries_finance_sales_report_detailed',
+            fetchedAt: new \DateTimeImmutable('2026-06-22 09:17:43+00:00'),
+            externalId: 'wb-sales-report-detailed:2026-06-21:rrd-0',
+            source: IngestSource::WILDBERRIES,
+            connectionRef: $connectionRef,
+            syncJobId: $job->getId(),
+        );
+        $raw->markNormalizationSkipped();
+
+        $this->em->persist($job);
+        $this->em->persist($raw);
+        $this->em->flush();
+
+        /** @var CoverageQuery $query */
+        $query = self::getContainer()->get(CoverageQuery::class);
+        $cells = $query->heatmap(
+            $companyId,
+            $connectionRef,
+            new \DateTimeImmutable('2026-06-01'),
+            new \DateTimeImmutable('2026-06-30'),
+        );
+
+        self::assertCount(1, $cells);
+        self::assertSame('2026-06-21', $cells[0]->date);
+        self::assertSame($connectionRef, $cells[0]->shopRef);
+        self::assertSame('wildberries_finance_sales_report_detailed', $cells[0]->resourceType);
+        self::assertSame(1, $cells[0]->rawCount);
+        self::assertSame(0, $cells[0]->txCount);
+        self::assertSame(0, $cells[0]->issueCount);
+        self::assertNotNull($cells[0]->lastFetchedAt);
+    }
+
+    public function testCoverageFallsBackToFetchedDateForRawOnlyRecordsWithoutJobWindow(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+        $job = new SyncJob(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            source: IngestSource::WILDBERRIES,
+            resourceType: 'wildberries_finance_sales_report_detailed',
+            kind: SyncJobKind::INCREMENTAL,
+            shopRef: $connectionRef,
+        );
+        $raw = $this->rawRecord(
+            companyId: $companyId,
+            shopRef: $connectionRef,
+            resourceType: 'wildberries_finance_sales_report_detailed',
+            fetchedAt: new \DateTimeImmutable('2026-06-22 09:17:43+00:00'),
+            externalId: 'wb-sales-report-detailed:incremental:rrd-0',
+            source: IngestSource::WILDBERRIES,
+            connectionRef: $connectionRef,
+            syncJobId: $job->getId(),
+        );
+        $raw->markNormalizationSkipped();
+
+        $this->em->persist($job);
+        $this->em->persist($raw);
+        $this->em->flush();
+
+        /** @var CoverageQuery $query */
+        $query = self::getContainer()->get(CoverageQuery::class);
+        $cells = $query->heatmap(
+            $companyId,
+            $connectionRef,
+            new \DateTimeImmutable('2026-06-22'),
+            new \DateTimeImmutable('2026-06-22'),
+        );
+
+        self::assertCount(1, $cells);
+        self::assertSame('2026-06-22', $cells[0]->date);
+        self::assertSame($connectionRef, $cells[0]->shopRef);
+        self::assertSame('wildberries_finance_sales_report_detailed', $cells[0]->resourceType);
+        self::assertSame(1, $cells[0]->rawCount);
+        self::assertSame(0, $cells[0]->txCount);
+        self::assertSame(0, $cells[0]->issueCount);
     }
 
     public function testReconciliationComparesShopCanonWithCompanyPeriodOzonControl(): void
@@ -238,19 +335,22 @@ final class VerificationQueriesTest extends IntegrationTestCase
         string $resourceType,
         \DateTimeImmutable $fetchedAt,
         string $externalId,
+        IngestSource $source = IngestSource::OZON,
+        string $connectionRef = 'connection-1',
+        ?string $syncJobId = null,
     ): IngestRawRecord {
         return new IngestRawRecord(
             companyId: $companyId,
-            connectionRef: 'connection-1',
+            connectionRef: $connectionRef,
             shopRef: $shopRef,
-            source: IngestSource::OZON,
+            source: $source,
             resourceType: $resourceType,
             externalId: $externalId,
             storagePath: sprintf('%s/%s.ndjson.gz', $companyId, $externalId),
             hash: hash('sha256', $companyId.$externalId),
             byteSize: 100,
             fetchedAt: $fetchedAt,
-            syncJobId: 'job-'.$externalId,
+            syncJobId: $syncJobId ?? 'job-'.$externalId,
         );
     }
 

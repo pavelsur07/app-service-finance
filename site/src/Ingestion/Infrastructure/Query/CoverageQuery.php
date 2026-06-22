@@ -28,42 +28,64 @@ final class CoverageQuery
     ): array {
         Assert::uuid($companyId);
 
+        $recordDate = "COALESCE(TO_CHAR(ft.occurred_at, 'YYYY-MM-DD'), TO_CHAR(j.window_from, 'YYYY-MM-DD'), TO_CHAR(r.fetched_at, 'YYYY-MM-DD'))";
+        $shopExpression = "COALESCE(NULLIF(ft.shop_ref, ''), r.shop_ref)";
+        $dateFilter = <<<'SQL'
+            (
+                (ft.id IS NOT NULL AND ft.occurred_at >= :from AND ft.occurred_at < :toExclusive)
+                OR (
+                    ft.id IS NULL
+                    AND (
+                        (j.window_from IS NOT NULL AND j.window_from >= :fromDate AND j.window_from <= :toDate)
+                        OR (j.window_from IS NULL AND r.fetched_at >= :from AND r.fetched_at < :toExclusive)
+                    )
+                )
+            )
+            SQL;
+
         $qb = $this->connection->createQueryBuilder()
             ->select(
-                "TO_CHAR(ft.occurred_at, 'YYYY-MM-DD') AS record_date",
-                'ft.shop_ref',
+                $recordDate.' AS record_date',
+                $shopExpression.' AS shop_ref',
                 'r.resource_type',
                 'COUNT(DISTINCT r.id) AS raw_count',
                 'COUNT(DISTINCT ft.id) AS tx_count',
                 'COUNT(DISTINCT ni.id) AS issue_count',
                 'MAX(r.fetched_at) AS last_fetched_at',
             )
-            ->from('ingest_financial_transactions', 'ft')
+            ->from('ingest_raw_records', 'r')
             ->leftJoin(
-                'ft',
-                'ingest_raw_records',
                 'r',
-                'r.company_id = :companyId AND r.company_id = ft.company_id AND r.id = ft.raw_record_id',
+                'ingest_sync_jobs',
+                'j',
+                'j.company_id = r.company_id AND j.id::text = r.sync_job_id',
             )
             ->leftJoin(
+                'r',
+                'ingest_financial_transactions',
                 'ft',
+                'ft.company_id = r.company_id AND ft.raw_record_id = r.id',
+            )
+            ->leftJoin(
+                'r',
                 'ingest_normalization_issues',
                 'ni',
-                'ni.company_id = :companyId AND ni.company_id = ft.company_id AND ni.raw_record_id = r.id AND ni.resolved_at IS NULL',
+                'ni.company_id = r.company_id AND ni.raw_record_id = r.id AND ni.resolved_at IS NULL',
             )
-            ->where('ft.company_id = :companyId')
-            ->andWhere('ft.occurred_at >= :from')
-            ->andWhere('ft.occurred_at < :toExclusive')
+            ->where('r.company_id = :companyId')
+            ->andWhere($dateFilter)
             ->setParameter('companyId', $companyId)
             ->setParameter('from', $from, Types::DATETIME_IMMUTABLE)
             ->setParameter('toExclusive', $to->modify('+1 day'), Types::DATETIME_IMMUTABLE)
-            ->groupBy('record_date', 'ft.shop_ref', 'r.resource_type')
+            ->setParameter('fromDate', $from, Types::DATE_IMMUTABLE)
+            ->setParameter('toDate', $to, Types::DATE_IMMUTABLE)
+            ->groupBy($recordDate, $shopExpression, 'r.resource_type')
             ->orderBy('record_date', 'ASC')
-            ->addOrderBy('ft.shop_ref', 'ASC')
+            ->addOrderBy($shopExpression, 'ASC')
             ->addOrderBy('r.resource_type', 'ASC');
 
         if (null !== $shopRef && '' !== $shopRef) {
-            $qb->andWhere('ft.shop_ref = :shopRef')
+            $qb->andWhere($shopExpression.' = :shopRef')
                 ->setParameter('shopRef', $shopRef);
         }
 
