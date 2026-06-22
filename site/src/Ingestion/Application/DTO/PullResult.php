@@ -12,6 +12,8 @@ final readonly class PullResult
         public RawBatch $rawBatch,
         public ?string $nextCursorValue,
         public bool $hasMore,
+        public bool $normalizeRawRecords = true,
+        public ?int $continuationDelaySeconds = null,
     ) {
     }
 }

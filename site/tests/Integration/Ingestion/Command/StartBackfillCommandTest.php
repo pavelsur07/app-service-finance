@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Ingestion\Command;
 
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
+use App\Ingestion\Application\Source\Wildberries\WbResourceType;
 use App\Ingestion\Entity\SyncJob;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\SyncJobKind;
@@ -79,6 +80,39 @@ final class StartBackfillCommandTest extends IntegrationTestCase
         foreach ($envelopes as $envelope) {
             self::assertInstanceOf(RunSyncChunkMessage::class, $envelope->getMessage());
         }
+    }
+
+    public function testStartsBackfillForDefaultWildberriesFinanceResourceTypeWithDailyChunks(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+        $transport = $this->getIngestFetchTransport();
+        $transport->reset();
+
+        $tester = $this->tester('app:ingestion:start-backfill');
+        $exit = $tester->execute([
+            '--company-id' => $companyId,
+            '--connection-ref' => $connectionRef,
+            '--source' => 'wildberries',
+            '--days-back' => '3',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exit);
+        self::assertStringContainsString(WbResourceType::FINANCE_SALES_REPORT_DETAILED, $tester->getDisplay());
+
+        $parentJobs = $this->connection->fetchAllAssociative(
+            'SELECT resource_type, shop_ref, progress_total
+             FROM ingest_sync_jobs
+             WHERE company_id = :companyId AND parent_job_id IS NULL
+             ORDER BY resource_type',
+            ['companyId' => $companyId],
+        );
+
+        self::assertCount(1, $parentJobs);
+        self::assertSame([WbResourceType::FINANCE_SALES_REPORT_DETAILED], array_column($parentJobs, 'resource_type'));
+        self::assertSame('fake-shop', $parentJobs[0]['shop_ref']);
+        self::assertSame(3, (int) $parentJobs[0]['progress_total']);
+        self::assertCount(3, $transport->getSent());
     }
 
     public function testActiveBackfillWarningSkipsDefaultResource(): void

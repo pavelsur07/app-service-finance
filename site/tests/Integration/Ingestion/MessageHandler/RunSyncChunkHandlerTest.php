@@ -21,6 +21,7 @@ use App\Ingestion\Repository\SyncJobRepository;
 use App\Tests\Integration\Ingestion\Fixtures\FakeConnector;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\Messenger\Stamp\DelayStamp;
 use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 final class RunSyncChunkHandlerTest extends IntegrationTestCase
@@ -224,6 +225,66 @@ final class RunSyncChunkHandlerTest extends IntegrationTestCase
         self::assertNull($cursorRepository->findOne($companyId, 'connection-1', FakeConnector::RESOURCE_TYPE, 'shop-1'));
     }
 
+    public function testWindowedChunkSchedulesDelayedContinuationWhenConnectorRequestsDelay(): void
+    {
+        $fakeConnector = $this->fakeConnector();
+        $fakeConnector->reset();
+        $fakeConnector->enqueuePullResult(
+            externalId: 'fake-report-page-1',
+            nextCursorValue: 'cursor-page-2',
+            hasMore: true,
+            rowExternalId: 'fake-sale-1',
+            normalizeRawRecords: false,
+            continuationDelaySeconds: 70,
+        );
+
+        $companyId = Uuid::uuid7()->toString();
+        $job = new SyncJob(
+            companyId: $companyId,
+            connectionRef: 'connection-1',
+            source: IngestSource::WILDBERRIES,
+            resourceType: FakeConnector::RESOURCE_TYPE,
+            kind: SyncJobKind::BACKFILL,
+            windowFrom: new \DateTimeImmutable('2026-06-01'),
+            windowTo: new \DateTimeImmutable('2026-06-01'),
+            shopRef: 'shop-1',
+        );
+
+        $this->em->persist($job);
+        $this->em->flush();
+
+        $fetchTransport = $this->getFetchTransport();
+        $fetchTransport->reset();
+        $normalizeTransport = $this->getNormalizeTransport();
+        $normalizeTransport->reset();
+
+        /** @var RunSyncChunkHandler $handler */
+        $handler = self::getContainer()->get(RunSyncChunkHandler::class);
+        $handler(new RunSyncChunkMessage($companyId, $job->getId()));
+        $this->em->clear();
+
+        self::assertCount(1, $fakeConnector->pullRequests());
+        self::assertCount(0, $normalizeTransport->getSent());
+
+        $sent = $fetchTransport->getSent();
+        self::assertCount(1, $sent);
+        self::assertInstanceOf(RunSyncChunkMessage::class, $sent[0]->getMessage());
+
+        /** @var RunSyncChunkMessage $continuation */
+        $continuation = $sent[0]->getMessage();
+        self::assertSame($companyId, $continuation->companyId);
+        self::assertSame($job->getId(), $continuation->jobId);
+        self::assertSame('cursor-page-2', $continuation->cursorValue);
+
+        $delayStamps = $sent[0]->all(DelayStamp::class);
+        self::assertCount(1, $delayStamps);
+        self::assertSame(70000, $delayStamps[0]->getDelay());
+
+        /** @var SyncJobRepository $jobRepository */
+        $jobRepository = self::getContainer()->get(SyncJobRepository::class);
+        self::assertSame(SyncJobStatus::RUNNING, $jobRepository->findByIdAndCompany($job->getId(), $companyId)?->getStatus());
+    }
+
     public function testRateLimitLockContentionKeepsJobRetryable(): void
     {
         $this->fakeConnector()->reset();
@@ -280,6 +341,14 @@ final class RunSyncChunkHandlerTest extends IntegrationTestCase
     {
         /** @var InMemoryTransport $transport */
         $transport = self::getContainer()->get('messenger.transport.ingest_normalize');
+
+        return $transport;
+    }
+
+    private function getFetchTransport(): InMemoryTransport
+    {
+        /** @var InMemoryTransport $transport */
+        $transport = self::getContainer()->get('messenger.transport.ingest_fetch');
 
         return $transport;
     }

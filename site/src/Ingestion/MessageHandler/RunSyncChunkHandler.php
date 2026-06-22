@@ -13,6 +13,7 @@ use App\Ingestion\Application\Service\IngestRateLimitGuard;
 use App\Ingestion\Domain\Service\ConnectorRegistry;
 use App\Ingestion\Entity\SyncJob;
 use App\Ingestion\Exception\ConnectorAuthException;
+use App\Ingestion\Exception\ConnectorRateLimitedException;
 use App\Ingestion\Exception\ConnectorTransientException;
 use App\Ingestion\Exception\SyncJobNotFoundException;
 use App\Ingestion\Facade\RawStorageFacade;
@@ -26,6 +27,7 @@ use Symfony\Component\Lock\LockInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\DelayStamp;
 
 #[AsMessageHandler]
 final readonly class RunSyncChunkHandler
@@ -60,7 +62,7 @@ final readonly class RunSyncChunkHandler
         }
 
         $isWindowed = $this->isWindowed($job);
-        $cursorValue = $isWindowed ? null : $this->sharedCursorValue($job);
+        $cursorValue = $message->cursorValue ?? ($isWindowed ? null : $this->sharedCursorValue($job));
         $cursorSnapshot = !$isWindowed && null === $job->getStartedAt() && null !== $cursorValue && '' !== $cursorValue
             ? $cursorValue
             : null;
@@ -90,11 +92,19 @@ final readonly class RunSyncChunkHandler
                 ));
 
                 $records = $this->rawStorageFacade->store($result->rawBatch);
-                foreach ($records as $record) {
-                    $this->messageBus->dispatch(new NormalizeRawRecordMessage($record->getId(), $record->getCompanyId()));
+                if ($result->normalizeRawRecords) {
+                    foreach ($records as $record) {
+                        $this->messageBus->dispatch(new NormalizeRawRecordMessage($record->getId(), $record->getCompanyId()));
+                    }
                 }
 
                 if (null !== $result->nextCursorValue && '' !== $result->nextCursorValue) {
+                    if ($result->hasMore && null !== $result->continuationDelaySeconds) {
+                        $this->dispatchContinuation($message, $result->nextCursorValue, $result->continuationDelaySeconds);
+
+                        return;
+                    }
+
                     if (!$isWindowed) {
                         $this->syncFacade->updateCursor(new UpdateCursorCommand(
                             companyId: $job->getCompanyId(),
@@ -118,6 +128,17 @@ final readonly class RunSyncChunkHandler
             $this->markJobFailed($job->getId(), $job->getCompanyId(), 'auth');
 
             throw new UnrecoverableMessageHandlingException('Ingestion connector authentication failed.', 0, $exception);
+        } catch (ConnectorRateLimitedException $exception) {
+            $this->logger->info('Ingestion connector rate-limited; chunk continuation scheduled.', [
+                'companyId' => $job->getCompanyId(),
+                'jobId' => $job->getId(),
+                'source' => $job->getSource()->value,
+                'resourceType' => $job->getResourceType(),
+                'retryAfterSeconds' => $exception->retryAfterSeconds(),
+            ]);
+            $this->dispatchContinuation($message, $message->cursorValue, $exception->retryAfterSeconds());
+
+            return;
         } catch (ConnectorTransientException $exception) {
             $this->logger->warning('Ingestion connector transient failure; message will be retried.', [
                 'companyId' => $job->getCompanyId(),
@@ -191,5 +212,13 @@ final readonly class RunSyncChunkHandler
                 'errorMessage' => $exception->getMessage(),
             ]);
         }
+    }
+
+    private function dispatchContinuation(RunSyncChunkMessage $message, ?string $cursorValue, int $delaySeconds): void
+    {
+        $this->messageBus->dispatch(
+            new RunSyncChunkMessage($message->companyId, $message->jobId, $cursorValue),
+            [new DelayStamp(max(1, $delaySeconds) * 1000)],
+        );
     }
 }

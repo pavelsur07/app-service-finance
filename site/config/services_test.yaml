@@ -12,6 +12,9 @@ services:
     App\Tests\Integration\Ingestion\Fixtures\FakeMapper:
         tags: ['app.ingestion.mapper']
 
+    App\Ingestion\Application\Source\Wildberries\WbFinanceReportConnector:
+        tags: []
+
     App\Ingestion\Infrastructure\Api\Ozon\OzonAccrualClientInterface: '@App\Tests\Integration\Ingestion\Fixtures\FakeOzonAccrualClient'
 
     test.ingestion_lock_store:

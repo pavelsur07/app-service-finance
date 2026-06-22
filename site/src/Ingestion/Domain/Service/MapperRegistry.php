@@ -37,4 +37,9 @@ final class MapperRegistry
         return $this->mappers[$source->value][$resourceType]
             ?? throw new MapperNotFoundException(sprintf('Mapper for source "%s" and resource "%s" was not found.', $source->value, $resourceType));
     }
+
+    public function has(IngestSource $source, string $resourceType): bool
+    {
+        return isset($this->mappers[$source->value][$resourceType]);
+    }
 }
