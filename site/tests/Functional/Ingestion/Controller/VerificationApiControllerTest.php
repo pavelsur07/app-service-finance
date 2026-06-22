@@ -11,8 +11,10 @@ use App\Finance\Enum\PLFlow;
 use App\Ingestion\Entity\FinancialTransaction;
 use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Entity\NormalizationIssue;
+use App\Ingestion\Entity\SyncJob;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\NormalizationIssueKind;
+use App\Ingestion\Enum\SyncJobKind;
 use App\Ingestion\Enum\TransactionDirection;
 use App\Ingestion\Enum\TransactionType;
 use App\Marketplace\Entity\OzonTransactionTotalsCheck;
@@ -152,6 +154,64 @@ final class VerificationApiControllerTest extends WebTestCaseBase
             self::assertSame(1, $cell['tx_count']);
             self::assertSame('2026-06-20T07:00:00Z', $cell['last_fetched_at']);
         }
+    }
+
+    public function testCoverageEndpointReturnsRawOnlyIngestionRecords(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $owner = UserBuilder::aUser()->withIndex(9151)->build();
+        $company = CompanyBuilder::aCompany()
+            ->withId('11111111-1111-4111-8111-111111119151')
+            ->withOwner($owner)
+            ->build();
+        $companyId = $company->getId();
+        $connectionRef = 'b4c583ca-083e-46e2-8c9b-6e2deff1220f';
+        $job = new SyncJob(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            source: IngestSource::WILDBERRIES,
+            resourceType: 'wildberries_finance_sales_report_detailed',
+            kind: SyncJobKind::BACKFILL,
+            windowFrom: new \DateTimeImmutable('2026-06-21'),
+            windowTo: new \DateTimeImmutable('2026-06-21'),
+            shopRef: $connectionRef,
+        );
+        $raw = $this->rawRecord(
+            companyId: $companyId,
+            shopRef: $connectionRef,
+            resourceType: 'wildberries_finance_sales_report_detailed',
+            externalId: 'wb-sales-report-detailed:2026-06-21:rrd-0',
+            fetchedAt: new \DateTimeImmutable('2026-06-22 09:17:43+00:00'),
+            source: IngestSource::WILDBERRIES,
+            connectionRef: $connectionRef,
+            syncJobId: $job->getId(),
+        );
+        $raw->markNormalizationSkipped();
+
+        $em = $this->em();
+        $em->persist($owner);
+        $em->persist($company);
+        $em->persist($job);
+        $em->persist($raw);
+        $em->flush();
+
+        $this->loginWithActiveCompany($client, $owner, $company);
+        $client->request('GET', sprintf(
+            '/api/ingestion/verification/coverage?from=2026-06-01&to=2026-06-30&shop_ref=%s',
+            $connectionRef,
+        ));
+
+        self::assertResponseIsSuccessful();
+        $coverage = $this->json($client);
+        self::assertCount(1, $coverage['cells']);
+        self::assertSame('2026-06-21', $coverage['cells'][0]['date']);
+        self::assertSame($connectionRef, $coverage['cells'][0]['shop_ref']);
+        self::assertSame('wildberries_finance_sales_report_detailed', $coverage['cells'][0]['resource_type']);
+        self::assertSame(1, $coverage['cells'][0]['raw_count']);
+        self::assertSame(0, $coverage['cells'][0]['tx_count']);
+        self::assertSame(0, $coverage['cells'][0]['issue_count']);
     }
 
     public function testInvalidPeriodUsesUnifiedErrorFormat(): void
@@ -372,19 +432,22 @@ final class VerificationApiControllerTest extends WebTestCaseBase
         string $resourceType,
         string $externalId,
         ?\DateTimeImmutable $fetchedAt = null,
+        IngestSource $source = IngestSource::OZON,
+        string $connectionRef = 'connection-1',
+        ?string $syncJobId = null,
     ): IngestRawRecord {
         return new IngestRawRecord(
             companyId: $companyId,
-            connectionRef: 'connection-1',
+            connectionRef: $connectionRef,
             shopRef: $shopRef,
-            source: IngestSource::OZON,
+            source: $source,
             resourceType: $resourceType,
             externalId: $externalId,
             storagePath: sprintf('%s/%s.ndjson.gz', $companyId, $externalId),
             hash: hash('sha256', $companyId.$externalId),
             byteSize: 100,
             fetchedAt: $fetchedAt ?? new \DateTimeImmutable('2026-06-15 10:00:00+00:00'),
-            syncJobId: 'job-'.$externalId,
+            syncJobId: $syncJobId ?? 'job-'.$externalId,
         );
     }
 
