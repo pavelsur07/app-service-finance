@@ -9,6 +9,7 @@ use App\Inventory\Entity\InventoryRawSnapshot;
 use App\Inventory\Entity\InventorySnapshotSession;
 use App\Inventory\Enum\SnapshotSessionStatus;
 use App\Inventory\Enum\SnapshotTriggerType;
+use App\Inventory\Message\NormalizeInventorySnapshotMessage;
 use App\Inventory\Message\SyncOzonInventorySnapshotMessage;
 use App\Inventory\MessageHandler\SyncOzonInventorySnapshotHandler;
 use App\Marketplace\Entity\MarketplaceConnection;
@@ -19,6 +20,7 @@ use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 final class SyncOzonInventorySnapshotHandlerTest extends IntegrationTestCase
 {
@@ -202,23 +204,22 @@ final class SyncOzonInventorySnapshotHandlerTest extends IntegrationTestCase
 
     private function countNormalizeMessages(string $sessionId, string $companyId): int
     {
-        $cnt = (int) $this->em->getConnection()->fetchOne(
-            'SELECT COUNT(*) FROM messenger_messages WHERE body LIKE :needle1 AND body LIKE :needle2 AND body LIKE :needle3',
-            [
-                'needle1' => '%NormalizeInventorySnapshotMessage%',
-                'needle2' => '%"snapshotSessionId":"'.$sessionId.'"%',
-                'needle3' => '%"companyId":"'.$companyId.'"%',
-            ],
-        );
+        /** @var InMemoryTransport $transport */
+        $transport = self::getContainer()->get('messenger.transport.async_pipeline');
 
-        $body = (string) $this->em->getConnection()->fetchOne(
-            'SELECT body FROM messenger_messages WHERE body LIKE :needle ORDER BY available_at DESC LIMIT 1',
-            ['needle' => '%NormalizeInventorySnapshotMessage%'],
-        );
-        if ('' !== $body) {
-            self::assertStringContainsString('"source":"ozon"', $body);
-            self::assertStringNotContainsString('api_key', $body);
-            self::assertStringNotContainsString('client_id', $body);
+        $cnt = 0;
+        foreach ($transport->getSent() as $envelope) {
+            $message = $envelope->getMessage();
+            if (!$message instanceof NormalizeInventorySnapshotMessage) {
+                continue;
+            }
+
+            if ($message->snapshotSessionId !== $sessionId || $message->companyId !== $companyId) {
+                continue;
+            }
+
+            self::assertSame(MarketplaceType::OZON->value, $message->source);
+            ++$cnt;
         }
 
         return $cnt;

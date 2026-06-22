@@ -9,6 +9,7 @@ use App\Telegram\Application\CreateTelegramCashTransactionAction;
 use App\Telegram\Application\DTO\CreateTelegramCashTransactionCommand;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\UserBuilder;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
@@ -52,9 +53,11 @@ final class CreateTelegramCashTransactionActionTest extends KernelTestCase
 
     private function createCompanyAndAccount(int $companyIndex, string $moneyAccountId): array
     {
-        $company = CompanyBuilder::aCompany()->withIndex($companyIndex)->build();
+        $owner = UserBuilder::aUser()->withIndex($companyIndex)->build();
+        $company = CompanyBuilder::aCompany()->withIndex($companyIndex)->withOwner($owner)->build();
         $account = MoneyAccountBuilder::aMoneyAccount()->withId($moneyAccountId)->forCompany($company)->build();
 
+        $this->em->persist($owner);
         $this->em->persist($company);
         $this->em->persist($account);
         $this->em->flush();

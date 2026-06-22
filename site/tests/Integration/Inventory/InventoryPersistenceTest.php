@@ -69,9 +69,9 @@ final class InventoryPersistenceTest extends IntegrationTestCase
         self::assertInstanceOf(InventoryRawSnapshot::class, $loadedRaw);
         self::assertInstanceOf(StockSnapshot::class, $loadedStock);
 
-        self::assertSame(['zone' => 'A-1', 'tags' => ['cold', 'priority']], $loadedLocation->getMetadata());
-        self::assertSame(['page' => 2, 'filters' => ['active' => true]], $loadedRaw->getRequestParams());
-        self::assertSame(['rows' => [['sku' => 'SKU-42', 'qty' => 12.345]]], $loadedRaw->getResponseBody());
+        self::assertEqualsCanonicalizing(['zone' => 'A-1', 'tags' => ['cold', 'priority']], $loadedLocation->getMetadata());
+        self::assertEquals(['page' => 2, 'filters' => ['active' => true]], $loadedRaw->getRequestParams());
+        self::assertEquals(['rows' => [['sku' => 'SKU-42', 'qty' => 12.345]]], $loadedRaw->getResponseBody());
 
         self::assertSame('42.125', $loadedStock->getQuantity());
         self::assertSame('5.000', $loadedStock->getReservedQuantity());

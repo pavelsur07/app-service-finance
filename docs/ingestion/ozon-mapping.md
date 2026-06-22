@@ -1,81 +1,182 @@
-# Ingestion Ozon Seller Mapping
+# Ozon → Канон: маппинг полей
 
-## Resources
+## Источники данных
 
-| Resource type | Source API | Mapper |
+| Resource type | Endpoint Ozon API | Mapper |
 |---|---|---|
-| `ozon_seller_daily_report` | `POST /v3/finance/transaction/list` | `OzonSellerReportMapper` |
-| `ozon_seller_realization` | `POST /v2/finance/realization` | `OzonRealizationMapper` |
+| `ozon_finance_accrual_by_day` | `POST /v1/finance/accrual/by-day` | `OzonAccrualByDayMapper` |
+| `ozon_finance_accrual_postings` | `POST /v1/finance/accrual/postings` | `OzonAccrualShadowMapper` |
+| `ozon_finance_accrual_types` | `POST /v1/finance/accrual/types` | `OzonAccrualShadowMapper` |
 
-Legacy Marketplace Ozon pipelines remain unchanged. The Ingestion connector reads Ozon Seller data through `LegacyOzonClientAdapter`, writes raw NDJSON through `RawStorageFacade`, and normalizes rows into `FinancialTransaction`.
+Legacy-пайплайн Ozon (`app:marketplace:ozon-daily-sync`) продолжает работать параллельно.
+Новый Ingestion-пайплайн работает в shadow-режиме до переключения.
 
-## Natural Keys
+---
 
-Base operation id:
+## Natural key транзакции
 
-| Input | Base id |
-|---|---|
-| `operation_id` present | `ozon:operation:{operation_id}` |
-| `operation_id` missing | `ozon:fallback:{posting_number}:{sku}:{date}` |
-
-Canonical transaction external id:
-
-```text
-{base id}:{component}
+```
+externalId = "{base_id}:{component}"
 ```
 
-The component suffix is intentional. Current canonical uniqueness is `(companyId, source, externalId, type)`, and one Ozon operation can contain several rows with the same `TransactionType` such as multiple logistics or fee components. The suffix keeps daily and realization rows overwrite-compatible while preserving all components.
+### Base ID
 
-`operationGroupId` is UUIDv5 over `{companyId}:{base id}`. All components from one Ozon operation share the same group id.
+| Условие | Base ID |
+|---|---|
+| Есть `operation_id` | `ozon:operation:{operation_id}` |
+| Нет `operation_id` | `ozon:fallback:{posting_number}:{sku}:{date}` |
 
-## Daily Report Mapping
+### Component
 
-| Ozon field | Component | TransactionType | Direction |
+Суффикс компонента добавляется потому что одна операция Ozon может иметь
+несколько строк одного `TransactionType` (например, несколько логистических сборов).
+
+Примеры: `sale`, `commission`, `logistics_delivery`, `service_MarketplaceServiceItemDirectFlowLogistic`.
+
+### operationGroupId
+
+```
+UUID v5 от строки "{companyId}:{base_id}"
+```
+
+Все компоненты одной операции Ozon получают одинаковый `operationGroupId`.
+Используется для сверки контрольных сумм.
+
+---
+
+## Маппинг полей операции (accrual by day)
+
+### Даты
+
+| Канон | Источник |
+|---|---|
+| `occurredAt` | `operation_date` (UTC, без конвертации) |
+| `externalUpdatedAt` | `operation_date` (для ежедневного отчёта) |
+| `sourceTz` | `Europe/Moscow` (для UI-отображения) |
+
+### Ссылки
+
+| Канон | Источник |
+|---|---|
+| `orderRef` | `posting.posting_number` |
+| `payoutRef` | не передаётся в ежедневном отчёте |
+| `description` | `operation_type_name` |
+
+### Декомпозиция полей операции → компоненты
+
+Одна строка `transaction_list` → несколько `FinancialTransaction` с общим `operationGroupId`.
+
+| Поле Ozon | component суффикс | TransactionType | Direction |
 |---|---|---|---|
-| `accruals_for_sale` | `sale` | `SALE` | `IN` for positive, `OUT` for negative |
-| `amount` with `operation_type=ClientReturnAgentOperation` | `refund` | `REFUND` | `OUT` |
-| `sale_commission_amount` / `sale_commission` | `commission` | `COMMISSION` | by amount sign |
-| `deliv_charge_amount` / `delivery_charge` | `logistics_delivery` | `LOGISTICS` | by amount sign |
-| `return_delivery_charge_amount` / `return_delivery_charge` | `logistics_return_delivery` | `LOGISTICS` | by amount sign |
-| `services_amounts.MarketplaceServiceItemReturnAfterDelivToCustomer` | `service_*` | `LOGISTICS` | by amount sign |
-| `services_amounts.MarketplaceServiceItemDelivToCustomer` | `service_*` | `LAST_MILE` | by amount sign |
-| other `services_amounts` / `services[]` | `service_*` | `FEE` | by amount sign |
-| `acquiring` / `acquiring_amount` | `acquiring` | `ACQUIRING` | by amount sign |
-| fallback nonzero `amount` | `other` | `OTHER` | by amount sign |
+| `accruals_for_sale` | `sale` | `SALE` | `>0` → IN, `<0` → OUT |
+| `sale_commission` / `sale_commission_amount` | `commission` | `COMMISSION` | по знаку |
+| `delivery_charge` / `deliv_charge_amount` | `logistics_delivery` | `LOGISTICS` | по знаку |
+| `return_delivery_charge` / `return_delivery_charge_amount` | `logistics_return_delivery` | `LOGISTICS` | по знаку |
+| `amount` при `operation_type=ClientReturnAgentOperation` | `refund` | `REFUND` | `OUT` |
+| ненулевой `amount` (fallback) | `other` | `OTHER` | по знаку |
 
-Amounts are stored as unsigned minor units in `Money`; direction is represented by `TransactionDirection`.
+### Декомпозиция services[] → компоненты
 
-## Realization Mapping
+| service.name | component суффикс | TransactionType | Direction |
+|---|---|---|---|
+| `MarketplaceRedistributionOfAcquiringOperation` | `acquiring` | `ACQUIRING` | `price<0` → OUT (CHARGE), `price>0` → IN (STORNO) |
+| `MarketplaceServiceItemDelivToCustomer` | `service_{name}` | `LAST_MILE` | по знаку |
+| `MarketplaceServiceItemRedistributionLastMileCourier` | `service_{name}` | `LAST_MILE` | по знаку |
+| `MarketplaceServiceItemDirectFlowLogistic` | `service_{name}` | `LOGISTICS` | по знаку |
+| `MarketplaceServiceItemReturnFlowLogistic` | `service_{name}` | `LOGISTICS` | по знаку |
+| `MarketplaceServiceItemReturnAfterDelivToCustomer` | `service_{name}` | `LOGISTICS` | по знаку |
+| `MarketplaceServiceBrandCommission` | `service_{name}` | `COMMISSION` | по знаку |
+| `OperationMarketplaceCostPerClick` | `service_{name}` | `ADVERTISING` | по знаку |
+| `OperationMarketplaceServiceEarlyPaymentAccrual` | `service_{name}` | `FEE` | по знаку |
+| остальные `services[]` | `service_{name}` | `FEE` | по знаку |
 
-Realization uses the same component rules and external id algorithm as the daily report. It additionally accepts common realization field names:
+**Правило знака для services[]:**
+- `price == 0` → пропустить.
+- `price < 0` → `direction=OUT`.
+- `price > 0` → `direction=IN` (STORNO — возврат ранее начисленного).
 
-| Realization field | Canonical meaning |
+**Источник маппинга:** `OzonCostCategory::findByServiceName($service['name'])`.
+Не хардкодить в маппере — добавлять только в `OzonCostCategory`.
+
+---
+
+## Маппинг operation_type → TransactionType
+
+Используется для операций без `services[]` или с нераспознанными services.
+
+**Источник маппинга:** `OzonCostCategory::findByOperationType($operationType)`.
+
+| OzonCostCategory.widgetGroup | TransactionType |
 |---|---|
-| `seller_price` / `price` | sale amount |
-| `commission_amount` | commission |
-| `delivery_commission` | logistics delivery |
-| `return_delivery_commission` | return logistics |
-| `report_date`, `_header.stop_date` | `externalUpdatedAt` candidates |
+| «Вознаграждение» | `COMMISSION` |
+| «Услуги доставки и FBO» | `LOGISTICS` |
+| «Хранение» (ozon_storage, ozon_temporary_storage) | `STORAGE` |
+| «Услуги партнёров» (кроме ozon_acquiring) | `FEE` |
+| «Продвижение и реклама» | `ADVERTISING` |
+| «Другие услуги и штрафы» | `FEE` |
+| «Компенсации и декомпенсации» | `BONUS` |
+| не найден в OzonCostCategory | `OTHER` + `NormalizationIssue(UNKNOWN_FIELD)` |
 
-Because realization `externalUpdatedAt` is later than the daily operation date, `UpsertFinancialTransactionAction` replaces preliminary daily values instead of creating duplicates.
+---
 
-## Dates And References
+## Legacy daily/realization
 
-| Canon field | Source |
-|---|---|
-| `occurredAt` | `operation_date`, then `sale_date`, then `return_date`, then header dates |
-| daily `externalUpdatedAt` | operation date |
-| realization `externalUpdatedAt` | `realization_report_period_end`, `report_date`, header stop/doc date, then operation/sale/return date |
-| `sourceTz` | `Europe/Moscow` |
-| `orderRef` | `posting.posting_number` or `posting_number` |
-| `payoutRef` | `payout_ref`, `realization_id`, or `_header.doc_number` |
+Ресурсы `ozon_seller_daily_report` и `ozon_seller_realization` больше не доступны
+для `app:ingestion:start-backfill`. Старые cursor rows по ним используются только
+как seed для `ozon_finance_accrual_by_day`.
 
-## Control Sum
+Legacy ресурсы не нормализуются текущим production path. Если реализация снова
+понадобится в Ingestion, это должен быть отдельный ресурс и отдельный mapper.
 
-For each raw row, the mapper produces one control sum:
+---
 
-```text
-sum(abs(mapped component amount minor))
+## Контрольная сумма (сверка)
+
+После маппинга строки маппер вычисляет контрольную сумму:
+
+```
+controlSum = sum(abs(amountMinor) для всех компонентов одной операции)
 ```
 
-The control sum is compared against all canonical transactions in the same `operationGroupId`. Ozon control sums require the raw record company id, so Ozon mappers implement `RawRecordAwareControlSumMapperInterface`; the base `controlSum()` method remains empty for backward compatibility with the generic mapper contract.
+`NormalizeRawRecordAction` сверяет: сумма канона по `operationGroupId` == `controlSum`.
+Расхождение → `NormalizationIssue(kind=SUM_MISMATCH)`.
+
+---
+
+## Эквайринг — важное
+
+**Эквайринг НЕ передаётся как отдельное поле** в `/v3/finance/transaction/list`.
+Поля `acquiring` / `acquiring_amount` в ответе отсутствуют.
+
+Эквайринг приходит как элемент `services[]` с
+`name=MarketplaceRedistributionOfAcquiringOperation`.
+
+Маппер не должен искать `acquiring` / `acquiring_amount` в `source_data`.
+
+**STORNO эквайринга** (при возврате товара):
+- `price > 0` для `MarketplaceRedistributionOfAcquiringOperation` → `direction=IN`.
+- Учитывается автоматически через знак `price`.
+
+---
+
+## Неизвестные типы операций
+
+Если `operation_type` не найден в `OzonCostCategory` и нет подходящего `services[]`:
+- Транзакция создаётся с `type=OTHER`.
+- Создаётся `NormalizationIssue(kind=UNKNOWN_FIELD, details={operation_type})`.
+- Нормализация **не прерывается** — обрабатываются остальные строки.
+
+Для добавления нового типа: внести в `OzonCostCategory` в раздел `operationTypes`
+соответствующей категории. Код маппера не менять.
+
+---
+
+## Листинги (привязка к товару)
+
+При нормализации `SALE`-транзакции `OzonListingResolver` резолвит `listingId`:
+
+1. Ищет `MarketplaceListing` по `(companyId, marketplace=OZON, supplierSku=offer_id)`.
+2. Fallback: по `(companyId, marketplace=OZON, marketplaceSku=sku)`.
+3. Если не найден: `listingId=null`, `enrichmentStatus=PENDING_LISTING`.
+
+Cron `app:ingestion:resolve-missing-listings` повторяет попытку при появлении листинга в каталоге.

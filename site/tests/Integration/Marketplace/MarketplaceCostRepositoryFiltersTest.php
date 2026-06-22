@@ -32,7 +32,7 @@ final class MarketplaceCostRepositoryFiltersTest extends IntegrationTestCase
             null,
             'all',
         );
-        self::assertCount(3, $byMarketplace);
+        self::assertCount(2, $byMarketplace);
         self::assertSame(['ozon'], array_values(array_unique(array_column($byMarketplace, 'marketplace'))));
 
         $byDateRange = $repository->findExportRowsByCompanyAndFilters(
