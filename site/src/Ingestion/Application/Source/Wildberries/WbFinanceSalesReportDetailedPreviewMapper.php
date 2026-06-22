@@ -51,9 +51,10 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
                     $expectedNetMinor *= -1;
                 }
 
+                $payoutTransactions = $this->payoutCheckTransactions($rowTransactions);
                 $actualNetMinor = array_sum(array_map(
                     static fn (WbFinancePreviewTransaction $transaction): int => $transaction->signedAmountMinor(),
-                    $rowTransactions,
+                    $payoutTransactions,
                 ));
 
                 $rowChecks[] = new WbFinancePreviewRowCheck(
@@ -64,7 +65,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
                     expectedNetMinor: $expectedNetMinor,
                     actualNetMinor: $actualNetMinor,
                     deltaMinor: $actualNetMinor - $expectedNetMinor,
-                    transactionCount: count($rowTransactions),
+                    transactionCount: count($payoutTransactions),
                     sellerOperName: $sellerOperName,
                     docTypeName: $docTypeName,
                 );
@@ -329,6 +330,23 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
     private function costSignedAmountMinor(int $amountMinor): int
     {
         return -abs($amountMinor);
+    }
+
+    /**
+     * @param list<WbFinancePreviewTransaction> $transactions
+     *
+     * @return list<WbFinancePreviewTransaction>
+     */
+    private function payoutCheckTransactions(array $transactions): array
+    {
+        return array_values(array_filter(
+            $transactions,
+            static fn (WbFinancePreviewTransaction $transaction): bool => in_array(
+                $transaction->type,
+                [TransactionType::SALE, TransactionType::REFUND, TransactionType::COMMISSION, TransactionType::ACQUIRING],
+                true,
+            ),
+        ));
     }
 
     /**

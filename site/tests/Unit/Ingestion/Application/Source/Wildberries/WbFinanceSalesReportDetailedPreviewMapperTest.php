@@ -55,6 +55,35 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
         self::assertSame(0, $result->rowChecks[0]->deltaMinor);
     }
 
+    public function testPayoutCheckIgnoresAuxiliaryOperationsOnSaleRow(): void
+    {
+        $result = $this->mapper()->preview(self::COMPANY_ID, [[
+            'rrdId' => 107,
+            'currency' => 'RUB',
+            'docTypeName' => 'Продажа',
+            'sellerOperName' => 'Продажа',
+            'saleDt' => '2026-06-21T10:15:00Z',
+            'retailPriceWithDisc' => '1000.00',
+            'forPay' => '850.00',
+            'acquiringFee' => '20.00',
+            'deliveryAmount' => 1,
+            'deliveryService' => '-50.00',
+            'ppvzReward' => '-17.25',
+            'cashbackDiscount' => '4.10',
+        ]]);
+
+        self::assertCount(6, $result->transactions);
+        $this->transaction($result->transactions, 'wb:sales-report-detailed:107:logistics_delivery');
+        $this->transaction($result->transactions, 'wb:sales-report-detailed:107:pvz_processing');
+        $this->transaction($result->transactions, 'wb:sales-report-detailed:107:loyalty_discount_compensation');
+
+        self::assertCount(1, $result->rowChecks);
+        self::assertSame(85000, $result->rowChecks[0]->expectedNetMinor);
+        self::assertSame(85000, $result->rowChecks[0]->actualNetMinor);
+        self::assertSame(0, $result->rowChecks[0]->deltaMinor);
+        self::assertSame(3, $result->rowChecks[0]->transactionCount);
+    }
+
     public function testMapsReturnRowAsOutboundRefundWithCommissionAndAcquiringStorno(): void
     {
         $result = $this->mapper()->preview(self::COMPANY_ID, [[
