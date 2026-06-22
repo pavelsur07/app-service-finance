@@ -203,6 +203,12 @@ class IngestRawRecord implements TenantOwnedInterface
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    public function markNormalizationSkipped(): void
+    {
+        $this->normalizationStatus = RawNormalizationStatus::SKIPPED;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
     public function markNormalizationFailed(): void
     {
         $this->normalizationStatus = RawNormalizationStatus::FAILED;

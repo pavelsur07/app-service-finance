@@ -8,9 +8,9 @@ use App\Ingestion\Exception\ConnectorAuthException;
 use App\Ingestion\Exception\ConnectorRateLimitedException;
 use App\Ingestion\Exception\ConnectorTransientException;
 use App\Ingestion\Exception\CredentialNotFoundException;
+use App\Marketplace\Application\Service\WbFinanceRateLimiter;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Clock\ClockInterface;
-use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -21,11 +21,12 @@ final readonly class WbFinanceReportClient implements WbFinanceReportClientInter
     private const BASE_URL = 'https://finance-api.wildberries.ru';
     private const ENDPOINT = '/api/finance/v1/sales-reports/detailed';
     private const DEFAULT_RETRY_AFTER_SECONDS = 70;
+    private const GLOBAL_SELLER_BUCKET = 'global';
 
     public function __construct(
         private HttpClientInterface $httpClient,
         private WbCredentialProviderInterface $credentialProvider,
-        private RateLimiterFactory $rateLimiterFactory,
+        private WbFinanceRateLimiter $rateLimiter,
         private ClockInterface $clock,
         private LoggerInterface $logger,
     ) {
@@ -94,7 +95,7 @@ final readonly class WbFinanceReportClient implements WbFinanceReportClientInter
             );
         }
 
-        $this->classifyStatus($statusCode, $headers);
+        $this->classifyStatus($statusCode, $headers, $connectionRef);
         $rows = $this->decodeRows($body);
         if ([] === $rows) {
             return new WbFinanceReportPage(
@@ -121,16 +122,26 @@ final readonly class WbFinanceReportClient implements WbFinanceReportClientInter
 
     private function consumeRateLimit(string $connectionRef): void
     {
-        $limit = $this->rateLimiterFactory->create(sprintf('wb-finance:%s', $connectionRef))->consume(1);
-        if ($limit->isAccepted()) {
+        $sellerBucketId = $this->sellerBucketId($connectionRef);
+        $cooldownUntil = $this->rateLimiter->getActiveSalesReportsCooldownUntil($sellerBucketId);
+        if (null !== $cooldownUntil) {
+            throw new ConnectorRateLimitedException(
+                'WB finance report shared cooldown is active.',
+                $this->rateLimiter->secondsUntil($cooldownUntil),
+            );
+        }
+
+        $retryAfter = $this->rateLimiter->tryConsume(
+            $this->rateLimiter->buildSalesReportsRateLimitKeyForSellerBucket($sellerBucketId),
+        );
+        if (null === $retryAfter) {
             return;
         }
 
-        $retryAfter = $limit->getRetryAfter();
-        $now = $this->clock->now();
-        $retryAfterSeconds = max(1, $retryAfter->getTimestamp() - $now->getTimestamp());
-
-        throw new ConnectorRateLimitedException('WB finance report local rate limit is active.', $retryAfterSeconds);
+        throw new ConnectorRateLimitedException(
+            'WB finance report local rate limit is active.',
+            $this->rateLimiter->secondsUntil($retryAfter),
+        );
     }
 
     /**
@@ -155,16 +166,21 @@ final readonly class WbFinanceReportClient implements WbFinanceReportClientInter
     /**
      * @param array<string, list<string>> $headers
      */
-    private function classifyStatus(int $statusCode, array $headers): void
+    private function classifyStatus(int $statusCode, array $headers, string $connectionRef): void
     {
         if (401 === $statusCode || 403 === $statusCode) {
             throw new ConnectorAuthException('WB finance API authentication failed.');
         }
 
         if (429 === $statusCode) {
+            $retryAfterSeconds = $this->retryAfterSeconds($headers);
+            $sellerBucketId = $this->sellerBucketId($connectionRef);
+            $cooldownUntil = $this->rateLimiter->cooldownUntilAfterRemote429($retryAfterSeconds, self::DEFAULT_RETRY_AFTER_SECONDS);
+            $this->rateLimiter->setSalesReportsCooldownUntil($sellerBucketId, $cooldownUntil);
+
             throw new ConnectorRateLimitedException(
                 'WB finance API remote rate limit is active.',
-                $this->retryAfterSeconds($headers),
+                $this->rateLimiter->secondsUntil($cooldownUntil),
             );
         }
 
@@ -229,7 +245,7 @@ final readonly class WbFinanceReportClient implements WbFinanceReportClientInter
     /**
      * @param array<string, list<string>> $headers
      */
-    private function retryAfterSeconds(array $headers): int
+    private function retryAfterSeconds(array $headers): ?int
     {
         foreach (['retry-after', 'x-ratelimit-retry', 'x-ratelimit-reset'] as $headerName) {
             $value = $headers[$headerName][0] ?? null;
@@ -243,7 +259,7 @@ final readonly class WbFinanceReportClient implements WbFinanceReportClientInter
             }
         }
 
-        return self::DEFAULT_RETRY_AFTER_SECONDS;
+        return null;
     }
 
     private function parseRetryHeader(string $value, bool $allowRelativeSeconds): ?int
@@ -264,6 +280,16 @@ final readonly class WbFinanceReportClient implements WbFinanceReportClientInter
         }
 
         return max(1, $date->getTimestamp() - $this->clock->now()->getTimestamp());
+    }
+
+    private function sellerBucketId(string $connectionRef): string
+    {
+        $connectionRef = trim($connectionRef);
+        if ('' === $connectionRef) {
+            return self::GLOBAL_SELLER_BUCKET;
+        }
+
+        return 'connection:'.$connectionRef;
     }
 
     /**

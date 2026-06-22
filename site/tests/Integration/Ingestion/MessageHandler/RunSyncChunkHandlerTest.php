@@ -7,6 +7,7 @@ namespace App\Tests\Integration\Ingestion\MessageHandler;
 use App\Ingestion\Application\Service\IngestRateLimitGuard;
 use App\Ingestion\Entity\SyncJob;
 use App\Ingestion\Enum\IngestSource;
+use App\Ingestion\Enum\RawNormalizationStatus;
 use App\Ingestion\Enum\SyncJobKind;
 use App\Ingestion\Enum\SyncJobStatus;
 use App\Ingestion\Exception\ConnectorTransientException;
@@ -283,6 +284,12 @@ final class RunSyncChunkHandlerTest extends IntegrationTestCase
         /** @var SyncJobRepository $jobRepository */
         $jobRepository = self::getContainer()->get(SyncJobRepository::class);
         self::assertSame(SyncJobStatus::RUNNING, $jobRepository->findByIdAndCompany($job->getId(), $companyId)?->getStatus());
+
+        /** @var IngestRawRecordRepository $rawRecordRepository */
+        $rawRecordRepository = self::getContainer()->get(IngestRawRecordRepository::class);
+        $rawRecords = $rawRecordRepository->findBy(['companyId' => $companyId, 'syncJobId' => $job->getId()]);
+        self::assertCount(1, $rawRecords);
+        self::assertSame(RawNormalizationStatus::SKIPPED, $rawRecords[0]->getNormalizationStatus());
     }
 
     public function testRateLimitLockContentionKeepsJobRetryable(): void

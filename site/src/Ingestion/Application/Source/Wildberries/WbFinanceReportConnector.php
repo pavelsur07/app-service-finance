@@ -150,8 +150,8 @@ final readonly class WbFinanceReportConnector implements SourceConnectorInterfac
         }
 
         $nextDate = $date->modify('+1 day')->setTime(0, 0);
-        $yesterday = $this->clock->now()->modify('-1 day')->setTime(0, 0);
-        if ($nextDate > $yesterday) {
+        $today = $this->clock->now()->setTime(0, 0);
+        if ($nextDate > $today) {
             return null;
         }
 

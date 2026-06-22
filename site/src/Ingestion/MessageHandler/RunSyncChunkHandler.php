@@ -22,6 +22,7 @@ use App\Ingestion\Message\NormalizeRawRecordMessage;
 use App\Ingestion\Message\RunSyncChunkMessage;
 use App\Ingestion\Repository\IngestCursorRepository;
 use App\Ingestion\Repository\SyncJobRepository;
+use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Lock\LockInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -39,6 +40,7 @@ final readonly class RunSyncChunkHandler
         private RawStorageFacade $rawStorageFacade,
         private SyncFacade $syncFacade,
         private IngestRateLimitGuard $rateLimitGuard,
+        private EntityManagerInterface $entityManager,
         private MessageBusInterface $messageBus,
         private LoggerInterface $logger,
     ) {
@@ -96,6 +98,8 @@ final readonly class RunSyncChunkHandler
                     foreach ($records as $record) {
                         $this->messageBus->dispatch(new NormalizeRawRecordMessage($record->getId(), $record->getCompanyId()));
                     }
+                } else {
+                    $this->markNormalizationSkipped($records);
                 }
 
                 if (null !== $result->nextCursorValue && '' !== $result->nextCursorValue) {
@@ -212,6 +216,22 @@ final readonly class RunSyncChunkHandler
                 'errorMessage' => $exception->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * @param list<\App\Ingestion\Entity\IngestRawRecord> $records
+     */
+    private function markNormalizationSkipped(array $records): void
+    {
+        if ([] === $records) {
+            return;
+        }
+
+        foreach ($records as $record) {
+            $record->markNormalizationSkipped();
+        }
+
+        $this->entityManager->flush();
     }
 
     private function dispatchContinuation(RunSyncChunkMessage $message, ?string $cursorValue, int $delaySeconds): void

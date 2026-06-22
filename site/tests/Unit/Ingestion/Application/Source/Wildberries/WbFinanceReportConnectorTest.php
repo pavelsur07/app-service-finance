@@ -134,7 +134,7 @@ final class WbFinanceReportConnectorTest extends TestCase
         ));
     }
 
-    public function testIncrementalCursorDoesNotAdvancePastYesterday(): void
+    public function testIncrementalCursorAdvancesFromYesterdayToToday(): void
     {
         $connector = $this->connector(
             $this->client(new WbFinanceReportPage(rows: [], nextRrdId: null, hasMore: false)),
@@ -143,7 +143,7 @@ final class WbFinanceReportConnectorTest extends TestCase
 
         $result = $connector->pull($this->request(cursorValue: '2026-06-21'));
 
-        self::assertNull($result->nextCursorValue);
+        self::assertSame('2026-06-22', $result->nextCursorValue);
         self::assertFalse($result->hasMore);
     }
 
@@ -157,6 +157,19 @@ final class WbFinanceReportConnectorTest extends TestCase
         $result = $connector->pull($this->request(cursorValue: '2026-06-20'));
 
         self::assertSame('2026-06-21', $result->nextCursorValue);
+        self::assertFalse($result->hasMore);
+    }
+
+    public function testIncrementalCursorDoesNotAdvancePastToday(): void
+    {
+        $connector = $this->connector(
+            $this->client(new WbFinanceReportPage(rows: [], nextRrdId: null, hasMore: false)),
+            now: '2026-06-22T00:00:00+00:00',
+        );
+
+        $result = $connector->pull($this->request(cursorValue: '2026-06-22'));
+
+        self::assertNull($result->nextCursorValue);
         self::assertFalse($result->hasMore);
     }
 

@@ -144,6 +144,7 @@ final class WbFinanceStatusCommand extends Command
                         COALESCE(SUM(r.byte_size), 0) AS byte_size,
                         MAX(r.fetched_at) AS last_fetched_at,
                         COUNT(*) FILTER (WHERE r.normalization_status = 'pending') AS pending_raw,
+                        COUNT(*) FILTER (WHERE r.normalization_status = 'skipped') AS skipped_raw,
                         COUNT(*) FILTER (WHERE r.normalization_status = 'done') AS done_raw,
                         COUNT(*) FILTER (WHERE r.normalization_status = 'failed') AS failed_raw
                  FROM ingest_raw_records r
@@ -165,11 +166,12 @@ final class WbFinanceStatusCommand extends Command
         }
 
         $io->table(
-            ['resourceType', 'raw', 'pending', 'done', 'failed', 'bytes', 'lastFetchedAt'],
+            ['resourceType', 'raw', 'pending', 'skipped', 'done', 'failed', 'bytes', 'lastFetchedAt'],
             array_map(static fn (array $row): array => [
                 (string) $row['resource_type'],
                 (string) $row['raw_records'],
                 (string) $row['pending_raw'],
+                (string) $row['skipped_raw'],
                 (string) $row['done_raw'],
                 (string) $row['failed_raw'],
                 (string) $row['byte_size'],
