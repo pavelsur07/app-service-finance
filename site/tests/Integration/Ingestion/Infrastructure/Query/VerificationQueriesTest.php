@@ -134,6 +134,52 @@ final class VerificationQueriesTest extends IntegrationTestCase
         self::assertNotNull($cells[0]->lastFetchedAt);
     }
 
+    public function testCoverageFallsBackToFetchedDateForRawOnlyRecordsWithoutJobWindow(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+        $job = new SyncJob(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            source: IngestSource::WILDBERRIES,
+            resourceType: 'wildberries_finance_sales_report_detailed',
+            kind: SyncJobKind::INCREMENTAL,
+            shopRef: $connectionRef,
+        );
+        $raw = $this->rawRecord(
+            companyId: $companyId,
+            shopRef: $connectionRef,
+            resourceType: 'wildberries_finance_sales_report_detailed',
+            fetchedAt: new \DateTimeImmutable('2026-06-22 09:17:43+00:00'),
+            externalId: 'wb-sales-report-detailed:incremental:rrd-0',
+            source: IngestSource::WILDBERRIES,
+            connectionRef: $connectionRef,
+            syncJobId: $job->getId(),
+        );
+        $raw->markNormalizationSkipped();
+
+        $this->em->persist($job);
+        $this->em->persist($raw);
+        $this->em->flush();
+
+        /** @var CoverageQuery $query */
+        $query = self::getContainer()->get(CoverageQuery::class);
+        $cells = $query->heatmap(
+            $companyId,
+            $connectionRef,
+            new \DateTimeImmutable('2026-06-22'),
+            new \DateTimeImmutable('2026-06-22'),
+        );
+
+        self::assertCount(1, $cells);
+        self::assertSame('2026-06-22', $cells[0]->date);
+        self::assertSame($connectionRef, $cells[0]->shopRef);
+        self::assertSame('wildberries_finance_sales_report_detailed', $cells[0]->resourceType);
+        self::assertSame(1, $cells[0]->rawCount);
+        self::assertSame(0, $cells[0]->txCount);
+        self::assertSame(0, $cells[0]->issueCount);
+    }
+
     public function testReconciliationComparesShopCanonWithCompanyPeriodOzonControl(): void
     {
         $companyId = Uuid::uuid7()->toString();

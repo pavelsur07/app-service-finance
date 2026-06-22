@@ -28,8 +28,20 @@ final class CoverageQuery
     ): array {
         Assert::uuid($companyId);
 
-        $recordDate = "COALESCE(TO_CHAR(ft.occurred_at, 'YYYY-MM-DD'), TO_CHAR(j.window_from, 'YYYY-MM-DD'))";
+        $recordDate = "COALESCE(TO_CHAR(ft.occurred_at, 'YYYY-MM-DD'), TO_CHAR(j.window_from, 'YYYY-MM-DD'), TO_CHAR(r.fetched_at, 'YYYY-MM-DD'))";
         $shopExpression = "COALESCE(NULLIF(ft.shop_ref, ''), r.shop_ref)";
+        $dateFilter = <<<'SQL'
+            (
+                (ft.id IS NOT NULL AND ft.occurred_at >= :from AND ft.occurred_at < :toExclusive)
+                OR (
+                    ft.id IS NULL
+                    AND (
+                        (j.window_from IS NOT NULL AND j.window_from >= :fromDate AND j.window_from <= :toDate)
+                        OR (j.window_from IS NULL AND r.fetched_at >= :from AND r.fetched_at < :toExclusive)
+                    )
+                )
+            )
+            SQL;
 
         $qb = $this->connection->createQueryBuilder()
             ->select(
@@ -61,7 +73,7 @@ final class CoverageQuery
                 'ni.company_id = r.company_id AND ni.raw_record_id = r.id AND ni.resolved_at IS NULL',
             )
             ->where('r.company_id = :companyId')
-            ->andWhere('((ft.id IS NOT NULL AND ft.occurred_at >= :from AND ft.occurred_at < :toExclusive) OR (ft.id IS NULL AND j.window_from >= :fromDate AND j.window_from <= :toDate))')
+            ->andWhere($dateFilter)
             ->setParameter('companyId', $companyId)
             ->setParameter('from', $from, Types::DATETIME_IMMUTABLE)
             ->setParameter('toExclusive', $to->modify('+1 day'), Types::DATETIME_IMMUTABLE)

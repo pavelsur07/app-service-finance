@@ -214,6 +214,62 @@ final class VerificationApiControllerTest extends WebTestCaseBase
         self::assertSame(0, $coverage['cells'][0]['issue_count']);
     }
 
+    public function testCoverageEndpointFallsBackToFetchedDateForRawOnlyRecordsWithoutJobWindow(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $owner = UserBuilder::aUser()->withIndex(9152)->build();
+        $company = CompanyBuilder::aCompany()
+            ->withId('11111111-1111-4111-8111-111111119152')
+            ->withOwner($owner)
+            ->build();
+        $companyId = $company->getId();
+        $connectionRef = 'b4c583ca-083e-46e2-8c9b-6e2deff1220f';
+        $job = new SyncJob(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            source: IngestSource::WILDBERRIES,
+            resourceType: 'wildberries_finance_sales_report_detailed',
+            kind: SyncJobKind::INCREMENTAL,
+            shopRef: $connectionRef,
+        );
+        $raw = $this->rawRecord(
+            companyId: $companyId,
+            shopRef: $connectionRef,
+            resourceType: 'wildberries_finance_sales_report_detailed',
+            externalId: 'wb-sales-report-detailed:incremental:rrd-0',
+            fetchedAt: new \DateTimeImmutable('2026-06-22 09:17:43+00:00'),
+            source: IngestSource::WILDBERRIES,
+            connectionRef: $connectionRef,
+            syncJobId: $job->getId(),
+        );
+        $raw->markNormalizationSkipped();
+
+        $em = $this->em();
+        $em->persist($owner);
+        $em->persist($company);
+        $em->persist($job);
+        $em->persist($raw);
+        $em->flush();
+
+        $this->loginWithActiveCompany($client, $owner, $company);
+        $client->request('GET', sprintf(
+            '/api/ingestion/verification/coverage?from=2026-06-22&to=2026-06-22&shop_ref=%s',
+            $connectionRef,
+        ));
+
+        self::assertResponseIsSuccessful();
+        $coverage = $this->json($client);
+        self::assertCount(1, $coverage['cells']);
+        self::assertSame('2026-06-22', $coverage['cells'][0]['date']);
+        self::assertSame($connectionRef, $coverage['cells'][0]['shop_ref']);
+        self::assertSame('wildberries_finance_sales_report_detailed', $coverage['cells'][0]['resource_type']);
+        self::assertSame(1, $coverage['cells'][0]['raw_count']);
+        self::assertSame(0, $coverage['cells'][0]['tx_count']);
+        self::assertSame(0, $coverage['cells'][0]['issue_count']);
+    }
+
     public function testInvalidPeriodUsesUnifiedErrorFormat(): void
     {
         $client = static::createClient();
