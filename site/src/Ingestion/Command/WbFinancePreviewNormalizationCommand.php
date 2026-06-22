@@ -85,13 +85,15 @@ final class WbFinancePreviewNormalizationCommand extends Command
         ?string $shopRef,
         int $limit,
     ): array {
+        $externalReportDate = "substring(r.external_id from '^wb-sales-report-detailed:([0-9]{4}-[0-9]{2}-[0-9]{2}):rrd-[0-9]+$')::date";
+        $recordDate = sprintf('COALESCE(j.window_from, %s, DATE(r.fetched_at))', $externalReportDate);
         $conditions = [
             'r.company_id = :companyId',
             'r.source = :source',
             'r.resource_type = :resourceType',
             "(
                 (j.window_from IS NOT NULL AND j.window_from <= :toDate AND COALESCE(j.window_to, j.window_from) >= :fromDate)
-                OR (j.window_from IS NULL AND r.fetched_at >= :fromAt AND r.fetched_at < :toExclusive)
+                OR (j.window_from IS NULL AND {$recordDate} >= :fromDate AND {$recordDate} <= :toDate)
             )",
         ];
         $params = [
@@ -100,8 +102,6 @@ final class WbFinancePreviewNormalizationCommand extends Command
             'resourceType' => WbResourceType::FINANCE_SALES_REPORT_DETAILED,
             'fromDate' => $from->format('Y-m-d'),
             'toDate' => $to->format('Y-m-d'),
-            'fromAt' => $from->format('Y-m-d 00:00:00'),
-            'toExclusive' => $to->modify('+1 day')->format('Y-m-d 00:00:00'),
         ];
 
         if (null !== $shopRef && '' !== $shopRef) {
@@ -117,12 +117,13 @@ final class WbFinancePreviewNormalizationCommand extends Command
                         r.fetched_at,
                         r.byte_size,
                         r.normalization_status,
-                        COALESCE(j.window_from::text, DATE(r.fetched_at)::text) AS record_date
+                        TO_CHAR(%s, \'YYYY-MM-DD\') AS record_date
                  FROM ingest_raw_records r
                  LEFT JOIN ingest_sync_jobs j ON j.id::text = r.sync_job_id AND j.company_id = r.company_id
                  WHERE %s
                  ORDER BY record_date ASC, r.fetched_at ASC, r.created_at ASC
                  LIMIT %d',
+                $recordDate,
                 implode(' AND ', $conditions),
                 $limit,
             ),
