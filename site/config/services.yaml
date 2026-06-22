@@ -172,6 +172,9 @@ services:
     App\Ingestion\Application\Source\Ozon\OzonAccrualShadowMapper:
         tags: ['app.ingestion.mapper']
 
+    App\Ingestion\Application\Source\Wildberries\WbFinanceSalesReportDetailedMapper:
+        tags: ['app.ingestion.mapper']
+
     App\Ingestion\Domain\Service\ConnectorRegistry:
         arguments:
             $connectors: !tagged_iterator app.ingestion.connector
