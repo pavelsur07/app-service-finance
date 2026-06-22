@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Ingestion\Command;
 
+use App\Ingestion\Domain\Service\MapperRegistry;
 use App\Ingestion\Message\NormalizeRawRecordMessage;
 use App\Ingestion\Repository\IngestRawRecordRepository;
 use Psr\Log\LoggerInterface;
@@ -23,6 +24,7 @@ final class NormalizePendingRawRecordsCommand extends Command
 {
     public function __construct(
         private readonly IngestRawRecordRepository $rawRecordRepository,
+        private readonly MapperRegistry $mapperRegistry,
         private readonly MessageBusInterface $messageBus,
         private readonly LoggerInterface $logger,
     ) {
@@ -70,6 +72,17 @@ final class NormalizePendingRawRecordsCommand extends Command
         $rawRecordIds = [];
         $dispatched = 0;
         foreach ($records as $record) {
+            if (!$this->mapperRegistry->has($record->getSource(), $record->getResourceType())) {
+                $this->logger->debug('Stale pending ingestion raw record skipped because mapper is not registered.', [
+                    'companyId' => $record->getCompanyId(),
+                    'rawRecordId' => $record->getId(),
+                    'source' => $record->getSource()->value,
+                    'resourceType' => $record->getResourceType(),
+                ]);
+
+                continue;
+            }
+
             $rawRecordIds[] = $record->getId();
 
             try {

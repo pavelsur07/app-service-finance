@@ -148,11 +148,22 @@ services:
 
     App\Ingestion\Infrastructure\Api\Ozon\OzonCredentialProviderInterface: '@App\Ingestion\Infrastructure\Api\Ozon\CredentialFacadeOzonCredentialProvider'
     App\Ingestion\Infrastructure\Api\Ozon\OzonAccrualClientInterface: '@App\Ingestion\Infrastructure\Api\Ozon\OzonAccrualClient'
+    App\Ingestion\Infrastructure\Api\Wildberries\WbCredentialProviderInterface: '@App\Ingestion\Infrastructure\Api\Wildberries\CredentialFacadeWbCredentialProvider'
+    App\Ingestion\Infrastructure\Api\Wildberries\WbFinanceReportClientInterface: '@App\Ingestion\Infrastructure\Api\Wildberries\WbFinanceReportClient'
+
+    App\Ingestion\Infrastructure\Api\Wildberries\WbFinanceReportClient:
+        arguments:
+            $rateLimiter: '@App\Marketplace\Application\Service\WbFinanceRateLimiter'
 
     App\Ingestion\Application\Source\Ozon\OzonSellerReportConnector:
         arguments:
             $chunkSizeDays: 7
             $hotRewindDays: 14
+        tags: ['app.ingestion.connector']
+
+    App\Ingestion\Application\Source\Wildberries\WbFinanceReportConnector:
+        arguments:
+            $continuationDelaySeconds: '%wb_finance.rate_limit_interval_seconds%'
         tags: ['app.ingestion.connector']
 
     App\Ingestion\Application\Source\Ozon\OzonAccrualByDayMapper:

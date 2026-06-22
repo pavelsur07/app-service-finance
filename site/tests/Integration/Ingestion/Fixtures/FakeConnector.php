@@ -26,7 +26,7 @@ final class FakeConnector implements SourceConnectorInterface
     private array $pullRequests = [];
 
     /**
-     * @var list<array{externalId: string, nextCursorValue: ?string, hasMore: bool, rowExternalId: string}>
+     * @var list<array{externalId: string, nextCursorValue: ?string, hasMore: bool, rowExternalId: string, normalizeRawRecords: bool, continuationDelaySeconds: ?int}>
      */
     private array $queuedPullResults = [];
 
@@ -41,12 +41,16 @@ final class FakeConnector implements SourceConnectorInterface
         ?string $nextCursorValue,
         bool $hasMore,
         string $rowExternalId = 'fake-sale-1',
+        bool $normalizeRawRecords = true,
+        ?int $continuationDelaySeconds = null,
     ): void {
         $this->queuedPullResults[] = [
             'externalId' => $externalId,
             'nextCursorValue' => $nextCursorValue,
             'hasMore' => $hasMore,
             'rowExternalId' => $rowExternalId,
+            'normalizeRawRecords' => $normalizeRawRecords,
+            'continuationDelaySeconds' => $continuationDelaySeconds,
         ];
     }
 
@@ -94,6 +98,8 @@ final class FakeConnector implements SourceConnectorInterface
             'nextCursorValue' => 'cursor-after-fake-sale-1',
             'hasMore' => false,
             'rowExternalId' => 'fake-sale-1',
+            'normalizeRawRecords' => true,
+            'continuationDelaySeconds' => null,
         ];
         $operationGroupId = Uuid::uuid7()->toString();
 
@@ -122,6 +128,8 @@ final class FakeConnector implements SourceConnectorInterface
             ),
             nextCursorValue: $result['nextCursorValue'],
             hasMore: $result['hasMore'],
+            normalizeRawRecords: $result['normalizeRawRecords'],
+            continuationDelaySeconds: $result['continuationDelaySeconds'],
         );
     }
 

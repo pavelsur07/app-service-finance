@@ -11,9 +11,13 @@ final readonly class RunSyncChunkMessage implements CompanyAwareMessage
     public function __construct(
         public string $companyId,
         public string $jobId,
+        public ?string $cursorValue = null,
     ) {
         Assert::uuid($this->companyId);
         Assert::uuid($this->jobId);
+        if (null !== $this->cursorValue) {
+            Assert::notEmpty($this->cursorValue);
+        }
     }
 
     public function getCompanyId(): string

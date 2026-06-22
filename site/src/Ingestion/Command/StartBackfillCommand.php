@@ -6,6 +6,7 @@ namespace App\Ingestion\Command;
 
 use App\Ingestion\Application\Command\StartBackfillCommand as StartBackfillApplicationCommand;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
+use App\Ingestion\Application\Source\Wildberries\WbResourceType;
 use App\Ingestion\Domain\Service\ConnectorRegistry;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Exception\ActiveBackfillExistsException;
@@ -33,6 +34,9 @@ final class StartBackfillCommand extends Command
         'ozon' => [
             OzonResourceType::ACCRUAL_BY_DAY,
         ],
+        'wildberries' => [
+            WbResourceType::FINANCE_SALES_REPORT_DETAILED,
+        ],
     ];
 
     /**
@@ -41,6 +45,9 @@ final class StartBackfillCommand extends Command
     private const ALLOWED_RESOURCE_TYPES_BY_SOURCE = [
         'ozon' => [
             OzonResourceType::ACCRUAL_BY_DAY,
+        ],
+        'wildberries' => [
+            WbResourceType::FINANCE_SALES_REPORT_DETAILED,
         ],
     ];
 
@@ -57,7 +64,7 @@ final class StartBackfillCommand extends Command
         $this
             ->addOption('company-id', null, InputOption::VALUE_REQUIRED, 'Company UUID.')
             ->addOption('connection-ref', null, InputOption::VALUE_REQUIRED, 'Marketplace connection UUID.')
-            ->addOption('source', null, InputOption::VALUE_REQUIRED, 'Ingestion source, for example "ozon".')
+            ->addOption('source', null, InputOption::VALUE_REQUIRED, 'Ingestion source, for example "ozon" or "wildberries".')
             ->addOption('days-back', null, InputOption::VALUE_REQUIRED, 'Backfill depth in days, 1..365.', 30)
             ->addOption('shop-ref', null, InputOption::VALUE_REQUIRED, 'Optional concrete shop reference.')
             ->addOption('resource-type', null, InputOption::VALUE_REQUIRED, 'Optional concrete resource type.')
