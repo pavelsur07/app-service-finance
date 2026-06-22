@@ -28,7 +28,7 @@ final class CoverageQuery
     ): array {
         Assert::uuid($companyId);
 
-        $recordDate = "COALESCE(TO_CHAR(ft.occurred_at, 'YYYY-MM-DD'), TO_CHAR(j.window_from, 'YYYY-MM-DD'), TO_CHAR(r.fetched_at, 'YYYY-MM-DD'))";
+        $recordDate = "COALESCE(TO_CHAR(ft.occurred_at, 'YYYY-MM-DD'), TO_CHAR(raw_window.day, 'YYYY-MM-DD'), TO_CHAR(r.fetched_at, 'YYYY-MM-DD'))";
         $shopExpression = "COALESCE(NULLIF(ft.shop_ref, ''), r.shop_ref)";
         $dateFilter = <<<'SQL'
             (
@@ -36,7 +36,7 @@ final class CoverageQuery
                 OR (
                     ft.id IS NULL
                     AND (
-                        (j.window_from IS NOT NULL AND j.window_from >= :fromDate AND j.window_from <= :toDate)
+                        (j.window_from IS NOT NULL AND j.window_from <= :toDate AND COALESCE(j.window_to, j.window_from) >= :fromDate)
                         OR (j.window_from IS NULL AND r.fetched_at >= :from AND r.fetched_at < :toExclusive)
                     )
                 )
@@ -65,6 +65,20 @@ final class CoverageQuery
                 'ingest_financial_transactions',
                 'ft',
                 'ft.company_id = r.company_id AND ft.raw_record_id = r.id',
+            )
+            ->leftJoin(
+                'r',
+                "LATERAL (
+                    SELECT day::date AS day
+                    FROM generate_series(
+                        GREATEST(j.window_from, :fromDate)::date,
+                        LEAST(COALESCE(j.window_to, j.window_from), :toDate)::date,
+                        interval '1 day'
+                    ) AS day
+                    WHERE ft.id IS NULL AND j.window_from IS NOT NULL
+                )",
+                'raw_window',
+                'true',
             )
             ->leftJoin(
                 'r',

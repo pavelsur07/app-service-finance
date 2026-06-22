@@ -134,6 +134,56 @@ final class VerificationQueriesTest extends IntegrationTestCase
         self::assertNotNull($cells[0]->lastFetchedAt);
     }
 
+    public function testCoverageExpandsRawOnlyMultiDayJobWindowAcrossRequestedOverlap(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+        $job = new SyncJob(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            source: IngestSource::OZON,
+            resourceType: 'ozon_finance_accrual_by_day',
+            kind: SyncJobKind::BACKFILL,
+            windowFrom: new \DateTimeImmutable('2026-06-01'),
+            windowTo: new \DateTimeImmutable('2026-06-07'),
+            shopRef: $connectionRef,
+        );
+        $raw = $this->rawRecord(
+            companyId: $companyId,
+            shopRef: $connectionRef,
+            resourceType: 'ozon_finance_accrual_by_day',
+            fetchedAt: new \DateTimeImmutable('2026-06-08 09:00:00+00:00'),
+            externalId: 'ozon-accrual-by-day:2026-06-01:2026-06-07',
+            source: IngestSource::OZON,
+            connectionRef: $connectionRef,
+            syncJobId: $job->getId(),
+        );
+        $raw->markNormalizationSkipped();
+
+        $this->em->persist($job);
+        $this->em->persist($raw);
+        $this->em->flush();
+
+        /** @var CoverageQuery $query */
+        $query = self::getContainer()->get(CoverageQuery::class);
+        $cells = $query->heatmap(
+            $companyId,
+            $connectionRef,
+            new \DateTimeImmutable('2026-06-05'),
+            new \DateTimeImmutable('2026-06-06'),
+        );
+
+        self::assertCount(2, $cells);
+        self::assertSame(['2026-06-05', '2026-06-06'], array_map(static fn ($cell): string => $cell->date, $cells));
+        foreach ($cells as $cell) {
+            self::assertSame($connectionRef, $cell->shopRef);
+            self::assertSame('ozon_finance_accrual_by_day', $cell->resourceType);
+            self::assertSame(1, $cell->rawCount);
+            self::assertSame(0, $cell->txCount);
+            self::assertSame(0, $cell->issueCount);
+        }
+    }
+
     public function testCoverageFallsBackToFetchedDateForRawOnlyRecordsWithoutJobWindow(): void
     {
         $companyId = Uuid::uuid7()->toString();
