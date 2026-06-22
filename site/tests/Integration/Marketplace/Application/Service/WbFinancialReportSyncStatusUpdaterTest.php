@@ -176,6 +176,7 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
         $status = $this->startLoadingStatus();
         $this->updater->markRawLoaded($status, $this->rawId(), 1, 'h');
         $this->updater->markProcessing($status);
+        $this->em->flush();
 
         $company = $this->em->getReference(\App\Company\Entity\Company::class, $this->companyId());
         $raw = new \App\Marketplace\Entity\MarketplaceRawDocument(
@@ -202,6 +203,7 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
         $status = $this->startLoadingStatus();
         $this->updater->markRawLoaded($status, $this->rawId(), 1, 'h');
         $this->updater->markProcessing($status);
+        $this->em->flush();
 
         $company = $this->em->getReference(\App\Company\Entity\Company::class, $this->companyId());
         $raw = new \App\Marketplace\Entity\MarketplaceRawDocument(
