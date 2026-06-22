@@ -14,12 +14,13 @@ use App\Ingestion\Infrastructure\Api\Wildberries\WbFinanceReportClientInterface;
 use App\Ingestion\Infrastructure\Api\Wildberries\WbFinanceReportPage;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\Clock\MockClock;
 
 final class WbFinanceReportConnectorTest extends TestCase
 {
     public function testCapabilitiesDiscoverAndUnsupportedPush(): void
     {
-        $connector = new WbFinanceReportConnector($this->client(new WbFinanceReportPage([], null, false)));
+        $connector = $this->connector($this->client(new WbFinanceReportPage([], null, false)));
         $connectionRef = Uuid::uuid7()->toString();
 
         self::assertSame([Capability::CAN_DISCOVER_SHOPS, Capability::CAN_PULL], $connector->capabilities());
@@ -43,7 +44,7 @@ final class WbFinanceReportConnectorTest extends TestCase
             hasMore: false,
             metadata: ['endpoint' => '/api/finance/v1/sales-reports/detailed'],
         ));
-        $connector = new WbFinanceReportConnector($client);
+        $connector = $this->connector($client);
 
         $result = $connector->pull($this->request(
             windowFrom: new \DateTimeImmutable('2026-06-20'),
@@ -60,7 +61,6 @@ final class WbFinanceReportConnectorTest extends TestCase
                 'rrdId' => 10,
                 'docTypeName' => 'Продажа',
                 '_ingestion_resource' => WbResourceType::FINANCE_SALES_REPORT_DETAILED,
-                '_ingestion_metadata' => ['endpoint' => '/api/finance/v1/sales-reports/detailed'],
             ],
         ], $result->rawBatch->rows);
         self::assertSame([
@@ -76,7 +76,7 @@ final class WbFinanceReportConnectorTest extends TestCase
             hasMore: true,
             metadata: ['date' => '2026-06-20'],
         ));
-        $connector = new WbFinanceReportConnector($client, continuationDelaySeconds: 70);
+        $connector = $this->connector($client, continuationDelaySeconds: 70);
 
         $result = $connector->pull($this->request(
             windowFrom: new \DateTimeImmutable('2026-06-20'),
@@ -91,7 +91,7 @@ final class WbFinanceReportConnectorTest extends TestCase
     public function testPullContinuationUsesEncodedCursor(): void
     {
         $client = $this->client(new WbFinanceReportPage([], null, false));
-        $connector = new WbFinanceReportConnector($client);
+        $connector = $this->connector($client);
 
         $connector->pull($this->request(cursorValue: '{"date":"2026-06-20","rrdId":100}'));
 
@@ -102,7 +102,7 @@ final class WbFinanceReportConnectorTest extends TestCase
 
     public function testPullEmptyPageStoresEmptyMarker(): void
     {
-        $connector = new WbFinanceReportConnector($this->client(new WbFinanceReportPage(
+        $connector = $this->connector($this->client(new WbFinanceReportPage(
             rows: [],
             nextRrdId: null,
             hasMore: false,
@@ -123,7 +123,7 @@ final class WbFinanceReportConnectorTest extends TestCase
 
     public function testWindowMustBeOneDay(): void
     {
-        $connector = new WbFinanceReportConnector($this->client(new WbFinanceReportPage([], null, false)));
+        $connector = $this->connector($this->client(new WbFinanceReportPage([], null, false)));
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('one-day chunks');
@@ -132,6 +132,32 @@ final class WbFinanceReportConnectorTest extends TestCase
             windowFrom: new \DateTimeImmutable('2026-06-20'),
             windowTo: new \DateTimeImmutable('2026-06-21'),
         ));
+    }
+
+    public function testIncrementalCursorDoesNotAdvancePastYesterday(): void
+    {
+        $connector = $this->connector(
+            $this->client(new WbFinanceReportPage(rows: [], nextRrdId: null, hasMore: false)),
+            now: '2026-06-22T00:00:00+00:00',
+        );
+
+        $result = $connector->pull($this->request(cursorValue: '2026-06-21'));
+
+        self::assertNull($result->nextCursorValue);
+        self::assertFalse($result->hasMore);
+    }
+
+    public function testIncrementalCursorAdvancesUntilYesterday(): void
+    {
+        $connector = $this->connector(
+            $this->client(new WbFinanceReportPage(rows: [], nextRrdId: null, hasMore: false)),
+            now: '2026-06-22T00:00:00+00:00',
+        );
+
+        $result = $connector->pull($this->request(cursorValue: '2026-06-20'));
+
+        self::assertSame('2026-06-21', $result->nextCursorValue);
+        self::assertFalse($result->hasMore);
     }
 
     private function request(
@@ -175,5 +201,17 @@ final class WbFinanceReportConnectorTest extends TestCase
                 return $this->page;
             }
         };
+    }
+
+    private function connector(
+        WbFinanceReportClientInterface $client,
+        int $continuationDelaySeconds = 70,
+        string $now = '2026-06-22T00:00:00+00:00',
+    ): WbFinanceReportConnector {
+        return new WbFinanceReportConnector(
+            $client,
+            new MockClock($now),
+            $continuationDelaySeconds,
+        );
     }
 }

@@ -15,11 +15,13 @@ use App\Ingestion\Enum\Capability;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Exception\UnsupportedCapabilityException;
 use App\Ingestion\Infrastructure\Api\Wildberries\WbFinanceReportClientInterface;
+use Symfony\Component\Clock\ClockInterface;
 
 final readonly class WbFinanceReportConnector implements SourceConnectorInterface
 {
     public function __construct(
         private WbFinanceReportClientInterface $client,
+        private ClockInterface $clock,
         private int $continuationDelaySeconds = 70,
     ) {
     }
@@ -147,7 +149,13 @@ final readonly class WbFinanceReportConnector implements SourceConnectorInterfac
             return null;
         }
 
-        return $date->modify('+1 day')->format('Y-m-d');
+        $nextDate = $date->modify('+1 day')->setTime(0, 0);
+        $yesterday = $this->clock->now()->modify('-1 day')->setTime(0, 0);
+        if ($nextDate > $yesterday) {
+            return null;
+        }
+
+        return $nextDate->format('Y-m-d');
     }
 
     private function date(string $value): \DateTimeImmutable
@@ -192,7 +200,6 @@ final readonly class WbFinanceReportConnector implements SourceConnectorInterfac
         return array_map(
             static fn (array $row): array => $row + [
                 '_ingestion_resource' => WbResourceType::FINANCE_SALES_REPORT_DETAILED,
-                '_ingestion_metadata' => $metadata,
             ],
             $rows,
         );
