@@ -45,7 +45,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
             $this->collectCostComponents($transactions, $row, $operationGroupId, $rowKey, $currency, $occurredAt, $sellerOperName, $docTypeName);
 
             $rowTransactions = array_slice($transactions, $rowTransactionsStart);
-            if ([] !== $rowTransactions && $this->isSaleOrReturn($docTypeName)) {
+            if ([] !== $rowTransactions && $this->isSaleOrReturn($docTypeName) && $this->hasPayoutCheckFields($row)) {
                 $expectedNetMinor = $this->minor($row, 'forPay', 'ppvz_for_pay');
                 if ($this->isReturn($docTypeName)) {
                     $expectedNetMinor *= -1;
@@ -205,6 +205,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
         $this->addCostField($transactions, $row, $operationGroupId, $rowKey, $currency, $occurredAt, $sellerOperName, $docTypeName, 'penalty', TransactionType::PENALTY, 'penalty', null, 'WB penalty');
         $this->addCostField($transactions, $row, $operationGroupId, $rowKey, $currency, $occurredAt, $sellerOperName, $docTypeName, 'deduction', TransactionType::ADJUSTMENT, 'deduction', null, 'WB deduction');
         $this->addCostField($transactions, $row, $operationGroupId, $rowKey, $currency, $occurredAt, $sellerOperName, $docTypeName, 'warehouse_logistics', TransactionType::LOGISTICS, 'rebillLogisticCost', 'rebill_logistic_cost', 'WB warehouse logistics');
+        $this->addCostField($transactions, $row, $operationGroupId, $rowKey, $currency, $occurredAt, $sellerOperName, $docTypeName, 'pvz_processing', TransactionType::LOGISTICS, 'ppvzReward', 'ppvz_reward', 'WB PVZ processing');
 
         $additionalPaymentMinor = $this->minor($row, 'additionalPayment', 'additional_payment');
         if (0 !== $additionalPaymentMinor) {
@@ -221,6 +222,25 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
                 sellerOperName: $sellerOperName,
                 docTypeName: $docTypeName,
                 description: 'WB additional payment',
+                row: $row,
+            );
+        }
+
+        $cashbackDiscountMinor = $this->minor($row, 'cashbackDiscount', 'cashback_discount');
+        if (0 !== $cashbackDiscountMinor) {
+            $this->add(
+                transactions: $transactions,
+                operationGroupId: $operationGroupId,
+                rowKey: $rowKey,
+                component: 'loyalty_discount_compensation',
+                type: TransactionType::BONUS,
+                signedAmountMinor: $cashbackDiscountMinor,
+                currency: $currency,
+                occurredAt: $occurredAt,
+                field: 'cashbackDiscount',
+                sellerOperName: $sellerOperName,
+                docTypeName: $docTypeName,
+                description: 'WB loyalty discount compensation',
                 row: $row,
             );
         }
@@ -344,6 +364,8 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
                 'retailPriceWithDisc' => $this->raw($row, 'retailPriceWithDisc', 'retail_price_withdisc_rub'),
                 'forPay' => $this->raw($row, 'forPay', 'ppvz_for_pay'),
                 'acquiringFee' => $this->raw($row, 'acquiringFee', 'acquiring_fee'),
+                'ppvzReward' => $this->raw($row, 'ppvzReward', 'ppvz_reward'),
+                'cashbackDiscount' => $this->raw($row, 'cashbackDiscount', 'cashback_discount'),
             ],
         );
     }
@@ -366,6 +388,10 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
             ['deduction'],
             ['rebillLogisticCost', 'rebill_logistic_cost'],
             ['additionalPayment', 'additional_payment'],
+            ['ppvzReward', 'ppvz_reward'],
+            ['cashbackDiscount', 'cashback_discount'],
+            ['loyaltyDiscount', 'loyalty_discount'],
+            ['cashbackAmount', 'cashback_amount'],
         ];
 
         $nonZero = [];
@@ -423,6 +449,17 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
     private function isSaleOrReturn(string $docTypeName): bool
     {
         return $this->isSale($docTypeName) || $this->isReturn($docTypeName);
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private function hasPayoutCheckFields(array $row): bool
+    {
+        return 0 !== $this->minor($row, 'retailPriceWithDisc', 'retail_price_withdisc_rub')
+            || 0 !== $this->minor($row, 'retailAmount', 'retail_amount')
+            || 0 !== $this->minor($row, 'forPay', 'ppvz_for_pay')
+            || 0 !== $this->minor($row, 'acquiringFee', 'acquiring_fee');
     }
 
     private function isSale(string $docTypeName): bool

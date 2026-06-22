@@ -131,20 +131,67 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
         self::assertSame(250, $additionalPayment->amountMinor);
     }
 
-    public function testReportsUnknownRowsWithNoMappedTransactions(): void
+    public function testMapsPvzProcessingRewardAsLogisticsExpense(): void
     {
         $result = $this->mapper()->preview(self::COMPANY_ID, [[
             'rrdId' => 104,
+            'currency' => 'RUB',
+            'sellerOperName' => 'Возмещение за выдачу и возврат товаров на ПВЗ',
+            'docTypeName' => 'Продажа',
+            'rrDate' => '2026-06-21',
+            'ppvzReward' => '17.25',
+        ]]);
+
+        self::assertCount(1, $result->transactions);
+        self::assertSame([], $result->rowChecks);
+        self::assertSame([], $result->unknownRows);
+
+        $transaction = $this->transaction($result->transactions, 'wb:sales-report-detailed:104:pvz_processing');
+        self::assertSame(TransactionType::LOGISTICS, $transaction->type);
+        self::assertSame(TransactionDirection::OUT, $transaction->direction);
+        self::assertSame(1725, $transaction->amountMinor);
+        self::assertSame('ppvzReward', $transaction->field);
+        self::assertSame('17.25', $transaction->sourceData['ppvzReward']);
+    }
+
+    public function testMapsLoyaltyDiscountCompensationAsBonusIncome(): void
+    {
+        $result = $this->mapper()->preview(self::COMPANY_ID, [[
+            'rrdId' => 105,
+            'currency' => 'RUB',
+            'sellerOperName' => 'Компенсация скидки по программе лояльности',
+            'docTypeName' => 'Продажа',
+            'rrDate' => '2026-06-21',
+            'cashbackDiscount' => '42.10',
+        ]]);
+
+        self::assertCount(1, $result->transactions);
+        self::assertSame([], $result->rowChecks);
+        self::assertSame([], $result->unknownRows);
+
+        $transaction = $this->transaction($result->transactions, 'wb:sales-report-detailed:105:loyalty_discount_compensation');
+        self::assertSame(TransactionType::BONUS, $transaction->type);
+        self::assertSame(TransactionDirection::IN, $transaction->direction);
+        self::assertSame(4210, $transaction->amountMinor);
+        self::assertSame('cashbackDiscount', $transaction->field);
+        self::assertSame('42.10', $transaction->sourceData['cashbackDiscount']);
+    }
+
+    public function testReportsUnknownRowsWithNoMappedTransactions(): void
+    {
+        $result = $this->mapper()->preview(self::COMPANY_ID, [[
+            'rrdId' => 106,
             'sellerOperName' => 'Новая операция',
             'rrDate' => '2026-06-21',
             'forPay' => '12.34',
+            'loyaltyDiscount' => '5.67',
         ]]);
 
         self::assertSame([], $result->transactions);
         self::assertCount(1, $result->unknownRows);
-        self::assertSame('104', $result->unknownRows[0]->rowKey);
+        self::assertSame('106', $result->unknownRows[0]->rowKey);
         self::assertSame('Новая операция', $result->unknownRows[0]->sellerOperName);
-        self::assertSame(['forPay'], $result->unknownRows[0]->nonZeroFields);
+        self::assertSame(['forPay', 'loyaltyDiscount'], $result->unknownRows[0]->nonZeroFields);
     }
 
     /**
