@@ -117,6 +117,7 @@
 ### Ingestion: canonical finance layer
 
 - `FinancialTransaction` is the canonical transaction record produced from normalized raw source rows. Natural key: `(companyId, source, externalId, type)`.
+- **Boundary rule:** `FinancialTransaction` (and any `App\Ingestion\Entity\*` except the documented Variant-B `PLDirtyPeriod`) must not cross a module boundary. `IngestionFacade::getTransactions` projects each entity into a read-only `App\Ingestion\Application\DTO\FinancialTransactionView` (enum fields exposed as scalar `value`) so consumers never receive a managed, mutable entity. Enforced by `tests/Unit/Ingestion/Architecture/EntityBoundaryTest`.
 - Amounts are stored in minor units. Shared `Money` is signed and can represent positive, negative, or zero values; `TransactionDirection` (`IN`/`OUT`) remains the normalized flow classification. `Money` enforces one ISO-4217 currency per arithmetic operation.
 - `operationGroupId` groups decomposed transactions from one source operation for audit and sum-control checks.
 - `SystemCounterparty` is a global source dictionary (`source`, `name`, optional `inn`) for marketplace/system counterparties. It is not tenant-owned and is resolved by source during normalization; missing source rows leave `FinancialTransaction.counterpartyId = null` and are logged.
@@ -425,7 +426,9 @@ Dead code на Task-11.2: Repository ещё никем не вызывается
 ### `IngestionFacade` (`src/Ingestion/Facade/IngestionFacade.php`)
 ```php
 // Канонические финансовые транзакции за период для P&L rebuild.
-// @return iterable<FinancialTransaction>
+// Отдаёт read-only DTO (НЕ managed Entity) — Entity не пересекает границу модуля.
+// Генератор-проектор: память не растёт на больших периодах.
+// @return iterable<App\Ingestion\Application\DTO\FinancialTransactionView>
 getTransactions(string $companyId, DateTimeImmutable $from, DateTimeImmutable $to, ?string $shopRef = null): iterable
 
 // Количество открытых normalization issues по компании.

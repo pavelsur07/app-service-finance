@@ -6,6 +6,7 @@ namespace App\Tests\Integration\Ingestion\Application;
 
 use App\Ingestion\Application\Action\NormalizeRawRecordAction;
 use App\Ingestion\Application\Command\NormalizeRawRecordCommand;
+use App\Ingestion\Application\DTO\FinancialTransactionView;
 use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Entity\FinancialTransaction;
 use App\Ingestion\Entity\IngestRawRecord;
@@ -83,7 +84,7 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
         self::assertSame(
             [$transactions[0]->getId()],
             array_map(
-                static fn (FinancialTransaction $transaction): string => $transaction->getId(),
+                static fn (FinancialTransactionView $transaction): string => $transaction->id,
                 iterator_to_array($facade->getTransactions(
                     $companyId,
                     new \DateTimeImmutable('2026-06-18 00:00:00'),
