@@ -20,8 +20,10 @@ use App\Ingestion\Exception\RawRecordNotFoundException;
 use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Repository\FinancialTransactionRepository;
 use App\Ingestion\Repository\IngestRawRecordRepository;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 final readonly class NormalizeRawRecordAction
@@ -152,6 +154,22 @@ final readonly class NormalizeRawRecordAction
                     affectedPeriods: $affectedPeriods,
                 );
             }
+        } catch (UniqueConstraintViolationException $exception) {
+            // A concurrent normalization of the same raw record (event + cron safety
+            // net) won the race and inserted the same natural key first. The flush
+            // here aborts the transaction; roll back and let Messenger retry. On
+            // retry the rows already exist, so the upserts become no-change (B3) and
+            // this converges without duplicates. No unhandled exception escapes.
+            if ($connection->isTransactionActive()) {
+                $connection->rollBack();
+            }
+
+            $this->logger->info('Concurrent normalization detected for raw record; retrying.', [
+                'companyId' => $command->companyId,
+                'rawRecordId' => $command->rawRecordId,
+            ]);
+
+            throw new RecoverableMessageHandlingException('Concurrent normalization detected; retry expected.', previous: $exception);
         } catch (\Throwable $exception) {
             if ($connection->isTransactionActive()) {
                 $connection->rollBack();

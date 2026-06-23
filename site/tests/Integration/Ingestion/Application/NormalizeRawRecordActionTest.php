@@ -13,15 +13,20 @@ use App\Ingestion\Entity\SystemCounterparty;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\NormalizationIssueKind;
 use App\Ingestion\Enum\RawNormalizationStatus;
+use App\Ingestion\Enum\TransactionDirection;
+use App\Ingestion\Enum\TransactionType;
 use App\Ingestion\Facade\IngestionFacade;
 use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Repository\FinancialTransactionRepository;
 use App\Ingestion\Repository\IngestRawRecordRepository;
 use App\Ingestion\Repository\NormalizationIssueRepository;
+use App\Shared\Domain\ValueObject\Money;
 use App\Tests\Integration\Ingestion\Fixtures\FakeConnector;
 use App\Tests\Integration\Ingestion\Fixtures\NormalizationCompletedRecorder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
 
 final class NormalizeRawRecordActionTest extends IntegrationTestCase
 {
@@ -250,6 +255,68 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
             $rawRecordRepository->findByIdAndCompany($record->getId(), $companyId)?->getNormalizationStatus(),
         );
         self::assertSame([], $recorder->events());
+    }
+
+    public function testConcurrentInsertViolationIsTranslatedToRecoverableRetry(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+
+        $record = $this->storeRawRecord($companyId, [[
+            'externalId' => 'sale-1',
+            'operationGroupId' => Uuid::uuid7()->toString(),
+            'amountMinor' => 10000,
+            'controlAmountMinor' => 10000,
+            'currency' => 'RUB',
+        ]]);
+
+        // Reproduce the lost-race window: a colliding natural key is pending but NOT
+        // flushed, so findByNaturalKey's DB query misses it. It is inserted in the same
+        // batch flush as the upsert's row, raising a unique violation at flush time —
+        // exactly what a concurrent worker that committed first would cause.
+        $this->em->persist($this->financialTransaction($companyId, 'sale-1', 20000));
+
+        /** @var NormalizeRawRecordAction $action */
+        $action = self::getContainer()->get(NormalizeRawRecordAction::class);
+
+        try {
+            $action(new NormalizeRawRecordCommand($record->getId(), $companyId));
+            self::fail('Expected a RecoverableMessageHandlingException.');
+        } catch (RecoverableMessageHandlingException $exception) {
+            self::assertInstanceOf(UniqueConstraintViolationException::class, $exception->getPrevious());
+        }
+
+        // The transaction was rolled back, so no row leaked for this company.
+        self::assertSame(
+            0,
+            (int) $this->connection->fetchOne(
+                'SELECT COUNT(*) FROM ingest_financial_transactions WHERE company_id = ?',
+                [$companyId],
+            ),
+        );
+    }
+
+    private function financialTransaction(string $companyId, string $externalId, int $amount): FinancialTransaction
+    {
+        return new FinancialTransaction(
+            companyId: $companyId,
+            connectionRef: 'connection-1',
+            shopRef: 'shop-1',
+            source: IngestSource::WILDBERRIES,
+            externalId: $externalId,
+            externalUpdatedAt: new \DateTimeImmutable('2026-06-18 10:00:00'),
+            operationGroupId: Uuid::uuid7()->toString(),
+            type: TransactionType::SALE,
+            direction: TransactionDirection::IN,
+            money: Money::fromMinor($amount, 'RUB'),
+            occurredAt: new \DateTimeImmutable('2026-06-18 09:00:00'),
+            rawRecordId: Uuid::uuid7()->toString(),
+            orderRef: null,
+            payoutRef: null,
+            counterpartyId: null,
+            description: null,
+            sourceData: ['amountMinor' => $amount],
+            sourceTz: 'UTC',
+        );
     }
 
     /**
