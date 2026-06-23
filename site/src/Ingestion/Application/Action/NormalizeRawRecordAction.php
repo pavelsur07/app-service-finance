@@ -134,16 +134,24 @@ final readonly class NormalizeRawRecordAction
             }
 
             $this->entityManager->flush();
-            $this->recordControlSumIssues($command->companyId, $rawRecord->getId(), $controlSums);
+            // Mark the raw record DONE before recording control-sum issues: issues are
+            // diagnostic, so a failure there must not leave the record eligible for a
+            // full re-normalization on retry.
             $rawRecord->markNormalizationDone();
+            $this->recordControlSumIssues($command->companyId, $rawRecord->getId(), $controlSums);
             $this->entityManager->flush();
             $connection->commit();
 
-            $event = new NormalizationCompletedEvent(
-                companyId: $command->companyId,
-                rawRecordId: $rawRecord->getId(),
-                affectedPeriods: $affectedPeriods,
-            );
+            // Only publish when something actually changed. If every upsert returned a
+            // no-change result (B3), there is no affected period and nothing for
+            // subscribers (P&L dirty-period marking) to do.
+            if ([] !== $affectedPeriods) {
+                $event = new NormalizationCompletedEvent(
+                    companyId: $command->companyId,
+                    rawRecordId: $rawRecord->getId(),
+                    affectedPeriods: $affectedPeriods,
+                );
+            }
         } catch (\Throwable $exception) {
             if ($connection->isTransactionActive()) {
                 $connection->rollBack();

@@ -97,6 +97,94 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
         self::assertEquals(new \DateTimeImmutable('2026-06-18T09:00:00+00:00'), $events[0]->affectedPeriods[0]->newOccurredAt);
     }
 
+    public function testReNormalizationWithUnchangedContentDoesNotDispatchEvent(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $row = [
+            'externalId' => 'sale-1',
+            'externalUpdatedAt' => '2026-06-18T10:00:00+00:00',
+            'operationGroupId' => Uuid::uuid7()->toString(),
+            'amountMinor' => 10000,
+            'controlAmountMinor' => 10000,
+            'currency' => 'RUB',
+            'occurredAt' => '2026-06-18T09:00:00+00:00',
+        ];
+
+        $recorder = $this->eventRecorder();
+
+        $first = $this->storeRawRecord($companyId, [$row]);
+        $recorder->reset();
+        $this->normalize($first->getId(), $companyId);
+        $this->em->clear();
+
+        self::assertCount(1, $recorder->events());
+
+        // A second raw record with byte-identical content normalizes to the same
+        // natural key; every upsert is a no-change (B3), so no event is published.
+        $second = $this->storeRawRecord($companyId, [$row]);
+        $recorder->reset();
+        $this->normalize($second->getId(), $companyId);
+        $this->em->clear();
+
+        self::assertSame([], $recorder->events());
+
+        /** @var FinancialTransactionRepository $transactionRepository */
+        $transactionRepository = self::getContainer()->get(FinancialTransactionRepository::class);
+        // No duplicate created; the transaction still belongs to the first raw record.
+        self::assertCount(1, $transactionRepository->findByRawRecordId($companyId, $first->getId()));
+        self::assertCount(0, $transactionRepository->findByRawRecordId($companyId, $second->getId()));
+    }
+
+    public function testDispatchesEventOnlyForTransactionsThatChanged(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $rowSale1 = [
+            'externalId' => 'sale-1',
+            'externalUpdatedAt' => '2026-06-18T10:00:00+00:00',
+            'operationGroupId' => Uuid::uuid7()->toString(),
+            'amountMinor' => 10000,
+            'controlAmountMinor' => 10000,
+            'currency' => 'RUB',
+            'occurredAt' => '2026-06-18T09:00:00+00:00',
+        ];
+        $rowSale2 = [
+            'externalId' => 'sale-2',
+            'externalUpdatedAt' => '2026-06-18T10:00:00+00:00',
+            'operationGroupId' => Uuid::uuid7()->toString(),
+            'amountMinor' => 20000,
+            'controlAmountMinor' => 20000,
+            'currency' => 'RUB',
+            'occurredAt' => '2026-06-18T09:00:00+00:00',
+        ];
+
+        $recorder = $this->eventRecorder();
+
+        $first = $this->storeRawRecord($companyId, [$rowSale1, $rowSale2]);
+        $recorder->reset();
+        $this->normalize($first->getId(), $companyId);
+        $this->em->clear();
+
+        $firstEvents = $recorder->events();
+        self::assertCount(1, $firstEvents);
+        self::assertCount(2, $firstEvents[0]->affectedPeriods);
+
+        // Second record: sale-1 byte-identical (no-change), sale-2 a newer version.
+        $rowSale2Changed = $rowSale2;
+        $rowSale2Changed['externalUpdatedAt'] = '2026-06-18T11:00:00+00:00';
+        $rowSale2Changed['amountMinor'] = 25000;
+        $rowSale2Changed['controlAmountMinor'] = 25000;
+
+        $second = $this->storeRawRecord($companyId, [$rowSale1, $rowSale2Changed]);
+        $recorder->reset();
+        $this->normalize($second->getId(), $companyId);
+        $this->em->clear();
+
+        $secondEvents = $recorder->events();
+        self::assertCount(1, $secondEvents);
+        // Only sale-2 changed, so exactly one affected period is reported.
+        self::assertCount(1, $secondEvents[0]->affectedPeriods);
+    }
+
     public function testControlSumMismatchRecordsIssueButMarksRawRecordDone(): void
     {
         $companyId = Uuid::uuid7()->toString();
