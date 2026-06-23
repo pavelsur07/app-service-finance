@@ -10,6 +10,7 @@ use App\Ingestion\Application\DTO\PushRequest;
 use App\Ingestion\Application\DTO\PushResult;
 use App\Ingestion\Application\DTO\ShopDescriptor;
 use App\Ingestion\Domain\Contract\SourceConnectorInterface;
+use App\Ingestion\Domain\Service\SourceDataHasher;
 use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Enum\Capability;
 use App\Ingestion\Enum\IngestSource;
@@ -22,6 +23,7 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
         private OzonAccrualClientInterface $accrualClient,
         private int $chunkSizeDays = 7,
         private int $hotRewindDays = 14,
+        private SourceDataHasher $sourceDataHasher = new SourceDataHasher(),
     ) {
     }
 
@@ -95,6 +97,8 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
                 'metadata' => $page->metadata,
             ];
         }
+
+        $rows = $this->sortRowsCanonically($rows);
 
         $windowHasMore = null !== $request->windowTo && $to < $request->windowTo;
         $nextCursor = $windowHasMore || $this->isIncremental($request) ? $to->modify('+1 day')->format('Y-m-d') : null;
@@ -196,6 +200,35 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
             && '' !== $request->cursorValue
             && null === $request->windowFrom
             && null === $request->windowTo;
+    }
+
+    /**
+     * Order the accrual rows by a deterministic key so the persisted raw payload
+     * hash is stable regardless of the order Ozon returns the rows in.
+     *
+     * @param list<array<string, mixed>> $rows
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function sortRowsCanonically(array $rows): array
+    {
+        usort($rows, function (array $left, array $right): int {
+            return $this->canonicalSortKey($left) <=> $this->canonicalSortKey($right);
+        });
+
+        return array_values($rows);
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private function canonicalSortKey(array $row): string
+    {
+        $date = is_scalar($row['date'] ?? null) ? (string) $row['date'] : '';
+        $accrualId = is_scalar($row['accrual_id'] ?? null) ? (string) $row['accrual_id'] : '';
+
+        // Full-content hash is the tie-breaker for rows sharing date + accrual_id.
+        return $date.'|'.$accrualId.'|'.$this->sourceDataHasher->hash($row);
     }
 
     /**
