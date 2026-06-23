@@ -335,6 +335,10 @@ resolve(string $companyId, array $sourceData): ?string  // MarketplaceListing.id
 | `app:ingestion:normalize-pending` | Страховка: повторная нормализация зависших PENDING | `*/10 * * * *` |
 | `app:ingestion:enrich-pending-cogs` | Страховка: повторное обогащение COGS | `*/30 * * * *` |
 
+`app:ingestion:run-incremental` использует source/resource strategies. Сейчас поддержаны
+`ozon_finance_accrual_by_day` и `wildberries_finance_sales_report_detailed`; без
+`--source` команда обрабатывает оба источника, `--source=ozon|wildberries` ограничивает запуск.
+
 ---
 
 ## Правила модуля (обязательные)

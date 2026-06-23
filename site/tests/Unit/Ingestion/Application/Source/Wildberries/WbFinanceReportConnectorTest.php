@@ -36,7 +36,7 @@ final class WbFinanceReportConnectorTest extends TestCase
         ));
     }
 
-    public function testPullStoresOnePageRawWithoutNormalization(): void
+    public function testPullStoresOnePageRawWithNormalization(): void
     {
         $client = $this->client(new WbFinanceReportPage(
             rows: [['rrdId' => 10, 'docTypeName' => 'Продажа']],
@@ -53,7 +53,7 @@ final class WbFinanceReportConnectorTest extends TestCase
 
         self::assertSame(WbResourceType::FINANCE_SALES_REPORT_DETAILED, $result->rawBatch->resourceType);
         self::assertSame('wb-sales-report-detailed:2026-06-20:rrd-0', $result->rawBatch->externalId);
-        self::assertFalse($result->normalizeRawRecords);
+        self::assertTrue($result->normalizeRawRecords);
         self::assertFalse($result->hasMore);
         self::assertNull($result->nextCursorValue);
         self::assertSame([

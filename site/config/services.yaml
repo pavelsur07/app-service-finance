@@ -187,6 +187,16 @@ services:
         arguments:
             $resolvers: !tagged_iterator app.ingestion.listing_resolver
 
+    App\Ingestion\Command\RunIncrementalCommand:
+        arguments:
+            $strategies: !tagged_iterator app.ingestion.incremental_strategy
+
+    App\Ingestion\Application\Service\OzonAccrualIncrementalStrategy:
+        tags: ['app.ingestion.incremental_strategy']
+
+    App\Ingestion\Application\Service\WbFinanceIncrementalStrategy:
+        tags: ['app.ingestion.incremental_strategy']
+
     App\Ingestion\Application\Source\Ozon\OzonListingResolver:
         tags: ['app.ingestion.listing_resolver']
 

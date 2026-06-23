@@ -6,7 +6,11 @@ namespace App\Tests\Integration\Ingestion\Command;
 
 use App\Company\Entity\Company;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
+use App\Ingestion\Application\Source\Wildberries\WbResourceType;
+use App\Ingestion\DTO\RawBatch;
+use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\SyncJobKind;
+use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Message\RunSyncChunkMessage;
 use App\Ingestion\Repository\IngestCursorRepository;
 use App\Marketplace\Entity\MarketplaceConnection;
@@ -180,13 +184,109 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
         self::assertCount(0, $transport->getSent());
     }
 
-    public function testWildberriesSourceIsSkipped(): void
+    public function testWildberriesSourceSeedsCursorFromLatestRawAndDispatches(): void
     {
+        $company = $this->seedCompany(1008);
+        $connection = $this->seedConnection($company, '77777777-7777-7777-7777-000000001008', MarketplaceType::WILDBERRIES);
+        $this->storeWbRawRecord($company->getId(), $connection->getId(), '2025-01-10');
+
+        $transport = $this->getIngestFetchTransport();
+        $transport->reset();
+
+        $tester = $this->tester('app:ingestion:run-incremental');
+        $exit = $tester->execute([
+            '--source' => 'wildberries',
+            '--company-id' => $company->getId(),
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exit);
+        self::assertStringContainsString('Dispatched 1 incremental jobs', $tester->getDisplay());
+        self::assertSame(1, $this->incrementalJobCount($company->getId()));
+        self::assertCount(1, $transport->getSent());
+
+        /** @var IngestCursorRepository $cursorRepository */
+        $cursorRepository = self::getContainer()->get(IngestCursorRepository::class);
+        $cursor = $cursorRepository->findOne($company->getId(), $connection->getId(), WbResourceType::FINANCE_SALES_REPORT_DETAILED, $connection->getId());
+
+        self::assertNotNull($cursor);
+        self::assertSame('2025-01-11', $cursor->getCursorValue());
+    }
+
+    public function testWildberriesSourceSeedsCursorFromFirstDayOfCurrentMonthWithoutRawHistory(): void
+    {
+        $company = $this->seedCompany(1009);
+        $connection = $this->seedConnection($company, '77777777-7777-7777-7777-000000001009', MarketplaceType::WILDBERRIES);
+
+        $transport = $this->getIngestFetchTransport();
+        $transport->reset();
+
+        $tester = $this->tester('app:ingestion:run-incremental');
+        $exit = $tester->execute([
+            '--source' => 'wildberries',
+            '--company-id' => $company->getId(),
+        ]);
+
+        $expectedSeed = (new \DateTimeImmutable('first day of this month'))->format('Y-m-d');
+        $isSeedDue = new \DateTimeImmutable($expectedSeed) <= (new \DateTimeImmutable('today'))->modify('-1 day')->setTime(0, 0);
+
+        self::assertSame(Command::SUCCESS, $exit);
+        self::assertStringContainsString($isSeedDue ? 'Dispatched 1 incremental jobs' : 'not due: 1', $tester->getDisplay());
+        self::assertSame($isSeedDue ? 1 : 0, $this->incrementalJobCount($company->getId()));
+        self::assertCount($isSeedDue ? 1 : 0, $transport->getSent());
+
+        /** @var IngestCursorRepository $cursorRepository */
+        $cursorRepository = self::getContainer()->get(IngestCursorRepository::class);
+        $cursor = $cursorRepository->findOne($company->getId(), $connection->getId(), WbResourceType::FINANCE_SALES_REPORT_DETAILED, $connection->getId());
+
+        self::assertNotNull($cursor);
+        self::assertSame($expectedSeed, $cursor->getCursorValue());
+    }
+
+    public function testWildberriesCursorThatIsNotDueYetIsSkipped(): void
+    {
+        $company = $this->seedCompany(1010);
+        $connection = $this->seedConnection($company, '77777777-7777-7777-7777-000000001010', MarketplaceType::WILDBERRIES);
+        $this->seedCursor(
+            $company->getId(),
+            $connection->getId(),
+            WbResourceType::FINANCE_SALES_REPORT_DETAILED,
+            $connection->getId(),
+            (new \DateTimeImmutable('tomorrow'))->format('Y-m-d'),
+        );
+
+        $transport = $this->getIngestFetchTransport();
+        $transport->reset();
+
         $tester = $this->tester('app:ingestion:run-incremental');
         $exit = $tester->execute(['--source' => 'wildberries']);
 
         self::assertSame(Command::SUCCESS, $exit);
-        self::assertStringContainsString('not supported yet', $tester->getDisplay());
+        self::assertStringContainsString('not due: 1', $tester->getDisplay());
+        self::assertSame(0, $this->incrementalJobCount($company->getId()));
+        self::assertCount(0, $transport->getSent());
+    }
+
+    public function testDefaultRunDispatchesEligibleOzonAndWildberriesJobs(): void
+    {
+        $ozonCompany = $this->seedCompany(1012);
+        $ozonConnection = $this->seedConnection($ozonCompany, '77777777-7777-7777-7777-000000001012');
+        $this->seedCursor($ozonCompany->getId(), $ozonConnection->getId(), OzonResourceType::ACCRUAL_BY_DAY, $ozonConnection->getId(), '2025-01-10');
+
+        $wbCompany = $this->seedCompany(1013);
+        $wbConnection = $this->seedConnection($wbCompany, '77777777-7777-7777-7777-000000001013', MarketplaceType::WILDBERRIES);
+        $this->seedCursor($wbCompany->getId(), $wbConnection->getId(), WbResourceType::FINANCE_SALES_REPORT_DETAILED, $wbConnection->getId(), '2025-01-10');
+
+        $transport = $this->getIngestFetchTransport();
+        $transport->reset();
+
+        $tester = $this->tester('app:ingestion:run-incremental');
+        $exit = $tester->execute([]);
+
+        self::assertSame(Command::SUCCESS, $exit);
+        self::assertStringContainsString('Dispatched 2 incremental jobs', $tester->getDisplay());
+        self::assertSame(1, $this->incrementalJobCount($ozonCompany->getId()));
+        self::assertSame(1, $this->incrementalJobCount($wbCompany->getId()));
+        self::assertCount(2, $transport->getSent());
     }
 
     private function seedCompany(int $index): Company
@@ -201,12 +301,15 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
         return $company;
     }
 
-    private function seedConnection(Company $company, string $id): MarketplaceConnection
-    {
+    private function seedConnection(
+        Company $company,
+        string $id,
+        MarketplaceType $marketplace = MarketplaceType::OZON,
+    ): MarketplaceConnection {
         $connection = new MarketplaceConnection(
             id: $id,
             company: $company,
-            marketplace: MarketplaceType::OZON,
+            marketplace: $marketplace,
             connectionType: MarketplaceConnectionType::SELLER,
         );
         $connection->setApiKey('test-key');
@@ -217,6 +320,29 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
         $this->em->flush();
 
         return $connection;
+    }
+
+    private function storeWbRawRecord(string $companyId, string $connectionRef, string $date): void
+    {
+        /** @var RawStorageFacade $facade */
+        $facade = self::getContainer()->get(RawStorageFacade::class);
+
+        $facade->store(new RawBatch(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            shopRef: $connectionRef,
+            source: IngestSource::WILDBERRIES,
+            resourceType: WbResourceType::FINANCE_SALES_REPORT_DETAILED,
+            externalId: sprintf('wb-sales-report-detailed:%s:rrd-0', $date),
+            syncJobId: Uuid::uuid7()->toString(),
+            fetchedAt: new \DateTimeImmutable(sprintf('%s 10:00:00+00:00', $date)),
+            rows: [[
+                'rrdId' => 1,
+                'rrDate' => $date,
+                'currency' => 'RUB',
+            ]],
+        ));
+        $this->em->flush();
     }
 
     private function seedCursor(

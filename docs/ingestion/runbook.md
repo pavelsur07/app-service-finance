@@ -125,15 +125,17 @@ GROUP BY status;
 ```bash
 docker exec -it scheduler php /app/bin/console app:ingestion:run-incremental \
   --env=prod \
-  --source=ozon \
+  --source=wildberries \
   --company-id=UUID \
   --limit=1 \
   --no-interaction \
   -vv
 ```
 
-**Важно:** инкремент запускается только если есть cursor. Если `skippedWithoutCursor > 0`
-— сначала нужен backfill.
+`--source` можно опустить, чтобы запустить все поддержанные источники, или указать
+`ozon` / `wildberries` для точечной проверки. Ozon cursor seed-ится из legacy cursor
+или первого дня месяца. WB finance cursor seed-ится от последнего raw report date + 1 день,
+а если истории нет — с первого дня текущего месяца.
 
 ---
 

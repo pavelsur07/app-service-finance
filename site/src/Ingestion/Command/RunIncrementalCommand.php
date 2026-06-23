@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace App\Ingestion\Command;
 
-use App\Ingestion\Application\Action\EnsureOzonAccrualCursorAction;
-use App\Ingestion\Application\Command\EnsureOzonAccrualCursorCommand;
 use App\Ingestion\Application\Command\StartIncrementalCommand as StartIncrementalApplicationCommand;
-use App\Ingestion\Application\Source\Ozon\OzonResourceType;
+use App\Ingestion\Application\Service\IncrementalResourceStrategyInterface;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Exception\ActiveBackfillExistsException;
 use App\Ingestion\Facade\SyncFacade;
@@ -32,26 +30,31 @@ final class RunIncrementalCommand extends Command
     use LockableTrait;
 
     /**
-     * @var list<string>
+     * @var list<IncrementalResourceStrategyInterface>
      */
-    private const OZON_RESOURCE_TYPES = [
-        OzonResourceType::ACCRUAL_BY_DAY,
-    ];
+    private array $strategies;
 
+    /**
+     * @param iterable<IncrementalResourceStrategyInterface> $strategies
+     */
     public function __construct(
         private readonly ActiveSellerConnectionsQuery $connectionsQuery,
         private readonly IngestCursorRepository $cursorRepository,
         private readonly SyncFacade $syncFacade,
-        private readonly EnsureOzonAccrualCursorAction $ensureOzonAccrualCursorAction,
+        iterable $strategies,
         private readonly LoggerInterface $logger,
     ) {
+        $this->strategies = $strategies instanceof \Traversable
+            ? array_values(iterator_to_array($strategies, false))
+            : array_values(is_array($strategies) ? $strategies : []);
+
         parent::__construct();
     }
 
     protected function configure(): void
     {
         $this
-            ->addOption('source', null, InputOption::VALUE_REQUIRED, 'Optional source filter. Only "ozon" is supported now.')
+            ->addOption('source', null, InputOption::VALUE_REQUIRED, 'Optional source filter.')
             ->addOption('company-id', null, InputOption::VALUE_REQUIRED, 'Optional company UUID filter.')
             ->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Maximum companies per tick.', 50);
     }
@@ -76,7 +79,7 @@ final class RunIncrementalCommand extends Command
     private function runIncremental(InputInterface $input, SymfonyStyle $io): int
     {
         try {
-            $source = $this->source($input);
+            $source = $this->sourceFilter($input);
             $companyId = $this->companyId($input);
             $limit = $this->limit($input);
         } catch (\Throwable $exception) {
@@ -85,10 +88,12 @@ final class RunIncrementalCommand extends Command
             return Command::FAILURE;
         }
 
-        if (IngestSource::OZON !== $source) {
-            $io->warning(sprintf('Incremental ingestion for "%s" is not supported yet.', $source->value));
+        $strategies = $this->strategiesForSource($source);
+        if ([] === $strategies) {
+            $sourceValue = $source?->value ?? 'all';
+            $io->warning(sprintf('No incremental ingestion strategies are registered for "%s".', $sourceValue));
             $this->logger->info('Ingestion incremental skipped because source is not supported yet.', [
-                'source' => $source->value,
+                'source' => $sourceValue,
                 'companyId' => $companyId,
             ]);
 
@@ -104,19 +109,19 @@ final class RunIncrementalCommand extends Command
         $failed = 0;
 
         foreach ($connections as $connection) {
-            if (IngestSource::OZON->value !== (string) $connection['marketplace']) {
-                continue;
-            }
-
             $connectionCompanyId = (string) $connection['company_id'];
             if (null !== $companyId && $connectionCompanyId !== $companyId) {
                 continue;
             }
 
             $connectionRef = (string) $connection['id'];
-            ($this->ensureOzonAccrualCursorAction)(new EnsureOzonAccrualCursorCommand($connectionCompanyId, $connectionRef));
+            foreach ($strategies as $strategy) {
+                if (!$strategy->supportsConnection($connection)) {
+                    continue;
+                }
 
-            foreach (self::OZON_RESOURCE_TYPES as $resourceType) {
+                $strategy->ensureCursor($connectionCompanyId, $connectionRef);
+                $resourceType = $strategy->resourceType();
                 $cursors = $this->cursorRepository->findByResource($connectionCompanyId, $connectionRef, $resourceType);
                 if ([] === $cursors) {
                     ++$skippedWithoutCursor;
@@ -129,7 +134,7 @@ final class RunIncrementalCommand extends Command
                         continue;
                     }
 
-                    if (!$this->cursorHasDueWork($resourceType, $cursor->getCursorValue())) {
+                    if (!$strategy->cursorIsDue($cursor->getCursorValue())) {
                         ++$skippedNotDue;
                         continue;
                     }
@@ -145,6 +150,7 @@ final class RunIncrementalCommand extends Command
                     }
                     $eligibleWork[$connectionCompanyId]['jobs'][] = [
                         'connectionRef' => $connectionRef,
+                        'source' => $strategy->source(),
                         'resourceType' => $resourceType,
                         'shopRef' => $cursor->getShopRef(),
                     ];
@@ -167,7 +173,7 @@ final class RunIncrementalCommand extends Command
                     $this->syncFacade->startIncremental(new StartIncrementalApplicationCommand(
                         companyId: $connectionCompanyId,
                         connectionRef: $job['connectionRef'],
-                        source: IngestSource::OZON,
+                        source: $job['source'],
                         resourceType: $job['resourceType'],
                         shopRef: $job['shopRef'],
                     ));
@@ -186,7 +192,7 @@ final class RunIncrementalCommand extends Command
                     $this->logger->warning('Failed to dispatch ingestion incremental job.', [
                         'companyId' => $connectionCompanyId,
                         'connectionRef' => $job['connectionRef'],
-                        'source' => IngestSource::OZON->value,
+                        'source' => $job['source']->value,
                         'resourceType' => $job['resourceType'],
                         'shopRef' => $job['shopRef'],
                         'exceptionClass' => $exception::class,
@@ -204,7 +210,7 @@ final class RunIncrementalCommand extends Command
             'skippedActive' => $skippedActive,
             'companyLimit' => $limit,
             'companyId' => $companyId,
-            'source' => $source->value,
+            'source' => $source?->value ?? 'all',
         ]);
 
         $io->success(sprintf(
@@ -219,11 +225,11 @@ final class RunIncrementalCommand extends Command
         return 0 === $dispatched && $failed > 0 ? Command::FAILURE : Command::SUCCESS;
     }
 
-    private function source(InputInterface $input): IngestSource
+    private function sourceFilter(InputInterface $input): ?IngestSource
     {
         $value = trim((string) $input->getOption('source'));
         if ('' === $value) {
-            return IngestSource::OZON;
+            return null;
         }
 
         $source = IngestSource::tryFrom($value);
@@ -232,6 +238,21 @@ final class RunIncrementalCommand extends Command
         }
 
         return $source;
+    }
+
+    /**
+     * @return list<IncrementalResourceStrategyInterface>
+     */
+    private function strategiesForSource(?IngestSource $source): array
+    {
+        if (null === $source) {
+            return $this->strategies;
+        }
+
+        return array_values(array_filter(
+            $this->strategies,
+            static fn (IncrementalResourceStrategyInterface $strategy): bool => $strategy->source() === $source,
+        ));
     }
 
     private function companyId(InputInterface $input): ?string
@@ -259,30 +280,5 @@ final class RunIncrementalCommand extends Command
         }
 
         return $limit;
-    }
-
-    private function cursorHasDueWork(string $resourceType, string $cursorValue): bool
-    {
-        if (OzonResourceType::ACCRUAL_BY_DAY !== $resourceType) {
-            return true;
-        }
-
-        $cursorDate = $this->normalizedCursorDate($cursorValue);
-        if (null === $cursorDate) {
-            return true;
-        }
-
-        $yesterday = (new \DateTimeImmutable('today'))->modify('-1 day')->setTime(0, 0);
-
-        return new \DateTimeImmutable($cursorDate) <= $yesterday;
-    }
-
-    private function normalizedCursorDate(string $cursorValue): ?string
-    {
-        try {
-            return (new \DateTimeImmutable($cursorValue))->format('Y-m-d');
-        } catch (\Throwable) {
-            return null;
-        }
     }
 }
