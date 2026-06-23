@@ -44,8 +44,8 @@ final class MiniTreeFactory
         $c->setFormat($fmt);
         $c->setSortOrder($sort);
         if ($parent) {
+            // setParent maintains the inverse side (parent.children); no manual add.
             $c->setParent($parent);
-            $parent->getChildren()->add($c);
         }
         if ($formula) {
             $c->setFormula($formula);

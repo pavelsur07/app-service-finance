@@ -117,6 +117,20 @@ class PLCategory
 
     public function setParent(?self $parent): self
     {
+        // Keep the inverse side (parent.children) in sync so an in-memory tree
+        // exposes its children immediately, without waiting for an EntityManager
+        // reload. Report rollups iterate getChildren() in memory, so a stale
+        // (empty) collection silently zeroes out SUBTOTAL categories.
+        if ($this->parent !== $parent) {
+            if (null !== $this->parent) {
+                $this->parent->children->removeElement($this);
+            }
+
+            if (null !== $parent && !$parent->children->contains($this)) {
+                $parent->children->add($this);
+            }
+        }
+
         $this->parent = $parent;
         $this->level = $parent ? $parent->getLevel() + 1 : 1;
         Assert::range($this->level, 1, 5);
