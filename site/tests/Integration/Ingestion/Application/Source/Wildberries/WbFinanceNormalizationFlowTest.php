@@ -121,6 +121,34 @@ final class WbFinanceNormalizationFlowTest extends IntegrationTestCase
         self::assertStringContainsString('unmapped non-zero fields', $issues[0]->getDetails()['message']);
     }
 
+    public function testEmptyWildberriesFinanceRawRecordNormalizesWithoutTransactions(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $record = $this->storeRawRecord($companyId, [[
+            '_ingestion_empty' => true,
+            '_ingestion_resource' => WbResourceType::FINANCE_SALES_REPORT_DETAILED,
+            '_ingestion_metadata' => ['date' => '2026-06-22', 'statusCode' => 204],
+        ]]);
+
+        $this->normalize($record->getId(), $companyId);
+        $this->em->clear();
+
+        /** @var IngestRawRecordRepository $rawRecordRepository */
+        $rawRecordRepository = self::getContainer()->get(IngestRawRecordRepository::class);
+        self::assertSame(
+            RawNormalizationStatus::DONE,
+            $rawRecordRepository->findByIdAndCompany($record->getId(), $companyId)?->getNormalizationStatus(),
+        );
+
+        /** @var FinancialTransactionRepository $transactionRepository */
+        $transactionRepository = self::getContainer()->get(FinancialTransactionRepository::class);
+        self::assertSame([], $transactionRepository->findByRawRecordId($companyId, $record->getId()));
+
+        /** @var NormalizationIssueRepository $issueRepository */
+        $issueRepository = self::getContainer()->get(NormalizationIssueRepository::class);
+        self::assertSame([], $issueRepository->findOpenByRawRecord($companyId, $record->getId()));
+    }
+
     /**
      * @param list<array<string, mixed>> $rows
      */
