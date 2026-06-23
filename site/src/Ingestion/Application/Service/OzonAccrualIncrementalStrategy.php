@@ -8,11 +8,15 @@ use App\Ingestion\Application\Action\EnsureOzonAccrualCursorAction;
 use App\Ingestion\Application\Command\EnsureOzonAccrualCursorCommand;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Enum\IngestSource;
+use Symfony\Component\Clock\ClockInterface;
 
-final readonly class OzonAccrualIncrementalStrategy implements IncrementalResourceStrategyInterface
+final readonly class OzonAccrualIncrementalStrategy extends AbstractDailyCursorIncrementalStrategy
 {
-    public function __construct(private EnsureOzonAccrualCursorAction $ensureCursorAction)
-    {
+    public function __construct(
+        private EnsureOzonAccrualCursorAction $ensureCursorAction,
+        ClockInterface $clock,
+    ) {
+        parent::__construct($clock);
     }
 
     public function source(): IngestSource
@@ -33,29 +37,5 @@ final readonly class OzonAccrualIncrementalStrategy implements IncrementalResour
     public function ensureCursor(string $companyId, string $connectionRef): void
     {
         ($this->ensureCursorAction)(new EnsureOzonAccrualCursorCommand($companyId, $connectionRef));
-    }
-
-    public function cursorIsDue(string $cursorValue): bool
-    {
-        $cursorDate = $this->normalizedCursorDate($cursorValue);
-        if (null === $cursorDate) {
-            return true;
-        }
-
-        return new \DateTimeImmutable($cursorDate) <= $this->yesterday();
-    }
-
-    private function normalizedCursorDate(string $cursorValue): ?string
-    {
-        try {
-            return (new \DateTimeImmutable($cursorValue))->format('Y-m-d');
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    private function yesterday(): \DateTimeImmutable
-    {
-        return (new \DateTimeImmutable('today'))->modify('-1 day')->setTime(0, 0);
     }
 }

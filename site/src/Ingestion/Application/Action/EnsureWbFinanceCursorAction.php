@@ -11,6 +11,7 @@ use App\Ingestion\Repository\IngestCursorRepository;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\Clock\ClockInterface;
 
 final readonly class EnsureWbFinanceCursorAction
 {
@@ -18,6 +19,7 @@ final readonly class EnsureWbFinanceCursorAction
         private IngestCursorRepository $cursorRepository,
         private Connection $connection,
         private EntityManagerInterface $entityManager,
+        private ClockInterface $clock,
     ) {
     }
 
@@ -44,11 +46,12 @@ final readonly class EnsureWbFinanceCursorAction
             return $latestRawDate->modify('+1 day')->format('Y-m-d');
         }
 
-        return (new \DateTimeImmutable('first day of this month'))->format('Y-m-d');
+        return $this->clock->now()->modify('first day of this month')->format('Y-m-d');
     }
 
     private function latestRawReportDate(EnsureWbFinanceCursorCommand $command): ?\DateTimeImmutable
     {
+        // WbFinanceReportConnector stores raw pages as wb-sales-report-detailed:YYYY-MM-DD:rrd-N.
         $value = $this->connection->fetchOne(
             "SELECT MAX(substring(external_id from '^wb-sales-report-detailed:([0-9]{4}-[0-9]{2}-[0-9]{2}):rrd-[0-9]+$')::date)
              FROM ingest_raw_records
