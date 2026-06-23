@@ -336,6 +336,59 @@ final class RunSyncChunkHandlerTest extends IntegrationTestCase
         self::assertNull($retryableJob->getLastError());
     }
 
+    public function testTransientThrowableKeepsJobRetryableThenCompletesOnRetry(): void
+    {
+        $fakeConnector = $this->fakeConnector();
+        $fakeConnector->reset();
+        $fakeConnector->failNextPullWith(new \RuntimeException('Transient database deadlock.'));
+
+        $companyId = Uuid::uuid7()->toString();
+        $job = new SyncJob(
+            companyId: $companyId,
+            connectionRef: 'connection-1',
+            source: IngestSource::WILDBERRIES,
+            resourceType: FakeConnector::RESOURCE_TYPE,
+            kind: SyncJobKind::BACKFILL,
+            windowFrom: new \DateTimeImmutable('2026-06-18'),
+            windowTo: new \DateTimeImmutable('2026-06-18'),
+            shopRef: 'shop-1',
+        );
+
+        $this->em->persist($job);
+        $this->em->flush();
+
+        $this->getNormalizeTransport()->reset();
+
+        /** @var RunSyncChunkHandler $handler */
+        $handler = self::getContainer()->get(RunSyncChunkHandler::class);
+
+        /** @var SyncJobRepository $jobRepository */
+        $jobRepository = self::getContainer()->get(SyncJobRepository::class);
+
+        // First attempt: a generic transient failure must NOT mark the job FAILED; it
+        // is rethrown so the Messenger retry strategy can apply.
+        try {
+            $handler(new RunSyncChunkMessage($companyId, $job->getId()));
+            self::fail('Expected the transient failure to be rethrown.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame('Transient database deadlock.', $exception->getMessage());
+        }
+        $this->em->clear();
+
+        $retryableJob = $jobRepository->findByIdAndCompany($job->getId(), $companyId);
+        self::assertNotNull($retryableJob);
+        self::assertSame(SyncJobStatus::RUNNING, $retryableJob->getStatus());
+        self::assertNull($retryableJob->getLastError());
+
+        // Retry attempt: the connector now succeeds, so the job completes.
+        $handler(new RunSyncChunkMessage($companyId, $job->getId()));
+        $this->em->clear();
+
+        $completedJob = $jobRepository->findByIdAndCompany($job->getId(), $companyId);
+        self::assertNotNull($completedJob);
+        self::assertSame(SyncJobStatus::COMPLETED, $completedJob->getStatus());
+    }
+
     private function fakeConnector(): FakeConnector
     {
         /** @var FakeConnector $connector */

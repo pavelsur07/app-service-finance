@@ -30,10 +30,21 @@ final class FakeConnector implements SourceConnectorInterface
      */
     private array $queuedPullResults = [];
 
+    private ?\Throwable $nextPullFailure = null;
+
     public function reset(): void
     {
         $this->pullRequests = [];
         $this->queuedPullResults = [];
+        $this->nextPullFailure = null;
+    }
+
+    /**
+     * Make the next pull() throw the given exception exactly once, then behave normally.
+     */
+    public function failNextPullWith(\Throwable $exception): void
+    {
+        $this->nextPullFailure = $exception;
     }
 
     public function enqueuePullResult(
@@ -93,6 +104,14 @@ final class FakeConnector implements SourceConnectorInterface
     public function pull(PullRequest $request): PullResult
     {
         $this->pullRequests[] = $request;
+
+        if (null !== $this->nextPullFailure) {
+            $failure = $this->nextPullFailure;
+            $this->nextPullFailure = null;
+
+            throw $failure;
+        }
+
         $result = array_shift($this->queuedPullResults) ?? [
             'externalId' => sprintf('fake-report-%s', $request->syncJobId),
             'nextCursorValue' => 'cursor-after-fake-sale-1',

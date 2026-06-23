@@ -153,7 +153,17 @@ final readonly class RunSyncChunkHandler
 
             throw $exception;
         } catch (\Throwable $exception) {
-            $this->markJobFailed($job->getId(), $job->getCompanyId(), $this->failureReason($exception));
+            // Transient/unexpected failures must NOT terminate the job here: doing so
+            // turned every deadlock, socket drop or OOM into an immediate FAILED, and
+            // the terminal-status early return above made Messenger retries a no-op.
+            // Rethrow instead so the retry strategy applies; SyncJobFailureSubscriber
+            // marks the job FAILED once retries are exhausted.
+            $this->logger->warning('Ingestion sync chunk failed; message will be retried.', [
+                'companyId' => $job->getCompanyId(),
+                'jobId' => $job->getId(),
+                'exceptionClass' => $exception::class,
+                'errorMessage' => $exception->getMessage(),
+            ]);
 
             throw $exception;
         } finally {
@@ -190,16 +200,6 @@ final readonly class RunSyncChunkHandler
                 'errorMessage' => $exception->getMessage(),
             ]);
         }
-    }
-
-    private function failureReason(\Throwable $exception): string
-    {
-        $message = $exception->getMessage();
-        if ('' === $message) {
-            $message = $exception::class;
-        }
-
-        return substr($message, 0, 2000);
     }
 
     private function releaseLock(?LockInterface $lock): void
