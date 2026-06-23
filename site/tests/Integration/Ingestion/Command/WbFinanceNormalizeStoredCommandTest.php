@@ -15,6 +15,7 @@ use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Message\NormalizeRawRecordMessage;
 use App\Ingestion\Repository\FinancialTransactionRepository;
 use App\Ingestion\Repository\IngestRawRecordRepository;
+use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -190,6 +191,61 @@ final class WbFinanceNormalizeStoredCommandTest extends IntegrationTestCase
         self::assertStringContainsString('Normalized 1 Wildberries finance raw records inline.', $tester->getDisplay());
     }
 
+    public function testExecuteInlineMarksUnexpectedNormalizationExceptionAsFailed(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+        $record = $this->storeRawRecord(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            externalId: 'wb-sales-report-detailed:2026-06-21:rrd-0',
+            fetchedAt: new \DateTimeImmutable('2026-06-22 09:17:43+00:00'),
+            rows: [$this->emptyRow(21)],
+        );
+        $record->markNormalizationSkipped();
+        $this->em->persist(new NormalizationIssue(
+            companyId: $companyId,
+            rawRecordId: $record->getId(),
+            operationGroupId: null,
+            kind: NormalizationIssueKind::MAPPER_FAILURE,
+            details: ['message' => 'old failure'],
+        ));
+        $this->em->flush();
+
+        /** @var ObjectStorageInterface $objectStorage */
+        $objectStorage = self::getContainer()->get(ObjectStorageInterface::class);
+        $corruptedPayload = gzencode("{bad json}\n", 6);
+        self::assertIsString($corruptedPayload);
+        $objectStorage->write($record->getStoragePath(), $corruptedPayload);
+        $this->em->clear();
+
+        $tester = $this->tester();
+        $exit = $tester->execute([
+            '--company-id' => $companyId,
+            '--from' => '2026-06-21',
+            '--to' => '2026-06-21',
+            '--shop-ref' => $connectionRef,
+            '--execute-inline' => true,
+        ]);
+
+        self::assertSame(Command::FAILURE, $exit, $tester->getDisplay());
+        self::assertSame(RawNormalizationStatus::FAILED, $this->rawStatusById($companyId, $record->getId()));
+        self::assertSame(1, $this->openIssueCount($companyId, $record->getId()));
+        self::assertStringContainsString('Inline normalization finished with 1 non-done raw records.', $tester->getDisplay());
+
+        $retryTester = $this->tester();
+        $retryExit = $retryTester->execute([
+            '--company-id' => $companyId,
+            '--from' => '2026-06-21',
+            '--to' => '2026-06-21',
+            '--shop-ref' => $connectionRef,
+            '--dry-run' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $retryExit);
+        self::assertStringContainsString('wb-sales-report-detailed:2026-06-21:rrd-0', $retryTester->getDisplay());
+    }
+
     private function tester(): CommandTester
     {
         $app = new Application(self::$kernel);
@@ -239,10 +295,15 @@ final class WbFinanceNormalizeStoredCommandTest extends IntegrationTestCase
 
     private function rawStatus(IngestRawRecord $record): RawNormalizationStatus
     {
+        return $this->rawStatusById($record->getCompanyId(), $record->getId());
+    }
+
+    private function rawStatusById(string $companyId, string $rawRecordId): RawNormalizationStatus
+    {
         /** @var IngestRawRecordRepository $repository */
         $repository = self::getContainer()->get(IngestRawRecordRepository::class);
 
-        return $repository->findByIdAndCompany($record->getId(), $record->getCompanyId())?->getNormalizationStatus()
+        return $repository->findByIdAndCompany($rawRecordId, $companyId)?->getNormalizationStatus()
             ?? throw new \RuntimeException('Raw record was not found.');
     }
 

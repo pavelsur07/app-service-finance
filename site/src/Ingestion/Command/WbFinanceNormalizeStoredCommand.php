@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Ingestion\Command;
 
 use App\Ingestion\Application\Action\NormalizeRawRecordAction;
+use App\Ingestion\Application\Action\RecordNormalizationIssueAction;
 use App\Ingestion\Application\Command\NormalizeRawRecordCommand;
+use App\Ingestion\Application\Command\RecordNormalizationIssueCommand;
 use App\Ingestion\Application\Source\Wildberries\WbResourceType;
 use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Enum\IngestSource;
+use App\Ingestion\Enum\NormalizationIssueKind;
 use App\Ingestion\Enum\RawNormalizationStatus;
 use App\Ingestion\Message\NormalizeRawRecordMessage;
 use App\Ingestion\Repository\IngestRawRecordRepository;
@@ -38,6 +41,7 @@ final class WbFinanceNormalizeStoredCommand extends Command
         private readonly EntityManagerInterface $entityManager,
         private readonly MessageBusInterface $messageBus,
         private readonly NormalizeRawRecordAction $normalizeRawRecordAction,
+        private readonly RecordNormalizationIssueAction $recordNormalizationIssueAction,
     ) {
         parent::__construct();
     }
@@ -218,6 +222,8 @@ final class WbFinanceNormalizeStoredCommand extends Command
             try {
                 ($this->normalizeRawRecordAction)(new NormalizeRawRecordCommand($rawRecordId, $companyId));
             } catch (\Throwable $exception) {
+                $this->markInlineFailure($record, $exception);
+
                 $resultRows[] = [
                     'rawId' => $rawRecordId,
                     'status' => 'error',
@@ -260,6 +266,23 @@ final class WbFinanceNormalizeStoredCommand extends Command
         }
 
         return $records;
+    }
+
+    private function markInlineFailure(IngestRawRecord $record, \Throwable $exception): void
+    {
+        $record->markNormalizationFailed();
+        ($this->recordNormalizationIssueAction)(new RecordNormalizationIssueCommand(
+            companyId: $record->getCompanyId(),
+            rawRecordId: $record->getId(),
+            operationGroupId: null,
+            kind: NormalizationIssueKind::MAPPER_FAILURE,
+            details: [
+                'exceptionClass' => $exception::class,
+                'message' => $exception->getMessage(),
+                'source' => 'wb_finance_normalize_stored_inline',
+            ],
+        ));
+        $this->entityManager->flush();
     }
 
     private function resolveOpenIssues(string $companyId, string $rawRecordId): void
