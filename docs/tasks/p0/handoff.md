@@ -82,9 +82,10 @@ Stage Reports: `docs/tasks/p0/stages/stage-B{1..8}.md`. План: `docs/tasks/p0
 
 ## 6. Открытые вопросы / follow-ups (вне scope Phase 0)
 
-- **O1 (требует прод-доступа — не проверено):** есть ли в проде raw_records со старой формулой
-  fallback (`fallback-N-...`)? После B1 они станут «осиротевшими» FinancialTransaction'ами.
-  **Подтвердить запросом к проду перед merge B1**; при необходимости — одноразовый бэкфилл/сверка.
+- **O1 — ✅ ЗАКРЫТ (проверено в проде).** Запрос
+  `SELECT count(*) FROM ingest_financial_transactions WHERE external_id ~ 'fallback-[0-9]+-'`
+  на боевой БД вернул **0**. Записей со старой формулой (`fallback-N-...`) в проде нет →
+  осиротевших транзакций после B1 не будет, бэкфилл/сверка **не требуются**.
 - Issues-дедуп (часть B7 спеки) — не делался: в Phase 0 нет уникального индекса на issues.
 - §4.5 BLOCKED_BY_CLOSE skip — решить, нужно ли менять `MarkPnlPeriodDirtyAction` (follow-up).
 - Полный `IdempotentHandlerTrait` с `processed_messages` — отложен (A2).
