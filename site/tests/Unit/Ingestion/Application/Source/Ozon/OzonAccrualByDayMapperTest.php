@@ -9,6 +9,7 @@ use App\Ingestion\Application\Source\Ozon\OzonAccrualByDayMapper;
 use App\Ingestion\Application\Source\Ozon\OzonAccrualByDayPreviewMapper;
 use App\Ingestion\Application\Source\Ozon\OzonMoneyParser;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
+use App\Ingestion\Domain\Service\SourceDataHasher;
 use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\TransactionDirection;
@@ -150,7 +151,7 @@ final class OzonAccrualByDayMapperTest extends TestCase
 
     private function mapper(): OzonAccrualByDayMapper
     {
-        return new OzonAccrualByDayMapper(new OzonAccrualByDayPreviewMapper(new OzonMoneyParser()));
+        return new OzonAccrualByDayMapper(new OzonAccrualByDayPreviewMapper(new OzonMoneyParser(), new SourceDataHasher()));
     }
 
     private function rawRecord(string $companyId): IngestRawRecord

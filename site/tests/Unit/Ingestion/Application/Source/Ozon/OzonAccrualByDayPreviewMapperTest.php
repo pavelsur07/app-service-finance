@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Ingestion\Application\Source\Ozon;
 use App\Ingestion\Application\Source\Ozon\OzonAccrualByDayPreviewMapper;
 use App\Ingestion\Application\Source\Ozon\OzonAccrualPreviewTransaction;
 use App\Ingestion\Application\Source\Ozon\OzonMoneyParser;
+use App\Ingestion\Domain\Service\SourceDataHasher;
 use App\Ingestion\Enum\TransactionDirection;
 use App\Ingestion\Enum\TransactionType;
 use PHPUnit\Framework\TestCase;
@@ -217,6 +218,35 @@ final class OzonAccrualByDayPreviewMapperTest extends TestCase
         self::assertSame('ozon:accrual-by-day:53675409101:commission:product-0', $rows[0]->sourceKey);
     }
 
+    public function testFallbackAccrualIdIsIndependentOfRowOrder(): void
+    {
+        $rowA = $this->fallbackPostingRow('2026-06-13', '-10', '41774559-0885-1');
+        $rowB = $this->fallbackPostingRow('2026-06-14', '-20', '41774559-0885-2');
+
+        $forward = $this->mapper()->preview('19621cff-b028-45d9-9193-11f47ad9a8b2', [$rowA, $rowB]);
+        $reversed = $this->mapper()->preview('19621cff-b028-45d9-9193-11f47ad9a8b2', [$rowB, $rowA]);
+
+        $forwardKeys = array_map(static fn (OzonAccrualPreviewTransaction $row): string => $row->sourceKey, $forward);
+        $reversedKeys = array_map(static fn (OzonAccrualPreviewTransaction $row): string => $row->sourceKey, $reversed);
+
+        sort($forwardKeys);
+        sort($reversedKeys);
+
+        self::assertSame($forwardKeys, $reversedKeys);
+        self::assertStringContainsString('ozon:accrual-by-day:fallback-', $forward[0]->sourceKey);
+    }
+
+    public function testFallbackAccrualIdDiffersForDistinctRowContent(): void
+    {
+        $rowA = $this->fallbackPostingRow('2026-06-13', '-10', '41774559-0885-1');
+        $rowB = $this->fallbackPostingRow('2026-06-13', '-11', '41774559-0885-1');
+
+        $idA = $this->mapper()->preview('19621cff-b028-45d9-9193-11f47ad9a8b2', [$rowA])[0]->sourceKey;
+        $idB = $this->mapper()->preview('19621cff-b028-45d9-9193-11f47ad9a8b2', [$rowB])[0]->sourceKey;
+
+        self::assertNotSame($idA, $idB);
+    }
+
     /**
      * @param list<OzonAccrualPreviewTransaction> $rows
      */
@@ -233,7 +263,28 @@ final class OzonAccrualByDayPreviewMapperTest extends TestCase
 
     private function mapper(): OzonAccrualByDayPreviewMapper
     {
-        return new OzonAccrualByDayPreviewMapper(new OzonMoneyParser());
+        return new OzonAccrualByDayPreviewMapper(new OzonMoneyParser(), new SourceDataHasher());
+    }
+
+    /**
+     * Posting row WITHOUT an accrual_id, forcing the deterministic fallback id.
+     *
+     * @return array<string, mixed>
+     */
+    private function fallbackPostingRow(string $date, string $amount, string $unitNumber): array
+    {
+        return [
+            'date' => $date,
+            'unit_number' => $unitNumber,
+            'accrued_category' => 'POSTING',
+            'posting' => [
+                'products' => [[
+                    'commission' => [
+                        'commission' => ['amount' => $amount, 'currency' => 'RUB'],
+                    ],
+                ]],
+            ],
+        ];
     }
 
     /**
