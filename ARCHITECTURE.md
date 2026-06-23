@@ -166,10 +166,12 @@
 - `PLDailyTotal` and `PLMonthlySnapshot` now have nullable `rebuiltAt` audit columns. Legacy writers leave them `NULL`; future canonical rebuild code sets them when it owns the recalculation.
 - Existing P&L aggregate tables do not store `shop_ref` and must not receive a source/shop dimension. Repository delete methods support all-shop monthly cleanup (`shopRef = ''`) and reject non-empty `shopRef`; source linkage should be decided later at `Document` / `DocumentOperation` level under `docs/tasks/ingestion/FOLLOWUP-finance-source-linking.md`.
 - `NormalizationCompletedSubscriber` listens to Ingestion normalization events and dispatches `MarkPnlPeriodDirtyMessage`; it does not rebuild P&L inline.
-- `MarkPnlPeriodDirtyAction` is idempotent. Existing `DONE`/`FAILED` periods are reopened to `PENDING`; already pending/rebuilding/blocked periods are left unchanged.
+- `MarkPnlPeriodDirtyAction` is idempotent. Existing `DONE`/`FAILED`/`BLOCKED_BY_CLOSE` periods are reopened to `PENDING`; `PENDING`/`REBUILDING` periods are left unchanged. (Note: `TASK-PHASE0` §4.5 envisioned leaving `BLOCKED_BY_CLOSE` untouched; current code reopens it. Changing that is out of Phase 0 scope — verify-only — and tracked as a follow-up.)
 - `RebuildPnlPeriodAction` owns the Redis/Symfony Lock, close-period guard, delete-then-upsert rebuild, and `rebuiltAt` audit marking. It supports only all-source/all-shop rebuild (`shopRef = ''`) until Finance source-linking is decided.
 - `RebuildDirtyPnlPeriodsCommand` only dispatches `RebuildPnlPeriodMessage` jobs for pending dirty periods. No production cron entry is added by Ingestion Stage 8.
 - `pnl_rebuild` Messenger transport uses `MESSENGER_TRANSPORT_DSN_PIPELINE`. `MarkPnlPeriodDirtyMessage` routes to `ingest_normalize`; `RebuildPnlPeriodMessage` routes to `pnl_rebuild`.
+- `App\Finance\Facade\PnlFacade` is the single entry point for marking `pnl_dirty_periods` dirty from outside `App\Ingestion` (`markPeriodDirty(MarkPnlPeriodDirtyCommand)`). `TASK-FIX-06` (`EnrichCogsAction`) and `App\Marketplace` cost-price updates must call it rather than touching the repository.
+- **Variant-B temporary exception (deliberate MVP compromise):** `PLDirtyPeriod` физически остаётся в `App\Ingestion\Entity`, поэтому `App\Finance` (`PnlFacade` через `MarkPnlPeriodDirtyAction`/`RebuildPnlPeriodAction`/`RebuildDirtyPnlPeriodsCommand`) импортирует `App\Ingestion\Entity\PLDirtyPeriod` и `App\Ingestion\Repository\PLDirtyPeriodRepository` напрямую. Это единственное допустимое исключение из правила «соседний модуль — только через Facade». План миграции: перенос `PLDirtyPeriod` Entity + Repository в `App\Finance` после стабилизации (отдельная задача, не Phase 0). Арх-тест `EntityBoundaryTest` whitelist'ит `PLDirtyPeriod`.
 
 ### Marketplace: WB financial report sync status (дневной статус)
 
@@ -457,6 +459,9 @@ findByBarcode(string $companyId, string $marketplace, string $barcode): ?string
 
 ### `PnlFacade` (`src/Finance/Facade/PnlFacade.php`)
 ```php
+// Единственная точка входа для пометки периода dirty извне App\Ingestion.
+// Идемпотентно: DONE/FAILED/BLOCKED_BY_CLOSE → reopen в PENDING; PENDING/REBUILDING не трогает.
+// Использует Variant-B исключение (импорт App\Ingestion\Repository\PLDirtyPeriodRepository).
 markPeriodDirty(MarkPnlPeriodDirtyCommand $command): void
 rebuildPeriod(RebuildPnlPeriodCommand $command): void
 
