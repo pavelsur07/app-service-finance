@@ -203,6 +203,16 @@ class IngestRawRecord implements TenantOwnedInterface
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    public function markNormalizationPending(): void
+    {
+        if (RawNormalizationStatus::DONE === $this->normalizationStatus) {
+            throw new \DomainException('Done raw record cannot be reset to pending.');
+        }
+
+        $this->normalizationStatus = RawNormalizationStatus::PENDING;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
     public function markNormalizationSkipped(): void
     {
         $this->normalizationStatus = RawNormalizationStatus::SKIPPED;
