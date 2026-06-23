@@ -10,6 +10,7 @@ use App\Ingestion\Application\DTO\PushRequest;
 use App\Ingestion\Application\DTO\PushResult;
 use App\Ingestion\Application\DTO\ShopDescriptor;
 use App\Ingestion\Domain\Contract\SourceConnectorInterface;
+use App\Ingestion\Domain\Service\SourceDataHasher;
 use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Enum\Capability;
 use App\Ingestion\Enum\IngestSource;
@@ -23,6 +24,7 @@ final readonly class WbFinanceReportConnector implements SourceConnectorInterfac
         private WbFinanceReportClientInterface $client,
         private ClockInterface $clock,
         private int $continuationDelaySeconds = 70,
+        private SourceDataHasher $sourceDataHasher = new SourceDataHasher(),
     ) {
     }
 
@@ -76,7 +78,7 @@ final readonly class WbFinanceReportConnector implements SourceConnectorInterfac
                 externalId: sprintf('wb-sales-report-detailed:%s:rrd-%d', $date->format('Y-m-d'), $rrdId),
                 syncJobId: $request->syncJobId,
                 fetchedAt: new \DateTimeImmutable(),
-                rows: $this->rowsOrEmptyMarker($page->rows, $page->metadata),
+                rows: $this->rowsOrEmptyMarker($this->sortRowsCanonically($page->rows), $page->metadata),
             ),
             nextCursorValue: $nextCursor,
             hasMore: $page->hasMore,
@@ -179,6 +181,36 @@ final readonly class WbFinanceReportConnector implements SourceConnectorInterfac
         }
 
         throw new \InvalidArgumentException('Wildberries finance report cursor rrdId must be a non-negative integer.');
+    }
+
+    /**
+     * Order the report rows by a deterministic key so the persisted raw payload
+     * hash is stable regardless of the order Wildberries returns the rows in.
+     *
+     * @param list<array<string, mixed>> $rows
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function sortRowsCanonically(array $rows): array
+    {
+        usort($rows, function (array $left, array $right): int {
+            return $this->canonicalSortKey($left) <=> $this->canonicalSortKey($right);
+        });
+
+        return array_values($rows);
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private function canonicalSortKey(array $row): string
+    {
+        // WB raw rows expose the record id as either rrdId or rrd_id.
+        $rrdValue = $row['rrdId'] ?? $row['rrd_id'] ?? null;
+        $rrdId = is_scalar($rrdValue) ? (string) $rrdValue : '';
+
+        // Full-content hash is the tie-breaker for rows sharing the record id.
+        return $rrdId.'|'.$this->sourceDataHasher->hash($row);
     }
 
     /**

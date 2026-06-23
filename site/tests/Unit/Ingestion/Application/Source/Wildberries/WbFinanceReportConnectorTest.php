@@ -12,6 +12,7 @@ use App\Ingestion\Enum\Capability;
 use App\Ingestion\Exception\UnsupportedCapabilityException;
 use App\Ingestion\Infrastructure\Api\Wildberries\WbFinanceReportClientInterface;
 use App\Ingestion\Infrastructure\Api\Wildberries\WbFinanceReportPage;
+use App\Ingestion\Infrastructure\Storage\RawNdjsonCodec;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Clock\MockClock;
@@ -171,6 +172,48 @@ final class WbFinanceReportConnectorTest extends TestCase
 
         self::assertNull($result->nextCursorValue);
         self::assertFalse($result->hasMore);
+    }
+
+    public function testPullCanonicalisesRowOrderForStableHash(): void
+    {
+        $rows = [
+            ['rrdId' => 300, 'docTypeName' => 'C'],
+            ['rrdId' => 100, 'docTypeName' => 'A'],
+            ['rrdId' => 200, 'docTypeName' => 'B'],
+        ];
+
+        $forward = $this->pullRows($rows);
+        $reversed = $this->pullRows(array_reverse($rows));
+
+        $codec = new RawNdjsonCodec();
+
+        // Order of the source response must not change the persisted payload.
+        self::assertSame($forward, $reversed);
+        self::assertSame($codec->encodeRows($forward), $codec->encodeRows($reversed));
+
+        // Sanity: rows are ordered by the canonical key (rrdId ascending here).
+        self::assertSame([100, 200, 300], array_map(static fn (array $row): int => $row['rrdId'], $forward));
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function pullRows(array $rows): array
+    {
+        $connector = $this->connector($this->client(new WbFinanceReportPage(
+            rows: $rows,
+            nextRrdId: null,
+            hasMore: false,
+        )));
+
+        $result = $connector->pull($this->request(
+            windowFrom: new \DateTimeImmutable('2026-06-20'),
+            windowTo: new \DateTimeImmutable('2026-06-20'),
+        ));
+
+        return $result->rawBatch->rows;
     }
 
     private function request(

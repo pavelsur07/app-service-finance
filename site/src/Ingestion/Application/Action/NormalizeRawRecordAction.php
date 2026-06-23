@@ -20,8 +20,10 @@ use App\Ingestion\Exception\RawRecordNotFoundException;
 use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Repository\FinancialTransactionRepository;
 use App\Ingestion\Repository\IngestRawRecordRepository;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 final readonly class NormalizeRawRecordAction
@@ -134,16 +136,40 @@ final readonly class NormalizeRawRecordAction
             }
 
             $this->entityManager->flush();
-            $this->recordControlSumIssues($command->companyId, $rawRecord->getId(), $controlSums);
+            // Mark the raw record DONE before recording control-sum issues: issues are
+            // diagnostic, so a failure there must not leave the record eligible for a
+            // full re-normalization on retry.
             $rawRecord->markNormalizationDone();
+            $this->recordControlSumIssues($command->companyId, $rawRecord->getId(), $controlSums);
             $this->entityManager->flush();
             $connection->commit();
 
-            $event = new NormalizationCompletedEvent(
-                companyId: $command->companyId,
-                rawRecordId: $rawRecord->getId(),
-                affectedPeriods: $affectedPeriods,
-            );
+            // Only publish when something actually changed. If every upsert returned a
+            // no-change result (B3), there is no affected period and nothing for
+            // subscribers (P&L dirty-period marking) to do.
+            if ([] !== $affectedPeriods) {
+                $event = new NormalizationCompletedEvent(
+                    companyId: $command->companyId,
+                    rawRecordId: $rawRecord->getId(),
+                    affectedPeriods: $affectedPeriods,
+                );
+            }
+        } catch (UniqueConstraintViolationException $exception) {
+            // A concurrent normalization of the same raw record (event + cron safety
+            // net) won the race and inserted the same natural key first. The flush
+            // here aborts the transaction; roll back and let Messenger retry. On
+            // retry the rows already exist, so the upserts become no-change (B3) and
+            // this converges without duplicates. No unhandled exception escapes.
+            if ($connection->isTransactionActive()) {
+                $connection->rollBack();
+            }
+
+            $this->logger->info('Concurrent normalization detected for raw record; retrying.', [
+                'companyId' => $command->companyId,
+                'rawRecordId' => $command->rawRecordId,
+            ]);
+
+            throw new RecoverableMessageHandlingException('Concurrent normalization detected; retry expected.', previous: $exception);
         } catch (\Throwable $exception) {
             if ($connection->isTransactionActive()) {
                 $connection->rollBack();

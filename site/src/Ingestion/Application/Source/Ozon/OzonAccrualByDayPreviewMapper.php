@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace App\Ingestion\Application\Source\Ozon;
 
+use App\Ingestion\Domain\Service\SourceDataHasher;
 use App\Ingestion\Enum\TransactionDirection;
 use App\Ingestion\Enum\TransactionType;
 use Ramsey\Uuid\Uuid;
 
 final readonly class OzonAccrualByDayPreviewMapper
 {
-    public function __construct(private OzonMoneyParser $moneyParser)
-    {
+    public function __construct(
+        private OzonMoneyParser $moneyParser,
+        private SourceDataHasher $sourceDataHasher,
+    ) {
     }
 
     /**
@@ -27,18 +30,15 @@ final readonly class OzonAccrualByDayPreviewMapper
         bool $includeSaleRefund = false,
     ): array {
         $transactions = [];
-        $rowIndex = 0;
 
         foreach ($rows as $row) {
-            ++$rowIndex;
-
             $date = $this->stringValue($row['date'] ?? 'unknown');
             if (!$this->dateInWindow($date, $from, $to)) {
                 continue;
             }
 
             $category = $this->stringValue($row['accrued_category'] ?? 'unknown');
-            $accrualId = $this->accrualId($row, $rowIndex);
+            $accrualId = $this->accrualId($row);
             $operationGroupId = Uuid::uuid5(Uuid::NAMESPACE_URL, sprintf('%s:ozon:accrual-by-day:%s', $companyId, $accrualId))->toString();
             $unitNumber = $this->optionalString($row['unit_number'] ?? null);
 
@@ -386,16 +386,16 @@ final readonly class OzonAccrualByDayPreviewMapper
     /**
      * @param array<string, mixed> $row
      */
-    private function accrualId(array $row, int $rowIndex): string
+    private function accrualId(array $row): string
     {
         $accrualId = $this->optionalString($row['accrual_id'] ?? null);
         if (null !== $accrualId) {
             return $accrualId;
         }
 
-        $json = json_encode($row, \JSON_THROW_ON_ERROR);
-
-        return sprintf('fallback-%d-%s', $rowIndex, substr(hash('sha256', $json), 0, 16));
+        // Order-independent fallback: identical row content yields the same id
+        // regardless of its position in the source response.
+        return sprintf('fallback-%s', substr($this->sourceDataHasher->hash($row), 0, 16));
     }
 
     /**

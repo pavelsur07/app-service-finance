@@ -12,6 +12,7 @@ use App\Ingestion\Enum\Capability;
 use App\Ingestion\Exception\UnsupportedCapabilityException;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonAccrualClientInterface;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonRawPage;
+use App\Ingestion\Infrastructure\Storage\RawNdjsonCodec;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 
@@ -250,6 +251,73 @@ final class OzonSellerReportConnectorTest extends TestCase
         self::assertSame([['type_id' => 29, 'name' => 'Delivery']], $result->rawBatch->rows);
         self::assertNull($result->nextCursorValue);
         self::assertFalse($result->hasMore);
+    }
+
+    public function testPullAccrualByDayCanonicalisesRowOrderForStableHash(): void
+    {
+        $rows = [
+            ['date' => '2026-06-01', 'accrual_id' => '300', 'amount' => '3'],
+            ['date' => '2026-06-01', 'accrual_id' => '100', 'amount' => '1'],
+            ['date' => '2026-06-01', 'accrual_id' => '200', 'amount' => '2'],
+        ];
+
+        $forward = $this->pullSingleDay($rows);
+        $reversed = $this->pullSingleDay(array_reverse($rows));
+
+        $codec = new RawNdjsonCodec();
+
+        // Order of the source response must not change the persisted payload.
+        self::assertSame($forward, $reversed);
+        self::assertSame($codec->encodeRows($forward), $codec->encodeRows($reversed));
+
+        // Sanity: rows are ordered by the canonical key (accrual_id ascending here).
+        self::assertSame(['100', '200', '300'], array_map(static fn (array $row): string => $row['accrual_id'], $forward));
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function pullSingleDay(array $rows): array
+    {
+        $accrualClient = new class($rows) implements OzonAccrualClientInterface {
+            /**
+             * @param list<array<string, mixed>> $rows
+             */
+            public function __construct(private array $rows)
+            {
+            }
+
+            public function fetchPostings(string $companyId, string $connectionRef, array $postingNumbers): OzonRawPage
+            {
+                throw new \LogicException('Not used.');
+            }
+
+            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date): OzonRawPage
+            {
+                return new OzonRawPage(rows: $this->rows, hasMore: false);
+            }
+
+            public function fetchTypes(string $companyId, string $connectionRef): OzonRawPage
+            {
+                throw new \LogicException('Not used.');
+            }
+        };
+
+        $connector = new OzonSellerReportConnector($accrualClient);
+        $result = $connector->pull(new PullRequest(
+            companyId: Uuid::uuid7()->toString(),
+            connectionRef: 'connection-1',
+            shopRef: 'shop-1',
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            cursorValue: null,
+            windowFrom: new \DateTimeImmutable('2026-06-01'),
+            windowTo: new \DateTimeImmutable('2026-06-01'),
+            syncJobId: Uuid::uuid7()->toString(),
+        ));
+
+        return $result->rawBatch->rows;
     }
 
     private function unusedAccrualClient(): OzonAccrualClientInterface

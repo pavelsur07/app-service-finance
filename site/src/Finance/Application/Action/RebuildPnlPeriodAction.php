@@ -14,11 +14,11 @@ use App\Finance\Domain\Event\PnlClosedPeriodTouchedEvent;
 use App\Finance\Exception\PnlRebuildLockTimeoutException;
 use App\Finance\Repository\PLDailyTotalRepository;
 use App\Finance\Repository\PLMonthlySnapshotRepository;
-use App\Ingestion\Entity\FinancialTransaction;
 use App\Ingestion\Entity\PLDirtyPeriod;
 use App\Ingestion\Enum\PLDirtyPeriodReason;
 use App\Ingestion\Enum\PLDirtyPeriodStatus;
 use App\Ingestion\Enum\TransactionDirection;
+use App\Ingestion\Enum\TransactionType;
 use App\Ingestion\Facade\IngestionFacade;
 use App\Ingestion\Repository\PLDirtyPeriodRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -111,19 +111,16 @@ final readonly class RebuildPnlPeriodAction
             $this->monthlySnapshotRepository->deleteByCompanyShopAndMonth($command->companyId, $command->shopRef, $command->year, $command->month);
 
             foreach ($this->ingestionFacade->getTransactions($command->companyId, $from, $to, null) as $transaction) {
-                if (!$transaction instanceof FinancialTransaction) {
-                    continue;
-                }
-
-                $categoryId = $this->categoryResolver->resolve($command->companyId, $transaction->getType(), $transaction->getDirection());
-                $amount = $this->formatAmountMinor($transaction->getAmountMinor());
-                $income = TransactionDirection::IN === $transaction->getDirection() ? $amount : '0.00';
-                $expense = TransactionDirection::OUT === $transaction->getDirection() ? $amount : '0.00';
+                $direction = TransactionDirection::from($transaction->direction);
+                $categoryId = $this->categoryResolver->resolve($command->companyId, TransactionType::from($transaction->type), $direction);
+                $amount = $this->formatAmountMinor($transaction->amountMinor);
+                $income = TransactionDirection::IN === $direction ? $amount : '0.00';
+                $expense = TransactionDirection::OUT === $direction ? $amount : '0.00';
 
                 $this->dailyTotalRepository->upsert(
                     companyId: $command->companyId,
                     categoryId: $categoryId,
-                    date: $transaction->getOccurredAt()->setTimezone(new \DateTimeZone('Europe/Moscow'))->setTime(0, 0),
+                    date: $transaction->occurredAt->setTimezone(new \DateTimeZone('Europe/Moscow'))->setTime(0, 0),
                     projectDirectionId: $projectDirectionId,
                     amountIncome: $income,
                     amountExpense: $expense,

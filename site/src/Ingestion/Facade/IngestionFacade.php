@@ -7,6 +7,7 @@ namespace App\Ingestion\Facade;
 use App\Ingestion\Application\DTO\CoverageCellView;
 use App\Ingestion\Application\DTO\FinancialSummaryCategoryView;
 use App\Ingestion\Application\DTO\FinancialSummaryMonthView;
+use App\Ingestion\Application\DTO\FinancialTransactionView;
 use App\Ingestion\Application\DTO\IssueListItemView;
 use App\Ingestion\Application\DTO\PaginationMeta;
 use App\Ingestion\Application\DTO\ReconciliationByTypeView;
@@ -39,7 +40,7 @@ final readonly class IngestionFacade
     }
 
     /**
-     * @return iterable<FinancialTransaction>
+     * @return iterable<FinancialTransactionView>
      */
     public function getTransactions(
         string $companyId,
@@ -47,7 +48,34 @@ final readonly class IngestionFacade
         \DateTimeImmutable $to,
         ?string $shopRef = null,
     ): iterable {
-        return $this->financialTransactionRepository->iterateByPeriod($companyId, $from, $to, $shopRef);
+        foreach ($this->financialTransactionRepository->iterateByPeriod($companyId, $from, $to, $shopRef) as $transaction) {
+            yield $this->projectTransactionToView($transaction);
+        }
+    }
+
+    private function projectTransactionToView(FinancialTransaction $transaction): FinancialTransactionView
+    {
+        return new FinancialTransactionView(
+            id: $transaction->getId(),
+            companyId: $transaction->getCompanyId(),
+            shopRef: $transaction->getShopRef(),
+            source: $transaction->getSource()->value,
+            externalId: $transaction->getExternalId(),
+            operationGroupId: $transaction->getOperationGroupId(),
+            type: $transaction->getType()->value,
+            direction: $transaction->getDirection()->value,
+            amountMinor: $transaction->getAmountMinor(),
+            currency: $transaction->getCurrency(),
+            occurredAt: $transaction->getOccurredAt(),
+            sourceTz: $transaction->getSourceTz(),
+            orderRef: $transaction->getOrderRef(),
+            payoutRef: $transaction->getPayoutRef(),
+            counterpartyId: $transaction->getCounterpartyId(),
+            listingId: $transaction->getListingId(),
+            listingSku: $transaction->getListingSku(),
+            description: $transaction->getDescription(),
+            rawRecordId: $transaction->getRawRecordId(),
+        );
     }
 
     public function countOpenIssues(string $companyId): int

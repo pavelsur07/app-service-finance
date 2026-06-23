@@ -6,6 +6,7 @@ namespace App\Ingestion\Application\Action;
 
 use App\Ingestion\Application\Command\UpsertFinancialTransactionCommand;
 use App\Ingestion\Application\DTO\UpsertResult;
+use App\Ingestion\Domain\Service\SourceDataHasher;
 use App\Ingestion\Entity\FinancialTransaction;
 use App\Ingestion\Exception\StaleTransactionUpdateException;
 use App\Ingestion\Repository\FinancialTransactionRepository;
@@ -16,6 +17,7 @@ final readonly class UpsertFinancialTransactionAction
     public function __construct(
         private FinancialTransactionRepository $financialTransactionRepository,
         private EntityManagerInterface $entityManager,
+        private SourceDataHasher $sourceDataHasher = new SourceDataHasher(),
     ) {
     }
 
@@ -62,6 +64,14 @@ final readonly class UpsertFinancialTransactionAction
                 newOccurredAt: $mapped->occurredAt,
                 periodChanged: false,
             );
+        }
+
+        // No-change short-circuit: if the canonical source content is identical
+        // to what is already stored, skip the update entirely so updated_at /
+        // externalUpdatedAt do not move and no NormalizationCompletedEvent is
+        // raised for an unchanged period. Solves P0.2 without a schema change.
+        if ($this->sourceDataHasher->hash($mapped->sourceData) === $this->sourceDataHasher->hash($transaction->getSourceData())) {
+            return null;
         }
 
         $oldOccurredAt = $transaction->getOccurredAt();
