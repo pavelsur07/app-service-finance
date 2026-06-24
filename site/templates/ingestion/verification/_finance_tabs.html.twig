@@ -1,16 +1,16 @@
 {% set current_route = app.request ? app.request.attributes.get('_route') : '' %}
 {% set tabs = [
-    { route: 'ingestion_verification_coverage', label: 'Покрытие' },
-    { route: 'ingestion_verification_reconciliation', label: 'Сверка сумм' },
-    { route: 'ingestion_verification_issues', label: 'Проблемы' },
-    { route: 'ingestion_verification_financial_summary', label: 'Финансовая сводка' },
+    {route: 'ingestion_verification_coverage', label: 'Покрытие данных'},
+    {route: 'ingestion_verification_reconciliation', label: 'Сверка сумм'},
+    {route: 'ingestion_verification_issues', label: 'Проблемы'},
+    {route: 'ingestion_verification_financial_summary', label: 'Финансовая сводка'},
 ] %}
 
 <div class="page-header d-print-none mb-3">
     <div class="row align-items-center">
         <div class="col">
-            <h2 class="page-title">Финансы</h2>
-            <div class="text-secondary mt-1">Проверка качества ingestion-данных</div>
+            <h2 class="page-title">Загрузка данных</h2>
+            <div class="text-secondary mt-1">Покрытие и проверки ingestion-данных</div>
         </div>
     </div>
 </div>

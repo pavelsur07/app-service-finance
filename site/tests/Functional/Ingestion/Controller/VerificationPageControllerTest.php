@@ -45,7 +45,7 @@ final class VerificationPageControllerTest extends WebTestCaseBase
             );
             self::assertSame(1, $crawler->filter('aside a[href="/ingestion/verification"]')->count());
             self::assertStringContainsString(
-                'Финансы',
+                'Покрытие данных',
                 trim($crawler->filter('aside a[href="/ingestion/verification"]')->text()),
             );
             self::assertSame(4, $crawler->filter('.nav-tabs .nav-link')->count());
@@ -87,7 +87,7 @@ final class VerificationPageControllerTest extends WebTestCaseBase
             '/ingestion/verification/coverage',
             'ingestion-verification-coverage-root',
             'ingestion_verification_coverage_page',
-            'Покрытие',
+            'Покрытие данных',
         ];
         yield [
             '/ingestion/verification/reconciliation',
