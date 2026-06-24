@@ -27,7 +27,7 @@ final class AdEfficiencyQueryTest extends IntegrationTestCase
     private const LISTING_2_ID = '55555555-5555-5555-5555-000000000002';
     private const LISTING_3_ID = '55555555-5555-5555-5555-000000000003';
     private const LISTING_4_ID = '55555555-5555-5555-5555-000000000004';
-    private const LISTING_B_ID = '55555555-5555-5555-5555-00000000000B';
+    private const LISTING_B_ID = '55555555-5555-5555-5555-00000000000b';
 
     private const PERIOD_FROM = '2026-04-01';
     private const PERIOD_TO = '2026-04-30';
@@ -173,40 +173,41 @@ final class AdEfficiencyQueryTest extends IntegrationTestCase
 
     public function testPagination(): void
     {
-        // Страница 1 — 2 записи
+        $this->seedZeroRevenueListings(8);
+
+        // AdEfficiencyQuery нормализует pageSize минимум до 10.
+        // 3 базовые записи + 8 дополнительных = 11 строк для проверки page 2.
         $page1 = $this->query->getPage(
             self::COMPANY_A_ID,
             new \DateTimeImmutable(self::PERIOD_FROM),
             new \DateTimeImmutable(self::PERIOD_TO),
             null,
             page: 1,
-            pageSize: 2,
+            pageSize: 10,
         );
-        self::assertSame(3, $page1->total);
-        self::assertCount(2, $page1->items);
+        self::assertSame(11, $page1->total);
+        self::assertCount(10, $page1->items);
 
-        // Страница 2 — 1 запись
         $page2 = $this->query->getPage(
             self::COMPANY_A_ID,
             new \DateTimeImmutable(self::PERIOD_FROM),
             new \DateTimeImmutable(self::PERIOD_TO),
             null,
             page: 2,
-            pageSize: 2,
+            pageSize: 10,
         );
-        self::assertSame(3, $page2->total);
+        self::assertSame(11, $page2->total);
         self::assertCount(1, $page2->items);
 
-        // Страница 3 — пусто
         $page3 = $this->query->getPage(
             self::COMPANY_A_ID,
             new \DateTimeImmutable(self::PERIOD_FROM),
             new \DateTimeImmutable(self::PERIOD_TO),
             null,
             page: 3,
-            pageSize: 2,
+            pageSize: 10,
         );
-        self::assertSame(3, $page3->total);
+        self::assertSame(11, $page3->total);
         self::assertCount(0, $page3->items);
 
         // Records across pages — нет дубликатов
@@ -330,17 +331,19 @@ final class AdEfficiencyQueryTest extends IntegrationTestCase
 
     public function testTotalsAreComputedOverFullSetNotJustThePage(): void
     {
+        $this->seedZeroRevenueListings(8);
+
         $dto = $this->query->getPage(
             self::COMPANY_A_ID,
             new \DateTimeImmutable(self::PERIOD_FROM),
             new \DateTimeImmutable(self::PERIOD_TO),
             null,
-            page: 1,
-            pageSize: 1, // на страницу — только 1 запись
+            page: 2,
+            pageSize: 10, // на второй странице — только 1 запись
         );
 
         self::assertCount(1, $dto->items);
-        self::assertSame(3, $dto->total);
+        self::assertSame(11, $dto->total);
         // totals не должны зависеть от pageSize
         self::assertEqualsWithDelta(1500.0, (float) $dto->totalRevenue, 0.01);
         self::assertEqualsWithDelta(150.0, (float) $dto->totalAdSpend, 0.01);
@@ -527,6 +530,36 @@ final class AdEfficiencyQueryTest extends IntegrationTestCase
             listingId: $wbListingId,
             lineCost: '70.00',
         );
+
+        $this->em->flush();
+        $this->em->clear();
+    }
+
+    private function seedZeroRevenueListings(int $count): void
+    {
+        $companyA = $this->em->getRepository(Company::class)->find(self::COMPANY_A_ID);
+        self::assertInstanceOf(Company::class, $companyA);
+
+        for ($i = 1; $i <= $count; ++$i) {
+            $listingId = sprintf('55555555-5555-5555-5555-000000001%03d', $i);
+            $listing = $this->newListing(
+                $listingId,
+                $companyA,
+                MarketplaceType::OZON,
+                sprintf('SKU-ZERO-%03d', $i),
+                sprintf('Zero revenue product %03d', $i),
+            );
+            $this->em->persist($listing);
+            $this->persistSale(
+                $companyA,
+                $listing,
+                MarketplaceType::OZON,
+                '2026-04-20',
+                '0.00',
+                1,
+                sprintf('ORD-ZERO-%03d', $i),
+            );
+        }
 
         $this->em->flush();
         $this->em->clear();

@@ -44,7 +44,7 @@ final class AdScheduledBatchRepository extends ServiceEntityRepository implement
      *  - secondary по batch_index → внутри одного тика батчи одного job'а
      *    идут по возрастанию (снижает реордеринг в логах).
      *
-     * Предикат `scheduled_at <= NOW()` обязателен: retry/backoff-логика
+     * Предикат `scheduled_at <= (NOW() AT TIME ZONE 'UTC')` обязателен: retry/backoff-логика
      * (Task-11.3+) двигает `scheduled_at` в будущее через `setScheduledAt()`,
      * и без фильтра scheduler подхватит батч раньше запланированного момента,
      * сведя на нет throttling.
@@ -62,7 +62,7 @@ final class AdScheduledBatchRepository extends ServiceEntityRepository implement
             'SELECT %s FROM marketplace_ad_scheduled_batches b '
             . 'WHERE b.state = :state '
             . "  AND EXISTS (SELECT 1 FROM marketplace_ad_load_jobs j WHERE j.id = b.job_id AND j.status IN ('pending','running')) "
-            . '  AND b.scheduled_at <= NOW() '
+            . "  AND b.scheduled_at <= (NOW() AT TIME ZONE 'UTC') "
             . 'ORDER BY b.scheduled_at ASC, b.batch_index ASC '
             . 'LIMIT 1 FOR UPDATE SKIP LOCKED',
             $rsm->generateSelectClause(['b' => 'b']),

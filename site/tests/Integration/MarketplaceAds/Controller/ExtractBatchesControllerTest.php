@@ -190,9 +190,11 @@ final class ExtractBatchesControllerTest extends WebTestCaseBase
         $rawRepo = static::getContainer()->get(AdRawDocumentRepository::class);
         $docs = $rawRepo->findBy(['companyId' => self::COMPANY_ID]);
         self::assertCount(1, $docs, 'Повторный POST не должен создавать дубликат AdRawDocument');
-        // Сам сигнал об idempotent-пути: в очереди должно быть ровно одно
-        // message, без дубликатов от второго POST.
-        self::assertCount(1, $transport->getSent());
+        // KernelBrowser перезагружает kernel между запросами; после второго
+        // request свежий in-memory transport должен остаться пустым.
+        /** @var InMemoryTransport $transportAfterSecondPost */
+        $transportAfterSecondPost = static::getContainer()->get('messenger.transport.async_pipeline');
+        self::assertCount(0, $transportAfterSecondPost->getSent());
 
         @unlink($storage->getAbsolutePath($relativePath));
     }
@@ -316,18 +318,12 @@ final class ExtractBatchesControllerTest extends WebTestCaseBase
         self::assertCount(0, $transport->getSent());
     }
 
-    /**
-     * CSRF защита использует `_token_id` → token mapping, зависящий от сессии.
-     * Для теста запрашиваем токен у CsrfTokenManager на той же сессии, что и
-     * последующий POST (Symfony's WebTestCase сохраняет session cookies).
-     */
     private function fetchCsrfToken($client, string $jobId): string
     {
-        $container = $client->getContainer();
-        /** @var \Symfony\Component\Security\Csrf\CsrfTokenManagerInterface $manager */
-        $manager = $container->get('security.csrf.token_manager');
+        $token = 'test-token-'.$jobId;
+        $this->setClientSessionValue($client, '_csrf/extract-batches-'.$jobId, $token);
 
-        return $manager->getToken('extract-batches-'.$jobId)->getValue();
+        return $token;
     }
 
     private function login($client, object $owner, string $activeCompanyId): void

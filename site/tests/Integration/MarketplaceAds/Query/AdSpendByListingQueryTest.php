@@ -25,7 +25,7 @@ final class AdSpendByListingQueryTest extends IntegrationTestCase
     private const LISTING_1_ID = '55555555-5555-5555-5555-000000000001';
     private const LISTING_2_ID = '55555555-5555-5555-5555-000000000002';
     private const LISTING_WB_ID = '55555555-5555-5555-5555-000000000003';
-    private const LISTING_B_ID = '55555555-5555-5555-5555-00000000000B';
+    private const LISTING_B_ID = '55555555-5555-5555-5555-00000000000b';
 
     private const PERIOD_FROM = '2026-04-01';
     private const PERIOD_TO = '2026-04-30';
