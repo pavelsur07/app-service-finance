@@ -15,6 +15,6 @@ final class VerificationIndexPageController extends AbstractController
     #[Route('/ingestion/verification', name: 'ingestion_verification_index', methods: ['GET'])]
     public function __invoke(): Response
     {
-        return $this->redirectToRoute('ingestion_verification_coverage');
+        return $this->redirectToRoute('ingestion_verification_issues');
     }
 }

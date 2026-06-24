@@ -1,9 +1,16 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Загрузка данных — Покрытие данных{% endblock %}
+{% block title %}Покрытие данных{% endblock %}
 
 {% block content %}
-    {% include 'ingestion/verification/_finance_tabs.html.twig' %}
+    <div class="page-header d-print-none mb-3">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2 class="page-title">Покрытие данных</h2>
+                <div class="text-secondary mt-1">Контроль полноты загрузки данных по источникам и датам</div>
+            </div>
+        </div>
+    </div>
 
     <div
         id="ingestion-verification-coverage-root"
