@@ -11,7 +11,7 @@ use App\Ingestion\Repository\IngestRawRecordRepository;
 final class StoredOzonAccrualTypeNameResolver
 {
     /**
-     * @var array<string, array<string, string>>
+     * @var array<string, array{cacheKey: string, dictionary: array<string, string>}>
      */
     private array $cache = [];
 
@@ -38,10 +38,6 @@ final class StoredOzonAccrualTypeNameResolver
      */
     private function dictionary(string $companyId): array
     {
-        if (array_key_exists($companyId, $this->cache)) {
-            return $this->cache[$companyId];
-        }
-
         $rawRecord = $this->rawRecordRepository->findLatestByCompanySourceExternalId(
             $companyId,
             IngestSource::OZON,
@@ -49,7 +45,14 @@ final class StoredOzonAccrualTypeNameResolver
             'accrual-types',
         );
         if (null === $rawRecord) {
-            return $this->cache[$companyId] = [];
+            unset($this->cache[$companyId]);
+
+            return [];
+        }
+
+        $cacheKey = sprintf('%s:%s', $rawRecord->getId(), $rawRecord->getLastSeenAt()->format('Y-m-d H:i:s.u'));
+        if (($this->cache[$companyId]['cacheKey'] ?? null) === $cacheKey) {
+            return $this->cache[$companyId]['dictionary'];
         }
 
         $dictionary = [];
@@ -69,7 +72,12 @@ final class StoredOzonAccrualTypeNameResolver
 
         ksort($dictionary);
 
-        return $this->cache[$companyId] = $dictionary;
+        $this->cache[$companyId] = [
+            'cacheKey' => $cacheKey,
+            'dictionary' => $dictionary,
+        ];
+
+        return $dictionary;
     }
 
     private function stringValue(mixed $value): ?string

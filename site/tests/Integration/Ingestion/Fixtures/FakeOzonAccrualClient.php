@@ -9,6 +9,18 @@ use App\Ingestion\Infrastructure\Api\Ozon\OzonRawPage;
 
 final class FakeOzonAccrualClient implements OzonAccrualClientInterface
 {
+    private static ?\Throwable $fetchTypesException = null;
+
+    public static function failFetchTypes(\Throwable $exception): void
+    {
+        self::$fetchTypesException = $exception;
+    }
+
+    public static function reset(): void
+    {
+        self::$fetchTypesException = null;
+    }
+
     public function fetchPostings(string $companyId, string $connectionRef, array $postingNumbers): OzonRawPage
     {
         return new OzonRawPage(rows: [], hasMore: false);
@@ -43,6 +55,10 @@ final class FakeOzonAccrualClient implements OzonAccrualClientInterface
 
     public function fetchTypes(string $companyId, string $connectionRef): OzonRawPage
     {
+        if (null !== self::$fetchTypesException) {
+            throw self::$fetchTypesException;
+        }
+
         return new OzonRawPage(rows: [['type_id' => 29, 'name' => 'Логистика']], hasMore: false);
     }
 }

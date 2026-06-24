@@ -11,6 +11,7 @@ use App\Ingestion\Enum\SyncJobKind;
 use App\Ingestion\Enum\SyncJobStatus;
 use App\Ingestion\Message\NormalizeRawRecordMessage;
 use App\Ingestion\Message\RunSyncChunkMessage;
+use App\Tests\Integration\Ingestion\Fixtures\FakeOzonAccrualClient;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -20,6 +21,20 @@ use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 final class OzonAccrualLoadTypesCommandTest extends IntegrationTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        FakeOzonAccrualClient::reset();
+    }
+
+    protected function tearDown(): void
+    {
+        FakeOzonAccrualClient::reset();
+
+        parent::tearDown();
+    }
+
     public function testDispatchesAccrualTypesIncrementalJob(): void
     {
         $companyId = Uuid::uuid7()->toString();
@@ -106,6 +121,44 @@ final class OzonAccrualLoadTypesCommandTest extends IntegrationTestCase
         $normalizeMessages = $normalizeTransport->getSent();
         self::assertCount(1, $normalizeMessages);
         self::assertInstanceOf(NormalizeRawRecordMessage::class, $normalizeMessages[0]->getMessage());
+    }
+
+    public function testExecuteInlineFailureMarksAccrualTypesJobFailed(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+        FakeOzonAccrualClient::failFetchTypes(new \RuntimeException('types endpoint unavailable'));
+
+        $tester = $this->tester('app:ingestion:ozon-accrual:load-types');
+        $exit = $tester->execute([
+            '--company-id' => $companyId,
+            '--connection-ref' => $connectionRef,
+            '--execute-inline' => true,
+        ]);
+
+        self::assertSame(Command::FAILURE, $exit);
+        self::assertStringContainsString('types endpoint unavailable', $tester->getDisplay());
+
+        $jobs = $this->connection->fetchAllAssociative(
+            'SELECT resource_type, kind, status, last_error
+             FROM ingest_sync_jobs
+             WHERE company_id = :companyId',
+            ['companyId' => $companyId],
+        );
+        self::assertCount(1, $jobs);
+        self::assertSame(OzonResourceType::ACCRUAL_TYPES, $jobs[0]['resource_type']);
+        self::assertSame(SyncJobKind::INCREMENTAL->value, $jobs[0]['kind']);
+        self::assertSame(SyncJobStatus::FAILED->value, $jobs[0]['status']);
+        self::assertStringContainsString('inline load failed: types endpoint unavailable', (string) $jobs[0]['last_error']);
+
+        FakeOzonAccrualClient::reset();
+        $retry = $this->tester('app:ingestion:ozon-accrual:load-types');
+        self::assertSame(Command::SUCCESS, $retry->execute([
+            '--company-id' => $companyId,
+            '--connection-ref' => $connectionRef,
+            '--execute-inline' => true,
+        ]));
+        self::assertStringContainsString('Stored raw record', $retry->getDisplay());
     }
 
     public function testActiveTypesLoadIsSkipped(): void

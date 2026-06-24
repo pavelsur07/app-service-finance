@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Ingestion\Command;
 
+use App\Ingestion\Application\Command\MarkJobFailedCommand;
 use App\Ingestion\Application\Command\StartIncrementalCommand as StartIncrementalApplicationCommand;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Entity\IngestRawRecord;
@@ -75,17 +76,7 @@ final class OzonAccrualLoadTypesCommand extends Command
 
         try {
             if ((bool) $input->getOption('execute-inline')) {
-                $jobId = $this->startInlineJob($companyId, $connectionRef, $shopRef);
-                $io->writeln(sprintf('Started inline load: jobId=%s, resourceType=%s', $jobId, OzonResourceType::ACCRUAL_TYPES));
-
-                ($this->runSyncChunkHandler)(new RunSyncChunkMessage($companyId, $jobId));
-                $this->entityManager->clear();
-                $this->normalizeLatestRawRecord($companyId);
-                $this->entityManager->clear();
-
-                $this->printLatestRawRecord($io, $companyId, $sampleLimit);
-
-                return Command::SUCCESS;
+                return $this->executeInline($io, $companyId, $connectionRef, $shopRef, $sampleLimit);
             }
 
             $jobId = $this->syncFacade->startIncremental(new StartIncrementalApplicationCommand(
@@ -112,6 +103,33 @@ final class OzonAccrualLoadTypesCommand extends Command
         $io->success('Ozon accrual types load job dispatched.');
 
         return Command::SUCCESS;
+    }
+
+    private function executeInline(
+        SymfonyStyle $io,
+        string $companyId,
+        string $connectionRef,
+        string $shopRef,
+        int $sampleLimit,
+    ): int {
+        $jobId = $this->startInlineJob($companyId, $connectionRef, $shopRef);
+        $io->writeln(sprintf('Started inline load: jobId=%s, resourceType=%s', $jobId, OzonResourceType::ACCRUAL_TYPES));
+
+        try {
+            ($this->runSyncChunkHandler)(new RunSyncChunkMessage($companyId, $jobId));
+            $this->entityManager->clear();
+            $this->normalizeLatestRawRecord($companyId);
+            $this->entityManager->clear();
+
+            $this->printLatestRawRecord($io, $companyId, $sampleLimit);
+
+            return Command::SUCCESS;
+        } catch (\Throwable $exception) {
+            $this->entityManager->clear();
+            $this->failInlineJobIfActive($companyId, $jobId, $exception);
+
+            throw $exception;
+        }
     }
 
     private function requiredUuidOption(InputInterface $input, string $name): string
@@ -169,6 +187,17 @@ final class OzonAccrualLoadTypesCommand extends Command
         $this->entityManager->flush();
 
         return $job->getId();
+    }
+
+    private function failInlineJobIfActive(string $companyId, string $jobId, \Throwable $exception): void
+    {
+        $job = $this->syncJobRepository->findByIdAndCompany($jobId, $companyId);
+        if (null === $job || $job->getStatus()->isTerminal()) {
+            return;
+        }
+
+        $reason = sprintf('inline load failed: %s', $exception->getMessage());
+        $this->syncFacade->markJobFailed(new MarkJobFailedCommand($jobId, $companyId, mb_substr($reason, 0, 2000)));
     }
 
     private function printLatestRawRecord(SymfonyStyle $io, string $companyId, int $sampleLimit): void
