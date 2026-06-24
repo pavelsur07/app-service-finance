@@ -236,9 +236,10 @@ final readonly class OzonAccrualCategory
             return null;
         }
 
-        $name = str_replace('ё', 'е', str_replace('Ё', 'Е', $name));
+        $name = mb_strtolower($name);
+        $name = str_replace('ё', 'е', $name);
         $name = preg_replace('/\s+/u', ' ', $name) ?? $name;
 
-        return mb_strtolower($name);
+        return $name;
     }
 }

@@ -27,6 +27,17 @@ final class OzonAccrualCategoryTest extends TestCase
                 self::assertArrayNotHasKey($typeId, $typeIds, sprintf('Duplicate Ozon accrual type_id "%s".', $typeId));
                 $typeIds[$typeId] = $category->code;
             }
+
+            foreach (array_merge([$category->label], $category->aliases) as $alias) {
+                $resolved = OzonAccrualCategory::findByOzonName($alias);
+
+                self::assertNotNull($resolved, sprintf('Ozon accrual category alias "%s" failed to resolve.', $alias));
+                self::assertSame(
+                    $category->code,
+                    $resolved->code,
+                    sprintf('Ozon accrual category alias "%s" resolved to "%s" instead of "%s".', $alias, $resolved->code, $category->code),
+                );
+            }
         }
     }
 
