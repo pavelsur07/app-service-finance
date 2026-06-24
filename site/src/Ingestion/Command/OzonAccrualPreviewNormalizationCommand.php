@@ -212,26 +212,28 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
             return [];
         }
 
-        $rows = $this->connection->executeQuery(
-            'SELECT external_id, type, COUNT(*) AS count
-             FROM ingest_financial_transactions
-             WHERE company_id = :companyId
-               AND source = :source
-               AND external_id IN (:sourceKeys)
-             GROUP BY external_id, type',
-            [
-                'companyId' => $companyId,
-                'source' => IngestSource::OZON->value,
-                'sourceKeys' => $sourceKeys,
-            ],
-            [
-                'sourceKeys' => ArrayParameterType::STRING,
-            ],
-        )->fetchAllAssociative();
-
         $matches = [];
-        foreach ($rows as $row) {
-            $matches[$this->exactMatchKey((string) $row['external_id'], (string) $row['type'])] = (int) $row['count'];
+        foreach (array_chunk($sourceKeys, 5000) as $sourceKeyChunk) {
+            $rows = $this->connection->executeQuery(
+                'SELECT external_id, type, COUNT(*) AS count
+                 FROM ingest_financial_transactions
+                 WHERE company_id = :companyId
+                   AND source = :source
+                   AND external_id IN (:sourceKeys)
+                 GROUP BY external_id, type',
+                [
+                    'companyId' => $companyId,
+                    'source' => IngestSource::OZON->value,
+                    'sourceKeys' => $sourceKeyChunk,
+                ],
+                [
+                    'sourceKeys' => ArrayParameterType::STRING,
+                ],
+            )->fetchAllAssociative();
+
+            foreach ($rows as $row) {
+                $matches[$this->exactMatchKey((string) $row['external_id'], (string) $row['type'])] = (int) $row['count'];
+            }
         }
 
         return $matches;

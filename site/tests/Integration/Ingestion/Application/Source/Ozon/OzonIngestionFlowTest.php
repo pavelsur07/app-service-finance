@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Ingestion\Application\Source\Ozon;
 
+use App\Ingestion\Application\Source\Ozon\OzonAccrualByDayPreviewMapper;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
+use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Entity\SyncJob;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\SyncJobKind;
 use App\Ingestion\Enum\SyncJobStatus;
+use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Message\NormalizeRawRecordMessage;
 use App\Ingestion\Message\RunSyncChunkMessage;
 use App\Ingestion\MessageHandler\NormalizeRawRecordHandler;
@@ -86,6 +89,102 @@ final class OzonIngestionFlowTest extends IntegrationTestCase
         /** @var NormalizationIssueRepository $issueRepository */
         $issueRepository = self::getContainer()->get(NormalizationIssueRepository::class);
         self::assertSame([], $issueRepository->findOpenByRawRecord($companyId, $normalizeMessage->rawRecordId));
+    }
+
+    public function testPreviewMapperUsesStoredAccrualTypesDictionary(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+
+        /** @var RawStorageFacade $rawStorageFacade */
+        $rawStorageFacade = self::getContainer()->get(RawStorageFacade::class);
+        $rawStorageFacade->store(new RawBatch(
+            companyId: $companyId,
+            connectionRef: 'marketplace:ozon:seller',
+            shopRef: 'ozon-shop',
+            source: IngestSource::OZON,
+            resourceType: OzonResourceType::ACCRUAL_TYPES,
+            externalId: 'accrual-types',
+            syncJobId: Uuid::uuid7()->toString(),
+            fetchedAt: new \DateTimeImmutable('2026-06-24 10:00:00'),
+            rows: [['type_id' => 1, 'name' => 'Эквайринг']],
+        ));
+        $this->em->flush();
+
+        /** @var OzonAccrualByDayPreviewMapper $mapper */
+        $mapper = self::getContainer()->get(OzonAccrualByDayPreviewMapper::class);
+        $rows = $mapper->preview($companyId, [[
+            'accrual_id' => 53675409101,
+            'date' => '2026-06-13',
+            'accrued_category' => 'ITEM',
+            'item_fees' => [
+                'fees' => [[
+                    'fees' => [
+                        ['type_id' => 1, 'accrued' => ['amount' => '-18.66', 'currency' => 'RUB']],
+                    ],
+                ]],
+            ],
+        ]]);
+
+        self::assertCount(1, $rows);
+        self::assertSame('1', $rows[0]->typeId);
+        self::assertSame('ozon_acquiring', $rows[0]->ozonCategoryCode);
+        self::assertSame('Эквайринг', $rows[0]->ozonCategoryLabel);
+        self::assertTrue($rows[0]->ozonCategoryKnown);
+    }
+
+    public function testPreviewMapperRefreshesStoredAccrualTypesDictionaryAfterLoad(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+
+        /** @var OzonAccrualByDayPreviewMapper $mapper */
+        $mapper = self::getContainer()->get(OzonAccrualByDayPreviewMapper::class);
+        $rowsBeforeDictionary = $mapper->preview($companyId, [$this->itemFeeTypeOneRow()]);
+
+        self::assertCount(1, $rowsBeforeDictionary);
+        self::assertSame('1', $rowsBeforeDictionary[0]->typeId);
+        self::assertFalse($rowsBeforeDictionary[0]->ozonCategoryKnown);
+
+        /** @var RawStorageFacade $rawStorageFacade */
+        $rawStorageFacade = self::getContainer()->get(RawStorageFacade::class);
+        $rawStorageFacade->store(new RawBatch(
+            companyId: $companyId,
+            connectionRef: 'marketplace:ozon:seller',
+            shopRef: 'ozon-shop',
+            source: IngestSource::OZON,
+            resourceType: OzonResourceType::ACCRUAL_TYPES,
+            externalId: 'accrual-types',
+            syncJobId: Uuid::uuid7()->toString(),
+            fetchedAt: new \DateTimeImmutable('2026-06-24 10:00:00'),
+            rows: [['type_id' => 1, 'name' => 'Эквайринг']],
+        ));
+        $this->em->flush();
+
+        $rowsAfterDictionary = $mapper->preview($companyId, [$this->itemFeeTypeOneRow()]);
+
+        self::assertCount(1, $rowsAfterDictionary);
+        self::assertSame('1', $rowsAfterDictionary[0]->typeId);
+        self::assertSame('ozon_acquiring', $rowsAfterDictionary[0]->ozonCategoryCode);
+        self::assertSame('Эквайринг', $rowsAfterDictionary[0]->ozonCategoryLabel);
+        self::assertTrue($rowsAfterDictionary[0]->ozonCategoryKnown);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function itemFeeTypeOneRow(): array
+    {
+        return [
+            'accrual_id' => 53675409101,
+            'date' => '2026-06-13',
+            'accrued_category' => 'ITEM',
+            'item_fees' => [
+                'fees' => [[
+                    'fees' => [
+                        ['type_id' => 1, 'accrued' => ['amount' => '-18.66', 'currency' => 'RUB']],
+                    ],
+                ]],
+            ],
+        ];
     }
 
     private function getNormalizeTransport(): InMemoryTransport
