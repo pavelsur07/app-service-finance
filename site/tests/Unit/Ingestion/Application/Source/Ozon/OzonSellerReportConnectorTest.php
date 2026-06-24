@@ -252,6 +252,7 @@ final class OzonSellerReportConnectorTest extends TestCase
         self::assertSame(['2026-06-15', '2026-06-16', '2026-06-17', '2026-06-18', '2026-06-19', '2026-06-20', '2026-06-21'], $accrualClient->dates);
         self::assertSame('2026-06-22', $result->nextCursorValue);
         self::assertTrue($result->hasMore);
+        self::assertSame(1, $result->continuationDelaySeconds);
     }
 
     public function testIncrementalAccrualByDayStopsWhenNextCursorIsToday(): void
@@ -294,6 +295,7 @@ final class OzonSellerReportConnectorTest extends TestCase
         self::assertSame(['2026-06-22', '2026-06-23'], $accrualClient->dates);
         self::assertSame('2026-06-24', $result->nextCursorValue);
         self::assertFalse($result->hasMore);
+        self::assertNull($result->continuationDelaySeconds);
     }
 
     public function testPullAccrualTypesFetchesStaticDictionaryOnce(): void

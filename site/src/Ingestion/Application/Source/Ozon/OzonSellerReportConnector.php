@@ -20,6 +20,8 @@ use Symfony\Component\Clock\ClockInterface;
 
 final readonly class OzonSellerReportConnector implements SourceConnectorInterface
 {
+    private const INCREMENTAL_CONTINUATION_DELAY_SECONDS = 1;
+
     public function __construct(
         private OzonAccrualClientInterface $accrualClient,
         private ClockInterface $clock,
@@ -130,6 +132,7 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
             ),
             nextCursorValue: $nextCursor,
             hasMore: $windowHasMore || $incrementalHasMore,
+            continuationDelaySeconds: $incrementalHasMore ? self::INCREMENTAL_CONTINUATION_DELAY_SECONDS : null,
         );
     }
 

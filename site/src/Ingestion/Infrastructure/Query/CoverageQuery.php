@@ -215,7 +215,7 @@ final class CoverageQuery
                   {$shopFilter}
             )
             SELECT
-                TO_CHAR(day.day, 'YYYY-MM-DD') AS record_date,
+                TO_CHAR(GREATEST(fj.from_date, :fromDate)::date, 'YYYY-MM-DD') AS record_date,
                 fj.shop_ref,
                 fj.resource_type,
                 0 AS raw_count,
@@ -223,15 +223,9 @@ final class CoverageQuery
                 COUNT(DISTINCT fj.id) AS issue_count,
                 NULL AS last_fetched_at
             FROM failed_jobs fj
-            JOIN LATERAL (
-                SELECT day::date AS day
-                FROM generate_series(
-                    GREATEST(fj.from_date, :fromDate)::date,
-                    LEAST(fj.to_date, :toDate)::date,
-                    interval '1 day'
-                ) AS day
-            ) day ON fj.from_date <= :toDate AND fj.to_date >= :fromDate
-            GROUP BY day.day, fj.shop_ref, fj.resource_type
+            WHERE fj.from_date <= :toDate
+              AND fj.to_date >= :fromDate
+            GROUP BY record_date, fj.shop_ref, fj.resource_type
             ORDER BY record_date ASC, fj.shop_ref ASC, fj.resource_type ASC
             SQL;
 
