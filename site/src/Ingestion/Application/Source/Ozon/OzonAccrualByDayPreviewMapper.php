@@ -188,6 +188,8 @@ final readonly class OzonAccrualByDayPreviewMapper
                 unitNumber: $unitNumber,
                 ozonCategory: $ozonCategory,
             );
+
+            return;
         }
     }
 

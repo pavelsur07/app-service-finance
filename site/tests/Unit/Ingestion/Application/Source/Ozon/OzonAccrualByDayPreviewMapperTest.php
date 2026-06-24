@@ -151,6 +151,35 @@ final class OzonAccrualByDayPreviewMapperTest extends TestCase
         self::assertSame(TransactionType::COMMISSION, $rows[0]->type);
     }
 
+    public function testPartnerProgramAliasesUseFirstNonZeroField(): void
+    {
+        $rows = $this->mapper()->preview(
+            '19621cff-b028-45d9-9193-11f47ad9a8b2',
+            [[
+                'accrual_id' => 53675409100,
+                'date' => '2026-06-13',
+                'accrued_category' => 'POSTING',
+                'posting' => [
+                    'products' => [[
+                        'commission' => [
+                            'partner_program' => ['amount' => '10.00', 'currency' => 'RUB'],
+                            'partner_programs' => ['amount' => '20.00', 'currency' => 'RUB'],
+                        ],
+                    ]],
+                ],
+            ]],
+        );
+
+        self::assertCount(1, $rows);
+
+        $partnerProgram = $this->row($rows, 'partner_program:product-0');
+        self::assertSame(TransactionType::BONUS, $partnerProgram->type);
+        self::assertSame(TransactionDirection::IN, $partnerProgram->direction);
+        self::assertSame(1000, $partnerProgram->amountMinor);
+        self::assertSame('partner_program', $partnerProgram->field);
+        self::assertSame('ozon_partner_programs', $partnerProgram->ozonCategoryCode);
+    }
+
     public function testBuildsRefundFromNegativeSaleAmountAndKeepsCommissionStorno(): void
     {
         $rows = $this->mapper()->preview('19621cff-b028-45d9-9193-11f47ad9a8b2', [[
