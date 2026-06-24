@@ -79,6 +79,37 @@ final class OzonAccrualClientTest extends TestCase
         self::assertFalse($page->hasMore);
     }
 
+    public function testFetchTypesSendsEmptyJsonObjectAndExtractsAccrualTypes(): void
+    {
+        $capturedUrl = null;
+        $capturedOptions = null;
+        $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$capturedUrl, &$capturedOptions): MockResponse {
+            $capturedUrl = $url;
+            $capturedOptions = $options;
+
+            return new MockResponse(
+                '{"result":{"accrual_types":[{"id":1,"name":"Эквайринг"}]}}',
+                ['http_code' => 200],
+            );
+        });
+
+        $client = new OzonAccrualClient(
+            $http,
+            $this->credentialProvider(),
+            new NullLogger(),
+        );
+
+        $page = $client->fetchTypes(
+            '0192f0c2-0000-7000-8000-000000000001',
+            '0192f0c2-0000-7000-8000-000000000002',
+        );
+
+        self::assertSame('https://api-seller.ozon.ru/v1/finance/accrual/types', $capturedUrl);
+        self::assertSame('{}', (string) ($capturedOptions['body'] ?? ''));
+        self::assertSame([['id' => 1, 'name' => 'Эквайринг']], $page->rows);
+        self::assertFalse($page->hasMore);
+    }
+
     public function testFetchPostingsRequiresPostingNumbers(): void
     {
         $client = new OzonAccrualClient(

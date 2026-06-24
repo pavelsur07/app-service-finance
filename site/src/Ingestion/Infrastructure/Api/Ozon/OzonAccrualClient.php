@@ -63,18 +63,18 @@ final readonly class OzonAccrualClient implements OzonAccrualClientInterface
             companyId: $companyId,
             connectionRef: $connectionRef,
             endpoint: self::TYPES_ENDPOINT,
-            json: [],
+            json: new \stdClass(),
         );
     }
 
     /**
-     * @param array<string, mixed> $json
+     * @param array<string, mixed>|\stdClass $json
      */
     private function requestPage(
         string $companyId,
         string $connectionRef,
         string $endpoint,
-        array $json,
+        array|\stdClass $json,
         int $page = 1,
         int $pageSize = 0,
         int $offset = 0,
@@ -105,11 +105,11 @@ final readonly class OzonAccrualClient implements OzonAccrualClientInterface
     }
 
     /**
-     * @param array<string, mixed> $json
+     * @param array<string, mixed>|\stdClass $json
      *
      * @return array<string, mixed>
      */
-    private function requestJson(string $companyId, string $connectionRef, string $endpoint, array $json): array
+    private function requestJson(string $companyId, string $connectionRef, string $endpoint, array|\stdClass $json): array
     {
         $credentials = $this->credentials($companyId, $connectionRef);
         $startedAt = microtime(true);
@@ -170,7 +170,7 @@ final readonly class OzonAccrualClient implements OzonAccrualClientInterface
                 return $this->objectRows($candidate);
             }
 
-            foreach (['items', 'postings', 'accruals', 'operations', 'rows', 'data', 'types'] as $key) {
+            foreach (['items', 'postings', 'accruals', 'accrual_types', 'operations', 'rows', 'data', 'types'] as $key) {
                 $rows = $candidate[$key] ?? null;
                 if (is_array($rows) && array_is_list($rows)) {
                     return $this->objectRows($rows);
