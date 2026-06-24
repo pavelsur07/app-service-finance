@@ -61,6 +61,12 @@ final readonly class OzonAccrualByDayMapper implements SourceMapperInterface, Ra
                     '_ingestion_field' => $row->field,
                     '_ingestion_unit_number' => $row->unitNumber,
                     '_ingestion_source_key' => $row->sourceKey,
+                    '_ozon_category_code' => $row->ozonCategoryCode,
+                    '_ozon_category_label' => $row->ozonCategoryLabel,
+                    '_ozon_category_group' => $row->ozonCategoryGroup,
+                    '_ozon_category_parent' => $row->ozonCategoryParent,
+                    '_ozon_category_sort_order' => $row->ozonCategorySortOrder,
+                    '_ozon_category_known' => $row->ozonCategoryKnown,
                     'date' => $row->date,
                     'accrued_category' => $row->category,
                     'component' => $row->component,
@@ -116,6 +122,10 @@ final readonly class OzonAccrualByDayMapper implements SourceMapperInterface, Ra
 
     private function description(OzonAccrualPreviewTransaction $row): string
     {
+        if (null !== $row->ozonCategoryLabel) {
+            return sprintf('Ozon: %s', $row->ozonCategoryLabel);
+        }
+
         if (null !== $row->typeId) {
             return sprintf('Ozon accrual %s %s', strtolower($row->category), $row->typeId);
         }

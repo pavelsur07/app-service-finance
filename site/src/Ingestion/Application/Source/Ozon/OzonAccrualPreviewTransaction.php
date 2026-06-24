@@ -22,6 +22,12 @@ final readonly class OzonAccrualPreviewTransaction
         public ?string $typeId = null,
         public ?string $field = null,
         public ?string $unitNumber = null,
+        public ?string $ozonCategoryCode = null,
+        public ?string $ozonCategoryLabel = null,
+        public ?string $ozonCategoryGroup = null,
+        public ?string $ozonCategoryParent = null,
+        public ?int $ozonCategorySortOrder = null,
+        public bool $ozonCategoryKnown = true,
     ) {
     }
 

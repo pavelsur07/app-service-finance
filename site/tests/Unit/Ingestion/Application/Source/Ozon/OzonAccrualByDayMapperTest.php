@@ -45,7 +45,7 @@ final class OzonAccrualByDayMapperTest extends TestCase
             ],
         ]]);
 
-        self::assertCount(3, $transactions);
+        self::assertCount(4, $transactions);
 
         $sale = $this->transaction($transactions, 'ozon:accrual-by-day:53675409100:sale:product-0');
         self::assertSame(TransactionType::SALE, $sale->type);
@@ -53,6 +53,15 @@ final class OzonAccrualByDayMapperTest extends TestCase
         self::assertSame(6671800, $sale->money->amountMinor());
         self::assertSame('sale:product-0', $sale->sourceData['_ingestion_component']);
         self::assertSame('sale_amount', $sale->sourceData['_ingestion_field']);
+        self::assertSame('ozon_revenue', $sale->sourceData['_ozon_category_code']);
+        self::assertSame('Выручка', $sale->sourceData['_ozon_category_label']);
+
+        $bonus = $this->transaction($transactions, 'ozon:accrual-by-day:53675409100:bonus:product-0');
+        self::assertSame(TransactionType::BONUS, $bonus->type);
+        self::assertSame(TransactionDirection::IN, $bonus->direction);
+        self::assertSame(1279, $bonus->money->amountMinor());
+        self::assertSame('Продажи', $bonus->sourceData['_ozon_category_group']);
+        self::assertSame('Баллы за скидки', $bonus->sourceData['_ozon_category_label']);
 
         $commission = $this->transaction($transactions, 'ozon:accrual-by-day:53675409100:commission:product-0');
         self::assertSame('ozon:accrual-by-day:53675409100:commission:product-0', $commission->externalId);
@@ -63,6 +72,7 @@ final class OzonAccrualByDayMapperTest extends TestCase
         self::assertSame('Europe/Moscow', $commission->sourceTz);
         self::assertSame(OzonResourceType::ACCRUAL_BY_DAY, $commission->sourceData['_ingestion_resource']);
         self::assertSame('commission:product-0', $commission->sourceData['_ingestion_component']);
+        self::assertSame('Ozon: Вознаграждение за продажу', $commission->description);
 
         $delivery = $this->transaction($transactions, 'ozon:accrual-by-day:53675409100:delivery:product-0:service-0:type-29');
         self::assertSame('ozon:accrual-by-day:53675409100:delivery:product-0:service-0:type-29', $delivery->externalId);
@@ -70,6 +80,10 @@ final class OzonAccrualByDayMapperTest extends TestCase
         self::assertSame(TransactionDirection::OUT, $delivery->direction);
         self::assertSame(786, $delivery->money->amountMinor());
         self::assertSame('29', $delivery->sourceData['_ingestion_type_id']);
+        self::assertSame('ozon_logistics', $delivery->sourceData['_ozon_category_code']);
+        self::assertSame('Логистика', $delivery->sourceData['_ozon_category_label']);
+        self::assertSame(400, $delivery->sourceData['_ozon_category_sort_order']);
+        self::assertTrue($delivery->sourceData['_ozon_category_known']);
     }
 
     public function testBuildsControlSumsFromMappedComponents(): void
