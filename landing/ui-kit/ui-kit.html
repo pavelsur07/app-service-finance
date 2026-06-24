@@ -1,0 +1,3057 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UI Kit — Ваш Финдир</title>
+<meta name="description" content="Внутренний UI Kit Ваш Финдир: дизайн-токены, компоненты, формы, карточки, таблицы, навигация и шаблоны блоков.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<style>
+    :root {
+      /* Brand colors */
+      --brand-red: #B00020;
+      --brand-dark: #8A0019;
+      --brand: var(--brand-red);
+
+      /* Text colors */
+      --ink: #0B1020;
+      --ink-soft: #1A2033;
+      --muted: #5C677D;
+
+      /* Surface colors */
+      --bg: #F5F6F8;
+      --bg-soft: #ECEEF2;
+      --white: #FFFFFF;
+      --line: rgba(10,21,72,.14);
+
+      /* Radius system */
+      --radius-brand: .625rem;
+
+      /* Bootstrap radius bridge */
+      --bs-border-radius: var(--radius-brand);
+      --bs-border-radius-sm: var(--radius-brand);
+      --bs-border-radius-lg: var(--radius-brand);
+      --bs-border-radius-xl: var(--radius-brand);
+      --bs-border-radius-xxl: var(--radius-brand);
+      --bs-border-radius-pill: var(--radius-brand);
+
+      /* Bootstrap base bridge */
+      --bs-body-color: var(--ink);
+      --bs-body-bg: var(--bg);
+      --bs-primary: var(--ink);
+      --bs-primary-rgb: 11, 16, 32;
+      --bs-link-color: var(--ink);
+      --bs-link-hover-color: var(--brand);
+
+      /* Additional derived tokens */
+      --shadow-soft: 0 18px 60px rgba(10,21,72,.08);
+      --shadow-strong: 0 24px 70px rgba(10,21,72,.14);
+      --white-soft-line: rgba(255,255,255,.14);
+      --white-muted: rgba(255,255,255,.76);
+      --white-faint: rgba(255,255,255,.08);
+      --brand-light-bg: color-mix(in srgb, var(--brand) 8%, var(--white));
+      --ink-light-bg: color-mix(in srgb, var(--ink) 5%, var(--white));
+      --header-height: 4.5rem;
+      --header-anchor-offset: calc(var(--header-height) + 1rem);
+    }
+
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: var(--header-anchor-offset);
+    }
+
+    body {
+      padding-top: var(--header-height);
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.6;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .section {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .section[id] {
+      scroll-margin-top: var(--header-anchor-offset);
+    }
+
+    .section-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      margin-bottom: 1rem;
+      color: var(--muted);
+      font-size: .78rem;
+      font-weight: 700;
+      letter-spacing: .12em;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    .section-eyebrow::before {
+      content: '';
+      width: .5rem;
+      height: .5rem;
+      border-radius: var(--radius-brand);
+      background: var(--brand);
+      flex: 0 0 auto;
+    }
+
+    .section-title {
+      color: var(--ink);
+      font-weight: 800;
+      letter-spacing: -.035em;
+      line-height: 1.08;
+    }
+
+    .section-subtitle {
+      color: var(--ink-soft);
+      max-width: 720px;
+    }
+
+    .text-muted-brand {
+      color: var(--muted) !important;
+    }
+
+    .text-ink-soft {
+      color: var(--ink-soft) !important;
+    }
+
+    /* Reusable UI primitives for base template */
+    .vf-radius,
+    .vf-card,
+    .vf-chip,
+    .vf-control,
+    .brand-mark,
+    .btn,
+    .card,
+    .form-control,
+    .form-check-input,
+    .cookie-notice-card,
+    .footer-social-link {
+      border-radius: var(--radius-brand);
+    }
+
+    .vf-card {
+      border: 1px solid var(--line);
+      background: var(--white);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .vf-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: .45rem;
+      border: 1px solid var(--line);
+      color: var(--ink-soft);
+      background: var(--white);
+      text-decoration: none;
+    }
+
+    .site-header {
+      position: fixed;
+      top: 0;
+      right: 0;
+      left: 0;
+      z-index: 1030;
+    }
+
+    .navbar-wrap {
+      min-height: var(--header-height);
+      background: color-mix(in srgb, var(--white) 92%, transparent);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(16px);
+    }
+
+    .brand-logo {
+      display: inline-flex;
+      align-items: center;
+      gap: .65rem;
+      color: var(--ink);
+      font-size: 1.08rem;
+      font-weight: 800;
+      letter-spacing: -.02em;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .brand-mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.4rem;
+      height: 2.4rem;
+      border-radius: var(--radius-brand);
+      color: var(--white);
+      background: var(--ink);
+      font-size: .9rem;
+      font-weight: 800;
+      letter-spacing: -.04em;
+      line-height: 1;
+      text-align: center;
+    }
+
+    .header-menu {
+      align-items: center;
+      justify-content: center;
+      gap: 1.6rem;
+      flex: 1 1 auto;
+      margin: 0 1.5rem;
+    }
+
+    .header-menu-link {
+      position: relative;
+      color: var(--ink-soft);
+      font-size: .96rem;
+      font-weight: 700;
+      letter-spacing: -.015em;
+      line-height: 1.2;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: color .2s ease;
+    }
+
+    .header-menu-link::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      bottom: -.45rem;
+      left: 0;
+      height: 2px;
+      border-radius: var(--radius-brand);
+      background: var(--brand);
+      opacity: 0;
+      transform: scaleX(.4);
+      transform-origin: center;
+      transition: opacity .2s ease, transform .2s ease;
+    }
+
+    .header-menu-link:hover,
+    .header-menu-link:focus {
+      color: var(--brand);
+    }
+
+    .header-menu-link:hover::after,
+    .header-menu-link:focus::after {
+      opacity: 1;
+      transform: scaleX(1);
+    }
+
+    .mobile-menu-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: .45rem;
+      min-height: 2.75rem;
+      padding: .65rem .95rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      color: var(--ink);
+      background: var(--white);
+      font-weight: 800;
+      letter-spacing: -.015em;
+      line-height: 1;
+      transition: color .2s ease, background-color .2s ease, border-color .2s ease, transform .2s ease;
+    }
+
+    .mobile-menu-toggle:hover,
+    .mobile-menu-toggle:focus {
+      color: var(--white);
+      background: var(--ink);
+      border-color: var(--ink);
+      transform: translateY(-1px);
+    }
+
+    .mobile-menu-toggle i {
+      font-size: 1.2rem;
+      line-height: 1;
+    }
+
+    .vf-mobile-menu {
+      width: min(22.5rem, calc(100vw - 1rem));
+      color: var(--ink);
+      background: var(--white);
+      border-left: 1px solid var(--line);
+    }
+
+    .vf-mobile-menu-header {
+      min-height: var(--header-height);
+      padding: 1rem;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .vf-mobile-menu-body {
+      display: flex;
+      flex-direction: column;
+      padding: 1rem;
+    }
+
+    .vf-mobile-menu-nav {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .vf-mobile-menu-link {
+      display: flex;
+      align-items: center;
+      min-height: 3.25rem;
+      border-bottom: 1px solid var(--line);
+      color: var(--ink-soft);
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: -.025em;
+      line-height: 1.2;
+      text-decoration: none;
+      transition: color .2s ease, background-color .2s ease, padding-left .2s ease;
+    }
+
+    .vf-mobile-menu-link:hover,
+    .vf-mobile-menu-link:focus {
+      color: var(--brand);
+      background: var(--brand-light-bg);
+      padding-left: .75rem;
+    }
+
+    .btn {
+      border-radius: var(--radius-brand);
+      font-weight: 700;
+      letter-spacing: -.01em;
+      transition: transform .2s ease, box-shadow .2s ease, background-color .2s ease, color .2s ease, border-color .2s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .btn-primary,
+    .btn-primary:focus {
+      color: var(--white);
+      background-color: var(--ink);
+      border-color: var(--ink);
+      box-shadow: none;
+    }
+
+    .btn-primary:hover,
+    .btn-primary:active {
+      color: var(--white) !important;
+      background-color: var(--brand) !important;
+      border-color: var(--brand) !important;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .btn-outline-secondary,
+    .btn-outline-secondary:focus {
+      color: var(--ink);
+      background: transparent;
+      border-color: var(--ink);
+      box-shadow: none;
+    }
+
+    .btn-outline-secondary:hover,
+    .btn-outline-secondary:active {
+      color: var(--white) !important;
+      background-color: var(--ink) !important;
+      border-color: var(--ink) !important;
+    }
+
+    .btn-light-ink,
+    .btn-light-ink:focus {
+      color: var(--white);
+      background-color: var(--ink);
+      border-color: var(--ink);
+    }
+
+    .btn-light-ink:hover,
+    .btn-light-ink:active {
+      color: var(--ink) !important;
+      background-color: var(--white) !important;
+      border-color: var(--white) !important;
+    }
+
+    .hero-section {
+      min-height: 100vh;
+      min-height: 100svh;
+      margin-top: calc(-1 * var(--header-height));
+      padding-top: calc(var(--header-height) + 3rem) !important;
+      display: flex;
+      align-items: center;
+      background:
+        radial-gradient(circle at top right, var(--brand-light-bg), transparent 34rem),
+        var(--bg);
+    }
+
+    .hero-title {
+      max-width: 920px;
+      color: var(--ink);
+      font-size: clamp(2.55rem, 6vw, 5.55rem);
+      font-weight: 800;
+      letter-spacing: -.065em;
+      line-height: .96;
+    }
+
+    .hero-title em {
+      color: var(--brand);
+      font-style: italic;
+      white-space: nowrap;
+    }
+
+    .hero-lead {
+      max-width: 680px;
+      color: var(--ink-soft);
+      font-size: clamp(1.08rem, 2vw, 1.35rem);
+      font-weight: 500;
+    }
+
+    .hero-card {
+      position: relative;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--white);
+      box-shadow: var(--shadow-strong);
+      overflow: hidden;
+    }
+
+    .hero-card-header {
+      border-bottom: 1px solid var(--line);
+      background: var(--ink-light-bg);
+    }
+
+    .hero-dot {
+      width: .62rem;
+      height: .62rem;
+      border-radius: var(--radius-brand);
+      background: var(--brand);
+    }
+
+    .metric-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--white);
+      height: 100%;
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: .78rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+
+    .metric-value {
+      color: var(--ink);
+      font-size: 1.65rem;
+      font-weight: 800;
+      letter-spacing: -.04em;
+    }
+
+    .card-ui {
+      height: 100%;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--white);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .icon-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 3rem;
+      height: 3rem;
+      border-radius: var(--radius-brand);
+      color: var(--brand);
+      background: var(--brand-light-bg);
+      font-size: 1.35rem;
+    }
+
+    .service-card-main {
+      color: var(--white);
+      background: var(--ink);
+      border-color: var(--ink);
+    }
+
+    .service-card-main .icon-pill {
+      color: var(--white);
+      background: var(--white-faint);
+    }
+
+    .service-card-main p,
+    .service-card-main .service-caption {
+      color: var(--white-muted);
+    }
+
+    .service-card-accent {
+      color: var(--white);
+      background: var(--brand);
+      border-color: var(--brand);
+    }
+
+    .service-card-accent .icon-pill {
+      color: var(--white);
+      background: var(--white-faint);
+    }
+
+    .service-card-accent p,
+    .service-card-accent .service-caption {
+      color: var(--white-muted);
+    }
+
+    .dark-section {
+      color: var(--white);
+      background: var(--ink);
+    }
+
+    .dark-section .section-title,
+    .dark-section h5,
+    .dark-section p {
+      color: var(--white);
+    }
+
+    .dark-section .section-eyebrow {
+      color: var(--white-muted);
+    }
+
+    .step-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 4rem;
+      height: 4rem;
+      border-radius: var(--radius-brand);
+      color: var(--white);
+      background: var(--brand);
+      font-size: 1.45rem;
+      font-weight: 800;
+      box-shadow: 0 0 0 .7rem var(--white-faint);
+    }
+
+    .step-card {
+      height: 100%;
+      border: 1px solid var(--white-soft-line);
+      border-radius: var(--radius-brand);
+      background: var(--white-faint);
+    }
+
+    .case-section {
+      background: var(--bg-soft);
+    }
+
+    .case-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--white);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .case-label {
+      color: var(--muted);
+      font-size: .78rem;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .result-number {
+      color: var(--brand);
+      font-size: clamp(2rem, 4vw, 3.5rem);
+      font-weight: 800;
+      letter-spacing: -.06em;
+      line-height: 1;
+    }
+
+    .quote-card {
+      border-left: 4px solid var(--brand);
+      border-radius: var(--radius-brand);
+      background: var(--bg);
+    }
+
+    .telegram-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--white);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .contact-section {
+      color: var(--white);
+      background: var(--brand);
+    }
+
+    .contact-section .section-eyebrow,
+    .contact-section .section-title,
+    .contact-section .section-subtitle {
+      color: var(--white);
+    }
+
+    .contact-section .section-eyebrow::before {
+      background: var(--white);
+    }
+
+    .contact-card {
+      border: 1px solid var(--white-soft-line);
+      border-radius: var(--radius-brand);
+      color: var(--ink);
+      background: var(--white);
+      box-shadow: var(--shadow-strong);
+    }
+
+    .form-label {
+      color: var(--ink-soft);
+      font-weight: 700;
+    }
+
+    .form-control {
+      min-height: 3.35rem;
+      color: var(--ink);
+      border-color: var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--white);
+    }
+
+    .form-control:focus {
+      color: var(--ink);
+      border-color: var(--ink);
+      box-shadow: 0 0 0 .25rem var(--brand-light-bg);
+    }
+
+    .success-message {
+      display: none;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      color: var(--ink);
+      background: var(--brand-light-bg);
+    }
+
+    .success-message.is-visible {
+      display: block;
+    }
+
+    .footer-section {
+      color: var(--white);
+      background: var(--ink);
+    }
+
+    .footer-section a {
+      color: var(--white);
+      text-decoration: none;
+      transition: color .2s ease, opacity .2s ease, border-color .2s ease, background-color .2s ease, transform .2s ease;
+    }
+
+    .footer-section a:hover {
+      color: var(--white);
+      opacity: .9;
+    }
+
+    .footer-muted {
+      color: var(--white-muted);
+    }
+
+    .footer-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: .9rem;
+      margin-bottom: 1.6rem;
+      color: var(--white);
+      font-size: clamp(1.65rem, 2vw, 2rem);
+      font-weight: 800;
+      letter-spacing: -.05em;
+      line-height: 1;
+    }
+
+    .footer-brand:hover {
+      color: var(--white);
+      opacity: 1;
+    }
+
+    .footer-brand .brand-mark {
+      width: 2.75rem;
+      height: 2.75rem;
+      border-radius: var(--radius-brand);
+      color: var(--white);
+      background: var(--brand);
+      font-size: 1.05rem;
+    }
+
+    .footer-brand-text {
+      color: var(--white);
+    }
+
+    .footer-description {
+      max-width: 25rem;
+      color: var(--white-muted);
+      font-size: 1.05rem;
+      line-height: 1.6;
+    }
+
+    .footer-socials {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .8rem;
+      margin-top: 2rem;
+    }
+
+    .footer-social-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 3.1rem;
+      height: 3.1rem;
+      border: 1px solid var(--white-soft-line);
+      border-radius: var(--radius-brand);
+      color: var(--white);
+      background: var(--white-faint);
+      font-size: 1.1rem;
+    }
+
+    .footer-social-link:hover {
+      color: var(--white);
+      background: color-mix(in srgb, var(--white) 10%, transparent);
+      border-color: color-mix(in srgb, var(--white) 22%, transparent);
+      opacity: 1;
+      transform: translateY(-1px);
+    }
+
+    .footer-title {
+      margin-bottom: 1.85rem;
+      color: var(--white-muted);
+      font-size: .78rem;
+      font-weight: 600;
+      letter-spacing: .28em;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    .footer-contact-list,
+    .footer-docs-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1.4rem;
+    }
+
+    .footer-contact-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+
+    .footer-contact-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.55rem;
+      height: 2.55rem;
+      flex: 0 0 auto;
+      border: 1px solid var(--white-soft-line);
+      border-radius: var(--radius-brand);
+      color: var(--white-muted);
+      background: var(--white-faint);
+      font-size: 1rem;
+    }
+
+    .footer-kicker {
+      margin-bottom: .35rem;
+      color: var(--white-muted);
+      font-size: .74rem;
+      font-weight: 600;
+      letter-spacing: .24em;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    .footer-contact-link {
+      color: var(--white);
+      font-size: clamp(1.05rem, 1.15vw, 1.28rem);
+      font-weight: 600;
+      letter-spacing: -.03em;
+      line-height: 1.2;
+    }
+
+    .footer-docs-list a {
+      color: var(--white-muted);
+      font-size: clamp(1rem, 1.05vw, 1.14rem);
+      font-weight: 400;
+      letter-spacing: -.025em;
+      line-height: 1.35;
+    }
+
+    .footer-docs-list a:hover {
+      color: var(--white);
+    }
+
+    .footer-divider {
+      height: 1px;
+      margin-top: 3.4rem;
+      margin-bottom: 2rem;
+      background: var(--white-soft-line);
+    }
+
+    .footer-bottom {
+      color: var(--white-muted);
+      font-size: .98rem;
+    }
+
+    .footer-legal {
+      font-size: .9rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+
+    .cookie-notice {
+      position: fixed;
+      right: 0;
+      bottom: 1.25rem;
+      left: 0;
+      z-index: 1080;
+      padding-right: 1rem;
+      padding-left: 1rem;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(1rem);
+      transition: opacity .25s ease, transform .25s ease;
+    }
+
+    .cookie-notice.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .cookie-card {
+      position: relative;
+      max-width: 58rem;
+      margin-right: auto;
+      margin-left: auto;
+      padding: 1.75rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      color: var(--ink);
+      background: var(--white);
+      box-shadow: var(--shadow-strong);
+      pointer-events: auto;
+    }
+
+    .cookie-close {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.25rem;
+      height: 2.25rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      color: var(--ink-soft);
+      background: var(--white);
+      transition: color .2s ease, border-color .2s ease, background-color .2s ease, transform .2s ease;
+    }
+
+    .cookie-close:hover {
+      color: var(--white);
+      border-color: var(--ink);
+      background: var(--ink);
+      transform: translateY(-1px);
+    }
+
+    .cookie-title {
+      max-width: 42rem;
+      margin-bottom: .65rem;
+      padding-right: 2.5rem;
+      color: var(--ink);
+      font-size: clamp(1.35rem, 2vw, 1.75rem);
+      font-weight: 800;
+      letter-spacing: -.035em;
+      line-height: 1.15;
+    }
+
+    .cookie-text {
+      max-width: 43rem;
+      margin-bottom: 0;
+      color: var(--ink-soft);
+      font-size: 1rem;
+      line-height: 1.6;
+    }
+
+    .cookie-text a {
+      color: var(--brand);
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .cookie-text a:hover {
+      color: var(--brand-dark);
+      text-decoration: underline;
+    }
+
+    .cookie-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      height: 100%;
+    }
+
+    @media (max-width: 767.98px) {
+      :root {
+        --header-height: 4.25rem;
+        --header-anchor-offset: calc(var(--header-height) + .75rem);
+      }
+
+
+      .cookie-notice {
+        bottom: 1rem;
+      }
+
+      .cookie-card {
+        padding: 1.35rem;
+        border-radius: var(--radius-brand);
+      }
+
+      .cookie-actions {
+        justify-content: stretch;
+      }
+
+      .cookie-actions .btn {
+        width: 100%;
+      }
+
+      .brand-logo {
+        gap: .45rem;
+        font-size: .95rem;
+      }
+
+      .brand-mark {
+        width: 2rem;
+        height: 2rem;
+        border-radius: var(--radius-brand);
+        font-size: .76rem;
+      }
+
+      .navbar .btn {
+        padding: .58rem .85rem;
+        font-size: .88rem;
+      }
+
+      .hero-section {
+        min-height: 80vh;
+        min-height: 80svh;
+        padding-top: calc(var(--header-height) + 2rem) !important;
+      }
+
+      .hero-actions .btn {
+        width: 100%;
+      }
+
+      .section-title {
+        letter-spacing: -.045em;
+      }
+
+      .step-card {
+        text-align: center;
+      }
+    }
+
+    @media (max-width: 991.98px) {
+      .footer-description {
+        max-width: none;
+      }
+
+      .footer-divider {
+        margin-top: 2.6rem;
+      }
+
+      .footer-legal {
+        white-space: normal;
+        display: inline-block;
+        line-height: 1.8;
+      }
+    }
+
+    @media (max-width: 767.98px) {
+      .footer-brand {
+        justify-content: center;
+      }
+
+      .footer-socials,
+      .footer-contact-item {
+        justify-content: center;
+      }
+    }
+
+    @media (min-width: 768px) {
+      .hero-actions .btn {
+        width: auto;
+      }
+    }
+  
+
+    /* Informational pages */
+    .info-hero {
+      background:
+        radial-gradient(circle at top right, var(--brand-light-bg), transparent 32rem),
+        var(--white);
+    }
+
+    .info-hero-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--white);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .info-summary-card {
+      height: 100%;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--white);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .info-summary-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.8rem;
+      height: 2.8rem;
+      border-radius: var(--radius-brand);
+      color: var(--brand);
+      background: var(--brand-light-bg);
+      font-size: 1.2rem;
+      flex: 0 0 auto;
+    }
+
+    .info-layout {
+      background: var(--bg);
+    }
+
+    .info-sidebar {
+      position: sticky;
+      top: calc(var(--header-height) + 1.25rem);
+    }
+
+    .info-toc {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--white);
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+    }
+
+    .info-toc-head {
+      padding: 1.15rem 1.25rem;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: .76rem;
+      font-weight: 700;
+      letter-spacing: .14em;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    .info-toc-list {
+      max-height: calc(100svh - var(--header-height) - 6rem);
+      overflow: auto;
+      padding: .6rem;
+    }
+
+    .info-toc-link {
+      display: block;
+      padding: .7rem .75rem;
+      border-radius: var(--radius-brand);
+      color: var(--ink-soft);
+      font-size: .92rem;
+      font-weight: 600;
+      line-height: 1.28;
+      text-decoration: none;
+    }
+
+    .info-toc-link:hover {
+      color: var(--brand);
+      background: var(--brand-light-bg);
+    }
+
+    .info-content {
+      max-width: 58rem;
+    }
+
+    .info-card {
+      scroll-margin-top: var(--header-anchor-offset);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--white);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .info-card + .info-card {
+      margin-top: 1rem;
+    }
+
+    .info-card-head {
+      padding: clamp(1.4rem, 3vw, 2rem) clamp(1.25rem, 3vw, 2.25rem) 1rem;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .info-card-body {
+      padding: clamp(1.4rem, 3vw, 2.25rem);
+    }
+
+    .info-section-number {
+      display: inline-flex;
+      align-items: center;
+      margin-bottom: .85rem;
+      color: var(--muted);
+      font-size: .74rem;
+      font-weight: 700;
+      letter-spacing: .14em;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    .info-card h2 {
+      margin: 0;
+      color: var(--ink);
+      font-size: clamp(1.45rem, 2.2vw, 2rem);
+      font-weight: 800;
+      letter-spacing: -.035em;
+      line-height: 1.12;
+    }
+
+    .info-card h3 {
+      margin-top: 1.6rem;
+      margin-bottom: .85rem;
+      color: var(--ink);
+      font-size: 1.08rem;
+      font-weight: 800;
+      letter-spacing: -.02em;
+      line-height: 1.25;
+    }
+
+    .info-card h3:first-child {
+      margin-top: 0;
+    }
+
+    .info-card p {
+      max-width: 74ch;
+      margin-bottom: 1rem;
+      color: var(--ink-soft);
+      font-size: 1rem;
+      line-height: 1.78;
+    }
+
+    .info-card p:last-child {
+      margin-bottom: 0;
+    }
+
+    .info-card a {
+      color: var(--ink);
+      font-weight: 700;
+      text-decoration-color: var(--line);
+      text-underline-offset: .18em;
+    }
+
+    .info-card a:hover {
+      color: var(--brand);
+      text-decoration-color: var(--brand);
+    }
+
+    .info-card .quote-card {
+      max-width: none;
+      margin-top: 1rem;
+    }
+
+    .info-alert {
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--brand);
+      border-radius: var(--radius-brand);
+      background: var(--brand-light-bg);
+    }
+
+    .info-requisites-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+    }
+
+    .info-requisite-item {
+      padding: 1rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--bg);
+    }
+
+    .info-requisite-label {
+      margin-bottom: .35rem;
+      color: var(--muted);
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .12em;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    .info-requisite-value {
+      margin: 0;
+      color: var(--ink);
+      font-weight: 700;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 991.98px) {
+      .info-sidebar {
+        position: static;
+      }
+
+      .info-toc-list {
+        max-height: none;
+      }
+
+      .info-content {
+        max-width: none;
+      }
+    }
+
+    @media (max-width: 575.98px) {
+      .info-requisites-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .info-toc-link {
+        font-size: .9rem;
+      }
+
+      .info-card p {
+        font-size: .97rem;
+        line-height: 1.72;
+      }
+    }
+
+
+    /* Blog page styles */
+    .blog-hero {
+      background:
+        radial-gradient(circle at top right, var(--brand-light-bg), transparent 34rem),
+        var(--bg);
+    }
+
+    .breadcrumbs-wrap {
+      margin-bottom: 2.5rem;
+      color: var(--muted);
+      font-size: .95rem;
+      line-height: 1.3;
+    }
+
+    .vf-breadcrumb {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: .55rem;
+      margin: 0;
+      padding: 0;
+      color: var(--muted);
+    }
+
+    .vf-breadcrumb .breadcrumb-item {
+      display: inline-flex;
+      align-items: center;
+      gap: .55rem;
+      padding-left: 0;
+      color: var(--muted);
+    }
+
+    .vf-breadcrumb .breadcrumb-item + .breadcrumb-item::before {
+      content: "\F285";
+      padding: 0;
+      color: var(--muted);
+      font-family: "bootstrap-icons";
+      font-size: .8rem;
+      line-height: 1;
+    }
+
+    .vf-breadcrumb a {
+      color: var(--muted);
+      text-decoration: none;
+    }
+
+    .vf-breadcrumb a:hover {
+      color: var(--brand);
+    }
+
+    .vf-breadcrumb .active {
+      color: var(--ink);
+    }
+
+    .blog-meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.4rem;
+      color: var(--muted);
+      font-size: .98rem;
+    }
+
+    .blog-category-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: .42rem .85rem;
+      border-radius: var(--radius-brand);
+      color: var(--brand);
+      background: var(--white);
+      font-weight: 700;
+      line-height: 1;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .blog-meta-item {
+      display: inline-flex;
+      align-items: center;
+      gap: .45rem;
+      color: var(--muted);
+      line-height: 1;
+    }
+
+    .blog-title {
+      max-width: 920px;
+      color: var(--ink);
+      font-size: clamp(2.4rem, 5.2vw, 5.15rem);
+      font-weight: 800;
+      letter-spacing: -.065em;
+      line-height: .98;
+    }
+
+    .blog-title em {
+      color: var(--brand);
+      font-style: italic;
+    }
+
+    .blog-lead {
+      max-width: 780px;
+      color: var(--ink-soft);
+      font-size: clamp(1.08rem, 1.7vw, 1.3rem);
+      font-weight: 500;
+    }
+
+    .blog-author-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-top: 2.2rem;
+    }
+
+    .blog-author-card {
+      display: flex;
+      align-items: center;
+      gap: .9rem;
+      min-width: min(100%, 19rem);
+      padding: .9rem 1rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--white);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .blog-author-avatar {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 3.5rem;
+      height: 3.5rem;
+      flex: 0 0 auto;
+      border-radius: var(--radius-brand);
+      color: var(--white);
+      background: var(--ink);
+      font-size: 1.15rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .blog-author-name {
+      margin: 0;
+      color: var(--ink);
+      font-weight: 800;
+      letter-spacing: -.025em;
+      line-height: 1.2;
+    }
+
+    .blog-author-role {
+      margin: .15rem 0 0;
+      color: var(--muted);
+      font-size: .92rem;
+      line-height: 1.35;
+    }
+
+    .blog-hero-visual {
+      position: relative;
+      min-height: 26rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--white);
+      box-shadow: var(--shadow-strong);
+      overflow: hidden;
+    }
+
+    .blog-visual-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1.1rem 1.35rem;
+      border-bottom: 1px solid var(--line);
+      background: var(--ink-light-bg);
+    }
+
+    .blog-visual-dots {
+      display: inline-flex;
+      gap: .45rem;
+    }
+
+    .blog-visual-dot {
+      width: .75rem;
+      height: .75rem;
+      border-radius: var(--radius-brand);
+      background: var(--brand);
+    }
+
+    .blog-visual-label {
+      color: var(--muted);
+      font-size: .75rem;
+      font-weight: 800;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    .blog-visual-body {
+      padding: 2rem;
+    }
+
+    .blog-market-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.2rem;
+      margin-bottom: 1.4rem;
+    }
+
+    .blog-market-card {
+      min-height: 12rem;
+      padding: 1.2rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--bg);
+    }
+
+    .blog-market-card h3 {
+      margin: 0 0 .8rem;
+      color: var(--ink);
+      font-size: 1rem;
+      font-weight: 800;
+      letter-spacing: -.025em;
+    }
+
+    .blog-market-card ul {
+      margin: 0;
+      padding-left: 1.1rem;
+      color: var(--ink-soft);
+      font-size: .95rem;
+    }
+
+    .blog-market-card li + li {
+      margin-top: .45rem;
+    }
+
+    .blog-mini-chart {
+      padding: 1.25rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--white);
+    }
+
+    .blog-chart-row {
+      display: grid;
+      grid-template-columns: 7rem 1fr auto;
+      align-items: center;
+      gap: .85rem;
+      color: var(--ink-soft);
+      font-size: .95rem;
+    }
+
+    .blog-chart-row + .blog-chart-row {
+      margin-top: .9rem;
+    }
+
+    .blog-chart-track {
+      height: .7rem;
+      border-radius: var(--radius-brand);
+      background: var(--bg-soft);
+      overflow: hidden;
+    }
+
+    .blog-chart-fill {
+      height: 100%;
+      border-radius: var(--radius-brand);
+      background: var(--ink);
+    }
+
+    .blog-chart-fill-marketplace {
+      width: 64%;
+    }
+
+    .blog-chart-fill-control {
+      width: 82%;
+    }
+
+    .blog-chart-fill-accent {
+      background: var(--brand);
+    }
+
+    .blog-share-card,
+    .blog-ai-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--white);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .blog-chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .7rem;
+    }
+
+    .blog-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: .55rem;
+      padding: .62rem .9rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      color: var(--ink);
+      background: var(--white);
+      font-weight: 700;
+      text-decoration: none;
+      line-height: 1;
+    }
+
+    .blog-chip:hover {
+      color: var(--white);
+      background: var(--ink);
+      border-color: var(--ink);
+    }
+
+    .blog-layout {
+      background: var(--white);
+    }
+
+    .blog-sidebar {
+      position: sticky;
+      top: calc(var(--header-height) + 1.25rem);
+    }
+
+    .blog-toc-card,
+    .blog-side-cta,
+    .blog-side-note {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--white);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .blog-toc-title {
+      margin: 0 0 1rem;
+      color: var(--ink);
+      font-size: 1rem;
+      font-weight: 800;
+      letter-spacing: -.02em;
+    }
+
+    .blog-toc-list {
+      display: flex;
+      flex-direction: column;
+      gap: .7rem;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .blog-toc-list a {
+      display: block;
+      color: var(--muted);
+      font-size: .95rem;
+      line-height: 1.35;
+      text-decoration: none;
+    }
+
+    .blog-toc-list a:hover {
+      color: var(--brand);
+    }
+
+    .blog-side-cta {
+      color: var(--white);
+      background: var(--ink);
+      border-color: var(--ink);
+    }
+
+    .blog-side-cta p {
+      color: var(--white-muted);
+    }
+
+    .blog-side-cta .btn {
+      color: var(--ink);
+      background: var(--white);
+      border-color: var(--white);
+    }
+
+    .blog-side-cta .btn:hover {
+      color: var(--white) !important;
+      background: var(--brand) !important;
+      border-color: var(--brand) !important;
+    }
+
+    .blog-side-cta {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .blog-side-cta-content {
+      position: relative;
+      z-index: 2;
+      max-width: none;
+    }
+
+    .blog-side-cta-figure {
+      position: relative;
+      z-index: 1;
+      width: min(11rem, 76%);
+      margin: .75rem auto 1.25rem;
+      pointer-events: none;
+    }
+
+    .blog-side-cta-figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .blog-article {
+      width: 100%;
+      max-width: none;
+    }
+
+    .blog-article p,
+    .blog-article li {
+      color: var(--ink-soft);
+      font-size: 1.08rem;
+      line-height: 1.75;
+    }
+
+    .blog-article p + p {
+      margin-top: 1rem;
+    }
+
+    .blog-article h2 {
+      margin-top: 3rem;
+      margin-bottom: 1rem;
+      color: var(--ink);
+      font-size: clamp(1.85rem, 3vw, 2.55rem);
+      font-weight: 800;
+      letter-spacing: -.045em;
+      line-height: 1.12;
+    }
+
+    .blog-article h3 {
+      margin-top: 2rem;
+      margin-bottom: .8rem;
+      color: var(--ink);
+      font-size: 1.45rem;
+      font-weight: 800;
+      letter-spacing: -.035em;
+      line-height: 1.2;
+    }
+
+    .blog-article a {
+      color: var(--brand);
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .blog-article a:hover {
+      color: var(--brand-dark);
+    }
+
+    .blog-article .blog-chip:hover {
+      color: var(--white);
+      background: var(--ink);
+      border-color: var(--ink);
+    }
+
+    .blog-article-cover {
+      margin-bottom: 2rem;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--white);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .blog-article-cover img {
+      display: block;
+      width: 100%;
+      aspect-ratio: 16 / 7;
+      object-fit: cover;
+    }
+
+    .blog-intro-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--bg);
+    }
+
+    .blog-content-list {
+      margin: 1rem 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .blog-content-list li {
+      position: relative;
+      padding-left: 1.4rem;
+    }
+
+    .blog-content-list li::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: .78rem;
+      width: .45rem;
+      height: .45rem;
+      border-radius: var(--radius-brand);
+      background: var(--brand);
+    }
+
+    .blog-callout {
+      margin: 2rem 0;
+      padding: 1.4rem;
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--brand);
+      border-radius: var(--radius-brand);
+      background: var(--bg);
+    }
+
+    .blog-callout strong {
+      color: var(--ink);
+    }
+
+    .blog-table-wrap {
+      margin: 1.5rem 0;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--white);
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+    }
+
+    .blog-table {
+      margin: 0;
+      --bs-table-bg: transparent;
+      --bs-table-striped-bg: transparent;
+      --bs-table-hover-bg: transparent;
+    }
+
+    .blog-table th {
+      padding: 1rem 1.15rem;
+      color: var(--white);
+      background: var(--ink);
+      font-weight: 800;
+      line-height: 1.25;
+      border-color: var(--white-soft-line);
+      vertical-align: top;
+    }
+
+    .blog-table td {
+      padding: 1rem 1.15rem;
+      color: var(--ink-soft);
+      border-color: var(--line);
+      vertical-align: top;
+    }
+
+    .blog-table tbody tr:nth-child(odd) td {
+      background: var(--white);
+    }
+
+    .blog-table tbody tr:nth-child(even) td {
+      background: var(--bg);
+    }
+
+    .blog-table tbody tr:hover td {
+      background: var(--brand-light-bg);
+    }
+
+    .blog-table tbody tr:last-child td {
+      border-bottom-width: 0;
+    }
+
+    .blog-table td:first-child {
+      color: var(--ink);
+      font-weight: 800;
+      width: 16%;
+    }
+
+    .blog-cta-inline {
+      margin: 2.5rem 0;
+      padding: 1.5rem;
+      border-radius: var(--radius-brand);
+      color: var(--white);
+      background: var(--brand);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .blog-cta-inline p {
+      color: var(--white-muted);
+    }
+
+    .blog-cta-inline .contact-card p,
+    .blog-cta-inline .contact-card .form-check-label {
+      color: var(--muted) !important;
+    }
+
+    .blog-cta-inline .contact-card a:not(.btn) {
+      color: var(--brand);
+    }
+
+    .blog-cta-inline .form-check-input:checked {
+      background-color: var(--brand);
+      border-color: var(--brand);
+    }
+
+    .blog-cta-inline .btn {
+      color: var(--white);
+      background: var(--ink);
+      border-color: var(--ink);
+    }
+
+    .blog-cta-inline .btn:hover {
+      color: var(--ink) !important;
+      background: var(--white) !important;
+      border-color: var(--white) !important;
+    }
+
+    .blog-cta-inline .section-eyebrow {
+      color: var(--white-muted);
+    }
+
+    .blog-cta-inline .section-eyebrow::before {
+      background: var(--white);
+    }
+
+    .blog-cta-inline .contact-card .form-check-label {
+      color: var(--ink-soft) !important;
+      font-size: .95rem;
+      line-height: 1.45;
+    }
+
+    .blog-cta-inline .contact-card .form-check-label a {
+      color: var(--brand);
+      font-weight: 700;
+    }
+
+    .blog-cta-inline .form-check-input {
+      width: 1.15rem;
+      height: 1.15rem;
+      margin-top: .2rem;
+    }
+
+    .blog-cta-copy {
+      position: relative;
+      min-height: 31rem;
+      overflow: hidden;
+    }
+
+    .blog-cta-copy-content {
+      position: relative;
+      z-index: 2;
+      max-width: 33rem;
+    }
+
+    .blog-cta-person {
+      position: absolute;
+      right: 0;
+      bottom: -1.5rem;
+      width: min(21rem, 56%);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .blog-cta-person img {
+      display: block;
+      width: 100%;
+      height: auto;
+      filter: drop-shadow(0 1.5rem 2.5rem rgba(11, 16, 32, .22));
+    }
+
+    @media (max-width: 991.98px) {
+      .blog-cta-copy {
+        min-height: auto;
+      }
+
+      .blog-cta-copy-content {
+        max-width: none;
+      }
+
+      .blog-cta-person {
+        position: relative;
+        right: auto;
+        bottom: auto;
+        width: min(16rem, 72%);
+        margin: 1.5rem auto -1.5rem;
+      }
+    }
+
+    .blog-faq-item {
+      padding: 1.25rem 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .blog-faq-item:last-child {
+      border-bottom: 0;
+    }
+
+    .blog-related-card {
+      height: 100%;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--white);
+      box-shadow: var(--shadow-soft);
+      text-decoration: none;
+      overflow: hidden;
+      transition: transform .2s ease, box-shadow .2s ease;
+    }
+
+    .blog-related-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-strong);
+    }
+
+    .blog-related-image {
+      aspect-ratio: 16 / 10;
+      border-bottom: 1px solid var(--line);
+      background: var(--bg-soft);
+      overflow: hidden;
+    }
+
+    .blog-related-image img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .blog-related-tag {
+      color: var(--muted);
+      font-size: .78rem;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .blog-related-card .btn {
+      align-self: flex-start;
+      margin-top: auto;
+      pointer-events: none;
+    }
+
+    @media (max-width: 991.98px) {
+      .blog-sidebar {
+        position: static;
+      }
+
+      .blog-hero-visual {
+        min-height: auto;
+      }
+    }
+
+    @media (max-width: 767.98px) {
+      .blog-breadcrumbs {
+        margin-bottom: 1.6rem;
+        font-size: .88rem;
+      }
+
+      .blog-author-card {
+        width: 100%;
+      }
+
+      .blog-market-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .blog-visual-body {
+        padding: 1.25rem;
+      }
+
+      .blog-chart-row {
+        grid-template-columns: 1fr;
+        gap: .4rem;
+      }
+
+      .blog-article p,
+      .blog-article li {
+        font-size: 1rem;
+        line-height: 1.7;
+      }
+
+      .blog-chip {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+
+    .blog-fill-52 { width: 52%; }
+    .blog-fill-74 { width: 74%; }
+    .blog-fill-86 { width: 86%; }
+
+
+    /* UI Kit page */
+    .uikit-hero {
+      background:
+        radial-gradient(circle at top right, var(--brand-light-bg), transparent 34rem),
+        var(--bg);
+    }
+
+    .uikit-section {
+      background: var(--white);
+    }
+
+    .uikit-section-alt {
+      background: var(--bg);
+    }
+
+    .uikit-block {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--white);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .uikit-block-dark {
+      color: var(--white);
+      background: var(--ink);
+      border-color: var(--ink);
+    }
+
+    .uikit-block-accent {
+      color: var(--white);
+      background: var(--brand);
+      border-color: var(--brand);
+    }
+
+    .uikit-title-row {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .uikit-code {
+      display: inline-flex;
+      align-items: center;
+      min-height: 2.25rem;
+      padding: .35rem .65rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      color: var(--muted);
+      background: var(--bg);
+      font-size: .82rem;
+      font-weight: 600;
+      letter-spacing: .02em;
+      word-break: break-word;
+    }
+
+    .uikit-token-card {
+      height: 100%;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--white);
+      overflow: hidden;
+    }
+
+    .uikit-swatch {
+      height: 5rem;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .uikit-swatch-brand { background: var(--brand); }
+    .uikit-swatch-brand-dark { background: var(--brand-dark); }
+    .uikit-swatch-ink { background: var(--ink); }
+    .uikit-swatch-ink-soft { background: var(--ink-soft); }
+    .uikit-swatch-muted { background: var(--muted); }
+    .uikit-swatch-bg { background: var(--bg); }
+    .uikit-swatch-bg-soft { background: var(--bg-soft); }
+    .uikit-swatch-white { background: var(--white); }
+
+    .uikit-preview-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 1rem;
+    }
+
+    .uikit-preview-cell {
+      min-height: 3.5rem;
+      border: 1px dashed var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--bg);
+    }
+
+    .uikit-avatar {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 3rem;
+      height: 3rem;
+      flex: 0 0 auto;
+      border-radius: var(--radius-brand);
+      color: var(--white);
+      background: var(--ink);
+      font-weight: 800;
+      letter-spacing: -.04em;
+      line-height: 1;
+      text-align: center;
+    }
+
+    .uikit-empty-state {
+      border: 1px dashed var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--bg);
+    }
+
+    .uikit-component-label {
+      margin-bottom: .75rem;
+      color: var(--muted);
+      font-size: .78rem;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .uikit-demo-box {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--bg);
+    }
+
+    .uikit-icon-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+      gap: .75rem;
+    }
+
+    .uikit-icon-item {
+      display: flex;
+      align-items: center;
+      gap: .65rem;
+      padding: .85rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--white);
+      color: var(--ink-soft);
+      font-weight: 600;
+    }
+
+    .uikit-icon-item i {
+      color: var(--brand);
+      font-size: 1.15rem;
+    }
+
+    @media (max-width: 767.98px) {
+      .uikit-title-row {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+    }
+
+
+    /* Quick links / resource list page */
+    .quick-links-page {
+      background: var(--bg);
+    }
+
+    .quick-links-preview {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--bg-soft);
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+      isolation: isolate;
+    }
+
+    .quick-links-section-head {
+      padding: 1.5rem 1.5rem 0;
+      background: var(--white);
+      border-top-left-radius: var(--radius-brand);
+      border-top-right-radius: var(--radius-brand);
+    }
+
+    .quick-links-section-title {
+      margin: 0;
+      color: var(--ink);
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -.03em;
+      line-height: 1.15;
+    }
+
+    .quick-links-hero {
+      background: var(--white);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .quick-links-hero-inner,
+    .quick-links-shell,
+    .quick-links-section-head-inner {
+      max-width: 72rem;
+      margin: 0 auto;
+    }
+
+    .quick-links-profile {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+    }
+
+    .quick-links-avatar {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 5rem;
+      height: 5rem;
+      flex: 0 0 auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      color: var(--white);
+      background: var(--ink);
+      font-size: 1.15rem;
+      font-weight: 800;
+      line-height: 1;
+      overflow: hidden;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .quick-links-avatar img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .quick-links-title {
+      margin: 0;
+      color: var(--ink);
+      font-size: clamp(2rem, 4vw, 3.15rem);
+      font-weight: 800;
+      letter-spacing: -.055em;
+      line-height: 1;
+    }
+
+    .quick-links-description {
+      max-width: 44rem;
+      margin: .55rem 0 0;
+      color: var(--muted);
+      font-size: 1.08rem;
+      line-height: 1.55;
+    }
+
+    .quick-links-socials {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .75rem;
+      margin-top: 1rem;
+    }
+
+    .quick-links-main {
+      background: var(--bg-soft);
+      border-bottom-left-radius: var(--radius-brand);
+      border-bottom-right-radius: var(--radius-brand);
+    }
+
+    .quick-search {
+      position: relative;
+      margin-bottom: 1.75rem;
+    }
+
+    .quick-search-icon {
+      position: absolute;
+      top: 50%;
+      left: 1.1rem;
+      color: var(--muted);
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+
+    .quick-search .form-control {
+      padding-left: 3rem;
+      background: var(--white);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .quick-month-title {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin: 2rem 0 1rem;
+      color: var(--ink);
+      font-size: 1.1rem;
+      font-weight: 800;
+      letter-spacing: -.02em;
+    }
+
+    .quick-month-title::after {
+      content: '';
+      height: 1px;
+      flex: 1 1 auto;
+      background: var(--line);
+    }
+
+    .quick-link-list {
+      display: grid;
+      gap: .85rem;
+    }
+
+    .quick-link-card {
+      display: grid;
+      grid-template-columns: 5.25rem minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 1.25rem;
+      min-height: 5.25rem;
+      padding: 1rem 1.25rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-brand);
+      background: var(--white);
+      box-shadow: var(--shadow-soft);
+      transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+    }
+
+    .quick-link-card:hover {
+      border-color: color-mix(in srgb, var(--ink) 26%, transparent);
+      box-shadow: var(--shadow-strong);
+      transform: translateY(-1px);
+    }
+
+    .quick-link-date {
+      color: var(--muted);
+      font-size: .9rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .quick-link-title {
+      margin: 0;
+      color: var(--ink);
+      font-size: 1.05rem;
+      font-weight: 800;
+      letter-spacing: -.02em;
+      line-height: 1.35;
+    }
+
+    .quick-link-action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: .45rem;
+      min-height: 2.65rem;
+      padding: .65rem 1rem;
+      border: 1px solid var(--ink);
+      border-radius: var(--radius-brand);
+      color: var(--white);
+      background: var(--ink);
+      font-size: .92rem;
+      font-weight: 800;
+      line-height: 1;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: background-color .2s ease, border-color .2s ease, color .2s ease, transform .2s ease;
+    }
+
+    .quick-link-action:hover {
+      color: var(--white);
+      background: var(--brand);
+      border-color: var(--brand);
+      transform: translateY(-1px);
+    }
+
+    .quick-link-action.is-disabled {
+      color: var(--muted);
+      background: var(--bg);
+      border-color: var(--line);
+      pointer-events: none;
+    }
+
+    .quick-links-empty {
+      padding: 2rem;
+      border: 1px dashed var(--line);
+      border-radius: var(--radius-brand);
+      color: var(--muted);
+      background: var(--white);
+      text-align: center;
+    }
+
+    @media (max-width: 767.98px) {
+      .quick-links-profile {
+        align-items: flex-start;
+        gap: 1rem;
+      }
+
+      .quick-links-avatar {
+        width: 4rem;
+        height: 4rem;
+      }
+
+      .quick-link-card {
+        grid-template-columns: 1fr;
+        gap: .75rem;
+      }
+
+      .quick-link-action {
+        width: 100%;
+      }
+    }
+
+</style>
+</head>
+<body>
+<section id="header" class="site-header">
+  <nav class="navbar navbar-expand navbar-wrap">
+    <div class="container d-flex align-items-center justify-content-between gap-3">
+      <a class="brand-logo" href="#uikit-hero" aria-label="Ваш Финдир — UI Kit">
+        <span class="brand-mark">ВФ</span>
+        <span>Ваш Финдир</span>
+      </a>
+      <nav class="header-menu d-none d-lg-flex" aria-label="Основное меню">
+        <a class="header-menu-link" href="/services">Услуги</a>
+        <a class="header-menu-link" href="/cases">Кейсы</a>
+        <a class="header-menu-link" href="/about">О компании</a>
+        <a class="header-menu-link" href="/blog">Газета</a>
+        <a class="header-menu-link" href="/partners">Партнерам</a>
+      </nav>
+      <a class="btn btn-primary d-none d-lg-inline-flex js-cta-click" href="#forms">Записаться</a>
+      <button aria-controls="mobileMenu" aria-label="Открыть меню" class="mobile-menu-toggle d-lg-none" data-bs-target="#mobileMenu" data-bs-toggle="offcanvas" type="button">
+        <i class="bi bi-list"></i><span>Меню</span>
+      </button>
+    </div>
+  </nav>
+</section>
+
+<div aria-labelledby="mobileMenuLabel" class="offcanvas offcanvas-end vf-mobile-menu" id="mobileMenu" tabindex="-1">
+  <div class="offcanvas-header vf-mobile-menu-header">
+    <a class="brand-logo" href="#uikit-hero" id="mobileMenuLabel">
+      <span class="brand-mark">ВФ</span><span>Ваш Финдир</span>
+    </a>
+    <button aria-label="Закрыть меню" class="btn-close" data-bs-dismiss="offcanvas" type="button"></button>
+  </div>
+  <div class="offcanvas-body vf-mobile-menu-body">
+    <nav aria-label="Мобильное меню" class="vf-mobile-menu-nav">
+      <a class="vf-mobile-menu-link" data-bs-dismiss="offcanvas" href="/services">Услуги</a>
+      <a class="vf-mobile-menu-link" data-bs-dismiss="offcanvas" href="/cases">Кейсы</a>
+      <a class="vf-mobile-menu-link" data-bs-dismiss="offcanvas" href="/about">О компании</a>
+      <a class="vf-mobile-menu-link" data-bs-dismiss="offcanvas" href="/blog">Газета</a>
+      <a class="vf-mobile-menu-link" data-bs-dismiss="offcanvas" href="/partners">Партнерам</a>
+    </nav>
+    <a class="btn btn-primary btn-lg w-100 mt-4" data-bs-dismiss="offcanvas" href="#forms">Записаться на встречу</a>
+  </div>
+</div>
+
+<section id="uikit-hero" class="section uikit-hero py-5">
+  <div class="container py-5">
+    <div class="row align-items-end g-4">
+      <div class="col-lg-8">
+        <div class="section-eyebrow">UI Kit / Design system</div>
+        <h1 class="hero-title mb-4">Базовые элементы интерфейса <em>Ваш Финдир</em></h1>
+        <p class="hero-lead mb-0">Единая страница для разработчиков, дизайнера и продуктовой команды: токены, сетка, типографика, кнопки, формы, карточки, таблицы, блоговые и информационные блоки.</p>
+      </div>
+      <div class="col-lg-4">
+        <div class="uikit-block p-4">
+          <div class="section-eyebrow mb-3">Версия</div>
+          <p class="h4 fw-bold mb-2">UI Kit v1.0</p>
+          <p class="text-muted-brand mb-0">Bootstrap 5, CSS-переменные, без inline-стилей, единый радиус через <span class="uikit-code">--radius-brand</span>.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="tokens" class="section uikit-section py-5">
+  <div class="container">
+    <div class="uikit-title-row">
+      <div>
+        <div class="section-eyebrow">Design Tokens</div>
+        <h2 class="section-title h1 mb-0">Цвета, радиус, тени</h2>
+      </div>
+      <span class="uikit-code">:root variables</span>
+    </div>
+    <div class="row g-4 mb-4">
+      <div class="col-md-6 col-lg-3"><div class="uikit-token-card"><div class="uikit-swatch uikit-swatch-brand"></div><div class="p-3"><h3 class="h6 fw-bold mb-1">Brand Red</h3><span class="uikit-code">--brand-red</span></div></div></div>
+      <div class="col-md-6 col-lg-3"><div class="uikit-token-card"><div class="uikit-swatch uikit-swatch-ink"></div><div class="p-3"><h3 class="h6 fw-bold mb-1">Ink</h3><span class="uikit-code">--ink</span></div></div></div>
+      <div class="col-md-6 col-lg-3"><div class="uikit-token-card"><div class="uikit-swatch uikit-swatch-muted"></div><div class="p-3"><h3 class="h6 fw-bold mb-1">Muted</h3><span class="uikit-code">--muted</span></div></div></div>
+      <div class="col-md-6 col-lg-3"><div class="uikit-token-card"><div class="uikit-swatch uikit-swatch-bg"></div><div class="p-3"><h3 class="h6 fw-bold mb-1">Background</h3><span class="uikit-code">--bg</span></div></div></div>
+    </div>
+    <div class="row g-4">
+      <div class="col-lg-4"><div class="uikit-block p-4 h-100"><div class="uikit-component-label">Radius</div><p class="mb-2"><span class="uikit-code">--radius-brand: .625rem</span></p><p class="text-muted-brand mb-0">Используется для кнопок, карточек, форм, dropdown, chips, изображений и системных блоков.</p></div></div>
+      <div class="col-lg-4"><div class="uikit-block p-4 h-100"><div class="uikit-component-label">Shadow</div><p class="mb-2"><span class="uikit-code">--shadow-soft</span></p><p class="text-muted-brand mb-0">Мягкая тень для карточек. Не использовать для каждой мелкой детали.</p></div></div>
+      <div class="col-lg-4"><div class="uikit-block p-4 h-100"><div class="uikit-component-label">Border</div><p class="mb-2"><span class="uikit-code">--line</span></p><p class="text-muted-brand mb-0">Только полупрозрачная граница, без жёстких чёрных или красных линий.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="typography" class="section uikit-section-alt py-5">
+  <div class="container">
+    <div class="uikit-title-row">
+      <div>
+        <div class="section-eyebrow">Typography</div>
+        <h2 class="section-title h1 mb-0">Типографика</h2>
+      </div>
+      <span class="uikit-code">Inter / system fallback</span>
+    </div>
+    <div class="uikit-block p-4 p-lg-5">
+      <p class="section-eyebrow">Eyebrow label</p>
+      <h1 class="hero-title mb-4">Финансовая система для <em>роста</em>, а не отчётов</h1>
+      <h2 class="section-title mb-3">Заголовок секции H2</h2>
+      <p class="lead text-ink-soft mb-3">Lead-текст используется для короткого объяснения результата или сути страницы.</p>
+      <p class="mb-0">Обычный текст должен быть достаточно контрастным. Для основного текста используем Ink или Ink Soft. Muted — только для вспомогательных подписей, мета-информации и вторичных пояснений.</p>
+    </div>
+  </div>
+</section>
+
+<section id="buttons" class="section uikit-section py-5">
+  <div class="container">
+    <div class="uikit-title-row">
+      <div>
+        <div class="section-eyebrow">Buttons & links</div>
+        <h2 class="section-title h1 mb-0">Кнопки и ссылки</h2>
+      </div>
+      <span class="uikit-code">btn / blog-chip</span>
+    </div>
+    <div class="row g-4">
+      <div class="col-lg-6"><div class="uikit-block p-4 h-100"><div class="uikit-component-label">CTA</div><div class="d-flex flex-wrap gap-3"><a class="btn btn-primary btn-lg" href="#">Получить консультацию</a><a class="btn btn-outline-secondary btn-lg" href="#">Читать канал</a><a class="btn btn-light-ink btn-lg" href="#">На тёмном фоне</a></div></div></div>
+      <div class="col-lg-6"><div class="uikit-block p-4 h-100"><div class="uikit-component-label">Chips</div><div class="blog-chip-row"><a class="blog-chip" href="#"><i class="bi bi-graph-up"></i> Финансы</a><a class="blog-chip" href="#"><i class="bi bi-shop"></i> Маркетплейсы</a><a class="blog-chip" href="#"><i class="bi bi-cash-stack"></i> ДДС</a><a class="blog-chip" href="#"><i class="bi bi-file-earmark-text"></i> ОПиУ</a></div></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="breadcrumbs" class="section uikit-section-alt py-5">
+  <div class="container">
+    <div class="uikit-title-row">
+      <div>
+        <div class="section-eyebrow">Navigation</div>
+        <h2 class="section-title h1 mb-0">Хлебные крошки и меню</h2>
+      </div>
+      <span class="uikit-code">breadcrumbs-wrap / vf-breadcrumb</span>
+    </div>
+    <div class="uikit-block p-4">
+      <nav class="breadcrumbs-wrap" aria-label="Хлебные крошки">
+        <ol class="breadcrumb vf-breadcrumb mb-0">
+          <li class="breadcrumb-item"><a href="#">Главная</a></li>
+          <li class="breadcrumb-item"><a href="#">Газета</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Финансовый учёт</li>
+        </ol>
+      </nav>
+    </div>
+  </div>
+</section>
+
+<section id="cards" class="section uikit-section py-5">
+  <div class="container">
+    <div class="uikit-title-row">
+      <div>
+        <div class="section-eyebrow">Cards</div>
+        <h2 class="section-title h1 mb-0">Карточки</h2>
+      </div>
+      <span class="uikit-code">card-ui / vf-card</span>
+    </div>
+    <div class="row g-4">
+      <div class="col-md-6 col-lg-4"><div class="card-ui p-4"><span class="icon-pill mb-4"><i class="bi bi-cash-coin"></i></span><h3 class="h5 fw-bold">ДДС</h3><p class="text-muted-brand mb-0">Понимание, куда уходят деньги и где возникает кассовый разрыв.</p></div></div>
+      <div class="col-md-6 col-lg-4"><div class="card-ui service-card-main p-4"><span class="icon-pill mb-4"><i class="bi bi-bar-chart"></i></span><h3 class="h5 fw-bold">ОПиУ</h3><p class="mb-0">Реальная прибыль бизнеса, а не иллюзия оборота.</p></div></div>
+      <div class="col-md-6 col-lg-4"><div class="card-ui service-card-accent p-4"><span class="icon-pill mb-4"><i class="bi bi-bullseye"></i></span><h3 class="h5 fw-bold">Unit-экономика</h3><p class="mb-0">Прибыльность SKU, каналов и направлений.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="forms" class="section contact-section py-5">
+  <div class="container">
+    <div class="row g-5 align-items-center">
+      <div class="col-lg-5">
+        <div class="section-eyebrow">Forms</div>
+        <h2 class="section-title h1 mb-3">Форма захвата</h2>
+        <p class="section-subtitle mb-0">Форма должна быть короткой, контрастной и содержать ссылку на политику конфиденциальности.</p>
+      </div>
+      <div class="col-lg-7">
+        <div class="contact-card p-4 p-md-5">
+          <form class="needs-validation" novalidate>
+            <div class="row g-3">
+              <div class="col-md-6"><label class="form-label" for="uikitName">Имя</label><input class="form-control" id="uikitName" placeholder="Александр" required type="text"></div>
+              <div class="col-md-6"><label class="form-label" for="uikitContact">Telegram или телефон</label><input class="form-control" id="uikitContact" placeholder="@username" required type="text"></div>
+              <div class="col-12"><label class="form-label" for="uikitText">Комментарий</label><textarea class="form-control" id="uikitText" rows="4" placeholder="Коротко опишите задачу"></textarea></div>
+              <div class="col-12"><div class="form-check"><input class="form-check-input" id="uikitConsent" type="checkbox" required><label class="form-check-label" for="uikitConsent">Даю согласие на обработку персональных данных и принимаю <a href="/privacy">политику конфиденциальности</a>.</label></div></div>
+              <div class="col-12"><button class="btn btn-primary btn-lg w-100" type="button">Отправить</button></div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="tables" class="section uikit-section py-5">
+  <div class="container">
+    <div class="uikit-title-row">
+      <div>
+        <div class="section-eyebrow">Data</div>
+        <h2 class="section-title h1 mb-0">Таблицы</h2>
+      </div>
+      <span class="uikit-code">blog-table zebra</span>
+    </div>
+    <div class="blog-table-wrap">
+      <table class="table blog-table align-middle">
+        <thead><tr><th>Показатель</th><th>Маркетплейс</th><th>Сайт</th><th>Комментарий</th></tr></thead>
+        <tbody>
+          <tr><td>Выручка</td><td>2 400 000 ₽</td><td>680 000 ₽</td><td>Сравнивать только с расходами.</td></tr>
+          <tr><td>Комиссии</td><td>18–32%</td><td>2–4%</td><td>У сайта выше расходы на трафик.</td></tr>
+          <tr><td>Деньги</td><td>Выплаты с задержкой</td><td>Быстрее на счёт</td><td>Важен платёжный календарь.</td></tr>
+          <tr><td>Клиентская база</td><td>Ограничена</td><td>Ваша</td><td>Влияет на повторные продажи.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="blog-elements" class="section uikit-section-alt py-5">
+  <div class="container">
+    <div class="uikit-title-row">
+      <div>
+        <div class="section-eyebrow">Blog / Газета</div>
+        <h2 class="section-title h1 mb-0">Элементы для блога и газеты</h2>
+      </div>
+      <span class="uikit-code">blog-* components</span>
+    </div>
+
+    <div class="uikit-block p-4 p-lg-5 mb-4">
+      <div class="row g-4 align-items-start">
+        <div class="col-lg-4">
+          <div class="section-eyebrow mb-3">Best practice</div>
+          <h3 class="h4 fw-bold mb-3">Статья собирается из повторяемых блоков</h3>
+          <p class="text-ink-soft mb-0">Для каждой публикации используем одинаковые компоненты: breadcrumbs, hero статьи, мета, авторы, share, AI-пересказ, содержание, текстовые блоки, таблицы, форма диагностики, рубрики и related cards.</p>
+        </div>
+        <div class="col-lg-8">
+          <pre class="uikit-code mb-0">article.html.twig
+├─ breadcrumbs
+├─ article hero
+├─ share / AI links
+├─ sidebar TOC + CTA
+├─ article content
+├─ lead form
+├─ rubrics
+└─ related articles</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="mb-4">
+      <div class="section-eyebrow mb-3">Article hero</div>
+      <div class="blog-hero py-4 py-lg-5">
+        <nav class="breadcrumbs-wrap" aria-label="Хлебные крошки">
+          <ol class="breadcrumb vf-breadcrumb">
+            <li class="breadcrumb-item"><a href="#">Главная</a></li>
+            <li class="breadcrumb-item"><a href="#">Газета</a></li>
+            <li class="breadcrumb-item"><a href="#">Деньги и прибыль</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Маркетплейс или интернет-магазин</li>
+          </ol>
+        </nav>
+        <div class="row g-5 align-items-center">
+          <div class="col-lg-7">
+            <div class="blog-meta-row">
+              <span class="blog-category-pill">Деньги и прибыль</span>
+              <span class="blog-meta-item"><i class="bi bi-calendar3"></i> 27.05.2026</span>
+              <span class="blog-meta-item"><i class="bi bi-eye"></i> 3 428</span>
+            </div>
+            <h3 class="blog-title mb-3">Маркетплейс или интернет-магазин: где больше прибыли</h3>
+            <p class="blog-lead mb-0">Разбираем каналы продаж через финансы: вложения, комиссии, рекламу, cash flow и управленческие решения.</p>
+            <div class="blog-author-row">
+              <div class="blog-author-card">
+                <span class="blog-author-avatar">АК</span>
+                <div><p class="blog-author-name">Александр Кумар</p><p class="blog-author-role">Эксперт по маркетплейсам</p></div>
+              </div>
+              <div class="blog-author-card">
+                <span class="blog-author-avatar">ВФ</span>
+                <div><p class="blog-author-name">Редакция Ваш Финдир</p><p class="blog-author-role">Финансовый учёт</p></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-5">
+            <div class="blog-hero-visual">
+              <div class="blog-visual-topbar">
+                <div class="blog-visual-dots"><span class="blog-visual-dot"></span><span class="blog-visual-dot"></span><span class="blog-visual-dot"></span></div>
+                <span class="blog-visual-label">Channel comparison</span>
+              </div>
+              <div class="blog-visual-body">
+                <div class="blog-market-grid">
+                  <div class="blog-market-card"><h3>Marketplace</h3><ul><li>Быстрый старт</li><li>Комиссии и штрафы</li><li>Зависимость от правил</li></ul></div>
+                  <div class="blog-market-card"><h3>Own site</h3><ul><li>Контроль клиента</li><li>Своя CRM</li><li>Дольше запуск</li></ul></div>
+                </div>
+                <div class="blog-mini-chart">
+                  <div class="blog-chart-row"><span>Маржа</span><div class="blog-chart-track"><div class="blog-chart-fill blog-chart-fill-marketplace"></div></div></div>
+                  <div class="blog-chart-row"><span>Контроль</span><div class="blog-chart-track"><div class="blog-chart-fill blog-chart-fill-accent blog-chart-fill-control"></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+      <div class="col-lg-5">
+        <div class="blog-share-card uikit-block p-4 h-100">
+          <div class="section-eyebrow mb-3">Share</div>
+          <h3 class="h5 fw-bold mb-3">Поделиться статьёй</h3>
+          <div class="blog-chip-row">
+            <a class="blog-chip" href="#"><i class="bi bi-telegram"></i> Telegram</a>
+            <a class="blog-chip" href="#"><i class="bi bi-vk"></i> VK</a>
+            <a class="blog-chip" href="#"><i class="bi bi-link-45deg"></i> Скопировать</a>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-7">
+        <div class="blog-ai-card uikit-block p-4 h-100">
+          <div class="section-eyebrow mb-3">AI summary</div>
+          <h3 class="h5 fw-bold mb-3">Пересказ статьи в ИИ</h3>
+          <div class="blog-chip-row">
+            <a class="blog-chip" href="#"><i class="bi bi-stars"></i> ChatGPT</a>
+            <a class="blog-chip" href="#"><i class="bi bi-search"></i> Perplexity</a>
+            <a class="blog-chip" href="#"><i class="bi bi-braces"></i> Claude</a>
+            <a class="blog-chip" href="#"><i class="bi bi-circle-fill"></i> Yandex</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mb-4">
+      <div class="section-eyebrow mb-3">Article layout</div>
+      <div class="row g-4 align-items-start">
+        <div class="col-lg-3">
+          <aside class="blog-sidebar">
+            <div class="blog-toc-card p-4 mb-4">
+              <h3 class="blog-toc-title">Содержание</h3>
+              <ul class="blog-toc-list">
+                <li><a href="#">Коротко: что выбрать</a></li>
+                <li><a href="#">Сравнение затрат</a></li>
+                <li><a href="#">Unit-экономика</a></li>
+                <li><a href="#">Деньги и кассовый разрыв</a></li>
+              </ul>
+            </div>
+            <div class="blog-side-cta p-4 mb-4">
+              <div class="blog-side-cta-content">
+                <div class="section-eyebrow mb-3">Финансовая диагностика</div>
+                <h3 class="h5 fw-bold mb-3">Покажем, где канал продаж съедает прибыль</h3>
+                <p class="mb-3">Разберём ДДС, ОПиУ и unit-экономику.</p>
+                <div class="blog-side-cta-figure" aria-hidden="true"><img src="vf-diagnostic-person.png" alt=""></div>
+                <a class="btn btn-lg w-100" href="#">Записаться</a>
+              </div>
+            </div>
+          </aside>
+        </div>
+        <div class="col-lg-9">
+          <article class="blog-article">
+            <figure class="blog-article-cover">
+              <img alt="Финансовый учёт для выбора канала продаж" src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&amp;fit=crop&amp;w=1400&amp;q=80">
+            </figure>
+            <div class="blog-intro-card p-4 mb-4">
+              <p class="mb-0"><strong>Короткий вывод:</strong> маркетплейс быстрее запускается, но забирает часть контроля через комиссии и правила площадки. Собственный сайт дольше развивать, но он лучше подходит для повторных продаж и контроля клиентской базы.</p>
+            </div>
+            <h2>Сравнение затрат</h2>
+            <p>Основной текст статьи должен занимать всю доступную ширину справа от меню. Не зажимайте его искусственным <span class="uikit-code">max-width</span>, если sidebar уже занимает левую колонку.</p>
+            <div class="blog-callout"><strong>Главный вопрос:</strong><p class="mb-0 mt-2">Не где больше оборот, а где бизнес оставляет больше денег после всех расходов.</p></div>
+            <h3>Что отслеживать еженедельно</h3>
+            <ul class="blog-content-list">
+              <li>остаток денег и прогноз на 30 дней;</li>
+              <li>ожидаемые выплаты от маркетплейсов;</li>
+              <li>рекламный бюджет и план закупок;</li>
+              <li>товары, которые замораживают деньги в остатках.</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="uikit-block p-4 p-lg-5 mb-4">
+      <div class="section-eyebrow mb-3">Tables</div>
+      <h3 class="h4 fw-bold mb-3">Таблица с чередованием строк</h3>
+      <div class="blog-table-wrap">
+        <table class="table blog-table align-middle">
+          <thead><tr><th>Критерий</th><th>Маркетплейс</th><th>Интернет-магазин</th></tr></thead>
+          <tbody>
+            <tr><td>Старт</td><td>Быстрее: регистрация, карточки, остатки.</td><td>Дольше: сайт, каталог, платежи, аналитика.</td></tr>
+            <tr><td>Расходы</td><td>Комиссии, логистика, хранение, реклама.</td><td>Разработка, поддержка, CRM, сервис.</td></tr>
+            <tr><td>Клиентская база</td><td>Обычно остаётся у площадки.</td><td>Остаётся у бизнеса.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="uikit-block p-4 p-lg-5 mb-4">
+      <div class="section-eyebrow mb-3">Lead form</div>
+      <section class="blog-cta-inline">
+        <div class="row g-4 align-items-center">
+          <div class="col-lg-6 blog-cta-copy">
+            <div class="blog-cta-copy-content">
+              <div class="section-eyebrow mb-3">Финансовая диагностика</div>
+              <h3 class="h2 fw-bold mb-3 text-white">Хотите понять, какой канал продаж выгоднее именно вам?</h3>
+              <p class="mb-0">Оставьте контакты — разберём ДДС, ОПиУ, Баланс, unit-экономику и покажем, где бизнес теряет прибыль.</p>
+            </div>
+            <div class="blog-cta-person" aria-hidden="true"><img src="vf-diagnostic-person.png" alt=""></div>
+          </div>
+          <div class="col-lg-6">
+            <div class="contact-card p-4 p-md-5">
+              <form action="#" method="post">
+                <div class="mb-3"><label class="form-label" for="blogUiName">Ваше имя</label><input class="form-control" id="blogUiName" placeholder="Александр" type="text"></div>
+                <div class="mb-3"><label class="form-label" for="blogUiContact">Telegram или телефон</label><input class="form-control" id="blogUiContact" placeholder="@username или +7 999 000-00-00" type="text"></div>
+                <div class="mb-3"><label class="form-label" for="blogUiEmail">Email</label><input class="form-control" id="blogUiEmail" placeholder="hello@example.ru" type="email"></div>
+                <div class="form-check mb-4"><input class="form-check-input" id="blogUiConsent" type="checkbox"><label class="form-check-label" for="blogUiConsent">Даю согласие на обработку персональных данных и принимаю <a href="/privacy">политику конфиденциальности</a>.</label></div>
+                <button class="btn btn-lg w-100" type="submit">Получить консультацию</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="uikit-block p-4 p-lg-5 mb-4">
+      <div class="section-eyebrow mb-3">Rubrics</div>
+      <h3 class="h4 fw-bold mb-3">Рубрики для быстрого перехода</h3>
+      <div class="blog-chip-row">
+        <a class="blog-chip" href="#">Топовый топ!</a>
+        <a class="blog-chip" href="#">Бизнес-процессы</a>
+        <a class="blog-chip" href="#">Вопрос-ответ</a>
+        <a class="blog-chip" href="#">Глоссарий</a>
+        <a class="blog-chip" href="#">Деньги и прибыль</a>
+        <a class="blog-chip" href="#">Законы и налоги</a>
+        <a class="blog-chip" href="#">Показатели</a>
+        <a class="blog-chip" href="#">Финансовые отчеты</a>
+      </div>
+    </div>
+
+    <div class="uikit-block p-4 p-lg-5">
+      <div class="section-eyebrow mb-3">Related articles</div>
+      <h3 class="h4 fw-bold mb-4">Ещё статьи по финансовому учёту</h3>
+      <div class="row g-4">
+        <div class="col-md-6 col-lg-4">
+          <article class="blog-related-card d-flex flex-column">
+            <div class="blog-related-image"><img alt="Финансовая аналитика SKU" src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&amp;fit=crop&amp;w=900&amp;q=80"></div>
+            <div class="p-4 d-flex flex-column flex-grow-1"><div class="blog-related-tag mb-2">Unit-экономика</div><h3 class="h5 fw-bold mb-2">Как понять прибыльность SKU на маркетплейсе</h3><p class="text-muted-brand mb-4">Формула, частые ошибки и управленческий отчёт.</p><a class="btn btn-outline-secondary" href="#">Читать</a></div>
+          </article>
+        </div>
+        <div class="col-md-6 col-lg-4">
+          <article class="blog-related-card d-flex flex-column">
+            <div class="blog-related-image"><img alt="Планирование денежных потоков" src="https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&amp;fit=crop&amp;w=900&amp;q=80"></div>
+            <div class="p-4 d-flex flex-column flex-grow-1"><div class="blog-related-tag mb-2">ДДС</div><h3 class="h5 fw-bold mb-2">Почему прибыльный бизнес попадает в кассовый разрыв</h3><p class="text-muted-brand mb-4">Как прогнозировать деньги на 30 дней.</p><a class="btn btn-outline-secondary" href="#">Читать</a></div>
+          </article>
+        </div>
+        <div class="col-md-6 col-lg-4">
+          <article class="blog-related-card d-flex flex-column">
+            <div class="blog-related-image"><img alt="Отчёт о прибылях и убытках" src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&amp;fit=crop&amp;w=900&amp;q=80"></div>
+            <div class="p-4 d-flex flex-column flex-grow-1"><div class="blog-related-tag mb-2">ОПиУ</div><h3 class="h5 fw-bold mb-2">Оборот растёт, а прибыль нет: где искать причину</h3><p class="text-muted-brand mb-4">Комиссии, реклама, себестоимость и расходы.</p><a class="btn btn-outline-secondary" href="#">Читать</a></div>
+          </article>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section id="quick-links-elements" class="section quick-links-page py-5">
+  <div class="container">
+    <div class="uikit-title-row">
+      <div>
+        <div class="section-eyebrow">Quick links</div>
+        <h2 class="section-title h1 mb-0">Страница быстрых ссылок</h2>
+      </div>
+      <span class="uikit-code">quick-links-* components</span>
+    </div>
+
+    <div class="uikit-block p-4 p-lg-5 mb-4">
+      <div class="row g-4 align-items-start">
+        <div class="col-lg-5">
+          <div class="section-eyebrow mb-3">Назначение</div>
+          <h3 class="h4 fw-bold mb-3">Лента материалов, видео и дополнительных файлов</h3>
+          <p class="text-ink-soft mb-0">Компонент подходит для страницы с быстрыми ссылками: список материалов по датам, поиск, внешние каналы и кнопки доступа к материалам.</p>
+        </div>
+        <div class="col-lg-7">
+          <pre class="uikit-code mb-0">quick_links.html.twig
+├─ quick-links-hero
+├─ quick-search
+├─ quick-month-title
+├─ quick-link-list
+├─ quick-link-card
+└─ quick-link-action / is-disabled</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="quick-links-preview">
+      <div class="quick-links-section-head">
+        <div class="quick-links-section-head-inner">
+          <div class="section-eyebrow mb-2">Финансовые материалы</div>
+          <h3 class="quick-links-section-title">Страница быстрых ссылок и материалов</h3>
+        </div>
+      </div>
+
+      <div class="quick-links-hero p-4 p-lg-5 mb-0">
+        <div class="quick-links-hero-inner">
+          <div class="quick-links-profile">
+            <span class="quick-links-avatar" aria-hidden="true">ВФ</span>
+            <div>
+              <h3 class="quick-links-title">Финансовые материалы</h3>
+              <p class="quick-links-description">На этой странице собраны быстрые ссылки на материалы, видео, чек-листы и разборы по финансовому учёту e-commerce.</p>
+              <div class="quick-links-socials">
+                <a class="blog-chip" href="#"><i class="bi bi-youtube"></i> YouTube</a>
+                <a class="blog-chip" href="#"><i class="bi bi-telegram"></i> Telegram</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="quick-links-main p-4 p-lg-5">
+        <div class="quick-links-shell">
+          <div class="quick-search">
+            <i class="bi bi-search quick-search-icon"></i>
+            <label class="visually-hidden" for="quickLinksSearch">Поиск по материалам</label>
+            <input class="form-control" id="quickLinksSearch" type="search" placeholder="Поиск по названию материала...">
+          </div>
+
+          <div class="quick-month-title">Июнь 2026 г.</div>
+          <div class="quick-link-list">
+            <article class="quick-link-card">
+              <div class="quick-link-date">7 июня</div>
+              <h4 class="quick-link-title">Как понять, где бизнес теряет прибыль: ДДС, ОПиУ и unit-экономика</h4>
+              <a class="quick-link-action" href="#"><i class="bi bi-file-earmark-text"></i> Материалы</a>
+            </article>
+            <article class="quick-link-card">
+              <div class="quick-link-date">6 июня</div>
+              <h4 class="quick-link-title">Финансовая диагностика селлера: какие цифры смотреть каждую неделю</h4>
+              <a class="quick-link-action" href="#"><i class="bi bi-file-earmark-text"></i> Материалы</a>
+            </article>
+            <article class="quick-link-card">
+              <div class="quick-link-date">5 июня</div>
+              <h4 class="quick-link-title">Почему оборот растёт, а денег на счёте не становится больше</h4>
+              <a class="quick-link-action" href="#"><i class="bi bi-file-earmark-text"></i> Материалы</a>
+            </article>
+          </div>
+
+          <div class="quick-month-title">Май 2026 г.</div>
+          <div class="quick-link-list">
+            <article class="quick-link-card">
+              <div class="quick-link-date">29 мая</div>
+              <h4 class="quick-link-title">План-факт по прибыли: как не спорить с цифрами в конце месяца</h4>
+              <span class="quick-link-action is-disabled">Скоро</span>
+            </article>
+            <article class="quick-link-card">
+              <div class="quick-link-date">25 мая</div>
+              <h4 class="quick-link-title">Как считать прибыльность SKU без ручных таблиц и ошибок в себестоимости</h4>
+              <a class="quick-link-action" href="#"><i class="bi bi-file-earmark-text"></i> Материалы</a>
+            </article>
+            <article class="quick-link-card">
+              <div class="quick-link-date">22 мая</div>
+              <h4 class="quick-link-title">Кассовый разрыв в e-commerce: почему прибыль есть, а денег нет</h4>
+              <a class="quick-link-action" href="#"><i class="bi bi-file-earmark-text"></i> Материалы</a>
+            </article>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="alerts" class="section uikit-section py-5">
+  <div class="container">
+    <div class="uikit-title-row">
+      <div>
+        <div class="section-eyebrow">States</div>
+        <h2 class="section-title h1 mb-0">Состояния и уведомления</h2>
+      </div>
+      <span class="uikit-code">success / empty / error</span>
+    </div>
+    <div class="row g-4">
+      <div class="col-lg-4"><div class="success-message is-visible p-4 h-100"><strong>Успешно.</strong><p class="mb-0 mt-2">Спасибо! Свяжусь с вами в ближайшее время.</p></div></div>
+      <div class="col-lg-4"><div class="uikit-empty-state p-4 h-100 text-center"><span class="icon-pill mb-3"><i class="bi bi-inbox"></i></span><h3 class="h5 fw-bold">Пока нет данных</h3><p class="text-muted-brand mb-0">Добавьте первую интеграцию или загрузите отчёт.</p></div></div>
+      <div class="col-lg-4"><div class="uikit-block p-4 h-100"><div class="uikit-component-label">Cookie popup</div><p class="text-muted-brand mb-3">Компонент показывается снизу страницы и сохраняет согласие в localStorage.</p><button class="btn btn-primary" type="button">Принять</button></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="technical" class="section dark-section py-5">
+  <div class="container">
+    <div class="uikit-title-row">
+      <div>
+        <div class="section-eyebrow">Technical pages</div>
+        <h2 class="section-title h1 mb-0">404 / 500</h2>
+      </div>
+      <span class="uikit-code">tech-page</span>
+    </div>
+    <div class="row g-4">
+      <div class="col-md-6"><div class="uikit-block uikit-block-dark p-4 h-100"><p class="display-4 fw-bold mb-2">404</p><h3 class="h4 fw-bold">Страница не найдена</h3><p class="footer-muted">Такой страницы нет или ссылка устарела.</p><a class="btn btn-light-ink" href="/">На главную</a></div></div>
+      <div class="col-md-6"><div class="uikit-block uikit-block-dark p-4 h-100"><p class="display-4 fw-bold mb-2">500</p><h3 class="h4 fw-bold">Что-то пошло не так</h3><p class="footer-muted">Ошибка на нашей стороне. Уже разбираемся.</p><a class="btn btn-light-ink" href="/">Обновить позже</a></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="rules" class="section uikit-section py-5">
+  <div class="container">
+    <div class="uikit-title-row">
+      <div>
+        <div class="section-eyebrow">Best practices</div>
+        <h2 class="section-title h1 mb-0">Правила поддержки UI Kit</h2>
+      </div>
+    </div>
+    <div class="row g-4">
+      <div class="col-lg-4"><div class="uikit-block p-4 h-100"><h3 class="h5 fw-bold">1. Не плодить стили</h3><p class="text-muted-brand mb-0">Новые компоненты сначала собираем из существующих токенов и reusable-классов.</p></div></div>
+      <div class="col-lg-4"><div class="uikit-block p-4 h-100"><h3 class="h5 fw-bold">2. Всё через переменные</h3><p class="text-muted-brand mb-0">Цвета, радиусы, границы и тени не прописывать HEX-значениями в компонентах.</p></div></div>
+      <div class="col-lg-4"><div class="uikit-block p-4 h-100"><h3 class="h5 fw-bold">3. Проверять mobile</h3><p class="text-muted-brand mb-0">Каждый новый блок проверяем на xs, md, lg. Кликабельная зона — не меньше 44–48 px.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<footer id="footer" class="section footer-section pt-5 pb-4">
+  <div class="container">
+    <div class="row g-5 align-items-start">
+      <div class="col-lg-4 text-center text-md-start">
+        <a class="footer-brand" href="#uikit-hero" aria-label="Ваш Финдир — наверх"><span class="brand-mark">ВФ</span><span class="footer-brand-text">Ваш Финдир</span></a>
+        <p class="footer-description mb-0 mx-auto mx-md-0">Финансовый навигатор для e-commerce бизнеса. Строим системы учёта, которые помогают принимать прибыльные решения.</p>
+      </div>
+      <div class="col-md-6 col-lg-4 text-center text-md-start">
+        <div class="footer-title">Контакты</div>
+        <div class="footer-contact-list">
+          <div class="footer-contact-item justify-content-center justify-content-md-start"><span class="footer-contact-icon"><i class="bi bi-envelope"></i></span><div><div class="footer-kicker">Email</div><a class="footer-contact-link" href="mailto:hello@vashfindir.ru">hello@vashfindir.ru</a></div></div>
+          <div class="footer-contact-item justify-content-center justify-content-md-start"><span class="footer-contact-icon"><i class="bi bi-telegram"></i></span><div><div class="footer-kicker">Telegram</div><a class="footer-contact-link" href="https://t.me/vashfindir" target="_blank" rel="noopener">@vashfindir</a></div></div>
+        </div>
+      </div>
+      <div class="col-md-6 col-lg-3 offset-lg-1 text-center text-md-start">
+        <div class="footer-title">Документы</div>
+        <div class="footer-docs-list"><a href="/privacy">Политика конфиденциальности</a><a href="/offer">Договор оферты</a><a href="/consent">Согласие на обработку данных</a></div>
+      </div>
+    </div>
+    <div class="footer-divider"></div>
+    <div class="row g-3 align-items-center footer-bottom text-center text-md-start"><div class="col-md-7">© 2026 ООО «Ваш Финдир»</div><div class="col-md-5 text-center text-md-end"><span class="footer-legal">ИНН: 6140000234&nbsp;&nbsp;&nbsp;&nbsp;ОГРН: 1156188000176</span></div></div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
