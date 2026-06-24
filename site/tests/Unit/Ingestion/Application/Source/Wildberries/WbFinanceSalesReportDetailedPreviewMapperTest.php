@@ -84,6 +84,39 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
         self::assertSame(3, $result->rowChecks[0]->transactionCount);
     }
 
+    public function testMapsSalePayoutAdjustmentsWithoutFlippingForPaySign(): void
+    {
+        foreach ([
+            ['rrdId' => 108, 'sellerOperName' => 'Коррекция продаж', 'forPay' => '12.77', 'amountMinor' => 1277],
+            ['rrdId' => 109, 'sellerOperName' => 'Добровольная компенсация при возврате', 'forPay' => '197.22', 'amountMinor' => 19722],
+        ] as $case) {
+            $result = $this->mapper()->preview(self::COMPANY_ID, [[
+                'rrdId' => $case['rrdId'],
+                'currency' => 'RUB',
+                'docTypeName' => 'Продажа',
+                'sellerOperName' => $case['sellerOperName'],
+                'saleDt' => '2026-06-21T10:15:00Z',
+                'retailPriceWithDisc' => '0',
+                'forPay' => $case['forPay'],
+                'acquiringFee' => '0',
+            ]]);
+
+            self::assertCount(1, $result->transactions);
+
+            $transaction = $this->transaction($result->transactions, sprintf('wb:sales-report-detailed:%d:sale_payout_adjustment', $case['rrdId']));
+            self::assertSame(TransactionType::ADJUSTMENT, $transaction->type);
+            self::assertSame(TransactionDirection::IN, $transaction->direction);
+            self::assertSame($case['amountMinor'], $transaction->amountMinor);
+            self::assertSame('forPay', $transaction->field);
+
+            self::assertCount(1, $result->rowChecks);
+            self::assertSame($case['amountMinor'], $result->rowChecks[0]->expectedNetMinor);
+            self::assertSame($case['amountMinor'], $result->rowChecks[0]->actualNetMinor);
+            self::assertSame(0, $result->rowChecks[0]->deltaMinor);
+            self::assertSame(1, $result->rowChecks[0]->transactionCount);
+        }
+    }
+
     public function testMapsReturnRowAsOutboundRefundWithCommissionAndAcquiringStorno(): void
     {
         $result = $this->mapper()->preview(self::COMPANY_ID, [[

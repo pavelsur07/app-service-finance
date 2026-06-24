@@ -11,6 +11,7 @@ use Ramsey\Uuid\Uuid;
 final readonly class WbFinanceSalesReportDetailedPreviewMapper
 {
     private const SOURCE_TZ = 'UTC';
+    private const COMPONENT_SALE_PAYOUT_ADJUSTMENT = 'sale_payout_adjustment';
 
     /**
      * @param iterable<array<string, mixed>> $rows
@@ -87,7 +88,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
 
     /**
      * @param list<WbFinancePreviewTransaction> $transactions
-     * @param array<string, mixed>              $row
+     * @param array<string, mixed> $row
      */
     private function collectSaleRefundComponents(
         array &$transactions,
@@ -110,6 +111,31 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
 
         $forPayMinor = $this->minor($row, 'forPay', 'ppvz_for_pay');
         $acquiringMinor = $this->minor($row, 'acquiringFee', 'acquiring_fee');
+        if (
+            $this->isSalePayoutAdjustment($sellerOperName, $docTypeName)
+            && 0 === $retailMinor
+            && 0 === $acquiringMinor
+            && 0 !== $forPayMinor
+        ) {
+            $this->add(
+                transactions: $transactions,
+                operationGroupId: $operationGroupId,
+                rowKey: $rowKey,
+                component: self::COMPONENT_SALE_PAYOUT_ADJUSTMENT,
+                type: TransactionType::ADJUSTMENT,
+                signedAmountMinor: $forPayMinor,
+                currency: $currency,
+                occurredAt: $occurredAt,
+                field: 'forPay',
+                sellerOperName: $sellerOperName,
+                docTypeName: $docTypeName,
+                description: 'WB sale payout adjustment',
+                row: $row,
+            );
+
+            return;
+        }
+
         $commissionMinor = $retailMinor - $forPayMinor - $acquiringMinor;
         $isReturn = $this->isReturn($docTypeName);
 
@@ -170,7 +196,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
 
     /**
      * @param list<WbFinancePreviewTransaction> $transactions
-     * @param array<string, mixed>              $row
+     * @param array<string, mixed> $row
      */
     private function collectCostComponents(
         array &$transactions,
@@ -263,7 +289,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
 
     /**
      * @param list<WbFinancePreviewTransaction> $transactions
-     * @param array<string, mixed>              $row
+     * @param array<string, mixed> $row
      */
     private function addCostField(
         array &$transactions,
@@ -307,7 +333,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
 
     /**
      * @param list<WbFinancePreviewTransaction> $transactions
-     * @param array<string, mixed>              $row
+     * @param array<string, mixed> $row
      */
     private function addCost(
         array &$transactions,
@@ -341,17 +367,18 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
     {
         return array_values(array_filter(
             $transactions,
-            static fn (WbFinancePreviewTransaction $transaction): bool => in_array(
-                $transaction->type,
-                [TransactionType::SALE, TransactionType::REFUND, TransactionType::COMMISSION, TransactionType::ACQUIRING],
-                true,
-            ),
+            static fn (WbFinancePreviewTransaction $transaction): bool => self::COMPONENT_SALE_PAYOUT_ADJUSTMENT === $transaction->component
+                || in_array(
+                    $transaction->type,
+                    [TransactionType::SALE, TransactionType::REFUND, TransactionType::COMMISSION, TransactionType::ACQUIRING],
+                    true,
+                ),
         ));
     }
 
     /**
      * @param list<WbFinancePreviewTransaction> $transactions
-     * @param array<string, mixed>              $row
+     * @param array<string, mixed> $row
      */
     private function add(
         array &$transactions,
@@ -507,6 +534,19 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
     private function isReturn(string $docTypeName): bool
     {
         return in_array(mb_strtolower(trim($docTypeName)), ['возврат', 'return'], true);
+    }
+
+    private function isSalePayoutAdjustment(string $sellerOperName, string $docTypeName): bool
+    {
+        if (!$this->isSale($docTypeName)) {
+            return false;
+        }
+
+        return in_array(
+            mb_strtolower(trim($sellerOperName)),
+            ['коррекция продаж', 'добровольная компенсация при возврате'],
+            true,
+        );
     }
 
     /**
