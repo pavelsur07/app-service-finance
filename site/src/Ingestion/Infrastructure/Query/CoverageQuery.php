@@ -6,6 +6,7 @@ namespace App\Ingestion\Infrastructure\Query;
 
 use App\Ingestion\Application\DTO\CoverageCellView;
 use App\Ingestion\Application\DTO\ShopOptionView;
+use App\Ingestion\Enum\SyncJobKind;
 use App\Ingestion\Enum\SyncJobStatus;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Types\Types;
@@ -212,6 +213,7 @@ final class CoverageQuery
                 FROM ingest_sync_jobs j
                 WHERE j.company_id = :companyId
                   AND j.status = :failedStatus
+                  AND (j.kind = :incrementalKind OR j.parent_job_id IS NOT NULL)
                   {$shopFilter}
             )
             SELECT
@@ -232,6 +234,7 @@ final class CoverageQuery
         $params = [
             'companyId' => $companyId,
             'failedStatus' => SyncJobStatus::FAILED->value,
+            'incrementalKind' => SyncJobKind::INCREMENTAL->value,
             'fromDate' => $from,
             'toDate' => $to,
         ];
