@@ -43,6 +43,6 @@ final class FakeOzonAccrualClient implements OzonAccrualClientInterface
 
     public function fetchTypes(string $companyId, string $connectionRef): OzonRawPage
     {
-        return new OzonRawPage(rows: [['type_id' => 29, 'name' => 'Delivery']], hasMore: false);
+        return new OzonRawPage(rows: [['type_id' => 29, 'name' => 'Логистика']], hasMore: false);
     }
 }

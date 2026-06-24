@@ -52,6 +52,14 @@ final class OzonAccrualCategoryTest extends TestCase
         self::assertNotNull($acquiring);
         self::assertSame('ozon_acquiring', $acquiring->code);
         self::assertSame(TransactionType::ACQUIRING, $acquiring->transactionType);
+
+        $partnerReturn = OzonAccrualCategory::findByOzonName('Обработка возвратов, отмен и невыкупов партнерами');
+        self::assertNotNull($partnerReturn);
+        self::assertSame('ozon_partner_return_processing', $partnerReturn->code);
+
+        $crossDocking = OzonAccrualCategory::findByOzonName('Кросс-докинг Ozon');
+        self::assertNotNull($crossDocking);
+        self::assertSame('ozon_cross_docking', $crossDocking->code);
     }
 
     public function testFindsFieldCategoriesBySignedAmount(): void
