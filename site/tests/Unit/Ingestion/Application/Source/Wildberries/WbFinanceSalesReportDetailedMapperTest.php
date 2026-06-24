@@ -83,6 +83,44 @@ final class WbFinanceSalesReportDetailedMapperTest extends TestCase
         self::assertSame(115000, $controlSums[0]->amountMinor);
     }
 
+    public function testMapsSalePayoutAdjustmentRowsWithoutPayoutMismatch(): void
+    {
+        $transactions = $this->mapper()->map($this->rawRecord(), [
+            [
+                'rrdId' => 201,
+                'currency' => 'RUB',
+                'docTypeName' => 'Продажа',
+                'sellerOperName' => 'Коррекция продаж',
+                'saleDt' => '2026-06-10T10:15:00Z',
+                'retailPriceWithDisc' => '0',
+                'forPay' => '12.77',
+                'acquiringFee' => '0',
+            ],
+            [
+                'rrdId' => 202,
+                'currency' => 'RUB',
+                'docTypeName' => 'Продажа',
+                'sellerOperName' => 'Добровольная компенсация при возврате',
+                'saleDt' => '2026-06-17T10:15:00Z',
+                'retailPriceWithDisc' => '0',
+                'forPay' => '197.22',
+                'acquiringFee' => '0',
+            ],
+        ]);
+
+        self::assertCount(2, $transactions);
+
+        $correction = $this->transaction($transactions, 'wb:sales-report-detailed:201:sale_payout_adjustment');
+        self::assertSame(TransactionType::ADJUSTMENT, $correction->type);
+        self::assertSame(TransactionDirection::IN, $correction->direction);
+        self::assertSame(1277, $correction->money->amountMinor());
+
+        $compensation = $this->transaction($transactions, 'wb:sales-report-detailed:202:sale_payout_adjustment');
+        self::assertSame(TransactionType::ADJUSTMENT, $compensation->type);
+        self::assertSame(TransactionDirection::IN, $compensation->direction);
+        self::assertSame(19722, $compensation->money->amountMinor());
+    }
+
     public function testRejectsPayoutMismatches(): void
     {
         $this->expectException(\RuntimeException::class);
