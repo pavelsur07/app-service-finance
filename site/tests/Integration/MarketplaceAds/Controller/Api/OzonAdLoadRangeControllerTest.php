@@ -16,16 +16,16 @@ use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Ramsey\Uuid\Uuid;
-use Symfony\Component\Messenger\Transport\InMemoryTransport;
+use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 /**
  * End-to-end тесты `POST /api/marketplace-ads/ozon/load-range` после
  * переключения на cron-driven pipeline (Task-11.9a).
  *
  * Проверяют:
- *  - happy path (10 дней) → 200 + jobId + Planner вызван + НИ одного
+ *  - happy path (1 день) → 200 + jobId + Planner вызван + НИ одного
  *    сообщения в `async_ads`-транспорте (старый Messenger не задействован);
- *  - period > 62 дней → 400 с понятным русским сообщением, Planner не вызван;
+ *  - period > 1 дня → 400 с понятным русским сообщением, Planner не вызван;
  *  - reversed dates (dateFrom > dateTo) → 400, Planner не вызван.
  */
 final class OzonAdLoadRangeControllerTest extends WebTestCaseBase
@@ -48,8 +48,8 @@ final class OzonAdLoadRangeControllerTest extends WebTestCaseBase
             ->with(
                 self::isType('string'),
                 self::COMPANY_ID,
-                self::isInstanceOf(\DateTimeImmutable::class),
-                self::isInstanceOf(\DateTimeImmutable::class),
+                self::callback(static fn (\DateTimeImmutable $d): bool => '2026-03-01' === $d->format('Y-m-d')),
+                self::callback(static fn (\DateTimeImmutable $d): bool => '2026-03-01' === $d->format('Y-m-d')),
             )
             ->willReturn(2);
         $client->getContainer()->set(AdBatchPlanner::class, $plannerMock);
@@ -62,7 +62,7 @@ final class OzonAdLoadRangeControllerTest extends WebTestCaseBase
             [],
             [],
             ['HTTP_X-Requested-With' => 'XMLHttpRequest', 'CONTENT_TYPE' => 'application/json'],
-            json_encode(['dateFrom' => '2026-03-01', 'dateTo' => '2026-03-10'], \JSON_THROW_ON_ERROR),
+            json_encode(['dateFrom' => '2026-03-01', 'dateTo' => '2026-03-01'], \JSON_THROW_ON_ERROR),
         );
 
         self::assertResponseIsSuccessful();
@@ -82,7 +82,7 @@ final class OzonAdLoadRangeControllerTest extends WebTestCaseBase
         self::assertSame(0, $this->countLoadRangeMessages($transport));
     }
 
-    public function testReturns400ForPeriodExceeding62Days(): void
+    public function testReturns400ForPeriodLongerThanOneDay(): void
     {
         $client = static::createClient();
         $this->resetDb();
@@ -97,7 +97,6 @@ final class OzonAdLoadRangeControllerTest extends WebTestCaseBase
 
         $this->loginAsOwner($client);
 
-        // 63 дня включительно (01.01..04.03), заведомо в прошлом.
         $client->request(
             'POST',
             '/api/marketplace-ads/ozon/load-range',
@@ -111,7 +110,7 @@ final class OzonAdLoadRangeControllerTest extends WebTestCaseBase
 
         $data = json_decode($client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
         self::assertArrayHasKey('message', $data);
-        self::assertMatchesRegularExpression('/превышает лимит Ozon.*62/u', (string) $data['message']);
+        self::assertStringContainsString('поддерживает только один день', (string) $data['message']);
 
         // Ни одного сохранённого AdLoadJob — validator сработал ДО persist.
         $jobsCount = (int) $em->getConnection()->fetchOne(

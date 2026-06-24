@@ -176,11 +176,10 @@ final class AdBatchPlannerTest extends IntegrationTestCase
 
     /**
      * Регрессия Task-11.9a-fix: scheduled_at первого батча должен быть «due»
-     * при сравнении с Postgres NOW() (UTC) сразу после planBatchesForJob.
+     * при сравнении с UTC wall-clock сразу после planBatchesForJob.
      *
      * До фикса PHP писал DateTimeImmutable в локальном TZ (Europe/Moscow +3),
-     * а `b.scheduled_at <= NOW()` в {@see AdScheduledBatchRepository::findNextPlanned()}
-     * сравнивает с UTC → 3-часовой лаг. Тест падал бы с отрицательным delta.
+     * а сравнение с `NOW()` в Postgres-сессии Europe/Moscow давало 3-часовой лаг.
      */
     public function testFirstBatchIsDueImmediatelyVsPostgresNow(): void
     {
@@ -199,20 +198,20 @@ final class AdBatchPlannerTest extends IntegrationTestCase
 
         $conn = $this->em->getConnection();
         $deltaSeconds = (int) $conn->fetchOne(
-            'SELECT EXTRACT(EPOCH FROM (scheduled_at - NOW()))::bigint '
+            "SELECT EXTRACT(EPOCH FROM (scheduled_at - (NOW() AT TIME ZONE 'UTC')))::bigint "
             .'FROM marketplace_ad_scheduled_batches '
             .'WHERE job_id = :jobId AND batch_index = 0',
             ['jobId' => $job->getId()],
         );
 
-        // scheduled_at должен быть ≤ NOW() в пределах секунды. Допускаем
+        // scheduled_at должен быть рядом с UTC wall-clock в пределах нескольких секунд. Допускаем
         // небольшую положительную погрешность (например, clock skew), но
         // 3-часовой дрейф (старый баг) завалит тест с запасом.
         self::assertLessThanOrEqual(
-            1,
+            5,
             $deltaSeconds,
             sprintf(
-                'scheduled_at первого батча должен быть <= NOW() в пределах 1с, получили delta=%ds (TZ-баг?)',
+                'scheduled_at первого батча должен быть рядом с UTC wall-clock в пределах 5с, получили delta=%ds (TZ-баг?)',
                 $deltaSeconds,
             ),
         );

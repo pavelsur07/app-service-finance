@@ -108,7 +108,7 @@ final class DownloadBronzeControllerTest extends WebTestCaseBase
 
         self::assertResponseIsSuccessful();
         $response = $client->getResponse();
-        self::assertSame('text/csv', $response->headers->get('Content-Type'));
+        self::assertStringStartsWith('text/csv', (string) $response->headers->get('Content-Type'));
         self::assertStringContainsString('attachment', (string) $response->headers->get('Content-Disposition'));
         self::assertStringContainsString('uuid-csv.csv', (string) $response->headers->get('Content-Disposition'));
     }

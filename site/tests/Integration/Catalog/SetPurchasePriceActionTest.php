@@ -8,6 +8,7 @@ use App\Catalog\Application\SetPurchasePriceAction;
 use App\Catalog\DTO\SetPurchasePriceCommand;
 use App\Catalog\Entity\Product;
 use App\Catalog\Entity\ProductPurchasePrice;
+use App\Catalog\Infrastructure\Repository\ProductPurchasePriceRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
@@ -48,7 +49,7 @@ final class SetPurchasePriceActionTest extends IntegrationTestCase
         self::assertNull($prices[1]->getEffectiveTo());
     }
 
-    public function testBackdatedInsertBeforeFutureRecordThrowsDomainException(): void
+    public function testBackdatedInsertBeforeFutureRecordIsAllowed(): void
     {
         [$companyId, $productId] = $this->createBaseFixtures(
             'owner-set-price-c@example.test',
@@ -57,11 +58,27 @@ final class SetPurchasePriceActionTest extends IntegrationTestCase
         );
 
         $this->action()($this->makeCommand($companyId, $productId, '2026-05-10', 15000, 'Будущая цена'));
-
-        $this->expectException(\DomainException::class);
-        $this->expectExceptionMessage('Нельзя установить цену с даты 2026-05-01, потому что уже есть цена начиная с 2026-05-10.');
-
         $this->action()($this->makeCommand($companyId, $productId, '2026-05-01', 11000, 'Конфликтная цена'));
+
+        $prices = $this->em->getRepository(ProductPurchasePrice::class)->findBy([], ['effectiveFrom' => 'ASC']);
+        self::assertCount(2, $prices);
+        self::assertSame('2026-05-01', $prices[0]->getEffectiveFrom()->format('Y-m-d'));
+        self::assertEqualsWithDelta(11000.0, (float) $prices[0]->getPriceAmount(), 0.01);
+        self::assertSame('2026-05-10', $prices[1]->getEffectiveFrom()->format('Y-m-d'));
+        self::assertEqualsWithDelta(15000.0, (float) $prices[1]->getPriceAmount(), 0.01);
+
+        /** @var ProductPurchasePriceRepository $repository */
+        $repository = self::getContainer()->get(ProductPurchasePriceRepository::class);
+        self::assertEqualsWithDelta(
+            11000.0,
+            (float) $repository->findActiveAtDate($companyId, $productId, new \DateTimeImmutable('2026-05-05'))?->getPriceAmount(),
+            0.01,
+        );
+        self::assertEqualsWithDelta(
+            15000.0,
+            (float) $repository->findActiveAtDate($companyId, $productId, new \DateTimeImmutable('2026-05-10'))?->getPriceAmount(),
+            0.01,
+        );
     }
 
     private function makeCommand(string $companyId, string $productId, string $effectiveFrom, int $amount, ?string $note): SetPurchasePriceCommand

@@ -22,6 +22,7 @@ use Doctrine\DBAL\DriverManager;
 use PHPUnit\Framework\MockObject\MockObject;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Tester\ApplicationTester;
 use Symfony\Component\Console\Tester\CommandTester;
 
 /**
@@ -126,13 +127,13 @@ final class AdBatchSchedulerCommandTest extends PostgresResetTestCase
         self::assertStringContainsString('429', (string) $reloaded->getLastError());
 
         // scheduled_at должен сдвинуться примерно на +5 минут относительно NOW().
-        // Сравнение выполняем на стороне Postgres (SELECT scheduled_at - NOW()),
+        // Сравнение выполняем на стороне Postgres относительно UTC wall-clock,
         // чтобы не зависеть от того, в какой TZ Doctrine десериализует
         // TIMESTAMP WITHOUT TIME ZONE при `getScheduledAt()->getTimestamp()`
         // (Task-11.9a-fix: entity пишет UTC-wall-clock, а Doctrine при чтении
         // использует default PHP TZ — в тестах из docker это Europe/Moscow).
         $deltaSeconds = (int) $this->em->getConnection()->fetchOne(
-            'SELECT EXTRACT(EPOCH FROM (scheduled_at - NOW()))::bigint '
+            "SELECT EXTRACT(EPOCH FROM (scheduled_at - (NOW() AT TIME ZONE 'UTC')))::bigint "
             .'FROM marketplace_ad_scheduled_batches WHERE id = :id',
             ['id' => $batch->getId()],
         );
@@ -231,8 +232,10 @@ final class AdBatchSchedulerCommandTest extends PostgresResetTestCase
 
     public function testHelpOutputsDescription(): void
     {
-        $tester = $this->makeCommandTester();
-        $tester->execute(['--help' => true]);
+        $app = new Application(self::$kernel);
+        $app->setAutoExit(false);
+        $tester = new ApplicationTester($app);
+        $tester->run(['command' => 'app:marketplace-ads:scheduler', '--help' => true]);
 
         $display = $tester->getDisplay();
         self::assertStringContainsString('app:marketplace-ads:scheduler', $display);
