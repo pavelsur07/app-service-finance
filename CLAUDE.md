@@ -576,3 +576,64 @@ Query без companyId            — запрещено (IDOR + полный с
    - риски,
    - follow-ups, которые сознательно вынесены за scope.
 4. 🛑 **STOP. Final Owner review.** Merge — только после одобрения Владельцем.
+
+## Design System
+
+This project uses a custom design system. Everything visual goes through it.
+
+**Visual reference:** `site/ui-kit/storybook.html` — open in browser to
+see all components, tokens, and Money formats.
+
+**Rules document:** `site/ui-kit/decisions.md` — read first, it's compact.
+
+**Source audit:** `site/ui-kit/design-audit.md` — original analysis,
+historical reference.
+
+## Hard Rules
+
+1. **Tokens only.** Use CSS variables from `storybook.html` `:root`.
+   No raw hex, no out-of-scale font sizes, no arbitrary spacings.
+
+2. **Existing components only.** Button, Input, Money, Badge, StatusPill,
+   Avatar, Toggle, Table, KPI card, Card, Dropdown, Tabs, Drawer, Modal,
+   Empty state, Direction indicator, Sidebar, EntityPicker, TreePicker, Tags.
+
+   Full list with classes in `decisions.md`.
+
+3. **Money rules are sacred.** Minus = U+2212, thin space = U+2009 between
+   digit groups, ₽ as suffix, tabular-nums, color only for deltas (not
+   balances). 12 canonical formats in `decisions.md` → Money rules.
+
+4. **Icons inherit currentColor** inside components. Color is applied to
+   the whole menu item by semantic role (default/primary/danger), not to
+   icons individually. No emoji icons.
+
+5. **No new components without permission.** If a pattern isn't covered:
+    - First, propose adapting an existing component
+    - If impossible, STOP and ask before adding to ui-kit
+    - Never invent ad-hoc components in screen files
+
+6. **Universal pickers.** For flat entity selection (contractor / project /
+   company / account) — `EntityPicker`. For hierarchical (category / OPiU
+   article / tagged projects) — `TreePicker`. Don't create one-off pickers.
+
+## Where to put things
+
+- New screens → `site/screens/<name>.html`, one screen per file
+- Each screen imports tokens (copy `:root` block from storybook.html, or
+  reference storybook tokens in comments)
+- New UI Kit additions → `site/ui-kit/storybook.html` + update `decisions.md`
+    + bump version in `README.md`
+
+## Versioning
+
+Current UI Kit version: v1.1
+- v1.0 — initial UI Kit (Foundations, Money, base components)
+- v1.1 — added Sidebar, EntityPicker, TreePicker, Tags
+
+When updating UI Kit:
+1. Update `storybook.html`
+2. Regenerate `decisions.md`
+3. Update README.md changelog
+4. Commit with message `ui-kit: vX.X — what changed`
+5. Tag: `git tag ui-kit-vX.X`

@@ -1,0 +1,2846 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UI Kit · Ваш Финдир v1.0</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+
+:root {
+  /* ===== Brand ===== */
+  --color-primary: #1A56DB;
+  --color-primary-hover: #1E40AF;
+  --color-primary-tint: #EEF3FE;
+  --color-primary-border: #C7D7FB;
+  --color-primary-selection: #DBE6FF;
+
+  /* ===== Text ===== */
+  --text-strong: #0B1220;
+  --text-secondary: #475569;
+  --text-tertiary: #64748B;
+  --text-muted: #8B95A7;
+  --text-disabled: #94A3B8;
+  --text-faint: #CBD5E1;
+  --text-inverse: #FFFFFF;
+
+  /* ===== Borders ===== */
+  --border: #E8ECF3;
+  --border-soft: #F1F4F9;
+
+  /* ===== Backgrounds ===== */
+  --bg-page: #F4F6FA;
+  --bg-card: #FFFFFF;
+  --bg-subtle: #F7F9FC;
+  --bg-row-hover: #FAFBFD;
+  --bg-row-selected: #F4F8FF;
+  --bg-dark: #0B1220;
+
+  /* ===== Semantic ===== */
+  --success-bg: #ECFDF5;
+  --success-border: #D1FAE5;
+  --success-text: #047857;
+  --success-dot: #10B981;
+
+  --danger-bg: #FEF2F2;
+  --danger-border: #FECACA;
+  --danger-text: #B91C1C;
+  --danger-dot: #EF4444;
+
+  --warning-bg: #FFFBEB;
+  --warning-border: #FDE68A;
+  --warning-text: #92400E;
+  --warning-dot: #F59E0B;
+
+  --neutral-tint-bg: #F4F6FA;
+  --neutral-tint-text: #475569;
+
+  /* ===== Categories (tints + lines) ===== */
+  --cat-revenue: #10B981;
+  --cat-marketing: #F59E0B;
+  --cat-services: #06B6D4;
+  --cat-payroll: #8B5CF6;
+  --cat-tax: #EF4444;
+  --cat-software: #0EA5E9;
+  --cat-returns: #94A3B8;
+  --cat-financial: #1A56DB;
+
+  /* ===== Banks (brand colors) ===== */
+  --bank-tinkoff: #FFDD2D;        --bank-tinkoff-fg: #0B1220;
+  --bank-sber:    #1A9F29;        --bank-sber-fg:    #FFFFFF;
+  --bank-alfa:    #EF3124;        --bank-alfa-fg:    #FFFFFF;
+  --bank-tochka:  #6132D6;        --bank-tochka-fg:  #FFFFFF;
+  --bank-mts:     #EF4444;        --bank-mts-fg:     #FFFFFF;
+  --bank-yookassa:#7B61FF;        --bank-yookassa-fg:#FFFFFF;
+
+  /* ===== Source badge tints ===== */
+  --src-api-bg: #EEF3FE;          --src-api-text: #1E40AF;        --src-api-border: #DBE6FF;
+  --src-manual-bg: #F4F6FA;       --src-manual-text: #475569;     --src-manual-border: #E2E8F0;
+  --src-bot-bg: #F5F3FF;          --src-bot-text: #6D28D9;        --src-bot-border: #E9E5FF;
+  --src-xls-bg: #ECFDF5;          --src-xls-text: #047857;        --src-xls-border: #D1FAE5;
+  --src-1c-bg: #FFF7ED;           --src-1c-text: #C2410C;         --src-1c-border: #FFE4CC;
+
+  /* ===== Typography ===== */
+  --font-family: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+  --font-9_5: 9.5px;
+  --font-10_5: 10.5px;
+  --font-11: 11px;
+  --font-11_5: 11.5px;
+  --font-12: 12px;
+  --font-12_5: 12.5px;
+  --font-13: 13px;
+  --font-13_5: 13.5px;
+  --font-14: 14px;
+  --font-15: 15px;
+  --font-17: 17px;
+  --font-22: 22px;
+  --font-28: 28px;
+
+  /* ===== Spacing (4-base) ===== */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-7: 32px;
+  --s-8: 40px;
+
+  /* ===== Radii ===== */
+  --r-1: 4px;   /* chips, badges */
+  --r-2: 5px;   /* nav items, small buttons */
+  --r-3: 6px;   /* inputs, primary buttons */
+  --r-4: 8px;   /* cards, sections */
+  --r-pill: 999px;
+  --r-circle: 50%;
+
+  /* ===== Shadows ===== */
+  --shadow-sm: 0 1px 2px rgba(15,23,42,0.06);
+  --shadow-card-hover: 0 4px 12px rgba(15,23,42,0.04);
+  --shadow-primary: 0 1px 0 rgba(255,255,255,0.15) inset, 0 4px 10px rgba(26,86,219,0.25);
+  --shadow-menu: 0 16px 36px rgba(15,23,42,0.14), 0 2px 8px rgba(15,23,42,0.06);
+  --shadow-modal: 0 24px 60px rgba(11,18,32,0.28), 0 4px 12px rgba(11,18,32,0.08);
+  --shadow-drawer: -20px 0 60px rgba(11,18,32,0.22);
+
+  /* ===== Layout tokens ===== */
+  --card-padding: 16px 20px;
+  --card-padding-block: 24px;
+  --drawer-width: 680px;
+  --drawer-padding-body: 24px 28px;
+  --modal-width-compact: 440px;
+  --modal-width-standard: 520px;
+  --backdrop-opacity: 0.45;
+  --backdrop-blur: 6px;
+
+  /* ===== Avatar sizes (sm/md/lg) ===== */
+  --avatar-sm: 24px;
+  --avatar-md: 32px;
+  --avatar-lg: 40px;
+
+  /* ===== Toggle ===== */
+  --toggle-w: 42px;
+  --toggle-h: 24px;
+  --toggle-knob: 20px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-family);
+  background: var(--bg-page);
+  color: var(--text-strong);
+  font-size: var(--font-13);
+  line-height: 1.5;
+  letter-spacing: -0.005em;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: var(--color-primary-selection); }
+
+/* ============ LAYOUT ============ */
+.layout { display: flex; }
+
+.nav {
+  width: 240px;
+  position: sticky; top: 0; align-self: flex-start;
+  height: 100vh;
+  background: var(--bg-card);
+  border-right: 1px solid var(--border);
+  padding: 24px 16px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+.nav-brand {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 10px 16px;
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 12px;
+}
+.nav-logo {
+  width: 32px; height: 32px; border-radius: var(--r-3);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+  color: #fff; display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 13px; letter-spacing: 0.02em;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.4) inset;
+}
+.nav-title { font-size: 14px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; }
+.nav-version { font-size: 10.5px; color: var(--text-muted); font-family: var(--font-mono); }
+
+.nav-section {
+  font-size: var(--font-10_5);
+  font-weight: 700;
+  color: var(--text-disabled);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 14px 10px 4px;
+}
+.nav a {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--r-2);
+  text-decoration: none;
+  color: var(--text-secondary);
+  font-size: var(--font-13);
+  font-weight: 500;
+}
+.nav a:hover { background: var(--bg-page); color: var(--text-strong); }
+.nav a .num {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.main { flex: 1; padding: 32px 40px 80px; max-width: 1200px; }
+section { scroll-margin-top: 16px; margin-bottom: 64px; }
+section + section { padding-top: 24px; }
+
+h1.page-h1 { font-size: 32px; font-weight: 800; letter-spacing: -0.025em; margin: 0 0 8px; }
+.page-sub { font-size: 14px; color: var(--text-tertiary); margin: 0 0 32px; max-width: 70ch; line-height: 1.6; }
+.page-meta { font-size: 11.5px; color: var(--text-muted); font-family: var(--font-mono); margin-bottom: 32px; }
+
+h2.section-h { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 6px; }
+.section-sub { font-size: 13px; color: var(--text-tertiary); margin: 0 0 24px; max-width: 70ch; }
+
+h3.sub-h { font-size: 15px; font-weight: 700; margin: 32px 0 12px; color: var(--text-strong); letter-spacing: -0.015em; }
+h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); letter-spacing: 0.04em; text-transform: uppercase; margin: 16px 0 8px; }
+
+/* ============ CARD-BLOCK pattern ============ */
+.cb {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-4);
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+.cb-head {
+  display: flex; align-items: baseline; gap: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--border);
+}
+.cb-name { font-size: 14px; font-weight: 700; color: var(--text-strong); }
+.cb-tag { font-size: 10.5px; font-weight: 700; color: var(--text-muted); font-family: var(--font-mono); letter-spacing: 0.02em; padding: 2px 7px; background: var(--bg-page); border-radius: var(--r-1); }
+.cb-when { font-size: 12px; color: var(--text-tertiary); margin-left: auto; max-width: 50ch; text-align: right; }
+
+.demo {
+  padding: 20px;
+  background: var(--bg-page);
+  border-radius: var(--r-3);
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start;
+}
+.demo--column { flex-direction: column; }
+.demo--center { align-items: center; }
+.demo + .demo { margin-top: 10px; }
+.demo-label {
+  display: block;
+  font-size: 10.5px; font-weight: 700; color: var(--text-muted);
+  letter-spacing: 0.05em; text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+/* ============ FOUNDATIONS / SWATCHES ============ */
+.grid-swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.swatch {
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
+  overflow: hidden;
+  background: var(--bg-card);
+  display: flex; flex-direction: column;
+}
+.swatch-color { height: 56px; border-bottom: 1px solid var(--border-soft); }
+.swatch-info { padding: 8px 10px 10px; }
+.swatch-name { font-size: 12px; font-weight: 700; color: var(--text-strong); line-height: 1.3; }
+.swatch-token { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px; }
+.swatch-hex { font-size: 10.5px; color: var(--text-secondary); font-family: var(--font-mono); font-variant-numeric: tabular-nums; margin-top: 2px; }
+
+/* ============ TYPOGRAPHY scale ============ */
+.type-row { display: flex; align-items: baseline; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--border-soft); }
+.type-row:last-child { border: 0; }
+.type-meta { width: 200px; flex-shrink: 0; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+.type-meta b { color: var(--text-strong); font-family: var(--font-family); font-size: 12.5px; margin-right: 6px; }
+
+/* ============ SPACING scale ============ */
+.spacing-row { display: flex; align-items: center; gap: 16px; padding: 6px 0; }
+.spacing-bar { background: var(--color-primary); height: 12px; border-radius: 3px; }
+.spacing-meta { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-secondary); min-width: 160px; }
+.spacing-meta b { color: var(--text-strong); font-family: var(--font-family); }
+
+/* ============ RADIUS scale ============ */
+.radius-row { display: flex; gap: 24px; flex-wrap: wrap; }
+.radius-item { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.radius-box { width: 80px; height: 60px; background: var(--color-primary-tint); border: 1px solid var(--color-primary-border); }
+.radius-meta { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); text-align: center; line-height: 1.4; }
+.radius-meta b { color: var(--text-strong); font-family: var(--font-family); font-size: 12px; display: block; }
+
+/* ============ SHADOWS scale ============ */
+.shadow-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.shadow-item {
+  background: var(--bg-card);
+  border-radius: var(--r-4);
+  padding: 20px;
+  height: 110px;
+  display: flex; flex-direction: column; justify-content: space-between;
+}
+.shadow-name { font-size: 12.5px; font-weight: 700; }
+.shadow-token { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
+.shadow-use { font-size: 11px; color: var(--text-tertiary); }
+
+/* ============ BUTTONS ============ */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  font-family: inherit; cursor: pointer;
+  border: 1px solid transparent;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.btn-sm { height: 30px; padding: 0 12px; font-size: var(--font-12_5); border-radius: var(--r-2); }
+.btn-md { height: 36px; padding: 0 14px; font-size: var(--font-13); border-radius: var(--r-3); }
+.btn-lg { height: 44px; padding: 0 18px; font-size: var(--font-14); border-radius: var(--r-3); }
+
+.btn-primary { background: var(--color-primary); color: #fff; border-color: var(--color-primary); box-shadow: var(--shadow-primary); }
+.btn-primary:hover { background: var(--color-primary-hover); border-color: var(--color-primary-hover); }
+
+.btn-secondary { background: var(--bg-card); color: var(--text-strong); border-color: var(--border); }
+.btn-secondary:hover { background: var(--bg-page); border-color: #D8DEE8; }
+
+.btn-ghost { background: transparent; color: var(--text-secondary); }
+.btn-ghost:hover { background: var(--bg-page); color: var(--text-strong); }
+
+.btn-danger { background: var(--bg-card); color: var(--danger-text); border-color: var(--danger-border); }
+.btn-danger:hover { background: var(--danger-bg); }
+
+.btn-disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-loading::before {
+  content: '';
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: spin .8s linear infinite;
+  margin-right: 2px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* state-faked classes for showcase */
+.is-hover.btn-primary { background: var(--color-primary-hover); }
+.is-hover.btn-secondary { background: var(--bg-page); }
+.is-hover.btn-ghost { background: var(--bg-page); }
+.is-active.btn-primary { background: #1A3E9C; }
+.is-focus { outline: 3px solid rgba(26,86,219,0.25); outline-offset: 0; }
+
+/* ============ INPUTS ============ */
+.input {
+  width: 100%; height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--border); border-radius: var(--r-3);
+  background: var(--bg-card);
+  font-family: inherit; font-size: var(--font-13);
+  color: var(--text-strong);
+  outline: none;
+}
+.input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(26,86,219,0.12); }
+.input::placeholder { color: var(--text-muted); }
+.input-error { border-color: var(--danger-dot); box-shadow: 0 0 0 3px rgba(239,68,68,0.12); }
+.input-disabled { background: var(--bg-page); color: var(--text-muted); cursor: not-allowed; }
+
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field-label { font-size: var(--font-11_5); color: var(--text-tertiary); font-weight: 600; }
+.field-label .req { color: var(--danger-dot); margin-left: 2px; }
+.field-helper { font-size: var(--font-11); color: var(--text-muted); }
+.field-helper.error { color: var(--danger-text); }
+
+.input-wrap { position: relative; }
+.input-wrap .prefix, .input-wrap .suffix {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  color: var(--text-muted); font-size: var(--font-13); font-weight: 600;
+  pointer-events: none;
+}
+.input-wrap .prefix { left: 12px; }
+.input-wrap .suffix { right: 12px; }
+.input-wrap .input--prefix { padding-left: 32px; }
+.input-wrap .input--suffix { padding-right: 36px; }
+
+textarea.input { height: auto; min-height: 64px; padding-top: 10px; padding-bottom: 10px; resize: vertical; line-height: 1.5; }
+
+/* ============ MONEY ============ */
+.money {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-family);
+  letter-spacing: -0.01em;
+}
+.money--in   { color: var(--success-text); }
+.money--out  { color: var(--danger-text); }
+.money--strong { color: var(--text-strong); }
+.money--muted  { color: var(--text-faint); }
+.money--14 { font-size: 14px; font-weight: 700; }
+.money--16 { font-size: 16px; font-weight: 700; }
+.money--22 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+.money--28 { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+
+.money-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-4);
+  padding: 16px 20px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.money-card .mc-label { font-size: 10.5px; font-weight: 700; color: var(--text-tertiary); letter-spacing: 0.05em; text-transform: uppercase; }
+.money-card .mc-meta { font-size: 11px; color: var(--text-muted); display: flex; gap: 8px; flex-wrap: wrap; }
+.money-card .mc-meta b { color: var(--text-secondary); font-weight: 600; }
+.money-card .mc-spec {
+  font-family: var(--font-mono); font-size: 10.5px;
+  color: var(--text-muted); margin-top: auto; padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+  line-height: 1.5;
+}
+
+/* ============ BADGES / CHIPS ============ */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 9px;
+  border-radius: var(--r-1);
+  font-size: var(--font-12);
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.chip--filter { background: var(--bg-subtle); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer; }
+.chip--filter.is-active { background: var(--color-primary-tint); border-color: var(--color-primary-border); color: var(--color-primary-hover); font-weight: 700; }
+
+.src {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 7px 2px 5px;
+  border-radius: var(--r-1);
+  font-size: 10.5px; font-weight: 600; line-height: 1; white-space: nowrap;
+  border: 1px solid;
+}
+.src svg { width: 11px; height: 11px; }
+.src--api    { background: var(--src-api-bg);    color: var(--src-api-text);    border-color: var(--src-api-border); }
+.src--manual { background: var(--src-manual-bg); color: var(--src-manual-text); border-color: var(--src-manual-border); }
+.src--bot    { background: var(--src-bot-bg);    color: var(--src-bot-text);    border-color: var(--src-bot-border); }
+.src--xls    { background: var(--src-xls-bg);    color: var(--src-xls-text);    border-color: var(--src-xls-border); }
+.src--1c     { background: var(--src-1c-bg);     color: var(--src-1c-text);     border-color: var(--src-1c-border); }
+
+.bank-badge {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 6px 10px 6px 6px;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--r-3);
+}
+.bank-mark {
+  width: 32px; height: 32px; border-radius: var(--r-2);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 13px; letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+.bank-mark--tinkoff  { background: var(--bank-tinkoff);  color: var(--bank-tinkoff-fg); }
+.bank-mark--sber     { background: var(--bank-sber);     color: var(--bank-sber-fg); }
+.bank-mark--alfa     { background: var(--bank-alfa);     color: var(--bank-alfa-fg); }
+.bank-mark--tochka   { background: var(--bank-tochka);   color: var(--bank-tochka-fg); }
+.bank-mark--mts      { background: var(--bank-mts);      color: var(--bank-mts-fg); }
+.bank-mark--yookassa { background: var(--bank-yookassa); color: var(--bank-yookassa-fg); }
+.bank-name { font-size: 12.5px; font-weight: 700; line-height: 1.2; }
+.bank-token { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+/* ============ STATUS PILL (canonical) ============ */
+.status {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px 3px 8px;
+  border-radius: var(--r-pill);
+  font-size: 11.5px; font-weight: 600; line-height: 1; white-space: nowrap;
+}
+.status .dot { width: 6px; height: 6px; border-radius: 50%; }
+.status--success { background: var(--success-bg); color: var(--success-text); } .status--success .dot { background: var(--success-dot); }
+.status--danger  { background: var(--danger-bg);  color: var(--danger-text); }  .status--danger .dot  { background: var(--danger-dot); }
+.status--warning { background: var(--warning-bg); color: var(--warning-text); } .status--warning .dot { background: var(--warning-dot); }
+.status--neutral { background: var(--neutral-tint-bg); color: var(--neutral-tint-text); } .status--neutral .dot { background: var(--text-disabled); }
+.status--pending { background: var(--warning-bg); color: var(--warning-text); } .status--pending .dot { background: var(--warning-dot); }
+
+/* ============ AVATAR ============ */
+.avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 700; color: #fff;
+  border-radius: var(--r-circle);
+  flex-shrink: 0;
+}
+.avatar--sm { width: var(--avatar-sm); height: var(--avatar-sm); font-size: 10px; }
+.avatar--md { width: var(--avatar-md); height: var(--avatar-md); font-size: 12px; }
+.avatar--lg { width: var(--avatar-lg); height: var(--avatar-lg); font-size: 14px; }
+.avatar--square { border-radius: var(--r-3); }
+.avatar--tint-1 { background: var(--bg-dark); }
+.avatar--tint-2 { background: linear-gradient(135deg, #FBBF24, #F97316); }
+.avatar--tint-3 { background: var(--color-primary); }
+.avatar--tint-4 { background: var(--cat-payroll); }
+
+/* ============ TOGGLE ============ */
+.toggle {
+  display: inline-block;
+  width: var(--toggle-w); height: var(--toggle-h);
+  border-radius: var(--r-pill);
+  background: #D8DEE8;
+  position: relative; cursor: pointer;
+  border: 0; padding: 0;
+}
+.toggle::after {
+  content: '';
+  position: absolute; top: 2px; left: 2px;
+  width: var(--toggle-knob); height: var(--toggle-knob);
+  border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 3px rgba(15,23,42,0.2);
+  transition: left .12s;
+}
+.toggle.is-on { background: var(--color-primary); }
+.toggle.is-on::after { left: calc(var(--toggle-w) - var(--toggle-knob) - 2px); }
+.toggle.is-disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ============ TABLE ============ */
+.t-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.t-table thead th {
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 11px 12px;
+  background: var(--bg-row-hover);
+  border-bottom: 1px solid var(--border);
+}
+.t-table tbody td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 12.5px;
+  color: var(--text-strong);
+  vertical-align: top;
+}
+.t-row--hover { background: var(--bg-row-hover); }
+.t-row--selected { background: var(--bg-row-selected); }
+.t-row--day td {
+  background: var(--bg-row-hover);
+  font-size: 10.5px; font-weight: 700;
+  color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;
+}
+.t-row--subtotal td {
+  background: var(--bg-subtle);
+  font-weight: 700;
+  font-size: 13.5px;
+}
+.t-cell--right { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ============ KPI ============ */
+.kpi {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-4);
+  padding: 16px 20px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.kpi-label {
+  font-size: 11.5px; font-weight: 600; color: var(--text-tertiary);
+  letter-spacing: 0.02em;
+  display: flex; align-items: center; gap: 6px;
+}
+.kpi-value { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.kpi-value--hero { font-size: 28px; }
+.kpi-meta { font-size: 11px; color: var(--text-muted); display: flex; gap: 6px; align-items: center; }
+.kpi--dark { background: var(--bg-dark); color: #fff; border-color: var(--bg-dark); }
+.kpi--dark .kpi-label { color: #94A3B8; }
+.kpi--dark .kpi-value { color: #fff; }
+.kpi--dark .kpi-meta { color: #94A3B8; }
+
+/* Delta chip */
+.delta {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 7px; border-radius: var(--r-1);
+  font-size: 10.5px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.delta--up   { background: var(--success-bg); color: var(--success-text); }
+.delta--down { background: var(--danger-bg);  color: var(--danger-text); }
+.delta--neutral { background: var(--bg-page); color: var(--text-secondary); }
+
+/* sparkline placeholder */
+.spark {
+  width: 100%; height: 30px;
+  background: linear-gradient(180deg, rgba(26,86,219,0.16) 0%, rgba(26,86,219,0) 100%);
+  position: relative; margin-top: 4px;
+  border-radius: 3px;
+}
+.spark::before {
+  content: ''; position: absolute; bottom: 6px; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-primary) 100%);
+  clip-path: polygon(0 100%, 12% 60%, 25% 80%, 38% 40%, 52% 55%, 66% 30%, 80% 45%, 92% 20%, 100% 35%, 100% 100%);
+  height: 30px;
+}
+
+/* ============ DROPDOWN MENU ============ */
+.menu {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  box-shadow: var(--shadow-menu);
+  padding: 5px;
+  min-width: 240px;
+  display: flex; flex-direction: column;
+}
+.menu-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: var(--r-2);
+  border: 0; background: transparent;
+  font-family: inherit; font-size: 13px; color: var(--text-strong); font-weight: 500;
+  text-align: left; cursor: pointer; width: 100%;
+}
+.menu-item:hover { background: var(--bg-page); }
+.menu-item.is-primary { color: var(--color-primary-hover); font-weight: 600; }
+.menu-item.is-primary:hover { background: var(--color-primary-tint); }
+.menu-item.is-danger { color: var(--danger-text); }
+.menu-item.is-danger:hover { background: var(--danger-bg); }
+.menu-item .shortcut { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); }
+.menu-item svg { width: 14px; height: 14px; flex-shrink: 0; }
+.menu-divider { height: 1px; background: var(--border); margin: 5px 4px; }
+
+/* ============ TABS ============ */
+.tabs {
+  display: inline-flex; background: var(--bg-page);
+  padding: 3px; border-radius: var(--r-3); gap: 2px;
+}
+.tab {
+  height: 30px; padding: 0 12px;
+  border: 0; background: transparent; border-radius: var(--r-1);
+  font-family: inherit; font-size: 12.5px; font-weight: 600;
+  color: var(--text-tertiary); cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.tab.is-active {
+  background: var(--bg-card);
+  color: var(--text-strong);
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+}
+.tab .count { font-size: 11px; color: var(--text-muted); font-weight: 600; }
+.tab.is-active .count { color: var(--text-tertiary); }
+
+/* ============ DIRECTION (canonical: colored dot) ============ */
+.direction {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12px; font-weight: 600;
+}
+.direction .ddot { width: 8px; height: 8px; border-radius: 50%; }
+.direction--in  { color: var(--success-text); }
+.direction--in  .ddot { background: var(--success-dot); }
+.direction--out { color: var(--danger-text); }
+.direction--out .ddot { background: var(--danger-dot); }
+.direction--neutral { color: var(--text-secondary); }
+.direction--neutral .ddot { background: var(--text-disabled); }
+
+/* ============ MISC patterns ============ */
+.code-inline {
+  font-family: var(--font-mono); font-size: 11.5px;
+  background: var(--bg-page); padding: 2px 6px;
+  border-radius: 3px; color: var(--text-strong);
+}
+
+.decision-item { padding: 14px 0; border-bottom: 1px solid var(--border-soft); display: flex; gap: 16px; }
+.decision-item:last-child { border: 0; }
+.decision-num {
+  width: 28px; height: 28px; flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-primary-tint);
+  color: var(--color-primary-hover);
+  font-weight: 800; font-size: 12px;
+  display: flex; align-items: center; justify-content: center;
+}
+.decision-body { flex: 1; }
+.decision-title { font-size: 13.5px; font-weight: 700; color: var(--text-strong); margin-bottom: 3px; }
+.decision-value { display: inline-flex; align-items: center; gap: 6px; background: var(--bg-page); padding: 4px 10px; border-radius: var(--r-2); font-family: var(--font-mono); font-size: 11.5px; color: var(--text-strong); margin: 4px 0 6px; }
+.decision-why { font-size: 12px; color: var(--text-tertiary); }
+.decision-tag {
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em;
+  padding: 2px 6px; border-radius: 3px;
+  background: var(--warning-bg); color: var(--warning-text);
+  margin-left: 6px;
+}
+
+.row-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.row-3col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+/* ============ SIDEBAR (main nav, product) ============ */
+.sb {
+  width: 264px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-4);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.sb-head { padding: 16px 14px 12px; }
+.sb-logo { display: flex; align-items: center; gap: 10px; padding: 0 6px 12px; border-bottom: 1px solid var(--border-soft); }
+.sb-logo .mark {
+  width: 32px; height: 32px; border-radius: var(--r-3);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+  color: #fff; font-weight: 800; font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+  letter-spacing: 0.02em;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.4) inset;
+}
+.sb-logo .title { font-size: 14px; font-weight: 700; letter-spacing: -0.015em; }
+.sb-ws {
+  margin-top: 10px;
+  width: 100%;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+  padding: 8px 10px;
+  display: flex; align-items: center; gap: 10px;
+  cursor: pointer; text-align: left; font-family: inherit;
+}
+.sb-ws:hover { background: #F0F3F8; }
+.sb-ws .ws-name { font-size: 12.5px; font-weight: 700; color: var(--text-strong); line-height: 1.2; }
+.sb-ws .ws-meta { font-size: 10.5px; color: var(--text-muted); margin-top: 2px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.sb-ws .ws-chev { margin-left: auto; color: var(--text-muted); }
+
+.sb-nav { flex: 1; padding: 4px 8px 8px; overflow-y: auto; }
+.sb-group-title {
+  padding: 12px 10px 4px;
+  font-size: 10.5px; font-weight: 700;
+  color: var(--text-disabled);
+  letter-spacing: 0.06em; text-transform: uppercase;
+}
+.sb-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px;
+  border-radius: var(--r-2);
+  color: var(--text-secondary);
+  font-size: 13.5px; font-weight: 500;
+  text-decoration: none;
+  cursor: pointer; border: 0; background: transparent;
+  font-family: inherit; text-align: left; width: 100%;
+  margin-bottom: 1px;
+}
+.sb-item:hover { background: var(--bg-page); color: var(--text-strong); }
+.sb-item .ico { width: 18px; height: 18px; color: var(--text-muted); flex-shrink: 0; }
+.sb-item .lbl { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-item .badge {
+  font-size: 10.5px; font-weight: 700;
+  color: var(--text-muted); background: var(--bg-page);
+  padding: 1px 7px; border-radius: var(--r-1);
+  font-variant-numeric: tabular-nums;
+}
+.sb-item .chev { color: var(--text-muted); transition: transform .15s; }
+.sb-item.is-collapsed .chev { transform: rotate(-90deg); }
+.sb-item.is-active {
+  background: var(--color-primary-tint);
+  color: var(--color-primary-hover);
+  font-weight: 700;
+}
+.sb-item.is-active .ico { color: var(--color-primary); }
+.sb-item.is-active .badge { background: var(--bg-card); color: var(--color-primary); }
+
+.sb-sub { margin: 0 8px 4px 28px; padding-left: 12px; border-left: 1px solid var(--border-soft); }
+.sb-sub .sb-item { font-size: 13px; padding: 6px 10px; }
+.sb-sub .sb-item .ico-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text-faint); flex-shrink: 0; }
+.sb-sub .sb-item.is-active .ico-dot { background: var(--color-primary); }
+
+.sb-foot {
+  border-top: 1px solid var(--border-soft);
+  padding: 10px 12px;
+  display: flex; align-items: center; gap: 10px;
+}
+.sb-foot .me-name { font-size: 13px; font-weight: 600; line-height: 1.2; }
+.sb-foot .me-role { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.sb-foot .settings {
+  width: 28px; height: 28px; border-radius: var(--r-2);
+  background: transparent; border: 0; cursor: pointer; color: var(--text-secondary);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.sb-foot .settings:hover { background: var(--bg-page); color: var(--text-strong); }
+
+/* ============ EntityPicker / TreePicker shared ============ */
+.picker { display: flex; flex-direction: column; max-height: 560px; }
+.picker-search {
+  padding: 0 20px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  position: relative;
+}
+.picker-search svg {
+  position: absolute; left: 32px; top: 50%; transform: translateY(calc(-50% - 6px));
+  color: var(--text-muted); pointer-events: none;
+}
+.picker-search input {
+  width: 100%; height: 36px;
+  padding: 0 12px 0 34px;
+  background: var(--bg-subtle);
+  border: 1px solid transparent;
+  border-radius: var(--r-3);
+  font-family: inherit; font-size: 13px; color: var(--text-strong); outline: none;
+}
+.picker-search input:focus { background: var(--bg-card); border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(26,86,219,0.12); }
+
+.picker-tabs { padding: 10px 20px 0; display: flex; gap: 14px; border-bottom: 1px solid var(--border-soft); }
+.picker-tab {
+  background: transparent; border: 0; padding: 8px 2px 10px;
+  font-family: inherit; font-size: 12.5px; font-weight: 600;
+  color: var(--text-tertiary); cursor: pointer;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.picker-tab.is-active { color: var(--text-strong); border-bottom-color: var(--color-primary); font-weight: 700; }
+.picker-tab .count { font-size: 11px; color: var(--text-muted); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.picker-list { padding: 6px 8px; max-height: 360px; overflow-y: auto; }
+.picker-section {
+  font-size: 10.5px; font-weight: 700;
+  color: var(--text-disabled);
+  letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 12px 12px 4px;
+}
+.picker-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--r-2);
+  cursor: pointer; border: 0; background: transparent;
+  font-family: inherit; text-align: left; width: 100%;
+  margin-bottom: 1px;
+}
+.picker-item:hover { background: var(--bg-page); }
+.picker-item.is-selected { background: var(--bg-row-selected); }
+.picker-item .pi-body { flex: 1; min-width: 0; line-height: 1.3; }
+.picker-item .pi-name { font-size: 13px; font-weight: 600; color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.picker-item .pi-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.picker-item .pi-meta b { color: var(--text-secondary); font-weight: 600; font-variant-numeric: tabular-nums; }
+.picker-item .pi-right { flex-shrink: 0; display: flex; align-items: center; gap: 6px; }
+.picker-item .star { color: var(--text-faint); cursor: pointer; }
+.picker-item .star.is-on { color: var(--warning-dot); }
+.picker-item .role-chip {
+  font-size: 10px; font-weight: 700;
+  color: var(--text-secondary); background: var(--bg-page);
+  padding: 2px 7px; border-radius: var(--r-1);
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+.picker-item .check {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 1.5px solid var(--border);
+}
+.picker-item.is-selected .check {
+  background: var(--color-primary); border-color: var(--color-primary);
+  display: flex; align-items: center; justify-content: center; color: #fff;
+}
+
+.picker-foot {
+  padding: 12px 20px; border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+}
+.picker-foot .add { color: var(--color-primary); font-weight: 600; }
+
+.picker-breadcrumb {
+  padding: 8px 20px;
+  background: var(--bg-subtle);
+  border-top: 1px solid var(--border-soft);
+  font-size: 11.5px; color: var(--text-tertiary);
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.picker-breadcrumb b { color: var(--text-strong); font-weight: 700; }
+.picker-breadcrumb .sep { color: var(--text-faint); }
+
+/* Tree node */
+.tree-node {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px;
+  border-radius: var(--r-2);
+  cursor: pointer; border: 0; background: transparent;
+  font-family: inherit; text-align: left; width: 100%;
+  margin-bottom: 1px;
+  position: relative;
+}
+.tree-node:hover { background: var(--bg-page); }
+.tree-node.is-selected { background: var(--bg-row-selected); }
+.tree-node.is-disabled { cursor: not-allowed; }
+.tree-node.is-disabled .tn-name { color: var(--text-tertiary); font-weight: 600; }
+.tree-node .chev {
+  width: 14px; height: 14px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-muted); flex-shrink: 0;
+  transition: transform .15s;
+}
+.tree-node.is-collapsed .chev { transform: rotate(-90deg); }
+.tree-node .chev-spacer { width: 14px; flex-shrink: 0; }
+.tree-node .tn-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.tree-node .tn-name {
+  flex: 1; min-width: 0; font-size: 13px; color: var(--text-strong); font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tree-node .tn-name mark { background: var(--warning-bg); color: var(--warning-text); border-radius: 2px; padding: 0 2px; font-weight: 700; }
+.tree-node.is-selected .tn-name { font-weight: 700; color: var(--color-primary-hover); }
+.tree-node .tn-count {
+  font-size: 10.5px; color: var(--text-muted); font-weight: 600;
+  background: var(--bg-page); padding: 1px 7px; border-radius: var(--r-1);
+  font-variant-numeric: tabular-nums;
+}
+.tree-node .tn-amount {
+  font-size: 12px; font-variant-numeric: tabular-nums;
+  color: var(--text-strong); font-weight: 700; letter-spacing: -0.01em;
+}
+.tree-node .tn-check {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 1.5px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  color: transparent;
+}
+.tree-node.is-selected .tn-check { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+
+/* ============ Tags input ============ */
+.tags-input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--border); border-radius: var(--r-3);
+  background: var(--bg-card);
+  padding: 5px 6px;
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  cursor: text; position: relative;
+}
+.tags-input.is-focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(26,86,219,0.12); }
+.tags-input input {
+  border: 0; outline: 0; padding: 0 6px;
+  font-family: inherit; font-size: 13px; color: var(--text-strong);
+  background: transparent;
+  flex: 1; min-width: 80px; height: 26px;
+}
+.tags-input input::placeholder { color: var(--text-muted); }
+.tag-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 4px 3px 9px;
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+  font-size: 12px; font-weight: 600; color: var(--text-strong);
+  line-height: 1.4;
+}
+.tag-chip:hover { background: var(--bg-subtle); }
+.tag-chip.is-focused { background: var(--color-primary-tint); border-color: var(--color-primary-border); color: var(--color-primary-hover); }
+.tag-chip .x {
+  width: 18px; height: 18px; border-radius: var(--r-1);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-muted); cursor: pointer; border: 0; background: transparent;
+  font-family: inherit;
+}
+.tag-chip .x:hover { background: rgba(15,23,42,0.06); color: var(--text-strong); }
+.tag-chip.is-focused .x { color: var(--color-primary-hover); }
+
+.suggest {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border); border-radius: var(--r-3);
+  box-shadow: var(--shadow-menu);
+  padding: 5px; z-index: 5;
+  max-height: 200px; overflow-y: auto;
+}
+.suggest-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 9px; border-radius: var(--r-2);
+  cursor: pointer; font-size: 13px; color: var(--text-strong);
+}
+.suggest-item:hover, .suggest-item.is-active { background: var(--bg-page); }
+.suggest-item .hint { margin-left: auto; font-size: 10.5px; color: var(--text-muted); font-family: var(--font-mono); }
+.suggest-create {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 9px; border-radius: var(--r-2);
+  cursor: pointer; font-size: 13px; color: var(--color-primary); font-weight: 600;
+  border-top: 1px solid var(--border-soft); margin-top: 4px;
+}
+.suggest-create:hover { background: var(--color-primary-tint); }
+
+/* Empty state */
+.empty {
+  padding: 48px 24px;
+  background: var(--bg-card);
+  border: 1px dashed var(--border);
+  border-radius: var(--r-4);
+  text-align: center;
+}
+.empty-icon {
+  width: 48px; height: 48px;
+  background: var(--bg-page); border-radius: var(--r-circle);
+  margin: 0 auto 12px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-disabled);
+}
+.empty-title { font-size: 14px; font-weight: 700; color: var(--text-strong); margin-bottom: 4px; }
+.empty-text { font-size: 12.5px; color: var(--text-muted); max-width: 40ch; margin: 0 auto 16px; }
+
+/* Drawer header / footer (in-place demo) */
+.dw {
+  background: var(--bg-page);
+  border-radius: var(--r-4);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.dw-head {
+  background: var(--bg-card);
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: flex-start; gap: 12px;
+}
+.dw-head h3 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
+.dw-head .sub { font-size: 12px; color: var(--text-tertiary); margin-top: 5px; }
+.dw-body { padding: 16px 24px; min-height: 60px; }
+.dw-foot {
+  background: var(--bg-card);
+  padding: 14px 24px;
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px;
+}
+
+/* Modal (in-place demo) */
+.mdl {
+  width: 100%; max-width: var(--modal-width-standard);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-4);
+  box-shadow: var(--shadow-modal);
+}
+.mdl--compact { max-width: var(--modal-width-compact); }
+.mdl-head { padding: 18px 20px 12px; display: flex; align-items: flex-start; gap: 12px; }
+.mdl-head h3 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.015em; }
+.mdl-head .sub { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+.mdl-body { padding: 0 20px 12px; min-height: 60px; }
+.mdl-foot { border-top: 1px solid var(--border); padding: 12px 20px; display: flex; gap: 8px; justify-content: flex-end; }
+
+/* Account card hero */
+.acc-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-4);
+  padding: 16px 20px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.acc-top { display: flex; align-items: center; gap: 10px; }
+.acc-name { font-size: 12.5px; font-weight: 700; }
+.acc-mask { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.acc-type { font-size: 10.5px; font-weight: 600; color: var(--text-secondary); background: var(--bg-page); padding: 2px 7px; border-radius: var(--r-1); margin-left: auto; }
+.acc-balance { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.acc-sub { font-size: 11px; color: var(--text-muted); }
+.acc-foot { padding-top: 10px; border-top: 1px solid var(--border-soft); display: flex; gap: 8px; align-items: center; font-size: 11.5px; color: var(--text-secondary); }
+
+.row-form-field {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.row-form-field:last-child { border: 0; }
+.row-form-field .ll {
+  font-size: 11px; font-weight: 700; color: var(--text-tertiary);
+  letter-spacing: 0.05em; text-transform: uppercase;
+}
+.row-form-field .ee { font-size: 13px; color: var(--text-strong); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ============ NAV ============ -->
+  <nav class="nav">
+    <div class="nav-brand">
+      <div class="nav-logo">ВФ</div>
+      <div>
+        <div class="nav-title">UI Kit</div>
+        <div class="nav-version">v1.0 · 24.06.2026</div>
+      </div>
+    </div>
+
+    <div class="nav-section">Содержание</div>
+    <a href="#decisions"><span class="num">01</span> Decisions</a>
+
+    <div class="nav-section">02 Foundations</div>
+    <a href="#colors">Цвета</a>
+    <a href="#typography">Типографика</a>
+    <a href="#spacing">Spacing</a>
+    <a href="#radius">Radius</a>
+    <a href="#shadows">Shadows</a>
+
+    <div class="nav-section">03 Components</div>
+    <a href="#button">Button</a>
+    <a href="#input">Input</a>
+    <a href="#badge">Badge / Chip</a>
+    <a href="#status">StatusPill</a>
+    <a href="#avatar">Avatar</a>
+    <a href="#toggle">Toggle</a>
+    <a href="#tags">Tags <span class="num">new</span></a>
+    <a href="#table">Table row</a>
+    <a href="#kpi">KPI card</a>
+    <a href="#acc-card">Account card</a>
+    <a href="#card">Card</a>
+    <a href="#menu">Dropdown menu</a>
+    <a href="#tabs">Tabs</a>
+    <a href="#sidebar">Sidebar <span class="num">new</span></a>
+    <a href="#entity-picker">EntityPicker <span class="num">new</span></a>
+    <a href="#tree-picker">TreePicker <span class="num">new</span></a>
+    <a href="#drawer">Drawer</a>
+    <a href="#modal">Modal</a>
+    <a href="#empty">Empty state</a>
+    <a href="#direction">Direction</a>
+
+    <div class="nav-section">04 Money</div>
+    <a href="#money">Все форматы</a>
+
+    <div class="nav-section">05 Patterns</div>
+    <a href="#patterns">Patterns</a>
+
+    <div class="nav-section">Версия</div>
+    <a href="#changelog">Changelog</a>
+  </nav>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+
+    <h1 class="page-h1">UI Kit · Ваш Финдир</h1>
+    <p class="page-sub">
+      Канонический источник истины для всех экранов финансового SaaS-продукта.
+      Зафиксированы дизайн-токены, разрешены расхождения из аудита, собраны компоненты со всеми состояниями.
+    </p>
+    <div class="page-meta">v1.0 · 24 июня 2026 · Светлая тема</div>
+
+    <!-- ===================== 01. DECISIONS ===================== -->
+    <section id="decisions">
+      <h2 class="section-h">01 — Decisions</h2>
+      <p class="section-sub">Решения по всем расхождениям из аудита. Каждое решение — одна строка с обоснованием. <code class="code-inline">PROPOSED</code> — требует подтверждения.</p>
+
+      <div class="cb">
+        <div class="decision-item">
+          <div class="decision-num">1</div>
+          <div class="decision-body">
+            <div class="decision-title">Card padding</div>
+            <div class="decision-value">16px 20px</div>
+            <div class="decision-why">Компромисс между плотными KPI и просторными drawer-секциями; не теряет содержимое мелких карточек и не выглядит «дёшево» в крупных.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">2</div>
+          <div class="decision-body">
+            <div class="decision-title">KPI value size</div>
+            <div class="decision-value">22px (compact) · 28px (hero)</div>
+            <div class="decision-why">Две шкалы: 22 — для рядов виджетов, 28 — для одиночного hero-метрика (общий баланс, главный остаток). 26 удалён.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">3</div>
+          <div class="decision-body">
+            <div class="decision-title">Border color</div>
+            <div class="decision-value">#E8ECF3</div>
+            <div class="decision-why">Используется чаще, мягче по тону; #E2E8F0 удалён. Inputs и cards теперь единая линия.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">4</div>
+          <div class="decision-body">
+            <div class="decision-title">Drawer width</div>
+            <div class="decision-value">680px</div>
+            <div class="decision-why">Достаточно для двухколоночных форм (split-операции, parent + child fields); 640 ужимает.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">5</div>
+          <div class="decision-body">
+            <div class="decision-title">Backdrop</div>
+            <div class="decision-value">opacity 0.45 · blur 6px</div>
+            <div class="decision-why">Среднее затемнение, мягкий blur — модалки читаемы, контекст за ними различим.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">6</div>
+          <div class="decision-body">
+            <div class="decision-title">Avatar / initial sizes</div>
+            <div class="decision-value">sm 24 · md 32 · lg 40</div>
+            <div class="decision-why">Шаг кратный 8. Прежние 28/30/34 убраны — нет смысла, разница неразличима.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">7</div>
+          <div class="decision-body">
+            <div class="decision-title">Direction indicator</div>
+            <div class="decision-value">colored dot + знак суммы</div>
+            <div class="decision-why">Минимум визуального шума, не конкурирует со status-пилюлями. Знак направления передаётся самой суммой (+/−).</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">8</div>
+          <div class="decision-body">
+            <div class="decision-title">Status</div>
+            <div class="decision-value">pill с точкой (везде)</div>
+            <div class="decision-why">Пилюля заметнее dot+text, лучше для accessibility (форма + цвет). Sync-статусы на счетах тоже теперь pill.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">9</div>
+          <div class="decision-body">
+            <div class="decision-title">Money — знак минуса</div>
+            <div class="decision-value">U+2212 (−) · везде</div>
+            <div class="decision-why">Типографически правильный, ширина совпадает с +. Hyphen-minus запрещён в формате сумм.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">10</div>
+          <div class="decision-body">
+            <div class="decision-title">Money — миллионы</div>
+            <div class="decision-value">М (короткая запись)</div>
+            <div class="decision-why">В таблицах и на осях графиков: компактнее «млн», вписывается в узкие колонки. В описаниях допустимо «млн ₽».</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">11</div>
+          <div class="decision-body">
+            <div class="decision-title">Money — цвет</div>
+            <div class="decision-value">цвет только для дельт</div>
+            <div class="decision-why">Балансы — всегда тёмные (нейтральные). Зелёный/красный — только для %-дельт, сумм поступлений/расходов и signed transactions. Остаток на конец периода — НЕ цветной.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">12</div>
+          <div class="decision-body">
+            <div class="decision-title">Tint chip</div>
+            <div class="decision-value">именованные токены</div>
+            <div class="decision-why">Никакой математики с opacity — каждый тип чипа имеет свой набор переменных (--src-api-bg, --status-success-bg, …). Предсказуемо, не зависит от подложки.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">13</div>
+          <div class="decision-body">
+            <div class="decision-title">Drawer body padding <span class="decision-tag">PROPOSED</span></div>
+            <div class="decision-value">24px 28px</div>
+            <div class="decision-why">Чуть просторнее основной страницы, передаёт сосредоточенность задачи. Подтвердите.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">14</div>
+          <div class="decision-body">
+            <div class="decision-title">Tabular numerals <span class="decision-tag">PROPOSED</span></div>
+            <div class="decision-value">для всех числовых ячеек таблиц + сумм</div>
+            <div class="decision-why">font-variant-numeric: tabular-nums по умолчанию для денег и счётчиков. Не для процентов в KPI-карточках (там вес доминирует).</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">15</div>
+          <div class="decision-body">
+            <div class="decision-title">Icon color rule</div>
+            <div class="decision-value">currentColor inheritance · semantic роль на пункте</div>
+            <div class="decision-why">Иконки внутри компонентов наследуют currentColor. Цветом окрашивается ВЕСЬ пункт по семантической роли (default · primary · danger), не иконка отдельно. Эмодзи-иконки запрещены.</div>
+          </div>
+        </div>
+      </div>
+    </section> -->
+    <section id="foundations">
+      <h2 class="section-h">02 — Foundations</h2>
+      <p class="section-sub">Атомарные токены: цвет, шрифт, шаг сетки, скругление, тень. Всё через CSS-переменные.</p>
+
+      <!-- Colors -->
+      <h3 class="sub-h" id="colors">Цвета</h3>
+
+      <h4 class="mini-h">Brand</h4>
+      <div class="grid-swatches">
+        <div class="swatch"><div class="swatch-color" style="background:#1A56DB"></div><div class="swatch-info"><div class="swatch-name">Primary</div><div class="swatch-token">--color-primary</div><div class="swatch-hex">#1A56DB</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#1E40AF"></div><div class="swatch-info"><div class="swatch-name">Primary hover</div><div class="swatch-token">--color-primary-hover</div><div class="swatch-hex">#1E40AF</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#EEF3FE"></div><div class="swatch-info"><div class="swatch-name">Primary tint</div><div class="swatch-token">--color-primary-tint</div><div class="swatch-hex">#EEF3FE</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#C7D7FB"></div><div class="swatch-info"><div class="swatch-name">Primary border</div><div class="swatch-token">--color-primary-border</div><div class="swatch-hex">#C7D7FB</div></div></div>
+      </div>
+
+      <h4 class="mini-h">Text</h4>
+      <div class="grid-swatches">
+        <div class="swatch"><div class="swatch-color" style="background:#0B1220"></div><div class="swatch-info"><div class="swatch-name">Strong</div><div class="swatch-token">--text-strong</div><div class="swatch-hex">#0B1220</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#475569"></div><div class="swatch-info"><div class="swatch-name">Secondary</div><div class="swatch-token">--text-secondary</div><div class="swatch-hex">#475569</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#64748B"></div><div class="swatch-info"><div class="swatch-name">Tertiary</div><div class="swatch-token">--text-tertiary</div><div class="swatch-hex">#64748B</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#8B95A7"></div><div class="swatch-info"><div class="swatch-name">Muted</div><div class="swatch-token">--text-muted</div><div class="swatch-hex">#8B95A7</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#94A3B8"></div><div class="swatch-info"><div class="swatch-name">Disabled</div><div class="swatch-token">--text-disabled</div><div class="swatch-hex">#94A3B8</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#CBD5E1"></div><div class="swatch-info"><div class="swatch-name">Faint</div><div class="swatch-token">--text-faint</div><div class="swatch-hex">#CBD5E1</div></div></div>
+      </div>
+
+      <h4 class="mini-h">Borders & Backgrounds</h4>
+      <div class="grid-swatches">
+        <div class="swatch"><div class="swatch-color" style="background:#E8ECF3"></div><div class="swatch-info"><div class="swatch-name">Border</div><div class="swatch-token">--border</div><div class="swatch-hex">#E8ECF3</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#F1F4F9"></div><div class="swatch-info"><div class="swatch-name">Border soft</div><div class="swatch-token">--border-soft</div><div class="swatch-hex">#F1F4F9</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#FFFFFF; border-top:1px dashed #E8ECF3"></div><div class="swatch-info"><div class="swatch-name">Card</div><div class="swatch-token">--bg-card</div><div class="swatch-hex">#FFFFFF</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#F4F6FA"></div><div class="swatch-info"><div class="swatch-name">Page</div><div class="swatch-token">--bg-page</div><div class="swatch-hex">#F4F6FA</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#F7F9FC"></div><div class="swatch-info"><div class="swatch-name">Subtle</div><div class="swatch-token">--bg-subtle</div><div class="swatch-hex">#F7F9FC</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#FAFBFD"></div><div class="swatch-info"><div class="swatch-name">Row hover</div><div class="swatch-token">--bg-row-hover</div><div class="swatch-hex">#FAFBFD</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#F4F8FF"></div><div class="swatch-info"><div class="swatch-name">Row selected</div><div class="swatch-token">--bg-row-selected</div><div class="swatch-hex">#F4F8FF</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#0B1220"></div><div class="swatch-info"><div class="swatch-name">Dark surface</div><div class="swatch-token">--bg-dark</div><div class="swatch-hex">#0B1220</div></div></div>
+      </div>
+
+      <h4 class="mini-h">Semantic — Success</h4>
+      <div class="grid-swatches">
+        <div class="swatch"><div class="swatch-color" style="background:#ECFDF5"></div><div class="swatch-info"><div class="swatch-name">Success bg</div><div class="swatch-token">--success-bg</div><div class="swatch-hex">#ECFDF5</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#D1FAE5"></div><div class="swatch-info"><div class="swatch-name">Success border</div><div class="swatch-token">--success-border</div><div class="swatch-hex">#D1FAE5</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#047857"></div><div class="swatch-info"><div class="swatch-name">Success text</div><div class="swatch-token">--success-text</div><div class="swatch-hex">#047857</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#10B981"></div><div class="swatch-info"><div class="swatch-name">Success dot</div><div class="swatch-token">--success-dot</div><div class="swatch-hex">#10B981</div></div></div>
+      </div>
+
+      <h4 class="mini-h">Semantic — Danger</h4>
+      <div class="grid-swatches">
+        <div class="swatch"><div class="swatch-color" style="background:#FEF2F2"></div><div class="swatch-info"><div class="swatch-name">Danger bg</div><div class="swatch-token">--danger-bg</div><div class="swatch-hex">#FEF2F2</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#FECACA"></div><div class="swatch-info"><div class="swatch-name">Danger border</div><div class="swatch-token">--danger-border</div><div class="swatch-hex">#FECACA</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#B91C1C"></div><div class="swatch-info"><div class="swatch-name">Danger text</div><div class="swatch-token">--danger-text</div><div class="swatch-hex">#B91C1C</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#EF4444"></div><div class="swatch-info"><div class="swatch-name">Danger dot</div><div class="swatch-token">--danger-dot</div><div class="swatch-hex">#EF4444</div></div></div>
+      </div>
+
+      <h4 class="mini-h">Semantic — Warning</h4>
+      <div class="grid-swatches">
+        <div class="swatch"><div class="swatch-color" style="background:#FFFBEB"></div><div class="swatch-info"><div class="swatch-name">Warning bg</div><div class="swatch-token">--warning-bg</div><div class="swatch-hex">#FFFBEB</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#FDE68A"></div><div class="swatch-info"><div class="swatch-name">Warning border</div><div class="swatch-token">--warning-border</div><div class="swatch-hex">#FDE68A</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#92400E"></div><div class="swatch-info"><div class="swatch-name">Warning text</div><div class="swatch-token">--warning-text</div><div class="swatch-hex">#92400E</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#F59E0B"></div><div class="swatch-info"><div class="swatch-name">Warning dot</div><div class="swatch-token">--warning-dot</div><div class="swatch-hex">#F59E0B</div></div></div>
+      </div>
+
+      <h4 class="mini-h">Categories (8)</h4>
+      <div class="grid-swatches">
+        <div class="swatch"><div class="swatch-color" style="background:#10B981"></div><div class="swatch-info"><div class="swatch-name">Revenue</div><div class="swatch-token">--cat-revenue</div><div class="swatch-hex">#10B981</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#F59E0B"></div><div class="swatch-info"><div class="swatch-name">Marketing</div><div class="swatch-token">--cat-marketing</div><div class="swatch-hex">#F59E0B</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#06B6D4"></div><div class="swatch-info"><div class="swatch-name">Services</div><div class="swatch-token">--cat-services</div><div class="swatch-hex">#06B6D4</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#8B5CF6"></div><div class="swatch-info"><div class="swatch-name">Payroll</div><div class="swatch-token">--cat-payroll</div><div class="swatch-hex">#8B5CF6</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#EF4444"></div><div class="swatch-info"><div class="swatch-name">Tax</div><div class="swatch-token">--cat-tax</div><div class="swatch-hex">#EF4444</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#0EA5E9"></div><div class="swatch-info"><div class="swatch-name">Software</div><div class="swatch-token">--cat-software</div><div class="swatch-hex">#0EA5E9</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#94A3B8"></div><div class="swatch-info"><div class="swatch-name">Returns</div><div class="swatch-token">--cat-returns</div><div class="swatch-hex">#94A3B8</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#1A56DB"></div><div class="swatch-info"><div class="swatch-name">Financial</div><div class="swatch-token">--cat-financial</div><div class="swatch-hex">#1A56DB</div></div></div>
+      </div>
+
+      <h4 class="mini-h">Bank brand colors</h4>
+      <div class="demo">
+        <div class="bank-badge"><div class="bank-mark bank-mark--tinkoff">Т</div><div><div class="bank-name">Тинькофф</div><div class="bank-token">--bank-tinkoff</div></div></div>
+        <div class="bank-badge"><div class="bank-mark bank-mark--sber">С</div><div><div class="bank-name">Сбер</div><div class="bank-token">--bank-sber</div></div></div>
+        <div class="bank-badge"><div class="bank-mark bank-mark--alfa">А</div><div><div class="bank-name">Альфа</div><div class="bank-token">--bank-alfa</div></div></div>
+        <div class="bank-badge"><div class="bank-mark bank-mark--tochka">Т</div><div><div class="bank-name">Точка</div><div class="bank-token">--bank-tochka</div></div></div>
+        <div class="bank-badge"><div class="bank-mark bank-mark--mts">М</div><div><div class="bank-name">МТС</div><div class="bank-token">--bank-mts</div></div></div>
+        <div class="bank-badge"><div class="bank-mark bank-mark--yookassa">Ю</div><div><div class="bank-name">ЮKassa</div><div class="bank-token">--bank-yookassa</div></div></div>
+      </div>
+
+      <!-- Typography -->
+      <h3 class="sub-h" id="typography">Типографика</h3>
+      <p class="section-sub">Manrope, веса 400–800. Числа всегда tabular-nums в таблицах и блоках сумм.</p>
+      <div class="cb">
+        <div class="type-row"><div class="type-meta"><b>9.5px</b> 700 · +0.05em uppercase</div><div style="font-size:9.5px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:var(--text-muted)">CUSTOM · ОСНОВНОЙ · РАЗДЕЛ</div></div>
+        <div class="type-row"><div class="type-meta"><b>10.5px</b> 700 · +0.05em</div><div style="font-size:10.5px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:var(--text-tertiary)">Table head · Section label</div></div>
+        <div class="type-row"><div class="type-meta"><b>11px</b> 500</div><div style="font-size:11px; color:var(--text-muted)">Footer hint · KPI meta</div></div>
+        <div class="type-row"><div class="type-meta"><b>11.5px</b> 600</div><div style="font-size:11.5px; font-weight:600; color:var(--text-tertiary)">KPI label · Form field label</div></div>
+        <div class="type-row"><div class="type-meta"><b>12px</b> 600</div><div style="font-size:12px; font-weight:600;">Filter chip · Secondary text</div></div>
+        <div class="type-row"><div class="type-meta"><b>12.5px</b> 600</div><div style="font-size:12.5px; font-weight:600;">Tabs · Compact button · Sidebar item</div></div>
+        <div class="type-row"><div class="type-meta"><b>13px</b> 400/500</div><div style="font-size:13px;">Body text · Table row · Form input value</div></div>
+        <div class="type-row"><div class="type-meta"><b>13.5px</b> 600</div><div style="font-size:13.5px; font-weight:600;">Sidebar main · Subtotal row</div></div>
+        <div class="type-row"><div class="type-meta"><b>14px</b> 700</div><div style="font-size:14px; font-weight:700;">Card section header · Money 14</div></div>
+        <div class="type-row"><div class="type-meta"><b>15px</b> 700</div><div style="font-size:15px; font-weight:700; letter-spacing:-0.015em;">Modal title · Card title</div></div>
+        <div class="type-row"><div class="type-meta"><b>17px</b> 700 · −0.02em</div><div style="font-size:17px; font-weight:700; letter-spacing:-0.02em;">Drawer header title</div></div>
+        <div class="type-row"><div class="type-meta"><b>22px</b> 700 · −0.02em</div><div style="font-size:22px; font-weight:700; letter-spacing:-0.02em;">KPI value (compact)</div></div>
+        <div class="type-row"><div class="type-meta"><b>28px</b> 700 · −0.02em</div><div style="font-size:28px; font-weight:700; letter-spacing:-0.02em;">Hero KPI value · Page title</div></div>
+      </div>
+
+      <!-- Spacing -->
+      <h3 class="sub-h" id="spacing">Spacing</h3>
+      <p class="section-sub">Шкала 4-base. Используем через токены <code class="code-inline">--s-1</code> … <code class="code-inline">--s-8</code>.</p>
+      <div class="cb">
+        <div class="spacing-row"><div class="spacing-meta"><b>s-1</b> 4px</div><div class="spacing-bar" style="width:4px"></div></div>
+        <div class="spacing-row"><div class="spacing-meta"><b>s-2</b> 8px</div><div class="spacing-bar" style="width:8px"></div></div>
+        <div class="spacing-row"><div class="spacing-meta"><b>s-3</b> 12px</div><div class="spacing-bar" style="width:12px"></div></div>
+        <div class="spacing-row"><div class="spacing-meta"><b>s-4</b> 16px</div><div class="spacing-bar" style="width:16px"></div></div>
+        <div class="spacing-row"><div class="spacing-meta"><b>s-5</b> 20px</div><div class="spacing-bar" style="width:20px"></div></div>
+        <div class="spacing-row"><div class="spacing-meta"><b>s-6</b> 24px</div><div class="spacing-bar" style="width:24px"></div></div>
+        <div class="spacing-row"><div class="spacing-meta"><b>s-7</b> 32px</div><div class="spacing-bar" style="width:32px"></div></div>
+        <div class="spacing-row"><div class="spacing-meta"><b>s-8</b> 40px</div><div class="spacing-bar" style="width:40px"></div></div>
+      </div>
+
+      <!-- Radius -->
+      <h3 class="sub-h" id="radius">Radius</h3>
+      <div class="cb">
+        <div class="radius-row">
+          <div class="radius-item"><div class="radius-box" style="border-radius:4px"></div><div class="radius-meta"><b>r-1</b> 4px<br>chips, badges</div></div>
+          <div class="radius-item"><div class="radius-box" style="border-radius:5px"></div><div class="radius-meta"><b>r-2</b> 5px<br>nav, small buttons</div></div>
+          <div class="radius-item"><div class="radius-box" style="border-radius:6px"></div><div class="radius-meta"><b>r-3</b> 6px<br>inputs, primary buttons</div></div>
+          <div class="radius-item"><div class="radius-box" style="border-radius:8px"></div><div class="radius-meta"><b>r-4</b> 8px<br>cards, sections</div></div>
+          <div class="radius-item"><div class="radius-box" style="border-radius:999px"></div><div class="radius-meta"><b>r-pill</b> 999px<br>status, toggle</div></div>
+          <div class="radius-item"><div class="radius-box" style="border-radius:50%; width:60px"></div><div class="radius-meta"><b>r-circle</b> 50%<br>avatar, dots</div></div>
+        </div>
+      </div>
+
+      <!-- Shadows -->
+      <h3 class="sub-h" id="shadows">Shadows</h3>
+      <div class="shadow-grid">
+        <div class="shadow-item" style="box-shadow:var(--shadow-sm)">
+          <div><div class="shadow-name">--shadow-sm</div><div class="shadow-token">0 1px 2px rgba(15,23,42,.06)</div></div>
+          <div class="shadow-use">Активный tab, нажатый pill</div>
+        </div>
+        <div class="shadow-item" style="box-shadow:var(--shadow-card-hover)">
+          <div><div class="shadow-name">--shadow-card-hover</div><div class="shadow-token">0 4px 12px rgba(15,23,42,.04)</div></div>
+          <div class="shadow-use">Hover на карточке-row</div>
+        </div>
+        <div class="shadow-item" style="box-shadow:var(--shadow-primary); background:var(--color-primary); color:#fff">
+          <div><div class="shadow-name">--shadow-primary</div><div class="shadow-token" style="color:rgba(255,255,255,0.7)">0 4px 10px rgba(26,86,219,.25)</div></div>
+          <div class="shadow-use" style="color:rgba(255,255,255,0.8)">Primary CTA</div>
+        </div>
+        <div class="shadow-item" style="box-shadow:var(--shadow-menu)">
+          <div><div class="shadow-name">--shadow-menu</div><div class="shadow-token">0 16px 36px + 0 2px 8px</div></div>
+          <div class="shadow-use">Dropdown меню строки</div>
+        </div>
+        <div class="shadow-item" style="box-shadow:var(--shadow-modal)">
+          <div><div class="shadow-name">--shadow-modal</div><div class="shadow-token">0 24px 60px + 0 4px 12px</div></div>
+          <div class="shadow-use">Модалки (компании, контрагент)</div>
+        </div>
+        <div class="shadow-item" style="box-shadow:var(--shadow-drawer)">
+          <div><div class="shadow-name">--shadow-drawer</div><div class="shadow-token">−20px 0 60px rgba(11,18,32,.22)</div></div>
+          <div class="shadow-use">Slide-in drawer слева от тени</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== 03. COMPONENTS ===================== -->
+    <section id="components">
+      <h2 class="section-h">03 — Components</h2>
+      <p class="section-sub">Каждый компонент со всеми каноническими состояниями. Под каждым — пояснение «что это / когда».</p>
+
+      <!-- BUTTON -->
+      <div class="cb" id="button">
+        <div class="cb-head">
+          <span class="cb-name">Button</span>
+          <span class="cb-tag">.btn</span>
+          <span class="cb-when">Действия. Primary — основное на странице/в drawer'е; Secondary — рядовое; Ghost — наименее важное; Danger — деструктивное.</span>
+        </div>
+        <span class="demo-label">Variants × Size</span>
+        <div class="demo">
+          <button class="btn btn-md btn-primary">Primary</button>
+          <button class="btn btn-md btn-secondary">Secondary</button>
+          <button class="btn btn-md btn-ghost">Ghost</button>
+          <button class="btn btn-md btn-danger">Danger</button>
+        </div>
+        <span class="demo-label">Sizes (Primary)</span>
+        <div class="demo">
+          <button class="btn btn-sm btn-primary">Small 30</button>
+          <button class="btn btn-md btn-primary">Medium 36</button>
+          <button class="btn btn-lg btn-primary">Large 44</button>
+        </div>
+        <span class="demo-label">States (Medium · Primary)</span>
+        <div class="demo">
+          <button class="btn btn-md btn-primary">Default</button>
+          <button class="btn btn-md btn-primary is-hover">Hover</button>
+          <button class="btn btn-md btn-primary is-focus">Focus ring</button>
+          <button class="btn btn-md btn-primary is-active">Active</button>
+          <button class="btn btn-md btn-primary btn-disabled">Disabled</button>
+          <button class="btn btn-md btn-primary btn-loading">Loading…</button>
+        </div>
+        <span class="demo-label">With icon</span>
+        <div class="demo">
+          <button class="btn btn-md btn-primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Добавить операцию
+          </button>
+          <button class="btn btn-md btn-secondary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Экспорт
+          </button>
+        </div>
+      </div>
+
+      <!-- INPUT -->
+      <div class="cb" id="input">
+        <div class="cb-head">
+          <span class="cb-name">Input</span>
+          <span class="cb-tag">.input</span>
+          <span class="cb-when">Текстовые поля форм. Высота 38px. Focus — синяя обводка с тенью.</span>
+        </div>
+        <div class="row-2col">
+          <div class="field">
+            <label class="field-label">Default</label>
+            <input class="input" placeholder="Поиск контрагента…">
+          </div>
+          <div class="field">
+            <label class="field-label">Focus</label>
+            <input class="input" value="Тинькофф Бизнес" style="border-color:var(--color-primary); box-shadow:0 0 0 3px rgba(26,86,219,0.12)">
+          </div>
+          <div class="field">
+            <label class="field-label">Error <span class="req">*</span></label>
+            <input class="input input-error" value="abc">
+            <span class="field-helper error">ИНН должен содержать 10 или 12 цифр</span>
+          </div>
+          <div class="field">
+            <label class="field-label">Disabled</label>
+            <input class="input input-disabled" value="Заблокировано" disabled>
+          </div>
+          <div class="field">
+            <label class="field-label">С prefix</label>
+            <div class="input-wrap">
+              <span class="prefix">₽</span>
+              <input class="input input--prefix" value="245 000">
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label">С suffix · helper</label>
+            <div class="input-wrap">
+              <input class="input input--suffix" value="1.99">
+              <span class="suffix">%</span>
+            </div>
+            <span class="field-helper">Комиссия за платёжный сервис</span>
+          </div>
+          <div class="field" style="grid-column:1/-1">
+            <label class="field-label">Textarea</label>
+            <textarea class="input" rows="3" placeholder="Комментарий, виден только команде…"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- BADGE / CHIP -->
+      <div class="cb" id="badge">
+        <div class="cb-head">
+          <span class="cb-name">Badge / Chip</span>
+          <span class="cb-tag">.chip · .src · .bank-badge</span>
+          <span class="cb-when">Filter chip — выбор в фильтр-баре. Source badge — источник операции. Bank badge — бренд счёта.</span>
+        </div>
+        <span class="demo-label">Filter chips</span>
+        <div class="demo">
+          <button class="chip chip--filter is-active">Все <span style="color:#94A3B8; font-weight:600; margin-left:2px;">248</span></button>
+          <button class="chip chip--filter">Поступления <span style="color:#94A3B8; font-weight:600; margin-left:2px;">94</span></button>
+          <button class="chip chip--filter">Списания <span style="color:#94A3B8; font-weight:600; margin-left:2px;">154</span></button>
+        </div>
+        <span class="demo-label">Source badges (5 типов)</span>
+        <div class="demo">
+          <span class="src src--api"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a9 9 0 1 1-9-9"/><polyline points="21 3 21 9 15 9"/></svg>API</span>
+          <span class="src src--manual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M2 2l7.5 7.5"/></svg>Вручную</span>
+          <span class="src src--bot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="8" width="18" height="12" rx="3"/><circle cx="9" cy="14" r="1.2"/><circle cx="15" cy="14" r="1.2"/></svg>Бот</span>
+          <span class="src src--xls"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M9 13l6 6M15 13l-6 6"/></svg>XLS</span>
+          <span class="src src--1c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M10 8l2-1v9"/></svg>1С</span>
+        </div>
+      </div>
+
+      <!-- STATUS PILL -->
+      <div class="cb" id="status">
+        <div class="cb-head">
+          <span class="cb-name">StatusPill</span>
+          <span class="cb-tag">.status</span>
+          <span class="cb-when">Канонический формат статуса: пилюля с точкой. Используется для операций, счетов, правил, документов.</span>
+        </div>
+        <span class="demo-label">Семантика</span>
+        <div class="demo">
+          <span class="status status--success"><span class="dot"></span>Проведено</span>
+          <span class="status status--danger"><span class="dot"></span>Ошибка</span>
+          <span class="status status--warning"><span class="dot"></span>На согласовании</span>
+          <span class="status status--neutral"><span class="dot"></span>Черновик</span>
+          <span class="status status--pending"><span class="dot"></span>В обработке</span>
+        </div>
+        <span class="demo-label">Sync статусы (счета)</span>
+        <div class="demo">
+          <span class="status status--success"><span class="dot"></span>Синхронизировано · 2 мин назад</span>
+          <span class="status status--warning"><span class="dot"></span>Устарело · вчера, 18:42</span>
+          <span class="status status--danger"><span class="dot"></span>Ошибка · 1 ч назад</span>
+          <span class="status status--neutral"><span class="dot"></span>Ручной учёт</span>
+        </div>
+      </div>
+
+      <!-- AVATAR -->
+      <div class="cb" id="avatar">
+        <div class="cb-head">
+          <span class="cb-name">Avatar / Initial</span>
+          <span class="cb-tag">.avatar</span>
+          <span class="cb-when">Круглый — пользователь, контрагент-физлицо. Квадрат — компания, банк, карта. Только три размера.</span>
+        </div>
+        <span class="demo-label">Sizes · circle</span>
+        <div class="demo demo--center">
+          <span class="avatar avatar--sm avatar--tint-2">АК</span>
+          <span class="avatar avatar--md avatar--tint-2">АК</span>
+          <span class="avatar avatar--lg avatar--tint-2">АК</span>
+        </div>
+        <span class="demo-label">Sizes · square (для банков/компаний)</span>
+        <div class="demo demo--center">
+          <span class="avatar avatar--sm avatar--square avatar--tint-1">ВФ</span>
+          <span class="avatar avatar--md avatar--square avatar--tint-1">ВФ</span>
+          <span class="avatar avatar--lg avatar--square avatar--tint-1">ВФ</span>
+        </div>
+        <span class="demo-label">Tint вариантов</span>
+        <div class="demo demo--center">
+          <span class="avatar avatar--md avatar--square avatar--tint-1">РБ</span>
+          <span class="avatar avatar--md avatar--tint-2">АК</span>
+          <span class="avatar avatar--md avatar--square avatar--tint-3">ПС</span>
+          <span class="avatar avatar--md avatar--square avatar--tint-4">ИК</span>
+        </div>
+      </div>
+
+      <!-- TOGGLE -->
+      <div class="cb" id="toggle">
+        <div class="cb-head">
+          <span class="cb-name">Toggle</span>
+          <span class="cb-tag">.toggle</span>
+          <span class="cb-when">Включение/выключение фичи. 42×24, knob 20.</span>
+        </div>
+        <div class="demo demo--center">
+          <button class="toggle is-on" aria-label="On"></button>
+          <span style="font-size:12.5px">On</span>
+          <span style="width:24px"></span>
+          <button class="toggle" aria-label="Off"></button>
+          <span style="font-size:12.5px">Off</span>
+          <span style="width:24px"></span>
+          <button class="toggle is-on is-disabled" aria-label="Disabled"></button>
+          <span style="font-size:12.5px">Disabled</span>
+        </div>
+      </div>
+
+      <!-- TABLE -->
+      <div class="cb" id="table">
+        <div class="cb-head">
+          <span class="cb-name">Table row</span>
+          <span class="cb-tag">.t-table .t-row--*</span>
+          <span class="cb-when">Все состояния строки. Day-divider группирует операции, subtotal — итог по группе.</span>
+        </div>
+        <table class="t-table">
+          <thead>
+            <tr>
+              <th style="width:36px">#</th>
+              <th>Контрагент</th>
+              <th class="t-cell--right" style="width:160px">Сумма</th>
+              <th style="width:140px">Статус</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="t-row--day"><td colspan="4">Сегодня · 24 июня</td></tr>
+            <tr>
+              <td>1</td>
+              <td>ООО «Технопарк»<div style="color:var(--text-muted); font-size:11px">Оплата по счёту № 245</div></td>
+              <td class="t-cell--right"><span class="money money--14 money--in">+245&thinsp;000 ₽</span></td>
+              <td><span class="status status--success"><span class="dot"></span>Проведено</span></td>
+            </tr>
+            <tr class="t-row--hover">
+              <td>2</td>
+              <td>Яндекс.Директ<div style="color:var(--text-muted); font-size:11px">Реклама</div></td>
+              <td class="t-cell--right"><span class="money money--14 money--out">−38&thinsp;500 ₽</span></td>
+              <td><span class="status status--success"><span class="dot"></span>Проведено</span></td>
+            </tr>
+            <tr class="t-row--selected">
+              <td>3</td>
+              <td>ФНС России<div style="color:var(--text-muted); font-size:11px">НДС за 2 кв. 2026</div></td>
+              <td class="t-cell--right"><span class="money money--14 money--out">−156&thinsp;200 ₽</span></td>
+              <td><span class="status status--warning"><span class="dot"></span>На согласовании</span></td>
+            </tr>
+            <tr class="t-row--subtotal">
+              <td></td>
+              <td>Итого за день</td>
+              <td class="t-cell--right"><span class="money money--14 money--strong">+50&thinsp;300 ₽</span></td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- KPI -->
+      <div class="cb" id="kpi">
+        <div class="cb-head">
+          <span class="cb-name">KPI card</span>
+          <span class="cb-tag">.kpi</span>
+          <span class="cb-when">Compact 22px — для ряда из 3–4 виджетов. Hero 28px — для одиночной главной метрики (тёмная карточка-акцент).</span>
+        </div>
+        <span class="demo-label">Compact (22px)</span>
+        <div class="demo">
+          <div class="kpi" style="flex:1; min-width:200px">
+            <div class="kpi-label">Активных счетов</div>
+            <div class="kpi-value">10 <span style="font-size:13px; color:var(--text-disabled); font-weight:500">/ 11</span></div>
+            <div class="kpi-meta">в 5 банках + 2 кассы</div>
+          </div>
+          <div class="kpi" style="flex:1; min-width:200px">
+            <div class="kpi-label">Поступления</div>
+            <div class="kpi-value money--strong">+3&thinsp;820&thinsp;450 ₽</div>
+            <div class="kpi-meta"><span class="delta delta--up">+12,4%</span> к прошлому месяцу</div>
+          </div>
+          <div class="kpi" style="flex:1; min-width:200px">
+            <div class="kpi-label">Списания</div>
+            <div class="kpi-value money--strong">−2&thinsp;968&thinsp;720 ₽</div>
+            <div class="kpi-meta"><span class="delta delta--down">+4,1%</span> к прошлому месяцу</div>
+          </div>
+        </div>
+        <span class="demo-label">Hero (28px, тёмный)</span>
+        <div class="demo">
+          <div class="kpi kpi--dark" style="flex:1">
+            <div class="kpi-label"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/></svg> Общий баланс</div>
+            <div class="kpi-value kpi-value--hero">3&thinsp;829&thinsp;930 ₽</div>
+            <div class="kpi-meta"><span class="delta delta--up">+12,4% за месяц</span> · в валюте: $8&thinsp;450</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACCOUNT CARD hero -->
+      <div class="cb" id="acc-card">
+        <div class="cb-head">
+          <span class="cb-name">Account card</span>
+          <span class="cb-tag">.acc-card</span>
+          <span class="cb-when">Карточка счёта/кассы в grid-сетке. Сумма 22px, без цвета (нейтральная).</span>
+        </div>
+        <div class="row-3col">
+          <div class="acc-card">
+            <div class="acc-top">
+              <div class="bank-mark bank-mark--tinkoff">Т</div>
+              <div style="flex:1; min-width:0; line-height:1.3">
+                <div class="acc-name">Тинькофф Бизнес</div>
+                <div class="acc-mask">•• 4521 5612</div>
+              </div>
+              <span class="acc-type">Расчётный</span>
+            </div>
+            <div>
+              <div class="acc-balance">1&thinsp;245&thinsp;230 ₽</div>
+              <div class="acc-sub">Основной счёт</div>
+            </div>
+            <div class="acc-foot">
+              <span class="status status--success" style="font-size:10.5px"><span class="dot"></span>2 мин</span>
+            </div>
+          </div>
+          <div class="acc-card">
+            <div class="acc-top">
+              <div class="bank-mark bank-mark--alfa">А</div>
+              <div style="flex:1; min-width:0; line-height:1.3">
+                <div class="acc-name">Альфа-Банк</div>
+                <div class="acc-mask">•• 0934 1278</div>
+              </div>
+              <span class="acc-type">Валютный</span>
+            </div>
+            <div>
+              <div class="acc-balance">$8&thinsp;450</div>
+              <div class="acc-sub">≈ 759&thinsp;660 ₽</div>
+            </div>
+            <div class="acc-foot">
+              <span class="status status--success" style="font-size:10.5px"><span class="dot"></span>8 мин</span>
+            </div>
+          </div>
+          <div class="acc-card">
+            <div class="acc-top">
+              <div class="bank-mark bank-mark--sber">С</div>
+              <div style="flex:1; min-width:0; line-height:1.3">
+                <div class="acc-name">Сбер Бизнес</div>
+                <div class="acc-mask">•• 2204</div>
+              </div>
+              <span class="acc-type">Карта</span>
+            </div>
+            <div>
+              <div class="acc-balance">8&thinsp;500 ₽</div>
+              <div class="acc-sub">А. Соколов · лимит 80&thinsp;000 ₽</div>
+            </div>
+            <div class="acc-foot">
+              <span class="status status--danger" style="font-size:10.5px"><span class="dot"></span>Ошибка</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CARD -->
+      <div class="cb" id="card">
+        <div class="cb-head">
+          <span class="cb-name">Card</span>
+          <span class="cb-tag">.card · padding 16px 20px</span>
+          <span class="cb-when">Базовый блок. Един padding. Не использовать «компактный» вариант — отделять секции через spacing вокруг.</span>
+        </div>
+        <div class="demo demo--column">
+          <div class="card" style="width:100%">
+            <div style="font-size:11px; font-weight:700; color:var(--text-tertiary); letter-spacing:0.05em; text-transform:uppercase; margin-bottom:10px;">Контрагент и описание</div>
+            <div style="font-size:13px;">Стандартный блок секции в drawer'ах и на страницах.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DROPDOWN MENU -->
+      <div class="cb" id="menu">
+        <div class="cb-head">
+          <span class="cb-name">Dropdown menu</span>
+          <span class="cb-tag">.menu</span>
+          <span class="cb-when">Меню действий на строке таблицы или у виджета. Разделители — для смены смысловой группы.</span>
+        </div>
+        <div class="demo" style="background:transparent">
+          <div class="menu">
+            <button class="menu-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Редактировать <span class="shortcut">⌘E</span>
+            </button>
+            <button class="menu-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Создать на основании
+            </button>
+            <div class="menu-divider"></div>
+            <button class="menu-item is-primary">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
+              Создать ОПиУ
+            </button>
+            <div class="menu-divider"></div>
+            <button class="menu-item is-danger">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg>
+              Удалить
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TABS -->
+      <div class="cb" id="tabs">
+        <div class="cb-head">
+          <span class="cb-name">Tabs (segmented)</span>
+          <span class="cb-tag">.tabs · .tab</span>
+          <span class="cb-when">Сегментер фильтра. Не используйте обычные tab-ленты — этот компонент канонический.</span>
+        </div>
+        <div class="demo demo--center">
+          <div class="tabs">
+            <button class="tab is-active">Все <span class="count">248</span></button>
+            <button class="tab">Поступления <span class="count">94</span></button>
+            <button class="tab">Списания <span class="count">154</span></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DRAWER -->
+      <div class="cb" id="drawer">
+        <div class="cb-head">
+          <span class="cb-name">Drawer header / footer</span>
+          <span class="cb-tag">.dw · width 680</span>
+          <span class="cb-when">Открывается справа. Body — белые секции на сером фоне. Footer — sticky, Удалить слева, Save справа.</span>
+        </div>
+        <div class="dw">
+          <div class="dw-head">
+            <div style="flex:1">
+              <h3>Редактирование операции</h3>
+              <div class="sub">№ ДДС-1247 · 24.06.2026 · Тинькофф Бизнес •• 4521 · <span class="src src--api" style="vertical-align:middle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a9 9 0 1 1-9-9"/><polyline points="21 3 21 9 15 9"/></svg>API</span></div>
+            </div>
+            <span class="status status--success"><span class="dot"></span>Проведено</span>
+            <button class="btn btn-sm btn-secondary" style="width:32px; padding:0">✕</button>
+          </div>
+          <div class="dw-body" style="display:flex; flex-direction:column; gap:14px; padding:18px 24px;">
+            <!-- Section: Сумма и направление -->
+            <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r-4); padding:16px 20px;">
+              <div style="font-size:11px; font-weight:700; color:var(--text-tertiary); letter-spacing:0.05em; text-transform:uppercase; margin-bottom:12px;">Сумма и направление</div>
+              <div class="row-2col">
+                <div class="field">
+                  <label class="field-label">Сумма <span class="req">*</span></label>
+                  <div class="input-wrap">
+                    <input class="input" value="156 200" style="text-align:right; font-weight:700; padding-right:32px; font-variant-numeric:tabular-nums;">
+                    <span class="suffix">₽</span>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="field-label">Направление</label>
+                  <div style="display:flex; gap:6px;">
+                    <button class="chip chip--filter" style="flex:1; justify-content:center; padding:8px;"><span class="direction direction--in" style="font-weight:600;"><span class="ddot"></span>Поступление</span></button>
+                    <button class="chip chip--filter is-active" style="flex:1; justify-content:center; padding:8px;"><span class="direction direction--out" style="font-weight:600;"><span class="ddot"></span>Списание</span></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Section: Контрагент и категория -->
+            <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r-4); padding:16px 20px;">
+              <div style="font-size:11px; font-weight:700; color:var(--text-tertiary); letter-spacing:0.05em; text-transform:uppercase; margin-bottom:12px;">Контрагент и категория</div>
+              <div class="row-2col">
+                <div class="field">
+                  <label class="field-label">Контрагент <span class="req">*</span></label>
+                  <button class="input" style="display:flex; align-items:center; gap:8px; cursor:pointer; text-align:left; padding:0 10px;">
+                    <span class="avatar avatar--sm avatar--square avatar--tint-1" style="width:22px; height:22px; font-size:9px;">ФНС</span>
+                    <span style="flex:1; min-width:0;">ФНС России</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-muted);"><polyline points="6 9 12 15 18 9"/></svg>
+                  </button>
+                </div>
+                <div class="field">
+                  <label class="field-label">Категория ДДС <span class="req">*</span></label>
+                  <button class="input" style="display:flex; align-items:center; gap:8px; cursor:pointer; text-align:left; padding:0 10px;">
+                    <span style="width:8px; height:8px; border-radius:50%; background:var(--cat-tax);"></span>
+                    <span style="flex:1; min-width:0;">Налоги и сборы</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-muted);"><polyline points="6 9 12 15 18 9"/></svg>
+                  </button>
+                </div>
+                <div class="field" style="grid-column:1/-1;">
+                  <label class="field-label">Назначение платежа</label>
+                  <input class="input" value="НДС за 2 кв. 2026, договор № 245">
+                </div>
+                <div class="field" style="grid-column:1/-1;">
+                  <label class="field-label">Теги</label>
+                  <div class="tags-input">
+                    <span class="tag-chip">2026-Q2 <button class="x">×</button></span>
+                    <span class="tag-chip">обязательный <button class="x">×</button></span>
+                    <input placeholder="Добавить тег…">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="dw-foot">
+            <button class="btn btn-md btn-danger">Удалить операцию</button>
+            <div style="flex:1"></div>
+            <button class="btn btn-md btn-secondary">Отмена</button>
+            <button class="btn btn-md btn-primary">Сохранить</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODAL -->
+      <div class="cb" id="modal">
+        <div class="cb-head">
+          <span class="cb-name">Modal</span>
+          <span class="cb-tag">.mdl · 440 / 520</span>
+          <span class="cb-when">Compact (440) — выбор компании. Standard (520) — выбор контрагента/категории. Если шире 520 — переходим на drawer.</span>
+        </div>
+        <div class="demo" style="background:rgba(11,18,32,0.05); padding:24px">
+          <div class="mdl mdl--compact">
+            <div class="mdl-head">
+              <div style="flex:1">
+                <h3>Выбор компании</h3>
+                <div class="sub">Переключение между организациями</div>
+              </div>
+              <button class="btn btn-sm btn-ghost" style="width:28px; padding:0">✕</button>
+            </div>
+            <div class="mdl-body picker" style="padding:0">
+              <div class="picker-search" style="padding-top:0">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input placeholder="Найти компанию…">
+              </div>
+              <div class="picker-list" style="max-height:240px">
+                <button class="picker-item is-selected">
+                  <span class="avatar avatar--md avatar--square avatar--tint-1">РБ</span>
+                  <div class="pi-body">
+                    <div class="pi-name">ООО «Ромашка-Бэст»</div>
+                    <div class="pi-meta"><span class="role-chip">Главбух</span> · ИНН <b>7723812931</b></div>
+                  </div>
+                  <div class="pi-right"><div class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+                </button>
+                <button class="picker-item">
+                  <span class="avatar avatar--md avatar--square avatar--tint-3">ПЛ</span>
+                  <div class="pi-body">
+                    <div class="pi-name">ИП Петров Л. А.</div>
+                    <div class="pi-meta"><span class="role-chip">Финдир</span> · ИНН <b>772345678901</b></div>
+                  </div>
+                  <div class="pi-right"><div class="check"></div></div>
+                </button>
+                <button class="picker-item">
+                  <span class="avatar avatar--md avatar--square avatar--tint-4">ШК</span>
+                  <div class="pi-body">
+                    <div class="pi-name">ООО «ШарКомпани»</div>
+                    <div class="pi-meta"><span class="role-chip">Наблюдатель</span> · ИНН <b>5012094556</b></div>
+                  </div>
+                  <div class="pi-right"><div class="check"></div></div>
+                </button>
+              </div>
+            </div>
+            <div class="mdl-foot" style="display:flex;">
+              <button class="btn btn-md btn-ghost add" style="color:var(--color-primary); margin-right:auto">+ Добавить компанию</button>
+              <button class="btn btn-md btn-secondary">Отмена</button>
+              <button class="btn btn-md btn-primary">Выбрать</button>
+            </div>
+          </div>
+          <div class="mdl">
+            <div class="mdl-head">
+              <div style="flex:1">
+                <h3>Выбор категории ДДС</h3>
+                <div class="sub">Можно выбрать только конечную статью</div>
+              </div>
+              <button class="btn btn-sm btn-ghost" style="width:28px; padding:0">✕</button>
+            </div>
+            <div class="mdl-body picker" style="padding:0">
+              <div class="picker-search" style="padding-top:0">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input placeholder="Найти статью…">
+              </div>
+              <div class="picker-list" style="max-height:260px">
+                <button class="tree-node is-disabled">
+                  <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"/></svg></span>
+                  <span class="tn-name">Доходы</span>
+                  <span class="tn-amount" style="color:var(--success-text);">+5&thinsp;670&thinsp;000 ₽</span>
+                </button>
+                <div style="padding-left:16px;">
+                  <button class="tree-node is-disabled">
+                    <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"/></svg></span>
+                    <span class="tn-name">От клиентов</span>
+                    <span class="tn-amount" style="color:var(--success-text);">+4&thinsp;820&thinsp;450 ₽</span>
+                  </button>
+                  <div style="padding-left:16px;">
+                    <button class="tree-node is-selected">
+                      <span class="chev-spacer"></span>
+                      <span class="tn-dot" style="background:var(--cat-revenue);"></span>
+                      <span class="tn-name">Оплата за <mark>услу</mark>ги</span>
+                      <span class="tn-amount" style="color:var(--success-text);">+3&thinsp;240&thinsp;000 ₽</span>
+                      <span class="tn-check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>
+                    </button>
+                    <button class="tree-node">
+                      <span class="chev-spacer"></span>
+                      <span class="tn-dot" style="background:var(--cat-revenue);"></span>
+                      <span class="tn-name">Оплата за товары</span>
+                      <span class="tn-amount" style="color:var(--success-text);">+1&thinsp;580&thinsp;450 ₽</span>
+                      <span class="tn-check"></span>
+                    </button>
+                  </div>
+                </div>
+                <button class="tree-node is-collapsed is-disabled">
+                  <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"/></svg></span>
+                  <span class="tn-name">Расходы</span>
+                  <span class="tn-amount" style="color:var(--danger-text);">−2&thinsp;968&thinsp;720 ₽</span>
+                </button>
+              </div>
+              <div class="picker-breadcrumb">
+                <span>Выбрано:</span>
+                <b>Доходы</b><span class="sep">›</span>
+                <b>От клиентов</b><span class="sep">›</span>
+                <b style="color:var(--color-primary-hover);">Оплата за услуги</b>
+              </div>
+            </div>
+            <div class="mdl-foot">
+              <button class="btn btn-md btn-secondary">Отмена</button>
+              <button class="btn btn-md btn-primary">Выбрать</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============== SIDEBAR ============== -->
+      <div class="cb" id="sidebar">
+        <div class="cb-head">
+          <span class="cb-name">Sidebar / Main Navigation</span>
+          <span class="cb-tag">.sb · 264px</span>
+          <span class="cb-when">Основная навигация продукта. Лого + workspace + группы пунктов + футер с юзером.</span>
+        </div>
+        <div class="demo" style="background:var(--bg-page); align-items:flex-start;">
+          <div class="sb" style="min-height:680px;">
+            <div class="sb-head">
+              <div class="sb-logo">
+                <div class="mark">ВФ</div>
+                <div class="title">Ваш Финдир</div>
+              </div>
+              <button class="sb-ws">
+                <span class="avatar avatar--sm avatar--square avatar--tint-1" style="width:28px; height:28px; font-size:10px;">РБ</span>
+                <div style="flex:1; min-width:0;">
+                  <div class="ws-name">ООО «Ромашка-Бэст»</div>
+                  <div class="ws-meta">ИНН 7723812931</div>
+                </div>
+                <svg class="ws-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="8 9 12 5 16 9"/><polyline points="8 15 12 19 16 15"/></svg>
+              </button>
+            </div>
+            <div class="sb-nav">
+              <div class="sb-group-title">Главное</div>
+              <a class="sb-item" href="#sidebar">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12L12 4l9 8"/><path d="M5 10v10h14V10"/></svg>
+                <span class="lbl">Дашборд</span>
+              </a>
+              <a class="sb-item is-active" href="#sidebar">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><circle cx="16" cy="14.5" r="1.2" fill="currentColor"/></svg>
+                <span class="lbl">Движение ДС</span>
+                <span class="badge">248</span>
+              </a>
+              <a class="sb-item" href="#sidebar">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
+                <span class="lbl">ОПиУ</span>
+              </a>
+              <a class="sb-item" href="#sidebar">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                <span class="lbl">Счета и касса</span>
+              </a>
+              <a class="sb-item" href="#sidebar">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="7" r="4"/><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/></svg>
+                <span class="lbl">Контрагенты</span>
+                <span class="badge">42</span>
+              </a>
+
+              <div class="sb-group-title">Настройки учета</div>
+              <button class="sb-item" type="button">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3h18v18H3z"/><path d="M9 3v18M3 9h18"/></svg>
+                <span class="lbl">Категории ДДС</span>
+                <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="sb-sub">
+                <a class="sb-item" href="#sidebar"><span class="ico-dot"></span><span class="lbl">Доходы</span></a>
+                <a class="sb-item is-active" href="#sidebar"><span class="ico-dot"></span><span class="lbl">Расходы</span></a>
+                <a class="sb-item" href="#sidebar"><span class="ico-dot"></span><span class="lbl">Технические</span></a>
+              </div>
+
+              <a class="sb-item" href="#sidebar">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 3h10v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7z"/></svg>
+                <span class="lbl">Проекты</span>
+                <span class="badge">7</span>
+              </a>
+              <a class="sb-item" href="#sidebar">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5"/></svg>
+                <span class="lbl">Авто-правила</span>
+                <span class="badge">8</span>
+              </a>
+              <a class="sb-item" href="#sidebar">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span class="lbl">Импорт</span>
+              </a>
+
+              <div class="sb-group-title">Система</div>
+              <a class="sb-item" href="#sidebar">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1"/></svg>
+                <span class="lbl">Настройки</span>
+              </a>
+            </div>
+            <div class="sb-foot">
+              <span class="avatar avatar--md avatar--tint-2">АК</span>
+              <div style="flex:1; min-width:0;">
+                <div class="me-name">Анна Кузнецова</div>
+                <div class="me-role">Главный бухгалтер</div>
+              </div>
+              <button class="settings" title="Настройки профиля">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div style="flex:1; padding:20px; font-size:12px; color:var(--text-tertiary); line-height:1.7; min-width:280px;">
+            <h4 class="mini-h" style="margin-top:0;">Состояния пункта</h4>
+            · <b>default</b> — серый текст + приглушённая иконка<br>
+            · <b>hover</b> — фон <code class="code-inline">--bg-page</code>, текст тёмнее<br>
+            · <b>active</b> — фон <code class="code-inline">--color-primary-tint</code>, текст <code class="code-inline">--color-primary-hover</code>, иконка <code class="code-inline">--color-primary</code>, weight 700<br>
+            · <b>counter-badge</b> — выравнивание по правой стороне, tabular-nums<br>
+            · <b>collapsible group</b> — chev поворачивается на −90° при состоянии collapsed
+          </div>
+        </div>
+      </div>
+
+      <!-- ============== ENTITY PICKER ============== -->
+      <div class="cb" id="entity-picker">
+        <div class="cb-head">
+          <span class="cb-name">EntityPicker</span>
+          <span class="cb-tag">.mdl + .picker</span>
+          <span class="cb-when">Универсальный плоский выбор из списка сущностей. Один компонент — три применения.</span>
+        </div>
+
+        <span class="demo-label">Инстанс 1 — Контрагент (ИНН + source в meta)</span>
+        <div class="demo" style="background:rgba(11,18,32,0.05); justify-content:center;">
+          <div class="mdl">
+            <div class="mdl-head">
+              <div style="flex:1">
+                <h3>Выбор контрагента</h3>
+                <div class="sub">42 контрагента · поиск по названию и ИНН</div>
+              </div>
+              <button class="btn btn-sm btn-ghost" style="width:28px; padding:0">✕</button>
+            </div>
+            <div class="picker">
+              <div class="picker-search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input placeholder="Найти по названию или ИНН…">
+              </div>
+              <div class="picker-tabs">
+                <button class="picker-tab is-active">Недавние <span class="count">8</span></button>
+                <button class="picker-tab">Избранные <span class="count">3</span></button>
+                <button class="picker-tab">Все <span class="count">42</span></button>
+              </div>
+              <div class="picker-list">
+                <button class="picker-item is-selected">
+                  <span class="avatar avatar--md avatar--square avatar--tint-1" style="font-size:10px;">ТП</span>
+                  <div class="pi-body">
+                    <div class="pi-name">ООО «Технопарк»</div>
+                    <div class="pi-meta">ИНН <b>7704123456</b> · ООО · <span class="src src--api" style="padding:1px 5px;">API</span></div>
+                  </div>
+                  <div class="pi-right">
+                    <span class="star is-on"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15 9 22 9 17 14 19 22 12 18 5 22 7 14 2 9 9 9"/></svg></span>
+                  </div>
+                </button>
+                <button class="picker-item">
+                  <span class="avatar avatar--md avatar--square avatar--tint-3" style="font-size:10px;">ЯД</span>
+                  <div class="pi-body">
+                    <div class="pi-name">Яндекс.Директ</div>
+                    <div class="pi-meta">ИНН <b>7736207543</b> · ООО · <span class="src src--api" style="padding:1px 5px;">API</span></div>
+                  </div>
+                  <div class="pi-right">
+                    <span class="star is-on"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15 9 22 9 17 14 19 22 12 18 5 22 7 14 2 9 9 9"/></svg></span>
+                  </div>
+                </button>
+                <button class="picker-item">
+                  <span class="avatar avatar--md avatar--square avatar--tint-1" style="font-size:10px;">АС</span>
+                  <div class="pi-body">
+                    <div class="pi-name">ООО «Аренда-Сити»</div>
+                    <div class="pi-meta">ИНН <b>5012094556</b> · ООО · <span class="src src--xls" style="padding:1px 5px;">XLS</span></div>
+                  </div>
+                  <div class="pi-right">
+                    <span class="star"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15 9 22 9 17 14 19 22 12 18 5 22 7 14 2 9 9 9"/></svg></span>
+                  </div>
+                </button>
+                <button class="picker-item">
+                  <span class="avatar avatar--md avatar--square avatar--tint-4" style="font-size:10px;">ФНС</span>
+                  <div class="pi-body">
+                    <div class="pi-name">ФНС России</div>
+                    <div class="pi-meta">ИНН <b>7707329152</b> · Бюджетная организация</div>
+                  </div>
+                  <div class="pi-right">
+                    <span class="star"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15 9 22 9 17 14 19 22 12 18 5 22 7 14 2 9 9 9"/></svg></span>
+                  </div>
+                </button>
+              </div>
+            </div>
+            <div class="picker-foot">
+              <button class="btn btn-md btn-ghost add" style="color:var(--color-primary); margin-right:auto">+ Добавить контрагента</button>
+              <button class="btn btn-md btn-secondary">Отмена</button>
+              <button class="btn btn-md btn-primary">Выбрать</button>
+            </div>
+          </div>
+        </div>
+
+        <span class="demo-label">Инстанс 2 — Проект (цветной dot слева, прогресс в meta)</span>
+        <div class="demo" style="background:rgba(11,18,32,0.05); justify-content:center;">
+          <div class="mdl">
+            <div class="mdl-head">
+              <div style="flex:1">
+                <h3>Выбор проекта</h3>
+                <div class="sub">Проект привяжется к выбранным операциям</div>
+              </div>
+              <button class="btn btn-sm btn-ghost" style="width:28px; padding:0">✕</button>
+            </div>
+            <div class="picker">
+              <div class="picker-search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input placeholder="Найти проект…">
+              </div>
+              <div class="picker-list">
+                <button class="picker-item">
+                  <span style="width:24px; display:inline-flex; justify-content:center;"><span style="width:10px; height:10px; border-radius:50%; background:var(--cat-revenue);"></span></span>
+                  <div class="pi-body">
+                    <div class="pi-name">Оптовая торговля шарами</div>
+                    <div class="pi-meta">3 этапа · бюджет <b>4&thinsp;500&thinsp;000 ₽</b> · потрачено <b>72%</b></div>
+                  </div>
+                  <div class="pi-right">
+                    <div style="width:48px;">
+                      <div style="height:4px; background:var(--bg-page); border-radius:3px; overflow:hidden;">
+                        <div style="width:72%; height:100%; background:var(--cat-revenue);"></div>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+                <button class="picker-item is-selected">
+                  <span style="width:24px; display:inline-flex; justify-content:center;"><span style="width:10px; height:10px; border-radius:50%; background:var(--cat-marketing);"></span></span>
+                  <div class="pi-body">
+                    <div class="pi-name">Маркетинг Q3</div>
+                    <div class="pi-meta">бюджет <b>1&thinsp;200&thinsp;000 ₽</b> · потрачено <b>45%</b></div>
+                  </div>
+                  <div class="pi-right">
+                    <div style="width:48px;">
+                      <div style="height:4px; background:var(--bg-page); border-radius:3px; overflow:hidden;">
+                        <div style="width:45%; height:100%; background:var(--cat-marketing);"></div>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+                <button class="picker-item">
+                  <span style="width:24px; display:inline-flex; justify-content:center;"><span style="width:10px; height:10px; border-radius:50%; background:var(--cat-software);"></span></span>
+                  <div class="pi-body">
+                    <div class="pi-name">Разработка CRM</div>
+                    <div class="pi-meta">бюджет <b>2&thinsp;800&thinsp;000 ₽</b> · потрачено <b>98%</b></div>
+                  </div>
+                  <div class="pi-right">
+                    <div style="width:48px;">
+                      <div style="height:4px; background:var(--bg-page); border-radius:3px; overflow:hidden;">
+                        <div style="width:98%; height:100%; background:var(--danger-dot);"></div>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </div>
+            <div class="picker-foot">
+              <button class="btn btn-md btn-ghost add" style="color:var(--color-primary); margin-right:auto">+ Новый проект</button>
+              <button class="btn btn-md btn-secondary">Отмена</button>
+              <button class="btn btn-md btn-primary">Выбрать</button>
+            </div>
+          </div>
+        </div>
+
+        <span class="demo-label">Инстанс 3 — Компания / Workspace + Empty state</span>
+        <div class="demo" style="background:rgba(11,18,32,0.05); justify-content:center; gap:16px; flex-wrap:wrap;">
+          <div class="mdl mdl--compact">
+            <div class="mdl-head">
+              <div style="flex:1">
+                <h3>Переключение компании</h3>
+                <div class="sub">3 организации в вашем аккаунте</div>
+              </div>
+              <button class="btn btn-sm btn-ghost" style="width:28px; padding:0">✕</button>
+            </div>
+            <div class="picker">
+              <div class="picker-list" style="max-height:260px">
+                <button class="picker-item is-selected">
+                  <span class="avatar avatar--md avatar--square avatar--tint-1">РБ</span>
+                  <div class="pi-body">
+                    <div class="pi-name">ООО «Ромашка-Бэст»</div>
+                    <div class="pi-meta"><span class="role-chip">Главбух</span></div>
+                  </div>
+                  <div class="pi-right"><div class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+                </button>
+                <button class="picker-item">
+                  <span class="avatar avatar--md avatar--square avatar--tint-3">ПЛ</span>
+                  <div class="pi-body">
+                    <div class="pi-name">ИП Петров Л. А.</div>
+                    <div class="pi-meta"><span class="role-chip">Финдир</span></div>
+                  </div>
+                  <div class="pi-right"><div class="check"></div></div>
+                </button>
+                <button class="picker-item">
+                  <span class="avatar avatar--md avatar--square avatar--tint-4">ШК</span>
+                  <div class="pi-body">
+                    <div class="pi-name">ООО «ШарКомпани»</div>
+                    <div class="pi-meta"><span class="role-chip">Наблюдатель</span></div>
+                  </div>
+                  <div class="pi-right"><div class="check"></div></div>
+                </button>
+              </div>
+            </div>
+            <div class="picker-foot">
+              <button class="btn btn-md btn-ghost add" style="color:var(--color-primary); margin-right:auto">+ Подключить</button>
+            </div>
+          </div>
+
+          <div class="mdl">
+            <div class="mdl-head">
+              <div style="flex:1">
+                <h3>Выбор контрагента</h3>
+                <div class="sub">Поиск: <b>«xxxxx»</b></div>
+              </div>
+              <button class="btn btn-sm btn-ghost" style="width:28px; padding:0">✕</button>
+            </div>
+            <div class="picker">
+              <div class="picker-search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input value="xxxxx">
+              </div>
+              <div class="empty" style="margin:8px; padding:32px 20px; border:0;">
+                <div class="empty-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+                <div class="empty-title">Ничего не нашлось</div>
+                <div class="empty-text">Попробуйте другой запрос или добавьте контрагента</div>
+                <button class="btn btn-md btn-secondary">+ Добавить «xxxxx»</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============== TREE PICKER ============== -->
+      <div class="cb" id="tree-picker">
+        <div class="cb-head">
+          <span class="cb-name">TreePicker</span>
+          <span class="cb-tag">.mdl + .tree-node</span>
+          <span class="cb-when">Иерархический выбор конечного узла. Разделы — дизаблены. При глубоком дереве — drawer 680.</span>
+        </div>
+
+        <span class="demo-label">Инстанс 1 — Категория ДДС (с агрегатами)</span>
+        <div class="demo" style="background:rgba(11,18,32,0.05); justify-content:center;">
+          <div class="mdl">
+            <div class="mdl-head">
+              <div style="flex:1">
+                <h3>Выбор категории ДДС</h3>
+                <div class="sub">Серые разделы — для группировки; выбираются цветные конечные статьи</div>
+              </div>
+              <button class="btn btn-sm btn-ghost" style="width:28px; padding:0">✕</button>
+            </div>
+            <div class="picker">
+              <div class="picker-search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input value="услу" placeholder="Найти статью…">
+              </div>
+              <div class="picker-list" style="max-height:300px;">
+                <button class="tree-node is-disabled">
+                  <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"/></svg></span>
+                  <span class="tn-name">Доходы</span>
+                  <span class="tn-amount" style="color:var(--success-text);">+5&thinsp;670&thinsp;000 ₽</span>
+                </button>
+                <div style="padding-left:16px;">
+                  <button class="tree-node is-disabled">
+                    <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"/></svg></span>
+                    <span class="tn-name">От клиентов</span>
+                    <span class="tn-amount" style="color:var(--success-text);">+4&thinsp;820&thinsp;450 ₽</span>
+                  </button>
+                  <div style="padding-left:16px;">
+                    <button class="tree-node is-selected">
+                      <span class="chev-spacer"></span>
+                      <span class="tn-dot" style="background:var(--cat-revenue);"></span>
+                      <span class="tn-name">Оплата за <mark>услу</mark>ги</span>
+                      <span class="tn-amount" style="color:var(--success-text);">+3&thinsp;240&thinsp;000 ₽</span>
+                      <span class="tn-check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>
+                    </button>
+                    <button class="tree-node">
+                      <span class="chev-spacer"></span>
+                      <span class="tn-dot" style="background:var(--cat-revenue);"></span>
+                      <span class="tn-name">Оплата за товары</span>
+                      <span class="tn-amount" style="color:var(--success-text);">+1&thinsp;580&thinsp;450 ₽</span>
+                      <span class="tn-check"></span>
+                    </button>
+                  </div>
+                  <button class="tree-node is-collapsed is-disabled">
+                    <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"/></svg></span>
+                    <span class="tn-name">От партнёров</span>
+                    <span class="tn-amount" style="color:var(--success-text);">+849&thinsp;550 ₽</span>
+                  </button>
+                </div>
+                <button class="tree-node is-collapsed is-disabled">
+                  <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"/></svg></span>
+                  <span class="tn-name">Расходы</span>
+                  <span class="tn-amount" style="color:var(--danger-text);">−2&thinsp;968&thinsp;720 ₽</span>
+                </button>
+              </div>
+              <div class="picker-breadcrumb">
+                <span>Выбрано:</span>
+                <b>Доходы</b><span class="sep">›</span>
+                <b>От клиентов</b><span class="sep">›</span>
+                <b style="color:var(--color-primary-hover);">Оплата за услуги</b>
+              </div>
+            </div>
+            <div class="mdl-foot">
+              <button class="btn btn-md btn-secondary">Отмена</button>
+              <button class="btn btn-md btn-primary">Выбрать</button>
+            </div>
+          </div>
+        </div>
+
+        <span class="demo-label">Инстанс 2 — Статья ОПиУ (multi-level, без агрегатов)</span>
+        <div class="demo" style="background:rgba(11,18,32,0.05); justify-content:center;">
+          <div class="mdl">
+            <div class="mdl-head">
+              <div style="flex:1">
+                <h3>Выбор статьи ОПиУ</h3>
+                <div class="sub">Куда отнести в отчёте о прибыли и убытках</div>
+              </div>
+              <button class="btn btn-sm btn-ghost" style="width:28px; padding:0">✕</button>
+            </div>
+            <div class="picker">
+              <div class="picker-search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input placeholder="Найти статью…">
+              </div>
+              <div class="picker-list" style="max-height:340px;">
+                <button class="tree-node is-disabled">
+                  <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"/></svg></span>
+                  <span class="tn-name">Выручка</span>
+                  <span class="tn-count">3</span>
+                </button>
+                <div style="padding-left:16px;">
+                  <button class="tree-node">
+                    <span class="chev-spacer"></span>
+                    <span class="tn-dot" style="background:var(--cat-revenue);"></span>
+                    <span class="tn-name">Выручка от основной деятельности</span>
+                    <span class="tn-check"></span>
+                  </button>
+                  <button class="tree-node">
+                    <span class="chev-spacer"></span>
+                    <span class="tn-dot" style="background:var(--cat-revenue);"></span>
+                    <span class="tn-name">Выручка от прочих услуг</span>
+                    <span class="tn-check"></span>
+                  </button>
+                </div>
+                <button class="tree-node is-disabled">
+                  <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"/></svg></span>
+                  <span class="tn-name">Себестоимость</span>
+                  <span class="tn-count">4</span>
+                </button>
+                <div style="padding-left:16px;">
+                  <button class="tree-node is-disabled">
+                    <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"/></svg></span>
+                    <span class="tn-name">Прямые расходы</span>
+                  </button>
+                  <div style="padding-left:16px;">
+                    <button class="tree-node is-selected">
+                      <span class="chev-spacer"></span>
+                      <span class="tn-dot" style="background:var(--cat-services);"></span>
+                      <span class="tn-name">Материалы и сырьё</span>
+                      <span class="tn-check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>
+                    </button>
+                    <button class="tree-node">
+                      <span class="chev-spacer"></span>
+                      <span class="tn-dot" style="background:var(--cat-services);"></span>
+                      <span class="tn-name">Сдельная зарплата</span>
+                      <span class="tn-check"></span>
+                    </button>
+                  </div>
+                  <button class="tree-node is-collapsed is-disabled">
+                    <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"/></svg></span>
+                    <span class="tn-name">Косвенные расходы</span>
+                    <span class="tn-count">5</span>
+                  </button>
+                </div>
+              </div>
+              <div class="picker-breadcrumb">
+                <span>Выбрано:</span>
+                <b>Себестоимость</b><span class="sep">›</span>
+                <b>Прямые расходы</b><span class="sep">›</span>
+                <b style="color:var(--color-primary-hover);">Материалы и сырьё</b>
+              </div>
+            </div>
+            <div class="mdl-foot">
+              <button class="btn btn-md btn-secondary">Отмена</button>
+              <button class="btn btn-md btn-primary">Выбрать</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============== TAGS ============== -->
+      <div class="cb" id="tags">
+        <div class="cb-head">
+          <span class="cb-name">Tags input</span>
+          <span class="cb-tag">.tags-input · .tag-chip</span>
+          <span class="cb-when">Нейтральные теги (без радужности), ввод + autosuggest. Backspace фокусирует последний chip, повтор — удаляет.</span>
+        </div>
+
+        <span class="demo-label">Пустое поле</span>
+        <div class="demo demo--column">
+          <div class="field" style="width:100%; max-width:480px;">
+            <label class="field-label">Теги</label>
+            <div class="tags-input">
+              <input placeholder="Добавьте тег…">
+            </div>
+            <div class="field-helper">Enter для добавления, Backspace — удалить последний</div>
+          </div>
+        </div>
+
+        <span class="demo-label">С тегами</span>
+        <div class="demo demo--column">
+          <div class="field" style="width:100%; max-width:480px;">
+            <label class="field-label">Теги</label>
+            <div class="tags-input is-focus">
+              <span class="tag-chip">2026-Q2<button class="x"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span>
+              <span class="tag-chip">обязательный<button class="x"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span>
+              <span class="tag-chip is-focused">налоги<button class="x"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span>
+              <input value="">
+            </div>
+            <div class="field-helper">Последний chip в фокусе — повторный Backspace удалит</div>
+          </div>
+        </div>
+
+        <span class="demo-label">С автосаджестом</span>
+        <div class="demo demo--column" style="padding-bottom:160px;">
+          <div class="field" style="width:100%; max-width:480px;">
+            <label class="field-label">Теги</label>
+            <div class="tags-input is-focus">
+              <span class="tag-chip">2026-Q2<button class="x"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span>
+              <input value="подо" autofocus>
+              <div class="suggest">
+                <div class="suggest-item is-active">подо<b style="color:var(--color-primary)">тчётный</b><span class="hint">7 опер.</span></div>
+                <div class="suggest-item">подо<b style="color:var(--color-primary)">ждёт</b><span class="hint">2 опер.</span></div>
+                <div class="suggest-item">под<b style="color:var(--color-primary)">отчёт</b><span class="hint">5 опер.</span></div>
+                <div class="suggest-create">+ Создать тег «подо»</div>
+              </div>
+            </div>
+            <div class="field-helper">Поиск по вхождению + опция создать новый</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- EMPTY STATE -->
+      <div class="cb" id="empty">
+        <div class="cb-head">
+          <span class="cb-name">Empty state</span>
+          <span class="cb-tag">.empty</span>
+          <span class="cb-when">Когда у пользователя пусто — карточка с иконкой, заголовком (одна строка), пояснением и одним CTA.</span>
+        </div>
+        <div class="empty">
+          <div class="empty-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
+          </div>
+          <div class="empty-title">Правила автомаппинга ещё не созданы</div>
+          <div class="empty-text">Создайте первое правило, чтобы система автоматически присваивала категории новым операциям из выписок.</div>
+          <button class="btn btn-md btn-primary">Создать правило</button>
+        </div>
+      </div>
+
+      <!-- DIRECTION -->
+      <div class="cb" id="direction">
+        <div class="cb-head">
+          <span class="cb-name">Direction indicator</span>
+          <span class="cb-tag">.direction</span>
+          <span class="cb-when">Канонический формат — цветной dot + слово или сумма со знаком. Никаких кружков ↑/↓ или +/− чипов.</span>
+        </div>
+        <div class="demo demo--center">
+          <span class="direction direction--in"><span class="ddot"></span>Поступление</span>
+          <span class="direction direction--out"><span class="ddot"></span>Списание</span>
+          <span class="direction direction--neutral"><span class="ddot"></span>Технический</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== 04. MONEY (⭐ key section) ===================== -->
+    <section id="money">
+      <h2 class="section-h">04 — Money</h2>
+      <p class="section-sub">
+        Самый ответственный раздел. <b>Знак минуса — всегда U+2212 (−)</b>, hyphen-minus (-) запрещён.
+        <b>Разделитель тысяч — тонкий пробел U+2009</b>. <b>Десятичные — запятая</b> (русская локаль).
+        <b>Цвет</b> используется только для signed transactions и %-дельт, балансы — всегда нейтральные.
+        <b>tabular-nums обязательны</b> в таблицах и блоках сумм.
+      </p>
+
+      <div class="row-2col">
+        <!-- 1 Signed transaction -->
+        <div class="money-card">
+          <div class="mc-label">01 · Signed transaction</div>
+          <div><span class="money money--14 money--in">+245&thinsp;000 ₽</span></div>
+          <div><span class="money money--14 money--out">−156&thinsp;200 ₽</span></div>
+          <div class="mc-meta"><b>Где:</b> строки таблицы ДДС, drawer редактирования</div>
+          <div class="mc-spec">14px / 700 / tabular / цветной</div>
+        </div>
+
+        <!-- 2 Balance (unsigned) -->
+        <div class="money-card">
+          <div class="mc-label">02 · Balance (unsigned)</div>
+          <div><span class="money money--22 money--strong">3&thinsp;829&thinsp;930 ₽</span></div>
+          <div class="mc-meta"><b>Где:</b> total balance KPI, account card balance, итог по группе валют</div>
+          <div class="mc-spec">22px / 700 / tabular / нейтральный — балансы НЕ цветные</div>
+        </div>
+
+        <!-- 3 Short metric -->
+        <div class="money-card">
+          <div class="mc-label">03 · Short metric (М/К)</div>
+          <div><span class="money money--14 money--strong">2,0 М ₽</span></div>
+          <div><span class="money money--14 money--strong">500 К ₽</span></div>
+          <div class="mc-meta"><b>Где:</b> ось Y графика, buffer-линия, узкие колонки</div>
+          <div class="mc-spec">10–14px / 500–700 / запятая для десятых · «М», не «млн»</div>
+        </div>
+
+        <!-- 4 Foreign currency -->
+        <div class="money-card">
+          <div class="mc-label">04 · Foreign currency</div>
+          <div><span class="money money--22 money--strong">$8&thinsp;450</span></div>
+          <div><span class="money money--14 money--strong">€12&thinsp;200</span></div>
+          <div class="mc-meta"><b>Где:</b> валютные счета в AccountsCash</div>
+          <div class="mc-spec">Символ ₽/$/€ всегда префиксом для иностранной, суффиксом для ₽</div>
+        </div>
+
+        <!-- 5 No currency (column-context) -->
+        <div class="money-card">
+          <div class="mc-label">05 · No currency (column-context)</div>
+          <div><span class="money money--14 money--strong">1&thinsp;245&thinsp;230</span></div>
+          <div><span class="money money--14 money--strong">845&thinsp;600</span></div>
+          <div class="mc-meta"><b>Где:</b> ячейки таблицы с отдельной колонкой валюты</div>
+          <div class="mc-spec">Без знака валюты — она вынесена в колонку. tabular-nums</div>
+        </div>
+
+        <!-- 6 Inline meta -->
+        <div class="money-card">
+          <div class="mc-label">06 · Inline meta</div>
+          <div style="font-size:11.5px; color:var(--warning-text); font-weight:600">в обработке: 18&thinsp;200 ₽</div>
+          <div style="font-size:11.5px; color:var(--text-muted)">лимит 200&thinsp;000 ₽</div>
+          <div class="mc-meta"><b>Где:</b> подстрочки в account-card</div>
+          <div class="mc-spec">11.5px / 500–600 / цвет по контексту (warning, muted)</div>
+        </div>
+
+        <!-- 7 Input value (raw) -->
+        <div class="money-card">
+          <div class="mc-label">07 · Input value (raw)</div>
+          <div class="input-wrap" style="max-width:200px">
+            <input class="input" value="95 000" style="text-align:right; font-weight:700; padding-right:32px">
+            <span class="suffix">₽</span>
+          </div>
+          <div class="mc-meta"><b>Где:</b> поля ввода сумм (split-rows, amount-input)</div>
+          <div class="mc-spec">13–18px / 700 / без знака / валюта suffix-иконкой</div>
+        </div>
+
+        <!-- 8 Zero state -->
+        <div class="money-card">
+          <div class="mc-label">08 · Zero state</div>
+          <div><span class="money money--14 money--muted">0</span></div>
+          <div><span class="money money--14 money--muted">— ₽</span></div>
+          <div class="mc-meta"><b>Где:</b> нулевая активность, отсутствие данных</div>
+          <div class="mc-spec">Цвет --text-faint (#CBD5E1). Em-dash (—), не hyphen</div>
+        </div>
+
+        <!-- 9 Percentage delta -->
+        <div class="money-card">
+          <div class="mc-label">09 · Percentage delta</div>
+          <div><span class="delta delta--up">+12,4%</span> <span class="delta delta--down" style="margin-left:6px">−4,1%</span></div>
+          <div><span class="delta delta--neutral">±0,0%</span></div>
+          <div class="mc-meta"><b>Где:</b> KPI-meta, dashboard deltas</div>
+          <div class="mc-spec">10.5px / 700 / chip с tinted bg / десятичные через запятую</div>
+        </div>
+
+        <!-- 10 Day total / subtotal -->
+        <div class="money-card">
+          <div class="mc-label">10 · Day total / subtotal</div>
+          <div style="font-size:11.5px; color:var(--text-tertiary)">итого по дню: <span class="money money--in" style="font-weight:700">+206&thinsp;500 ₽</span></div>
+          <div style="font-size:13.5px; font-weight:700">Всего по RUB: <span class="money money--strong">3&thinsp;079&thinsp;930</span></div>
+          <div class="mc-meta"><b>Где:</b> day-divider, subtotal-row таблицы</div>
+          <div class="mc-spec">Подпись 11.5px тусклая · сумма цветная (если знаковая) / нейтральная (если итог)</div>
+        </div>
+
+        <!-- 11 Rate / annualized -->
+        <div class="money-card">
+          <div class="mc-label">11 · Rate / annualized</div>
+          <div style="font-size:11px; color:var(--success-text); font-weight:700">+12% год.</div>
+          <div style="font-size:11px; color:var(--text-secondary)">ставка 1,99%</div>
+          <div class="mc-meta"><b>Где:</b> депозит-карточка, эквайринг-комиссия</div>
+          <div class="mc-spec">11px / 600–700 / контекстный цвет (success для дохода)</div>
+        </div>
+
+        <!-- 12 Hero balance dark -->
+        <div class="money-card" style="background:var(--bg-dark); color:#fff">
+          <div class="mc-label" style="color:#94A3B8">12 · Hero balance (dark)</div>
+          <div><span class="money money--28" style="color:#fff">3&thinsp;829&thinsp;930 ₽</span></div>
+          <div class="mc-meta" style="color:#94A3B8"><b style="color:#fff">Где:</b> главный KPI на дашборде / Counts (один на странице)</div>
+          <div class="mc-spec" style="color:#94A3B8; border-top-color:rgba(255,255,255,0.1)">28px / 700 / tabular / на тёмной подложке</div>
+        </div>
+      </div>
+
+      <h3 class="sub-h">Правила (must)</h3>
+      <div class="cb">
+        <ul style="margin:0; padding-left:20px; line-height:1.7; font-size:13px;">
+          <li>Знак минуса — <code class="code-inline">U+2212 (−)</code>. Не <code class="code-inline">U+002D (-)</code>.</li>
+          <li>Разделитель разрядов — <code class="code-inline">U+2009 (&amp;thinsp;)</code>, не обычный пробел.</li>
+          <li>Десятичные — запятая <code class="code-inline">,</code>. Только в коротких форматах и процентах.</li>
+          <li>«млн» и «тыс.» — нет. Используем <b>М</b> и <b>К</b> для коротких форм.</li>
+          <li>₽ — суффикс, всегда после числа с пробелом. $/€ — префикс без пробела.</li>
+          <li>Цвет: <b>signed transactions, deltas</b> — да; <b>балансы, итоги по дню, остаток на конец</b> — нет.</li>
+          <li>Шрифтовое начертание — <code class="code-inline">font-variant-numeric: tabular-nums</code> в любой ячейке таблицы или блоке суммы.</li>
+          <li>Если значение ноль и контекст денежный — приглушённый <code class="code-inline">--text-faint</code>, цифра <code class="code-inline">0</code> или em-dash <code class="code-inline">— ₽</code>.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ===================== 05. PATTERNS ===================== -->
+    <section id="patterns">
+      <h2 class="section-h">05 — Patterns</h2>
+      <p class="section-sub">Готовые композиции из компонентов. Используйте как есть.</p>
+
+      <div class="cb">
+        <div class="cb-head">
+          <span class="cb-name">Row dropdown</span>
+          <span class="cb-tag">.t-table + .menu</span>
+          <span class="cb-when">Меню действий по строке. Клик на «⋯» открывает позиционированное справа меню.</span>
+        </div>
+        <div class="demo">
+          <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r-4); padding:14px 18px; display:flex; align-items:center; gap:12px; flex:1; min-width:300px">
+            <span style="font-size:12.5px; font-weight:600">ФНС России</span>
+            <span class="money money--14 money--out" style="margin-left:auto">−156&thinsp;200 ₽</span>
+            <span class="status status--warning"><span class="dot"></span>На согласовании</span>
+            <button class="btn btn-sm btn-ghost" style="width:28px; padding:0">⋯</button>
+          </div>
+          <div class="menu" style="margin-top:8px">
+            <button class="menu-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Редактировать
+            </button>
+            <button class="menu-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Дублировать
+            </button>
+            <div class="menu-divider"></div>
+            <button class="menu-item is-danger">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg>
+              Удалить
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="cb">
+        <div class="cb-head">
+          <span class="cb-name">Form field</span>
+          <span class="cb-tag">.field</span>
+          <span class="cb-when">Стандартное поле формы: label сверху, input, helper/error внизу.</span>
+        </div>
+        <div class="row-2col">
+          <div class="field">
+            <label class="field-label">ИНН <span class="req">*</span></label>
+            <input class="input" value="7723812931">
+            <span class="field-helper">10 цифр для ЮЛ, 12 для ИП и физлица</span>
+          </div>
+          <div class="field">
+            <label class="field-label">Категория ДДС <span class="req">*</span></label>
+            <button class="input" style="display:flex; align-items:center; gap:8px; cursor:pointer; text-align:left; padding:0 10px">
+              <span style="width:8px; height:8px; border-radius:50%; background:var(--cat-revenue)"></span>
+              <span style="flex:1">Оплата от клиента</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-muted)"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <span class="field-helper">Выбор из дерева</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="cb">
+        <div class="cb-head">
+          <span class="cb-name">Section header в drawer</span>
+          <span class="cb-tag">drawer-section-label</span>
+          <span class="cb-when">Заголовок секции внутри drawer'а — uppercase 11px tracking + опциональное описание под ним.</span>
+        </div>
+        <div class="demo" style="background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r-4); padding:18px 20px;">
+          <div style="width:100%">
+            <div style="font-size:11px; font-weight:700; color:var(--text-tertiary); letter-spacing:0.05em; text-transform:uppercase;">Контрагент и описание</div>
+            <div style="font-size:11.5px; color:var(--text-muted); margin-top:3px;">Опционально — короткая подсказка про назначение секции</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cb">
+        <div class="cb-head">
+          <span class="cb-name">Сумма + meta под ней</span>
+          <span class="cb-tag">money + sub</span>
+          <span class="cb-when">Паттерн «крупная сумма + 1–2 строки пояснений мелким шрифтом». KPI и Account card строятся так.</span>
+        </div>
+        <div class="demo demo--column">
+          <div>
+            <div class="money money--22 money--strong">2&thinsp;996&thinsp;730 ₽</div>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:4px">Остаток на 24 июня · по всем счетам</div>
+          </div>
+          <div>
+            <div class="money money--22 money--strong">+3&thinsp;820&thinsp;450 ₽</div>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:4px; display:flex; gap:6px"><span class="delta delta--up">+12,4%</span> к прошлому месяцу</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== CHANGELOG ===================== -->
+    <section id="changelog">
+      <h2 class="section-h">Changelog</h2>
+      <div class="cb">
+        <div style="font-size:13.5px; font-weight:700; margin-bottom:4px;">v1.1.1 — 24 июня 2026</div>
+        <div style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">Icon color rule unified.</div>
+        <ul style="margin:0; padding-left:20px; line-height:1.7; font-size:13px;">
+          <li>📐 Зафиксировано: иконки наследуют <code class="code-inline">currentColor</code>. Цветом окрашивается весь пункт по семантической роли.</li>
+          <li>🔧 <b>Patterns → Row dropdown</b>: эмодзи (✏️ 📋 🗑) заменены на SVG-иконки, идентичные Components/Dropdown menu</li>
+          <li>🔧 <b>Components → Dropdown menu</b>: inline-стиль <code class="code-inline">color:#1E40AF</code> на «Создать ОПиУ» заменён на класс <code class="code-inline">.is-primary</code></li>
+          <li>🔧 Убрано принудительное окрашивание <code class="code-inline">.menu-item svg { color: var(--text-secondary) }</code> — теперь иконки следуют цвету пункта</li>
+          <li>🔧 Добавлен класс <code class="code-inline">.menu-item.is-primary</code> с правильным hover-фоном</li>
+          <li>🧹 Декоративные эмодзи ⭐ убраны из nav и заголовка Money</li>
+        </ul>
+      </div>
+
+      <div class="cb">
+        <div style="font-size:13.5px; font-weight:700; margin-bottom:4px;">v1.1 — 24 июня 2026</div>
+        <div style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">Компоненты навигации, выбора и теги. Заполнены заглушки Modal/Drawer.</div>
+        <ul style="margin:0; padding-left:20px; line-height:1.7; font-size:13px;">
+          <li>➕ <b>Sidebar</b> — 264px с workspace switcher, группами, sub-пунктами, footer с юзером</li>
+          <li>➕ <b>EntityPicker</b> — универсальный плоский пикер (3 инстанса: контрагент/проект/компания)</li>
+          <li>➕ <b>TreePicker</b> — иерархический (2 инстанса: Категория ДДС с агрегатами / Статья ОПиУ без)</li>
+          <li>➕ <b>Tags</b> — нейтральные чипы + autosuggest с опцией «Создать»</li>
+          <li>✍ <b>Modal / Drawer</b> заглушки заменены на реальный контент (EntityPicker в модалке, форма редактирования в drawer)</li>
+          <li>✨ Боковая навигация артефакта обновлена — 4 новых пункта</li>
+        </ul>
+      </div>
+
+      <div class="cb">
+        <div style="font-size:13.5px; font-weight:700; margin-bottom:4px;">v1.0 — 24 июня 2026</div>
+        <div style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">Первый канон. Зафиксированы все базовые токены и компоненты.</div>
+        <ul style="margin:0; padding-left:20px; line-height:1.7; font-size:13px;">
+          <li>Card padding унифицирован: <b>16px 20px</b></li>
+          <li>KPI value: две шкалы <b>22 (compact)</b> / <b>28 (hero)</b></li>
+          <li>Border: единый <b>#E8ECF3</b></li>
+          <li>Drawer width: <b>680px</b></li>
+          <li>Backdrop: <b>opacity 0.45 · blur 6px</b></li>
+          <li>Avatar: <b>24 / 32 / 40</b> (sm/md/lg)</li>
+          <li>Direction indicator: <b>colored dot</b></li>
+          <li>Status: <b>pill с точкой</b> (везде)</li>
+          <li>Money: <b>U+2212 для минуса</b>, <b>«М» вместо «млн»</b>, <b>цвет только для дельт и signed transactions</b></li>
+          <li>Tint chip: <b>именованные токены</b></li>
+          <li><span class="decision-tag">PROPOSED</span> Drawer body padding 24px 28px · tabular-nums дефолт для всех денежных ячеек</li>
+        </ul>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+</body>
+</html>
