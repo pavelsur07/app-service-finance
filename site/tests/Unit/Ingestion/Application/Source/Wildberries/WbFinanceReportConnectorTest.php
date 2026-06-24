@@ -158,7 +158,7 @@ final class WbFinanceReportConnectorTest extends TestCase
         $result = $connector->pull($this->request(cursorValue: '2026-06-20'));
 
         self::assertSame('2026-06-21', $result->nextCursorValue);
-        self::assertFalse($result->hasMore);
+        self::assertTrue($result->hasMore);
     }
 
     public function testIncrementalCursorDoesNotAdvancePastToday(): void

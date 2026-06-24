@@ -26,7 +26,7 @@ final class FakeConnector implements SourceConnectorInterface
     private array $pullRequests = [];
 
     /**
-     * @var list<array{externalId: string, nextCursorValue: ?string, hasMore: bool, rowExternalId: string, normalizeRawRecords: bool, continuationDelaySeconds: ?int}>
+     * @var list<array{externalId: string, nextCursorValue: ?string, hasMore: bool, rowExternalId: string, normalizeRawRecords: bool, continuationDelaySeconds: ?int}|\Throwable>
      */
     private array $queuedPullResults = [];
 
@@ -63,6 +63,11 @@ final class FakeConnector implements SourceConnectorInterface
             'normalizeRawRecords' => $normalizeRawRecords,
             'continuationDelaySeconds' => $continuationDelaySeconds,
         ];
+    }
+
+    public function enqueuePullFailure(\Throwable $exception): void
+    {
+        $this->queuedPullResults[] = $exception;
     }
 
     /**
@@ -112,7 +117,12 @@ final class FakeConnector implements SourceConnectorInterface
             throw $failure;
         }
 
-        $result = array_shift($this->queuedPullResults) ?? [
+        $result = array_shift($this->queuedPullResults);
+        if ($result instanceof \Throwable) {
+            throw $result;
+        }
+
+        $result ??= [
             'externalId' => sprintf('fake-report-%s', $request->syncJobId),
             'nextCursorValue' => 'cursor-after-fake-sale-1',
             'hasMore' => false,

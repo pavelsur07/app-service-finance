@@ -230,6 +230,44 @@ final class VerificationQueriesTest extends IntegrationTestCase
         self::assertSame(0, $cells[0]->issueCount);
     }
 
+    public function testCoverageCountsFailedSyncJobsAsOpenIssues(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+        $job = new SyncJob(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            source: IngestSource::OZON,
+            resourceType: 'ozon_finance_accrual_by_day',
+            kind: SyncJobKind::INCREMENTAL,
+            shopRef: $connectionRef,
+        );
+        $job->setCursorSnapshot('2026-06-22');
+        $job->markRunning();
+        $job->markFailed('Connector failed after retries.');
+
+        $this->em->persist($job);
+        $this->em->flush();
+
+        /** @var CoverageQuery $query */
+        $query = self::getContainer()->get(CoverageQuery::class);
+        $cells = $query->heatmap(
+            $companyId,
+            $connectionRef,
+            new \DateTimeImmutable('2026-06-22'),
+            new \DateTimeImmutable('2026-06-22'),
+        );
+
+        self::assertCount(1, $cells);
+        self::assertSame('2026-06-22', $cells[0]->date);
+        self::assertSame($connectionRef, $cells[0]->shopRef);
+        self::assertSame('ozon_finance_accrual_by_day', $cells[0]->resourceType);
+        self::assertSame(0, $cells[0]->rawCount);
+        self::assertSame(0, $cells[0]->txCount);
+        self::assertSame(1, $cells[0]->issueCount);
+        self::assertNull($cells[0]->lastFetchedAt);
+    }
+
     public function testReconciliationComparesShopCanonWithCompanyPeriodOzonControl(): void
     {
         $companyId = Uuid::uuid7()->toString();

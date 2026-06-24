@@ -6,6 +6,7 @@ namespace App\Ingestion\Infrastructure\Query;
 
 use App\Ingestion\Application\DTO\CoverageCellView;
 use App\Ingestion\Application\DTO\ShopOptionView;
+use App\Ingestion\Enum\SyncJobStatus;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Types\Types;
 use Webmozart\Assert\Assert;
@@ -104,6 +105,7 @@ final class CoverageQuery
         }
 
         $rows = $qb->executeQuery()->fetchAllAssociative();
+        $rows = $this->mergeRows($rows, $this->failedJobIssueRows($companyId, $shopRef, $from, $to));
 
         return array_map(
             static fn (array $row): CoverageCellView => new CoverageCellView(
@@ -117,6 +119,138 @@ final class CoverageQuery
             ),
             $rows,
         );
+    }
+
+    /**
+     * @param list<array<string, mixed>> $baseRows
+     * @param list<array<string, mixed>> $issueRows
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function mergeRows(array $baseRows, array $issueRows): array
+    {
+        $merged = [];
+
+        foreach (array_merge($baseRows, $issueRows) as $row) {
+            $key = implode('|', [
+                (string) $row['record_date'],
+                (string) $row['shop_ref'],
+                (string) $row['resource_type'],
+            ]);
+
+            if (!isset($merged[$key])) {
+                $merged[$key] = [
+                    'record_date' => (string) $row['record_date'],
+                    'shop_ref' => (string) $row['shop_ref'],
+                    'resource_type' => (string) $row['resource_type'],
+                    'raw_count' => 0,
+                    'tx_count' => 0,
+                    'issue_count' => 0,
+                    'last_fetched_at' => null,
+                ];
+            }
+
+            $merged[$key]['raw_count'] += (int) ($row['raw_count'] ?? 0);
+            $merged[$key]['tx_count'] += (int) ($row['tx_count'] ?? 0);
+            $merged[$key]['issue_count'] += (int) ($row['issue_count'] ?? 0);
+
+            if (null !== ($row['last_fetched_at'] ?? null)) {
+                $current = $merged[$key]['last_fetched_at'];
+                if (null === $current || (string) $row['last_fetched_at'] > (string) $current) {
+                    $merged[$key]['last_fetched_at'] = $row['last_fetched_at'];
+                }
+            }
+        }
+
+        $rows = array_values($merged);
+        usort($rows, static fn (array $left, array $right): int => [
+            (string) $left['record_date'],
+            (string) $left['shop_ref'],
+            (string) $left['resource_type'],
+        ] <=> [
+            (string) $right['record_date'],
+            (string) $right['shop_ref'],
+            (string) $right['resource_type'],
+        ]);
+
+        return $rows;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function failedJobIssueRows(
+        string $companyId,
+        ?string $shopRef,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+    ): array {
+        $shopFilter = null !== $shopRef && '' !== $shopRef ? 'AND j.shop_ref = :shopRef' : '';
+        $sql = <<<SQL
+            WITH failed_jobs AS (
+                SELECT
+                    j.id,
+                    j.shop_ref,
+                    j.resource_type,
+                    COALESCE(
+                        j.window_from,
+                        CASE
+                            WHEN j.cursor_snapshot ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+                                THEN j.cursor_snapshot::date
+                            ELSE j.created_at::date
+                        END
+                    ) AS from_date,
+                    COALESCE(
+                        j.window_to,
+                        j.window_from,
+                        CASE
+                            WHEN j.cursor_snapshot ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+                                THEN j.cursor_snapshot::date
+                            ELSE j.created_at::date
+                        END
+                    ) AS to_date
+                FROM ingest_sync_jobs j
+                WHERE j.company_id = :companyId
+                  AND j.status = :failedStatus
+                  {$shopFilter}
+            )
+            SELECT
+                TO_CHAR(day.day, 'YYYY-MM-DD') AS record_date,
+                fj.shop_ref,
+                fj.resource_type,
+                0 AS raw_count,
+                0 AS tx_count,
+                COUNT(DISTINCT fj.id) AS issue_count,
+                NULL AS last_fetched_at
+            FROM failed_jobs fj
+            JOIN LATERAL (
+                SELECT day::date AS day
+                FROM generate_series(
+                    GREATEST(fj.from_date, :fromDate)::date,
+                    LEAST(fj.to_date, :toDate)::date,
+                    interval '1 day'
+                ) AS day
+            ) day ON fj.from_date <= :toDate AND fj.to_date >= :fromDate
+            GROUP BY day.day, fj.shop_ref, fj.resource_type
+            ORDER BY record_date ASC, fj.shop_ref ASC, fj.resource_type ASC
+            SQL;
+
+        $params = [
+            'companyId' => $companyId,
+            'failedStatus' => SyncJobStatus::FAILED->value,
+            'fromDate' => $from,
+            'toDate' => $to,
+        ];
+        $types = [
+            'fromDate' => Types::DATE_IMMUTABLE,
+            'toDate' => Types::DATE_IMMUTABLE,
+        ];
+
+        if (null !== $shopRef && '' !== $shopRef) {
+            $params['shopRef'] = $shopRef;
+        }
+
+        return $this->connection->executeQuery($sql, $params, $types)->fetchAllAssociative();
     }
 
     /**
