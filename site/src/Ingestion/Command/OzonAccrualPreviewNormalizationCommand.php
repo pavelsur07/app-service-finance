@@ -81,11 +81,12 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
         $io->title('Ozon accrual normalization preview');
         $io->writeln('Read-only: no canonical transactions are written.');
         $io->writeln($includeSaleRefund
-            ? 'Preview includes sale/refund from sale_amount or seller_price, and intentionally omits bonus and coinvestment.'
-            : 'Preview excludes sale/refund amount fields for expense-only diagnostics, and intentionally omits bonus and coinvestment.'
+            ? 'Preview includes sale/refund, bonus, partner-program fields, and typed Ozon accrual rows.'
+            : 'Preview excludes sale/refund amount fields for expense-only diagnostics, but includes bonus, partner-program fields, and typed Ozon accrual rows.'
         );
         $this->printRawRecords($io, $rawRecords);
         $this->printSummary($io, $previewRows, $exactMatches, $sameAmountCandidates);
+        $this->printOzonCategorySummary($io, $previewRows);
         $this->printParityDecision($io, $previewRows, $exactMatches, $sameAmountCandidates, $parityRows, $omittedTypes);
         $this->printParityRows($io, $parityRows);
 
@@ -314,6 +315,7 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
     {
         $exactMatchRows = 0;
         $sameAmountCandidateRows = 0;
+        $unknownCategoryRows = 0;
 
         foreach ($previewRows as $row) {
             if (($exactMatches[$this->exactMatchKey($row->sourceKey, $row->type->value)] ?? 0) > 0) {
@@ -322,6 +324,10 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
 
             if (($sameAmountCandidates[$this->sameAmountKey($row->date, $row->type->value, $row->direction->value, $row->amountMinor)] ?? 0) > 0) {
                 ++$sameAmountCandidateRows;
+            }
+
+            if (false === $row->ozonCategoryKnown) {
+                ++$unknownCategoryRows;
             }
         }
 
@@ -332,6 +338,7 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
                 ['proposedRows', (string) count($previewRows)],
                 ['exactNaturalKeyMatches', (string) $exactMatchRows],
                 ['sameDayTypeDirectionAmountCandidates', (string) $sameAmountCandidateRows],
+                ['unknownOzonCategoryRows', (string) $unknownCategoryRows],
             ],
         );
     }
@@ -363,6 +370,8 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
                 $row->direction->value,
                 $this->minorToRub($row->amountMinor),
                 $row->category,
+                $row->ozonCategoryGroup ?? '',
+                $row->ozonCategoryLabel ?? '',
                 $row->component,
                 $row->typeId ?? $row->field ?? '',
                 $row->sourceKey,
@@ -372,8 +381,75 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
         }
 
         $io->table(
-            ['date', 'type', 'direction', 'amountRub', 'category', 'component', 'typeIdOrField', 'sourceKey', 'exact', 'sameAmount'],
+            ['date', 'type', 'direction', 'amountRub', 'category', 'ozonGroup', 'ozonCategory', 'component', 'typeIdOrField', 'sourceKey', 'exact', 'sameAmount'],
             $rows,
+        );
+    }
+
+    /**
+     * @param list<OzonAccrualPreviewTransaction> $previewRows
+     */
+    private function printOzonCategorySummary(SymfonyStyle $io, array $previewRows): void
+    {
+        $io->section('Ozon category summary');
+        if ([] === $previewRows) {
+            $io->writeln('No preview rows.');
+
+            return;
+        }
+
+        $groups = [];
+        foreach ($previewRows as $row) {
+            $group = $row->ozonCategoryGroup ?? 'Без категории Ozon';
+            $label = $row->ozonCategoryLabel ?? ($row->typeId ?? $row->field ?? $row->component);
+            $key = implode('|', [$group, $label, $row->type->value, $row->direction->value, $row->ozonCategoryKnown ? 'known' : 'unknown']);
+
+            if (!isset($groups[$key])) {
+                $groups[$key] = [
+                    'group' => $group,
+                    'label' => $label,
+                    'type' => $row->type->value,
+                    'direction' => $row->direction->value,
+                    'known' => $row->ozonCategoryKnown ? 'yes' : 'no',
+                    'sortOrder' => $row->ozonCategorySortOrder ?? 9999,
+                    'count' => 0,
+                    'totalMinor' => 0,
+                ];
+            }
+
+            $groups[$key]['sortOrder'] = min((int) $groups[$key]['sortOrder'], $row->ozonCategorySortOrder ?? 9999);
+            ++$groups[$key]['count'];
+            $groups[$key]['totalMinor'] += $row->amountMinor;
+        }
+
+        $rows = array_values($groups);
+        usort($rows, static function (array $left, array $right): int {
+            $orderComparison = ((int) $left['sortOrder']) <=> ((int) $right['sortOrder']);
+            if (0 !== $orderComparison) {
+                return $orderComparison;
+            }
+
+            foreach (['group', 'label', 'type', 'direction'] as $key) {
+                $comparison = strcmp((string) $left[$key], (string) $right[$key]);
+                if (0 !== $comparison) {
+                    return $comparison;
+                }
+            }
+
+            return 0;
+        });
+
+        $io->table(
+            ['ozonGroup', 'ozonCategory', 'type', 'direction', 'known', 'txCount', 'totalRub'],
+            array_map(fn (array $row): array => [
+                (string) $row['group'],
+                (string) $row['label'],
+                (string) $row['type'],
+                (string) $row['direction'],
+                (string) $row['known'],
+                (string) $row['count'],
+                $this->minorToRub((int) $row['totalMinor']),
+            ], $rows),
         );
     }
 
