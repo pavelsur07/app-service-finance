@@ -102,10 +102,11 @@ final class OzonAccrualByDayPreviewMapperTest extends TestCase
         self::assertSame('Вознаграждение за продажу', $commission->ozonCategoryLabel);
 
         $delivery = $this->row($rows, 'delivery:product-0:service-0:type-29');
-        self::assertSame(TransactionType::LOGISTICS, $delivery->type);
+        self::assertSame(TransactionType::FEE, $delivery->type);
         self::assertSame(TransactionDirection::OUT, $delivery->direction);
         self::assertSame(786, $delivery->amountMinor);
         self::assertSame('29', $delivery->typeId);
+        self::assertSame('ozon_logistics', $delivery->ozonCategoryCode);
         self::assertSame('Логистика', $delivery->ozonCategoryLabel);
 
         $item = $this->row($rows, 'item_fee:group-0:fee-0:type-1');
@@ -121,9 +122,10 @@ final class OzonAccrualByDayPreviewMapperTest extends TestCase
         self::assertSame('Неизвестные категории Ozon', $nonItem->ozonCategoryGroup);
 
         $container = $this->row($rows, 'container_fee:fees:0:type-77');
-        self::assertSame(TransactionType::ACCEPTANCE, $container->type);
+        self::assertSame(TransactionType::FEE, $container->type);
         self::assertSame(TransactionDirection::OUT, $container->direction);
         self::assertSame(350, $container->amountMinor);
+        self::assertSame('ozon_cargo_place_item_processing', $container->ozonCategoryCode);
         self::assertSame('Обработка товара в составе грузоместа', $container->ozonCategoryLabel);
     }
 
@@ -151,7 +153,7 @@ final class OzonAccrualByDayPreviewMapperTest extends TestCase
         self::assertSame(TransactionType::COMMISSION, $rows[0]->type);
     }
 
-    public function testPartnerProgramAliasesUseFirstNonZeroField(): void
+    public function testPartnerProgramAliasesUseCanonicalSourceKeyAndFirstNonZeroField(): void
     {
         $rows = $this->mapper()->preview(
             '19621cff-b028-45d9-9193-11f47ad9a8b2',
@@ -172,12 +174,33 @@ final class OzonAccrualByDayPreviewMapperTest extends TestCase
 
         self::assertCount(1, $rows);
 
-        $partnerProgram = $this->row($rows, 'partner_program:product-0');
+        $partnerProgram = $this->row($rows, 'partner_programs:product-0');
         self::assertSame(TransactionType::BONUS, $partnerProgram->type);
         self::assertSame(TransactionDirection::IN, $partnerProgram->direction);
         self::assertSame(1000, $partnerProgram->amountMinor);
         self::assertSame('partner_program', $partnerProgram->field);
+        self::assertSame('ozon:accrual-by-day:53675409100:partner_programs:product-0', $partnerProgram->sourceKey);
         self::assertSame('ozon_partner_programs', $partnerProgram->ozonCategoryCode);
+
+        $rowsWithCoinvestmentAlias = $this->mapper()->preview(
+            '19621cff-b028-45d9-9193-11f47ad9a8b2',
+            [[
+                'accrual_id' => 53675409100,
+                'date' => '2026-06-13',
+                'accrued_category' => 'POSTING',
+                'posting' => [
+                    'products' => [[
+                        'commission' => [
+                            'coinvestment' => ['amount' => '10.00', 'currency' => 'RUB'],
+                        ],
+                    ]],
+                ],
+            ]],
+        );
+
+        self::assertCount(1, $rowsWithCoinvestmentAlias);
+        self::assertSame($partnerProgram->sourceKey, $rowsWithCoinvestmentAlias[0]->sourceKey);
+        self::assertSame('coinvestment', $rowsWithCoinvestmentAlias[0]->field);
     }
 
     public function testBuildsRefundFromNegativeSaleAmountAndKeepsCommissionStorno(): void

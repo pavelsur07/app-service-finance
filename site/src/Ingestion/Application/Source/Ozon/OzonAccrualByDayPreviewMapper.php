@@ -97,6 +97,7 @@ final readonly class OzonAccrualByDayPreviewMapper
                 accrualId: $accrualId,
                 productIndex: (int) $productIndex,
                 unitNumber: $unitNumber,
+                canonicalComponent: 'partner_programs',
             );
             $this->collectCommission($transactions, $product['commission'] ?? null, $operationGroupId, $date, $category, $accrualId, (int) $productIndex, $unitNumber);
             $this->collectDeliveryServices($transactions, $product['delivery']['services'] ?? null, $operationGroupId, $date, $category, $accrualId, (int) $productIndex, $unitNumber);
@@ -159,6 +160,7 @@ final readonly class OzonAccrualByDayPreviewMapper
         string $accrualId,
         int $productIndex,
         ?string $unitNumber,
+        ?string $canonicalComponent = null,
     ): void {
         if (!is_array($commission)) {
             return;
@@ -181,7 +183,7 @@ final readonly class OzonAccrualByDayPreviewMapper
                 date: $date,
                 category: $category,
                 accrualId: $accrualId,
-                component: sprintf('%s:product-%d', $this->normalizeComponent($field), $productIndex),
+                component: sprintf('%s:product-%d', $this->normalizeComponent($canonicalComponent ?? $field), $productIndex),
                 type: $ozonCategory?->transactionType ?? TransactionType::BONUS,
                 signedAmountMinor: $amount,
                 field: $field,
@@ -269,7 +271,7 @@ final readonly class OzonAccrualByDayPreviewMapper
                 category: $category,
                 accrualId: $accrualId,
                 component: sprintf('delivery:product-%d:service-%d:type-%s', $productIndex, (int) $serviceIndex, $typeId),
-                type: $ozonCategory->transactionType,
+                type: TransactionType::FEE,
                 signedAmountMinor: $amount,
                 typeId: $typeId,
                 unitNumber: $unitNumber,
@@ -413,7 +415,7 @@ final readonly class OzonAccrualByDayPreviewMapper
             category: $category,
             accrualId: $accrualId,
             component: sprintf('%s:type-%s', $componentPrefix, $typeId),
-            type: $ozonCategory->transactionType,
+            type: $type,
             signedAmountMinor: $amount,
             typeId: $typeId,
             unitNumber: $unitNumber,

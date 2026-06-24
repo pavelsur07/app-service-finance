@@ -76,10 +76,11 @@ final class OzonAccrualByDayMapperTest extends TestCase
 
         $delivery = $this->transaction($transactions, 'ozon:accrual-by-day:53675409100:delivery:product-0:service-0:type-29');
         self::assertSame('ozon:accrual-by-day:53675409100:delivery:product-0:service-0:type-29', $delivery->externalId);
-        self::assertSame(TransactionType::LOGISTICS, $delivery->type);
+        self::assertSame(TransactionType::FEE, $delivery->type);
         self::assertSame(TransactionDirection::OUT, $delivery->direction);
         self::assertSame(786, $delivery->money->amountMinor());
         self::assertSame('29', $delivery->sourceData['_ingestion_type_id']);
+        self::assertSame('ozon_logistics', $delivery->sourceData['_ozon_category_code']);
         self::assertSame('Логистика', $delivery->sourceData['_ozon_category_label']);
         self::assertSame(400, $delivery->sourceData['_ozon_category_sort_order']);
         self::assertTrue($delivery->sourceData['_ozon_category_known']);
