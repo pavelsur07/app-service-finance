@@ -16,11 +16,15 @@ use App\Ingestion\Enum\Capability;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Exception\UnsupportedCapabilityException;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonAccrualClientInterface;
+use Symfony\Component\Clock\ClockInterface;
 
 final readonly class OzonSellerReportConnector implements SourceConnectorInterface
 {
+    private const INCREMENTAL_CONTINUATION_DELAY_SECONDS = 1;
+
     public function __construct(
         private OzonAccrualClientInterface $accrualClient,
+        private ClockInterface $clock,
         private int $chunkSizeDays = 7,
         private int $hotRewindDays = 14,
         private SourceDataHasher $sourceDataHasher = new SourceDataHasher(),
@@ -102,6 +106,9 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
 
         $windowHasMore = null !== $request->windowTo && $to < $request->windowTo;
         $nextCursor = $windowHasMore || $this->isIncremental($request) ? $to->modify('+1 day')->format('Y-m-d') : null;
+        $incrementalHasMore = $this->isIncremental($request)
+            && null !== $nextCursor
+            && $this->dailyCursorIsDue($nextCursor);
 
         return new PullResult(
             rawBatch: new RawBatch(
@@ -124,7 +131,8 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
                 ),
             ),
             nextCursorValue: $nextCursor,
-            hasMore: $windowHasMore,
+            hasMore: $windowHasMore || $incrementalHasMore,
+            continuationDelaySeconds: $incrementalHasMore ? self::INCREMENTAL_CONTINUATION_DELAY_SECONDS : null,
         );
     }
 
@@ -169,7 +177,7 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
             : $maxTo;
 
         if (null === $request->windowTo && null !== $request->cursorValue && '' !== $request->cursorValue) {
-            $yesterday = (new \DateTimeImmutable('today'))->modify('-1 day')->setTime(23, 59, 59);
+            $yesterday = $this->now()->modify('-1 day')->setTime(23, 59, 59);
             if ($yesterday < $to) {
                 $to = $yesterday;
             }
@@ -200,6 +208,21 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
             && '' !== $request->cursorValue
             && null === $request->windowFrom
             && null === $request->windowTo;
+    }
+
+    private function dailyCursorIsDue(string $cursorValue): bool
+    {
+        $cursorDate = \DateTimeImmutable::createFromFormat('!Y-m-d', $cursorValue);
+        if (false === $cursorDate || $cursorDate->format('Y-m-d') !== $cursorValue) {
+            return false;
+        }
+
+        return $cursorDate <= $this->now()->modify('-1 day')->setTime(0, 0);
+    }
+
+    private function now(): \DateTimeImmutable
+    {
+        return $this->clock->now()->setTimezone(new \DateTimeZone(date_default_timezone_get()));
     }
 
     /**

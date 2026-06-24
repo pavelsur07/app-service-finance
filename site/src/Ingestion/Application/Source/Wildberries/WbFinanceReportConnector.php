@@ -67,6 +67,9 @@ final readonly class WbFinanceReportConnector implements SourceConnectorInterfac
         $nextCursor = $page->hasMore && null !== $page->nextRrdId
             ? $this->encodeCursor($date, $page->nextRrdId)
             : $this->nextIncrementalDateCursor($request, $date, $page->hasMore);
+        $incrementalHasMore = !$page->hasMore
+            && null !== $nextCursor
+            && $this->dailyCursorIsDue($nextCursor);
 
         return new PullResult(
             rawBatch: new RawBatch(
@@ -81,7 +84,7 @@ final readonly class WbFinanceReportConnector implements SourceConnectorInterfac
                 rows: $this->rowsOrEmptyMarker($this->sortRowsCanonically($page->rows), $page->metadata),
             ),
             nextCursorValue: $nextCursor,
-            hasMore: $page->hasMore,
+            hasMore: $page->hasMore || $incrementalHasMore,
             normalizeRawRecords: true,
             continuationDelaySeconds: $page->hasMore ? $this->continuationDelaySeconds : null,
         );
@@ -111,7 +114,7 @@ final readonly class WbFinanceReportConnector implements SourceConnectorInterfac
             return [$from, 0];
         }
 
-        $yesterday = (new \DateTimeImmutable('today'))->modify('-1 day')->setTime(0, 0);
+        $yesterday = $this->now()->modify('-1 day')->setTime(0, 0);
 
         return [$yesterday, 0];
     }
@@ -152,12 +155,27 @@ final readonly class WbFinanceReportConnector implements SourceConnectorInterfac
         }
 
         $nextDate = $date->modify('+1 day')->setTime(0, 0);
-        $today = $this->clock->now()->setTime(0, 0);
+        $today = $this->now()->setTime(0, 0);
         if ($nextDate > $today) {
             return null;
         }
 
         return $nextDate->format('Y-m-d');
+    }
+
+    private function dailyCursorIsDue(string $cursorValue): bool
+    {
+        $cursorDate = \DateTimeImmutable::createFromFormat('!Y-m-d', $cursorValue);
+        if (false === $cursorDate || $cursorDate->format('Y-m-d') !== $cursorValue) {
+            return false;
+        }
+
+        return $cursorDate <= $this->now()->modify('-1 day')->setTime(0, 0);
+    }
+
+    private function now(): \DateTimeImmutable
+    {
+        return $this->clock->now()->setTimezone(new \DateTimeZone(date_default_timezone_get()));
     }
 
     private function date(string $value): \DateTimeImmutable

@@ -140,7 +140,7 @@ final readonly class RunSyncChunkHandler
                 'resourceType' => $job->getResourceType(),
                 'retryAfterSeconds' => $exception->retryAfterSeconds(),
             ]);
-            $this->dispatchContinuation($message, $message->cursorValue, $exception->retryAfterSeconds());
+            $this->dispatchContinuation($message, $cursorValue, $exception->retryAfterSeconds());
 
             return;
         } catch (ConnectorTransientException $exception) {

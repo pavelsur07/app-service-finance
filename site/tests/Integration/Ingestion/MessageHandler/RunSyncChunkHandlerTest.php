@@ -10,6 +10,7 @@ use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\RawNormalizationStatus;
 use App\Ingestion\Enum\SyncJobKind;
 use App\Ingestion\Enum\SyncJobStatus;
+use App\Ingestion\Exception\ConnectorRateLimitedException;
 use App\Ingestion\Exception\ConnectorTransientException;
 use App\Ingestion\Message\NormalizeRawRecordMessage;
 use App\Ingestion\Message\RunSyncChunkMessage;
@@ -137,6 +138,57 @@ final class RunSyncChunkHandlerTest extends IntegrationTestCase
         $completedJob = $jobRepository->findByIdAndCompany($job->getId(), $companyId);
         self::assertSame(SyncJobStatus::COMPLETED, $completedJob?->getStatus());
         self::assertSame('cursor-before', $completedJob?->getCursorSnapshot());
+    }
+
+    public function testIncrementalChunkContinuesPullingUntilConnectorHasNoMoreData(): void
+    {
+        $fakeConnector = $this->fakeConnector();
+        $fakeConnector->reset();
+        $fakeConnector->enqueuePullResult('fake-report-page-1', '2026-06-08', true, 'fake-sale-1');
+        $fakeConnector->enqueuePullResult('fake-report-page-2', '2026-06-15', false, 'fake-sale-2');
+
+        $companyId = Uuid::uuid7()->toString();
+        $job = new SyncJob(
+            companyId: $companyId,
+            connectionRef: 'connection-1',
+            source: IngestSource::WILDBERRIES,
+            resourceType: FakeConnector::RESOURCE_TYPE,
+            kind: SyncJobKind::INCREMENTAL,
+            shopRef: 'shop-1',
+        );
+
+        $this->em->persist($job);
+        $this->em->flush();
+
+        /** @var IngestCursorRepository $cursorRepository */
+        $cursorRepository = self::getContainer()->get(IngestCursorRepository::class);
+        $cursor = $cursorRepository->getOrCreate($companyId, 'connection-1', FakeConnector::RESOURCE_TYPE, 'shop-1');
+        $cursor->advance('2026-06-01', $job->getId(), new \DateTimeImmutable('2026-06-18 09:00:00'));
+        $this->em->flush();
+
+        $normalizeTransport = $this->getNormalizeTransport();
+        $normalizeTransport->reset();
+
+        /** @var RunSyncChunkHandler $handler */
+        $handler = self::getContainer()->get(RunSyncChunkHandler::class);
+        $handler(new RunSyncChunkMessage($companyId, $job->getId()));
+        $this->em->clear();
+
+        $pullRequests = $fakeConnector->pullRequests();
+        self::assertCount(2, $pullRequests);
+        self::assertSame('2026-06-01', $pullRequests[0]->cursorValue);
+        self::assertSame('2026-06-08', $pullRequests[1]->cursorValue);
+        self::assertCount(2, $normalizeTransport->getSent());
+
+        $cursor = $cursorRepository->findOne($companyId, 'connection-1', FakeConnector::RESOURCE_TYPE, 'shop-1');
+        self::assertNotNull($cursor);
+        self::assertSame('2026-06-15', $cursor->getCursorValue());
+
+        /** @var SyncJobRepository $jobRepository */
+        $jobRepository = self::getContainer()->get(SyncJobRepository::class);
+        $completedJob = $jobRepository->findByIdAndCompany($job->getId(), $companyId);
+        self::assertSame(SyncJobStatus::COMPLETED, $completedJob?->getStatus());
+        self::assertSame('2026-06-01', $completedJob?->getCursorSnapshot());
     }
 
     public function testWindowedChunkIgnoresExistingSharedCursor(): void
@@ -290,6 +342,65 @@ final class RunSyncChunkHandlerTest extends IntegrationTestCase
         $rawRecords = $rawRecordRepository->findBy(['companyId' => $companyId, 'syncJobId' => $job->getId()]);
         self::assertCount(1, $rawRecords);
         self::assertSame(RawNormalizationStatus::SKIPPED, $rawRecords[0]->getNormalizationStatus());
+    }
+
+    public function testRateLimitContinuationUsesCurrentCursorAfterSuccessfulChunk(): void
+    {
+        $fakeConnector = $this->fakeConnector();
+        $fakeConnector->reset();
+        $fakeConnector->enqueuePullResult(
+            externalId: 'fake-report-page-1',
+            nextCursorValue: '2026-06-08',
+            hasMore: true,
+            rowExternalId: 'fake-sale-1',
+            normalizeRawRecords: false,
+        );
+        $fakeConnector->enqueuePullFailure(new ConnectorRateLimitedException('Local rate limit is active.', 70));
+
+        $companyId = Uuid::uuid7()->toString();
+        $job = new SyncJob(
+            companyId: $companyId,
+            connectionRef: 'connection-1',
+            source: IngestSource::WILDBERRIES,
+            resourceType: FakeConnector::RESOURCE_TYPE,
+            kind: SyncJobKind::INCREMENTAL,
+            shopRef: 'shop-1',
+        );
+
+        $this->em->persist($job);
+        $this->em->flush();
+
+        /** @var IngestCursorRepository $cursorRepository */
+        $cursorRepository = self::getContainer()->get(IngestCursorRepository::class);
+        $cursor = $cursorRepository->getOrCreate($companyId, 'connection-1', FakeConnector::RESOURCE_TYPE, 'shop-1');
+        $cursor->advance('2026-06-01', $job->getId(), new \DateTimeImmutable('2026-06-18 09:00:00'));
+        $this->em->flush();
+
+        $fetchTransport = $this->getFetchTransport();
+        $fetchTransport->reset();
+        $this->getNormalizeTransport()->reset();
+
+        /** @var RunSyncChunkHandler $handler */
+        $handler = self::getContainer()->get(RunSyncChunkHandler::class);
+        $handler(new RunSyncChunkMessage($companyId, $job->getId()));
+        $this->em->clear();
+
+        $pullRequests = $fakeConnector->pullRequests();
+        self::assertCount(2, $pullRequests);
+        self::assertSame('2026-06-01', $pullRequests[0]->cursorValue);
+        self::assertSame('2026-06-08', $pullRequests[1]->cursorValue);
+
+        $sent = $fetchTransport->getSent();
+        self::assertCount(1, $sent);
+        self::assertInstanceOf(RunSyncChunkMessage::class, $sent[0]->getMessage());
+
+        /** @var RunSyncChunkMessage $continuation */
+        $continuation = $sent[0]->getMessage();
+        self::assertSame('2026-06-08', $continuation->cursorValue);
+
+        $cursor = $cursorRepository->findOne($companyId, 'connection-1', FakeConnector::RESOURCE_TYPE, 'shop-1');
+        self::assertNotNull($cursor);
+        self::assertSame('2026-06-08', $cursor->getCursorValue());
     }
 
     public function testRateLimitLockContentionKeepsJobRetryable(): void

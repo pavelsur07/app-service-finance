@@ -230,6 +230,147 @@ final class VerificationQueriesTest extends IntegrationTestCase
         self::assertSame(0, $cells[0]->issueCount);
     }
 
+    public function testCoverageCountsFailedSyncJobsAsOpenIssues(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+        $job = new SyncJob(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            source: IngestSource::OZON,
+            resourceType: 'ozon_finance_accrual_by_day',
+            kind: SyncJobKind::INCREMENTAL,
+            shopRef: $connectionRef,
+        );
+        $job->setCursorSnapshot('2026-06-22');
+        $job->markRunning();
+        $job->markFailed('Connector failed after retries.');
+
+        $this->em->persist($job);
+        $this->em->flush();
+
+        /** @var CoverageQuery $query */
+        $query = self::getContainer()->get(CoverageQuery::class);
+        $cells = $query->heatmap(
+            $companyId,
+            $connectionRef,
+            new \DateTimeImmutable('2026-06-22'),
+            new \DateTimeImmutable('2026-06-22'),
+        );
+
+        self::assertCount(1, $cells);
+        self::assertSame('2026-06-22', $cells[0]->date);
+        self::assertSame($connectionRef, $cells[0]->shopRef);
+        self::assertSame('ozon_finance_accrual_by_day', $cells[0]->resourceType);
+        self::assertSame(0, $cells[0]->rawCount);
+        self::assertSame(0, $cells[0]->txCount);
+        self::assertSame(1, $cells[0]->issueCount);
+        self::assertNull($cells[0]->lastFetchedAt);
+    }
+
+    public function testCoverageCountsFailedBackfillChunkOnceAcrossWindow(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+        $parent = new SyncJob(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            source: IngestSource::OZON,
+            resourceType: 'ozon_finance_accrual_by_day',
+            kind: SyncJobKind::BACKFILL,
+            windowFrom: new \DateTimeImmutable('2026-06-01'),
+            windowTo: new \DateTimeImmutable('2026-06-30'),
+            shopRef: $connectionRef,
+        );
+        $chunk = new SyncJob(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            source: IngestSource::OZON,
+            resourceType: 'ozon_finance_accrual_by_day',
+            kind: SyncJobKind::BACKFILL,
+            windowFrom: new \DateTimeImmutable('2026-06-01'),
+            windowTo: new \DateTimeImmutable('2026-06-30'),
+            shopRef: $connectionRef,
+            parentJobId: $parent->getId(),
+        );
+        $chunk->markRunning();
+        $chunk->markFailed('Connector failed after retries.');
+
+        $this->em->persist($parent);
+        $this->em->persist($chunk);
+        $this->em->flush();
+
+        /** @var CoverageQuery $query */
+        $query = self::getContainer()->get(CoverageQuery::class);
+        $cells = $query->heatmap(
+            $companyId,
+            $connectionRef,
+            new \DateTimeImmutable('2026-06-10'),
+            new \DateTimeImmutable('2026-06-20'),
+        );
+
+        self::assertCount(1, $cells);
+        self::assertSame('2026-06-10', $cells[0]->date);
+        self::assertSame($connectionRef, $cells[0]->shopRef);
+        self::assertSame('ozon_finance_accrual_by_day', $cells[0]->resourceType);
+        self::assertSame(0, $cells[0]->rawCount);
+        self::assertSame(0, $cells[0]->txCount);
+        self::assertSame(1, $cells[0]->issueCount);
+    }
+
+    public function testCoverageIgnoresFailedAggregateBackfillParentIssue(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+        $parent = new SyncJob(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            source: IngestSource::OZON,
+            resourceType: 'ozon_finance_accrual_by_day',
+            kind: SyncJobKind::BACKFILL,
+            windowFrom: new \DateTimeImmutable('2026-06-01'),
+            windowTo: new \DateTimeImmutable('2026-06-30'),
+            shopRef: $connectionRef,
+        );
+        $parent->markRunning();
+        $parent->markFailed('partial failure: 1 failed, 0 cancelled, 4 completed');
+
+        $child = new SyncJob(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            source: IngestSource::OZON,
+            resourceType: 'ozon_finance_accrual_by_day',
+            kind: SyncJobKind::BACKFILL,
+            windowFrom: new \DateTimeImmutable('2026-06-15'),
+            windowTo: new \DateTimeImmutable('2026-06-21'),
+            shopRef: $connectionRef,
+            parentJobId: $parent->getId(),
+        );
+        $child->markRunning();
+        $child->markFailed('Connector failed after retries.');
+
+        $this->em->persist($parent);
+        $this->em->persist($child);
+        $this->em->flush();
+
+        /** @var CoverageQuery $query */
+        $query = self::getContainer()->get(CoverageQuery::class);
+        $cells = $query->heatmap(
+            $companyId,
+            $connectionRef,
+            new \DateTimeImmutable('2026-06-01'),
+            new \DateTimeImmutable('2026-06-30'),
+        );
+
+        self::assertCount(1, $cells);
+        self::assertSame('2026-06-15', $cells[0]->date);
+        self::assertSame($connectionRef, $cells[0]->shopRef);
+        self::assertSame('ozon_finance_accrual_by_day', $cells[0]->resourceType);
+        self::assertSame(0, $cells[0]->rawCount);
+        self::assertSame(0, $cells[0]->txCount);
+        self::assertSame(1, $cells[0]->issueCount);
+    }
+
     public function testReconciliationComparesShopCanonWithCompanyPeriodOzonControl(): void
     {
         $companyId = Uuid::uuid7()->toString();
