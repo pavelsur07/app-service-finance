@@ -10,6 +10,7 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Component\DomCrawler\Crawler;
 
 final class VerificationPageControllerTest extends WebTestCaseBase
 {
@@ -32,7 +33,10 @@ final class VerificationPageControllerTest extends WebTestCaseBase
         $this->loginWithActiveCompany($client, $owner, $company);
 
         $client->request('GET', '/ingestion/verification');
-        self::assertResponseRedirects('/ingestion/verification/coverage');
+        self::assertResponseRedirects('/ingestion/verification/issues');
+
+        $client->request('GET', '/ingestion/verification/coverage');
+        self::assertResponseRedirects('/ingestion/coverage');
 
         foreach ($this->pages() as [$url, $mountId, $entryKey, $activeTabLabel]) {
             $crawler = $client->request('GET', $url);
@@ -43,12 +47,9 @@ final class VerificationPageControllerTest extends WebTestCaseBase
                 $entryKey,
                 $crawler->filter(sprintf('#%s', $mountId))->attr('data-vite-entry'),
             );
-            self::assertSame(1, $crawler->filter('aside a[href="/ingestion/verification"]')->count());
-            self::assertStringContainsString(
-                'Покрытие данных',
-                trim($crawler->filter('aside a[href="/ingestion/verification"]')->text()),
-            );
-            self::assertSame(4, $crawler->filter('.nav-tabs .nav-link')->count());
+            $this->assertIngestionMenu($crawler);
+
+            self::assertSame(3, $crawler->filter('.nav-tabs .nav-link')->count());
             self::assertSame(
                 $url,
                 $crawler->filter('.nav-tabs .nav-link.active')->attr('href'),
@@ -57,13 +58,28 @@ final class VerificationPageControllerTest extends WebTestCaseBase
                 $activeTabLabel,
                 trim($crawler->filter('.nav-tabs .nav-link.active')->text()),
             );
+            self::assertStringNotContainsString(
+                'Покрытие',
+                trim($crawler->filter('.nav-tabs')->text()),
+            );
         }
+
+        $crawler = $client->request('GET', '/ingestion/coverage');
+
+        self::assertResponseIsSuccessful();
+        $this->assertIngestionMenu($crawler);
+        self::assertSame(1, $crawler->filter('#ingestion-verification-coverage-root')->count());
+        self::assertSame(
+            'ingestion_verification_coverage_page',
+            $crawler->filter('#ingestion-verification-coverage-root')->attr('data-vite-entry'),
+        );
+        self::assertSame(0, $crawler->filter('.nav-tabs .nav-link')->count());
     }
 
     public function testVerificationPagesRequireAuthentication(): void
     {
         $client = static::createClient();
-        $client->request('GET', '/ingestion/verification/coverage');
+        $client->request('GET', '/ingestion/coverage');
 
         $response = $client->getResponse();
         $statusCode = $response->getStatusCode();
@@ -84,10 +100,10 @@ final class VerificationPageControllerTest extends WebTestCaseBase
     private function pages(): iterable
     {
         yield [
-            '/ingestion/verification/coverage',
-            'ingestion-verification-coverage-root',
-            'ingestion_verification_coverage_page',
-            'Покрытие данных',
+            '/ingestion/verification/issues',
+            'ingestion-verification-issues-root',
+            'ingestion_verification_issues_page',
+            'Проблемы',
         ];
         yield [
             '/ingestion/verification/reconciliation',
@@ -96,17 +112,20 @@ final class VerificationPageControllerTest extends WebTestCaseBase
             'Сверка сумм',
         ];
         yield [
-            '/ingestion/verification/issues',
-            'ingestion-verification-issues-root',
-            'ingestion_verification_issues_page',
-            'Проблемы',
-        ];
-        yield [
             '/ingestion/verification/financial-summary',
             'ingestion-verification-financial-summary-root',
             'ingestion_verification_financial_summary_page',
             'Финансовая сводка',
         ];
+    }
+
+    private function assertIngestionMenu(Crawler $crawler): void
+    {
+        $items = $crawler->filter('aside a[href="/ingestion/verification"], aside a[href="/ingestion/coverage"]');
+
+        self::assertSame(2, $items->count());
+        self::assertSame('Финансы', trim($items->eq(0)->text()));
+        self::assertSame('Покрытие данных', trim($items->eq(1)->text()));
     }
 
     private function loginWithActiveCompany(KernelBrowser $client, User $user, Company $company): void
