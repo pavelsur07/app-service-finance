@@ -1057,6 +1057,114 @@ textarea.input { height: auto; min-height: 64px; padding-top: 10px; padding-bott
   letter-spacing: 0.05em; text-transform: uppercase;
 }
 .row-form-field .ee { font-size: 13px; color: var(--text-strong); font-weight: 600; }
+
+/* ============ TOAST ============ */
+.toast-stack {
+  position: fixed; top: 24px; right: 24px;
+  display: flex; flex-direction: column-reverse; gap: 10px;
+  z-index: 200; max-width: 380px;
+}
+.toast {
+  display: flex; align-items: flex-start; gap: 10px;
+  width: 360px; max-width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--r-4);
+  border: 1px solid;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-menu);
+}
+.toast .t-ico {
+  width: 20px; height: 20px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-top: 1px;
+}
+.toast .t-body { flex: 1; min-width: 0; }
+.toast .t-title { font-size: 13px; font-weight: 600; color: var(--text-strong); line-height: 1.35; }
+.toast .t-desc  { font-size: 12.5px; color: var(--text-tertiary); margin-top: 3px; line-height: 1.45; }
+.toast .t-action {
+  background: transparent; border: 0; padding: 0 4px;
+  font-family: inherit; font-size: 12.5px; font-weight: 700;
+  color: var(--color-primary); cursor: pointer; flex-shrink: 0; align-self: center;
+}
+.toast .t-action:hover { color: var(--color-primary-hover); }
+.toast .t-close {
+  width: 22px; height: 22px; border-radius: var(--r-1);
+  background: transparent; border: 0; cursor: pointer; color: var(--text-muted);
+  display: flex; align-items: center; justify-content: center;
+  font-family: inherit; flex-shrink: 0; margin: -2px -4px 0 0;
+}
+.toast .t-close:hover { background: var(--bg-page); color: var(--text-strong); }
+.toast--success { border-color: var(--success-border); }
+.toast--success .t-ico { background: var(--success-bg); color: var(--success-text); }
+.toast--danger  { border-color: var(--danger-border); }
+.toast--danger .t-ico  { background: var(--danger-bg); color: var(--danger-text); }
+.toast--warning { border-color: var(--warning-border); }
+.toast--warning .t-ico { background: var(--warning-bg); color: var(--warning-text); }
+.toast--info    { border-color: var(--color-primary-border); }
+.toast--info .t-ico    { background: var(--color-primary-tint); color: var(--color-primary-hover); }
+
+/* ============ INLINE ALERT ============ */
+.alert {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--r-4);
+  border: 1px solid;
+}
+.alert .a-ico { flex-shrink: 0; margin-top: 1px; }
+.alert .a-body { flex: 1; min-width: 0; line-height: 1.45; }
+.alert .a-title { font-size: 13px; font-weight: 700; }
+.alert .a-text  { font-size: 12.5px; }
+.alert .a-title + .a-text { margin-top: 2px; }
+.alert .a-action {
+  flex-shrink: 0; align-self: center;
+  background: transparent; border: 1px solid currentColor;
+  height: 28px; padding: 0 12px; border-radius: var(--r-2);
+  font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+  color: inherit;
+}
+.alert .a-action:hover { background: rgba(255,255,255,0.55); }
+.alert .a-link {
+  font-size: 12.5px; font-weight: 700;
+  color: inherit; text-decoration: none;
+  border-bottom: 1px dotted currentColor;
+}
+.alert .a-close {
+  width: 22px; height: 22px; border-radius: var(--r-1);
+  background: transparent; border: 0; cursor: pointer; color: inherit;
+  display: flex; align-items: center; justify-content: center;
+  font-family: inherit; flex-shrink: 0; opacity: 0.55;
+  align-self: flex-start; margin-top: -2px;
+}
+.alert .a-close:hover { opacity: 1; background: rgba(255,255,255,0.5); }
+.alert--success { background: var(--success-bg); border-color: var(--success-border); color: var(--success-text); }
+.alert--danger  { background: var(--danger-bg);  border-color: var(--danger-border);  color: var(--danger-text); }
+.alert--warning { background: var(--warning-bg); border-color: var(--warning-border); color: var(--warning-text); }
+.alert--info    { background: var(--color-primary-tint); border-color: var(--color-primary-border); color: var(--color-primary-hover); }
+
+/* ============ CONFIRMATION DIALOG ============ */
+.confirm-body { padding: 14px 20px 4px; }
+.confirm-title { font-size: 15px; font-weight: 700; color: var(--text-strong); letter-spacing: -0.015em; }
+.confirm-text  { font-size: 13px; color: var(--text-tertiary); margin-top: 6px; line-height: 1.55; }
+.confirm-text b { color: var(--text-strong); }
+.confirm-foot {
+  padding: 14px 20px;
+  border-top: 1px solid var(--border-soft);
+  display: flex; justify-content: flex-end; gap: 8px;
+  margin-top: 14px;
+}
+.btn-danger-solid {
+  background: var(--danger-text); border-color: var(--danger-text);
+  color: #fff;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.15) inset, 0 4px 10px rgba(185,28,28,0.22);
+}
+.btn-danger-solid:hover { background: #991B1B; border-color: #991B1B; }
+.btn-warning-solid {
+  background: var(--warning-text); border-color: var(--warning-text);
+  color: #fff;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.15) inset, 0 4px 10px rgba(146,64,14,0.22);
+}
+.btn-warning-solid:hover { background: #78350F; border-color: #78350F; }
+
 </style>
 </head>
 <body>
@@ -1104,6 +1212,9 @@ textarea.input { height: auto; min-height: 64px; padding-top: 10px; padding-bott
     <a href="#modal">Modal</a>
     <a href="#empty">Empty state</a>
     <a href="#direction">Direction</a>
+    <a href="#toast">Toast <span class="num">new</span></a>
+    <a href="#alert">Inline Alert <span class="num">new</span></a>
+    <a href="#confirm">Confirmation <span class="num">new</span></a>
 
     <div class="nav-section">04 Money</div>
     <a href="#money">Все форматы</a>
@@ -1249,6 +1360,30 @@ textarea.input { height: auto; min-height: 64px; padding-top: 10px; padding-bott
             <div class="decision-title">Icon color rule</div>
             <div class="decision-value">currentColor inheritance · semantic роль на пункте</div>
             <div class="decision-why">Иконки внутри компонентов наследуют currentColor. Цветом окрашивается ВЕСЬ пункт по семантической роли (default · primary · danger), не иконка отдельно. Эмодзи-иконки запрещены.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">16</div>
+          <div class="decision-body">
+            <div class="decision-title">Toast vs Alert</div>
+            <div class="decision-value">Toast — результат действия, auto-dismiss 4s · Alert — контекст, не исчезает сам</div>
+            <div class="decision-why">Toast подтверждает то, что только что сделал пользователь. Alert — статус системы или окружения, не привязан к моментному действию. Не путать роли — Alert не должен «всплывать», а Toast не должен жить на странице постоянно.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">17</div>
+          <div class="decision-body">
+            <div class="decision-title">Confirmation Dialog</div>
+            <div class="decision-value">обязателен для destructive/irreversible действий</div>
+            <div class="decision-why">Удаление, архивирование, отмена операции, закрытие без сохранения — всегда через .mdl--compact + confirm-*. Primary-кнопка окрашивается по риску: danger-solid (удалить), warning-solid (отменить операцию), primary (закрыть без сохранения).</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">18</div>
+          <div class="decision-body">
+            <div class="decision-title">Feedback icon rule</div>
+            <div class="decision-value">SVG 16px · currentColor · нейтральные пиктограммы</div>
+            <div class="decision-why">Иконки в Toast, Alert, Confirmation — стандартные пиктограммы (info, warning, check, x). Цвет задаётся семантикой родительского компонента через currentColor. Никаких эмодзи и фирменных иллюстраций.</div>
           </div>
         </div>
       </div>
@@ -2561,6 +2696,166 @@ textarea.input { height: auto; min-height: 64px; padding-top: 10px; padding-bott
           <span class="direction direction--neutral"><span class="ddot"></span>Технический</span>
         </div>
       </div>
+
+      <!-- TOAST -->
+      <div class="cb" id="toast">
+        <div class="cb-head">
+          <span class="cb-name">Toast</span>
+          <span class="cb-tag">.toast · .toast-stack</span>
+          <span class="cb-when">Короткое уведомление о результате действия. Top-right, auto-dismiss 4s, закрывается крестиком.</span>
+        </div>
+        <span class="demo-label">4 семантики</span>
+        <div class="demo demo--column">
+          <div class="toast toast--success">
+            <span class="t-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <div class="t-body">
+              <div class="t-title">Операция сохранена</div>
+              <div class="t-desc">№ ДДС-1247 · +245&thinsp;000 ₽</div>
+            </div>
+            <button class="t-action">Открыть</button>
+            <button class="t-close" aria-label="Закрыть"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+          <div class="toast toast--danger">
+            <span class="t-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span>
+            <div class="t-body">
+              <div class="t-title">Не удалось удалить контрагента</div>
+              <div class="t-desc">У контрагента 12 связанных операций</div>
+            </div>
+            <button class="t-close" aria-label="Закрыть"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+          <div class="toast toast--warning">
+            <span class="t-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/><circle cx="12" cy="12" r="10"/></svg></span>
+            <div class="t-body">
+              <div class="t-title">Период закроется через 5 минут</div>
+              <div class="t-desc">Сохраните черновики, чтобы не потерять изменения</div>
+            </div>
+            <button class="t-close" aria-label="Закрыть"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+          <div class="toast toast--info">
+            <span class="t-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
+            <div class="t-body">
+              <div class="t-title">Импорт выписки запущен</div>
+              <div class="t-desc">Обновим, когда закончим — это займёт минуту</div>
+            </div>
+            <button class="t-close" aria-label="Закрыть"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+        </div>
+
+        <span class="demo-label">Стек из 3 (top-right)</span>
+        <div class="demo" style="min-height:300px; background:var(--bg-page); position:relative;">
+          <div style="position:absolute; top:16px; right:16px; display:flex; flex-direction:column-reverse; gap:10px;">
+            <div class="toast toast--info">
+              <span class="t-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
+              <div class="t-body"><div class="t-title">Импорт выписки запущен</div></div>
+              <button class="t-close" aria-label="Закрыть"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+            <div class="toast toast--warning">
+              <span class="t-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/><circle cx="12" cy="12" r="10"/></svg></span>
+              <div class="t-body"><div class="t-title">Период закроется через 5 минут</div></div>
+              <button class="t-close" aria-label="Закрыть"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+            <div class="toast toast--success">
+              <span class="t-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+              <div class="t-body"><div class="t-title">Операция сохранена</div><div class="t-desc">№ ДДС-1247 · +245&thinsp;000 ₽</div></div>
+              <button class="t-action">Открыть</button>
+              <button class="t-close" aria-label="Закрыть"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- INLINE ALERT -->
+      <div class="cb" id="alert">
+        <div class="cb-head">
+          <span class="cb-name">Inline Alert / Banner</span>
+          <span class="cb-tag">.alert</span>
+          <span class="cb-when">Встроенное сообщение в layout. Не исчезает само. Для контекстной информации, не результата действия.</span>
+        </div>
+        <span class="demo-label">4 семантики</span>
+        <div class="demo demo--column">
+          <div class="alert alert--warning">
+            <svg class="a-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <div class="a-body">
+              <div class="a-title">Синхронизация банка прервана</div>
+              <div class="a-text">Токен Тинькофф Бизнес истёк 24 июня. Обновите подключение, чтобы продолжить авто-импорт операций.</div>
+            </div>
+            <button class="a-action">Обновить токен</button>
+          </div>
+          <div class="alert alert--info">
+            <svg class="a-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <div class="a-body">
+              <div class="a-title">Период 1 кв. 2026 закрыт</div>
+              <div class="a-text">Изменения в проведённых операциях недоступны. Можно создавать новые корректировки в открытом периоде.</div>
+            </div>
+          </div>
+          <div class="alert alert--danger">
+            <svg class="a-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <div class="a-body">
+              <div class="a-title">Не удалось загрузить категории</div>
+              <div class="a-text">Сервер не ответил за 10 сек. Проверьте подключение и попробуйте ещё раз.</div>
+            </div>
+            <button class="a-action">Повторить</button>
+          </div>
+          <div class="alert alert--success">
+            <svg class="a-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            <div class="a-body">
+              <div class="a-title">Все операции категоризированы</div>
+              <div class="a-text">Система присвоила статьи ДДС 152 импортированным операциям. <a href="#alert" class="a-link">Проверить результат</a></div>
+            </div>
+            <button class="a-close" aria-label="Скрыть"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CONFIRMATION DIALOG -->
+      <div class="cb" id="confirm">
+        <div class="cb-head">
+          <span class="cb-name">Confirmation Dialog</span>
+          <span class="cb-tag">.mdl.mdl--compact + .confirm-*</span>
+          <span class="cb-when">Подтверждение действия. Для destructive/irreversible операций. На базе Modal compact (440).</span>
+        </div>
+        <span class="demo-label">Destructive (Удалить)</span>
+        <div class="demo" style="background:rgba(11,18,32,0.05); justify-content:center;">
+          <div class="mdl mdl--compact">
+            <div class="confirm-body">
+              <div class="confirm-title">Удалить контрагента «ФНС России»?</div>
+              <div class="confirm-text">Это действие нельзя отменить. У контрагента <b>8 связанных операций</b> — они останутся, но потеряют связь с контрагентом.</div>
+            </div>
+            <div class="confirm-foot">
+              <button class="btn btn-md btn-secondary">Отмена</button>
+              <button class="btn btn-md btn-danger-solid">Удалить</button>
+            </div>
+          </div>
+        </div>
+
+        <span class="demo-label">Warning (Прервать операцию)</span>
+        <div class="demo" style="background:rgba(11,18,32,0.05); justify-content:center;">
+          <div class="mdl mdl--compact">
+            <div class="confirm-body">
+              <div class="confirm-title">Отменить операцию?</div>
+              <div class="confirm-text">Операция «Оплата по счёту № 245» будет отменена. Действие можно откатить в течение 24 часов.</div>
+            </div>
+            <div class="confirm-foot">
+              <button class="btn btn-md btn-secondary">Не отменять</button>
+              <button class="btn btn-md btn-warning-solid">Отменить операцию</button>
+            </div>
+          </div>
+        </div>
+
+        <span class="demo-label">Neutral (Закрыть без сохранения)</span>
+        <div class="demo" style="background:rgba(11,18,32,0.05); justify-content:center;">
+          <div class="mdl mdl--compact">
+            <div class="confirm-body">
+              <div class="confirm-title">Закрыть без сохранения?</div>
+              <div class="confirm-text">Введённые данные будут потеряны. Чтобы сохранить, нажмите «Отмена» и нажмите «Сохранить» в форме.</div>
+            </div>
+            <div class="confirm-foot">
+              <button class="btn btn-md btn-secondary">Отмена</button>
+              <button class="btn btn-md btn-primary">Закрыть</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- ===================== 04. MONEY (⭐ key section) ===================== -->
@@ -2789,11 +3084,55 @@ textarea.input { height: auto; min-height: 64px; padding-top: 10px; padding-bott
           </div>
         </div>
       </div>
+      <div class="cb" id="auth-msg">
+        <div class="cb-head">
+          <span class="cb-name">Auth form messages</span>
+          <span class="cb-tag">.alert над .fields</span>
+          <span class="cb-when">Сообщение на уровне всей формы (а не поля). На auth-страницах и в form-модалках. Применение Inline Alert, не новый компонент.</span>
+        </div>
+        <div class="demo demo--column">
+          <div style="width:100%; max-width:380px; padding:20px; background:var(--bg-page); border-radius:var(--r-4);">
+            <div class="alert alert--danger" style="margin-bottom:14px;">
+              <svg class="a-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <div class="a-body"><div class="a-text">Неверный e-mail или пароль</div></div>
+            </div>
+            <div class="field"><label class="field-label">E-mail</label><input class="input" value="anna@company.ru"></div>
+            <div class="field" style="margin-top:10px;"><label class="field-label">Пароль</label><input class="input" type="password" value="●●●●●●"></div>
+          </div>
+          <div style="width:100%; max-width:380px; padding:20px; background:var(--bg-page); border-radius:var(--r-4);">
+            <div class="alert alert--success" style="margin-bottom:14px;">
+              <svg class="a-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <div class="a-body"><div class="a-text">Код подтверждения отправлен на <b><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="4e2f20202f0e2d21233e2f2037603c3b">[email&#160;protected]</a></b></div></div>
+            </div>
+            <div class="field"><label class="field-label">Код из письма</label><input class="input" value="" placeholder="6 цифр"></div>
+          </div>
+          <div style="width:100%; max-width:380px; padding:20px; background:var(--bg-page); border-radius:var(--r-4);">
+            <div class="alert alert--info" style="margin-bottom:14px;">
+              <svg class="a-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              <div class="a-body"><div class="a-text">Ссылка для входа отправлена. Проверьте почту — она действительна 15 минут.</div></div>
+            </div>
+            <div class="field"><label class="field-label">E-mail</label><input class="input" value="anna@company.ru" disabled style="background:var(--bg-page); color:var(--text-muted);"></div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- ===================== CHANGELOG ===================== -->
     <section id="changelog">
       <h2 class="section-h">Changelog</h2>
+      <div class="cb">
+        <div style="font-size:13.5px; font-weight:700; margin-bottom:4px;">v1.2 — 25 июня 2026</div>
+        <div style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">Feedback layer: Toast, Alert, Confirmation, Form messages.</div>
+        <ul style="margin:0; padding-left:20px; line-height:1.7; font-size:13px;">
+          <li>➕ <b>Toast</b> (<code class="code-inline">.toast</code>) — 4 семантики (success/danger/warning/info), top-right стек, auto-dismiss 4s, action-кнопка и close</li>
+          <li>➕ <b>Inline Alert</b> (<code class="code-inline">.alert</code>) — 4 семантики, без shadow, с опц. action/link/close. 4 примера в контексте</li>
+          <li>➕ <b>Confirmation Dialog</b> (<code class="code-inline">.mdl--compact + .confirm-*</code>) — 3 варианта: destructive (Удалить), warning (Прервать), neutral (Закрыть без сохранения)</li>
+          <li>➕ <b>Auth form messages</b> (Patterns) — Inline Alert над полями: danger/success/info примеры</li>
+          <li>📐 Decisions 16–18: правила Toast vs Alert · Confirmation для destructive · Feedback icon rule</li>
+          <li>🎨 Без новых hex-токенов — переиспользованы существующие semantic (success/danger/warning/primary-tint)</li>
+        </ul>
+      </div>
+
       <div class="cb">
         <div style="font-size:13.5px; font-weight:700; margin-bottom:4px;">v1.1.1 — 24 июня 2026</div>
         <div style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">Icon color rule unified.</div>
@@ -2842,5 +3181,5 @@ textarea.input { height: auto; min-height: 64px; padding-top: 10px; padding-bott
   </main>
 </div>
 
-</body>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script></body>
 </html>
