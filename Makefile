@@ -129,7 +129,13 @@ codex-test-unit-filter: codex-prepare
 # site-php-cli экспортирует спеку через CLI-команду Nelmio (без HTTP/auth),
 # site-frontend перегоняет JSON → TypeScript через openapi-typescript.
 
-.PHONY: api-doc-export api-doc-lint api-types api-types-check
+.PHONY: api-doc-export api-doc-lint api-types api-types-check check-ui-kit check-uikit-react-mapping
+
+check-ui-kit:
+	$(DOCKER_COMPOSE) run --rm -T site-frontend npm run check:ui-kit
+
+check-uikit-react-mapping:
+	$(DOCKER_COMPOSE) run --rm -T site-frontend npm run check:uikit-react-mapping
 
 # Экспорт OpenAPI-спеки в JSON-файл (через PHP CLI — не требует HTTP и auth)
 api-doc-export:
