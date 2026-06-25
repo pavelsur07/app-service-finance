@@ -13,9 +13,9 @@
 | 🛡️ KEEP (protected) | excluded from scan | keep |
 | 🟢 KEEP (active < 14d) | 2 | keep |
 | 🟡 REVIEW (14–59d, single/newest) | 12 | manual decision |
-| 🟡 DELETE_OLD_DUP (older duplicate in family) | 21 | delete after approval |
-| 🟠 DELETE_STALE (60–179d) | 158 | delete after approval |
-| 🔴 DELETE_ANCIENT (≥ 180d) | 22 | delete after approval |
+| 🟡 DELETE_OLD_DUP (older duplicate in family) | 26 | delete after approval |
+| 🟠 DELETE_STALE (60–179d) | 159 | delete after approval |
+| 🔴 DELETE_ANCIENT (≥ 180d) | 16 | delete after approval |
 
 **Branches proposed for deletion:** 201
 **Branches recommended to keep:** 14
@@ -24,18 +24,18 @@
 
 | Family | Count | Newest branch | Action |
 |---|---|---|---|
-| `codex/fix-migration-error-with-balance_categories` | 13 | 2026-01-15 / origin/codex/fix-migration-error-with-balance_categories-q7r4l0 | keep newest, delete 12 others |
-| `codex/add-ci-job-for-empty-db-migration` | 5 | 2025-12-24 / origin/codex/add-ci-job-for-empty-db-migration-2qsm3t | keep newest, delete 4 others |
-| `claude/fix-sticky-table` | 3 | 2026-04-21 / origin/claude/fix-sticky-table-header-DRDXV | keep newest, delete 2 others |
-| `codex/implement-token-authorization-for-public-api` | 2 | 2025-09-19 / origin/codex/implement-token-authorization-for-public-api-k7xau3 | keep newest, delete 1 others |
-| `codex/implement-invitetokenservice-and-companyinvitemanager` | 2 | 2026-01-27 / origin/codex/implement-invitetokenservice-and-companyinvitemanager-p4t1j0 | keep newest, delete 1 others |
-| `codex/fix-email-case-sensitivity-on-registration` | 2 | 2026-01-27 / origin/codex/fix-email-case-sensitivity-on-registration-2lptkx | keep newest, delete 1 others |
-| `codex/add-view-for-plans-in-admin` | 2 | 2026-01-31 / origin/codex/add-view-for-plans-in-admin-d6aqst | keep newest, delete 1 others |
-| `codex/add-usagecounter-entity-and-repository` | 2 | 2026-01-31 / origin/codex/add-usagecounter-entity-and-repository-3xo4o7 | keep newest, delete 1 others |
-| `codex/add-subscriptionintegration-entity-and-repository` | 2 | 2026-01-31 / origin/codex/add-subscriptionintegration-entity-and-repository-qd7utg | keep newest, delete 1 others |
-| `codex/add-admin-plan-viewing-functionality` | 2 | 2026-01-31 / origin/codex/add-admin-plan-viewing-functionality-cj7yh0 | keep newest, delete 1 others |
+| `codex/fix-migration-error-with-balance_categories` | 12 | 2026-01-15 / origin/codex/fix-migration-error-with-balance_categories | keep newest, delete 11 others |
+| `codex/add-ci-job-for-empty-db-migration` | 5 | 2025-12-24 / origin/codex/add-ci-job-for-empty-db-migration | keep newest, delete 4 others |
+| `claude/fix-sticky-table-header` | 3 | 2026-04-21 / origin/claude/fix-sticky-table-header-DRDXV | keep newest, delete 2 others |
 | `codex` | 2 | 2026-03-01 / origin/codex-66oa2j | keep newest, delete 1 others |
-| `claude/marketplace-ads-chunk-progress` | 2 | 2026-04-18 / origin/claude/marketplace-ads-chunk-progress-switch | keep newest, delete 1 others |
+| `codex/add-admin-plan-viewing-functionality` | 2 | 2026-01-31 / origin/codex/add-admin-plan-viewing-functionality | keep newest, delete 1 others |
+| `codex/add-read-only-plans-view-in-admin` | 2 | 2026-01-31 / origin/codex/add-read-only-plans-view-in-admin | keep newest, delete 1 others |
+| `codex/add-subscriptionintegration-entity-and-repository` | 2 | 2026-01-31 / origin/codex/add-subscriptionintegration-entity-and-repository | keep newest, delete 1 others |
+| `codex/add-usagecounter-entity-and-repository` | 2 | 2026-01-31 / origin/codex/add-usagecounter-entity-and-repository | keep newest, delete 1 others |
+| `codex/add-view-for-plans-in-admin` | 2 | 2026-01-31 / origin/codex/add-view-for-plans-in-admin | keep newest, delete 1 others |
+| `codex/fix-email-case-sensitivity-on-registration` | 2 | 2026-01-27 / origin/codex/fix-email-case-sensitivity-on-registration | keep newest, delete 1 others |
+| `codex/implement-invitetokenservice-and-companyinvitemanager` | 2 | 2026-01-27 / origin/codex/implement-invitetokenservice-and-companyinvitemanager | keep newest, delete 1 others |
+| `codex/implement-token-authorization-for-public-api` | 2 | 2025-09-19 / origin/codex/implement-token-authorization-for-public-api | keep newest, delete 1 others |
 
 ## Full deletion plan
 
@@ -46,7 +46,6 @@
 | origin/codex/align-button-block-to-the-right-q7gf9k | 296d | pavelsur07@gmail.com | 2025-09-01 |
 | origin/codex/fix-transaction-saving-error-in-cashtransactioncontroller | 295d | pavelsur07@gmail.com | 2025-09-02 |
 | origin/codex/remove | 281d | pavelsur07@gmail.com | 2025-09-16 |
-| origin/codex/implement-token-authorization-for-public-api-k7xau3 | 278d | pavelsur07@gmail.com | 2025-09-19 |
 | origin/codex/implement-token-authorization-for-public-api | 278d | pavelsur07@gmail.com | 2025-09-19 |
 | origin/codex/add-apijson-method-to-reportcashflowcontroller | 278d | pavelsur07@gmail.com | 2025-09-19 |
 | origin/codex/refactor-plcategory-with-crud-ui | 265d | pavelsur07@gmail.com | 2025-10-02 |
@@ -55,15 +54,10 @@
 | origin/codex/implement-payment-calendar-page | 252d | pavelsur07@gmail.com | 2025-10-15 |
 | origin/codex/refactor-ui-to-match-tabler-io | 242d | pavelsur07@gmail.com | 2025-10-26 |
 | origin/codex/refactor-_sidebar-to-remove-macros | 241d | pavelsur07@gmail.com | 2025-10-26 |
-| origin/codex-6oftok | 232d | pavelsur07@gmail.com | 2025-11-04 |
 | origin/codex/add-create-document-button-in-payment-schedule | 206d | pavelsur07@gmail.com | 2025-11-30 |
 | origin/codex/refactor-pl-preview-ui-rlne2j | 205d | pavelsur07@gmail.com | 2025-12-01 |
 | origin/codex/create-empty-cardreceiptingest-module | 189d | pavelsur07@gmail.com | 2025-12-18 |
 | origin/codex/add-migration-rules-and-ci-checks | 183d | pavelsur07@gmail.com | 2025-12-24 |
-| origin/codex/add-ci-job-for-empty-db-migration-le1u8w | 183d | pavelsur07@gmail.com | 2025-12-24 |
-| origin/codex/add-ci-job-for-empty-db-migration-ge1me6 | 183d | pavelsur07@gmail.com | 2025-12-24 |
-| origin/codex/add-ci-job-for-empty-db-migration-3lhq64 | 183d | pavelsur07@gmail.com | 2025-12-24 |
-| origin/codex/add-ci-job-for-empty-db-migration-2qsm3t | 183d | pavelsur07@gmail.com | 2025-12-24 |
 | origin/codex/add-ci-job-for-empty-db-migration | 183d | pavelsur07@gmail.com | 2025-12-24 |
 
 ### 🟠 DELETE_STALE (60–179 days)
@@ -72,7 +66,8 @@
 |---|---|---|---|
 | origin/codex/update-composer-dependencies-for-php-version | 177d | pavelsur07@gmail.com | 2025-12-30 |
 | origin/codex/fix-missing-php-zip-extension | 177d | pavelsur07@gmail.com | 2025-12-30 |
-| origin/codex/fix-migration-error-with-balance_categories-q7r4l0 | 160d | pavelsur07@gmail.com | 2026-01-15 |
+| origin/codex/fix-migration-error-with-balance_categories-gtqvwz | 160d | pavelsur07@gmail.com | 2026-01-15 |
+| origin/codex/fix-migration-error-with-balance_categories | 160d | pavelsur07@gmail.com | 2026-01-15 |
 | origin/codex/update-project-selection-to-show-hierarchy | 156d | pavelsur07@gmail.com | 2026-01-19 |
 | origin/codex/add-reusable-projectdirectionpicker-widget | 156d | pavelsur07@gmail.com | 2026-01-19 |
 | origin/codex/add-parent-selection-validation-to-projectdirection | 156d | pavelsur07@gmail.com | 2026-01-19 |
@@ -82,23 +77,22 @@
 | origin/codex/add-xlsx-format-validation-service | 153d | pavelsur07@gmail.com | 2026-01-23 |
 | origin/codex/add-test-for-invalid-non-xlsx-file | 152d | pavelsur07@gmail.com | 2026-01-23 |
 | origin/codex/remove-marketplace-modules-completely | 151d | pavelsur07@gmail.com | 2026-01-24 |
-| origin/codex/implement-invitetokenservice-and-companyinvitemanager-p4t1j0 | 148d | pavelsur07@gmail.com | 2026-01-27 |
+| origin/codex/implement-invitetokenservice-and-companyinvitemanager | 148d | pavelsur07@gmail.com | 2026-01-27 |
 | origin/codex/implement-email-invitation-sending | 148d | pavelsur07@gmail.com | 2026-01-28 |
 | origin/codex/fix-symfony-argument-resolver-error | 148d | pavelsur07@gmail.com | 2026-01-28 |
-| origin/codex/fix-email-case-sensitivity-on-registration-2lptkx | 148d | pavelsur07@gmail.com | 2026-01-27 |
+| origin/codex/fix-email-case-sensitivity-on-registration | 148d | pavelsur07@gmail.com | 2026-01-27 |
 | origin/codex/fix-activecompanyservice-for-invited-operators | 148d | pavelsur07@gmail.com | 2026-01-28 |
 | origin/codex/create-company-repositories-structure | 148d | pavelsur07@gmail.com | 2026-01-27 |
 | origin/codex/add-unit-and-functional-tests-for-company-wxmjmo | 148d | pavelsur07@gmail.com | 2026-01-27 |
 | origin/codex/add-unit-and-functional-tests-for-company | 148d | pavelsur07@gmail.com | 2026-01-27 |
 | origin/codex/add-info-section-on-homepage-based-on-tabler | 147d | pavelsur07@gmail.com | 2026-01-29 |
-| origin/codex/add-subscriptionintegration-entity-and-repository-qd7utg | 145d | pavelsur07@gmail.com | 2026-01-31 |
+| origin/codex/add-subscriptionintegration-entity-and-repository | 145d | pavelsur07@gmail.com | 2026-01-31 |
 | origin/codex/add-billing-subscription-entity-and-repository | 145d | pavelsur07@gmail.com | 2026-01-31 |
-| origin/codex/add-view-for-plans-in-admin-d6aqst | 144d | pavelsur07@gmail.com | 2026-01-31 |
+| origin/codex/add-view-for-plans-in-admin-flfkwh | 144d | pavelsur07@gmail.com | 2026-01-31 |
 | origin/codex/add-view-for-plans-in-admin | 144d | pavelsur07@gmail.com | 2026-01-31 |
-| origin/codex/add-usagecounter-entity-and-repository-3xo4o7 | 144d | pavelsur07@gmail.com | 2026-01-31 |
-| origin/codex/add-read-only-plans-view-in-admin-jwyp0o | 144d | pavelsur07@gmail.com | 2026-01-31 |
+| origin/codex/add-usagecounter-entity-and-repository | 144d | pavelsur07@gmail.com | 2026-01-31 |
 | origin/codex/add-read-only-plans-view-in-admin | 144d | pavelsur07@gmail.com | 2026-01-31 |
-| origin/codex/add-admin-plan-viewing-functionality-cj7yh0 | 144d | pavelsur07@gmail.com | 2026-01-31 |
+| origin/codex/add-admin-plan-viewing-functionality | 144d | pavelsur07@gmail.com | 2026-01-31 |
 | origin/codex/add-auditlog-entity-and-migration | 140d | pavelsur07@gmail.com | 2026-02-04 |
 | origin/codex/refactor-cashtransactioncontroller-to-use-new-service | 138d | pavelsur07@gmail.com | 2026-02-07 |
 | origin/codex/fix-cash-file-import-job-hang | 137d | pavelsur07@gmail.com | 2026-02-07 |
@@ -203,6 +197,7 @@
 | origin/claude/plan-ozon-ads-loading-YCI0T | 67d | noreply@anthropic.com | 2026-04-18 |
 | origin/claude/ozon-ads-ui-loader-AH7zP | 67d | noreply@anthropic.com | 2026-04-19 |
 | origin/claude/ozon-ad-statistics-message-eQHk5 | 67d | noreply@anthropic.com | 2026-04-18 |
+| origin/claude/marketplace-ads-chunk-progress-tests | 67d | noreply@anthropic.com | 2026-04-18 |
 | origin/claude/marketplace-ads-chunk-progress-switch | 67d | noreply@anthropic.com | 2026-04-18 |
 | origin/claude/marketplace-ads-chunk-progress-repo | 67d | noreply@anthropic.com | 2026-04-18 |
 | origin/claude/enhance-ozon-handler-PGEHD | 67d | noreply@anthropic.com | 2026-04-18 |
@@ -233,27 +228,32 @@
 
 | Branch | Age | Author | Last commit |
 |---|---|---|---|
+| origin/codex/implement-token-authorization-for-public-api-k7xau3 | 278d | pavelsur07@gmail.com | 2025-09-19 |
+| origin/codex-6oftok | 232d | pavelsur07@gmail.com | 2025-11-04 |
+| origin/codex/add-ci-job-for-empty-db-migration-le1u8w | 183d | pavelsur07@gmail.com | 2025-12-24 |
+| origin/codex/add-ci-job-for-empty-db-migration-ge1me6 | 183d | pavelsur07@gmail.com | 2025-12-24 |
+| origin/codex/add-ci-job-for-empty-db-migration-3lhq64 | 183d | pavelsur07@gmail.com | 2025-12-24 |
+| origin/codex/add-ci-job-for-empty-db-migration-2qsm3t | 183d | pavelsur07@gmail.com | 2025-12-24 |
 | origin/codex/fix-migration-error-with-balance_categories-x4y55x | 160d | pavelsur07@gmail.com | 2026-01-15 |
 | origin/codex/fix-migration-error-with-balance_categories-uizd5p | 160d | pavelsur07@gmail.com | 2026-01-15 |
 | origin/codex/fix-migration-error-with-balance_categories-sjlkr8 | 160d | pavelsur07@gmail.com | 2026-01-15 |
 | origin/codex/fix-migration-error-with-balance_categories-rp8m4z | 160d | pavelsur07@gmail.com | 2026-01-15 |
+| origin/codex/fix-migration-error-with-balance_categories-q7r4l0 | 160d | pavelsur07@gmail.com | 2026-01-15 |
 | origin/codex/fix-migration-error-with-balance_categories-ogt3zg | 160d | pavelsur07@gmail.com | 2026-01-15 |
 | origin/codex/fix-migration-error-with-balance_categories-i62uuc | 160d | pavelsur07@gmail.com | 2026-01-15 |
-| origin/codex/fix-migration-error-with-balance_categories-gtqvwz | 160d | pavelsur07@gmail.com | 2026-01-15 |
 | origin/codex/fix-migration-error-with-balance_categories-gau23w | 160d | pavelsur07@gmail.com | 2026-01-15 |
 | origin/codex/fix-migration-error-with-balance_categories-bje61b | 160d | pavelsur07@gmail.com | 2026-01-15 |
 | origin/codex/fix-migration-error-with-balance_categories-9l8zbb | 160d | pavelsur07@gmail.com | 2026-01-15 |
 | origin/codex/fix-migration-error-with-balance_categories-8q7xpz | 160d | pavelsur07@gmail.com | 2026-01-15 |
-| origin/codex/fix-migration-error-with-balance_categories | 160d | pavelsur07@gmail.com | 2026-01-15 |
-| origin/codex/implement-invitetokenservice-and-companyinvitemanager | 148d | pavelsur07@gmail.com | 2026-01-27 |
-| origin/codex/fix-email-case-sensitivity-on-registration | 148d | pavelsur07@gmail.com | 2026-01-27 |
-| origin/codex/add-subscriptionintegration-entity-and-repository | 145d | pavelsur07@gmail.com | 2026-01-31 |
-| origin/codex/add-view-for-plans-in-admin-flfkwh | 144d | pavelsur07@gmail.com | 2026-01-31 |
-| origin/codex/add-usagecounter-entity-and-repository | 144d | pavelsur07@gmail.com | 2026-01-31 |
-| origin/codex/add-admin-plan-viewing-functionality | 144d | pavelsur07@gmail.com | 2026-01-31 |
+| origin/codex/implement-invitetokenservice-and-companyinvitemanager-p4t1j0 | 148d | pavelsur07@gmail.com | 2026-01-27 |
+| origin/codex/fix-email-case-sensitivity-on-registration-2lptkx | 148d | pavelsur07@gmail.com | 2026-01-27 |
+| origin/codex/add-subscriptionintegration-entity-and-repository-qd7utg | 145d | pavelsur07@gmail.com | 2026-01-31 |
+| origin/codex/add-view-for-plans-in-admin-d6aqst | 144d | pavelsur07@gmail.com | 2026-01-31 |
+| origin/codex/add-usagecounter-entity-and-repository-3xo4o7 | 144d | pavelsur07@gmail.com | 2026-01-31 |
+| origin/codex/add-read-only-plans-view-in-admin-jwyp0o | 144d | pavelsur07@gmail.com | 2026-01-31 |
+| origin/codex/add-admin-plan-viewing-functionality-cj7yh0 | 144d | pavelsur07@gmail.com | 2026-01-31 |
 | origin/claude/fix-sticky-table-header-62inZ | 72d | noreply@anthropic.com | 2026-04-14 |
 | origin/claude/fix-sticky-table-header-HVv5W | 70d | noreply@anthropic.com | 2026-04-16 |
-| origin/claude/marketplace-ads-chunk-progress-tests | 67d | noreply@anthropic.com | 2026-04-18 |
 
 ## Branches to keep (for reference)
 
@@ -281,15 +281,22 @@
 | origin/codex/fix-reprocess-raw-document-for-wb-sales-returns-and-costs | 41d | pavelsur07@gmail.com | 2026-05-14 |
 | origin/codex/fix-deduplication-of-wb-financial-reports | 22d | pavelsur07@gmail.com | 2026-06-03 |
 
-## Open questions for Owner
+## Owner decisions (locked)
 
-1. **Thresholds** — confirmed at defaults (14 / 60 / 180 days) for this run. ✅
-2. **Extra protected branches?** — beyond the standard set (`master/main/develop/staging/production/release/* + HEAD`), are any of the branches above protected and must NOT be deleted? List them and they will be moved to KEEP.
-3. **🟡 REVIEW bucket (12 branches, 14–59d singles)** — by default these are **kept**. Options: (a) keep all, (b) delete all, (c) review individually. Default = keep.
-4. **🟡 DELETE_OLD_DUP** — for each multi-branch family the **newest** branch is kept; all older siblings are proposed for deletion. Confirm this "keep newest only" policy.
-5. **Notify authors before deletion?** — author list below. Almost all branches belong to automated agents (`noreply@anthropic.com`) and the Owner (`pavelsur07@gmail.com`).
+1. **Thresholds:** defaults (14 / 60 / 180) — locked.
+2. **Extra protected branches:** none. Standard protection set is sufficient.
+3. **REVIEW bucket (14–59d singles):** keep all. They will roll into STALE naturally if abandoned.
+4. **DELETE_OLD_DUP policy:** keep newest in each family, delete older siblings. Confirmed.
+5. **Notify authors:** no. 119 branches belong to automated agents, 82 to Owner himself.
 
-> **Note on family grouping:** the normalization heuristic (strip random hash suffixes) collapsed two standalone branches `origin/codex-66oa2j` and `origin/codex-6oftok` into one nominal family `origin/codex`. Both are stale deletion candidates regardless, so this does not affect the deletion set. No RECENT-bucket (14–59d) branch was affected by an over-collapse.
+> **Note on family normalization:** the family suffix-stripping keeps meaningful lowercase words
+> (`-frontend`, `-header`, `-backend`, `-tests`, `-repo`, `-switch`, `-api`, …) and strips only
+> hash-like suffixes (containing a digit or an uppercase letter, e.g. `-62inZ`, `-DRDXV`, `-q7gf9k`).
+> Consequences, all immaterial to the deletion set (every branch below is a stale candidate regardless):
+> - `marketplace-ads-chunk-progress-{repo,switch,tests}` stay as distinct singletons (word suffixes kept).
+> - An all-lowercase hash without digits (e.g. `…balance_categories-gtqvwz`) is indistinguishable from a
+>   word, so it stays a singleton by design of the rule.
+> - `widgets-{frontend,summary-api,integrate,cpc-fix}` stay separate — these are genuinely distinct tasks.
 
 ## Authors list (for optional notification)
 
