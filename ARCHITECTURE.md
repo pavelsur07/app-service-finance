@@ -74,6 +74,8 @@
 | `SyncJob` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
 | `FinancialTransaction` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
 | `SystemCounterparty` | Ingestion | global dictionary, no company filter |
+| `ExternalCategory` | Ingestion | global marketplace source dictionary, no company filter |
+| `ExternalCategoryMapping` | Ingestion | global mapping dictionary, no company filter |
 | `NormalizationIssue` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
 | `PLDirtyPeriod` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
 | `ProductImport` | Catalog | `string $companyId` ✅ |
@@ -121,6 +123,7 @@
 - Amounts are stored in minor units. Shared `Money` is signed and can represent positive, negative, or zero values; `TransactionDirection` (`IN`/`OUT`) remains the normalized flow classification. `Money` enforces one ISO-4217 currency per arithmetic operation.
 - `operationGroupId` groups decomposed transactions from one source operation for audit and sum-control checks.
 - `SystemCounterparty` is a global source dictionary (`source`, `name`, optional `inn`) for marketplace/system counterparties. It is not tenant-owned and is resolved by source during normalization; missing source rows leave `FinancialTransaction.counterpartyId = null` and are logged.
+- `ExternalCategory` and `ExternalCategoryMapping` are global Ingestion dictionaries for marketplace source categories (`source`, `resourceType`, `scope`, normalized external key). They are intentionally not tenant-owned: Ozon/WB category names and base mappings are source-level semantics, while admin changes affect future normalization and metadata refresh across companies.
 - `FinancialTransaction.listingId` and `listingSku` are nullable marketplace listing attribution fields. Missing or ambiguous listing matches must not block normalization.
 - `ListingResolverInterface` resolves source-specific listing attribution from `MappedTransaction.sourceData`; implementations are registered with `app.ingestion.listing_resolver`. `OzonListingResolver` uses supplier SKU (`offer_id`/`item_code`) and marketplace SKU fallbacks; WB resolver is intentionally a warning-only stub until WB ingestion mapping is defined.
 - `MarketplaceListingFacade` is the Ingestion-facing boundary to legacy Marketplace listing repositories. Ingestion must not query Marketplace entities directly outside this facade.

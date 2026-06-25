@@ -119,7 +119,7 @@ final class OzonAccrualByDayPreviewMapperTest extends TestCase
         self::assertSame(TransactionType::OTHER, $nonItem->type);
         self::assertSame(TransactionDirection::OUT, $nonItem->direction);
         self::assertSame(7828, $nonItem->amountMinor);
-        self::assertSame('Неизвестные категории Ozon', $nonItem->ozonCategoryGroup);
+        self::assertSame('Требует классификации', $nonItem->ozonCategoryGroup);
 
         $container = $this->row($rows, 'container_fee:fees:0:type-77');
         self::assertSame(TransactionType::FEE, $container->type);
