@@ -574,6 +574,24 @@ export interface operations {
                             /** @example 1500000000 */
                             amount_minor?: number;
                         }[];
+                        marketplace_categories?: {
+                            /** @example ozon */
+                            source?: string;
+                            /** @example Услуги доставки */
+                            category_group?: string;
+                            /** @example Логистика */
+                            category_name?: string;
+                            /** @example fee */
+                            type?: string;
+                            /** @example out */
+                            direction?: string;
+                            /** @example -5374795 */
+                            amount_minor?: number;
+                            /** @example 1418 */
+                            tx_count?: number;
+                            /** @example 400 */
+                            sort_order?: number;
+                        }[];
                     };
                 };
             };

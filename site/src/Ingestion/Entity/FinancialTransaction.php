@@ -219,6 +219,44 @@ class FinancialTransaction implements TenantOwnedInterface
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /**
+     * @param array<string, mixed> $sourceData
+     * @param list<string> $keys
+     */
+    public function replaceSourceDataFields(array $sourceData, array $keys, ?string $description = null): bool
+    {
+        Assert::allString($keys);
+        Assert::allNotEmpty($keys);
+
+        $changed = false;
+        $nextSourceData = $this->sourceData;
+
+        foreach ($keys as $key) {
+            if (!array_key_exists($key, $sourceData)) {
+                continue;
+            }
+
+            if (!array_key_exists($key, $nextSourceData) || $nextSourceData[$key] !== $sourceData[$key]) {
+                $nextSourceData[$key] = $sourceData[$key];
+                $changed = true;
+            }
+        }
+
+        if (null !== $description && $this->description !== $description) {
+            $this->description = $description;
+            $changed = true;
+        }
+
+        if (!$changed) {
+            return false;
+        }
+
+        $this->sourceData = $nextSourceData;
+        $this->updatedAt = new \DateTimeImmutable();
+
+        return true;
+    }
+
     public function oldOccurredAt(): \DateTimeImmutable
     {
         return $this->oldOccurredAt ?? $this->occurredAt;

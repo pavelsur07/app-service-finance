@@ -33,6 +33,7 @@ export type FinancialSummaryResponse = JsonResponse<'get_api_ingestion_verificat
 export type FinancialSummaryQuery = QueryParameters<'get_api_ingestion_verification_financial_summary'>;
 export type FinancialSummaryMonthDto = NonNullable<FinancialSummaryResponse['by_month']>[number];
 export type FinancialSummaryCategoryDto = NonNullable<FinancialSummaryResponse['by_category']>[number];
+export type FinancialSummaryMarketplaceCategoryDto = NonNullable<FinancialSummaryResponse['marketplace_categories']>[number];
 
 export interface MonthPeriod {
     year: number;

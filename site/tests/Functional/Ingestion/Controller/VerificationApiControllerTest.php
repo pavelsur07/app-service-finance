@@ -8,6 +8,7 @@ use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\Finance\Entity\PLMonthlySnapshot;
 use App\Finance\Enum\PLFlow;
+use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Entity\FinancialTransaction;
 use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Entity\NormalizationIssue;
@@ -69,6 +70,9 @@ final class VerificationApiControllerTest extends WebTestCaseBase
         self::assertSame(2345, $summary['by_month'][0]['expense_minor']);
         self::assertSame(10000, $summary['by_month'][0]['net_minor']);
         self::assertSame('income', $summary['by_category'][1]['flow']);
+        self::assertSame('Услуги доставки', $summary['marketplace_categories'][0]['category_group']);
+        self::assertSame('Логистика', $summary['marketplace_categories'][0]['category_name']);
+        self::assertSame(-200, $summary['marketplace_categories'][0]['amount_minor']);
     }
 
     public function testCoverageUsesTransactionOccurredDateForBackfillHeatmap(): void
@@ -376,7 +380,19 @@ final class VerificationApiControllerTest extends WebTestCaseBase
         $em->persist($raw);
         $em->persist($this->transaction($companyId, $raw->getId(), 'api-sale-1', 1000, TransactionType::SALE));
         $em->persist($this->transaction($companyId, $raw->getId(), 'api-refund-1', -300, TransactionType::REFUND));
-        $em->persist($this->transaction($companyId, $raw->getId(), 'api-commission-1', -200, TransactionType::COMMISSION));
+        $em->persist($this->transaction(
+            $companyId,
+            $raw->getId(),
+            'api-commission-1',
+            -200,
+            TransactionType::COMMISSION,
+            sourceData: [
+                '_ingestion_resource' => OzonResourceType::ACCRUAL_BY_DAY,
+                '_ozon_category_group' => 'Услуги доставки',
+                '_ozon_category_label' => 'Логистика',
+                '_ozon_category_sort_order' => 400,
+            ],
+        ));
         $em->persist(new NormalizationIssue(
             $companyId,
             $raw->getId(),
@@ -515,6 +531,8 @@ final class VerificationApiControllerTest extends WebTestCaseBase
         TransactionType $type,
         string $shopRef = 'shop-1',
         ?\DateTimeImmutable $occurredAt = null,
+        ?TransactionDirection $direction = null,
+        array $sourceData = [],
     ): FinancialTransaction {
         return new FinancialTransaction(
             companyId: $companyId,
@@ -525,10 +543,11 @@ final class VerificationApiControllerTest extends WebTestCaseBase
             externalUpdatedAt: new \DateTimeImmutable('2026-06-15 10:00:00+00:00'),
             operationGroupId: Uuid::uuid7()->toString(),
             type: $type,
-            direction: $amountMinor >= 0 ? TransactionDirection::IN : TransactionDirection::OUT,
+            direction: $direction ?? ($amountMinor >= 0 ? TransactionDirection::IN : TransactionDirection::OUT),
             money: Money::fromMinor($amountMinor, 'RUB'),
             occurredAt: $occurredAt ?? new \DateTimeImmutable('2026-06-15 10:00:00+00:00'),
             rawRecordId: $rawRecordId,
+            sourceData: $sourceData,
         );
     }
 

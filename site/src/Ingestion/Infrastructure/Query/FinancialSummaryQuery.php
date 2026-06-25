@@ -6,8 +6,13 @@ namespace App\Ingestion\Infrastructure\Query;
 
 use App\Finance\Enum\PLFlow;
 use App\Ingestion\Application\DTO\FinancialSummaryCategoryView;
+use App\Ingestion\Application\DTO\FinancialSummaryMarketplaceCategoryView;
 use App\Ingestion\Application\DTO\FinancialSummaryMonthView;
+use App\Ingestion\Application\Source\Ozon\OzonResourceType;
+use App\Ingestion\Enum\IngestSource;
+use App\Ingestion\Enum\TransactionDirection;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Types\Types;
 use Webmozart\Assert\Assert;
 
 final class FinancialSummaryQuery
@@ -125,6 +130,90 @@ final class FinancialSummaryQuery
         );
     }
 
+    /**
+     * @return list<FinancialSummaryMarketplaceCategoryView>
+     */
+    public function marketplaceCategories(string $companyId, ?string $shopRef, int $year, int $month): array
+    {
+        Assert::uuid($companyId);
+        [$from, $toExclusive] = $this->monthBounds($year, $month);
+
+        $conditions = [
+            'ft.company_id = :companyId',
+            'ft.source = :source',
+            "ft.source_data->>'_ingestion_resource' = :resourceType",
+            'ft.occurred_at >= :from',
+            'ft.occurred_at < :toExclusive',
+        ];
+        $params = [
+            'companyId' => $companyId,
+            'source' => IngestSource::OZON->value,
+            'resourceType' => OzonResourceType::ACCRUAL_BY_DAY,
+            'from' => $from,
+            'toExclusive' => $toExclusive,
+            'outDirection' => TransactionDirection::OUT->value,
+        ];
+        $types = [
+            'from' => Types::DATETIME_IMMUTABLE,
+            'toExclusive' => Types::DATETIME_IMMUTABLE,
+        ];
+
+        if (null !== $shopRef && '' !== trim($shopRef)) {
+            $conditions[] = 'ft.shop_ref = :shopRef';
+            $params['shopRef'] = trim($shopRef);
+        }
+
+        $rows = $this->connection->fetchAllAssociative(
+            sprintf(
+                "WITH base AS (
+                    SELECT
+                        ft.source,
+                        COALESCE(NULLIF(ft.source_data->>'_ozon_category_group', ''), 'Без группы Ozon') AS category_group,
+                        COALESCE(NULLIF(ft.source_data->>'_ozon_category_label', ''), ft.description, ft.type) AS category_name,
+                        ft.type,
+                        ft.direction,
+                        ABS(ft.amount_minor::bigint) AS amount_minor,
+                        CASE
+                            WHEN ft.source_data->>'_ozon_category_sort_order' ~ '^[0-9]+$'
+                                THEN (ft.source_data->>'_ozon_category_sort_order')::int
+                            ELSE 9999
+                        END AS sort_order
+                    FROM ingest_financial_transactions ft
+                    WHERE %s
+                )
+                SELECT
+                    source,
+                    category_group,
+                    category_name,
+                    type,
+                    direction,
+                    COALESCE(SUM(CASE WHEN direction = :outDirection THEN -amount_minor ELSE amount_minor END), 0) AS amount_minor,
+                    COUNT(*) AS tx_count,
+                    MIN(sort_order) AS sort_order
+                FROM base
+                GROUP BY source, category_group, category_name, type, direction
+                ORDER BY sort_order ASC, category_group ASC, category_name ASC, type ASC, direction ASC",
+                implode(' AND ', $conditions),
+            ),
+            $params,
+            $types,
+        );
+
+        return array_map(
+            static fn (array $row): FinancialSummaryMarketplaceCategoryView => new FinancialSummaryMarketplaceCategoryView(
+                source: (string) $row['source'],
+                categoryGroup: (string) $row['category_group'],
+                categoryName: (string) $row['category_name'],
+                type: (string) $row['type'],
+                direction: (string) $row['direction'],
+                amountMinor: (int) $row['amount_minor'],
+                txCount: (int) $row['tx_count'],
+                sortOrder: (int) $row['sort_order'],
+            ),
+            $rows,
+        );
+    }
+
     private static function decimalToMinor(string $amount): int
     {
         $amount = trim($amount);
@@ -134,5 +223,16 @@ final class FinancialSummaryQuery
         $minor = ((int) $whole * 100) + (int) str_pad(substr($fraction, 0, 2), 2, '0');
 
         return $negative ? -$minor : $minor;
+    }
+
+    /**
+     * @return array{0: \DateTimeImmutable, 1: \DateTimeImmutable}
+     */
+    private function monthBounds(int $year, int $month): array
+    {
+        Assert::range($month, 1, 12);
+        $from = new \DateTimeImmutable(sprintf('%04d-%02d-01 00:00:00', $year, $month));
+
+        return [$from, $from->modify('first day of next month')];
     }
 }
