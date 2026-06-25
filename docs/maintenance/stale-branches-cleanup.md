@@ -3,7 +3,7 @@
 **Generated at:** 2026-06-25
 **Base branch:** origin/master
 **Total non-merged branches:** 215
-**Run scope:** Phases 0–4 (plan only). No branch deleted in this run.
+**Run scope:** Phases 0–6 — plan approved and **executed** on 2026-06-25 (see Execution result below).
 **Thresholds (Owner-confirmed, defaults):** ACTIVE <14d · RECENT 14–59d · STALE 60–179d · ANCIENT ≥180d
 
 ## Summary
@@ -312,3 +312,27 @@ Unique authors among the 201 branches proposed for deletion:
 🛑 **STOP. План удаления готов. Ждать апрува Владельца на Phase 5.**
 
 Чтобы запустить удаление (Phase 5), Владелец должен дать явный апрув — например `approve the deletion plan`. До этого ни одна ветка не удаляется.
+
+---
+
+## Execution result (2026-06-25)
+
+- **Approved for deletion:** 201 (Owner approval: «план одобрен»)
+- **Successfully deleted:** 201
+- **Failed:** 0
+- **Branches remaining in origin:** 1581 (down from 1783)
+- **Keep-set verified intact:** 14/14 (🟢 ACTIVE + 🟡 REVIEW branches still present on remote)
+- **Backup file:** `docs/maintenance/stale-branches-deleted-2026-06-25.txt` (201 lines `origin/<name> <sha>`)
+- **Rollback command (per branch):**
+  ```bash
+  git branch <name> <sha> && git push origin <name>
+  ```
+  Full rollback loop: see `stale-branches-cleanup.md` task spec § "Rollback всей задачи".
+
+### Execution notes
+
+- Deleted via `git push origin --delete` in batches of 10, `git fetch --prune` + 2s pause between batches.
+- Batch 14 timed out once on the first pass (network, rc=124); its 10 refs were retried individually and all deleted successfully.
+- No protected branch, no branch <14d, and no keep-set branch was touched. No `git push --force`, `git reset`, `git gc`, or `git prune` was run.
+
+🛑 **STOP. Финальный handoff. Задача Stale Branches Cleanup завершена.**
