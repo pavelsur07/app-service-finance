@@ -1,4 +1,4 @@
-import type { operations } from '../../api/schema';
+import type { operations } from '@/api/schema';
 
 type JsonResponse<K extends keyof operations> =
     operations[K] extends { responses: { 200: infer SuccessResponse } }
