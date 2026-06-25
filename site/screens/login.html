@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Вход · Ваш Финдир</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --color-primary: #1A56DB;
+  --color-primary-hover: #1E40AF;
+  --color-primary-tint: #EEF3FE;
+  --color-primary-border: #C7D7FB;
+  --text-strong: #0B1220; --text-secondary: #475569; --text-tertiary: #64748B;
+  --text-muted: #8B95A7; --text-disabled: #94A3B8; --text-faint: #CBD5E1;
+  --border: #E8ECF3; --border-soft: #F1F4F9;
+  --bg-page: #F4F6FA; --bg-card: #FFFFFF; --bg-subtle: #F7F9FC; --bg-dark: #0B1220;
+  --success-bg: #ECFDF5; --success-text: #047857; --success-dot: #10B981;
+  --danger-bg: #FEF2F2; --danger-text: #B91C1C; --danger-dot: #EF4444;
+  --warning-bg: #FFFBEB; --warning-text: #92400E; --warning-dot: #F59E0B;
+  --font: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --r-1: 4px; --r-2: 5px; --r-3: 6px; --r-4: 8px; --r-pill: 999px;
+  --shadow-primary: 0 1px 0 rgba(255,255,255,0.15) inset, 0 4px 10px rgba(26,86,219,0.25);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; }
+body {
+  font-family: var(--font); background: var(--bg-page); color: var(--text-strong);
+  font-size: 13px; line-height: 1.5; letter-spacing: -0.005em;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: #DBE6FF; }
+
+.layout { min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr; }
+@media (max-width: 960px) { .layout { grid-template-columns: 1fr; } }
+
+/* ============== LEFT — BRAND ============== */
+.brand {
+  background: var(--bg-dark); color: #fff;
+  padding: 40px 56px;
+  display: flex; flex-direction: column;
+  position: relative; overflow: hidden;
+}
+@media (max-width: 960px) { .brand { padding: 32px 24px; min-height: 220px; } }
+
+.brand::before {
+  content: ''; position: absolute; top: -20%; right: -20%;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(26,86,219,0.35) 0%, transparent 60%);
+  pointer-events: none;
+}
+.brand::after {
+  content: ''; position: absolute; bottom: -30%; left: -10%;
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(16,185,129,0.18) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.brand-head { display: flex; align-items: center; gap: 12px; position: relative; z-index: 1; }
+.brand-mark {
+  width: 40px; height: 40px; border-radius: var(--r-3);
+  background: #B00020;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 800; font-size: 15px; letter-spacing: 0.02em;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset;
+}
+.brand-name { font-size: 16px; font-weight: 800; letter-spacing: -0.015em; }
+.brand-tag  { font-size: 11.5px; color: #94A3B8; margin-top: 2px; }
+
+.brand-body {
+  flex: 1; display: flex; flex-direction: column; justify-content: center;
+  padding: 24px 0; position: relative; z-index: 1;
+}
+.brand-h {
+  font-size: 32px; font-weight: 700; letter-spacing: -0.025em;
+  line-height: 1.2; max-width: 18ch;
+}
+.brand-sub {
+  margin-top: 14px;
+  font-size: 14px; color: #94A3B8; line-height: 1.6; max-width: 38ch;
+}
+
+/* Hero stat card */
+.brand-stat {
+  margin-top: 28px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--r-4);
+  padding: 16px 20px;
+  max-width: 360px;
+}
+.brand-stat-label {
+  font-size: 10.5px; font-weight: 700; color: #94A3B8;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  display: flex; align-items: center; gap: 6px;
+}
+.brand-stat-label .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success-dot); }
+.brand-stat-value {
+  margin-top: 6px;
+  font-size: 28px; font-weight: 700; letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums; color: #fff;
+}
+.brand-stat-meta {
+  margin-top: 4px;
+  font-size: 11.5px; color: #94A3B8; display: flex; align-items: center; gap: 6px;
+}
+.delta-up {
+  display: inline-flex; align-items: center;
+  font-size: 10.5px; font-weight: 700;
+  padding: 2px 7px; border-radius: var(--r-1);
+  background: rgba(16,185,129,0.16); color: #6EE7B7;
+}
+
+.brand-foot {
+  position: relative; z-index: 1;
+  padding-top: 24px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  display: flex; align-items: center; gap: 10px;
+  font-size: 11.5px; color: #94A3B8;
+}
+
+/* ============== RIGHT — FORM ============== */
+.form-pane {
+  padding: 40px 56px;
+  display: flex; flex-direction: column;
+  background: var(--bg-page);
+}
+@media (max-width: 960px) { .form-pane { padding: 32px 24px; } }
+
+.form-top {
+  display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+  font-size: 12.5px; color: var(--text-tertiary);
+}
+.form-top a { color: var(--color-primary); text-decoration: none; font-weight: 700; }
+.form-top a:hover { color: var(--color-primary-hover); }
+
+.form-card {
+  max-width: 420px; width: 100%;
+  margin: 56px auto auto;
+  display: flex; flex-direction: column;
+}
+
+.form-h { font-size: 24px; font-weight: 700; letter-spacing: -0.025em; margin: 0 0 6px; }
+.form-sub { font-size: 13px; color: var(--text-tertiary); margin: 0 0 24px; line-height: 1.55; }
+
+.fields { display: flex; flex-direction: column; gap: 14px; }
+
+/* ============ INLINE ALERT (UIKit v1.2) ============ */
+.alert {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--r-4);
+  border: 1px solid;
+  margin-bottom: 16px;
+}
+.alert .a-ico { flex-shrink: 0; margin-top: 1px; }
+.alert .a-body { flex: 1; min-width: 0; line-height: 1.45; }
+.alert .a-title { font-size: 13px; font-weight: 700; }
+.alert .a-text  { font-size: 12.5px; }
+.alert .a-title + .a-text { margin-top: 2px; }
+.alert .a-link {
+  font-size: 12.5px; font-weight: 700;
+  color: inherit; text-decoration: none;
+  border-bottom: 1px dotted currentColor;
+}
+.alert--success { background: var(--success-bg); border-color: var(--success-border, #D1FAE5); color: var(--success-text); }
+.alert--danger  { background: var(--danger-bg);  border-color: var(--danger-border, #FECACA);  color: var(--danger-text); }
+.alert--warning { background: var(--warning-bg); border-color: var(--warning-border, #FDE68A); color: var(--warning-text); }
+.alert--info    { background: var(--color-primary-tint); border-color: var(--color-primary-border); color: var(--color-primary-hover); }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field-label {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11.5px; color: var(--text-tertiary); font-weight: 600;
+}
+.field-label .right {
+  margin-left: auto; font-weight: 700; color: var(--color-primary); text-decoration: none;
+}
+.field-label .right:hover { color: var(--color-primary-hover); }
+
+.input-wrap { position: relative; }
+.input-wrap > svg.leading {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  color: var(--text-muted); pointer-events: none;
+}
+.input-wrap > .trailing {
+  position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
+  width: 28px; height: 28px; border-radius: var(--r-2);
+  background: transparent; border: 0; cursor: pointer; color: var(--text-secondary);
+  display: flex; align-items: center; justify-content: center;
+  font-family: inherit;
+}
+.input-wrap > .trailing:hover { background: var(--bg-page); color: var(--text-strong); }
+
+.input {
+  width: 100%; height: 38px;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--r-3);
+  padding: 0 12px 0 36px;
+  font-family: inherit; font-size: 13px; color: var(--text-strong);
+  outline: none;
+}
+.input::placeholder { color: var(--text-muted); }
+.input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(26,86,219,0.12); }
+.input.has-trailing { padding-right: 40px; }
+
+.remember {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 14px; font-size: 12.5px; color: var(--text-secondary);
+}
+.remember input[type="checkbox"] {
+  width: 16px; height: 16px; accent-color: var(--color-primary); cursor: pointer;
+}
+
+.btn-submit {
+  margin-top: 18px;
+  width: 100%; height: 44px;
+  background: var(--color-primary); color: #fff;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--r-3);
+  font-family: inherit; font-size: 14px; font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow-primary);
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn-submit:hover { background: var(--color-primary-hover); border-color: var(--color-primary-hover); }
+
+.signup-link {
+  margin-top: 22px;
+  text-align: center;
+  font-size: 13px; color: var(--text-tertiary);
+}
+.signup-link a {
+  color: var(--color-primary); font-weight: 700; text-decoration: none;
+}
+.signup-link a:hover { color: var(--color-primary-hover); }
+
+.form-foot {
+  margin-top: auto; padding-top: 32px;
+  display: flex; align-items: center; gap: 16px;
+  font-size: 11.5px; color: var(--text-muted);
+  flex-wrap: wrap;
+}
+.form-foot a { color: var(--text-tertiary); text-decoration: none; }
+.form-foot a:hover { color: var(--text-strong); }
+.form-foot .lang {
+  margin-left: auto;
+  display: inline-flex; align-items: center; gap: 4px;
+  font-weight: 600; color: var(--text-tertiary);
+}
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ============== LEFT — BRAND ============== -->
+  <aside class="brand">
+    <div class="brand-head">
+      <div class="brand-mark">ВФ</div>
+      <div>
+        <div class="brand-name">Ваш Финдир</div>
+        <div class="brand-tag">Финансы для бизнеса · с 2024</div>
+      </div>
+    </div>
+
+    <div class="brand-body">
+      <h1 class="brand-h">С возвращением.<br>Деньги ждут.</h1>
+      <p class="brand-sub">
+        За ночь импортировано 12 новых операций и сформирован отчёт ДДС. Войдите, чтобы посмотреть.
+      </p>
+
+      <div class="brand-stat">
+        <div class="brand-stat-label"><span class="dot"></span>Остаток на 25 июня</div>
+        <div class="brand-stat-value">3&thinsp;082&thinsp;540 ₽</div>
+        <div class="brand-stat-meta">
+          <span class="delta-up">+85&thinsp;810 ₽</span>
+          за ночь · 12 новых операций
+        </div>
+      </div>
+    </div>
+
+    <div class="brand-foot">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <span>Защищённое соединение · TLS 1.3 · 2FA</span>
+    </div>
+  </aside>
+
+  <!-- ============== RIGHT — FORM ============== -->
+  <main class="form-pane">
+    <div class="form-top">
+      Нет аккаунта?
+      <a href="signup.html">Зарегистрироваться →</a>
+    </div>
+
+    <form class="form-card" autocomplete="on" novalidate>
+      <h1 class="form-h">Вход в аккаунт</h1>
+      <p class="form-sub">Используйте e-mail или телефон, указанный при регистрации.</p>
+
+      <!-- Auth form message (UI Kit · Inline Alert) -->
+      <div class="alert alert--danger" role="alert">
+        <svg class="a-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <div class="a-body">
+          <div class="a-title">Неверный логин или пароль</div>
+          <div class="a-text">Проверьте e-mail/телефон и пароль. Осталось <b>2 попытки</b> до временной блокировки. <a href="#" class="a-link">Забыли пароль?</a></div>
+        </div>
+      </div>
+
+      <div class="fields">
+
+        <!-- LOGIN -->
+        <div class="field">
+          <label class="field-label" for="f-login">Логин</label>
+          <div class="input-wrap">
+            <svg class="leading" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <input id="f-login" class="input" type="text" autocomplete="username" placeholder="E-mail или телефон">
+          </div>
+        </div>
+
+        <!-- PASSWORD -->
+        <div class="field">
+          <label class="field-label" for="f-pwd">
+            Пароль
+            <a class="right" href="#">Забыли пароль?</a>
+          </label>
+          <div class="input-wrap">
+            <svg class="leading" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input id="f-pwd" class="input has-trailing" type="password" autocomplete="current-password" placeholder="Введите пароль">
+            <button type="button" class="trailing" aria-label="Показать пароль" data-toggle="pwd">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <label class="remember">
+        <input type="checkbox" checked>
+        Запомнить меня на этом устройстве
+      </label>
+
+      <button type="submit" class="btn-submit">
+        Войти
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </button>
+
+      <div class="signup-link">
+        Первый раз здесь? <a href="signup.html">Создать аккаунт</a>
+      </div>
+    </form>
+
+    <div class="form-foot">
+      <span>© 2024–2026 ООО «Ваш Финдир»</span>
+      <a href="#">Помощь</a>
+      <a href="#">Безопасность</a>
+      <a href="#">Контакты</a>
+      <span class="lang">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        RU
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </span>
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+  document.querySelectorAll('[data-toggle="pwd"]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var input = btn.parentElement.querySelector('input');
+      input.type = input.type === 'password' ? 'text' : 'password';
+    });
+  });
+})();
+</script>
+
+</body>
+</html>
