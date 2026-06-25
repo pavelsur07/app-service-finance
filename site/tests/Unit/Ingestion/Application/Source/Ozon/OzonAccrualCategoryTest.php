@@ -62,6 +62,34 @@ final class OzonAccrualCategoryTest extends TestCase
         self::assertSame('ozon_cross_docking', $crossDocking->code);
     }
 
+    public function testFindsObservedInternalOzonTypeNames(): void
+    {
+        $expectedCodes = [
+            'Acquiring' => 'ozon_acquiring',
+            'CrossDock' => 'ozon_cross_docking',
+            'DefectFineErrors' => 'ozon_other_services',
+            'DeliveryToHandoverPlaceByOzon' => 'ozon_delivery_to_pickup_ozon',
+            'Disposal' => 'ozon_disposal',
+            'ItemPacking' => 'ozon_partner_packaging',
+            'Logistic' => 'ozon_logistics',
+            'PackageCost' => 'ozon_packaging_materials',
+            'PackingFee' => 'ozon_partner_packaging',
+            'PremiumCashbackIndividualPoints' => 'ozon_other_services',
+            'PremiumMailingCommission' => 'ozon_other_services',
+            'ReturnFlowLogistic' => 'ozon_reverse_logistics',
+            'RfbsServiceFee' => 'ozon_other_services',
+            'SellerReturns' => 'ozon_partner_return_processing',
+            'TemporaryPlacementsAgent' => 'ozon_temporary_partner_storage',
+        ];
+
+        foreach ($expectedCodes as $ozonTypeName => $expectedCode) {
+            $category = OzonAccrualCategory::forTypedFee(null, $ozonTypeName, TransactionType::FEE);
+
+            self::assertTrue($category->known, sprintf('Ozon type name "%s" must not resolve as unknown.', $ozonTypeName));
+            self::assertSame($expectedCode, $category->code, sprintf('Unexpected category for Ozon type name "%s".', $ozonTypeName));
+        }
+    }
+
     public function testFindsFieldCategoriesBySignedAmount(): void
     {
         self::assertSame('ozon_revenue', OzonAccrualCategory::forField('sale_amount', 100)?->code);
