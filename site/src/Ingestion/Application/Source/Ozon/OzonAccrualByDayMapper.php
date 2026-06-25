@@ -40,9 +40,29 @@ final readonly class OzonAccrualByDayMapper implements SourceMapperInterface, Ra
      */
     public function map(IngestRawRecord $rawRecord, iterable $rows): array
     {
+        return $this->mapRows($rawRecord, $rows, recordUnknownCategories: true);
+    }
+
+    /**
+     * @param iterable<array<string, mixed>> $rows
+     *
+     * @return list<MappedTransaction>
+     */
+    public function mapForCategoryMetadataRefresh(IngestRawRecord $rawRecord, iterable $rows, bool $recordUnknownCategories): array
+    {
+        return $this->mapRows($rawRecord, $rows, $recordUnknownCategories);
+    }
+
+    /**
+     * @param iterable<array<string, mixed>> $rows
+     *
+     * @return list<MappedTransaction>
+     */
+    private function mapRows(IngestRawRecord $rawRecord, iterable $rows, bool $recordUnknownCategories): array
+    {
         $transactions = [];
 
-        foreach ($this->previewMapper->preview($rawRecord->getCompanyId(), $rows, includeSaleRefund: true, recordUnknownCategories: true) as $row) {
+        foreach ($this->previewMapper->preview($rawRecord->getCompanyId(), $rows, includeSaleRefund: true, recordUnknownCategories: $recordUnknownCategories) as $row) {
             $transactions[] = new MappedTransaction(
                 externalId: $row->sourceKey,
                 externalUpdatedAt: $rawRecord->getFetchedAt(),

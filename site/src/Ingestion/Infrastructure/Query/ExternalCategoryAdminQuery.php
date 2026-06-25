@@ -83,7 +83,15 @@ final readonly class ExternalCategoryAdminQuery
                             m.status AS mapping_status
                      FROM ingest_external_categories c
                      LEFT JOIN ingest_external_category_mappings m ON m.external_category_id = c.id
-                     ORDER BY c.status ASC, c.last_seen_at DESC, c.created_at DESC
+                     ORDER BY CASE c.status
+                                WHEN \'new\' THEN 0
+                                WHEN \'mapped\' THEN 1
+                                WHEN \'ignored\' THEN 2
+                                WHEN \'deprecated\' THEN 3
+                                ELSE 9
+                              END ASC,
+                              c.last_seen_at DESC,
+                              c.created_at DESC
                      LIMIT %d',
                     $limit,
                 ),

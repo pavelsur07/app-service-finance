@@ -44,6 +44,8 @@ final readonly class DiscoverExternalCategoriesAction
             'autoMapped' => 0,
             'unmapped' => 0,
         ];
+        $categoriesByIdentity = [];
+        $mappingKnownByCategoryId = [];
 
         foreach ($this->unknownOzonAccrualRows($limit) as $row) {
             ++$stats['scanned'];
@@ -59,33 +61,45 @@ final readonly class DiscoverExternalCategoriesAction
             }
 
             $scope = $this->scopeFromComponent($this->optionalString($row['component'] ?? null));
-            $externalCategory = $this->categoryRepository->findByIdentity(
-                IngestSource::OZON,
-                OzonResourceType::ACCRUAL_BY_DAY,
-                $scope,
-                $normalizedKey,
-            );
+            $identityKey = $this->identityKey($scope, $normalizedKey);
+            $externalCategory = $categoriesByIdentity[$identityKey] ?? null;
 
-            if (!$externalCategory instanceof ExternalCategory) {
-                $externalCategory = new ExternalCategory(
-                    source: IngestSource::OZON,
-                    resourceType: OzonResourceType::ACCRUAL_BY_DAY,
-                    scope: $scope,
-                    normalizedKey: $normalizedKey,
-                    externalTypeId: $typeId,
-                    externalName: $typeName,
-                    status: ExternalCategoryStatus::NEW,
-                );
-                $this->entityManager->persist($externalCategory);
-                ++$stats['categoriesCreated'];
-            } else {
+            if ($externalCategory instanceof ExternalCategory) {
                 $externalCategory->markSeen($typeId, $typeName);
                 ++$stats['categoriesSeen'];
+            } else {
+                $externalCategory = $this->categoryRepository->findByIdentity(
+                    IngestSource::OZON,
+                    OzonResourceType::ACCRUAL_BY_DAY,
+                    $scope,
+                    $normalizedKey,
+                );
+
+                if (!$externalCategory instanceof ExternalCategory) {
+                    $externalCategory = new ExternalCategory(
+                        source: IngestSource::OZON,
+                        resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+                        scope: $scope,
+                        normalizedKey: $normalizedKey,
+                        externalTypeId: $typeId,
+                        externalName: $typeName,
+                        status: ExternalCategoryStatus::NEW,
+                    );
+                    $this->entityManager->persist($externalCategory);
+                    ++$stats['categoriesCreated'];
+                } else {
+                    $externalCategory->markSeen($typeId, $typeName);
+                    ++$stats['categoriesSeen'];
+                }
+
+                $categoriesByIdentity[$identityKey] = $externalCategory;
             }
 
             $mappedCategory = OzonAccrualCategory::findByTypeId($typeId) ?? OzonAccrualCategory::findByOzonName($typeName);
-            $existingMapping = $this->mappingRepository->findByCategory($externalCategory);
-            if ($mappedCategory instanceof OzonAccrualCategory && null === $existingMapping) {
+            $categoryId = $externalCategory->getId();
+            $mappingKnownByCategoryId[$categoryId] ??= $this->mappingRepository->findByCategory($externalCategory) instanceof ExternalCategoryMapping;
+
+            if ($mappedCategory instanceof OzonAccrualCategory && !$mappingKnownByCategoryId[$categoryId]) {
                 $this->entityManager->persist(new ExternalCategoryMapping(
                     externalCategory: $externalCategory,
                     canonicalCode: $mappedCategory->code,
@@ -96,6 +110,7 @@ final readonly class DiscoverExternalCategoriesAction
                     known: true,
                     status: ExternalCategoryMappingStatus::ACTIVE,
                 ));
+                $mappingKnownByCategoryId[$categoryId] = true;
                 ++$stats['autoMapped'];
             }
 
@@ -170,6 +185,11 @@ final readonly class DiscoverExternalCategoriesAction
             str_starts_with($component, 'container_fee') => OzonAccrualCategoryTaxonomyResolver::SCOPE_CONTAINER,
             default => OzonAccrualCategoryTaxonomyResolver::SCOPE_ANY,
         };
+    }
+
+    private function identityKey(string $scope, string $normalizedKey): string
+    {
+        return sprintf('%s:%s', $scope, $normalizedKey);
     }
 
     private function optionalString(mixed $value): ?string

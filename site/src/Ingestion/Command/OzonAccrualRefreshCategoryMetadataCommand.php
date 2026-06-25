@@ -197,7 +197,11 @@ final class OzonAccrualRefreshCategoryMetadataCommand extends Command
 
                 /** @var list<array<string, mixed>> $rows */
                 $rows = array_values(iterator_to_array($this->rawStorageFacade->read($rawRecord->getId(), $companyId), false));
-                $mappedTransactions = $this->mapper->map($rawRecord, $rows);
+                $mappedTransactions = $this->mapper->mapForCategoryMetadataRefresh(
+                    rawRecord: $rawRecord,
+                    rows: $rows,
+                    recordUnknownCategories: !$dryRun,
+                );
                 $existingByKey = $this->existingTransactionsByNaturalKey($companyId, $rawRecord);
 
                 $scanned = 0;
@@ -254,8 +258,11 @@ final class OzonAccrualRefreshCategoryMetadataCommand extends Command
                     'missing' => $missing,
                 ];
             } catch (\Throwable $exception) {
-                if (!$dryRun && $connection->isTransactionActive()) {
-                    $connection->rollBack();
+                if (!$dryRun) {
+                    if ($connection->isTransactionActive()) {
+                        $connection->rollBack();
+                    }
+                    $this->entityManager->clear();
                 }
 
                 $resultRows[] = [

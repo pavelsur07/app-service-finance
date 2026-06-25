@@ -32,6 +32,8 @@ final readonly class OzonAccrualByDayPreviewMapper
         bool $includeSaleRefund = false,
         bool $recordUnknownCategories = false,
     ): array {
+        $this->categoryResolver?->resetPerPreviewState();
+
         $transactions = [];
 
         foreach ($rows as $row) {
@@ -264,6 +266,11 @@ final readonly class OzonAccrualByDayPreviewMapper
                 continue;
             }
 
+            $amount = $this->moneyObjectMinor($service['accrued'] ?? null);
+            if (0 === $amount) {
+                continue;
+            }
+
             $typeId = $this->typeId($service);
             $ozonCategory = $this->categoryForTypedFee(
                 typeId: $typeId,
@@ -272,10 +279,6 @@ final readonly class OzonAccrualByDayPreviewMapper
                 scope: OzonAccrualCategoryTaxonomyResolver::SCOPE_DELIVERY,
                 recordUnknown: $recordUnknownCategories,
             );
-            $amount = $this->moneyObjectMinor($service['accrued'] ?? null);
-            if (0 === $amount) {
-                continue;
-            }
 
             $this->add(
                 transactions: $transactions,
@@ -433,6 +436,11 @@ final readonly class OzonAccrualByDayPreviewMapper
             return;
         }
 
+        $amount = $this->moneyObjectMinor($fee['accrued']);
+        if (0 === $amount) {
+            return;
+        }
+
         $typeId = $this->typeId($fee);
         $ozonCategory = $this->categoryForTypedFee(
             typeId: $typeId,
@@ -441,10 +449,6 @@ final readonly class OzonAccrualByDayPreviewMapper
             scope: $scope,
             recordUnknown: $recordUnknownCategories,
         );
-        $amount = $this->moneyObjectMinor($fee['accrued']);
-        if (0 === $amount) {
-            return;
-        }
 
         $this->add(
             transactions: $transactions,

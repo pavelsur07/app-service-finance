@@ -62,4 +62,22 @@ final class ExternalCategoryMappingRepository extends ServiceEntityRepository
             ->getQuery()
             ->getOneOrNullResult();
     }
+
+    /**
+     * @return list<ExternalCategoryMapping>
+     */
+    public function findActiveBySourceAndResource(IngestSource $source, string $resourceType): array
+    {
+        return $this->createQueryBuilder('mapping')
+            ->innerJoin('mapping.externalCategory', 'category')
+            ->addSelect('category')
+            ->andWhere('category.source = :source')
+            ->andWhere('category.resourceType = :resourceType')
+            ->andWhere('mapping.status = :status')
+            ->setParameter('source', $source->value)
+            ->setParameter('resourceType', $resourceType)
+            ->setParameter('status', ExternalCategoryMappingStatus::ACTIVE->value)
+            ->getQuery()
+            ->getResult();
+    }
 }

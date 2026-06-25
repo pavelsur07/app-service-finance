@@ -169,7 +169,7 @@ final class FinancialSummaryQuery
                     SELECT
                         ft.source,
                         COALESCE(NULLIF(ft.source_data->>'_ozon_category_group', ''), 'Требует классификации') AS category_group,
-                        COALESCE(NULLIF(ft.source_data->>'_ozon_category_label', ''), 'Неклассифицированная категория Ozon') AS category_name,
+                        COALESCE(NULLIF(ft.source_data->>'_ozon_category_label', ''), NULLIF(ft.description, ''), ft.type, 'Неклассифицированная категория Ozon') AS category_name,
                         ft.type,
                         ft.direction,
                         ABS(ft.amount_minor::bigint) AS amount_minor,

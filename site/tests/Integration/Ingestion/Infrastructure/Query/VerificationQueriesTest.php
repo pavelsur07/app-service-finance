@@ -616,6 +616,43 @@ final class VerificationQueriesTest extends IntegrationTestCase
         self::assertSame(1, $categories[1]->txCount);
     }
 
+    public function testFinancialSummaryMarketplaceCategoriesKeepLegacyDescriptionFallback(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $raw = $this->rawRecord(
+            companyId: $companyId,
+            shopRef: 'shop-1',
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            fetchedAt: new \DateTimeImmutable('2026-06-15 10:00:00+00:00'),
+            externalId: 'marketplace-category-legacy-raw',
+        );
+
+        $this->em->persist($raw);
+        $this->em->persist($this->legacyMarketplaceCategoryTransaction(
+            companyId: $companyId,
+            rawRecordId: $raw->getId(),
+            externalId: 'ozon:accrual-by-day:legacy:posting:32',
+            amountMinor: 1000,
+            description: 'Ozon accrual posting 32',
+        ));
+        $this->em->persist($this->legacyMarketplaceCategoryTransaction(
+            companyId: $companyId,
+            rawRecordId: $raw->getId(),
+            externalId: 'ozon:accrual-by-day:legacy:item:1',
+            amountMinor: 250,
+            description: 'Ozon accrual item 1',
+        ));
+        $this->em->flush();
+
+        /** @var FinancialSummaryQuery $query */
+        $query = self::getContainer()->get(FinancialSummaryQuery::class);
+        $categories = $query->marketplaceCategories($companyId, 'shop-1', 2026, 6);
+        $amountsByName = array_column($categories, 'amountMinor', 'categoryName');
+
+        self::assertSame(-250, $amountsByName['Ozon accrual item 1'] ?? null);
+        self::assertSame(-1000, $amountsByName['Ozon accrual posting 32'] ?? null);
+    }
+
     private function rawRecord(
         string $companyId,
         string $shopRef,
@@ -673,6 +710,33 @@ final class VerificationQueriesTest extends IntegrationTestCase
                 '_ozon_category_group' => $group,
                 '_ozon_category_label' => $label,
                 '_ozon_category_sort_order' => $sortOrder,
+            ],
+        );
+    }
+
+    private function legacyMarketplaceCategoryTransaction(
+        string $companyId,
+        string $rawRecordId,
+        string $externalId,
+        int $amountMinor,
+        string $description,
+    ): FinancialTransaction {
+        return new FinancialTransaction(
+            companyId: $companyId,
+            connectionRef: 'connection-1',
+            shopRef: 'shop-1',
+            source: IngestSource::OZON,
+            externalId: $externalId,
+            externalUpdatedAt: new \DateTimeImmutable('2026-06-15 10:00:00+00:00'),
+            operationGroupId: Uuid::uuid7()->toString(),
+            type: TransactionType::FEE,
+            direction: TransactionDirection::OUT,
+            money: Money::fromMinor($amountMinor, 'RUB'),
+            occurredAt: new \DateTimeImmutable('2026-06-15 10:00:00+00:00'),
+            rawRecordId: $rawRecordId,
+            description: $description,
+            sourceData: [
+                '_ingestion_resource' => OzonResourceType::ACCRUAL_BY_DAY,
             ],
         );
     }

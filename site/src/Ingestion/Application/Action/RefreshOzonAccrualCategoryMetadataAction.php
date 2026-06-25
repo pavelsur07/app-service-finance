@@ -144,7 +144,11 @@ final readonly class RefreshOzonAccrualCategoryMetadataAction
 
                 /** @var list<array<string, mixed>> $rows */
                 $rows = array_values(iterator_to_array($this->rawStorageFacade->read($rawRecord->getId(), $companyId), false));
-                $mappedTransactions = $this->mapper->map($rawRecord, $rows);
+                $mappedTransactions = $this->mapper->mapForCategoryMetadataRefresh(
+                    rawRecord: $rawRecord,
+                    rows: $rows,
+                    recordUnknownCategories: !$dryRun,
+                );
                 $existingByKey = $this->existingTransactionsByNaturalKey($companyId, $rawRecord);
 
                 $scanned = 0;
@@ -201,8 +205,11 @@ final readonly class RefreshOzonAccrualCategoryMetadataAction
                     'missing' => $missing,
                 ];
             } catch (\Throwable $exception) {
-                if (!$dryRun && $this->connection->isTransactionActive()) {
-                    $this->connection->rollBack();
+                if (!$dryRun) {
+                    if ($this->connection->isTransactionActive()) {
+                        $this->connection->rollBack();
+                    }
+                    $this->entityManager->clear();
                 }
 
                 $resultRows[] = [
