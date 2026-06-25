@@ -1,206 +1,446 @@
-# CLAUDE.frontend.md — Frontend UI Rules for Symfony + Twig + React + Vite
+# CLAUDE.frontend.md — Frontend Rules
 
-This file defines coding standards, patterns, and architecture rules for all React TypeScript UI development in this project. Follow these rules strictly on every task.
+Правила разработки фронтенда для проекта на Symfony + Twig + React + Vite, с собственной дизайн-системой (UI Kit) как живым документом.
 
-> **Режим работы — автономный.** Claude выполняет задачу этапами, каждый этап завершает self-review + Stage Report. Высокорисковые этапы — обязательная остановка для ревью Владельцем. Общий workflow совпадает с `CLAUDE.md` (backend), специфика этапов фронта — в разделе «🤖 Автономный режим — Frontend workflow» ниже.
-
----
-
-## Stack
-
-- **Backend**: Symfony (PHP), Twig templates
-- **Frontend**: React 18 + TypeScript (strict), Vite
-- **UI Kit**: Tabler UI (React components + Tabler CSS)
-- **Data fetching**: TanStack Query (React Query v5)
-- **Forms**: React Hook Form + Zod
-- **Styling**: Tabler CSS variables + CSS Modules for custom overrides
-- **Icons**: `@tabler/icons-react`
-- **HTTP**: Native `fetch` via centralized `apiClient.ts`
+> **Режим работы — автономный.** Claude выполняет задачу этапами, каждый этап завершает self-review + Stage Report. Высокорисковые этапы — обязательная остановка для ревью Владельцем. Без явной спецификации задача не стартует. Без апрува плана код не пишется.
 
 ---
 
-## 🤖 Автономный режим — Frontend workflow
+## 1. Стек
+
+- **Backend:** Symfony (PHP), Twig-шаблоны.
+- **Frontend:** React 18 + TypeScript (strict), Vite.
+- **Стили:** собственный UI Kit (CSS-классы и токены из `ui-kit/`). **Никакого Tabler / Bootstrap.**
+- **Иконки:** SVG-спрайт из `ui-kit/icons/` (или `@tabler/icons-react` поштучно — если решено оставить, см. ADR).
+- **Запросы:** TanStack Query (React Query v5).
+- **Формы:** React Hook Form + Zod.
+- **HTTP:** Native `fetch` через централизованный `assets/api/client.ts`.
+- **CSS:** глобальные классы из UI Kit + CSS Modules для feature-локальных оверрайдов. Никаких inline-стилей с хардкодом цветов.
+- **Stimulus:** допустим **только** для Twig-only страниц с лёгким интерактивом (show/hide, copy-to-clipboard). Любая логика с запросами к API — React-остров.
+
+---
+
+## 2. Источники правды
+
+В проекте три слоя, каждый — единственный источник правды для своего:
+
+| Слой | Источник правды для | Где живёт |
+|---|---|---|
+| **UI Kit** | Визуальный язык: классы, токены, компоненты | `ui-kit/` (HTML + CSS + decisions.md + CHANGELOG.md) |
+| **Screens** | Спецификация конкретных страниц от дизайнера | `screens/<name>.html` |
+| **Code** | Реализация: Twig + React + Symfony | `templates/`, `assets/`, `src/` |
+
+**Правила несовпадений:**
+
+- Код противоречит UI Kit (использует класс, которого нет в DS) → виноват код, фиксится код. Lint в CI ловит это автоматически.
+- Screen противоречит UI Kit (использует класс, которого нет в DS) → возвращаем дизайнеру или дополняем UI Kit, **до** реализации.
+- UI Kit противоречит сам себе (два компонента делают одно и то же) → правится `ui-kit/decisions.md`, фиксируется решение, обновляется CHANGELOG.
+
+Код **никогда не является источником правды**. Если в коде есть класс, которого нет в UI Kit, — это баг, не фича.
+
+---
+
+## 3. Структура проекта
+
+```
+site/
+├── ui-kit/                                  ← дизайн-система (источник правды для UI)
+│   ├── tokens/
+│   │   ├── colors.css                       ← raw tokens: --color-primary, --bank-*, --src-*
+│   │   ├── typography.css                   ← --font-family, --font-*
+│   │   ├── spacing.css                      ← --space-*
+│   │   ├── radius.css                       ← --r-*
+│   │   ├── shadows.css                      ← --shadow-*
+│   │   ├── semantic.css                     ← semantic tokens: --button-primary-bg, --card-bg, --form-error-text
+│   │   └── index.css                        ← @import всех файлов выше + :root { ... }
+│   ├── components/                          ← примитивы (atoms)
+│   │   ├── button.html + button.css
+│   │   ├── input.html + input.css
+│   │   ├── card.html + card.css
+│   │   ├── badge.html + badge.css
+│   │   ├── status.html + status.css
+│   │   ├── chip.html + chip.css
+│   │   └── all.css                          ← @import всех компонентов
+│   ├── patterns/                            ← композиты (molecules)
+│   │   ├── kpi-row.html + kpi-row.css
+│   │   ├── filter-bar.html + filter-bar.css
+│   │   ├── page-header.html + page-header.css
+│   │   ├── empty-state.html + empty-state.css
+│   │   └── all.css
+│   ├── icons/                               ← SVG-спрайт
+│   ├── storybook.html                       ← живой документ для дизайнера и команды
+│   ├── decisions.md                         ← ADR дизайна
+│   ├── design-audit.md
+│   ├── CHANGELOG.md                         ← semver-журнал изменений DS
+│   ├── promts/                              ← промпты для дизайн-AI (если используете)
+│   └── README.md
+│
+├── screens/                                 ← HTML-макеты от дизайнера (спецификации страниц)
+│   ├── _analysis/                           ← отчёты screen-intake task
+│   │   └── reconciliation.md
+│   ├── _archive/                            ← предыдущие версии макетов
+│   │   └── dashboard-2026-05.html
+│   ├── login.html                           ← с frontmatter (uiKit version, date, source)
+│   ├── dashboard.html
+│   ├── reconciliation.html
+│   └── README.md                            ← матрица: какой screen реализован, где, статус
+│
+├── assets/
+│   ├── api/
+│   │   ├── client.ts                        ← apiFetch + CSRF + 401/422 handling
+│   │   ├── schema.d.ts                      ← codegen из OpenAPI
+│   │   └── README.md
+│   ├── controllers/                         ← Stimulus (только для Twig-only лёгкого интерактива)
+│   ├── styles/
+│   │   └── app.css                          ← @import '../../ui-kit/tokens/index.css';
+│   │                                            @import '../../ui-kit/components/all.css';
+│   │                                            @import '../../ui-kit/patterns/all.css';
+│   └── react/
+│       ├── ui-kit/                          ← React-обёртки над классами UI Kit (1:1 с ui-kit/components и ui-kit/patterns)
+│       │   ├── Button/
+│       │   │   ├── Button.tsx
+│       │   │   ├── Button.test.tsx          ← тест рядом с кодом
+│       │   │   └── index.ts
+│       │   ├── Card/
+│       │   ├── Kpi/
+│       │   ├── Status/
+│       │   ├── KpiRow/                      ← обёртка над паттерном
+│       │   └── index.ts                     ← публичный экспорт
+│       ├── modules/                         ← бизнес-домены (bounded contexts)
+│       │   ├── dashboard/
+│       │   ├── marketplace-analytics/
+│       │   ├── reconciliation/
+│       │   ├── ingestion-verification/
+│       │   └── marketplace-ads/
+│       ├── shared/                          ← cross-module утилиты (не дизайн-система!)
+│       │   ├── inputs/                      ← доменные инпуты: MoneyInput, BankSelector, DateRangePicker
+│       │   ├── format/                      ← formatMoney, formatDate, formatPercent
+│       │   ├── hooks/                       ← useTenant, useUser, useDebounce
+│       │   ├── http/                        ← обёртки над api/client.ts (queryFn helpers)
+│       │   ├── i18n/                        ← переводы для React
+│       │   └── lib/
+│       ├── app/                             ← bootstrap, провайдеры
+│       │   ├── providers.tsx                ← QueryClientProvider, I18nProvider, ErrorBoundary
+│       │   ├── ErrorBoundary.tsx
+│       │   └── mountIsland.tsx              ← универсальный mount-хелпер для островов
+│       ├── entrypoints/                     ← ТОЛЬКО mount-логика
+│       │   ├── dashboard.tsx
+│       │   ├── marketplace-analytics.tsx
+│       │   ├── reconciliation.tsx
+│       │   └── ingestion-verification.tsx
+│       └── _legacy/                         ← карантин для старого кода (см. раздел «Migration»)
+│
+├── templates/
+│   ├── _macros/
+│   │   └── ui-kit.html.twig                 ← Twig-макросы для UI Kit (button, status, kpi)
+│   ├── _layout/
+│   └── <module>/                            ← Twig-шаблоны модулей
+│
+├── src/                                     ← Symfony
+├── public/
+│   └── build/                               ← Vite output (gitignored)
+├── tools/
+│   ├── check-ui-kit-classes.mjs             ← lint: классы в коде есть в UI Kit
+│   ├── check-uikit-react-mapping.mjs        ← lint: каждый ui-kit/components/* имеет React-обёртку и наоборот
+│   └── codegen/                             ← OpenAPI → TS types
+├── tests/                                   ← e2e (Playwright); unit-тесты живут рядом с кодом
+└── docs/
+    └── tasks/                               ← планы и отчёты автономных задач
+        └── <id>/
+            ├── plan.md
+            ├── api-contract.md
+            ├── stages/
+            │   ├── stage-F1.md
+            │   ├── stage-F2.md
+            │   └── ...
+            └── handoff.md
+```
+
+---
+
+## 4. Автономный workflow
 
 ### Источник задачи
 
-Каждая задача начинается со **спецификации**:
-- либо `docs/tasks/<id>/TASK.md` в ветке,
-- либо чёткий бриф от Владельца в чате (scope + ограничения + acceptance).
+Каждая задача начинается со **спецификации** одного из двух типов:
 
-Нет спецификации → **STOP**, попросить её. Догадки и расширение scope автономно — запрещены.
+1. **Screen-intake task** — пришёл новый HTML-макет от дизайнера. Спецификация — сам файл `screens/<name>.html`. Правила выполнения — в `screen-intake.md` (отдельный документ). Это **не реализация**, это анализ. Результат — отчёт в `screens/_analysis/<name>.md`.
 
-### Фазы работы над задачей
+2. **Implementation task** — реализация фичи на основе утверждённого анализа screen или прямого брифа Владельца. Спецификация — `docs/tasks/<id>/TASK.md` или чёткий бриф Владельца с scope и acceptance criteria. Правила — этот документ, разделы 5–10.
+
+Без спецификации → 🛑 **STOP, попросить её**. Догадки и автоматическое расширение scope — запрещены.
+
+### Общая последовательность фаз
 
 ```
-Phase 0 (Plan)  →  Phase 1..N (Execute by Stages)  →  Phase Final (Handoff)
-                          ↑
-              после каждого этапа: self-review + Stage Report
-              если этап high-risk → 🛑 STOP, ждать Владельца
-              если self-review red → fix или 🛑 STOP, не идти дальше
+Phase 0 (Plan)  →  Phase F1..F5 (Execute)  →  Phase Final (Handoff)
+       ↑                  ↑
+   STOP, апрув     после каждого этапа: self-review + Stage Report
+   Владельца       high-risk → 🛑 STOP, ждать Владельца
+                   self-review red → fix или 🛑 STOP
 ```
 
-### Phase 0 — Plan (всегда первая, всегда заканчивается ревью)
+### Phase 0 — Plan (для implementation task)
 
-1. Прочитать: `CLAUDE.frontend.md`, спецификацию задачи. Если есть backend-зависимость — согласовать DTO/контракт с backend-веткой.
-2. Найти 2–3 похожих feature-слайса в `assets/react/features/`, опереться на их паттерны.
-3. Составить план:
-   - **Дерево компонентов:** Widget (smart) → View (dumb) → atoms из Tabler / `components/shared`.
-   - **Список новых vs переиспользуемых** компонентов. Каждый новый компонент — обоснование (почему не подошёл Tabler / `components/shared`).
-   - **API-интеграция:** какие эндпоинты, какие хуки (`useX`, `useUpdateX`), какие типы.
-   - **Mount-контракт:** новый Vite entry / новый Twig mount point — да / нет; если да, какие `data-*` атрибуты.
-   - **Список этапов** (типовая декомпозиция F1..F5 ниже) с риск-классом.
-   - **Тесты,** которые потребуются.
-4. Сохранить план в `docs/tasks/<id>/plan.md`.
-5. 🛑 **STOP. Дождаться одобрения плана Владельцем.** Без подтверждения — не писать код.
+1. Прочитать: `CLAUDE.frontend.md`, спецификацию задачи, утверждённый отчёт `screens/_analysis/<screen>.md` (если задача от screen).
+2. Прочитать `ui-kit/CHANGELOG.md` — что недавно изменилось в DS.
+3. Найти 2–3 похожих feature-слайса в `assets/react/modules/*/features/*`, опереться на их паттерны.
+4. Составить план в `docs/tasks/<id>/plan.md`:
+    - **Дерево компонентов:** Widget (smart) → View (dumb) → компоненты из `react/ui-kit/` → классы UI Kit.
+    - **Список переиспользуемых vs новых компонентов.** Для каждого нового — обоснование (почему не подошёл существующий примитив/паттерн).
+    - **API-интеграция:** эндпоинты, хуки (`useX`, `useUpdateX`), типы (из `schema.d.ts` или ручные).
+    - **Mount-контракт:** новые Vite entry / Twig mount points + `data-*` атрибуты.
+    - **Список этапов** (F1–F5) с риск-классом.
+    - **Тесты,** которые потребуются.
+5. 🛑 **STOP. Ждать апрува плана Владельцем.** Без подтверждения — не писать код.
 
-### Типовая декомпозиция этапов (frontend)
-
-Подгоняется под задачу; не все этапы всегда нужны. Для расширения существующей фичи F4 обычно пропускается.
+### Типовая декомпозиция этапов
 
 | Stage | Цель | Типовой риск |
 |---|---|---|
 | **F1 — Types & API** | `feature.types.ts`, Zod-схемы (если формы), хуки на React Query (`useX`, `useUpdateX`). Безопасные дефолты. | 🟡 MEDIUM |
-| **F2 — UI components** | Только **новые** atoms/molecules. Сначала проверить Tabler + `components/shared`. Каждый компонент тестируется только пропсами. | 🟢 LOW / 🟡 MEDIUM |
-| **F3 — Widget + View** | Smart-контейнер использует hook из F1, View рендерит UI. Loading / error / empty состояния через Tabler spinner / alert / empty state. | 🟡 MEDIUM |
+| **F2 — UI components** | Только **новые** компоненты. Сначала проверить `react/ui-kit/` + `react/shared/`. Каждый новый компонент тестируется только пропсами. | 🟢 LOW / 🟡 MEDIUM |
+| **F3 — Widget + View** | Smart-контейнер использует hook из F1, View рендерит UI. Loading / error / empty состояния через `EmptyState` / `Spinner` из UI Kit. | 🟡 MEDIUM |
 | **F4 — Entrypoint + Twig integration** | Новый файл в `entrypoints/`, запись в `vite.config.ts` rollupOptions, Twig mount point с `\|e('html_attr')`, `vite_entry_script_tags`, `ErrorBoundary` оборачивает виджет. | 🔴 **HIGH** |
-| **F5 — Tests + final review** | Unit-тесты на dumb-компоненты и хуки. Smoke на entrypoint, если есть. Финальный handoff. | 🟢 LOW (но финальный STOP всегда) |
+| **F5 — Tests + final review** | Unit-тесты на dumb-компоненты и хуки. Smoke на entrypoint. Финальный handoff. | 🟢 LOW (но финальный STOP всегда) |
 
-### Классификация этапов по риску (frontend)
+### Phase Final — Handoff
+
+1. Прогнать полный набор: `npm run lint && npm run typecheck && npm run test && npm run build && npm run check:ui-kit`.
+2. Сверить построчно «Self-review checklist» (раздел 14) и «What NOT to do» (раздел 15).
+3. Заполнить `docs/tasks/<id>/handoff.md`:
+    - summary всех этапов,
+    - список новых Vite entries + Twig mount points,
+    - список изменений в shared-инфраструктуре (`apiClient.ts`, `queryClient.ts`, `vite.config.ts`, `ui-kit/tokens/*`),
+    - список новых npm-зависимостей с обоснованием,
+    - bump-версии UI Kit, если затронут (с записью в `ui-kit/CHANGELOG.md`),
+    - размер бандла до/после,
+    - риски и follow-ups, вынесенные за scope.
+4. 🛑 **STOP. Final Owner review.** Merge — только после одобрения Владельцем.
+
+---
+
+## 5. Классификация этапов по риску
 
 | Риск | Примеры | Поведение после self-review |
 |---|---|---|
 | 🟢 **LOW** | Рефакторинг внутри одного dumb-компонента; добавление иконки / empty-state текста; добавление feature-scoped CSS Module override; добавление unit-тестов; обновление документации | Self-review зелёный → **продолжать автономно** |
-| 🟡 **MEDIUM** | Новый feature-слайс (Widget+View+hook+types) внутри существующего entrypoint; новая форма с Zod; новый hook на React Query; новая Modal/Card композиция | Self-review зелёный → **продолжать автономно**, Stage Report в `docs/tasks/<id>/stages/` |
-| 🔴 **HIGH** | Новый Vite entry / новый widget mount point; изменения в `apiClient.ts` / `queryClient.ts` / `vite.config.ts`; правки глобальных Tabler overrides (`:root` CSS variables); новые npm-зависимости; изменения Twig-шаблонов (mount-контракт); удаление/переименование публичного widget/hook/type; изменения CSRF / auth flow | Self-review зелёный → 🛑 **STOP, обязательное ревью Владельцем перед следующим этапом** |
+| 🟡 **MEDIUM** | Новый feature-слайс (Widget+View+hook+types) внутри существующего entrypoint; новая форма с Zod; новый hook на React Query; новая Modal/Card композиция из существующих UI Kit компонентов | Self-review зелёный → **продолжать автономно**, Stage Report в `docs/tasks/<id>/stages/` |
+| 🔴 **HIGH** | Новый Vite entry / новый widget mount point; изменения в `api/client.ts` / `app/providers.tsx` / `vite.config.ts`; правки `ui-kit/tokens/*` (даже одной CSS-переменной); добавление/удаление/переименование класса в `ui-kit/components/*` или `ui-kit/patterns/*`; добавление компонента в `react/ui-kit/`; новые npm-зависимости; изменения CSRF / auth flow; изменение публичного API виджета | Self-review зелёный → 🛑 **STOP, обязательное ревью Владельцем перед следующим этапом** |
 
 Если затрудняешься классифицировать — считай **HIGH** и остановись.
 
-### Обязательные точки STOP (никогда не продолжать без Владельца)
+---
 
-- Перед добавлением нового Vite entry в `rollupOptions.input`
-- Перед изменением `vite.config.ts`, `tsconfig.json`
-- Перед изменением `services/apiClient.ts` (касается всех фич)
-- Перед изменением `services/queryClient.ts` (касается всех запросов)
-- Перед изменением Twig-шаблона с mount point виджета
-- Перед изменением CSRF / auth-флоу
-- Перед глобальными Tabler overrides (`:root { --tblr-* }`)
-- Перед `npm install` любой новой зависимости
-- Перед удалением: компонента, хука, типа, entrypoint, mount point
-- Перед изменением публичного API виджета (data-attrs контракт, props виджета)
-- Если self-review нашёл проблему, которую не удалось починить за 1 итерацию
-- Если задача требует выйти за изначальный scope
-- Финальный handoff (всегда STOP)
+## 6. Обязательные точки STOP
 
-### Формат Stage Report (заполняется в конце каждого этапа)
+Никогда не продолжать без явного апрува Владельца:
+
+```
+перед добавлением нового Vite entry в rollupOptions.input
+перед изменением vite.config.ts, tsconfig.json
+перед изменением assets/api/client.ts (касается всех фич)
+перед изменением assets/react/app/providers.tsx (касается всех виджетов)
+перед изменением Twig-шаблона с mount point виджета
+перед изменением CSRF / auth-флоу
+перед изменением ui-kit/tokens/*.css (любая правка токенов)
+перед добавлением / удалением / переименованием класса в ui-kit/components/* или ui-kit/patterns/*
+перед добавлением нового React-компонента в assets/react/ui-kit/
+перед npm install любой новой зависимости
+перед удалением: компонента, хука, типа, entrypoint, mount point
+перед изменением публичного API виджета (data-attrs контракт, props виджета)
+перед bump-версии UI Kit (CHANGELOG.md)
+если self-review нашёл проблему, которую не удалось починить за 1 итерацию
+если задача требует выйти за изначальный scope
+финальный handoff (всегда STOP)
+```
+
+
+---
+
+## 7. UI Kit — правила использования
+
+### 7.1. Токены: raw vs semantic
+
+В `ui-kit/tokens/` два слоя:
+
+**Raw tokens** (`colors.css`, `typography.css`, `spacing.css`, `radius.css`, `shadows.css`):
+```css
+:root {
+  --color-primary: #1A56DB;
+  --color-success: #047857;
+  --space-2: 8px;
+  --r-2: 6px;
+}
+```
+
+**Semantic tokens** (`semantic.css`):
+```css
+:root {
+  --button-primary-bg: var(--color-primary);
+  --button-primary-text: #FFFFFF;
+  --card-bg: var(--bg-card);
+  --form-error-text: var(--danger-text);
+  --status-success-bg: var(--success-bg);
+}
+```
+
+**Правила:**
+
+- В компонентах UI Kit (`ui-kit/components/*.css`, `ui-kit/patterns/*.css`) использовать **только semantic tokens**.
+- В feature-стилях (CSS Modules в модулях) использовать **только semantic tokens или классы UI Kit**.
+- Raw tokens **никогда** не используются напрямую в компонентах — только через semantic.
+- Хардкод цветов (`#1A56DB`, `rgb(...)`, `hsl(...)`) — **запрещён** везде, кроме `ui-kit/tokens/colors.css`.
+
+Это даёт два преимущества: можно переименовать `--color-primary` без правки всех компонентов; можно сделать dark mode переопределением semantic-токенов в одном файле.
+
+### 7.2. Классы UI Kit
+
+- В коде (Twig, React, CSS Modules) использовать **только классы, определённые в `ui-kit/`**.
+- Запрещено создавать кастомные классы вида `.my-button`, `.special-card` в модулях.
+- Если для конкретной фичи нужен мелкий визуальный оверрайд (например, отступ) — использовать CSS Module внутри модуля, с именем-неймспейсом:
+  ```css
+  /* modules/reconciliation/features/kpi-summary/KpiSummaryView.module.css */
+  .root { padding-top: var(--space-4); }
+  ```
+  Внутри CSS Module нельзя переопределять стили классов UI Kit (`.btn`, `.card`). Только обёртки.
+- Если оверрайд нужен в нескольких модулях — это сигнал, что нужен новый вариант компонента в UI Kit, а не дублирование CSS Module.
+
+### 7.3. React-обёртки (`assets/react/ui-kit/`)
+
+Для каждого компонента в `ui-kit/components/` и каждого паттерна в `ui-kit/patterns/` должна существовать React-обёртка в `assets/react/ui-kit/<Name>/<Name>.tsx`.
+
+**Контракт обёртки:**
+
+```tsx
+// assets/react/ui-kit/Button/Button.tsx
+import clsx from 'clsx';
+
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type Size = 'sm' | 'md' | 'lg';
+
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: Variant;
+  size?: Size;
+  loading?: boolean;
+  leadingIcon?: React.ReactNode;
+}
+
+/**
+ * Button — wrapper over UI Kit `.btn` class.
+ *
+ * @uiKit ui-kit/components/button.html
+ * @version 1.2
+ */
+export const Button: React.FC<ButtonProps> = ({
+  variant = 'primary',
+  size = 'md',
+  loading = false,
+  leadingIcon,
+  className,
+  disabled,
+  children,
+  ...rest
+}) => (
+  <button
+    className={clsx('btn', `btn-${variant}`, `btn-${size}`, loading && 'btn-loading', className)}
+    disabled={disabled || loading}
+    {...rest}
+  >
+    {leadingIcon}
+    {children}
+  </button>
+);
+```
+
+**Правила:**
+
+- Обёртка **не пишет свой CSS**. Все стили — из UI Kit.
+- Обёртка только: типизирует пропсы, нормализует классы, ставит `disabled` при `loading`, делает мелкую логику (state для controlled-компонентов).
+- JSDoc с `@uiKit` и `@version` — **обязательны**. Скрипт `tools/check-uikit-react-mapping.mjs` проверяет, что для каждого `ui-kit/components/<name>.html` есть React-обёртка с правильным `@uiKit`-указателем, и наоборот.
+- Версия в `@version` указывает, какой версии UI Kit обёртка соответствует. При breaking-изменении компонента DS — обновляется здесь же.
+- `className` пропс **всегда** мерджится через `clsx`. Никаких `style={{ ... }}` с цветами.
+
+### 7.4. Twig-макросы для UI Kit
+
+Для сложных компонентов с повторяющейся разметкой (например, `status` с `<span class="dot">` + a11y) — в `templates/_macros/ui-kit.html.twig` живут макросы:
+
+```twig
+{# templates/_macros/ui-kit.html.twig #}
+{% macro status(variant, label) %}
+  <span class="status status--{{ variant }}" role="status">
+    <span class="dot" aria-hidden="true"></span>
+    {{ label }}
+  </span>
+{% endmacro %}
+
+{% macro button(label, variant = 'primary', size = 'md', attrs = {}) %}
+  <button class="btn btn-{{ variant }} btn-{{ size }}"
+          {% for k, v in attrs %}{{ k }}="{{ v|e('html_attr') }}" {% endfor %}>
+    {{ label }}
+  </button>
+{% endmacro %}
+```
+
+Использование:
+```twig
+{% import '_macros/ui-kit.html.twig' as ui %}
+{{ ui.status('success', 'Активен') }}
+{{ ui.button('Сохранить', 'primary', 'md', { type: 'submit' }) }}
+```
+
+Простые случаи (`<button class="btn btn-primary">Ок</button>`) — макрос не нужен, пишем напрямую.
+
+### 7.5. Версионирование UI Kit
+
+UI Kit — **живой документ**, но изменения дисциплинированы по semver:
+
+| Тип изменения | Версия | Кто решает | Что требуется |
+|---|---|---|---|
+| Косметические fix'ы (контраст, тени, мелкие отступы) | patch (1.2.0 → 1.2.1) | Дизайнер + ревью одним фронтом | Запись в CHANGELOG, визуальный регресс-тест в CI |
+| Новые компоненты, новые варианты, новые токены, без поломки существующего | minor (1.2.0 → 1.3.0) | Дизайнер + Владелец | Запись в CHANGELOG, обновление React-обёрток (новые), визуальный регресс |
+| Переименование классов, удаление вариантов, breaking-изменения токенов | major (1.2.0 → 2.0.0) | Владелец + миграционный план | Запись в CHANGELOG, **отдельная задача на миграцию всех потребителей**, deprecation-период минимум 1 minor |
+
+Любое изменение `ui-kit/*` сопровождается:
+
+1. Записью в `ui-kit/CHANGELOG.md` (формат — см. ниже).
+2. Bump-версии в JSDoc-обёртках React-компонентов, если затронуты.
+3. Если major — отдельной миграционной задачей.
+
+**Формат `ui-kit/CHANGELOG.md`:**
 
 ```markdown
-## Stage F<N>: <название> — DONE
+## [1.3.0] — 2026-07-01
+### Added
+- `KpiRow` pattern (`ui-kit/patterns/kpi-row.*`)
+- `--button-ghost-bg` semantic token
 
-**Риск:** 🟢 LOW | 🟡 MEDIUM | 🔴 HIGH
-**Следующее действие:** continue autonomously | 🛑 STOP, ждать Владельца
+### Changed
+- `.btn-primary` hover: `#1E40AF` → `#1742B0` (улучшен контраст)
 
-### Что сделано
-- ...
+### Deprecated
+- `.chip` без модификатора — использовать `.chip--filter`. Удалится в 1.5.
 
-### Затронутые файлы
-- `assets/react/features/orders/useOrders.ts` — new
-- `assets/react/features/orders/OrdersWidget.tsx` — new
-- `assets/react/features/orders/OrdersView.tsx` — new
-- `assets/react/entrypoints/orders.tsx` — new (HIGH-risk)
-- `vite.config.ts` — modified (new entry)
-- `templates/order/list.html.twig` — modified (mount point)
-
-### Self-review
-- [x] Project Structure / Naming
-- [x] TypeScript strict (no any, no @ts-ignore, no `!`)
-- [x] Tabler-first (нет хардкода цветов / spacing)
-- [x] Smart/Dumb split
-- [x] Hook возвращает безопасные дефолты
-- [x] apiFetch через `apiClient.ts` (не raw fetch)
-- [x] ErrorBoundary оборачивает виджет в entrypoint
-- [x] Twig `data-*` экранированы через `|e('html_attr')`
-- [x] Bundle size — не вырос неожиданно
-- [x] `npm run lint && npm run typecheck && npm run test` — green
-
-### Команды для проверки
-- `npm run dev` + ручной smoke `/orders`
-- `npm run build` — нет warning, manifest сгенерирован
-
-### Риски / на что обратить внимание ревьюеру
-- Добавлен новый Vite entry — проверить, что Symfony `vite_entry_script_tags('orders')` подтягивает корректный manifest.
-
-### Открытые вопросы
-- нет
-```
-
-### Phase Final — Handoff (всегда STOP)
-
-В конце последнего этапа:
-1. Прогнать полный набор: `npm run lint && npm run typecheck && npm run test && npm run build`.
-2. Сверить построчно «Self-review checklist на каждом этапе» (раздел ниже) и «What NOT To Do».
-3. Заполнить `docs/tasks/<id>/handoff.md`:
-   - summary всех этапов,
-   - список новых Vite entries + Twig mount points,
-   - список изменений в shared-инфраструктуре (`apiClient.ts`, `queryClient.ts`, `vite.config.ts`, глобальных Tabler overrides),
-   - список новых npm-зависимостей (с обоснованием),
-   - размер бандла до/после,
-   - риски,
-   - follow-ups, которые сознательно вынесены за scope.
-4. 🛑 **STOP. Final Owner review.** Merge — только после одобрения Владельцем.
-
-### Запрещено в автономном режиме
-
-```
-самовольно расширять scope                              — STOP и спросить
-коммитить незакрытый этап                               — self-review red == этап не закрыт
-пропускать self-review «потому что очевидно»            — checklist обязателен
-пропускать STOP на high-risk этапе «ради скорости»     — Владелец сам решит, что пропустить
-переписывать существующие фичи по дороге («заодно»)    — отдельная задача
-делать новый Vite entry / Twig mount без STOP           — обязательная остановка
-npm install без STOP                                    — обязательная остановка
-правки apiClient.ts / queryClient.ts без STOP           — обязательная остановка
-merge в основную ветку                                  — никогда, только PR
-force-push в shared-ветки                               — никогда
+### Migration notes
+- Никаких breaking. Обновить можно немедленно.
 ```
 
 ---
 
-## Project Structure
+## 8. React — правила
 
-```
-assets/
-├── react/
-│   ├── components/          # Reusable UI primitives
-│   │   ├── ui/              # Atoms: Button, Input, Modal, Badge
-│   │   └── shared/          # Molecules: ProductCard, Pagination
-│   ├── features/            # Business-domain slices
-│   │   └── {feature}/
-│   │       ├── {Feature}Widget.tsx   # Smart container (data-aware)
-│   │       ├── {Feature}View.tsx     # Dumb presenter (UI only)
-│   │       ├── use{Feature}.ts       # Business logic hook
-│   │       └── {feature}.types.ts   # Feature-local types
-│   ├── hooks/               # Shared custom hooks
-│   ├── services/            # API client, external integrations
-│   ├── types/               # Global TypeScript types
-│   ├── utils/               # Pure helper functions
-│   └── entrypoints/         # One mount file per Twig page/widget
-│       ├── cart.tsx
-│       └── product-configurator.tsx
-vite.config.ts
-tsconfig.json
-```
+### 8.1. Smart / Dumb split
 
-**Rules:**
-- One component per file. Filename = component name (PascalCase).
-- Feature folder contains everything related to that domain.
-- Never import from `features/X` inside `features/Y` — use `components/shared` instead.
-- `entrypoints/` files only mount React into DOM; zero business logic there.
+Любая нетривиальная фича делится на минимум два файла:
 
----
+- **`<Feature>Widget.tsx`** — smart. Хук `use<Feature>`, состояние, обработчики, маппинг данных в пропсы View. Не рендерит UI напрямую, только передаёт пропсы во View.
+- **`<Feature>View.tsx`** — dumb. Только JSX из компонентов UI Kit + пропсы. Никаких хуков с побочными эффектами, никаких `fetch`, никакого `useQuery`. Тестируется одними пропсами.
 
-## TypeScript Rules
+Тривиальная фича (1 компонент, без данных) — может быть одним файлом, но обычно это означает, что её надо положить в `react/ui-kit/` или `react/shared/`, а не в `modules/`.
 
-**tsconfig.json must include:**
+### 8.2. TypeScript strict
+
+`tsconfig.json`:
 ```json
 {
   "compilerOptions": {
@@ -213,813 +453,317 @@ tsconfig.json
 }
 ```
 
-**Forbidden:**
-- `any` — use `unknown` and narrow with type guards
-- Non-null assertion `!` — use optional chaining `?.` or explicit checks
-- `@ts-ignore` — fix the type, don't suppress it
-- Inline type definitions in JSX props — define `interface` above the component
+**Запрещено:**
+- `any` — использовать `unknown` и сужать типы через type guards.
+- Non-null assertion `!` — использовать `?.`, явные проверки.
+- `@ts-ignore` — фиксить тип, не подавлять.
+- Inline-типы в пропсах JSX — `interface` объявляется над компонентом.
 
-**Required:**
-```tsx
-// ✅ Props via interface
-interface CartItemProps {
-  id: number;
-  title: string;
-  quantity: number;
-  onRemove: (id: number) => void;
-}
+**Обязательно:**
+- Пропсы через `interface`.
+- Возвращаемый тип хуков указан явно.
+- Типы API-ответов из `assets/api/schema.d.ts` (codegen) или, если генератор не настроен, отдельные интерфейсы в `<feature>.types.ts`.
 
-// ✅ Explicit return type on hooks
-function useCart(): { items: CartItem[]; total: number; addItem: (id: number) => void } { ... }
+### 8.3. Хуки
 
-// ✅ API response shapes typed separately
-interface ApiResponse<T> {
-  data: T;
-  meta?: { total: number; page: number; perPage: number };
-}
-```
-
----
-
-## Vite Configuration
-
+Хук фичи:
 ```ts
-// vite.config.ts
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import path from 'path';
+// modules/reconciliation/features/kpi-summary/useKpiSummary.ts
+import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from '@/api/client';
+import type { KpiSummary } from './kpi-summary.types';
 
-export default defineConfig({
-  plugins: [react()],
-  build: {
-    outDir: 'public/build',
-    manifest: true,           // Required for Symfony asset() helper
-    rollupOptions: {
-      input: {
-        cart: 'assets/react/entrypoints/cart.tsx',
-        'product-configurator': 'assets/react/entrypoints/product-configurator.tsx',
-        // Add one entry per page/widget
-      },
-    },
-  },
-  resolve: {
-    alias: { '@': path.resolve(__dirname, 'assets/react') },
-  },
-});
-```
-
-**Rules:**
-- One Vite entry per widget/page — load only what the page needs.
-- Always enable `manifest: true` so Symfony can reference hashed filenames.
-- Use `@` alias for all internal imports (`@/components/ui/Button`).
-- **Изменения `vite.config.ts` — 🔴 HIGH risk, обязательный STOP перед коммитом.**
-
----
-
-## Tabler UI
-
-### Installation & Setup
-
-```bash
-npm install @tabler/core @tabler/icons-react
-```
-
-```ts
-// assets/react/entrypoints/cart.tsx — import Tabler CSS once per entrypoint
-import '@tabler/core/dist/css/tabler.min.css';
-```
-
-Alternatively, import Tabler CSS globally in Twig base layout (preferred — avoids duplicate CSS per entrypoint):
-
-```twig
-{# templates/base.html.twig #}
-<link rel="stylesheet" href="{{ vite_asset('assets/tabler.css') }}">
-```
-
-```ts
-// assets/tabler.css (global entry, imported in vite.config.ts)
-@import '@tabler/core/dist/css/tabler.min.css';
-```
-
----
-
-### Using Tabler React Components
-
-Tabler provides ready-made React components. Always import from `@tabler/core/dist/js/tabler-react.esm.js` or the package root:
-
-```tsx
-import { Card, Button, Badge, Alert, Table, Spinner } from '@tabler/core/react';
-import { IconShoppingCart, IconTrash, IconCheck } from '@tabler/icons-react';
-```
-
-> **Note**: As of Tabler v1.x, React components are in `@tabler/core`. Check installed version — if using Tabler React separately, import from `@tabler/react`.
-
----
-
-### Component Usage Patterns
-
-#### Cards (primary layout unit)
-
-```tsx
-// ✅ Standard content card
-const ProductCard: React.FC<ProductCardProps> = ({ title, price, status }) => (
-  <div className="card">
-    <div className="card-header">
-      <h3 className="card-title">{title}</h3>
-      <div className="card-options">
-        <Badge color={status === 'active' ? 'green' : 'red'}>{status}</Badge>
-      </div>
-    </div>
-    <div className="card-body">
-      <p className="text-muted">Price: {price}</p>
-    </div>
-    <div className="card-footer">
-      <button className="btn btn-primary btn-sm">
-        <IconShoppingCart size={16} className="me-1" />
-        Add to cart
-      </button>
-    </div>
-  </div>
-);
-```
-
-#### Page layout structure
-
-```tsx
-// features/orders/OrdersWidget.tsx
-const OrdersWidget: React.FC = () => (
-  <div className="page-wrapper">
-    <div className="page-header d-print-none">
-      <div className="container-xl">
-        <div className="row g-2 align-items-center">
-          <div className="col">
-            <h2 className="page-title">Orders</h2>
-          </div>
-          <div className="col-auto ms-auto">
-            <button className="btn btn-primary">
-              <IconPlus size={16} className="me-1" />
-              New Order
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div className="page-body">
-      <div className="container-xl">
-        <OrdersTable />
-      </div>
-    </div>
-  </div>
-);
-```
-
-#### Tables
-
-```tsx
-// components/shared/DataTable.tsx
-interface DataTableProps<T> {
-  columns: { key: keyof T; label: string }[];
-  rows: T[];
+export function useKpiSummary(period: string): {
+  data: KpiSummary;
   isLoading: boolean;
-  onRowClick?: (row: T) => void;
-}
-
-function DataTable<T extends { id: number }>({ columns, rows, isLoading }: DataTableProps<T>) {
-  if (isLoading) return <div className="text-center py-4"><div className="spinner-border" /></div>;
-
-  return (
-    <div className="table-responsive">
-      <table className="table table-vcenter card-table">
-        <thead>
-          <tr>
-            {columns.map((col) => (
-              <th key={String(col.key)}>{col.label}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.id}>
-              {columns.map((col) => (
-                <td key={String(col.key)}>{String(row[col.key])}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-```
-
-#### Loading states — use Tabler Skeleton/Spinner
-
-```tsx
-// Always use Tabler's built-in spinner, not custom ones
-const LoadingSpinner: React.FC = () => (
-  <div className="d-flex justify-content-center py-4">
-    <div className="spinner-border text-primary" role="status">
-      <span className="visually-hidden">Loading...</span>
-    </div>
-  </div>
-);
-
-// Skeleton placeholder for card lists
-const CardSkeleton: React.FC = () => (
-  <div className="card card-body placeholder-glow">
-    <p className="placeholder col-7 mb-2" />
-    <p className="placeholder col-4" />
-  </div>
-);
-```
-
-#### Alerts and feedback
-
-```tsx
-// ✅ Use Tabler alert classes — never custom divs for status messages
-const SuccessAlert: React.FC<{ message: string }> = ({ message }) => (
-  <div className="alert alert-success" role="alert">
-    <div className="d-flex">
-      <div><IconCheck size={16} className="me-2" /></div>
-      <div>{message}</div>
-    </div>
-  </div>
-);
-
-const ErrorAlert: React.FC<{ message: string }> = ({ message }) => (
-  <div className="alert alert-danger" role="alert">
-    <h4 className="alert-title">Error</h4>
-    <div className="text-muted">{message}</div>
-  </div>
-);
-```
-
-#### Modals
-
-```tsx
-// Use Tabler modal structure — control visibility via React state, not Bootstrap JS
-interface ConfirmModalProps {
-  isOpen: boolean;
-  title: string;
-  message: string;
-  onConfirm: () => void;
-  onClose: () => void;
-  isLoading?: boolean;
-}
-
-const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, title, message, onConfirm, onClose, isLoading }) => {
-  if (!isOpen) return null;
-
-  return (
-    <>
-      <div className="modal modal-blur fade show d-block" tabIndex={-1} role="dialog">
-        <div className="modal-dialog modal-sm modal-dialog-centered" role="document">
-          <div className="modal-content">
-            <div className="modal-body">
-              <div className="modal-title">{title}</div>
-              <div className="text-muted">{message}</div>
-            </div>
-            <div className="modal-footer">
-              <button type="button" className="btn btn-link link-secondary me-auto" onClick={onClose}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn btn-danger"
-                onClick={onConfirm}
-                disabled={isLoading}
-              >
-                {isLoading ? <span className="spinner-border spinner-border-sm me-1" /> : null}
-                Confirm
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div className="modal-backdrop fade show" onClick={onClose} />
-    </>
-  );
-};
-```
-
----
-
-### Forms with Tabler + React Hook Form
-
-```tsx
-// ✅ Correct: Tabler form classes + RHF registration
-const UserForm: React.FC = () => {
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
-    resolver: zodResolver(schema),
-  });
-
-  return (
-    <div className="card">
-      <div className="card-header">
-        <h3 className="card-title">Edit User</h3>
-      </div>
-      <div className="card-body">
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <div className="mb-3">
-            <label className="form-label required">Email</label>
-            <input
-              className={`form-control ${errors.email ? 'is-invalid' : ''}`}
-              type="email"
-              {...register('email')}
-            />
-            {errors.email && (
-              <div className="invalid-feedback">{errors.email.message}</div>
-            )}
-          </div>
-
-          <div className="mb-3">
-            <label className="form-label">Role</label>
-            <select className="form-select" {...register('role')}>
-              <option value="user">User</option>
-              <option value="admin">Admin</option>
-            </select>
-          </div>
-
-          <div className="card-footer">
-            <button type="submit" className="btn btn-primary" disabled={submit.isPending}>
-              {submit.isPending
-                ? <><span className="spinner-border spinner-border-sm me-2" />Saving...</>
-                : 'Save changes'
-              }
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-```
-
----
-
-### Icons — @tabler/icons-react
-
-```tsx
-import {
-  IconEdit,
-  IconTrash,
-  IconPlus,
-  IconSearch,
-  IconChevronRight,
-} from '@tabler/icons-react';
-
-// ✅ Standard usage — always set explicit size, never rely on defaults
-<IconEdit size={16} stroke={1.5} className="me-1" />
-
-// ✅ In action buttons
-<button className="btn btn-sm btn-icon btn-ghost-danger" onClick={() => onDelete(id)}>
-  <IconTrash size={16} />
-</button>
-
-// ✅ Empty state
-const EmptyState: React.FC<{ message: string }> = ({ message }) => (
-  <div className="empty">
-    <div className="empty-img">
-      <IconSearch size={48} stroke={1} className="text-muted" />
-    </div>
-    <p className="empty-title">{message}</p>
-  </div>
-);
-```
-
-**Icon rules:**
-- Always import only icons you use — tree-shaking keeps bundle small.
-- Default `size={16}` for inline/button icons, `size={24}` for standalone, `size={48}` for empty states.
-- Default `stroke={1.5}` — matches Tabler's visual style.
-- Never use `<img>` for Tabler icons.
-
----
-
-### Tabler CSS Variables — Custom Overrides
-
-Never override Tabler styles with hardcoded values. Use CSS variables:
-
-```css
-/* assets/react/styles/overrides.css */
-:root {
-  --tblr-primary: #2563eb;        /* Brand primary */
-  --tblr-font-size-base: 0.875rem;
-  --tblr-border-radius: 6px;
-}
-
-/* Feature-scoped overrides — use CSS Modules */
-.compactTable {
-  --tblr-table-cell-padding-y: 0.35rem;
-}
-```
-
-```tsx
-import styles from './OrdersTable.module.css';
-
-<table className={`table ${styles.compactTable}`}>
-```
-
-**Styling rules:**
-- Use Tabler utility classes first (`text-muted`, `fw-bold`, `ms-auto`, `d-flex`, `gap-2`).
-- CSS Modules only for component-specific overrides — not for layout already covered by Tabler.
-- Never write custom CSS for spacing — use Tabler's Bootstrap-based spacing (`m-*`, `p-*`, `gap-*`).
-- Never override Tabler classes with `!important`.
-- **Изменения `:root { --tblr-* }` (глобальные overrides) — 🔴 HIGH risk, STOP перед коммитом.** Feature-scoped overrides через CSS Modules — 🟢 LOW.
-
----
-
-### Tabler Color Tokens
-
-Use semantic Tabler color classes, not hex values in JSX:
-
-```tsx
-// ✅ Correct — semantic and themeable
-<Badge color="green">Active</Badge>
-<Badge color="red">Inactive</Badge>
-<Badge color="yellow">Pending</Badge>
-<Badge color="blue">Info</Badge>
-
-// ✅ Status mapping pattern
-const STATUS_COLORS = {
-  active: 'green',
-  inactive: 'red',
-  pending: 'yellow',
-  draft: 'gray',
-} as const;
-
-type Status = keyof typeof STATUS_COLORS;
-
-const StatusBadge: React.FC<{ status: Status }> = ({ status }) => (
-  <span className={`badge bg-${STATUS_COLORS[status]}-lt`}>
-    {status}
-  </span>
-);
-
-// ❌ Never
-<span style={{ color: '#2fb344' }}>Active</span>
-```
-
----
-
-## Twig Integration
-
-### Mounting React widgets
-
-**Twig template side:**
-```twig
-{# templates/product/show.html.twig #}
-
-{# 1. Mount point with data attributes (small data) #}
-<div
-  id="product-configurator"
-  data-product-id="{{ product.id }}"
-  data-initial-data="{{ product|json_encode|e('html_attr') }}"
-></div>
-
-{# 2. Inline JSON for larger payloads #}
-<script id="page-bootstrap" type="application/json">
-  {{ { user: currentUser, locale: app.request.locale }|json_encode|raw }}
-</script>
-
-{# 3. CSRF token for API calls #}
-<meta name="csrf-token" content="{{ csrf_token('api') }}">
-
-{# 4. Load the Vite entry #}
-{% block javascripts %}
-  <script type="module" src="{{ vite_entry_script_tags('product-configurator') }}"></script>
-{% endblock %}
-```
-
-**React entrypoint side:**
-```tsx
-// assets/react/entrypoints/product-configurator.tsx
-import { createRoot } from 'react-dom/client';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { queryClient } from '@/services/queryClient';
-import ProductConfiguratorWidget from '@/features/product-configurator/ProductConfiguratorWidget';
-
-const el = document.getElementById('product-configurator');
-if (el) {
-  const props = {
-    productId: Number(el.dataset.productId),
-    initialData: JSON.parse(el.dataset.initialData ?? 'null'),
-  };
-
-  createRoot(el).render(
-    <QueryClientProvider client={queryClient}>
-      <ProductConfiguratorWidget {...props} />
-    </QueryClientProvider>
-  );
-}
-```
-
-**Rules:**
-- Always guard with `if (el)` before mounting.
-- Always wrap with `QueryClientProvider` at the entrypoint level.
-- Always wrap with `ErrorBoundary` — one widget crashing must not break the page.
-- Parse `data-*` values immediately at the entrypoint; never pass raw strings to components.
-- Use `json_encode|e('html_attr')` in Twig to prevent XSS.
-- **Изменения mount-контракта (имя `id`, набор `data-*`) — 🔴 HIGH risk, STOP перед коммитом** (фронт + Twig + Symfony controller связаны).
-
----
-
-## Component Patterns
-
-### Smart / Dumb split
-
-Every feature must separate data concerns from presentation:
-
-```tsx
-// features/cart/CartWidget.tsx — SMART (knows about data)
-import { useCart } from './useCart';
-import CartView from './CartView';
-
-const CartWidget: React.FC = () => {
-  const { items, total, removeItem, isLoading } = useCart();
-
-  if (isLoading) return <CartSkeleton />;
-
-  return <CartView items={items} total={total} onRemove={removeItem} />;
-};
-
-export default CartWidget;
-```
-
-```tsx
-// features/cart/CartView.tsx — DUMB (pure UI, no hooks, no fetch)
-interface CartViewProps {
-  items: CartItem[];
-  total: number;
-  onRemove: (id: number) => void;
-}
-
-const CartView: React.FC<CartViewProps> = ({ items, total, onRemove }) => (
-  <div className="cart">
-    {items.map((item) => (
-      <CartItem key={item.id} {...item} onRemove={onRemove} />
-    ))}
-    <CartTotal amount={total} />
-  </div>
-);
-
-export default CartView;
-```
-
-**Rules:**
-- Dumb components: zero hooks except `useState` for local UI state (open/closed, hover).
-- Smart components: no inline JSX logic — delegate everything to dumb components.
-- Dumb components must be fully testable with just props.
-
----
-
-## Custom Hooks
-
-All business logic lives in hooks. Components only call hooks and render JSX.
-
-```ts
-// features/cart/useCart.ts
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiFetch } from '@/services/apiClient';
-import type { Cart, CartItem } from './cart.types';
-
-export function useCart() {
-  const qc = useQueryClient();
-
-  const { data: cart, isLoading } = useQuery<Cart>({
-    queryKey: ['cart'],
-    queryFn: () => apiFetch('/api/cart'),
-  });
-
-  const removeItem = useMutation({
-    mutationFn: (itemId: number) =>
-      apiFetch(`/api/cart/items/${itemId}`, { method: 'DELETE' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['cart'] }),
+  error: unknown;
+} {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['reconciliation', 'kpi', period],
+    queryFn: () => apiFetch<KpiSummary>(`/api/reconciliation/kpi?period=${period}`),
   });
 
   return {
-    items: cart?.items ?? [],
-    total: cart?.total ?? 0,
+    data: data ?? { matched: 0, mismatched: 0, missing: 0 },  // safe defaults
     isLoading,
-    removeItem: removeItem.mutate,
+    error,
   };
 }
 ```
 
-**Rules:**
-- Hook name always starts with `use`.
-- Return plain values, not query objects — components don't need to know about React Query internals.
-- `invalidateQueries` after every mutation that changes shared state.
-- Provide safe defaults (`?? []`, `?? 0`) so components never crash on undefined.
+**Правила:**
+
+- Хук всегда возвращает **безопасные дефолты** для данных (`?? []`, `?? 0`, `?? { ... }`). View не должен валиться, если `data` ещё `undefined`.
+- Query-ключ строится по схеме `[module, entity, ...params]`.
+- Мутации после успеха вызывают `queryClient.invalidateQueries({ queryKey: ['module', 'entity'] })`.
+- Запросы **только** через `apiFetch` из `assets/api/client.ts`. Никаких raw `fetch`.
 
 ---
 
-## API Client
+## 9. Формы
 
-Single centralized module — never call `fetch` directly in components or hooks:
+- React Hook Form + Zod.
+- Zod-схема — single source of truth. Тип формы выводится через `z.infer<typeof schema>`.
+- Схема живёт в `<feature>.schema.ts` внутри feature-папки.
 
 ```ts
-// services/apiClient.ts
-
-function getCsrfToken(): string {
-  return document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
-}
-
-export class ApiError extends Error {
-  constructor(
-    public status: number,
-    message: string
-  ) {
-    super(message);
-    this.name = 'ApiError';
-  }
-}
-
-export async function apiFetch<T>(url: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRF-Token': getCsrfToken(),
-      'X-Requested-With': 'XMLHttpRequest',
-      ...options.headers,
-    },
-  });
-
-  if (!response.ok) {
-    const message = await response.text().catch(() => `HTTP ${response.status}`);
-    throw new ApiError(response.status, message);
-  }
-
-  // Handle 204 No Content
-  if (response.status === 204) return undefined as T;
-
-  return response.json() as Promise<T>;
-}
-```
-
-**Rules:**
-- Always send `X-Requested-With: XMLHttpRequest` so Symfony identifies AJAX requests.
-- Always send CSRF token on non-GET requests.
-- Throw `ApiError` with status code — hooks and query error handlers can discriminate by status.
-- Never hardcode base URL — Symfony handles routing.
-- **Изменения `apiClient.ts` — 🔴 HIGH risk, STOP перед коммитом** (касается всех фич).
-
----
-
-## Forms
-
-Use React Hook Form + Zod for all forms:
-
-```tsx
-// features/checkout/CheckoutForm.tsx
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+// modules/billing/features/plan-selection/plan-selection.schema.ts
 import { z } from 'zod';
-import { useMutation } from '@tanstack/react-query';
-import { apiFetch } from '@/services/apiClient';
 
-const schema = z.object({
-  email: z.string().email('Некорректный email'),
-  address: z.string().min(10, 'Укажите полный адрес'),
+export const planSelectionSchema = z.object({
+  planId: z.string().uuid(),
+  billingPeriod: z.enum(['monthly', 'yearly']),
+  promoCode: z.string().optional(),
 });
 
-type FormData = z.infer<typeof schema>;
-
-const CheckoutForm: React.FC = () => {
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
-    resolver: zodResolver(schema),
-  });
-
-  const submit = useMutation({
-    mutationFn: (data: FormData) => apiFetch('/api/checkout', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  });
-
-  return (
-    <form onSubmit={handleSubmit((data) => submit.mutate(data))}>
-      <input {...register('email')} />
-      {errors.email && <span>{errors.email.message}</span>}
-
-      <input {...register('address')} />
-      {errors.address && <span>{errors.address.message}</span>}
-
-      <button type="submit" disabled={submit.isPending}>
-        {submit.isPending ? 'Отправка...' : 'Оформить'}
-      </button>
-    </form>
-  );
-};
-```
-
-**Rules:**
-- All form schemas defined with Zod — single source of truth for validation.
-- Type derived from schema via `z.infer<typeof schema>` — never define separately.
-- Mutation for submission — never manual `fetch` inside `onSubmit`.
-- Show `isPending` state on submit button to prevent double-submit.
-
----
-
-## Error Handling
-
-Wrap every widget in an `ErrorBoundary`:
-
-```tsx
-// components/ui/ErrorBoundary.tsx
-import { Component, type ReactNode } from 'react';
-
-interface Props { children: ReactNode; fallback?: ReactNode; }
-interface State { hasError: boolean; }
-
-class ErrorBoundary extends Component<Props, State> {
-  state: State = { hasError: false };
-
-  static getDerivedStateFromError(): State {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: Error) {
-    console.error('[Widget Error]', error);
-    // Optional: send to Sentry
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return this.props.fallback ?? <div className="widget-error">Что-то пошло не так</div>;
-    }
-    return this.props.children;
-  }
-}
-
-export default ErrorBoundary;
+export type PlanSelectionForm = z.infer<typeof planSelectionSchema>;
 ```
 
 ```tsx
-// In every entrypoint:
-createRoot(el).render(
-  <QueryClientProvider client={queryClient}>
-    <ErrorBoundary>
-      <CartWidget />
-    </ErrorBoundary>
-  </QueryClientProvider>
-);
+// modules/billing/features/plan-selection/PlanSelectionView.tsx
+const { register, handleSubmit, formState: { errors, isSubmitting } } =
+  useForm<PlanSelectionForm>({ resolver: zodResolver(planSelectionSchema) });
 ```
 
-**Rules:**
-- Every `createRoot().render()` must have `<ErrorBoundary>` wrapping the widget.
-- Query errors handled per-query via `error` state from `useQuery` — don't rely solely on boundary.
-- `ApiError` with status 401 → redirect to Symfony login page.
-- `ApiError` with status 422 → show validation errors from response body.
+**Правила вывода ошибок:**
+
+- Поля используют CSS-классы UI Kit для ошибок (например, `input-error` из `ui-kit/components/input.css`).
+- Сообщение ошибки — отдельный элемент по правилам UI Kit (например, `<div class="form-error">`).
+- Серверная ошибка 422 с валидационным map → сетим в форму через `setError(field, { message })`.
 
 ---
 
-## Query Client Configuration
+## 10. Twig-интеграция (острова)
+
+### 10.1. Mount-контракт
+
+Twig отдаёт shell, React монтируется только в местах с интерактивом:
+
+```twig
+{# templates/reconciliation/show.html.twig #}
+{% extends '_layout/dashboard.html.twig' %}
+
+{% block body %}
+  <header class="page-header">
+    <h1 class="page-title">{{ 'reconciliation.title'|trans }}</h1>
+  </header>
+
+  <main>
+    <div
+      data-island="reconciliation-filters"
+      data-props="{{ {
+        period: app.request.get('period', 'month'),
+        availablePeriods: availablePeriods,
+        csrfToken: csrf_token('reconciliation')
+      }|json_encode|e('html_attr') }}"
+    ></div>
+
+    <div
+      data-island="reconciliation-kpi"
+      data-props="{{ { period: app.request.get('period', 'month') }|json_encode|e('html_attr') }}"
+    ></div>
+
+    <div
+      data-island="reconciliation-transactions"
+      data-props="{{ { period: app.request.get('period', 'month') }|json_encode|e('html_attr') }}"
+    ></div>
+  </main>
+
+  {{ vite_entry_script_tags('reconciliation') }}
+  {{ vite_entry_link_tags('reconciliation') }}
+{% endblock %}
+```
+
+### 10.2. Entrypoint
 
 ```ts
-// services/queryClient.ts
-import { QueryClient } from '@tanstack/react-query';
-import { ApiError } from './apiClient';
+// assets/react/entrypoints/reconciliation.tsx
+import { mountIsland } from '@/app/mountIsland';
+import { FiltersWidget } from '@/modules/reconciliation/features/filters/FiltersWidget';
+import { KpiWidget } from '@/modules/reconciliation/features/kpi-summary/KpiWidget';
+import { TransactionsWidget } from '@/modules/reconciliation/features/transactions/TransactionsWidget';
 
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60,       // 1 min — data fresh without refetch
-      retry: (failureCount, error) => {
-        if (error instanceof ApiError && error.status < 500) return false; // no retry on 4xx
-        return failureCount < 2;
-      },
-    },
-    mutations: {
-      onError: (error) => {
-        if (error instanceof ApiError && error.status === 401) {
-          window.location.href = '/login';
-        }
-      },
-    },
-  },
-});
+mountIsland('reconciliation-filters', FiltersWidget);
+mountIsland('reconciliation-kpi', KpiWidget);
+mountIsland('reconciliation-transactions', TransactionsWidget);
 ```
 
-**Изменения `queryClient.ts` — 🔴 HIGH risk, STOP перед коммитом** (касается поведения всех запросов в приложении).
+`mountIsland` находит все `<div data-island="<name>">`, читает `data-props`, оборачивает в `<AppProviders><ErrorBoundary>` и монтирует.
+
+### 10.3. Правила
+
+- В `entrypoints/` — **только** mount-логика, никакой бизнес-логики, никаких хуков.
+- `data-props` всегда экранируется через `|json_encode|e('html_attr')`. Без этого — XSS-риск.
+- Mount защищён `if (el)`.
+- Виджет оборачивается в `QueryClientProvider` + `ErrorBoundary` (делается через `AppProviders`).
+- CSRF-токен передаётся через `data-props` или meta-тег `<meta name="csrf-token" content="{{ csrf_token('...') }}">`, который читается в `api/client.ts`.
 
 ---
 
-## Naming Conventions
+## 11. Импорты и границы
 
-| Entity | Convention | Example |
+Жёсткая иерархия зависимостей. Нарушение → ESLint красный → CI красный.
+
+```
+ui-kit         ← никаких импортов из react/
+react/shared   ← только ui-kit и api
+react/modules  ← ui-kit, shared, api; НЕ другой модуль
+entrypoints    ← только модули + app/providers
+_legacy        ← карантин, импортируется только из entrypoints/
+```
+
+**Конкретно запрещено:**
+
+- `import X from '@/modules/billing/...'` внутри `modules/auth/*` — модули не импортируют друг друга. Общее — через `shared/`.
+- Импорт из `_legacy/` в `modules/` — запрещён. `_legacy/` импортируется только из `entrypoints/` (для старых страниц до миграции).
+- Импорт из `modules/` внутри `react/ui-kit/` — запрещён. UI Kit ничего не знает про бизнес.
+- Импорт из `modules/` внутри `react/shared/` — запрещён.
+
+ESLint-правило:
+
+```json
+{
+  "import/no-restricted-paths": ["error", {
+    "zones": [
+      { "target": "assets/react/ui-kit", "from": "assets/react", "except": ["./ui-kit"] },
+      { "target": "assets/react/shared", "from": "assets/react/modules" },
+      { "target": "assets/react/modules/marketplace-ads", "from": "assets/react/modules", "except": ["./marketplace-ads", "./shared"] },
+      { "target": "assets/react/modules/dashboard", "from": "assets/react/modules", "except": ["./dashboard", "./shared"] },
+      { "target": "assets/react/modules", "from": "assets/react/_legacy" }
+    ]
+  }]
+}
+```
+
+---
+
+## 12. Naming conventions
+
+| Сущность | Правило | Пример |
 |---|---|---|
-| Component file | PascalCase | `ProductCard.tsx` |
-| Hook file | camelCase with `use` prefix | `useCart.ts` |
-| Type file | camelCase with `.types` | `cart.types.ts` |
-| CSS Module | camelCase | `styles.module.css` |
-| Entrypoint file | kebab-case | `product-configurator.tsx` |
-| API route constants | SCREAMING_SNAKE | `const API_CART = '/api/cart'` |
-| Task plan / reports | kebab-case | `docs/tasks/<id>/plan.md`, `docs/tasks/<id>/stages/stage-1.md` |
+| Component file | PascalCase | `KpiSummaryView.tsx` |
+| Hook file | camelCase с префиксом `use` | `useKpiSummary.ts` |
+| Type file | camelCase с `.types` | `kpi-summary.types.ts` |
+| Zod schema file | camelCase с `.schema` | `plan-selection.schema.ts` |
+| CSS Module | `.module.css` | `KpiSummaryView.module.css` |
+| Entrypoint file | kebab-case | `reconciliation.tsx`, `marketplace-analytics.tsx` |
+| Vite entry name | kebab-case | `reconciliation` |
+| Island name (data-island) | kebab-case | `reconciliation-kpi` |
+| API route constants | SCREAMING_SNAKE | `const API_RECONCILIATION_KPI = '/api/reconciliation/kpi'` |
+| Module folder | kebab-case | `marketplace-analytics/` |
+| Feature folder | kebab-case | `kpi-summary/` |
+| Task plan / reports | kebab-case | `docs/tasks/<id>/plan.md` |
 
 ---
 
-## What NOT To Do
+## 13. Stage Report (заполняется в конце каждого этапа)
+
+```markdown
+## Stage F<N>: <название> — DONE
+
+**Риск:** 🟢 LOW | 🟡 MEDIUM | 🔴 HIGH
+**Следующее действие:** continue autonomously | 🛑 STOP, ждать Владельца
+
+### Что сделано
+- ...
+
+### Затронутые файлы
+- `assets/react/modules/reconciliation/features/kpi-summary/useKpiSummary.ts` — new
+- `assets/react/modules/reconciliation/features/kpi-summary/KpiWidget.tsx` — new
+- `assets/react/modules/reconciliation/features/kpi-summary/KpiView.tsx` — new
+- `assets/react/entrypoints/reconciliation.tsx` — new (HIGH-risk)
+- `vite.config.ts` — modified (new entry `reconciliation`)
+- `templates/reconciliation/show.html.twig` — modified (mount points)
+
+### Self-review
+- [x] Project Structure / Naming
+- [x] TypeScript strict (no any, no @ts-ignore, no `!`)
+- [x] UI Kit-first (нет хардкода цветов / spacing, все классы из ui-kit/)
+- [x] Smart/Dumb split
+- [x] Хук возвращает безопасные дефолты
+- [x] apiFetch через api/client.ts (не raw fetch)
+- [x] ErrorBoundary оборачивает виджет в entrypoint
+- [x] Twig `data-*` экранированы через `|e('html_attr')`
+- [x] Bundle size — не вырос неожиданно
+- [x] `npm run lint && npm run typecheck && npm run test && npm run check:ui-kit` — green
+
+### Команды для проверки
+- `npm run dev` + ручной smoke `/reconciliation`
+- `npm run build` — нет warning, manifest сгенерирован
+
+### Риски / на что обратить внимание ревьюеру
+- Добавлен новый Vite entry — проверить `vite_entry_script_tags('reconciliation')` в Twig.
+
+### Открытые вопросы
+- нет
+```
+
+---
+
+## 14. Self-review checklist
+
+Запускать в строгом порядке. Если хоть один пункт красный — этап **не закрыт**, fix или 🛑 STOP.
+
+**Структура и архитектура:**
+- [ ] Изменения строго в рамках цели этапа (нет out-of-scope правок)
+- [ ] Структура файлов и naming соблюдены (раздел 12)
+- [ ] Нет импортов из `modules/X` внутри `modules/Y` — общее через `shared/`
+- [ ] Нет импортов из `_legacy/` в `modules/`
+- [ ] `entrypoints/` содержат **только** mount-логику
+- [ ] Smart/Dumb split соблюдён для нетривиальной фичи
+
+**TypeScript:**
+- [ ] Нет `any`, нет `@ts-ignore`, нет non-null `!`
+- [ ] Props через `interface`, не inline
+- [ ] Hook возвращает безопасные дефолты (`?? []`, `?? 0`, `?? { ... }`)
+- [ ] `npm run typecheck` — green
+
+**UI Kit:**
+- [ ] Все CSS-классы в коде существуют в `ui-kit/components/` или `ui-kit/patterns/`
+- [ ] `npm run check:ui-kit` — green (классы в коде совпадают с DS)
+- [ ] Нет hardcoded hex/rgb цветов в JSX, CSS Modules, inline styles
+- [ ] Нет inline `style={{ color: ..., padding: ... }}` со значениями вместо токенов
+- [ ] Status/label цвета через UI Kit классы (`.status--success`, `.badge--danger`)
+- [ ] Иконки из `ui-kit/icons/` (или поштучно из библиотеки иконок, если решено)
+- [ ] Loading-состояния через `Spinner` / `Skeleton` из `react/ui-kit/`, не custom
+- [ ] Empty-states через `EmptyState` из `react/ui-kit/patterns/`, не custom
+- [ ] Modals/dropdowns управляются React-стейтом, не через раскрытие классов сторонним JS
+- [ ] Формы используют классы UI Kit для ошибок (`input-error` + `form-error`)
+- [ ] CSS Modules только для component-scoped offset/layout, не для переопределения классов UI Kit
+
+**Data & API:**
+- [ ] Все запросы через `apiFetch` из `api/client.ts`, не raw `fetch`
+- [ ] `useQuery` / `useMutation` использованы корректно, `invalidateQueries` после мутаций
+- [ ] Формы используют React Hook Form + Zod, тип через `z.infer`
+- [ ] `isPending` / `isLoading` обработаны в UI (нет залипающих кнопок)
+- [ ] 401 → redirect на login; 422 → показ валидационных ошибок через `setError`
+
+**Mount-контракт (если затронут):**
+- [ ] Новый Vite entry добавлен в `rollupOptions.input`
+- [ ] Twig `data-*` экранированы `|e('html_attr')`
+- [ ] Mount защищён `if (el)`
+- [ ] Виджет обёрнут в `QueryClientProvider` + `ErrorBoundary` (через `AppProviders`)
+- [ ] CSRF meta-тег или `data-props.csrfToken` присутствует в Twig
+
+**UI Kit обёртки (если затронуты):**
+- [ ] JSDoc `@uiKit <путь>` + `@version <X.Y>` присутствует
+- [ ] `npm run check:uikit-react-mapping` — green
+- [ ] Не пишет свой CSS (только использует классы DS)
+- [ ] `className` мерджится через `clsx`
+
+**Качество кода:**
+- [ ] `npm run lint` — green
+- [ ] `npm run test` — green
+- [ ] `npm run build` — green, бандл не вырос неожиданно (>10% — обосновать)
+- [ ] Нет `console.log` в коммитах (только `console.error` в `ErrorBoundary` / `catch`)
+
+**Stage Report:**
+- [ ] Stage Report создан и сохранён в `docs/tasks/<id>/stages/stage-F<N>.md`
+- [ ] Коммит сделан с Conventional Commits префиксом, сообщение отражает цель этапа
+
+---
+
+## 15. What NOT To Do
 
 ```tsx
 // ❌ Never fetch inside a component directly
@@ -1037,111 +781,91 @@ const handler = (e: any) => {};
 window.cartCount = 5; // NO
 
 // ❌ Never import feature A from feature B
-import { useCart } from '@/features/cart/useCart'; // inside features/checkout/ — NO
+import { useFilters } from '@/modules/billing/features/filters/useFilters';
+// inside modules/auth/ — NO
 
 // ❌ Never hardcode strings in Twig data attributes without escaping
-data-data="{{ data|json_encode }}"  {# Missing |e('html_attr') — XSS risk #}
+data-props="{{ data|json_encode }}"  {# Missing |e('html_attr') — XSS risk #}
 
-// ❌ Never hardcode colors — use Tabler tokens
-<span style={{ color: '#2fb344' }}>Active</span>  // NO
-<span className="badge bg-green-lt">Active</span>  // YES
+// ❌ Never hardcode colors — use UI Kit classes or semantic tokens
+<span style={{ color: '#047857' }}>Active</span>  // NO
+<span className="status status--success"><span className="dot" /> Active</span>  // YES
 
-// ❌ Never use Bootstrap JS / Tabler JS for modal/dropdown state — use React state
-const modal = new bootstrap.Modal(el); // NO — causes conflicts with React DOM
+// ❌ Never invent CSS classes outside UI Kit
+<div className="my-custom-card"> // NO — добавить в ui-kit или использовать существующий
+
+// ❌ Never write your own CSS for status colors, buttons, cards
+// All visuals come from ui-kit/
 
 // ❌ Never import all icons
-import * as Icons from '@tabler/icons-react'; // Kills tree-shaking, massive bundle
+import * as Icons from '@tabler/icons-react'; // Kills tree-shaking
 ```
 
 **Дополнительно в автономном режиме запрещено:**
 
 ```
-расширять scope задачи самовольно                     — STOP и спросить
-менять apiClient.ts / queryClient.ts / vite.config.ts без STOP — обязательная остановка
+расширять scope задачи самовольно                      — STOP и спросить
+менять api/client.ts / app/providers.tsx / vite.config.ts без STOP — обязательная остановка
 добавлять Vite entry / Twig mount без STOP             — обязательная остановка
-npm install / npm uninstall без STOP                  — обязательная остановка
-менять глобальные :root { --tblr-* } overrides без STOP — обязательная остановка
+npm install / npm uninstall без STOP                   — обязательная остановка
+менять ui-kit/tokens/*.css без STOP                    — обязательная остановка
+добавлять/удалять/переименовывать класс в ui-kit без STOP — обязательная остановка
+добавлять компонент в react/ui-kit/ без STOP           — обязательная остановка
+bump UI Kit версии без STOP                            — обязательная остановка
 коммитить незакрытый этап (красный self-review)        — нельзя
 merge / force-push                                     — никогда автономно
 ```
 
 ---
 
-## Self-review checklist (выполнять в конце КАЖДОГО этапа)
+## 16. Migration: legacy → modules
 
-Запускать в строгом порядке. Если хоть один пункт красный — этап **не закрыт**, fix или 🛑 STOP.
+`assets/react/_legacy/` — карантин для старого кода. Правила:
 
-**Структура и архитектура:**
-- [ ] Изменения строго в рамках цели этапа (нет out-of-scope правок)
-- [ ] Структура файлов и naming соблюдены (см. «Project Structure», «Naming Conventions»)
-- [ ] Нет импортов из `features/X` внутри `features/Y` — общее через `components/shared`
-- [ ] `entrypoints/` содержат **только** mount-логику
-- [ ] Smart/Dumb split соблюдён для нетривиальной фичи
-
-**TypeScript:**
-- [ ] Нет `any`, нет `@ts-ignore`, нет non-null `!`
-- [ ] Props через `interface`, не inline
-- [ ] Hook возвращает безопасные дефолты (`?? []`, `?? 0`)
-- [ ] `npm run typecheck` — green
-
-**UI (Tabler):**
-- [ ] Использованы Tabler utility-классы вместо custom CSS для spacing/layout
-- [ ] Нет hardcoded hex/rgb цветов в JSX или inline styles
-- [ ] Status/label цвета через семантические Tabler-токены (`bg-green-lt`, `text-red`)
-- [ ] Иконки импортированы поштучно из `@tabler/icons-react` с явным `size` и `stroke`
-- [ ] Loading-состояния через Tabler spinner / skeleton, не custom
-- [ ] Alerts/feedback — через `alert alert-*`, не custom div
-- [ ] Modals/dropdowns управляются React-стейтом, не Bootstrap JS
-- [ ] Формы используют `is-invalid` + `invalid-feedback` от Tabler
-- [ ] CSS Modules только для component-scoped overrides (не для layout)
-
-**Data & API:**
-- [ ] Все запросы через `apiFetch` из `services/apiClient.ts`, не raw `fetch`
-- [ ] `useQuery` / `useMutation` использованы корректно, `invalidateQueries` после мутаций
-- [ ] Формы используют React Hook Form + Zod, тип через `z.infer`
-- [ ] `isPending` / `isLoading` обработаны в UI (нет залипающих кнопок)
-- [ ] 401 → redirect на login; 422 → показ валидационных ошибок
-
-**Mount-контракт (если затронут):**
-- [ ] Новый Vite entry добавлен в `rollupOptions.input`
-- [ ] Twig `data-*` экранированы `|e('html_attr')`
-- [ ] Mount защищён `if (el)`
-- [ ] Виджет обёрнут в `QueryClientProvider` + `ErrorBoundary`
-- [ ] CSRF meta-тег присутствует в Twig
-
-**Качество кода:**
-- [ ] `npm run lint` — green
-- [ ] `npm run test` — green
-- [ ] `npm run build` — green, бандл не вырос неожиданно (>10% — обосновать)
-- [ ] Нет `console.log` в коммитах (только `console.error` в `ErrorBoundary` / `catch`)
-
-**Stage Report:**
-- [ ] Stage Report создан и сохранён в `docs/tasks/<id>/stages/stage-F<N>.md`
-- [ ] Коммит сделан с Conventional Commits префиксом, сообщение отражает цель этапа
+1. Любая правка legacy-файла = задача на миграцию в `modules/<name>/`. Не правим точечно.
+2. ESLint запрещает импорт из `_legacy/` в `modules/` и `ui-kit/`. Импорт разрешён только из `entrypoints/` — чтобы старые страницы продолжали работать до миграции.
+3. Миграция модуля = отдельная задача по этому workflow (Phase 0 → F1–F5 → Final).
+4. После миграции — соответствующие файлы из `_legacy/` **удаляются в том же PR**. Параллельное существование двух реализаций — запрещено.
+5. Цель — пустой `_legacy/`. Прогресс отслеживается: «осталось N файлов из M».
 
 ---
 
-## Закрытие этапа
+## 17. Закрытие этапа
 
 В конце каждого этапа — строго по порядку:
 
-1. Прогнать `npm run lint && npm run typecheck && npm run test`. Если затронуты mount/build — также `npm run build`.
-2. Пройти **Self-review checklist** выше. Любой красный пункт — этап не закрыт.
+1. Прогнать `npm run lint && npm run typecheck && npm run test && npm run check:ui-kit`. Если затронуты mount/build — также `npm run build`.
+2. Пройти **Self-review checklist** (раздел 14). Любой красный пункт — этап не закрыт.
 3. Сделать коммит: Conventional Commits, сообщение отражает цель этапа.
 4. Сохранить **Stage Report** в `docs/tasks/<id>/stages/stage-F<N>.md`.
 5. Решить по риск-классу:
-   - 🟢 LOW / 🟡 MEDIUM → продолжать к следующему этапу автономно.
-   - 🔴 HIGH → 🛑 STOP, ждать Владельца.
+    - 🟢 LOW / 🟡 MEDIUM → продолжать к следующему этапу автономно.
+    - 🔴 HIGH → 🛑 STOP, ждать Владельца.
 
-## Закрытие задачи (Phase Final)
+---
 
-1. Прогнать полный набор: `npm run lint && npm run typecheck && npm run test && npm run build`.
-2. Сверить построчно «What NOT To Do» и Self-review checklist.
+## 18. Закрытие задачи (Phase Final)
+
+1. Прогнать полный набор: `npm run lint && npm run typecheck && npm run test && npm run build && npm run check:ui-kit && npm run check:uikit-react-mapping`.
+2. Сверить построчно «What NOT to do» и Self-review checklist.
 3. Собрать `docs/tasks/<id>/handoff.md`:
-   - summary всех этапов,
-   - список новых Vite entries + Twig mount points,
-   - список изменений в shared-инфраструктуре (`apiClient.ts`, `queryClient.ts`, `vite.config.ts`, глобальные Tabler overrides),
-   - список новых npm-зависимостей с обоснованием,
-   - размер бандла до/после,
-   - риски и follow-ups, вынесенные за scope.
+    - summary всех этапов,
+    - список новых Vite entries + Twig mount points,
+    - список изменений в shared-инфраструктуре (`api/client.ts`, `app/providers.tsx`, `vite.config.ts`),
+    - список изменений в UI Kit (компоненты, паттерны, токены, версия bump),
+    - запись в `ui-kit/CHANGELOG.md`, если затронут,
+    - список новых npm-зависимостей с обоснованием,
+    - размер бандла до/после,
+    - риски и follow-ups, вынесенные за scope.
 4. 🛑 **STOP. Final Owner review.** Merge — только после одобрения Владельцем.
+
+---
+
+## Приложение A. Связанные документы
+
+- `screen-intake.md` — задача для Claude Code на анализ HTML-макета от дизайнера. Запускается на каждый новый screen.
+- `ui-kit/decisions.md` — ADR дизайн-системы.
+- `ui-kit/CHANGELOG.md` — журнал изменений UI Kit.
+- `ui-kit/README.md` — обзор UI Kit и инструкция для дизайнера.
+- `screens/README.md` — матрица реализации макетов.
+- `docs/tasks/<id>/` — артефакты конкретной задачи (план, контракты, отчёты, handoff).
