@@ -66,6 +66,23 @@ final class GetFinancialSummaryController extends AbstractController
                         type: 'object',
                     ),
                 ),
+                new OA\Property(
+                    property: 'marketplace_categories',
+                    type: 'array',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'source', type: 'string', example: 'ozon'),
+                            new OA\Property(property: 'category_group', type: 'string', example: 'Услуги доставки'),
+                            new OA\Property(property: 'category_name', type: 'string', example: 'Логистика'),
+                            new OA\Property(property: 'type', type: 'string', example: 'fee'),
+                            new OA\Property(property: 'direction', type: 'string', example: 'out'),
+                            new OA\Property(property: 'amount_minor', type: 'integer', example: -5374795),
+                            new OA\Property(property: 'tx_count', type: 'integer', example: 1418),
+                            new OA\Property(property: 'sort_order', type: 'integer', example: 400),
+                        ],
+                        type: 'object',
+                    ),
+                ),
             ],
             type: 'object',
         ),
@@ -112,6 +129,7 @@ final class GetFinancialSummaryController extends AbstractController
         return $this->json([
             'by_month' => array_map(static fn ($item): array => $item->toArray(), $summary['byMonth']),
             'by_category' => array_map(static fn ($item): array => $item->toArray(), $summary['byCategory']),
+            'marketplace_categories' => array_map(static fn ($item): array => $item->toArray(), $summary['marketplaceCategories']),
         ]);
     }
 

@@ -6,6 +6,7 @@ namespace App\Tests\Integration\Ingestion\Infrastructure\Query;
 
 use App\Finance\Entity\PLMonthlySnapshot;
 use App\Finance\Enum\PLFlow;
+use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Entity\FinancialTransaction;
 use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Entity\NormalizationIssue;
@@ -520,6 +521,101 @@ final class VerificationQueriesTest extends IntegrationTestCase
         );
     }
 
+    public function testFinancialSummaryMarketplaceCategoriesUseOzonSourceDataAndShopFilter(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $raw = $this->rawRecord(
+            companyId: $companyId,
+            shopRef: 'shop-1',
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            fetchedAt: new \DateTimeImmutable('2026-06-15 10:00:00+00:00'),
+            externalId: 'marketplace-category-raw-1',
+        );
+        $otherShopRaw = $this->rawRecord(
+            companyId: $companyId,
+            shopRef: 'shop-2',
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            fetchedAt: new \DateTimeImmutable('2026-06-15 10:00:00+00:00'),
+            externalId: 'marketplace-category-raw-2',
+        );
+
+        $this->em->persist($raw);
+        $this->em->persist($otherShopRaw);
+        $this->em->persist($this->marketplaceCategoryTransaction(
+            companyId: $companyId,
+            rawRecordId: $raw->getId(),
+            externalId: 'ozon:accrual-by-day:1:delivery:type-29',
+            amountMinor: 1000,
+            type: TransactionType::FEE,
+            direction: TransactionDirection::OUT,
+            group: 'Услуги доставки',
+            label: 'Логистика',
+            sortOrder: 400,
+        ));
+        $this->em->persist($this->marketplaceCategoryTransaction(
+            companyId: $companyId,
+            rawRecordId: $raw->getId(),
+            externalId: 'ozon:accrual-by-day:2:delivery:type-29',
+            amountMinor: 500,
+            type: TransactionType::FEE,
+            direction: TransactionDirection::OUT,
+            group: 'Услуги доставки',
+            label: 'Логистика',
+            sortOrder: 400,
+        ));
+        $this->em->persist($this->marketplaceCategoryTransaction(
+            companyId: $companyId,
+            rawRecordId: $raw->getId(),
+            externalId: 'ozon:accrual-by-day:3:acquiring:type-1',
+            amountMinor: 120,
+            type: TransactionType::FEE,
+            direction: TransactionDirection::IN,
+            group: 'Услуги партнёров',
+            label: 'Эквайринг',
+            sortOrder: 510,
+        ));
+        $this->em->persist($this->marketplaceCategoryTransaction(
+            companyId: $companyId,
+            rawRecordId: $otherShopRaw->getId(),
+            externalId: 'ozon:accrual-by-day:4:delivery:type-29',
+            amountMinor: 999,
+            type: TransactionType::FEE,
+            direction: TransactionDirection::OUT,
+            group: 'Услуги доставки',
+            label: 'Логистика',
+            sortOrder: 400,
+            shopRef: 'shop-2',
+        ));
+        $this->em->persist($this->marketplaceCategoryTransaction(
+            companyId: $companyId,
+            rawRecordId: $raw->getId(),
+            externalId: 'ozon:legacy:ignored',
+            amountMinor: 777,
+            type: TransactionType::FEE,
+            direction: TransactionDirection::OUT,
+            group: 'Услуги доставки',
+            label: 'Логистика',
+            sortOrder: 400,
+            resourceType: 'ozon_finance_legacy',
+        ));
+        $this->em->flush();
+
+        /** @var FinancialSummaryQuery $query */
+        $query = self::getContainer()->get(FinancialSummaryQuery::class);
+        $categories = $query->marketplaceCategories($companyId, 'shop-1', 2026, 6);
+
+        self::assertCount(2, $categories);
+        self::assertSame('Логистика', $categories[0]->categoryName);
+        self::assertSame('Услуги доставки', $categories[0]->categoryGroup);
+        self::assertSame(TransactionType::FEE->value, $categories[0]->type);
+        self::assertSame(TransactionDirection::OUT->value, $categories[0]->direction);
+        self::assertSame(-1500, $categories[0]->amountMinor);
+        self::assertSame(2, $categories[0]->txCount);
+        self::assertSame('Эквайринг', $categories[1]->categoryName);
+        self::assertSame(120, $categories[1]->amountMinor);
+        self::assertSame(1, $categories[1]->txCount);
+    }
+
     private function rawRecord(
         string $companyId,
         string $shopRef,
@@ -542,6 +638,42 @@ final class VerificationQueriesTest extends IntegrationTestCase
             byteSize: 100,
             fetchedAt: $fetchedAt,
             syncJobId: $syncJobId ?? 'job-'.$externalId,
+        );
+    }
+
+    private function marketplaceCategoryTransaction(
+        string $companyId,
+        string $rawRecordId,
+        string $externalId,
+        int $amountMinor,
+        TransactionType $type,
+        TransactionDirection $direction,
+        string $group,
+        string $label,
+        int $sortOrder,
+        string $shopRef = 'shop-1',
+        string $resourceType = OzonResourceType::ACCRUAL_BY_DAY,
+    ): FinancialTransaction {
+        return new FinancialTransaction(
+            companyId: $companyId,
+            connectionRef: 'connection-1',
+            shopRef: $shopRef,
+            source: IngestSource::OZON,
+            externalId: $externalId,
+            externalUpdatedAt: new \DateTimeImmutable('2026-06-15 10:00:00+00:00'),
+            operationGroupId: Uuid::uuid7()->toString(),
+            type: $type,
+            direction: $direction,
+            money: Money::fromMinor($amountMinor, 'RUB'),
+            occurredAt: new \DateTimeImmutable('2026-06-15 10:00:00+00:00'),
+            rawRecordId: $rawRecordId,
+            description: sprintf('Ozon: %s', $label),
+            sourceData: [
+                '_ingestion_resource' => $resourceType,
+                '_ozon_category_group' => $group,
+                '_ozon_category_label' => $label,
+                '_ozon_category_sort_order' => $sortOrder,
+            ],
         );
     }
 

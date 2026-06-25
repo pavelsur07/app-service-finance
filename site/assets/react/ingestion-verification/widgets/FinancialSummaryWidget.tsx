@@ -26,6 +26,8 @@ const FinancialSummaryWidget: React.FC = () => {
     const summary = useFinancialSummaryData(debouncedParams);
     const by_month = summary.data.by_month ?? [];
     const by_category = summary.data.by_category ?? [];
+    const marketplace_categories = summary.data.marketplace_categories ?? [];
+    const hasSummary = by_month.length > 0 || by_category.length > 0 || marketplace_categories.length > 0;
 
     return (
         <div>
@@ -57,14 +59,15 @@ const FinancialSummaryWidget: React.FC = () => {
 
             {!shopOptions.isError && !summary.isError && summary.isLoading && <LoadingState />}
 
-            {!shopOptions.isError && !summary.isError && !summary.isLoading && by_month.length === 0 && (
+            {!shopOptions.isError && !summary.isError && !summary.isLoading && !hasSummary && (
                 <EmptyState message="Финансовой сводки за выбранный период нет" />
             )}
 
-            {!shopOptions.isError && !summary.isError && !summary.isLoading && by_month.length > 0 && (
+            {!shopOptions.isError && !summary.isError && !summary.isLoading && hasSummary && (
                 <FinancialSummaryView
                     by_month={by_month}
                     by_category={by_category}
+                    marketplace_categories={marketplace_categories}
                     period={period}
                 />
             )}

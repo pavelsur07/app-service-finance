@@ -54,7 +54,11 @@ const EMPTY_ISSUES: IssuesResponse = {
     items: [],
     meta: { page: 1, limit: 50, total: 0, total_pages: 0 },
 };
-const EMPTY_FINANCIAL_SUMMARY: FinancialSummaryResponse = { by_month: [], by_category: [] };
+const EMPTY_FINANCIAL_SUMMARY: FinancialSummaryResponse = {
+    by_month: [],
+    by_category: [],
+    marketplace_categories: [],
+};
 
 function nullableShopRef(shopRef: string | null): string | undefined {
     return shopRef === null || shopRef.trim() === '' ? undefined : shopRef.trim();

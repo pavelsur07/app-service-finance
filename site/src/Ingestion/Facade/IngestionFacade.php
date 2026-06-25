@@ -6,6 +6,7 @@ namespace App\Ingestion\Facade;
 
 use App\Ingestion\Application\DTO\CoverageCellView;
 use App\Ingestion\Application\DTO\FinancialSummaryCategoryView;
+use App\Ingestion\Application\DTO\FinancialSummaryMarketplaceCategoryView;
 use App\Ingestion\Application\DTO\FinancialSummaryMonthView;
 use App\Ingestion\Application\DTO\FinancialTransactionView;
 use App\Ingestion\Application\DTO\IssueListItemView;
@@ -152,7 +153,7 @@ final readonly class IngestionFacade
     }
 
     /**
-     * @return array{byMonth: list<FinancialSummaryMonthView>, byCategory: list<FinancialSummaryCategoryView>}
+     * @return array{byMonth: list<FinancialSummaryMonthView>, byCategory: list<FinancialSummaryCategoryView>, marketplaceCategories: list<FinancialSummaryMarketplaceCategoryView>}
      */
     public function getFinancialSummary(
         string $companyId,
@@ -172,6 +173,7 @@ final readonly class IngestionFacade
                 $monthTo,
             ),
             'byCategory' => $this->financialSummaryQuery->byCategory($companyId, $shopRef, $yearTo, $monthTo),
+            'marketplaceCategories' => $this->financialSummaryQuery->marketplaceCategories($companyId, $shopRef, $yearTo, $monthTo),
         ];
     }
 
