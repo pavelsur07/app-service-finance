@@ -15,6 +15,7 @@ final readonly class OzonAccrualByDayPreviewMapper
         private OzonMoneyParser $moneyParser,
         private SourceDataHasher $sourceDataHasher,
         private ?StoredOzonAccrualTypeNameResolver $typeNameResolver = null,
+        private ?OzonAccrualCategoryTaxonomyResolver $categoryResolver = null,
     ) {
     }
 
@@ -29,6 +30,7 @@ final readonly class OzonAccrualByDayPreviewMapper
         ?\DateTimeImmutable $from = null,
         ?\DateTimeImmutable $to = null,
         bool $includeSaleRefund = false,
+        bool $recordUnknownCategories = false,
     ): array {
         $transactions = [];
 
@@ -44,10 +46,10 @@ final readonly class OzonAccrualByDayPreviewMapper
             $unitNumber = $this->optionalString($row['unit_number'] ?? null);
 
             match ($category) {
-                'POSTING' => $this->collectPosting($transactions, $companyId, $row, $operationGroupId, $date, $category, $accrualId, $unitNumber, $includeSaleRefund),
-                'ITEM' => $this->collectItemFees($transactions, $companyId, $row['item_fees'] ?? null, $operationGroupId, $date, $category, $accrualId, $unitNumber),
-                'NON_ITEM' => $this->collectNonItemFee($transactions, $companyId, $row['non_item_fee'] ?? null, $operationGroupId, $date, $category, $accrualId, $unitNumber),
-                'CONTAINER' => $this->collectContainerFees($transactions, $companyId, $row['container_fees'] ?? null, $operationGroupId, $date, $category, $accrualId, $unitNumber),
+                'POSTING' => $this->collectPosting($transactions, $companyId, $row, $operationGroupId, $date, $category, $accrualId, $unitNumber, $includeSaleRefund, $recordUnknownCategories),
+                'ITEM' => $this->collectItemFees($transactions, $companyId, $row['item_fees'] ?? null, $operationGroupId, $date, $category, $accrualId, $unitNumber, $recordUnknownCategories),
+                'NON_ITEM' => $this->collectNonItemFee($transactions, $companyId, $row['non_item_fee'] ?? null, $operationGroupId, $date, $category, $accrualId, $unitNumber, $recordUnknownCategories),
+                'CONTAINER' => $this->collectContainerFees($transactions, $companyId, $row['container_fees'] ?? null, $operationGroupId, $date, $category, $accrualId, $unitNumber, recordUnknownCategories: $recordUnknownCategories),
                 default => null,
             };
         }
@@ -69,6 +71,7 @@ final readonly class OzonAccrualByDayPreviewMapper
         string $accrualId,
         ?string $unitNumber,
         bool $includeSaleRefund,
+        bool $recordUnknownCategories,
     ): void {
         $posting = $row['posting'] ?? null;
         if (!is_array($posting)) {
@@ -102,7 +105,7 @@ final readonly class OzonAccrualByDayPreviewMapper
                 canonicalComponent: 'partner_programs',
             );
             $this->collectCommission($transactions, $product['commission'] ?? null, $operationGroupId, $date, $category, $accrualId, (int) $productIndex, $unitNumber);
-            $this->collectDeliveryServices($transactions, $companyId, $product['delivery']['services'] ?? null, $operationGroupId, $date, $category, $accrualId, (int) $productIndex, $unitNumber);
+            $this->collectDeliveryServices($transactions, $companyId, $product['delivery']['services'] ?? null, $operationGroupId, $date, $category, $accrualId, (int) $productIndex, $unitNumber, $recordUnknownCategories);
         }
     }
 
@@ -144,7 +147,7 @@ final readonly class OzonAccrualByDayPreviewMapper
             signedAmountMinor: $amount,
             field: $field,
             unitNumber: $unitNumber,
-            ozonCategory: OzonAccrualCategory::forField($field, $amount),
+            ozonCategory: $this->categoryForField($field, $amount),
         );
     }
 
@@ -178,7 +181,7 @@ final readonly class OzonAccrualByDayPreviewMapper
                 continue;
             }
 
-            $ozonCategory = OzonAccrualCategory::forField($field, $amount);
+            $ozonCategory = $this->categoryForField($field, $amount);
             $this->add(
                 transactions: $transactions,
                 operationGroupId: $operationGroupId,
@@ -233,7 +236,7 @@ final readonly class OzonAccrualByDayPreviewMapper
             signedAmountMinor: $amount,
             field: $field,
             unitNumber: $unitNumber,
-            ozonCategory: OzonAccrualCategory::forField($field, $amount),
+            ozonCategory: $this->categoryForField($field, $amount),
         );
     }
 
@@ -250,6 +253,7 @@ final readonly class OzonAccrualByDayPreviewMapper
         string $accrualId,
         int $productIndex,
         ?string $unitNumber,
+        bool $recordUnknownCategories,
     ): void {
         if (!is_array($services)) {
             return;
@@ -261,7 +265,13 @@ final readonly class OzonAccrualByDayPreviewMapper
             }
 
             $typeId = $this->typeId($service);
-            $ozonCategory = OzonAccrualCategory::forTypedFee($typeId, $this->resolvedTypeName($companyId, $typeId, $service), TransactionType::FEE);
+            $ozonCategory = $this->categoryForTypedFee(
+                typeId: $typeId,
+                typeName: $this->resolvedTypeName($companyId, $typeId, $service),
+                fallbackType: TransactionType::FEE,
+                scope: OzonAccrualCategoryTaxonomyResolver::SCOPE_DELIVERY,
+                recordUnknown: $recordUnknownCategories,
+            );
             $amount = $this->moneyObjectMinor($service['accrued'] ?? null);
             if (0 === $amount) {
                 continue;
@@ -295,6 +305,7 @@ final readonly class OzonAccrualByDayPreviewMapper
         string $category,
         string $accrualId,
         ?string $unitNumber,
+        bool $recordUnknownCategories,
     ): void {
         if (!is_array($itemFeesBlock)) {
             return;
@@ -322,6 +333,8 @@ final readonly class OzonAccrualByDayPreviewMapper
                     componentPrefix: sprintf('item_fee:group-%d:fee-%d', (int) $groupIndex, (int) $feeIndex),
                     type: TransactionType::FEE,
                     unitNumber: $unitNumber,
+                    scope: OzonAccrualCategoryTaxonomyResolver::SCOPE_ITEM,
+                    recordUnknownCategories: $recordUnknownCategories,
                 );
             }
         }
@@ -339,6 +352,7 @@ final readonly class OzonAccrualByDayPreviewMapper
         string $category,
         string $accrualId,
         ?string $unitNumber,
+        bool $recordUnknownCategories,
     ): void {
         $this->collectTypedFee(
             transactions: $transactions,
@@ -351,6 +365,8 @@ final readonly class OzonAccrualByDayPreviewMapper
             componentPrefix: 'non_item_fee',
             type: TransactionType::OTHER,
             unitNumber: $unitNumber,
+            scope: OzonAccrualCategoryTaxonomyResolver::SCOPE_NON_ITEM,
+            recordUnknownCategories: $recordUnknownCategories,
         );
     }
 
@@ -367,6 +383,8 @@ final readonly class OzonAccrualByDayPreviewMapper
         string $accrualId,
         ?string $unitNumber,
         string $path = 'container_fee',
+        string $scope = OzonAccrualCategoryTaxonomyResolver::SCOPE_CONTAINER,
+        bool $recordUnknownCategories = false,
     ): void {
         if (!is_array($value)) {
             return;
@@ -383,11 +401,13 @@ final readonly class OzonAccrualByDayPreviewMapper
             componentPrefix: $path,
             type: TransactionType::FEE,
             unitNumber: $unitNumber,
+            scope: $scope,
+            recordUnknownCategories: $recordUnknownCategories,
         );
 
         foreach ($value as $childKey => $child) {
             if (is_array($child)) {
-                $this->collectContainerFees($transactions, $companyId, $child, $operationGroupId, $date, $category, $accrualId, $unitNumber, sprintf('%s:%s', $path, $this->normalizeComponent((string) $childKey)));
+                $this->collectContainerFees($transactions, $companyId, $child, $operationGroupId, $date, $category, $accrualId, $unitNumber, sprintf('%s:%s', $path, $this->normalizeComponent((string) $childKey)), $scope, $recordUnknownCategories);
             }
         }
     }
@@ -406,13 +426,21 @@ final readonly class OzonAccrualByDayPreviewMapper
         string $componentPrefix,
         TransactionType $type,
         ?string $unitNumber,
+        string $scope,
+        bool $recordUnknownCategories,
     ): void {
         if (!is_array($fee) || !array_key_exists('accrued', $fee)) {
             return;
         }
 
         $typeId = $this->typeId($fee);
-        $ozonCategory = OzonAccrualCategory::forTypedFee($typeId, $this->resolvedTypeName($companyId, $typeId, $fee), $type);
+        $ozonCategory = $this->categoryForTypedFee(
+            typeId: $typeId,
+            typeName: $this->resolvedTypeName($companyId, $typeId, $fee),
+            fallbackType: $type,
+            scope: $scope,
+            recordUnknown: $recordUnknownCategories,
+        );
         $amount = $this->moneyObjectMinor($fee['accrued']);
         if (0 === $amount) {
             return;
@@ -515,6 +543,23 @@ final readonly class OzonAccrualByDayPreviewMapper
     private function resolvedTypeName(string $companyId, string $typeId, array $fee): ?string
     {
         return $this->typeName($fee) ?? $this->typeNameResolver?->resolve($companyId, $typeId);
+    }
+
+    private function categoryForField(string $field, int $signedAmountMinor): ?OzonAccrualCategory
+    {
+        return $this->categoryResolver?->forField($field, $signedAmountMinor)
+            ?? OzonAccrualCategory::forField($field, $signedAmountMinor);
+    }
+
+    private function categoryForTypedFee(
+        ?string $typeId,
+        ?string $typeName,
+        TransactionType $fallbackType,
+        string $scope,
+        bool $recordUnknown,
+    ): OzonAccrualCategory {
+        return $this->categoryResolver?->forTypedFee($typeId, $typeName, $fallbackType, $scope, $recordUnknown)
+            ?? OzonAccrualCategory::forTypedFee($typeId, $typeName, $fallbackType);
     }
 
     private function moneyObjectMinor(mixed $value): int

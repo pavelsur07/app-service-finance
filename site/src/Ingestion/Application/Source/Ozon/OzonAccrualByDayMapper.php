@@ -42,7 +42,7 @@ final readonly class OzonAccrualByDayMapper implements SourceMapperInterface, Ra
     {
         $transactions = [];
 
-        foreach ($this->previewMapper->preview($rawRecord->getCompanyId(), $rows, includeSaleRefund: true) as $row) {
+        foreach ($this->previewMapper->preview($rawRecord->getCompanyId(), $rows, includeSaleRefund: true, recordUnknownCategories: true) as $row) {
             $transactions[] = new MappedTransaction(
                 externalId: $row->sourceKey,
                 externalUpdatedAt: $rawRecord->getFetchedAt(),

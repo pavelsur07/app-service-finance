@@ -1,0 +1,271 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}Admin · Категории затрат маркетплейсов{% endblock %}
+
+{% block body %}
+  <div class="page-header d-print-none">
+    <div class="row align-items-center">
+      <div class="col">
+        <h2 class="page-title">Категории затрат маркетплейсов</h2>
+      </div>
+    </div>
+  </div>
+
+  {% for message in app.flashes('success') %}
+    <div class="alert alert-success alert-dismissible mt-3" role="alert">
+      <div>{{ message|nl2br }}</div>
+      <a class="btn-close" data-bs-dismiss="alert" aria-label="Close"></a>
+    </div>
+  {% endfor %}
+
+  {% for message in app.flashes('error') %}
+    <div class="alert alert-danger alert-dismissible mt-3" role="alert">
+      <div>{{ message|nl2br }}</div>
+      <a class="btn-close" data-bs-dismiss="alert" aria-label="Close"></a>
+    </div>
+  {% endfor %}
+
+  <div class="row row-cards mt-3">
+    <div class="col-sm-6 col-lg-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="subheader">Неклассифицированные операции Ozon</div>
+          <div class="h1 mb-0">{{ unclassified.transactions }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="subheader">Неклассифицированные группы</div>
+          <div class="h1 mb-0">{{ unclassified.groups }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row row-cards mt-3">
+    <div class="col-lg-4">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Операции</h3>
+        </div>
+        <div class="card-body">
+          <form action="{{ path('admin_marketplace_category_taxonomy_seed_defaults') }}" method="POST" class="mb-3">
+            <input type="hidden" name="_token" value="{{ csrf_token('admin_marketplace_category_taxonomy_seed_defaults') }}">
+            <button type="submit" class="btn btn-primary w-100">Обновить базовые Ozon-маппинги</button>
+          </form>
+
+          <form action="{{ path('admin_marketplace_category_taxonomy_discover') }}" method="POST">
+            <input type="hidden" name="_token" value="{{ csrf_token('admin_marketplace_category_taxonomy_discover') }}">
+            <div class="mb-3">
+              <label class="form-label" for="discover_limit">Лимит discovery</label>
+              <input type="number" min="1" max="5000" class="form-control" id="discover_limit" name="limit" value="500">
+            </div>
+            <button type="submit" class="btn btn-outline-primary w-100">Найти новые категории</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Refresh metadata Ozon accrual</h3>
+        </div>
+        <div class="card-body">
+          <form action="{{ path('admin_marketplace_category_taxonomy_refresh_ozon_metadata') }}" method="POST">
+            <input type="hidden" name="_token" value="{{ csrf_token('admin_marketplace_category_taxonomy_refresh_ozon_metadata') }}">
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label" for="refresh_company_id">Company ID</label>
+                <input type="text" class="form-control" id="refresh_company_id" name="company_id" placeholder="UUID компании" required>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label" for="refresh_shop_ref">Shop ref</label>
+                <input type="text" class="form-control" id="refresh_shop_ref" name="shop_ref" placeholder="опционально">
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label" for="refresh_from">From</label>
+                <input type="date" class="form-control" id="refresh_from" name="from" required>
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label" for="refresh_to">To</label>
+                <input type="date" class="form-control" id="refresh_to" name="to" required>
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label" for="refresh_limit">Raw limit</label>
+                <input type="number" min="1" max="500" class="form-control" id="refresh_limit" name="limit" value="100">
+              </div>
+            </div>
+            <div class="btn-list">
+              <button type="submit" name="mode" value="dry-run" class="btn btn-outline-primary">Dry-run</button>
+              <button type="submit" name="mode" value="execute" class="btn btn-danger">Execute refresh</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if last_refresh %}
+    <div class="card mt-3">
+      <div class="card-header">
+        <h3 class="card-title">Последний refresh: {{ last_refresh.mode }}</h3>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-vcenter">
+            <thead>
+              <tr>
+                <th>Raw ID</th>
+                <th>Status</th>
+                <th>Scanned</th>
+                <th>Matched</th>
+                <th>Updated</th>
+                <th>Unchanged</th>
+                <th>Missing</th>
+                <th>Error</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in last_refresh.results %}
+                <tr>
+                  <td><code>{{ row.rawId }}</code></td>
+                  <td>{{ row.status }}</td>
+                  <td>{{ row.scanned }}</td>
+                  <td>{{ row.matched }}</td>
+                  <td>{{ row.updated }}</td>
+                  <td>{{ row.unchanged }}</td>
+                  <td>{{ row.missing }}</td>
+                  <td>{{ row.error|default('') }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="card mt-3">
+    <div class="card-header">
+      <h3 class="card-title">Статусы справочника</h3>
+    </div>
+    <div class="card-body">
+      {% if status_summary is empty %}
+        <div class="alert alert-info mb-0">Справочник еще не заполнен</div>
+      {% else %}
+        <div class="table-responsive">
+          <table class="table table-vcenter">
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Resource</th>
+                <th>Status</th>
+                <th>Categories</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in status_summary %}
+                <tr>
+                  <td>{{ row.source }}</td>
+                  <td>{{ row.resource_type }}</td>
+                  <td>{{ row.status }}</td>
+                  <td>{{ row.categories }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header">
+      <h3 class="card-title">Последние внешние категории</h3>
+    </div>
+    <div class="card-body">
+      {% if latest_categories is empty %}
+        <div class="alert alert-info mb-0">Категорий пока нет</div>
+      {% else %}
+        <div class="table-responsive">
+          <table class="table table-vcenter">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Scope</th>
+                <th>External</th>
+                <th>Mapping</th>
+                <th>Seen</th>
+                <th>Last seen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in latest_categories %}
+                <tr>
+                  <td>{{ row.status }}</td>
+                  <td>{{ row.scope }}</td>
+                  <td>
+                    {% if row.external_name %}
+                      {{ row.external_name }}
+                    {% elseif row.external_type_id %}
+                      type_id {{ row.external_type_id }}
+                    {% else %}
+                      {{ row.normalized_key }}
+                    {% endif %}
+                  </td>
+                  <td>
+                    <form action="{{ path('admin_marketplace_category_taxonomy_update_mapping', {id: row.id}) }}" method="POST">
+                      <input type="hidden" name="_token" value="{{ csrf_token('admin_marketplace_category_taxonomy_update_mapping_' ~ row.id) }}">
+                      <div class="row g-2">
+                        <div class="col-md-3">
+                          <input class="form-control form-control-sm" name="canonical_code" value="{{ row.canonical_code ?? '' }}" placeholder="code" required>
+                        </div>
+                        <div class="col-md-3">
+                          <input class="form-control form-control-sm" name="canonical_group" value="{{ row.canonical_group ?? '' }}" placeholder="group" required>
+                        </div>
+                        <div class="col-md-3">
+                          <input class="form-control form-control-sm" name="canonical_label" value="{{ row.canonical_label ?? '' }}" placeholder="label" required>
+                        </div>
+                        <div class="col-md-3">
+                          <select class="form-select form-select-sm" name="transaction_type" required>
+                            {% for type in transaction_types %}
+                              <option value="{{ type.value }}" {% if row.transaction_type == type.value %}selected{% endif %}>{{ type.label }}</option>
+                            {% endfor %}
+                          </select>
+                        </div>
+                        <div class="col-md-2">
+                          <input type="number" min="1" max="100000" class="form-control form-control-sm" name="sort_order" value="{{ row.sort_order ?? 9000 }}" placeholder="sort" required>
+                        </div>
+                        <div class="col-md-3">
+                          <select class="form-select form-select-sm" name="mapping_status" required>
+                            {% for status in mapping_statuses %}
+                              <option value="{{ status.value }}" {% if (row.mapping_status ?? 'active') == status.value %}selected{% endif %}>{{ status.label }}</option>
+                            {% endfor %}
+                          </select>
+                        </div>
+                        <div class="col-md-2">
+                          <label class="form-check mt-1">
+                            <input type="checkbox" class="form-check-input" name="known" value="1" {% if row.known is same as(true) or row.known is null %}checked{% endif %}>
+                            <span class="form-check-label">known</span>
+                          </label>
+                        </div>
+                        <div class="col-md-3">
+                          <button type="submit" class="btn btn-sm btn-outline-primary w-100">Сохранить</button>
+                        </div>
+                      </div>
+                    </form>
+                  </td>
+                  <td>{{ row.seen_count }}</td>
+                  <td>{{ row.last_seen_at }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

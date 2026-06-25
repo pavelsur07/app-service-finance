@@ -108,7 +108,7 @@ final class OzonAccrualCategoryTest extends TestCase
 
         self::assertFalse($unknown->known);
         self::assertSame(TransactionType::FEE, $unknown->transactionType);
-        self::assertSame('Неизвестные категории Ozon', $unknown->group);
+        self::assertSame('Требует классификации', $unknown->group);
         self::assertSame(['999999'], $unknown->typeIds);
     }
 }

@@ -74,6 +74,12 @@
                                     <span class="nav-link-title">Переобработка затрат</span>
                                 </a>
                             </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if app.request.get('_route') starts with 'admin_marketplace_category_taxonomy_' %}active{% endif %}"
+                                   href="{{ path('admin_marketplace_category_taxonomy_index') }}">
+                                    <span class="nav-link-title">Категории затрат</span>
+                                </a>
+                            </li>
                         </ul>
                     </div>
                 </li>
