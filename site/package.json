@@ -5,7 +5,10 @@
         "dev": "vite",
         "build": "vite build",
         "api:types": "openapi-typescript var/openapi.json -o assets/api/schema.d.ts",
-        "api:types:check": "openapi-typescript var/openapi.json -o /tmp/schema.check.d.ts && diff /tmp/schema.check.d.ts assets/api/schema.d.ts"
+        "api:types:check": "openapi-typescript var/openapi.json -o /tmp/schema.check.d.ts && diff /tmp/schema.check.d.ts assets/api/schema.d.ts",
+        "check:ui-kit": "node tools/check-ui-kit-classes.mjs",
+        "check:uikit-react-mapping": "node tools/check-uikit-react-mapping.mjs",
+        "check:all": "npm run build && npm run check:uikit-react-mapping"
     },
     "devDependencies": {
         "@types/react": "^18.3.1",
