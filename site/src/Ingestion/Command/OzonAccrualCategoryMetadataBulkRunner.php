@@ -217,7 +217,7 @@ final readonly class OzonAccrualCategoryMetadataBulkRunner implements OzonAccrua
             $dryRun ? '--dry-run' : '--execute-inline',
             '--json-result',
             '--no-interaction',
-        ], $this->projectDir(), $this->subprocessEnv());
+        ], $this->projectDir(), $this->subprocessEnvOverlay());
         $process->setTimeout(null);
 
         try {
@@ -298,9 +298,12 @@ final readonly class OzonAccrualCategoryMetadataBulkRunner implements OzonAccrua
     }
 
     /**
+     * Symfony Process inherits the parent environment by default; these values
+     * are only an explicit overlay for runtime settings needed by child console runs.
+     *
      * @return array<string, string>
      */
-    private function subprocessEnv(): array
+    private function subprocessEnvOverlay(): array
     {
         $env = [];
         foreach (['APP_ENV', 'APP_DEBUG', 'DATABASE_URL', 'KERNEL_CLASS', 'SYMFONY_DEPRECATIONS_HELPER'] as $name) {

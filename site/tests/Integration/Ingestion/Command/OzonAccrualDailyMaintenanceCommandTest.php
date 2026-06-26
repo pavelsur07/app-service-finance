@@ -4,7 +4,16 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Ingestion\Command;
 
+use App\Ingestion\Application\Source\Ozon\OzonAccrualCategoryTaxonomyResolver;
+use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Command\OzonAccrualCategoryMetadataBulkRunnerInterface;
+use App\Ingestion\Entity\ExternalCategory;
+use App\Ingestion\Entity\FinancialTransaction;
+use App\Ingestion\Enum\ExternalCategoryStatus;
+use App\Ingestion\Enum\IngestSource;
+use App\Ingestion\Enum\TransactionDirection;
+use App\Ingestion\Enum\TransactionType;
+use App\Shared\Domain\ValueObject\Money;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -52,11 +61,106 @@ final class OzonAccrualDailyMaintenanceCommandTest extends IntegrationTestCase
         self::assertFalse($runner->dryRun);
     }
 
+    public function testExecuteSucceedsWhenOnlyUnmappedCategoriesRemain(): void
+    {
+        $runner = new FakeOzonAccrualCategoryMetadataBulkRunner();
+        self::getContainer()->set(OzonAccrualCategoryMetadataBulkRunnerInterface::class, $runner);
+        $this->em->persist(new ExternalCategory(
+            source: IngestSource::OZON,
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            scope: OzonAccrualCategoryTaxonomyResolver::SCOPE_ANY,
+            normalizedKey: 'code:reviewonlyunmapped',
+            externalCode: 'ReviewOnlyUnmapped',
+            externalName: 'ReviewOnlyUnmapped',
+            status: ExternalCategoryStatus::NEW,
+            seenAt: new \DateTimeImmutable('2026-06-25 12:00:00+00:00'),
+        ));
+        $this->em->flush();
+
+        $tester = $this->tester();
+        $exit = $tester->execute([
+            '--from' => '2026-06-01',
+            '--to' => '2026-06-25',
+            '--execute' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exit, $tester->getDisplay());
+        self::assertStringContainsString('categories are awaiting mapping', $tester->getDisplay());
+    }
+
+    public function testScopedExecuteIgnoresGlobalHealthFailures(): void
+    {
+        $runner = new FakeOzonAccrualCategoryMetadataBulkRunner();
+        self::getContainer()->set(OzonAccrualCategoryMetadataBulkRunnerInterface::class, $runner);
+        $this->persistUnclassifiedTransaction();
+
+        $tester = $this->tester();
+        $exit = $tester->execute([
+            '--from' => '2026-06-01',
+            '--to' => '2026-06-25',
+            '--company-id' => Uuid::uuid7()->toString(),
+            '--execute' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exit, $tester->getDisplay());
+        self::assertStringContainsString('global taxonomy health is informational', $tester->getDisplay());
+    }
+
+    public function testRejectsOutOfRangeIntegerOptions(): void
+    {
+        $runner = new FakeOzonAccrualCategoryMetadataBulkRunner();
+        self::getContainer()->set(OzonAccrualCategoryMetadataBulkRunnerInterface::class, $runner);
+
+        $tester = $this->tester();
+        $exit = $tester->execute([
+            '--from' => '2026-06-01',
+            '--to' => '2026-06-25',
+            '--limit-per-shop' => '99999',
+            '--execute' => true,
+        ]);
+
+        self::assertSame(Command::FAILURE, $exit, $tester->getDisplay());
+        self::assertStringContainsString('The --limit-per-shop option must be an integer from 1 to 500.', $tester->getDisplay());
+        self::assertSame(0, $runner->limitPerShop);
+    }
+
     private function tester(): CommandTester
     {
         $app = new Application(self::$kernel);
 
         return new CommandTester($app->find('app:ingestion:ozon-accrual:daily-maintenance'));
+    }
+
+    private function persistUnclassifiedTransaction(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+        $rawRecordId = Uuid::uuid7()->toString();
+
+        $this->em->persist(new FinancialTransaction(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            shopRef: $connectionRef,
+            source: IngestSource::OZON,
+            externalId: 'ozon:accrual-by-day:test-unclassified',
+            externalUpdatedAt: new \DateTimeImmutable('2026-06-25 00:00:00+00:00'),
+            operationGroupId: Uuid::uuid5(Uuid::NAMESPACE_URL, sprintf('%s:ozon:unclassified', $companyId))->toString(),
+            type: TransactionType::FEE,
+            direction: TransactionDirection::OUT,
+            money: Money::fromMinor(100, 'RUB'),
+            occurredAt: new \DateTimeImmutable('2026-06-25 00:00:00+03:00'),
+            rawRecordId: $rawRecordId,
+            description: 'Ozon accrual unclassified test',
+            sourceData: [
+                '_ingestion_resource' => OzonResourceType::ACCRUAL_BY_DAY,
+                '_ingestion_type_id' => '999',
+                '_ozon_category_label' => 'Неизвестный type_id Ozon: 999',
+                '_ozon_category_group' => 'Требует классификации',
+                '_ozon_category_known' => false,
+            ],
+            sourceTz: 'Europe/Moscow',
+        ));
+        $this->em->flush();
     }
 }
 

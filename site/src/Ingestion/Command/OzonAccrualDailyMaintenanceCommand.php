@@ -20,7 +20,6 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Webmozart\Assert\Assert;
 
 #[AsCommand(
     name: 'app:ingestion:ozon-accrual:daily-maintenance',
@@ -29,6 +28,7 @@ use Webmozart\Assert\Assert;
 final class OzonAccrualDailyMaintenanceCommand extends Command
 {
     use LockableTrait;
+    use OzonAccrualCommandHelperTrait;
 
     private const BUSINESS_TIMEZONE = 'Europe/Moscow';
 
@@ -157,7 +157,7 @@ final class OzonAccrualDailyMaintenanceCommand extends Command
 
         if ($dryRun) {
             $io->note('Dry-run only. No canonical transactions or taxonomy rows were changed.');
-            $this->printHealth($io);
+            $this->printHealth($io, scoped: null !== $companyId || null !== $shopRef);
 
             return $hasFailure ? Command::FAILURE : Command::SUCCESS;
         }
@@ -188,11 +188,21 @@ final class OzonAccrualDailyMaintenanceCommand extends Command
             ),
         );
 
+        $scopedRun = null !== $companyId || null !== $shopRef;
         $health = $this->health();
         $io->section('Health check');
         $this->printMetrics($io, $health);
 
-        if ($health['unclassifiedTransactions'] > 0 || $health['unclassifiedGroups'] > 0 || $health['unmappedCategories'] > 0) {
+        if ($scopedRun) {
+            $this->logger->warning('Ozon accrual daily maintenance scoped run skipped global health gate.', [
+                'from' => $from->format('Y-m-d'),
+                'to' => $to->format('Y-m-d'),
+                'company_id' => $companyId,
+                'shop_ref' => $shopRef,
+                'health' => $health,
+            ]);
+            $io->note('Scoped run: global taxonomy health is informational and does not affect exit code.');
+        } elseif ($health['unclassifiedTransactions'] > 0 || $health['unclassifiedGroups'] > 0) {
             $hasFailure = true;
             $this->logger->error('Ozon accrual daily maintenance health check failed.', [
                 'from' => $from->format('Y-m-d'),
@@ -201,6 +211,13 @@ final class OzonAccrualDailyMaintenanceCommand extends Command
                 'shop_ref' => $shopRef,
                 'health' => $health,
             ]);
+        } elseif ($health['unmappedCategories'] > 0) {
+            $this->logger->warning('Ozon accrual daily maintenance has categories awaiting mapping.', [
+                'from' => $from->format('Y-m-d'),
+                'to' => $to->format('Y-m-d'),
+                'health' => $health,
+            ]);
+            $io->warning('Ozon accrual categories are awaiting mapping, but canonical transactions are classified.');
         }
 
         if ($hasFailure) {
@@ -245,52 +262,6 @@ final class OzonAccrualDailyMaintenanceCommand extends Command
         ];
     }
 
-    private function optionalUuidOption(InputInterface $input, string $name): ?string
-    {
-        $value = $this->optionalStringOption($input, $name);
-        if (null === $value) {
-            return null;
-        }
-
-        Assert::uuid($value, sprintf('Invalid --%s UUID.', $name));
-
-        return $value;
-    }
-
-    private function optionalDateOption(InputInterface $input, string $name): ?\DateTimeImmutable
-    {
-        $value = $this->optionalStringOption($input, $name);
-        if (null === $value) {
-            return null;
-        }
-
-        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
-        if (false === $date || $date->format('Y-m-d') !== $value) {
-            throw new \InvalidArgumentException(sprintf('--%s must be a valid YYYY-MM-DD date.', $name));
-        }
-
-        return $date;
-    }
-
-    private function optionalStringOption(InputInterface $input, string $name): ?string
-    {
-        $value = trim((string) $input->getOption($name));
-
-        return '' === $value ? null : $value;
-    }
-
-    private function intOption(InputInterface $input, string $name, int $min, int $max): int
-    {
-        $value = (string) $input->getOption($name);
-        if (!ctype_digit($value)) {
-            throw new \InvalidArgumentException(sprintf('The --%s option must be an integer from %d to %d.', $name, $min, $max));
-        }
-
-        $number = (int) $value;
-
-        return max($min, min($max, $number));
-    }
-
     private function mode(InputInterface $input): string
     {
         $modes = array_values(array_filter([
@@ -305,48 +276,13 @@ final class OzonAccrualDailyMaintenanceCommand extends Command
         return $modes[0];
     }
 
-    /**
-     * @param list<array<string, mixed>> $targets
-     */
-    private function printTargets(SymfonyStyle $io, array $targets): void
-    {
-        if ([] === $targets) {
-            $io->writeln('No done Ozon accrual by-day raw records found for the selected filters.');
-
-            return;
-        }
-
-        $io->table(
-            ['companyId', 'shopRef', 'windowFrom', 'windowTo', 'rawRecords'],
-            array_map(static fn (array $target): array => [
-                (string) $target['company_id'],
-                (string) $target['shop_ref'],
-                (string) $target['window_from'],
-                (string) $target['window_to'],
-                (string) $target['raw_count'],
-            ], $targets),
-        );
-    }
-
-    /**
-     * @param array<string, int> $metrics
-     */
-    private function printMetrics(SymfonyStyle $io, array $metrics): void
-    {
-        $io->table(
-            ['metric', 'value'],
-            array_map(
-                static fn (string $metric, int $value): array => [$metric, (string) $value],
-                array_keys($metrics),
-                array_values($metrics),
-            ),
-        );
-    }
-
-    private function printHealth(SymfonyStyle $io): void
+    private function printHealth(SymfonyStyle $io, bool $scoped): void
     {
         $io->section('Health check');
         $this->printMetrics($io, $this->health());
+        if ($scoped) {
+            $io->note('Scoped run: global taxonomy health is informational and does not affect exit code.');
+        }
     }
 
     /**
@@ -383,19 +319,5 @@ final class OzonAccrualDailyMaintenanceCommand extends Command
         }
 
         return $total;
-    }
-
-    /**
-     * @param array<string, int> $metrics
-     *
-     * @return list<array{0: string, 1: string, 2: string}>
-     */
-    private function metricRows(string $action, array $metrics): array
-    {
-        return array_map(
-            static fn (string $metric, int $value): array => [$action, $metric, (string) $value],
-            array_keys($metrics),
-            array_values($metrics),
-        );
     }
 }
