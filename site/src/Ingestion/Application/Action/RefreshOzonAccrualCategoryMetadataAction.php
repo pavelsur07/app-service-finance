@@ -8,7 +8,6 @@ use App\Ingestion\Application\DTO\MappedTransaction;
 use App\Ingestion\Application\Source\Ozon\OzonAccrualByDayMapper;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Entity\FinancialTransaction;
-use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\RawNormalizationStatus;
 use App\Ingestion\Facade\RawStorageFacade;
@@ -19,6 +18,8 @@ use Doctrine\ORM\EntityManagerInterface;
 
 final readonly class RefreshOzonAccrualCategoryMetadataAction
 {
+    private const FLUSH_BATCH_SIZE = 500;
+
     private const CATEGORY_SOURCE_DATA_KEYS = [
         '_ingestion_external_code',
         '_ingestion_provider_label',
@@ -200,7 +201,7 @@ final readonly class RefreshOzonAccrualCategoryMetadataAction
                     rows: $rows,
                     recordUnknownCategories: !$dryRun,
                 );
-                $existingByKey = $this->existingTransactionsByNaturalKey($companyId, $rawRecord);
+                unset($rows);
 
                 $scanned = 0;
                 $matched = 0;
@@ -210,24 +211,23 @@ final readonly class RefreshOzonAccrualCategoryMetadataAction
 
                 foreach ($mappedTransactions as $mappedTransaction) {
                     ++$scanned;
-                    $transaction = $existingByKey[$this->naturalKey($mappedTransaction)] ?? null;
-                    if (!$transaction instanceof FinancialTransaction) {
-                        $transaction = $this->financialTransactionRepository->findByNaturalKey(
-                            $companyId,
-                            IngestSource::OZON,
-                            $mappedTransaction->externalId,
-                            $mappedTransaction->type,
-                        );
-                    }
+                    $transaction = $this->financialTransactionRepository->findByNaturalKey(
+                        $companyId,
+                        IngestSource::OZON,
+                        $mappedTransaction->externalId,
+                        $mappedTransaction->type,
+                    );
 
                     if (!$transaction instanceof FinancialTransaction) {
                         ++$missing;
+                        $this->releaseBatchIfNeeded($dryRun, $scanned);
                         continue;
                     }
 
                     ++$matched;
                     if (!$this->metadataDiffers($transaction, $mappedTransaction)) {
                         ++$unchanged;
+                        $this->releaseBatchIfNeeded($dryRun, $scanned);
                         continue;
                     }
 
@@ -239,13 +239,15 @@ final readonly class RefreshOzonAccrualCategoryMetadataAction
                             $mappedTransaction->description,
                         );
                     }
+                    $this->releaseBatchIfNeeded($dryRun, $scanned);
                 }
+                unset($mappedTransactions);
 
                 if (!$dryRun) {
                     $this->entityManager->flush();
                     $this->connection->commit();
                 }
-                $this->entityManager->clear();
+                $this->clearManagedState();
 
                 $resultRows[] = [
                     'rawId' => $rawRecordId,
@@ -262,7 +264,7 @@ final readonly class RefreshOzonAccrualCategoryMetadataAction
                         $this->connection->rollBack();
                     }
                 }
-                $this->entityManager->clear();
+                $this->clearManagedState();
 
                 $resultRows[] = [
                     'rawId' => $rawRecordId,
@@ -280,22 +282,23 @@ final readonly class RefreshOzonAccrualCategoryMetadataAction
         return $resultRows;
     }
 
-    /**
-     * @return array<string, FinancialTransaction>
-     */
-    private function existingTransactionsByNaturalKey(string $companyId, IngestRawRecord $rawRecord): array
+    private function releaseBatchIfNeeded(bool $dryRun, int $scanned): void
     {
-        $transactions = [];
-        foreach ($this->financialTransactionRepository->findByRawRecordId($companyId, $rawRecord->getId()) as $transaction) {
-            $transactions[sprintf('%s:%s', $transaction->getExternalId(), $transaction->getType()->value)] = $transaction;
+        if (0 !== $scanned % self::FLUSH_BATCH_SIZE) {
+            return;
         }
 
-        return $transactions;
+        if (!$dryRun) {
+            $this->entityManager->flush();
+        }
+
+        $this->clearManagedState();
     }
 
-    private function naturalKey(MappedTransaction $transaction): string
+    private function clearManagedState(): void
     {
-        return sprintf('%s:%s', $transaction->externalId, $transaction->type->value);
+        $this->entityManager->clear();
+        $this->financialTransactionRepository->reset();
     }
 
     private function metadataDiffers(FinancialTransaction $transaction, MappedTransaction $mappedTransaction): bool
