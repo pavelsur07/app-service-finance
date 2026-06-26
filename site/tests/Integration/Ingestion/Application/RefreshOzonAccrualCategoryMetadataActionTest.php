@@ -207,6 +207,12 @@ final class RefreshOzonAccrualCategoryMetadataActionTest extends IntegrationTest
         self::assertSame($firstRecord->getId(), $firstPage[0]['id']);
         self::assertSame($secondRecord->getId(), $secondPage[0]['id']);
         self::assertSame($thirdRecord->getId(), $thirdPage[0]['id']);
+
+        $rawRecord = $action->rawRecord($companyId, $secondRecord->getId());
+        self::assertNotNull($rawRecord);
+        self::assertSame($secondRecord->getId(), $rawRecord['id']);
+        self::assertSame('2026-06-02', $rawRecord['window_from']);
+        self::assertSame('2026-06-02', $rawRecord['window_to']);
     }
 
     private function refreshActionWithFirstFlushFailure(): RefreshOzonAccrualCategoryMetadataAction

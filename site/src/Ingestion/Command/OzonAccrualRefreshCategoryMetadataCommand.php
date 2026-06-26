@@ -28,12 +28,14 @@ final class OzonAccrualRefreshCategoryMetadataCommand extends Command
     {
         $this
             ->addOption('company-id', null, InputOption::VALUE_REQUIRED, 'Company UUID.')
+            ->addOption('raw-id', null, InputOption::VALUE_REQUIRED, 'Optional raw record UUID. When set, --from and --to are not required.')
             ->addOption('from', null, InputOption::VALUE_REQUIRED, 'Start accrual date YYYY-MM-DD.')
             ->addOption('to', null, InputOption::VALUE_REQUIRED, 'End accrual date YYYY-MM-DD.')
             ->addOption('shop-ref', null, InputOption::VALUE_REQUIRED, 'Optional shop reference.')
             ->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Raw records to process, 1..500.', 100)
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Show selected records and planned metadata updates without writing.')
-            ->addOption('execute-inline', null, InputOption::VALUE_NONE, 'Refresh metadata synchronously in this process.');
+            ->addOption('execute-inline', null, InputOption::VALUE_NONE, 'Refresh metadata synchronously in this process.')
+            ->addOption('json-result', null, InputOption::VALUE_NONE, 'Print only JSON action results.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -42,7 +44,8 @@ final class OzonAccrualRefreshCategoryMetadataCommand extends Command
 
         try {
             $companyId = $this->requiredUuidOption($input, 'company-id');
-            [$from, $to] = $this->requiredDateWindow($input);
+            $rawRecordId = $this->optionalUuidOption($input, 'raw-id');
+            [$from, $to] = null === $rawRecordId ? $this->requiredDateWindow($input) : [null, null];
             $shopRef = $this->optionalStringOption($input, 'shop-ref');
             $limit = $this->intOption($input, 'limit', 1, 500);
             $mode = $this->mode($input);
@@ -52,34 +55,56 @@ final class OzonAccrualRefreshCategoryMetadataCommand extends Command
             return Command::FAILURE;
         }
 
-        $rawRecords = $this->refreshMetadata->rawRecords($companyId, $from, $to, $shopRef, $limit);
+        $rawRecords = null !== $rawRecordId
+            ? array_values(array_filter([$this->refreshMetadata->rawRecord($companyId, $rawRecordId)]))
+            : $this->refreshMetadata->rawRecords($companyId, $from, $to, $shopRef, $limit);
 
-        $io->title('Ozon accrual category metadata refresh');
-        $this->printRawRecords($io, $rawRecords);
+        $jsonResult = (bool) $input->getOption('json-result');
+        $dryRun = 'dry-run' === $mode;
+
+        if ($jsonResult && [] === $rawRecords) {
+            $output->writeln('[]');
+
+            return Command::SUCCESS;
+        }
+
+        if (!$jsonResult) {
+            $io->title('Ozon accrual category metadata refresh');
+            $this->printRawRecords($io, $rawRecords);
+        }
 
         if ([] === $rawRecords) {
             return Command::SUCCESS;
         }
 
-        $dryRun = 'dry-run' === $mode;
         $resultRows = $this->refreshMetadata->refresh($companyId, $rawRecords, $dryRun);
-        $this->printActionResult($io, $resultRows);
+        if ($jsonResult) {
+            $output->writeln(json_encode($resultRows, JSON_THROW_ON_ERROR));
+        } else {
+            $this->printActionResult($io, $resultRows);
+        }
 
         $failed = array_values(array_filter($resultRows, static fn (array $row): bool => 'error' === $row['status']));
         if ([] !== $failed) {
-            $io->warning(sprintf('Metadata refresh finished with %d failed raw records.', count($failed)));
+            if (!$jsonResult) {
+                $io->warning(sprintf('Metadata refresh finished with %d failed raw records.', count($failed)));
+            }
 
             return Command::FAILURE;
         }
 
         if ($dryRun) {
-            $io->note('Dry-run only. No canonical transactions were changed.');
+            if (!$jsonResult) {
+                $io->note('Dry-run only. No canonical transactions were changed.');
+            }
 
             return Command::SUCCESS;
         }
 
         $updated = array_sum(array_map(static fn (array $row): int => (int) $row['updated'], $resultRows));
-        $io->success(sprintf('Refreshed Ozon category metadata on %d canonical transactions.', $updated));
+        if (!$jsonResult) {
+            $io->success(sprintf('Refreshed Ozon category metadata on %d canonical transactions.', $updated));
+        }
 
         return Command::SUCCESS;
     }
@@ -141,6 +166,18 @@ final class OzonAccrualRefreshCategoryMetadataCommand extends Command
     private function requiredUuidOption(InputInterface $input, string $name): string
     {
         $value = trim((string) $input->getOption($name));
+        Assert::uuid($value, sprintf('Invalid --%s UUID.', $name));
+
+        return $value;
+    }
+
+    private function optionalUuidOption(InputInterface $input, string $name): ?string
+    {
+        $value = $this->optionalStringOption($input, $name);
+        if (null === $value) {
+            return null;
+        }
+
         Assert::uuid($value, sprintf('Invalid --%s UUID.', $name));
 
         return $value;

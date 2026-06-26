@@ -117,6 +117,60 @@ final class OzonAccrualRefreshCategoryMetadataCommandTest extends IntegrationTes
         self::assertStringContainsString('Refreshed Ozon category metadata on 0 canonical transactions.', $secondTester->getDisplay());
     }
 
+    public function testRawIdJsonResultRefreshesSingleRawRecord(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+        $record = $this->storeRawRecord(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            externalId: 'accrual-by-day:2026-06-01:2026-06-01',
+            fetchedAt: new \DateTimeImmutable('2026-06-02 03:00:00+00:00'),
+            rows: [$this->itemFeeRow()],
+        );
+        $record->markNormalizationDone();
+
+        $this->em->persist(new FinancialTransaction(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            shopRef: $connectionRef,
+            source: IngestSource::OZON,
+            externalId: 'ozon:accrual-by-day:53675409101:item_fee:group-0:fee-0:type-1',
+            externalUpdatedAt: new \DateTimeImmutable('2026-06-02 03:00:00+00:00'),
+            operationGroupId: Uuid::uuid5(Uuid::NAMESPACE_URL, sprintf('%s:ozon:accrual-by-day:%s', $companyId, '53675409101'))->toString(),
+            type: TransactionType::FEE,
+            direction: TransactionDirection::OUT,
+            money: Money::fromMinor(1234, 'RUB'),
+            occurredAt: new \DateTimeImmutable('2026-06-01 00:00:00+03:00'),
+            rawRecordId: $record->getId(),
+            description: 'Existing Ozon accrual transaction',
+            sourceData: [
+                '_ingestion_resource' => OzonResourceType::ACCRUAL_BY_DAY,
+                '_ozon_category_code' => 'ozon_unknown_1',
+                '_ozon_category_label' => 'Неизвестный type_id Ozon: 1',
+                '_ozon_category_group' => 'Неизвестные категории Ozon',
+                '_ozon_category_sort_order' => 9000,
+                '_ozon_category_known' => false,
+            ],
+            sourceTz: 'Europe/Moscow',
+        ));
+        $this->em->flush();
+
+        $tester = $this->tester();
+        $exit = $tester->execute([
+            '--company-id' => $companyId,
+            '--raw-id' => $record->getId(),
+            '--execute-inline' => true,
+            '--json-result' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exit, $tester->getDisplay());
+        $resultRows = json_decode(trim($tester->getDisplay()), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('done', $resultRows[0]['status']);
+        self::assertSame(1, $resultRows[0]['updated']);
+        self::assertStringNotContainsString('Ozon accrual category metadata refresh', $tester->getDisplay());
+    }
+
     private function tester(): CommandTester
     {
         $app = new Application(self::$kernel);
