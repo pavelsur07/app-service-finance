@@ -84,6 +84,43 @@ final class MarketplaceCategoryRebuildIdentitiesCommandTest extends IntegrationT
         self::assertSame(ExternalCategoryStatus::NEW, $this->findCategory('code:pushcampaign')?->getStatus());
     }
 
+    public function testDeprecatesStaleTypeOnlyCategoryWhenSemanticCategoryExistsInAnotherScope(): void
+    {
+        $staleTypeOnly = new ExternalCategory(
+            source: IngestSource::OZON,
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            scope: OzonAccrualCategoryTaxonomyResolver::SCOPE_ITEM,
+            normalizedKey: 'type:55',
+            externalTypeId: '55',
+            status: ExternalCategoryStatus::NEW,
+        );
+        $semantic = new ExternalCategory(
+            source: IngestSource::OZON,
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            scope: OzonAccrualCategoryTaxonomyResolver::SCOPE_NON_ITEM,
+            normalizedKey: 'code:pushcampaign',
+            externalTypeId: '55',
+            externalCode: 'PushCampaign',
+            externalName: 'PushCampaign',
+            providerLabel: 'PushCampaign',
+            displayLabel: 'PushCampaign',
+            status: ExternalCategoryStatus::NEW,
+        );
+        $this->em->persist($staleTypeOnly);
+        $this->em->persist($semantic);
+        $this->em->flush();
+
+        $execute = $this->tester();
+        self::assertSame(Command::SUCCESS, $execute->execute(['--execute' => true]));
+        $this->em->clear();
+
+        self::assertSame(
+            ExternalCategoryStatus::DEPRECATED,
+            $this->findCategory('type:55', OzonAccrualCategoryTaxonomyResolver::SCOPE_ITEM)?->getStatus(),
+        );
+        self::assertSame(ExternalCategoryStatus::NEW, $this->findCategory('code:pushcampaign')?->getStatus());
+    }
+
     private function tester(): CommandTester
     {
         $app = new Application(self::$kernel);
@@ -91,7 +128,10 @@ final class MarketplaceCategoryRebuildIdentitiesCommandTest extends IntegrationT
         return new CommandTester($app->find('app:ingestion:marketplace-categories:rebuild-identities'));
     }
 
-    private function findCategory(string $normalizedKey): ?ExternalCategory
+    private function findCategory(
+        string $normalizedKey,
+        string $scope = OzonAccrualCategoryTaxonomyResolver::SCOPE_NON_ITEM,
+    ): ?ExternalCategory
     {
         /** @var ExternalCategoryRepository $repository */
         $repository = self::getContainer()->get(ExternalCategoryRepository::class);
@@ -99,7 +139,7 @@ final class MarketplaceCategoryRebuildIdentitiesCommandTest extends IntegrationT
         return $repository->findByIdentity(
             IngestSource::OZON,
             OzonResourceType::ACCRUAL_BY_DAY,
-            OzonAccrualCategoryTaxonomyResolver::SCOPE_NON_ITEM,
+            $scope,
             $normalizedKey,
         );
     }
