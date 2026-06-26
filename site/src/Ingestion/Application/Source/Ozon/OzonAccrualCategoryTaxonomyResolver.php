@@ -58,11 +58,13 @@ final class OzonAccrualCategoryTaxonomyResolver
     public function forTypedFee(
         ?string $typeId,
         ?string $typeName,
+        ?string $externalCode,
+        ?string $providerLabel,
         TransactionType $fallbackType,
         string $scope,
         bool $recordUnknown = false,
     ): OzonAccrualCategory {
-        foreach ($this->candidateKeys($typeId, $typeName) as $normalizedKey) {
+        foreach ($this->candidateKeys($externalCode, $providerLabel ?? $typeName, $typeId) as $normalizedKey) {
             $mapped = $this->categoryFromMapping($this->findMapping($scope, $normalizedKey));
             if (null !== $mapped) {
                 return $mapped;
@@ -74,16 +76,23 @@ final class OzonAccrualCategoryTaxonomyResolver
             }
         }
 
-        $static = OzonAccrualCategory::forTypedFee($typeId, $typeName, $fallbackType);
+        $static = $this->staticCategory($typeId, $typeName, $externalCode, $providerLabel, $fallbackType);
         if ($static->known) {
             return $static;
         }
 
         if ($recordUnknown) {
-            $this->recordUnknown($scope, $typeId, $typeName);
+            $this->recordUnknown($scope, $typeId, $typeName, $externalCode, $providerLabel);
         }
 
         return $static;
+    }
+
+    public static function codeKey(?string $externalCode): ?string
+    {
+        $externalCode = self::normalizeExternalCode($externalCode);
+
+        return null !== $externalCode ? sprintf('code:%s', $externalCode) : null;
     }
 
     public static function typeKey(?string $typeId): ?string
@@ -119,6 +128,34 @@ final class OzonAccrualCategoryTaxonomyResolver
         return $name;
     }
 
+    public static function normalizeExternalCode(?string $externalCode): ?string
+    {
+        $externalCode = trim((string) $externalCode);
+        if ('' === $externalCode || 'unknown' === strtolower($externalCode)) {
+            return null;
+        }
+
+        return mb_strtolower($externalCode);
+    }
+
+    public static function looksLikeExternalCode(?string $value): bool
+    {
+        $value = trim((string) $value);
+        if ('' === $value) {
+            return false;
+        }
+
+        if (1 !== preg_match('/^[A-Za-z][A-Za-z0-9_.:-]*$/', $value)) {
+            return false;
+        }
+
+        return str_contains($value, '_')
+            || str_contains($value, '.')
+            || str_contains($value, ':')
+            || 1 === preg_match('/[a-z][A-Z]/', $value)
+            || str_starts_with(strtolower($value), 'ozon');
+    }
+
     private static function normalizeTypeId(?string $typeId): ?string
     {
         $typeId = trim((string) $typeId);
@@ -129,20 +166,40 @@ final class OzonAccrualCategoryTaxonomyResolver
     /**
      * @return list<string>
      */
-    private function candidateKeys(?string $typeId, ?string $typeName): array
+    private function candidateKeys(?string $externalCode, ?string $providerLabel, ?string $typeId): array
     {
         $keys = [];
+        $codeKey = self::codeKey($externalCode);
+        if (null !== $codeKey) {
+            $keys[] = $codeKey;
+        }
+
+        $nameKey = self::nameKey($providerLabel);
+        if (null !== $nameKey) {
+            $keys[] = $nameKey;
+        }
+
         $typeKey = self::typeKey($typeId);
         if (null !== $typeKey) {
             $keys[] = $typeKey;
         }
 
-        $nameKey = self::nameKey($typeName);
-        if (null !== $nameKey) {
-            $keys[] = $nameKey;
-        }
-
         return array_values(array_unique($keys));
+    }
+
+    private function staticCategory(
+        ?string $typeId,
+        ?string $typeName,
+        ?string $externalCode,
+        ?string $providerLabel,
+        TransactionType $fallbackType,
+    ): OzonAccrualCategory {
+        $externalCode = self::normalizeExternalCode($externalCode);
+
+        return (null !== $externalCode ? OzonAccrualCategory::findByCode($externalCode) : null)
+            ?? OzonAccrualCategory::findByOzonName($externalCode)
+            ?? OzonAccrualCategory::findByOzonName($providerLabel)
+            ?? OzonAccrualCategory::forTypedFee($typeId, $typeName, $fallbackType, $externalCode, $providerLabel);
     }
 
     private function findMapping(string $scope, string $normalizedKey): ?ExternalCategoryMapping
@@ -192,16 +249,24 @@ final class OzonAccrualCategoryTaxonomyResolver
         );
     }
 
-    private function recordUnknown(string $scope, ?string $typeId, ?string $typeName): void
+    private function recordUnknown(
+        string $scope,
+        ?string $typeId,
+        ?string $typeName,
+        ?string $externalCode,
+        ?string $providerLabel,
+    ): void
     {
-        $normalizedKey = self::typeKey($typeId) ?? self::nameKey($typeName);
+        $normalizedKey = self::codeKey($externalCode)
+            ?? self::nameKey($providerLabel ?? $typeName)
+            ?? self::typeKey($typeId);
         if (null === $normalizedKey) {
             return;
         }
 
         $cacheKey = sprintf('%s:%s', $scope, $normalizedKey);
         if (isset($this->recordedUnknowns[$cacheKey])) {
-            $this->recordedUnknowns[$cacheKey]->markSeen($typeId, $typeName);
+            $this->recordedUnknowns[$cacheKey]->markSeen($typeId, $typeName, externalCode: $externalCode, providerLabel: $providerLabel);
 
             return;
         }
@@ -214,7 +279,7 @@ final class OzonAccrualCategoryTaxonomyResolver
         );
 
         if ($category instanceof ExternalCategory) {
-            $category->markSeen($typeId, $typeName);
+            $category->markSeen($typeId, $typeName, externalCode: $externalCode, providerLabel: $providerLabel);
             $this->recordedUnknowns[$cacheKey] = $category;
 
             return;
@@ -226,7 +291,10 @@ final class OzonAccrualCategoryTaxonomyResolver
             scope: $scope,
             normalizedKey: $normalizedKey,
             externalTypeId: $typeId,
+            externalCode: $externalCode,
             externalName: $typeName,
+            providerLabel: $providerLabel,
+            displayLabel: $providerLabel ?? $typeName,
             status: ExternalCategoryStatus::NEW,
         );
 

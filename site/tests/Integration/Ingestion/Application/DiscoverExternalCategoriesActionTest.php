@@ -33,6 +33,7 @@ final class DiscoverExternalCategoriesActionTest extends IntegrationTestCase
             externalId: 'ozon:accrual-by-day:1:delivery:product-0:service-0:type-29',
             component: 'delivery:product-0:service-0:type-29',
             label: 'Неизвестная категория Ozon: Logistic',
+            externalCode: 'ozon_logistics',
         ));
         $this->em->persist($this->unknownOzonFeeTransaction(
             companyId: $companyId,
@@ -40,6 +41,7 @@ final class DiscoverExternalCategoriesActionTest extends IntegrationTestCase
             externalId: 'ozon:accrual-by-day:2:delivery:product-1:service-0:type-29',
             component: 'delivery:product-1:service-0:type-29',
             label: 'Неизвестная категория Ozon: Logistic duplicate label',
+            externalCode: 'ozon_logistics',
         ));
         $this->em->flush();
 
@@ -59,7 +61,7 @@ final class DiscoverExternalCategoriesActionTest extends IntegrationTestCase
             IngestSource::OZON,
             OzonResourceType::ACCRUAL_BY_DAY,
             OzonAccrualCategoryTaxonomyResolver::SCOPE_DELIVERY,
-            'type:29',
+            'code:ozon_logistics',
         );
 
         self::assertInstanceOf(ExternalCategory::class, $category);
@@ -80,6 +82,7 @@ final class DiscoverExternalCategoriesActionTest extends IntegrationTestCase
         string $externalId,
         string $component,
         string $label,
+        ?string $externalCode = null,
     ): FinancialTransaction {
         return new FinancialTransaction(
             companyId: $companyId,
@@ -98,6 +101,7 @@ final class DiscoverExternalCategoriesActionTest extends IntegrationTestCase
             sourceData: [
                 '_ingestion_resource' => OzonResourceType::ACCRUAL_BY_DAY,
                 '_ingestion_type_id' => '29',
+                '_ingestion_external_code' => $externalCode,
                 '_ingestion_component' => $component,
                 '_ozon_category_known' => false,
                 '_ozon_category_group' => 'Неизвестные категории Ozon',

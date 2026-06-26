@@ -272,9 +272,14 @@ final readonly class OzonAccrualByDayPreviewMapper
             }
 
             $typeId = $this->typeId($service);
+            $typeName = $this->resolvedTypeName($companyId, $typeId, $service);
+            $externalCode = $this->externalCode($service, $typeName);
+            $providerLabel = $this->providerLabel($service, $typeName);
             $ozonCategory = $this->categoryForTypedFee(
                 typeId: $typeId,
-                typeName: $this->resolvedTypeName($companyId, $typeId, $service),
+                typeName: $typeName,
+                externalCode: $externalCode,
+                providerLabel: $providerLabel,
                 fallbackType: TransactionType::FEE,
                 scope: OzonAccrualCategoryTaxonomyResolver::SCOPE_DELIVERY,
                 recordUnknown: $recordUnknownCategories,
@@ -290,6 +295,8 @@ final readonly class OzonAccrualByDayPreviewMapper
                 type: TransactionType::FEE,
                 signedAmountMinor: $amount,
                 typeId: $typeId,
+                externalCode: $externalCode,
+                providerLabel: $providerLabel,
                 unitNumber: $unitNumber,
                 ozonCategory: $ozonCategory,
             );
@@ -442,9 +449,14 @@ final readonly class OzonAccrualByDayPreviewMapper
         }
 
         $typeId = $this->typeId($fee);
+        $typeName = $this->resolvedTypeName($companyId, $typeId, $fee);
+        $externalCode = $this->externalCode($fee, $typeName);
+        $providerLabel = $this->providerLabel($fee, $typeName);
         $ozonCategory = $this->categoryForTypedFee(
             typeId: $typeId,
-            typeName: $this->resolvedTypeName($companyId, $typeId, $fee),
+            typeName: $typeName,
+            externalCode: $externalCode,
+            providerLabel: $providerLabel,
             fallbackType: $type,
             scope: $scope,
             recordUnknown: $recordUnknownCategories,
@@ -460,6 +472,8 @@ final readonly class OzonAccrualByDayPreviewMapper
             type: $type,
             signedAmountMinor: $amount,
             typeId: $typeId,
+            externalCode: $externalCode,
+            providerLabel: $providerLabel,
             unitNumber: $unitNumber,
             ozonCategory: $ozonCategory,
         );
@@ -478,6 +492,8 @@ final readonly class OzonAccrualByDayPreviewMapper
         TransactionType $type,
         int $signedAmountMinor,
         ?string $typeId = null,
+        ?string $externalCode = null,
+        ?string $providerLabel = null,
         ?string $field = null,
         ?string $unitNumber = null,
         ?OzonAccrualCategory $ozonCategory = null,
@@ -492,6 +508,8 @@ final readonly class OzonAccrualByDayPreviewMapper
             direction: $this->directionFromSigned($signedAmountMinor),
             amountMinor: abs($signedAmountMinor),
             typeId: $typeId,
+            externalCode: $externalCode,
+            providerLabel: $providerLabel,
             field: $field,
             unitNumber: $unitNumber,
             ozonCategoryCode: $ozonCategory?->code,
@@ -544,6 +562,36 @@ final readonly class OzonAccrualByDayPreviewMapper
     /**
      * @param array<string, mixed> $fee
      */
+    private function externalCode(array $fee, ?string $typeName): ?string
+    {
+        foreach (['code', 'key', 'type_code', 'typeCode', 'service_code', 'serviceCode', 'operation_type', 'operationType', 'category_code', 'categoryCode'] as $field) {
+            $code = $this->optionalString($fee[$field] ?? null);
+            if (null !== $code) {
+                return $code;
+            }
+        }
+
+        return OzonAccrualCategoryTaxonomyResolver::looksLikeExternalCode($typeName) ? $typeName : null;
+    }
+
+    /**
+     * @param array<string, mixed> $fee
+     */
+    private function providerLabel(array $fee, ?string $typeName): ?string
+    {
+        foreach (['label', 'title', 'type_label', 'typeLabel', 'service_name', 'serviceName'] as $field) {
+            $label = $this->optionalString($fee[$field] ?? null);
+            if (null !== $label) {
+                return $label;
+            }
+        }
+
+        return OzonAccrualCategoryTaxonomyResolver::looksLikeExternalCode($typeName) ? null : $typeName;
+    }
+
+    /**
+     * @param array<string, mixed> $fee
+     */
     private function resolvedTypeName(string $companyId, string $typeId, array $fee): ?string
     {
         return $this->typeName($fee) ?? $this->typeNameResolver?->resolve($companyId, $typeId);
@@ -558,12 +606,14 @@ final readonly class OzonAccrualByDayPreviewMapper
     private function categoryForTypedFee(
         ?string $typeId,
         ?string $typeName,
+        ?string $externalCode,
+        ?string $providerLabel,
         TransactionType $fallbackType,
         string $scope,
         bool $recordUnknown,
     ): OzonAccrualCategory {
-        return $this->categoryResolver?->forTypedFee($typeId, $typeName, $fallbackType, $scope, $recordUnknown)
-            ?? OzonAccrualCategory::forTypedFee($typeId, $typeName, $fallbackType);
+        return $this->categoryResolver?->forTypedFee($typeId, $typeName, $externalCode, $providerLabel, $fallbackType, $scope, $recordUnknown)
+            ?? OzonAccrualCategory::forTypedFee($typeId, $typeName, $fallbackType, $externalCode, $providerLabel);
     }
 
     private function moneyObjectMinor(mixed $value): int

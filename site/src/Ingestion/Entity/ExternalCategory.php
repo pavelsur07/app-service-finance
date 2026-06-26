@@ -17,6 +17,7 @@ use Webmozart\Assert\Assert;
 #[ORM\UniqueConstraint(name: 'uniq_ingest_ext_category_identity', columns: ['source', 'resource_type', 'scope', 'normalized_key'])]
 #[ORM\Index(name: 'idx_ingest_ext_category_status', columns: ['status', 'last_seen_at'])]
 #[ORM\Index(name: 'idx_ingest_ext_category_source_resource', columns: ['source', 'resource_type'])]
+#[ORM\Index(name: 'idx_ingest_ext_category_external_code', columns: ['source', 'resource_type', 'external_code'])]
 class ExternalCategory
 {
     #[ORM\Id]
@@ -36,7 +37,16 @@ class ExternalCategory
     private ?string $externalTypeId;
 
     #[ORM\Column(type: Types::STRING, length: 255, nullable: true)]
+    private ?string $externalCode;
+
+    #[ORM\Column(type: Types::STRING, length: 255, nullable: true)]
     private ?string $externalName;
+
+    #[ORM\Column(type: Types::STRING, length: 255, nullable: true)]
+    private ?string $providerLabel;
+
+    #[ORM\Column(type: Types::STRING, length: 255, nullable: true)]
+    private ?string $displayLabel;
 
     #[ORM\Column(type: Types::STRING, length: 512)]
     private string $normalizedKey;
@@ -65,7 +75,10 @@ class ExternalCategory
         string $scope,
         string $normalizedKey,
         ?string $externalTypeId = null,
+        ?string $externalCode = null,
         ?string $externalName = null,
+        ?string $providerLabel = null,
+        ?string $displayLabel = null,
         ExternalCategoryStatus $status = ExternalCategoryStatus::NEW,
         ?\DateTimeImmutable $seenAt = null,
     ) {
@@ -81,7 +94,10 @@ class ExternalCategory
         $this->scope = $scope;
         $this->normalizedKey = $normalizedKey;
         $this->externalTypeId = $this->normalizeNullable($externalTypeId);
+        $this->externalCode = $this->normalizeNullable($externalCode);
         $this->externalName = $this->normalizeNullable($externalName);
+        $this->providerLabel = $this->normalizeNullable($providerLabel) ?? $this->externalName;
+        $this->displayLabel = $this->normalizeNullable($displayLabel) ?? $this->providerLabel;
         $this->status = $status;
         $this->firstSeenAt = $now;
         $this->lastSeenAt = $now;
@@ -114,9 +130,24 @@ class ExternalCategory
         return $this->externalTypeId;
     }
 
+    public function getExternalCode(): ?string
+    {
+        return $this->externalCode;
+    }
+
     public function getExternalName(): ?string
     {
         return $this->externalName;
+    }
+
+    public function getProviderLabel(): ?string
+    {
+        return $this->providerLabel;
+    }
+
+    public function getDisplayLabel(): ?string
+    {
+        return $this->displayLabel;
     }
 
     public function getNormalizedKey(): string
@@ -154,12 +185,27 @@ class ExternalCategory
         return $this->updatedAt;
     }
 
-    public function markSeen(?string $externalTypeId = null, ?string $externalName = null, ?\DateTimeImmutable $seenAt = null): void
-    {
+    public function markSeen(
+        ?string $externalTypeId = null,
+        ?string $externalName = null,
+        ?\DateTimeImmutable $seenAt = null,
+        ?string $externalCode = null,
+        ?string $providerLabel = null,
+        ?string $displayLabel = null,
+    ): void {
         $this->externalTypeId ??= $this->normalizeNullable($externalTypeId);
+        $this->externalCode ??= $this->normalizeNullable($externalCode);
         $this->externalName ??= $this->normalizeNullable($externalName);
+        $this->providerLabel ??= $this->normalizeNullable($providerLabel) ?? $this->externalName;
+        $this->displayLabel ??= $this->normalizeNullable($displayLabel) ?? $this->providerLabel;
         $this->lastSeenAt = $seenAt ?? new \DateTimeImmutable();
         ++$this->seenCount;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function updateDisplayLabel(?string $displayLabel): void
+    {
+        $this->displayLabel = $this->normalizeNullable($displayLabel);
         $this->updatedAt = new \DateTimeImmutable();
     }
 
@@ -172,6 +218,12 @@ class ExternalCategory
     public function markNew(): void
     {
         $this->status = ExternalCategoryStatus::NEW;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function markNeedsIdentification(): void
+    {
+        $this->status = ExternalCategoryStatus::NEEDS_IDENTIFICATION;
         $this->updatedAt = new \DateTimeImmutable();
     }
 

@@ -106,11 +106,22 @@ final readonly class OzonAccrualCategory
         return self::byAlias()[$normalized] ?? null;
     }
 
-    public static function forTypedFee(?string $typeId, ?string $typeName, TransactionType $fallbackType): self
+    public static function forTypedFee(
+        ?string $typeId,
+        ?string $typeName,
+        TransactionType $fallbackType,
+        ?string $externalCode = null,
+        ?string $providerLabel = null,
+    ): self
     {
-        return self::findByTypeId($typeId)
+        $externalCode = null !== $externalCode ? strtolower(trim($externalCode)) : null;
+
+        return (null !== $externalCode ? self::findByCode($externalCode) : null)
+            ?? self::findByOzonName($externalCode)
+            ?? self::findByOzonName($providerLabel)
             ?? self::findByOzonName($typeName)
-            ?? self::unknown($typeId, $typeName, $fallbackType);
+            ?? self::findByTypeId($typeId)
+            ?? self::unknown($typeId, $providerLabel ?? $externalCode ?? $typeName, $fallbackType);
     }
 
     public static function forField(string $field, int $signedAmountMinor): ?self

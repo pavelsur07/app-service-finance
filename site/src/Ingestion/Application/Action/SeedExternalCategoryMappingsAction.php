@@ -57,13 +57,22 @@ final readonly class SeedExternalCategoryMappingsAction
                         scope: OzonAccrualCategoryTaxonomyResolver::SCOPE_ANY,
                         normalizedKey: $identity['normalizedKey'],
                         externalTypeId: $identity['externalTypeId'],
+                        externalCode: $identity['externalCode'],
                         externalName: $identity['externalName'],
+                        providerLabel: $identity['providerLabel'],
+                        displayLabel: $identity['displayLabel'],
                         status: ExternalCategoryStatus::MAPPED,
                     );
                     $this->entityManager->persist($externalCategory);
                     ++$stats['categoriesCreated'];
                 } else {
-                    $externalCategory->markSeen($identity['externalTypeId'], $identity['externalName']);
+                    $externalCategory->markSeen(
+                        externalTypeId: $identity['externalTypeId'],
+                        externalName: $identity['externalName'],
+                        externalCode: $identity['externalCode'],
+                        providerLabel: $identity['providerLabel'],
+                        displayLabel: $identity['displayLabel'],
+                    );
                     ++$stats['categoriesSeen'];
                 }
 
@@ -93,11 +102,23 @@ final readonly class SeedExternalCategoryMappingsAction
     }
 
     /**
-     * @return list<array{normalizedKey: string, externalTypeId: ?string, externalName: ?string}>
+     * @return list<array{normalizedKey: string, externalTypeId: ?string, externalCode: ?string, externalName: ?string, providerLabel: ?string, displayLabel: ?string}>
      */
     private function ozonIdentities(OzonAccrualCategory $category): array
     {
         $identities = [];
+
+        $normalizedCodeKey = OzonAccrualCategoryTaxonomyResolver::codeKey($category->code);
+        if (null !== $normalizedCodeKey) {
+            $identities[$normalizedCodeKey] = [
+                'normalizedKey' => $normalizedCodeKey,
+                'externalTypeId' => null,
+                'externalCode' => $category->code,
+                'externalName' => null,
+                'providerLabel' => $category->label,
+                'displayLabel' => $category->label,
+            ];
+        }
 
         foreach ($category->typeIds as $typeId) {
             $normalizedKey = OzonAccrualCategoryTaxonomyResolver::typeKey($typeId);
@@ -105,18 +126,27 @@ final readonly class SeedExternalCategoryMappingsAction
                 $identities[$normalizedKey] = [
                     'normalizedKey' => $normalizedKey,
                     'externalTypeId' => (string) $typeId,
+                    'externalCode' => null,
                     'externalName' => null,
+                    'providerLabel' => $category->label,
+                    'displayLabel' => $category->label,
                 ];
             }
         }
 
         foreach (array_merge([$category->label], $category->aliases) as $alias) {
-            $normalizedKey = OzonAccrualCategoryTaxonomyResolver::nameKey($alias);
+            $externalCode = OzonAccrualCategoryTaxonomyResolver::looksLikeExternalCode($alias) ? $alias : null;
+            $normalizedKey = null !== $externalCode
+                ? OzonAccrualCategoryTaxonomyResolver::codeKey($externalCode)
+                : OzonAccrualCategoryTaxonomyResolver::nameKey($alias);
             if (null !== $normalizedKey) {
                 $identities[$normalizedKey] = [
                     'normalizedKey' => $normalizedKey,
                     'externalTypeId' => null,
+                    'externalCode' => $externalCode,
                     'externalName' => (string) $alias,
+                    'providerLabel' => null === $externalCode ? (string) $alias : $category->label,
+                    'displayLabel' => $category->label,
                 ];
             }
         }

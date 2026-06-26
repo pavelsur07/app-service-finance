@@ -160,6 +160,7 @@ final class IngestionExternalCategoriesController extends AbstractController
                 sortOrder: $this->intValue($request->request->get('sort_order'), 9000, 1, 100000),
                 status: ExternalCategoryMappingStatus::from((string) $request->request->get('mapping_status')),
                 known: '1' === (string) $request->request->get('known', '0'),
+                displayLabel: $this->optionalString($request->request->get('display_label')),
             );
             $this->addFlash('success', 'Маппинг категории сохранен. Запустите refresh metadata для нужного периода.');
         } catch (\Throwable $exception) {

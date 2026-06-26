@@ -50,7 +50,10 @@ final readonly class ExternalCategoryAdminQuery
                 'scope' => (string) $row['scope'],
                 'normalized_key' => (string) $row['normalized_key'],
                 'external_type_id' => null !== $row['external_type_id'] ? (string) $row['external_type_id'] : null,
+                'external_code' => null !== $row['external_code'] ? (string) $row['external_code'] : null,
                 'external_name' => null !== $row['external_name'] ? (string) $row['external_name'] : null,
+                'provider_label' => null !== $row['provider_label'] ? (string) $row['provider_label'] : null,
+                'display_label' => null !== $row['display_label'] ? (string) $row['display_label'] : null,
                 'status' => (string) $row['status'],
                 'seen_count' => (int) $row['seen_count'],
                 'last_seen_at' => (string) $row['last_seen_at'],
@@ -70,7 +73,10 @@ final readonly class ExternalCategoryAdminQuery
                             c.scope,
                             c.normalized_key,
                             c.external_type_id,
+                            c.external_code,
                             c.external_name,
+                            c.provider_label,
+                            c.display_label,
                             c.status,
                             c.seen_count,
                             c.last_seen_at,
@@ -85,9 +91,10 @@ final readonly class ExternalCategoryAdminQuery
                      LEFT JOIN ingest_external_category_mappings m ON m.external_category_id = c.id
                      ORDER BY CASE c.status
                                 WHEN \'new\' THEN 0
-                                WHEN \'mapped\' THEN 1
-                                WHEN \'ignored\' THEN 2
-                                WHEN \'deprecated\' THEN 3
+                                WHEN \'needs_identification\' THEN 1
+                                WHEN \'mapped\' THEN 2
+                                WHEN \'ignored\' THEN 3
+                                WHEN \'deprecated\' THEN 4
                                 ELSE 9
                               END ASC,
                               c.last_seen_at DESC,
@@ -107,7 +114,13 @@ final readonly class ExternalCategoryAdminQuery
         $row = $this->connection->fetchAssociative(
             "SELECT
                 COUNT(*) AS transactions,
-                COUNT(DISTINCT COALESCE(NULLIF(ft.source_data->>'_ozon_category_label', ''), ft.description, ft.type)) AS groups
+                COUNT(DISTINCT COALESCE(
+                    NULLIF(ft.source_data->>'_ingestion_external_code', ''),
+                    NULLIF(ft.source_data->>'_ingestion_provider_label', ''),
+                    NULLIF(ft.source_data->>'_ozon_category_label', ''),
+                    ft.description,
+                    ft.type
+                )) AS groups
              FROM ingest_financial_transactions ft
              WHERE ft.source = :source
                AND ft.source_data->>'_ingestion_resource' = :resourceType

@@ -20,6 +20,8 @@ final readonly class OzonAccrualPreviewTransaction
         public int $amountMinor,
         public string $currency = 'RUB',
         public ?string $typeId = null,
+        public ?string $externalCode = null,
+        public ?string $providerLabel = null,
         public ?string $field = null,
         public ?string $unitNumber = null,
         public ?string $ozonCategoryCode = null,
