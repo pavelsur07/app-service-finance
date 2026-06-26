@@ -194,6 +194,7 @@ final readonly class RefreshOzonAccrualCategoryMetadataAction
                     $this->entityManager->flush();
                     $this->connection->commit();
                 }
+                $this->entityManager->clear();
 
                 $resultRows[] = [
                     'rawId' => $rawRecordId,
@@ -209,8 +210,8 @@ final readonly class RefreshOzonAccrualCategoryMetadataAction
                     if ($this->connection->isTransactionActive()) {
                         $this->connection->rollBack();
                     }
-                    $this->entityManager->clear();
                 }
+                $this->entityManager->clear();
 
                 $resultRows[] = [
                     'rawId' => $rawRecordId,
