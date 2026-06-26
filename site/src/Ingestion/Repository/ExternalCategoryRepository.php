@@ -42,6 +42,26 @@ final class ExternalCategoryRepository extends ServiceEntityRepository
     /**
      * @return list<ExternalCategory>
      */
+    public function findBySourceResourceAndNormalizedKey(
+        IngestSource $source,
+        string $resourceType,
+        string $normalizedKey,
+    ): array {
+        return $this->createQueryBuilder('category')
+            ->andWhere('category.source = :source')
+            ->andWhere('category.resourceType = :resourceType')
+            ->andWhere('category.normalizedKey = :normalizedKey')
+            ->setParameter('source', $source->value)
+            ->setParameter('resourceType', $resourceType)
+            ->setParameter('normalizedKey', $normalizedKey)
+            ->orderBy('category.scope', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * @return list<ExternalCategory>
+     */
     public function findByStatus(ExternalCategoryStatus $status, int $limit = 100): array
     {
         return $this->createQueryBuilder('category')

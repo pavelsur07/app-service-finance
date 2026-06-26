@@ -59,7 +59,8 @@ final readonly class OzonAccrualCategory
             new self('ozon_acquiring', 'Эквайринг', 'Услуги партнёров', TransactionType::ACQUIRING, 510, aliases: ['Эквайринг Ozon', 'Acquiring']),
             new self('ozon_partner_packaging', 'Упаковка товара партнёрами', 'Услуги партнёров', TransactionType::FEE, 520, aliases: ['Упаковка товара партнерами', 'ItemPacking', 'PackingFee']),
             new self('ozon_delivery_to_pickup_partners', 'Доставка до места выдачи партнёрами', 'Услуги партнёров', TransactionType::LAST_MILE, 530, aliases: ['Доставка до места выдачи партнерами']),
-            new self('ozon_temporary_partner_storage', 'Временное размещение товара партнёрами', 'Услуги партнёров', TransactionType::STORAGE, 540, aliases: ['Временное размещение товара партнерами', 'TemporaryPlacementsAgent']),
+            new self('ozon_temporary_partner_storage', 'Временное размещение товара партнёрами', 'Услуги партнёров', TransactionType::STORAGE, 540, aliases: ['Временное размещение товара партнерами', 'TemporaryPlacement', 'TemporaryPlacementsAgent']),
+            new self('ozon_partner_placement', 'Размещение товара партнёрами', 'Услуги партнёров', TransactionType::STORAGE, 550, aliases: ['Placements']),
 
             new self('ozon_cross_docking', 'Кросс-докинг', 'Услуги FBO', TransactionType::LOGISTICS, 600, parentLabel: 'Доставка до склада', aliases: ['Кросс-докинг Ozon', 'CrossDock']),
             new self('ozon_warehouse_export', 'Вывоз товара со склада силами Ozon', 'Услуги FBO', TransactionType::STORAGE, 700, parentLabel: 'Складские услуги'),
@@ -69,12 +70,27 @@ final readonly class OzonAccrualCategory
             new self('ozon_identified_surplus_processing', 'Обработка опознанных излишков в составе грузоместа', 'Услуги FBO', TransactionType::ACCEPTANCE, 810, parentLabel: 'Услуги приёмки'),
             new self('ozon_cargo_place_item_processing', 'Обработка товара в составе грузоместа', 'Услуги FBO', TransactionType::ACCEPTANCE, 820, parentLabel: 'Услуги приёмки', typeIds: ['77']),
 
-            new self('ozon_cpc', 'Оплата за клик', 'Продвижение и реклама', TransactionType::ADVERTISING, 900, aliases: ['Оплата за клик Ozon']),
-            new self('ozon_accelerated_reviews', 'Ускоренный сбор отзывов', 'Продвижение и реклама', TransactionType::ADVERTISING, 910, aliases: ['Приобретение отзывов Ozon', 'Баллы за отзывы']),
+            new self('ozon_cpc', 'Оплата за клик', 'Продвижение и реклама', TransactionType::ADVERTISING, 900, aliases: ['Оплата за клик Ozon', 'PayPerClick']),
+            new self('ozon_accelerated_reviews', 'Ускоренный сбор отзывов', 'Продвижение и реклама', TransactionType::ADVERTISING, 910, aliases: ['Приобретение отзывов Ozon', 'Баллы за отзывы', 'AcceleratedReviewCollection']),
+            new self('ozon_stars_membership', 'Звёздные товары', 'Продвижение и реклама', TransactionType::ADVERTISING, 920, aliases: ['StarsMembership']),
+            new self('ozon_brand_commission', 'Продвижение бренда', 'Продвижение и реклама', TransactionType::ADVERTISING, 930, aliases: ['BrandCommission']),
+            new self('ozon_push_campaign', 'Push-кампании', 'Продвижение и реклама', TransactionType::ADVERTISING, 940, aliases: ['PushCampaign']),
+            new self('ozon_promotion', 'Продвижение', 'Продвижение и реклама', TransactionType::ADVERTISING, 950, aliases: ['Promotion']),
+            new self('ozon_marketing', 'Маркетинг', 'Продвижение и реклама', TransactionType::ADVERTISING, 960, aliases: ['Marketing']),
+            new self('ozon_site_advertising', 'Реклама на сайте', 'Продвижение и реклама', TransactionType::ADVERTISING, 970, aliases: ['InternetSiteAdvertising']),
 
-            new self('ozon_early_payout', 'Досрочная выплата', 'Другие услуги и штрафы', TransactionType::FEE, 1000),
+            new self('ozon_drop_off', 'Drop-off', 'Услуги доставки', TransactionType::LOGISTICS, 980, aliases: ['Drop-Off']),
+
+            new self('ozon_compensation', 'Компенсация', 'Компенсации', TransactionType::ADJUSTMENT, 990, aliases: ['Compensation']),
+            new self('ozon_item_compensation', 'Компенсация товара', 'Компенсации', TransactionType::ADJUSTMENT, 995, aliases: ['ItemCompensation']),
+
+            new self('ozon_early_payout', 'Досрочная выплата', 'Другие услуги и штрафы', TransactionType::FEE, 1000, aliases: ['EarlyPayment']),
             new self('ozon_disposal', 'Утилизация товара', 'Другие услуги и штрафы', TransactionType::FEE, 1010, aliases: ['Disposal']),
             new self('ozon_packaging_materials', 'Обеспечение материалами для упаковки товара', 'Другие услуги и штрафы', TransactionType::FEE, 1020, aliases: ['PackageCost']),
+            new self('ozon_premium_subscription', 'Premium-подписка', 'Другие услуги и штрафы', TransactionType::FEE, 1030, aliases: ['PremiumSubscription']),
+            new self('ozon_original_labeling', 'Маркировка оригинальности', 'Другие услуги и штрафы', TransactionType::FEE, 1040, aliases: ['LabelOriginal']),
+            new self('ozon_defect_fine_complaint', 'Штраф за жалобу', 'Другие услуги и штрафы', TransactionType::PENALTY, 1050, aliases: ['DefectFineComplaint']),
+            new self('ozon_defect_fine_shipment_delay', 'Штраф за задержку отгрузки', 'Другие услуги и штрафы', TransactionType::PENALTY, 1060, aliases: ['DefectFineShipmentDelayRate']),
             new self('ozon_other_services', 'Другие услуги', 'Другие услуги и штрафы', TransactionType::FEE, 1090, aliases: ['DefectFineErrors', 'PremiumCashbackIndividualPoints', 'PremiumMailingCommission', 'RfbsServiceFee']),
         ];
 
