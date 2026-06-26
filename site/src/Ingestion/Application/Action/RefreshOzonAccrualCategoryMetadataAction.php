@@ -129,6 +129,49 @@ final readonly class RefreshOzonAccrualCategoryMetadataAction
     }
 
     /**
+     * @return array<string, mixed>|null
+     */
+    public function rawRecord(string $companyId, string $rawRecordId): ?array
+    {
+        $externalWindowFrom = "substring(r.external_id from '^accrual-by-day:([0-9]{4}-[0-9]{2}-[0-9]{2}):[0-9]{4}-[0-9]{2}-[0-9]{2}$')::date";
+        $externalWindowTo = "substring(r.external_id from '^accrual-by-day:[0-9]{4}-[0-9]{2}-[0-9]{2}:([0-9]{4}-[0-9]{2}-[0-9]{2})$')::date";
+        $windowFrom = sprintf('COALESCE(j.window_from, %s, DATE(r.fetched_at))', $externalWindowFrom);
+        $windowTo = sprintf('COALESCE(j.window_to, j.window_from, %s, %s, DATE(r.fetched_at))', $externalWindowTo, $externalWindowFrom);
+
+        $row = $this->connection->fetchAssociative(
+            sprintf(
+                'SELECT r.id,
+                        r.external_id,
+                        r.shop_ref,
+                        r.fetched_at,
+                        r.byte_size,
+                        r.normalization_status,
+                        TO_CHAR(%s, \'YYYY-MM-DD\') AS window_from,
+                        TO_CHAR(%s, \'YYYY-MM-DD\') AS window_to
+                 FROM ingest_raw_records r
+                 LEFT JOIN ingest_sync_jobs j ON j.id::text = r.sync_job_id AND j.company_id = r.company_id
+                 WHERE r.id = :rawRecordId
+                   AND r.company_id = :companyId
+                   AND r.source = :source
+                   AND r.resource_type = :resourceType
+                   AND r.normalization_status = :status
+                 LIMIT 1',
+                $windowFrom,
+                $windowTo,
+            ),
+            [
+                'rawRecordId' => $rawRecordId,
+                'companyId' => $companyId,
+                'source' => IngestSource::OZON->value,
+                'resourceType' => OzonResourceType::ACCRUAL_BY_DAY,
+                'status' => RawNormalizationStatus::DONE->value,
+            ],
+        );
+
+        return false === $row ? null : $row;
+    }
+
+    /**
      * @param list<array<string, mixed>> $rawRecords
      *
      * @return list<array<string, string|int>>
