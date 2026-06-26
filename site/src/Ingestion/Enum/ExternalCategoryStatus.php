@@ -7,6 +7,7 @@ namespace App\Ingestion\Enum;
 enum ExternalCategoryStatus: string
 {
     case NEW = 'new';
+    case NEEDS_IDENTIFICATION = 'needs_identification';
     case MAPPED = 'mapped';
     case IGNORED = 'ignored';
     case DEPRECATED = 'deprecated';
@@ -15,6 +16,7 @@ enum ExternalCategoryStatus: string
     {
         return match ($this) {
             self::NEW => 'Требует классификации',
+            self::NEEDS_IDENTIFICATION => 'Требует идентификации',
             self::MAPPED => 'Сопоставлена',
             self::IGNORED => 'Игнорируется',
             self::DEPRECATED => 'Устарела',

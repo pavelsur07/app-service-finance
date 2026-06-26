@@ -60,6 +60,10 @@ final class OzonAccrualCategoryTest extends TestCase
         $crossDocking = OzonAccrualCategory::findByOzonName('Кросс-докинг Ozon');
         self::assertNotNull($crossDocking);
         self::assertSame('ozon_cross_docking', $crossDocking->code);
+
+        $warehouseExport = OzonAccrualCategory::forTypedFee('77', null, TransactionType::FEE, 'ozon_warehouse_export');
+        self::assertTrue($warehouseExport->known);
+        self::assertSame('ozon_warehouse_export', $warehouseExport->code);
     }
 
     public function testFindsObservedInternalOzonTypeNames(): void

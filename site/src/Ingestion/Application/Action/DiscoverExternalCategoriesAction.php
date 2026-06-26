@@ -51,9 +51,12 @@ final readonly class DiscoverExternalCategoriesAction
             ++$stats['scanned'];
 
             $typeId = $this->optionalString($row['type_id'] ?? null);
-            $typeName = $this->extractOzonTypeName($this->optionalString($row['label'] ?? null));
-            $normalizedKey = OzonAccrualCategoryTaxonomyResolver::typeKey($typeId)
-                ?? OzonAccrualCategoryTaxonomyResolver::nameKey($typeName);
+            $externalCode = $this->optionalString($row['external_code'] ?? null);
+            $providerLabel = $this->optionalString($row['provider_label'] ?? null);
+            $typeName = $providerLabel ?? $this->extractOzonTypeName($this->optionalString($row['label'] ?? null));
+            $normalizedKey = OzonAccrualCategoryTaxonomyResolver::codeKey($externalCode)
+                ?? OzonAccrualCategoryTaxonomyResolver::nameKey($typeName)
+                ?? OzonAccrualCategoryTaxonomyResolver::typeKey($typeId);
 
             if (null === $normalizedKey) {
                 ++$stats['unmapped'];
@@ -61,11 +64,14 @@ final readonly class DiscoverExternalCategoriesAction
             }
 
             $scope = $this->scopeFromComponent($this->optionalString($row['component'] ?? null));
+            $status = null !== $externalCode || null !== $typeName
+                ? ExternalCategoryStatus::NEW
+                : ExternalCategoryStatus::NEEDS_IDENTIFICATION;
             $identityKey = $this->identityKey($scope, $normalizedKey);
             $externalCategory = $categoriesByIdentity[$identityKey] ?? null;
 
             if ($externalCategory instanceof ExternalCategory) {
-                $externalCategory->markSeen($typeId, $typeName);
+                $externalCategory->markSeen($typeId, $typeName, externalCode: $externalCode, providerLabel: $providerLabel);
                 ++$stats['categoriesSeen'];
             } else {
                 $externalCategory = $this->categoryRepository->findByIdentity(
@@ -82,20 +88,26 @@ final readonly class DiscoverExternalCategoriesAction
                         scope: $scope,
                         normalizedKey: $normalizedKey,
                         externalTypeId: $typeId,
+                        externalCode: $externalCode,
                         externalName: $typeName,
-                        status: ExternalCategoryStatus::NEW,
+                        providerLabel: $providerLabel,
+                        displayLabel: $providerLabel ?? $typeName,
+                        status: $status,
                     );
                     $this->entityManager->persist($externalCategory);
                     ++$stats['categoriesCreated'];
                 } else {
-                    $externalCategory->markSeen($typeId, $typeName);
+                    $externalCategory->markSeen($typeId, $typeName, externalCode: $externalCode, providerLabel: $providerLabel);
                     ++$stats['categoriesSeen'];
                 }
 
                 $categoriesByIdentity[$identityKey] = $externalCategory;
             }
 
-            $mappedCategory = OzonAccrualCategory::findByTypeId($typeId) ?? OzonAccrualCategory::findByOzonName($typeName);
+            $mappedCategory = (null !== $externalCode ? OzonAccrualCategory::findByCode(OzonAccrualCategoryTaxonomyResolver::normalizeExternalCode($externalCode) ?? '') : null)
+                ?? OzonAccrualCategory::findByOzonName($externalCode)
+                ?? OzonAccrualCategory::findByOzonName($typeName)
+                ?? OzonAccrualCategory::findByTypeId($typeId);
             $categoryId = $externalCategory->getId();
             $mappingKnownByCategoryId[$categoryId] ??= $this->mappingRepository->findByCategory($externalCategory) instanceof ExternalCategoryMapping;
 
@@ -131,8 +143,10 @@ final readonly class DiscoverExternalCategoriesAction
     {
         return $this->connection->fetchAllAssociative(
             sprintf(
-                "SELECT
+                 "SELECT
                     ft.source_data->>'_ingestion_type_id' AS type_id,
+                    ft.source_data->>'_ingestion_external_code' AS external_code,
+                    ft.source_data->>'_ingestion_provider_label' AS provider_label,
                     ft.source_data->>'_ozon_category_label' AS label,
                     ft.source_data->>'_ingestion_component' AS component,
                     COUNT(*) AS tx_count,
@@ -149,7 +163,7 @@ final readonly class DiscoverExternalCategoriesAction
                         OR ft.source_data->>'_ozon_category_label' LIKE 'Ozon accrual%%'
                    )
                    AND NULLIF(ft.source_data->>'_ingestion_type_id', '') IS NOT NULL
-                 GROUP BY type_id, label, component
+                 GROUP BY type_id, external_code, provider_label, label, component
                  ORDER BY MAX(ft.occurred_at) DESC, COUNT(*) DESC
                  LIMIT %d",
                 $limit,

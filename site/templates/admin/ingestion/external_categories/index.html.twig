@@ -196,7 +196,9 @@
               <tr>
                 <th>Status</th>
                 <th>Scope</th>
-                <th>External</th>
+                <th>External code</th>
+                <th>Provider label</th>
+                <th>type_id</th>
                 <th>Mapping</th>
                 <th>Seen</th>
                 <th>Last seen</th>
@@ -208,18 +210,21 @@
                   <td>{{ row.status }}</td>
                   <td>{{ row.scope }}</td>
                   <td>
-                    {% if row.external_name %}
-                      {{ row.external_name }}
-                    {% elseif row.external_type_id %}
-                      type_id {{ row.external_type_id }}
-                    {% else %}
-                      {{ row.normalized_key }}
-                    {% endif %}
+                    <code>{{ row.external_code ?? row.normalized_key }}</code>
+                  </td>
+                  <td>
+                    {{ row.provider_label ?? row.external_name ?? '' }}
+                  </td>
+                  <td>
+                    {{ row.external_type_id ?? '' }}
                   </td>
                   <td>
                     <form action="{{ path('admin_ingestion_external_categories_update_mapping', {id: row.id}) }}" method="POST">
                       <input type="hidden" name="_token" value="{{ csrf_token('admin_ingestion_external_categories_update_mapping_' ~ row.id) }}">
                       <div class="row g-2">
+                        <div class="col-md-4">
+                          <input class="form-control form-control-sm" name="display_label" value="{{ row.display_label ?? row.provider_label ?? row.external_name ?? '' }}" placeholder="display label">
+                        </div>
                         <div class="col-md-3">
                           <input class="form-control form-control-sm" name="canonical_code" value="{{ row.canonical_code ?? '' }}" placeholder="code" required>
                         </div>

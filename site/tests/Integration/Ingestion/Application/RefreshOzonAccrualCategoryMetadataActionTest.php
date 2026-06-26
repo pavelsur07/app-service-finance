@@ -27,6 +27,83 @@ use Ramsey\Uuid\Uuid;
 
 final class RefreshOzonAccrualCategoryMetadataActionTest extends IntegrationTestCase
 {
+    public function testRefreshPersistsSemanticIdentityMetadataOnExistingTransactions(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+        $externalId = 'ozon:accrual-by-day:53675409102:item_fee:group-0:fee-0:type-77';
+
+        $record = $this->storeRawRecord(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            externalId: 'accrual-by-day:2026-06-03:2026-06-03',
+            rows: [$this->warehouseExportFeeRow()],
+        );
+        $record->markNormalizationDone();
+
+        $this->em->persist(new FinancialTransaction(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            shopRef: $connectionRef,
+            source: IngestSource::OZON,
+            externalId: $externalId,
+            externalUpdatedAt: new \DateTimeImmutable('2026-06-08 03:00:00+00:00'),
+            operationGroupId: Uuid::uuid5(Uuid::NAMESPACE_URL, sprintf('%s:ozon:accrual-by-day:%s', $companyId, '53675409102'))->toString(),
+            type: TransactionType::FEE,
+            direction: TransactionDirection::OUT,
+            money: Money::fromMinor(1234, 'RUB'),
+            occurredAt: new \DateTimeImmutable('2026-06-03 00:00:00+03:00'),
+            rawRecordId: $record->getId(),
+            description: 'Ozon: Вывоз товара со склада силами Ozon',
+            sourceData: [
+                '_ingestion_resource' => OzonResourceType::ACCRUAL_BY_DAY,
+                '_ingestion_component' => 'item_fee:group-0:fee-0:type-77',
+                '_ingestion_category' => 'ITEM',
+                '_ingestion_type_id' => '77',
+                '_ingestion_field' => null,
+                '_ingestion_unit_number' => 'unit-warehouse',
+                '_ingestion_source_key' => $externalId,
+                '_ozon_category_code' => 'ozon_warehouse_export',
+                '_ozon_category_label' => 'Вывоз товара со склада силами Ozon',
+                '_ozon_category_group' => 'Услуги FBO',
+                '_ozon_category_parent' => 'Складские услуги',
+                '_ozon_category_sort_order' => 700,
+                '_ozon_category_known' => true,
+                'date' => '2026-06-03',
+                'accrued_category' => 'ITEM',
+                'component' => 'item_fee:group-0:fee-0:type-77',
+                'type_id' => '77',
+                'field' => null,
+                'unit_number' => 'unit-warehouse',
+            ],
+            sourceTz: 'Europe/Moscow',
+        ));
+        $this->em->flush();
+
+        /** @var RefreshOzonAccrualCategoryMetadataAction $action */
+        $action = self::getContainer()->get(RefreshOzonAccrualCategoryMetadataAction::class);
+        $resultRows = $action->refresh($companyId, [['id' => $record->getId()]], dryRun: false);
+
+        self::assertSame('done', $resultRows[0]['status']);
+        self::assertSame(1, $resultRows[0]['updated']);
+        self::assertSame(0, $resultRows[0]['unchanged']);
+
+        /** @var FinancialTransactionRepository $transactionRepository */
+        $transactionRepository = self::getContainer()->get(FinancialTransactionRepository::class);
+        $transaction = $transactionRepository->findByNaturalKey(
+            $companyId,
+            IngestSource::OZON,
+            $externalId,
+            TransactionType::FEE,
+        );
+
+        self::assertNotNull($transaction);
+        self::assertSame('ozon_warehouse_export', $transaction->getSourceData()['_ingestion_external_code']);
+        self::assertNull($transaction->getSourceData()['_ingestion_provider_label']);
+        self::assertSame('ozon_warehouse_export', $transaction->getSourceData()['external_code']);
+        self::assertNull($transaction->getSourceData()['provider_label']);
+    }
+
     public function testFailedRowRollbackDoesNotLeakPendingUnknownCategoryIntoLaterFlush(): void
     {
         $companyId = Uuid::uuid7()->toString();
@@ -161,6 +238,28 @@ final class RefreshOzonAccrualCategoryMetadataActionTest extends IntegrationTest
                     'fees' => [[
                         'type_id' => 1,
                         'name' => 'Acquiring',
+                        'accrued' => ['amount' => '-12.34', 'currency' => 'RUB'],
+                    ]],
+                ]],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function warehouseExportFeeRow(): array
+    {
+        return [
+            'accrual_id' => 53675409102,
+            'date' => '2026-06-03',
+            'unit_number' => 'unit-warehouse',
+            'accrued_category' => 'ITEM',
+            'item_fees' => [
+                'fees' => [[
+                    'fees' => [[
+                        'type_id' => 77,
+                        'name' => 'ozon_warehouse_export',
                         'accrued' => ['amount' => '-12.34', 'currency' => 'RUB'],
                     ]],
                 ]],

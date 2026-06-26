@@ -20,12 +20,16 @@ use Doctrine\ORM\EntityManagerInterface;
 final readonly class RefreshOzonAccrualCategoryMetadataAction
 {
     private const CATEGORY_SOURCE_DATA_KEYS = [
+        '_ingestion_external_code',
+        '_ingestion_provider_label',
         '_ozon_category_code',
         '_ozon_category_label',
         '_ozon_category_group',
         '_ozon_category_parent',
         '_ozon_category_sort_order',
         '_ozon_category_known',
+        'external_code',
+        'provider_label',
     ];
 
     public function __construct(

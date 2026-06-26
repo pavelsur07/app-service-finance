@@ -73,6 +73,33 @@ final class OzonAccrualByDayMapperTaxonomyTest extends IntegrationTestCase
         ));
     }
 
+    public function testSemanticOzonCodeTakesPrecedenceOverTypeId(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $rawRecord = $this->rawRecord($companyId);
+
+        /** @var OzonAccrualByDayMapper $mapper */
+        $mapper = self::getContainer()->get(OzonAccrualByDayMapper::class);
+        $transactions = $mapper->mapForCategoryMetadataRefresh($rawRecord, [[
+            'accrual_id' => 777003,
+            'date' => '2026-06-15',
+            'unit_number' => 'unit-1',
+            'accrued_category' => 'NON_ITEM',
+            'non_item_fee' => [
+                'type_id' => 77,
+                'name' => 'ozon_warehouse_export',
+                'accrued' => ['amount' => '-10.00', 'currency' => 'RUB'],
+            ],
+        ]], recordUnknownCategories: false);
+
+        self::assertCount(1, $transactions);
+        self::assertSame('ozon_warehouse_export', $transactions[0]->sourceData['_ingestion_external_code']);
+        self::assertNull($transactions[0]->sourceData['_ingestion_provider_label']);
+        self::assertSame('ozon_warehouse_export', $transactions[0]->sourceData['_ozon_category_code']);
+        self::assertSame('Вывоз товара со склада силами Ozon', $transactions[0]->sourceData['_ozon_category_label']);
+        self::assertTrue($transactions[0]->sourceData['_ozon_category_known']);
+    }
+
     public function testZeroAmountTypedFeeDoesNotRecordUnknownCategory(): void
     {
         $companyId = Uuid::uuid7()->toString();

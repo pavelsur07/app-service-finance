@@ -31,6 +31,7 @@ final readonly class UpdateExternalCategoryMappingAction
         int $sortOrder,
         ExternalCategoryMappingStatus $status,
         bool $known,
+        ?string $displayLabel = null,
         ?TransactionDirection $defaultDirection = null,
         ?string $updatedBy = null,
     ): void {
@@ -73,6 +74,7 @@ final readonly class UpdateExternalCategoryMappingAction
         if (ExternalCategoryMappingStatus::DISABLED === $status) {
             $category->markIgnored();
         }
+        $category->updateDisplayLabel($displayLabel);
 
         $this->entityManager->flush();
     }

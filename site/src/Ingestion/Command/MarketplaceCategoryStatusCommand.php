@@ -64,7 +64,7 @@ final class MarketplaceCategoryStatusCommand extends Command
                     (string) $row['status'],
                     (string) $row['source'],
                     (string) $row['scope'],
-                    (string) ($row['external_name'] ?? $row['external_type_id'] ?? $row['normalized_key']),
+                    (string) ($row['external_code'] ?? $row['provider_label'] ?? $row['external_name'] ?? $row['external_type_id'] ?? $row['normalized_key']),
                     trim(sprintf('%s %s', (string) ($row['canonical_group'] ?? ''), (string) ($row['canonical_label'] ?? ''))),
                     (string) $row['seen_count'],
                     (string) $row['last_seen_at'],
