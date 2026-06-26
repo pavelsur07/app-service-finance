@@ -74,6 +74,7 @@ final class OzonAccrualRefreshCategoryMetadataCommandTest extends IntegrationTes
         ]);
 
         self::assertSame(Command::SUCCESS, $dryRunExit, $dryRunTester->getDisplay());
+        self::assertStringContainsString('Metadata refresh result', $dryRunTester->getDisplay());
         $afterDryRun = $this->transaction($companyId);
         $externalUpdatedAtBeforeExecute = $afterDryRun->getExternalUpdatedAt()->format(\DateTimeInterface::ATOM);
         self::assertSame('Неизвестный type_id Ozon: 1', $afterDryRun->getSourceData()['_ozon_category_label']);
@@ -89,6 +90,7 @@ final class OzonAccrualRefreshCategoryMetadataCommandTest extends IntegrationTes
         ]);
 
         self::assertSame(Command::SUCCESS, $executeExit, $executeTester->getDisplay());
+        self::assertStringContainsString('Metadata refresh result', $executeTester->getDisplay());
         $updated = $this->transaction($companyId);
         $sourceData = $updated->getSourceData();
         self::assertSame(1234, $updated->getAmountMinor());

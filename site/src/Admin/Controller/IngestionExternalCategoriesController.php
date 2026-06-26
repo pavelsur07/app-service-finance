@@ -19,14 +19,14 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Webmozart\Assert\Assert;
 
-#[Route('/admin/marketplace/category-taxonomy', name: 'admin_marketplace_category_taxonomy_')]
+#[Route('/admin/ingestion/external-categories', name: 'admin_ingestion_external_categories_')]
 #[IsGranted('ROLE_ADMIN')]
-final class MarketplaceCategoryTaxonomyController extends AbstractController
+final class IngestionExternalCategoriesController extends AbstractController
 {
     #[Route('', name: 'index', methods: ['GET'])]
     public function index(ExternalCategoryAdminQuery $query): Response
     {
-        return $this->render('admin/marketplace/category_taxonomy/index.html.twig', [
+        return $this->render('admin/ingestion/external_categories/index.html.twig', [
             'status_summary' => $query->statusSummary(),
             'unclassified' => $query->unclassifiedOzonAccrualTransactions(),
             'latest_categories' => $query->latestCategories(),
@@ -41,7 +41,7 @@ final class MarketplaceCategoryTaxonomyController extends AbstractController
         Request $request,
         SeedExternalCategoryMappingsAction $seedDefaults,
     ): Response {
-        $this->validateCsrf($request, 'admin_marketplace_category_taxonomy_seed_defaults');
+        $this->validateCsrf($request, 'admin_ingestion_external_categories_seed_defaults');
 
         try {
             $stats = $seedDefaults(IngestSource::OZON);
@@ -55,7 +55,7 @@ final class MarketplaceCategoryTaxonomyController extends AbstractController
             $this->addFlash('error', $exception->getMessage());
         }
 
-        return $this->redirectToRoute('admin_marketplace_category_taxonomy_index');
+        return $this->redirectToRoute('admin_ingestion_external_categories_index');
     }
 
     #[Route('/discover', name: 'discover', methods: ['POST'])]
@@ -63,7 +63,7 @@ final class MarketplaceCategoryTaxonomyController extends AbstractController
         Request $request,
         DiscoverExternalCategoriesAction $discoverExternalCategories,
     ): Response {
-        $this->validateCsrf($request, 'admin_marketplace_category_taxonomy_discover');
+        $this->validateCsrf($request, 'admin_ingestion_external_categories_discover');
 
         try {
             $stats = $discoverExternalCategories(IngestSource::OZON, $this->intValue($request->request->get('limit'), 500, 1, 5000));
@@ -78,7 +78,7 @@ final class MarketplaceCategoryTaxonomyController extends AbstractController
             $this->addFlash('error', $exception->getMessage());
         }
 
-        return $this->redirectToRoute('admin_marketplace_category_taxonomy_index');
+        return $this->redirectToRoute('admin_ingestion_external_categories_index');
     }
 
     #[Route('/refresh-ozon-metadata', name: 'refresh_ozon_metadata', methods: ['POST'])]
@@ -87,7 +87,7 @@ final class MarketplaceCategoryTaxonomyController extends AbstractController
         ExternalCategoryAdminQuery $query,
         RefreshOzonAccrualCategoryMetadataAction $refreshMetadata,
     ): Response {
-        $this->validateCsrf($request, 'admin_marketplace_category_taxonomy_refresh_ozon_metadata');
+        $this->validateCsrf($request, 'admin_ingestion_external_categories_refresh_ozon_metadata');
 
         try {
             $companyId = trim((string) $request->request->get('company_id', ''));
@@ -126,7 +126,7 @@ final class MarketplaceCategoryTaxonomyController extends AbstractController
                 ),
             );
 
-            return $this->render('admin/marketplace/category_taxonomy/index.html.twig', [
+            return $this->render('admin/ingestion/external_categories/index.html.twig', [
                 'status_summary' => $query->statusSummary(),
                 'unclassified' => $query->unclassifiedOzonAccrualTransactions(),
                 'latest_categories' => $query->latestCategories(),
@@ -137,7 +137,7 @@ final class MarketplaceCategoryTaxonomyController extends AbstractController
         } catch (\Throwable $exception) {
             $this->addFlash('error', $exception->getMessage());
 
-            return $this->redirectToRoute('admin_marketplace_category_taxonomy_index');
+            return $this->redirectToRoute('admin_ingestion_external_categories_index');
         }
     }
 
@@ -147,7 +147,7 @@ final class MarketplaceCategoryTaxonomyController extends AbstractController
         Request $request,
         UpdateExternalCategoryMappingAction $updateMapping,
     ): Response {
-        $this->validateCsrf($request, sprintf('admin_marketplace_category_taxonomy_update_mapping_%s', $id));
+        $this->validateCsrf($request, sprintf('admin_ingestion_external_categories_update_mapping_%s', $id));
 
         try {
             Assert::uuid($id, 'Category ID должен быть UUID.');
@@ -166,7 +166,7 @@ final class MarketplaceCategoryTaxonomyController extends AbstractController
             $this->addFlash('error', $exception->getMessage());
         }
 
-        return $this->redirectToRoute('admin_marketplace_category_taxonomy_index');
+        return $this->redirectToRoute('admin_ingestion_external_categories_index');
     }
 
     private function validateCsrf(Request $request, string $tokenId): void
