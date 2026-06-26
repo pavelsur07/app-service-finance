@@ -35,18 +35,22 @@ final readonly class RebuildMarketplaceCategoryIdentitiesAction
         ];
 
         $rows = $this->categoryRows($source);
-        $semanticByType = $this->semanticRowsByType($rows);
+        $staleTypeOnlyIds = $this->staleTypeOnlyCategoryIds($source);
 
         foreach ($rows as $row) {
             ++$stats['scanned'];
+
+            if (isset($staleTypeOnlyIds[(string) $row['id']])) {
+                if ($execute) {
+                    $this->deprecateCategory((string) $row['id']);
+                }
+                ++$stats['deprecated'];
+                ++$stats['conflicts'];
+                continue;
+            }
+
             $identity = $this->desiredIdentity($row);
             if (null === $identity) {
-                if ($this->deprecateStaleTypeOnlyRow($row, $semanticByType, $execute)) {
-                    ++$stats['deprecated'];
-                    ++$stats['conflicts'];
-                    continue;
-                }
-
                 ++$stats['skipped'];
                 continue;
             }
@@ -126,95 +130,44 @@ final readonly class RebuildMarketplaceCategoryIdentitiesAction
     }
 
     /**
-     * @param list<array<string, mixed>> $rows
-     *
-     * @return array<string, string>
+     * @return array<string, true>
      */
-    private function semanticRowsByType(array $rows): array
+    private function staleTypeOnlyCategoryIds(IngestSource $source): array
     {
-        $semanticByType = [];
+        $ids = $this->connection->fetchFirstColumn(
+            'SELECT stale.id
+             FROM ingest_external_categories stale
+             WHERE stale.source = :source
+               AND stale.resource_type = :resourceType
+               AND stale.status <> :deprecatedStatus
+               AND stale.external_type_id IS NOT NULL
+               AND stale.normalized_key = CONCAT(\'type:\', stale.external_type_id)
+               AND NULLIF(TRIM(COALESCE(stale.external_code, \'\')), \'\') IS NULL
+               AND NULLIF(TRIM(COALESCE(stale.provider_label, \'\')), \'\') IS NULL
+               AND NULLIF(TRIM(COALESCE(stale.external_name, \'\')), \'\') IS NULL
+               AND EXISTS (
+                   SELECT 1
+                   FROM ingest_external_categories semantic
+                   WHERE semantic.source = stale.source
+                     AND semantic.resource_type = stale.resource_type
+                     AND semantic.external_type_id = stale.external_type_id
+                     AND semantic.id <> stale.id
+                     AND semantic.status <> :deprecatedStatus
+                     AND semantic.normalized_key <> CONCAT(\'type:\', semantic.external_type_id)
+                     AND (
+                         NULLIF(TRIM(COALESCE(semantic.external_code, \'\')), \'\') IS NOT NULL
+                         OR NULLIF(TRIM(COALESCE(semantic.provider_label, \'\')), \'\') IS NOT NULL
+                         OR NULLIF(TRIM(COALESCE(semantic.external_name, \'\')), \'\') IS NOT NULL
+                     )
+               )',
+            [
+                'source' => $source->value,
+                'resourceType' => OzonResourceType::ACCRUAL_BY_DAY,
+                'deprecatedStatus' => ExternalCategoryStatus::DEPRECATED->value,
+            ],
+        );
 
-        foreach ($rows as $row) {
-            $typeId = $this->optionalString($row['external_type_id'] ?? null);
-            if (
-                null === $typeId
-                || (string) $row['status'] === ExternalCategoryStatus::DEPRECATED->value
-                || !$this->hasSemanticIdentity($row)
-            ) {
-                continue;
-            }
-
-            $semanticByType[$this->typeIdentityKey($row)] = (string) $row['id'];
-        }
-
-        return $semanticByType;
-    }
-
-    /**
-     * @param array<string, mixed> $row
-     * @param array<string, string> $semanticByType
-     */
-    private function deprecateStaleTypeOnlyRow(array $row, array $semanticByType, bool $execute): bool
-    {
-        if ((string) $row['status'] === ExternalCategoryStatus::DEPRECATED->value) {
-            return false;
-        }
-
-        $normalizedKey = (string) $row['normalized_key'];
-        if (!str_starts_with($normalizedKey, 'type:') || $this->hasSemanticIdentity($row)) {
-            return false;
-        }
-
-        $semanticId = $semanticByType[$this->typeIdentityKey($row)] ?? null;
-        if (null === $semanticId || $semanticId === (string) $row['id']) {
-            return false;
-        }
-
-        if ($execute) {
-            $this->deprecateCategory((string) $row['id']);
-        }
-
-        return true;
-    }
-
-    /**
-     * @param array<string, mixed> $row
-     */
-    private function hasSemanticIdentity(array $row): bool
-    {
-        return null !== $this->optionalString($row['external_code'] ?? null)
-            || null !== $this->optionalString($row['provider_label'] ?? null)
-            || null !== $this->semanticExternalName($row);
-    }
-
-    /**
-     * @param array<string, mixed> $row
-     */
-    private function semanticExternalName(array $row): ?string
-    {
-        $externalName = $this->optionalString($row['external_name'] ?? null);
-        if (null === $externalName) {
-            return null;
-        }
-
-        if (OzonAccrualCategoryTaxonomyResolver::looksLikeExternalCode($externalName)) {
-            return $externalName;
-        }
-
-        return $this->extractOzonTypeName($externalName) ?? $externalName;
-    }
-
-    /**
-     * @param array<string, mixed> $row
-     */
-    private function typeIdentityKey(array $row): string
-    {
-        return implode("\n", [
-            (string) $row['source'],
-            (string) $row['resource_type'],
-            (string) $row['scope'],
-            (string) $row['external_type_id'],
-        ]);
+        return array_fill_keys(array_map('strval', $ids), true);
     }
 
     /**
