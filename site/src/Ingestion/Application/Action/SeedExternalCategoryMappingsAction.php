@@ -76,23 +76,19 @@ final readonly class SeedExternalCategoryMappingsAction
                     ++$stats['categoriesSeen'];
                 }
 
-                $mapping = $this->mappingRepository->findByCategory($externalCategory);
-                if ($mapping instanceof ExternalCategoryMapping) {
-                    ++$stats['mappingsExisting'];
-                    continue;
-                }
+                $this->ensureMapping($externalCategory, $category, $stats);
 
-                $this->entityManager->persist(new ExternalCategoryMapping(
-                    externalCategory: $externalCategory,
-                    canonicalCode: $category->code,
-                    canonicalLabel: $category->label,
-                    canonicalGroup: $category->group,
-                    transactionType: $category->transactionType,
-                    sortOrder: $category->sortOrder,
-                    known: true,
-                    status: ExternalCategoryMappingStatus::ACTIVE,
-                ));
-                ++$stats['mappingsCreated'];
+                foreach ($this->categoryRepository->findBySourceResourceAndNormalizedKey(
+                    IngestSource::OZON,
+                    OzonResourceType::ACCRUAL_BY_DAY,
+                    $identity['normalizedKey'],
+                ) as $relatedCategory) {
+                    if ($relatedCategory->getId() === $externalCategory->getId()) {
+                        continue;
+                    }
+
+                    $this->ensureMapping($relatedCategory, $category, $stats);
+                }
             }
         }
 
@@ -152,5 +148,30 @@ final readonly class SeedExternalCategoryMappingsAction
         }
 
         return array_values($identities);
+    }
+
+    /**
+     * @param array{categoriesCreated: int, categoriesSeen: int, mappingsCreated: int, mappingsExisting: int} $stats
+     */
+    private function ensureMapping(ExternalCategory $externalCategory, OzonAccrualCategory $category, array &$stats): void
+    {
+        $mapping = $this->mappingRepository->findByCategory($externalCategory);
+        if ($mapping instanceof ExternalCategoryMapping) {
+            ++$stats['mappingsExisting'];
+
+            return;
+        }
+
+        $this->entityManager->persist(new ExternalCategoryMapping(
+            externalCategory: $externalCategory,
+            canonicalCode: $category->code,
+            canonicalLabel: $category->label,
+            canonicalGroup: $category->group,
+            transactionType: $category->transactionType,
+            sortOrder: $category->sortOrder,
+            known: true,
+            status: ExternalCategoryMappingStatus::ACTIVE,
+        ));
+        ++$stats['mappingsCreated'];
     }
 }
