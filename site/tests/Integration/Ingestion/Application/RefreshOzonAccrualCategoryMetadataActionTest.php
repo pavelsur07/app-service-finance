@@ -215,6 +215,31 @@ final class RefreshOzonAccrualCategoryMetadataActionTest extends IntegrationTest
         self::assertSame('2026-06-02', $rawRecord['window_to']);
     }
 
+    public function testRefreshHandlesLargeRawRecordAcrossManagedStateBatches(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+        $rows = array_fill(0, 501, $this->unknownFeeRow(1001, 'BatchUnknownFee', '-1.00'));
+
+        $record = $this->storeRawRecord(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            externalId: 'accrual-by-day:2026-06-04:2026-06-04',
+            rows: $rows,
+        );
+        $record->markNormalizationDone();
+        $this->em->flush();
+
+        /** @var RefreshOzonAccrualCategoryMetadataAction $action */
+        $action = self::getContainer()->get(RefreshOzonAccrualCategoryMetadataAction::class);
+        $resultRows = $action->refresh($companyId, [['id' => $record->getId()]], dryRun: false);
+
+        self::assertSame('done', $resultRows[0]['status']);
+        self::assertSame(501, $resultRows[0]['scanned']);
+        self::assertSame(501, $resultRows[0]['missing']);
+        self::assertSame(0, $resultRows[0]['updated']);
+    }
+
     private function refreshActionWithFirstFlushFailure(): RefreshOzonAccrualCategoryMetadataAction
     {
         $entityManager = new class($this->em) extends EntityManagerDecorator {
