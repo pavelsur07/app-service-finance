@@ -70,8 +70,10 @@ final readonly class RefreshOzonAccrualCategoryMetadataAction
         \DateTimeImmutable $to,
         ?string $shopRef,
         int $limit,
+        int $offset = 0,
     ): array {
         $limit = max(1, min(500, $limit));
+        $offset = max(0, $offset);
         $externalWindowFrom = "substring(r.external_id from '^accrual-by-day:([0-9]{4}-[0-9]{2}-[0-9]{2}):[0-9]{4}-[0-9]{2}-[0-9]{2}$')::date";
         $externalWindowTo = "substring(r.external_id from '^accrual-by-day:[0-9]{4}-[0-9]{2}-[0-9]{2}:([0-9]{4}-[0-9]{2}-[0-9]{2})$')::date";
         $windowFrom = sprintf('COALESCE(j.window_from, %s, DATE(r.fetched_at))', $externalWindowFrom);
@@ -112,13 +114,15 @@ final readonly class RefreshOzonAccrualCategoryMetadataAction
                  LEFT JOIN ingest_sync_jobs j ON j.id::text = r.sync_job_id AND j.company_id = r.company_id
                  WHERE %s
                  ORDER BY %s ASC, %s ASC, r.fetched_at ASC, r.created_at ASC
-                 LIMIT %d',
+                 LIMIT %d
+                 OFFSET %d',
                 $windowFrom,
                 $windowTo,
                 implode(' AND ', $conditions),
                 $windowFrom,
                 $windowTo,
                 $limit,
+                $offset,
             ),
             $params,
         );

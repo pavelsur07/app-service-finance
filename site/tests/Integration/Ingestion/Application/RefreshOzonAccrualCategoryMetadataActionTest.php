@@ -149,6 +149,66 @@ final class RefreshOzonAccrualCategoryMetadataActionTest extends IntegrationTest
         ));
     }
 
+    public function testRawRecordsCanBePagedWithOffset(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+        $firstRecord = $this->storeRawRecord(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            externalId: 'accrual-by-day:2026-06-01:2026-06-01',
+            rows: [$this->unknownFeeRow(901, 'FirstFee', '-1.00')],
+        );
+        $secondRecord = $this->storeRawRecord(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            externalId: 'accrual-by-day:2026-06-02:2026-06-02',
+            rows: [$this->unknownFeeRow(902, 'SecondFee', '-1.00')],
+        );
+        $thirdRecord = $this->storeRawRecord(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            externalId: 'accrual-by-day:2026-06-03:2026-06-03',
+            rows: [$this->unknownFeeRow(903, 'ThirdFee', '-1.00')],
+        );
+        foreach ([$firstRecord, $secondRecord, $thirdRecord] as $record) {
+            $record->markNormalizationDone();
+        }
+        $this->em->flush();
+
+        /** @var RefreshOzonAccrualCategoryMetadataAction $action */
+        $action = self::getContainer()->get(RefreshOzonAccrualCategoryMetadataAction::class);
+
+        $firstPage = $action->rawRecords(
+            companyId: $companyId,
+            from: new \DateTimeImmutable('2026-06-01'),
+            to: new \DateTimeImmutable('2026-06-03'),
+            shopRef: $connectionRef,
+            limit: 1,
+            offset: 0,
+        );
+        $secondPage = $action->rawRecords(
+            companyId: $companyId,
+            from: new \DateTimeImmutable('2026-06-01'),
+            to: new \DateTimeImmutable('2026-06-03'),
+            shopRef: $connectionRef,
+            limit: 1,
+            offset: 1,
+        );
+        $thirdPage = $action->rawRecords(
+            companyId: $companyId,
+            from: new \DateTimeImmutable('2026-06-01'),
+            to: new \DateTimeImmutable('2026-06-03'),
+            shopRef: $connectionRef,
+            limit: 1,
+            offset: 2,
+        );
+
+        self::assertSame($firstRecord->getId(), $firstPage[0]['id']);
+        self::assertSame($secondRecord->getId(), $secondPage[0]['id']);
+        self::assertSame($thirdRecord->getId(), $thirdPage[0]['id']);
+    }
+
     private function refreshActionWithFirstFlushFailure(): RefreshOzonAccrualCategoryMetadataAction
     {
         $entityManager = new class($this->em) extends EntityManagerDecorator {
