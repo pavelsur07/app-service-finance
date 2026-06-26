@@ -145,25 +145,58 @@ final readonly class RebuildMarketplaceCategoryIdentitiesAction
                AND NULLIF(TRIM(COALESCE(stale.external_code, \'\')), \'\') IS NULL
                AND NULLIF(TRIM(COALESCE(stale.provider_label, \'\')), \'\') IS NULL
                AND NULLIF(TRIM(COALESCE(stale.external_name, \'\')), \'\') IS NULL
-               AND EXISTS (
-                   SELECT 1
-                   FROM ingest_external_categories semantic
-                   WHERE semantic.source = stale.source
-                     AND semantic.resource_type = stale.resource_type
-                     AND semantic.external_type_id = stale.external_type_id
-                     AND semantic.id <> stale.id
-                     AND semantic.status <> :deprecatedStatus
-                     AND semantic.normalized_key <> CONCAT(\'type:\', semantic.external_type_id)
-                     AND (
-                         NULLIF(TRIM(COALESCE(semantic.external_code, \'\')), \'\') IS NOT NULL
-                         OR NULLIF(TRIM(COALESCE(semantic.provider_label, \'\')), \'\') IS NOT NULL
-                         OR NULLIF(TRIM(COALESCE(semantic.external_name, \'\')), \'\') IS NOT NULL
+               AND (
+                   EXISTS (
+                       SELECT 1
+                       FROM ingest_external_categories semantic
+                       WHERE semantic.source = stale.source
+                         AND semantic.resource_type = stale.resource_type
+                         AND semantic.external_type_id = stale.external_type_id
+                         AND semantic.id <> stale.id
+                         AND semantic.status <> :deprecatedStatus
+                         AND semantic.normalized_key <> CONCAT(\'type:\', semantic.external_type_id)
+                         AND (
+                             NULLIF(TRIM(COALESCE(semantic.external_code, \'\')), \'\') IS NOT NULL
+                             OR NULLIF(TRIM(COALESCE(semantic.provider_label, \'\')), \'\') IS NOT NULL
+                             OR NULLIF(TRIM(COALESCE(semantic.external_name, \'\')), \'\') IS NOT NULL
+                         )
+                   )
+                   OR NOT EXISTS (
+                       SELECT 1
+                       FROM ingest_financial_transactions ft
+                       WHERE ft.source = stale.source
+                         AND ft.source_data->>\'_ingestion_resource\' = stale.resource_type
+                         AND ft.source_data->>\'_ingestion_type_id\' = stale.external_type_id
+                         AND NULLIF(TRIM(COALESCE(ft.source_data->>\'_ingestion_external_code\', \'\')), \'\') IS NULL
+                         AND NULLIF(TRIM(COALESCE(ft.source_data->>\'_ingestion_provider_label\', \'\')), \'\') IS NULL
+                         AND (
+                             ft.source_data->>\'_ozon_category_known\' = \'false\'
+                             OR NULLIF(ft.source_data->>\'_ozon_category_group\', \'\') IS NULL
+                             OR ft.source_data->>\'_ozon_category_group\' IN (\'Неизвестные категории Ozon\', \'Требует классификации\', \'Без группы Ozon\')
+                             OR ft.source_data->>\'_ozon_category_label\' LIKE \'Неизвест%%\'
+                             OR ft.source_data->>\'_ozon_category_label\' LIKE \'Ozon accrual%%\'
+                         )
+                         AND COALESCE(ft.source_data->>\'_ozon_category_label\', \'\') NOT LIKE \'Неизвестная категория Ozon:%%\'
+                         AND (
+                             CASE
+                                 WHEN COALESCE(ft.source_data->>\'_ingestion_component\', \'\') LIKE \'delivery:%%\' THEN :deliveryScope
+                                 WHEN COALESCE(ft.source_data->>\'_ingestion_component\', \'\') LIKE \'item_fee:%%\' THEN :itemScope
+                                 WHEN COALESCE(ft.source_data->>\'_ingestion_component\', \'\') LIKE \'non_item_fee%%\' THEN :nonItemScope
+                                 WHEN COALESCE(ft.source_data->>\'_ingestion_component\', \'\') LIKE \'container_fee%%\' THEN :containerScope
+                                 ELSE :anyScope
+                             END
+                         ) = stale.scope
                      )
                )',
             [
                 'source' => $source->value,
                 'resourceType' => OzonResourceType::ACCRUAL_BY_DAY,
                 'deprecatedStatus' => ExternalCategoryStatus::DEPRECATED->value,
+                'deliveryScope' => OzonAccrualCategoryTaxonomyResolver::SCOPE_DELIVERY,
+                'itemScope' => OzonAccrualCategoryTaxonomyResolver::SCOPE_ITEM,
+                'nonItemScope' => OzonAccrualCategoryTaxonomyResolver::SCOPE_NON_ITEM,
+                'containerScope' => OzonAccrualCategoryTaxonomyResolver::SCOPE_CONTAINER,
+                'anyScope' => OzonAccrualCategoryTaxonomyResolver::SCOPE_ANY,
             ],
         );
 
