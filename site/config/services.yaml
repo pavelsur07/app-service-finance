@@ -107,6 +107,7 @@ services:
     App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface: '@App\Marketplace\Application\Service\WbFinancialReportSyncPlanner'
     App\Marketplace\Infrastructure\Api\Ozon\OzonSellerCredentialValidatorInterface: '@App\Marketplace\Infrastructure\Api\Ozon\OzonSellerCredentialValidator'
     App\Ingestion\Domain\Contract\SecretCodec: '@App\Ingestion\Infrastructure\Security\PlaintextSecretCodec'
+    App\Ingestion\Command\OzonAccrualCategoryMetadataBulkRunnerInterface: '@App\Ingestion\Command\OzonAccrualCategoryMetadataBulkRunner'
     App\Shared\Service\Storage\ObjectStorageInterface:
         factory: ['@App\Shared\Service\Storage\ObjectStorageFactory', 'create']
 

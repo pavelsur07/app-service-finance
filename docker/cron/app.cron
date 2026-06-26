@@ -87,6 +87,10 @@
 # Ежедневный инкрементальный запуск нового Ingestion pipeline.
 0 3 * * * cd /app && php bin/console app:ingestion:run-incremental --no-interaction --quiet
 
+# Ежедневное обслуживание справочника категорий Ozon accrual:
+# seed code mappings → refresh metadata for all companies/shops → discover/rebuild taxonomy → health-check.
+15 5 * * * cd /app && php -d memory_limit=1G bin/console app:ingestion:ozon-accrual:daily-maintenance --days-back=45 --execute --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Ежедневно в 02:10: снапшоты остатков по счетам
 #10 2 * * * php /app/bin/console app:money-account:snapshot --no-interaction
 
