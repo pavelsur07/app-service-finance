@@ -120,8 +120,13 @@ final readonly class MarketplaceFacade
         string $companyId,
         MarketplaceType $marketplace,
         MarketplaceConnectionType $connectionType,
+        ?string $connectionRef = null,
     ): ?array {
-        return $this->credentialsQuery->getCredentials($companyId, $marketplace, $connectionType);
+        if (null !== $connectionRef) {
+            Assert::uuid($connectionRef);
+        }
+
+        return $this->credentialsQuery->getCredentials($companyId, $marketplace, $connectionType, $connectionRef);
     }
 
     /**

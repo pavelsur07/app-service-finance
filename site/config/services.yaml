@@ -17,6 +17,8 @@ parameters:
     app.object_storage_s3_path_style_endpoint_default: '0'
     wb_finance.rate_limit_interval_seconds: 70
     wb_finance.retry_delay_ms: 70000
+    ozon_performance.api_base_url_default: 'https://api-performance.ozon.ru'
+    ozon_performance.api_base_url: '%env(default:ozon_performance.api_base_url_default:string:OZON_PERFORMANCE_API_BASE_URL)%'
     telegram.webhook_url: '%env(string:TELEGRAM_WEBHOOK_URL)%'
     telegram.webhook_secret: '%env(string:TELEGRAM_WEBHOOK_SECRET)%'
     telegram.api_base_url: '%env(string:TELEGRAM_API_BASE_URL)%'
@@ -150,6 +152,9 @@ services:
     App\Ingestion\Infrastructure\Api\Ozon\OzonCredentialProviderInterface: '@App\Ingestion\Infrastructure\Api\Ozon\CredentialFacadeOzonCredentialProvider'
     App\Ingestion\Infrastructure\Api\Ozon\OzonAccrualClientInterface: '@App\Ingestion\Infrastructure\Api\Ozon\OzonAccrualClient'
     App\Ingestion\Infrastructure\Api\Ozon\OzonPerformanceReportClientInterface: '@App\Ingestion\Infrastructure\Api\Ozon\OzonPerformanceReportClient'
+    App\Ingestion\Infrastructure\Api\Ozon\OzonPerformanceReportClient:
+        arguments:
+            $baseUrl: '%ozon_performance.api_base_url%'
     App\Ingestion\Infrastructure\Api\Wildberries\WbCredentialProviderInterface: '@App\Ingestion\Infrastructure\Api\Wildberries\CredentialFacadeWbCredentialProvider'
     App\Ingestion\Infrastructure\Api\Wildberries\WbFinanceReportClientInterface: '@App\Ingestion\Infrastructure\Api\Wildberries\WbFinanceReportClient'
 

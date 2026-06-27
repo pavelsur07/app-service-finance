@@ -21,6 +21,7 @@ final readonly class MarketplaceCredentialsQuery
         string $companyId,
         MarketplaceType $marketplace,
         MarketplaceConnectionType $connectionType = MarketplaceConnectionType::SELLER,
+        ?string $connectionRef = null,
     ): ?array {
         $sql = <<<'SQL'
             SELECT mc.api_key, mc.client_id
@@ -29,14 +30,19 @@ final readonly class MarketplaceCredentialsQuery
               AND mc.marketplace = :marketplace
               AND mc.connection_type = :connection_type
               AND mc.is_active = true
-            LIMIT 1
         SQL;
+
+        if (null !== $connectionRef) {
+            $sql .= ' AND mc.id = :connection_id';
+        }
+
+        $sql .= ' LIMIT 1';
 
         $row = $this->connection->fetchAssociative($sql, [
             'company_id' => $companyId,
             'marketplace' => $marketplace->value,
             'connection_type' => $connectionType->value,
-        ]);
+        ] + (null === $connectionRef ? [] : ['connection_id' => $connectionRef]));
 
         if (false === $row) {
             return null;

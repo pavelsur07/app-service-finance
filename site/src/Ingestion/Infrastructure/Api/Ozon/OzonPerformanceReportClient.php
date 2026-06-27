@@ -19,7 +19,6 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
 
 final readonly class OzonPerformanceReportClient implements OzonPerformanceReportClientInterface
 {
-    private const BASE_URL = 'https://api-performance.ozon.ru';
     private const TOKEN_PATH = '/api/client/token';
     private const CAMPAIGN_PATH = '/api/client/campaign';
     private const CAMPAIGN_OBJECTS_PATH = '/api/client/campaign/%s/objects';
@@ -37,12 +36,16 @@ final readonly class OzonPerformanceReportClient implements OzonPerformanceRepor
     private const CACHE_KEY_CAMPAIGNS_PREFIX = 'ingestion_ozon_perf_campaigns_';
     private const CAMPAIGN_CACHE_TTL_SECONDS = 300;
 
+    private string $baseUrl;
+
     public function __construct(
         private HttpClientInterface $httpClient,
         private MarketplaceFacade $marketplaceFacade,
         private CacheInterface $cache,
         private LoggerInterface $logger,
+        string $baseUrl,
     ) {
+        $this->baseUrl = rtrim($baseUrl, '/');
     }
 
     public function listCampaigns(string $companyId, string $connectionRef, array $advObjectTypes = []): OzonRawPage
@@ -248,11 +251,11 @@ final readonly class OzonPerformanceReportClient implements OzonPerformanceRepor
      */
     private function requestContent(string $companyId, string $connectionRef, string $method, string $endpoint, array $options = []): string
     {
-        $credentials = $this->credentials($companyId);
-        $token = $this->accessToken($companyId, $credentials['client_id'], $credentials['client_secret'], false);
+        $credentials = $this->credentials($companyId, $connectionRef);
+        $token = $this->accessToken($companyId, $connectionRef, $credentials['client_id'], $credentials['client_secret'], false);
         $response = $this->requestWithToken($companyId, $connectionRef, $method, $endpoint, $token, $options);
         if (401 === $response->getStatusCode()) {
-            $token = $this->accessToken($companyId, $credentials['client_id'], $credentials['client_secret'], true);
+            $token = $this->accessToken($companyId, $connectionRef, $credentials['client_id'], $credentials['client_secret'], true);
             $response = $this->requestWithToken($companyId, $connectionRef, $method, $endpoint, $token, $options);
         }
 
@@ -268,15 +271,18 @@ final readonly class OzonPerformanceReportClient implements OzonPerformanceRepor
      */
     private function requestWithToken(string $companyId, string $connectionRef, string $method, string $endpoint, string $token, array $options): ResponseInterface
     {
-        $url = isset($options['absoluteUrl']) && is_string($options['absoluteUrl']) && '' !== $options['absoluteUrl']
+        $absoluteUrl = isset($options['absoluteUrl']) && is_string($options['absoluteUrl']) && '' !== $options['absoluteUrl'];
+        $url = $absoluteUrl
             ? $options['absoluteUrl']
-            : self::BASE_URL.$endpoint;
+            : $this->baseUrl.$endpoint;
         unset($options['absoluteUrl']);
 
         $options['headers'] = array_merge($options['headers'] ?? [], [
-            'Authorization' => 'Bearer '.$token,
             'Accept' => 'application/json',
         ]);
+        if (!$absoluteUrl) {
+            $options['headers']['Authorization'] = 'Bearer '.$token;
+        }
         $options['timeout'] ??= self::REQUEST_TIMEOUT;
 
         $startedAt = microtime(true);
@@ -303,12 +309,13 @@ final readonly class OzonPerformanceReportClient implements OzonPerformanceRepor
     /**
      * @return array{client_id: string, client_secret: string}
      */
-    private function credentials(string $companyId): array
+    private function credentials(string $companyId, string $connectionRef): array
     {
         $credentials = $this->marketplaceFacade->getConnectionCredentials(
             $companyId,
             MarketplaceType::OZON,
             MarketplaceConnectionType::PERFORMANCE,
+            $connectionRef,
         );
 
         if (null === $credentials) {
@@ -324,16 +331,16 @@ final readonly class OzonPerformanceReportClient implements OzonPerformanceRepor
         return ['client_id' => $clientId, 'client_secret' => $clientSecret];
     }
 
-    private function accessToken(string $companyId, string $clientId, string $clientSecret, bool $forceRefresh): string
+    private function accessToken(string $companyId, string $connectionRef, string $clientId, string $clientSecret, bool $forceRefresh): string
     {
-        $cacheKey = self::CACHE_KEY_TOKEN_PREFIX.$companyId;
+        $cacheKey = self::CACHE_KEY_TOKEN_PREFIX.hash('sha256', $companyId.'|'.$connectionRef);
         if ($forceRefresh) {
             $this->cache->delete($cacheKey);
         }
 
         return $this->cache->get($cacheKey, function (ItemInterface $item) use ($clientId, $clientSecret): string {
             try {
-                $response = $this->httpClient->request('POST', self::BASE_URL.self::TOKEN_PATH, [
+                $response = $this->httpClient->request('POST', $this->baseUrl.self::TOKEN_PATH, [
                     'headers' => ['Content-Type' => 'application/json', 'Accept' => 'application/json'],
                     'json' => [
                         'client_id' => $clientId,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Ingestion\Infrastructure\Api\Ozon;
 
 use App\Company\Entity\Company;
+use App\Ingestion\Exception\ConnectorAuthException;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonPerformanceReportClient;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceConnectionType;
@@ -54,6 +55,50 @@ final class OzonPerformanceReportClientTest extends IntegrationTestCase
         self::assertSame(['SEARCH_PROMO', 'SKU'], $calls[1]['options']['query']['advObjectType']);
     }
 
+    public function testRejectsMismatchedConnectionRefInsteadOfFallingBackToCompanyCredentials(): void
+    {
+        $company = $this->seedCompany('11111111-1111-4111-8111-00000000b203', 9203);
+        $this->seedPerformanceConnection(
+            $company,
+            '77777777-7777-4777-8777-00000000b203',
+            'performance-client',
+            'performance-secret',
+        );
+        $sellerConnection = $this->seedConnection(
+            $company,
+            '77777777-7777-4777-8777-00000000b204',
+            MarketplaceConnectionType::SELLER,
+            'seller-client',
+            'seller-secret',
+        );
+        $this->em->flush();
+
+        $calls = [];
+        $http = new MockHttpClient(static function (string $method, string $url, array $options = []) use (&$calls): MockResponse {
+            $calls[] = ['method' => $method, 'url' => $url, 'options' => $options];
+
+            if (str_ends_with($url, '/api/client/token')) {
+                return new MockResponse('{"access_token":"second-token","expires_in":1800}', ['http_code' => 200]);
+            }
+            if (str_contains($url, '/api/client/campaign')) {
+                return new MockResponse('{"result":{"list":[{"id":"1"}]}}', ['http_code' => 200]);
+            }
+
+            throw new \LogicException(sprintf('Unexpected request: %s %s', $method, $url));
+        });
+
+        $client = $this->client($http);
+
+        $this->expectException(ConnectorAuthException::class);
+        $this->expectExceptionMessage('Ozon Performance credentials were not found.');
+
+        try {
+            $client->listCampaigns($company->getId(), $sellerConnection->getId(), ['SKU']);
+        } finally {
+            self::assertSame([], $calls);
+        }
+    }
+
     public function testDownloadReportParsesCsvWithBomSemicolonAndQuotedNewlines(): void
     {
         $company = $this->seedCompany('11111111-1111-4111-8111-00000000b202', 9202);
@@ -90,6 +135,7 @@ final class OzonPerformanceReportClientTest extends IntegrationTestCase
         self::assertCount(2, $calls);
         self::assertSame('https://download.example.test/report.csv', $calls[1]['url']);
         self::assertSame([], $calls[1]['options']['query'] ?? []);
+        self::assertStringNotContainsString('Authorization:', implode("\n", $this->headerLines($calls[1]['options'])));
     }
 
     private function client(MockHttpClient $http): OzonPerformanceReportClient
@@ -99,6 +145,7 @@ final class OzonPerformanceReportClientTest extends IntegrationTestCase
             self::getContainer()->get(MarketplaceFacade::class),
             new ArrayAdapter(),
             new NullLogger(),
+            'https://api-performance.ozon.ru',
         );
     }
 
@@ -119,20 +166,52 @@ final class OzonPerformanceReportClientTest extends IntegrationTestCase
         return $company;
     }
 
-    private function seedPerformanceConnection(Company $company, string $connectionId): MarketplaceConnection
-    {
+    private function seedPerformanceConnection(
+        Company $company,
+        string $connectionId,
+        string $clientId = 'performance-client',
+        string $apiKey = 'performance-secret',
+    ): MarketplaceConnection {
+        return $this->seedConnection($company, $connectionId, MarketplaceConnectionType::PERFORMANCE, $clientId, $apiKey);
+    }
+
+    private function seedConnection(
+        Company $company,
+        string $connectionId,
+        MarketplaceConnectionType $connectionType,
+        string $clientId,
+        string $apiKey,
+    ): MarketplaceConnection {
         $connection = new MarketplaceConnection(
             $connectionId,
             $company,
             MarketplaceType::OZON,
-            MarketplaceConnectionType::PERFORMANCE,
+            $connectionType,
         );
-        $connection->setApiKey('performance-secret');
-        $connection->setClientId('performance-client');
+        $connection->setApiKey($apiKey);
+        $connection->setClientId($clientId);
         $connection->setIsActive(true);
 
         $this->em->persist($connection);
 
         return $connection;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     *
+     * @return list<string>
+     */
+    private function headerLines(array $options): array
+    {
+        $headers = $options['headers'] ?? [];
+        if (!is_array($headers)) {
+            return [];
+        }
+
+        return array_values(array_map(
+            static fn (mixed $header): string => is_scalar($header) ? (string) $header : '',
+            $headers,
+        ));
     }
 }

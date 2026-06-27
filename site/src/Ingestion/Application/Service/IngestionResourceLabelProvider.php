@@ -7,7 +7,7 @@ namespace App\Ingestion\Application\Service;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Application\Source\Wildberries\WbResourceType;
 
-final class IngestionResourceLabelProvider
+final readonly class IngestionResourceLabelProvider
 {
     /**
      * @var array<string, array{group: string, label: string}>
