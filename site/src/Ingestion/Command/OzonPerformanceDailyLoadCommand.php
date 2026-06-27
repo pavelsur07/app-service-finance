@@ -136,7 +136,8 @@ final class OzonPerformanceDailyLoadCommand extends Command
         $started = 0;
         $skippedActive = 0;
         $failed = 0;
-        $nextCampaignDelaySeconds = 0;
+        /** @var array<string, int> $nextCampaignDelaySecondsByConnection */
+        $nextCampaignDelaySecondsByConnection = [];
         $chunkCount = $this->chunkCount($from, $to);
 
         foreach ($connections as $connection) {
@@ -145,10 +146,10 @@ final class OzonPerformanceDailyLoadCommand extends Command
 
             foreach (self::RESOURCE_TYPES as $resourceType) {
                 $campaignBacked = $this->isCampaignBackedResource($resourceType);
-                $initialDelaySeconds = $campaignBacked ? $nextCampaignDelaySeconds : 0;
+                $initialDelaySeconds = $campaignBacked ? ($nextCampaignDelaySecondsByConnection[$connectionRef] ?? 0) : 0;
                 $chunkDelayStepSeconds = $campaignBacked ? $dispatchSpacingSeconds : 0;
                 if ($campaignBacked) {
-                    $nextCampaignDelaySeconds += $dispatchSpacingSeconds * $chunkCount;
+                    $nextCampaignDelaySecondsByConnection[$connectionRef] = $initialDelaySeconds + ($dispatchSpacingSeconds * $chunkCount);
                 }
 
                 if ($dryRun) {
