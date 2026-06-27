@@ -107,10 +107,8 @@ final readonly class OzonPerformanceReportClient implements OzonPerformanceRepor
         $page = max(1, $page);
         $payload = $this->requestJson($companyId, $connectionRef, 'POST', self::SEARCH_PROMO_PRODUCTS_PATH, [
             'json' => [
-                'campaign_id' => $campaignId,
                 'campaignId' => $campaignId,
                 'page' => $page,
-                'page_size' => 1000,
                 'pageSize' => 1000,
             ],
         ]);
@@ -413,6 +411,18 @@ final readonly class OzonPerformanceReportClient implements OzonPerformanceRepor
 
         if ($statusCode >= 500) {
             throw new ConnectorTransientException(sprintf('Ozon Performance server error %d for %s.', $statusCode, $endpoint));
+        }
+
+        if (
+            404 === $statusCode
+            && preg_match('#^/api/client/campaign/([^/]+)/objects$#', $endpoint, $matches)
+            && str_contains(strtolower($content), 'campaign not found')
+        ) {
+            throw new OzonPerformanceCampaignNotFoundException(
+                rawurldecode($matches[1]),
+                $endpoint,
+                mb_substr($content, 0, 500),
+            );
         }
 
         if ($statusCode < 200 || $statusCode >= 300) {

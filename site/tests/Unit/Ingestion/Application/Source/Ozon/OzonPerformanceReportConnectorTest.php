@@ -11,6 +11,7 @@ use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Enum\Capability;
 use App\Ingestion\Exception\ConnectorTransientException;
 use App\Ingestion\Exception\UnsupportedCapabilityException;
+use App\Ingestion\Infrastructure\Api\Ozon\OzonPerformanceCampaignNotFoundException;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonPerformanceReportClientInterface;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonRawPage;
 use PHPUnit\Framework\TestCase;
@@ -81,6 +82,50 @@ final class OzonPerformanceReportConnectorTest extends TestCase
         self::assertFalse($second->hasMore);
         self::assertNull($second->nextCursorValue);
         self::assertSame(['11', '12'], $client->skuStatsCampaignCalls[1]);
+    }
+
+    public function testPullSkuCampaignObjectsSkipsMissingCampaignAndContinues(): void
+    {
+        $client = new FakeOzonPerformanceReportClient();
+        $client->campaignsByType['SKU'] = [
+            ['id' => '13815400'],
+            ['id' => '13815401'],
+        ];
+        $client->missingCampaignObjects['13815400'] = true;
+
+        $connector = $this->connector($client);
+        $first = $connector->pull($this->request(OzonResourceType::PERFORMANCE_SKU_CAMPAIGN_OBJECTS));
+
+        self::assertNotNull($first->rawBatch);
+        self::assertTrue($first->hasMore);
+        self::assertSame('{"campaignOffset":1}', $first->nextCursorValue);
+        self::assertSame('performance-sku-objects:13815400:2026-06-01:2026-06-07', $first->rawBatch->externalId);
+        self::assertSame([
+            [
+                '_ingestion_empty' => true,
+                '_ingestion_resource' => OzonResourceType::PERFORMANCE_SKU_CAMPAIGN_OBJECTS,
+                '_ingestion_metadata' => [
+                    'apiMetadata' => [
+                        'endpoint' => '/api/client/campaign/13815400/objects',
+                        'campaignId' => '13815400',
+                        'skippedReason' => 'campaign_not_found',
+                        'responseBody' => '{"error":"campaign not found"}',
+                    ],
+                    'campaignId' => '13815400',
+                    'campaignOffset' => 0,
+                    'campaignCount' => 2,
+                    'skippedReason' => 'campaign_not_found',
+                ],
+            ],
+        ], $first->rawBatch->rows);
+
+        $second = $connector->pull($this->request(
+            OzonResourceType::PERFORMANCE_SKU_CAMPAIGN_OBJECTS,
+            cursorValue: $first->nextCursorValue,
+        ));
+
+        self::assertFalse($second->hasMore);
+        self::assertSame([['campaign_id' => '13815401', 'sku' => 'sku-1']], $second->rawBatch?->rows);
     }
 
     public function testSearchPromoStatisticsGeneratesAsyncReportBeforeRawBatch(): void
@@ -194,6 +239,11 @@ final class FakeOzonPerformanceReportClient implements OzonPerformanceReportClie
      */
     public array $readyReports = [];
 
+    /**
+     * @var array<string, bool>
+     */
+    public array $missingCampaignObjects = [];
+
     public function listCampaigns(string $companyId, string $connectionRef, array $advObjectTypes = []): OzonRawPage
     {
         $rows = [];
@@ -206,6 +256,14 @@ final class FakeOzonPerformanceReportClient implements OzonPerformanceReportClie
 
     public function fetchCampaignObjects(string $companyId, string $connectionRef, string $campaignId): OzonRawPage
     {
+        if (($this->missingCampaignObjects[$campaignId] ?? false) === true) {
+            throw new OzonPerformanceCampaignNotFoundException(
+                $campaignId,
+                sprintf('/api/client/campaign/%s/objects', $campaignId),
+                '{"error":"campaign not found"}',
+            );
+        }
+
         return new OzonRawPage([['campaign_id' => $campaignId, 'sku' => 'sku-1']], false);
     }
 
