@@ -1,0 +1,127 @@
+/* ============ REPORT (period grid) ============ */
+/* Scrollable, sticky-left label column. Each row is its own grid:
+   var(--r-label-w, 300px) · repeat(var(--r-periods, 4), 1fr) · var(--r-total-w, 150px) */
+.report {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-4);
+  overflow: hidden;
+}
+.report-scroll { overflow-x: auto; }
+.report-scroll > * { min-width: fit-content; }
+
+.r-row {
+  display: grid;
+  grid-template-columns:
+    var(--r-label-w, 300px)
+    repeat(var(--r-periods, 4), minmax(96px, 1fr))
+    var(--r-total-w, 150px);
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-soft);
+  align-items: stretch;
+}
+
+/* Row variants */
+.r-row--head    { background: var(--bg-row-hover); border-bottom: 1px solid var(--border); }
+.r-row--section { background: var(--bg-subtle);    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.r-row--net     { background: var(--bg-row-hover); border-bottom: 1px solid var(--border); }
+.r-row--balance { background: var(--bg-subtle);    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.r-row--grand   { background: var(--bg-page);      border-top: 2px solid var(--text-strong); border-bottom: 1px solid var(--border); }
+.r-row--closing { background: var(--bg-dark); color: var(--text-inverse); border-top: 1px solid var(--border-dark); border-bottom: 0; }
+
+/* Sticky label column */
+.r-label {
+  position: sticky; left: 0; background: inherit; z-index: 1;
+  padding: 9px 18px;
+  border-right: 1px solid var(--border-soft);
+  display: flex; align-items: center; gap: 8px;
+  min-width: 0;
+}
+.r-row--head .r-label,
+.r-row--section .r-label,
+.r-row--balance .r-label,
+.r-row--net .r-label,
+.r-row--grand .r-label,
+.r-row--closing .r-label   { padding-top: 12px; padding-bottom: 12px; border-right-color: var(--border); }
+.r-row--section .r-label,
+.r-row--net .r-label       { border-left: 3px solid var(--r-accent, var(--color-primary)); padding-left: 14px; }
+.r-row--closing .r-label   { border-right-color: var(--border-dark); padding: 14px 18px; }
+
+.r-label-block { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.r-label-text {
+  font-size: 12.5px; font-weight: 500; color: var(--text-strong);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.r-label-text--group { font-weight: 700; }
+.r-row--section .r-label-text { font-size: 13.5px; font-weight: 700; letter-spacing: -0.01em; }
+.r-row--balance .r-label-text,
+.r-row--grand .r-label-text   { font-size: 13px; font-weight: 700; }
+.r-row--net .r-label-text     { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.r-row--closing .r-label-text { color: var(--text-inverse); }
+.r-label-sub { font-size: 11px; color: var(--text-muted); line-height: 1.2; }
+.r-row--closing .r-label-sub { color: var(--text-disabled); }
+.r-label-hint {
+  font-size: 10.5px; font-weight: 700; color: var(--text-tertiary);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+
+.r-chev {
+  width: 20px; height: 20px;
+  border: 0; background: transparent; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-secondary); border-radius: var(--r-1); flex-shrink: 0;
+}
+.r-chev:hover { background: var(--border-soft); }
+.r-row--section .r-chev { width: 22px; height: 22px; }
+.r-indent { display: inline-block; flex-shrink: 0; }
+.r-leaf-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text-faint); flex-shrink: 0; margin: 0 8px; }
+.r-dir-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.r-dir-dot--in  { background: var(--success-dot); }
+.r-dir-dot--out { background: var(--danger-dot); }
+
+/* Data cell: stacked sum + delta */
+.r-cell {
+  padding: 7px 12px; text-align: right;
+  border-right: 1px solid var(--border-soft);
+  display: flex; flex-direction: column; gap: 2px;
+  justify-content: center; align-items: flex-end;
+}
+.r-row--head .r-cell,
+.r-row--section .r-cell,
+.r-row--net .r-cell,
+.r-row--balance .r-cell,
+.r-row--grand .r-cell    { padding: 10px 12px; border-right-color: var(--border); }
+.r-row--closing .r-cell  { padding: 12px; border-right-color: var(--border-dark); }
+.r-cell-val { font-size: 12.5px; font-weight: 500; color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.r-cell-val--group,
+.r-row--section .r-cell-val,
+.r-row--net .r-cell-val      { font-size: 13px; font-weight: 700; }
+.r-row--balance .r-cell-val,
+.r-row--grand .r-cell-val    { font-size: 13.5px; font-weight: 700; }
+.r-row--closing .r-cell-val  { font-size: 13.5px; font-weight: 700; color: var(--text-inverse); }
+.r-cell-val--zero { color: var(--text-faint); }
+.r-cell-head-label { font-size: 12px; font-weight: 700; color: var(--text-strong); letter-spacing: -0.005em; }
+.r-cell-head-sub   { font-size: 10.5px; color: var(--text-disabled); font-variant-numeric: tabular-nums; }
+
+/* Total column (right-most, primary-tinted) */
+.r-total {
+  padding: 7px 14px 7px 12px; text-align: right;
+  background: var(--bg-row-selected);
+  border-left: 1px solid var(--color-primary-border);
+  display: flex; flex-direction: column; gap: 2px;
+  justify-content: center; align-items: flex-end;
+}
+.r-row--head .r-total,
+.r-row--section .r-total,
+.r-row--balance .r-total,
+.r-row--net .r-total,
+.r-row--grand .r-total       { padding: 10px 14px; }
+.r-row--head .r-total        { background: var(--color-primary-tint); }
+.r-row--head .r-total .r-cell-head-label { color: var(--color-primary-hover); }
+.r-row--head .r-total .r-cell-head-sub   { color: var(--report-head-meta); }
+.r-row--section .r-total .r-cell-val,
+.r-row--net .r-total .r-cell-val { color: var(--color-primary-hover); }
+.r-row--grand .r-total       { background: var(--bg-dark); border-left-color: var(--bg-dark); }
+.r-row--grand .r-total .r-cell-val { color: var(--text-inverse); }
+.r-row--closing .r-total     { background: var(--bg-dark); border-left-color: var(--border-dark); padding: 12px 14px; }
+.r-row--closing .r-total .r-cell-val { color: var(--text-inverse); }

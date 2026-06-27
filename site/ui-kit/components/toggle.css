@@ -1,0 +1,20 @@
+/* ============ TOGGLE ============ */
+.toggle {
+  display: inline-block;
+  width: var(--toggle-w); height: var(--toggle-h);
+  border-radius: var(--r-pill);
+  background: var(--border-hover);
+  position: relative; cursor: pointer;
+  border: 0; padding: 0;
+}
+.toggle::after {
+  content: '';
+  position: absolute; top: 2px; left: 2px;
+  width: var(--toggle-knob); height: var(--toggle-knob);
+  border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 3px rgba(15,23,42,0.2);
+  transition: left .12s;
+}
+.toggle.is-on { background: var(--color-primary); }
+.toggle.is-on::after { left: calc(var(--toggle-w) - var(--toggle-knob) - 2px); }
+.toggle.is-disabled { opacity: 0.4; cursor: not-allowed; }

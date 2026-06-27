@@ -1,0 +1,48 @@
+<!-- @react Money -->
+<!-- @uiKit v1.4 -->
+<!-- @docs ui-kit/components/money.css -->
+
+<div class="row-2col">
+  <!-- 01 Signed transaction -->
+  <div class="money-card">
+    <div class="mc-label">01 · Signed transaction</div>
+    <div><span class="money money--14 money--in">+245&thinsp;000 ₽</span></div>
+    <div><span class="money money--14 money--out">−156&thinsp;200 ₽</span></div>
+    <div class="mc-meta"><b>Где:</b> строки таблицы ДДС, drawer редактирования</div>
+    <div class="mc-spec">14px / 700 / tabular / цветной</div>
+  </div>
+
+  <!-- 02 Balance (unsigned) -->
+  <div class="money-card">
+    <div class="mc-label">02 · Balance (unsigned)</div>
+    <div><span class="money money--22 money--strong">3&thinsp;829&thinsp;930 ₽</span></div>
+    <div class="mc-meta"><b>Где:</b> total balance KPI, account card balance</div>
+    <div class="mc-spec">22px / 700 / tabular / нейтральный — балансы НЕ цветные</div>
+  </div>
+
+  <!-- 08 Zero state -->
+  <div class="money-card">
+    <div class="mc-label">08 · Zero state</div>
+    <div><span class="money money--14 money--muted">0</span></div>
+    <div><span class="money money--14 money--muted">— ₽</span></div>
+    <div class="mc-meta"><b>Где:</b> нулевая активность, отсутствие данных</div>
+    <div class="mc-spec">Цвет --text-faint (#CBD5E1). Em-dash (—), не hyphen</div>
+  </div>
+
+  <!-- 09 Percentage delta -->
+  <div class="money-card">
+    <div class="mc-label">09 · Percentage delta</div>
+    <div><span class="delta delta--up">+12,4%</span> <span class="delta delta--down" style="margin-left:6px">−4,1%</span></div>
+    <div><span class="delta delta--neutral">±0,0%</span></div>
+    <div class="mc-meta"><b>Где:</b> KPI-meta, dashboard deltas</div>
+    <div class="mc-spec">10.5px / 700 / chip с tinted bg / десятичные через запятую</div>
+  </div>
+
+  <!-- 12 Hero balance dark -->
+  <div class="money-card" style="background:var(--bg-dark); color:#fff">
+    <div class="mc-label" style="color:#94A3B8">12 · Hero balance (dark)</div>
+    <div><span class="money money--28" style="color:#fff">3&thinsp;829&thinsp;930 ₽</span></div>
+    <div class="mc-meta" style="color:#94A3B8"><b style="color:#fff">Где:</b> главный KPI на дашборде</div>
+    <div class="mc-spec" style="color:#94A3B8; border-top-color:rgba(255,255,255,0.1)">28px / 700 / tabular / на тёмной подложке</div>
+  </div>
+</div>

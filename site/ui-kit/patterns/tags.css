@@ -1,0 +1,60 @@
+/* ============ Tags input ============ */
+.tags-input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--border); border-radius: var(--r-3);
+  background: var(--bg-card);
+  padding: 5px 6px;
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  cursor: text; position: relative;
+}
+.tags-input.is-focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--focus-ring-input); }
+.tags-input input {
+  border: 0; outline: 0; padding: 0 6px;
+  font-family: inherit; font-size: 13px; color: var(--text-strong);
+  background: transparent;
+  flex: 1; min-width: 80px; height: 26px;
+}
+.tags-input input::placeholder { color: var(--text-muted); }
+.tag-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 4px 3px 9px;
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+  font-size: 12px; font-weight: 600; color: var(--text-strong);
+  line-height: 1.4;
+}
+.tag-chip:hover { background: var(--bg-subtle); }
+.tag-chip.is-focused { background: var(--color-primary-tint); border-color: var(--color-primary-border); color: var(--color-primary-hover); }
+.tag-chip .x {
+  width: 18px; height: 18px; border-radius: var(--r-1);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-muted); cursor: pointer; border: 0; background: transparent;
+  font-family: inherit;
+}
+.tag-chip .x:hover { background: rgba(15,23,42,0.06); color: var(--text-strong); }
+.tag-chip.is-focused .x { color: var(--color-primary-hover); }
+
+.suggest {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border); border-radius: var(--r-3);
+  box-shadow: var(--shadow-menu);
+  padding: 5px; z-index: 5;
+  max-height: 200px; overflow-y: auto;
+}
+.suggest-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 9px; border-radius: var(--r-2);
+  cursor: pointer; font-size: 13px; color: var(--text-strong);
+}
+.suggest-item:hover, .suggest-item.is-active { background: var(--bg-page); }
+.suggest-item .hint { margin-left: auto; font-size: 10.5px; color: var(--text-muted); font-family: var(--font-mono); }
+.suggest-create {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 9px; border-radius: var(--r-2);
+  cursor: pointer; font-size: 13px; color: var(--color-primary); font-weight: 600;
+  border-top: 1px solid var(--border-soft); margin-top: 4px;
+}
+.suggest-create:hover { background: var(--color-primary-tint); }

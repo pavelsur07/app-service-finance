@@ -1,0 +1,45 @@
+/* ============ KPI ============ */
+.kpi {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-4);
+  padding: 16px 20px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.kpi-label {
+  font-size: 11.5px; font-weight: 600; color: var(--text-tertiary);
+  letter-spacing: 0.02em;
+  display: flex; align-items: center; gap: 6px;
+}
+.kpi-value { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.kpi-value--hero { font-size: 28px; }
+.kpi-meta { font-size: 11px; color: var(--text-muted); display: flex; gap: 6px; align-items: center; }
+.kpi--dark { background: var(--bg-dark); color: #fff; border-color: var(--bg-dark); }
+.kpi--dark .kpi-label { color: var(--text-disabled); }
+.kpi--dark .kpi-value { color: #fff; }
+.kpi--dark .kpi-meta { color: var(--text-disabled); }
+
+/* Delta chip */
+.delta {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 7px; border-radius: var(--r-1);
+  font-size: 10.5px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.delta--up   { background: var(--success-bg); color: var(--success-text); }
+.delta--down { background: var(--danger-bg);  color: var(--danger-text); }
+.delta--neutral { background: var(--bg-page); color: var(--text-secondary); }
+
+/* sparkline placeholder */
+.spark {
+  width: 100%; height: 30px;
+  background: linear-gradient(180deg, rgba(26,86,219,0.16) 0%, rgba(26,86,219,0) 100%);
+  position: relative; margin-top: 4px;
+  border-radius: 3px;
+}
+.spark::before {
+  content: ''; position: absolute; bottom: 6px; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-primary) 100%);
+  clip-path: polygon(0 100%, 12% 60%, 25% 80%, 38% 40%, 52% 55%, 66% 30%, 80% 45%, 92% 20%, 100% 35%, 100% 100%);
+  height: 30px;
+}

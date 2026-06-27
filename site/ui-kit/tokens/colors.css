@@ -1,0 +1,90 @@
+:root {
+  /* ===== Brand ===== */
+  --color-primary: #1A56DB;
+  --color-primary-hover: #1E40AF;
+  --color-primary-tint: #EEF3FE;
+  --color-primary-border: #C7D7FB;
+  --color-primary-selection: #DBE6FF;
+
+  /* ===== Text ===== */
+  --text-strong: #0B1220;
+  --text-secondary: #475569;
+  --text-tertiary: #64748B;
+  --text-muted: #8B95A7;
+  --text-disabled: #94A3B8;
+  --text-faint: #CBD5E1;
+  --text-inverse: #FFFFFF;
+
+  /* ===== Borders ===== */
+  --border: #E8ECF3;
+  --border-soft: #F1F4F9;
+
+  /* ===== Backgrounds ===== */
+  --bg-page: #F4F6FA;
+  --bg-card: #FFFFFF;
+  --bg-subtle: #F7F9FC;
+  --bg-row-hover: #FAFBFD;
+  --bg-row-selected: #F4F8FF;
+  --bg-dark: #0B1220;
+
+  /* ===== Semantic ===== */
+  --success-bg: #ECFDF5;
+  --success-border: #D1FAE5;
+  --success-text: #047857;
+  --success-dot: #10B981;
+
+  --danger-bg: #FEF2F2;
+  --danger-border: #FECACA;
+  --danger-text: #B91C1C;
+  --danger-dot: #EF4444;
+
+  --warning-bg: #FFFBEB;
+  --warning-border: #FDE68A;
+  --warning-text: #92400E;
+  --warning-dot: #F59E0B;
+
+  --neutral-tint-bg: var(--bg-page); /* alias of --bg-page */
+  --neutral-tint-text: #475569;
+
+  /* ===== State colors (audit v1.4) ===== */
+  --color-primary-active: #1A3E9C;
+  --border-hover:         #D8DEE8;
+  --bg-subtle-hover:      #F0F3F8;
+  --danger-text-hover:    #991B1B;
+  --warning-text-hover:   #78350F;
+  --border-dark:          #1F2937;
+  --report-head-meta:     #6E89C6;
+
+  /* ===== Focus / glow (alpha brand colors) ===== */
+  --focus-ring-primary:  rgba(26, 86, 219, 0.25);
+  --focus-ring-input:    rgba(26, 86, 219, 0.12);
+  --focus-ring-danger:   rgba(239, 68, 68, 0.12);
+  --shadow-primary-glow: rgba(26, 86, 219, 0.25);
+  --shadow-danger-glow:  rgba(185, 28, 28, 0.22);
+  --shadow-warning-glow: rgba(146, 64, 14, 0.22);
+
+  /* ===== Categories (tints + lines) ===== */
+  --cat-revenue: #10B981;
+  --cat-marketing: #F59E0B;
+  --cat-services: #06B6D4;
+  --cat-payroll: #8B5CF6;
+  --cat-tax: #EF4444;
+  --cat-software: #0EA5E9;
+  --cat-returns: #94A3B8;
+  --cat-financial: #1A56DB;
+
+  /* ===== Banks (brand colors) ===== */
+  --bank-tinkoff: #FFDD2D;        --bank-tinkoff-fg: #0B1220;
+  --bank-sber:    #1A9F29;        --bank-sber-fg:    #FFFFFF;
+  --bank-alfa:    #EF3124;        --bank-alfa-fg:    #FFFFFF;
+  --bank-tochka:  #6132D6;        --bank-tochka-fg:  #FFFFFF;
+  --bank-mts:     #EF4444;        --bank-mts-fg:     #FFFFFF;
+  --bank-yookassa:#7B61FF;        --bank-yookassa-fg:#FFFFFF;
+
+  /* ===== Source badge tints ===== */
+  --src-api-bg: #EEF3FE;          --src-api-text: #1E40AF;        --src-api-border: #DBE6FF;
+  --src-manual-bg: #F4F6FA;       --src-manual-text: #475569;     --src-manual-border: #E2E8F0;
+  --src-bot-bg: #F5F3FF;          --src-bot-text: #6D28D9;        --src-bot-border: #E9E5FF;
+  --src-xls-bg: #ECFDF5;          --src-xls-text: #047857;        --src-xls-border: #D1FAE5;
+  --src-1c-bg: #FFF7ED;           --src-1c-text: #C2410C;         --src-1c-border: #FFE4CC;
+}

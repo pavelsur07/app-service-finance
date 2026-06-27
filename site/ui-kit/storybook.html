@@ -3,146 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>UI Kit · Ваш Финдир v1.0</title>
+<title>UI Kit · Ваш Финдир v1.4</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+<!-- UI Kit -->
+<link rel="stylesheet" href="tokens/index.css">
+<link rel="stylesheet" href="components/all.css">
+<link rel="stylesheet" href="patterns/all.css">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
-
-:root {
-  /* ===== Brand ===== */
-  --color-primary: #1A56DB;
-  --color-primary-hover: #1E40AF;
-  --color-primary-tint: #EEF3FE;
-  --color-primary-border: #C7D7FB;
-  --color-primary-selection: #DBE6FF;
-
-  /* ===== Text ===== */
-  --text-strong: #0B1220;
-  --text-secondary: #475569;
-  --text-tertiary: #64748B;
-  --text-muted: #8B95A7;
-  --text-disabled: #94A3B8;
-  --text-faint: #CBD5E1;
-  --text-inverse: #FFFFFF;
-
-  /* ===== Borders ===== */
-  --border: #E8ECF3;
-  --border-soft: #F1F4F9;
-
-  /* ===== Backgrounds ===== */
-  --bg-page: #F4F6FA;
-  --bg-card: #FFFFFF;
-  --bg-subtle: #F7F9FC;
-  --bg-row-hover: #FAFBFD;
-  --bg-row-selected: #F4F8FF;
-  --bg-dark: #0B1220;
-
-  /* ===== Semantic ===== */
-  --success-bg: #ECFDF5;
-  --success-border: #D1FAE5;
-  --success-text: #047857;
-  --success-dot: #10B981;
-
-  --danger-bg: #FEF2F2;
-  --danger-border: #FECACA;
-  --danger-text: #B91C1C;
-  --danger-dot: #EF4444;
-
-  --warning-bg: #FFFBEB;
-  --warning-border: #FDE68A;
-  --warning-text: #92400E;
-  --warning-dot: #F59E0B;
-
-  --neutral-tint-bg: #F4F6FA;
-  --neutral-tint-text: #475569;
-
-  /* ===== Categories (tints + lines) ===== */
-  --cat-revenue: #10B981;
-  --cat-marketing: #F59E0B;
-  --cat-services: #06B6D4;
-  --cat-payroll: #8B5CF6;
-  --cat-tax: #EF4444;
-  --cat-software: #0EA5E9;
-  --cat-returns: #94A3B8;
-  --cat-financial: #1A56DB;
-
-  /* ===== Banks (brand colors) ===== */
-  --bank-tinkoff: #FFDD2D;        --bank-tinkoff-fg: #0B1220;
-  --bank-sber:    #1A9F29;        --bank-sber-fg:    #FFFFFF;
-  --bank-alfa:    #EF3124;        --bank-alfa-fg:    #FFFFFF;
-  --bank-tochka:  #6132D6;        --bank-tochka-fg:  #FFFFFF;
-  --bank-mts:     #EF4444;        --bank-mts-fg:     #FFFFFF;
-  --bank-yookassa:#7B61FF;        --bank-yookassa-fg:#FFFFFF;
-
-  /* ===== Source badge tints ===== */
-  --src-api-bg: #EEF3FE;          --src-api-text: #1E40AF;        --src-api-border: #DBE6FF;
-  --src-manual-bg: #F4F6FA;       --src-manual-text: #475569;     --src-manual-border: #E2E8F0;
-  --src-bot-bg: #F5F3FF;          --src-bot-text: #6D28D9;        --src-bot-border: #E9E5FF;
-  --src-xls-bg: #ECFDF5;          --src-xls-text: #047857;        --src-xls-border: #D1FAE5;
-  --src-1c-bg: #FFF7ED;           --src-1c-text: #C2410C;         --src-1c-border: #FFE4CC;
-
-  /* ===== Typography ===== */
-  --font-family: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
-  --font-9_5: 9.5px;
-  --font-10_5: 10.5px;
-  --font-11: 11px;
-  --font-11_5: 11.5px;
-  --font-12: 12px;
-  --font-12_5: 12.5px;
-  --font-13: 13px;
-  --font-13_5: 13.5px;
-  --font-14: 14px;
-  --font-15: 15px;
-  --font-17: 17px;
-  --font-22: 22px;
-  --font-28: 28px;
-
-  /* ===== Spacing (4-base) ===== */
-  --s-1: 4px;
-  --s-2: 8px;
-  --s-3: 12px;
-  --s-4: 16px;
-  --s-5: 20px;
-  --s-6: 24px;
-  --s-7: 32px;
-  --s-8: 40px;
-
-  /* ===== Radii ===== */
-  --r-1: 4px;   /* chips, badges */
-  --r-2: 5px;   /* nav items, small buttons */
-  --r-3: 6px;   /* inputs, primary buttons */
-  --r-4: 8px;   /* cards, sections */
-  --r-pill: 999px;
-  --r-circle: 50%;
-
-  /* ===== Shadows ===== */
-  --shadow-sm: 0 1px 2px rgba(15,23,42,0.06);
-  --shadow-card-hover: 0 4px 12px rgba(15,23,42,0.04);
-  --shadow-primary: 0 1px 0 rgba(255,255,255,0.15) inset, 0 4px 10px rgba(26,86,219,0.25);
-  --shadow-menu: 0 16px 36px rgba(15,23,42,0.14), 0 2px 8px rgba(15,23,42,0.06);
-  --shadow-modal: 0 24px 60px rgba(11,18,32,0.28), 0 4px 12px rgba(11,18,32,0.08);
-  --shadow-drawer: -20px 0 60px rgba(11,18,32,0.22);
-
-  /* ===== Layout tokens ===== */
-  --card-padding: 16px 20px;
-  --card-padding-block: 24px;
-  --drawer-width: 680px;
-  --drawer-padding-body: 24px 28px;
-  --modal-width-compact: 440px;
-  --modal-width-standard: 520px;
-  --backdrop-opacity: 0.45;
-  --backdrop-blur: 6px;
-
-  /* ===== Avatar sizes (sm/md/lg) ===== */
-  --avatar-sm: 24px;
-  --avatar-md: 32px;
-  --avatar-lg: 40px;
-
-  /* ===== Toggle ===== */
-  --toggle-w: 42px;
-  --toggle-h: 24px;
-  --toggle-knob: 20px;
-}
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
@@ -218,6 +87,11 @@ section + section { padding-top: 24px; }
 h1.page-h1 { font-size: 32px; font-weight: 800; letter-spacing: -0.025em; margin: 0 0 8px; }
 .page-sub { font-size: 14px; color: var(--text-tertiary); margin: 0 0 32px; max-width: 70ch; line-height: 1.6; }
 .page-meta { font-size: 11.5px; color: var(--text-muted); font-family: var(--font-mono); margin-bottom: 32px; }
+
+/* Changelog entries (audit v1.4) */
+.cl-version { font-size: 13.5px; font-weight: 700; margin-bottom: 4px; }
+.cl-summary { font-size: 12px; color: var(--text-muted); margin-bottom: 14px; }
+.cl-list    { margin: 0; padding-left: 20px; line-height: 1.7; font-size: 13px; }
 
 h2.section-h { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 6px; }
 .section-sub { font-size: 13px; color: var(--text-tertiary); margin: 0 0 24px; max-width: 70ch; }
@@ -306,354 +180,12 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
 .shadow-token { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
 .shadow-use { font-size: 11px; color: var(--text-tertiary); }
 
-/* ============ BUTTONS ============ */
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  font-family: inherit; cursor: pointer;
-  border: 1px solid transparent;
-  font-weight: 600;
-  white-space: nowrap;
-  text-decoration: none;
-  transition: background .12s, border-color .12s, color .12s;
-}
-.btn-sm { height: 30px; padding: 0 12px; font-size: var(--font-12_5); border-radius: var(--r-2); }
-.btn-md { height: 36px; padding: 0 14px; font-size: var(--font-13); border-radius: var(--r-3); }
-.btn-lg { height: 44px; padding: 0 18px; font-size: var(--font-14); border-radius: var(--r-3); }
-
-.btn-primary { background: var(--color-primary); color: #fff; border-color: var(--color-primary); box-shadow: var(--shadow-primary); }
-.btn-primary:hover { background: var(--color-primary-hover); border-color: var(--color-primary-hover); }
-
-.btn-secondary { background: var(--bg-card); color: var(--text-strong); border-color: var(--border); }
-.btn-secondary:hover { background: var(--bg-page); border-color: #D8DEE8; }
-
-.btn-ghost { background: transparent; color: var(--text-secondary); }
-.btn-ghost:hover { background: var(--bg-page); color: var(--text-strong); }
-
-.btn-danger { background: var(--bg-card); color: var(--danger-text); border-color: var(--danger-border); }
-.btn-danger:hover { background: var(--danger-bg); }
-
-.btn-disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-loading::before {
-  content: '';
-  width: 12px; height: 12px;
-  border-radius: 50%;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  animation: spin .8s linear infinite;
-  margin-right: 2px;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
 /* state-faked classes for showcase */
 .is-hover.btn-primary { background: var(--color-primary-hover); }
 .is-hover.btn-secondary { background: var(--bg-page); }
 .is-hover.btn-ghost { background: var(--bg-page); }
-.is-active.btn-primary { background: #1A3E9C; }
-.is-focus { outline: 3px solid rgba(26,86,219,0.25); outline-offset: 0; }
-
-/* ============ INPUTS ============ */
-.input {
-  width: 100%; height: 38px;
-  padding: 0 12px;
-  border: 1px solid var(--border); border-radius: var(--r-3);
-  background: var(--bg-card);
-  font-family: inherit; font-size: var(--font-13);
-  color: var(--text-strong);
-  outline: none;
-}
-.input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(26,86,219,0.12); }
-.input::placeholder { color: var(--text-muted); }
-.input-error { border-color: var(--danger-dot); box-shadow: 0 0 0 3px rgba(239,68,68,0.12); }
-.input-disabled { background: var(--bg-page); color: var(--text-muted); cursor: not-allowed; }
-
-.field { display: flex; flex-direction: column; gap: 5px; }
-.field-label { font-size: var(--font-11_5); color: var(--text-tertiary); font-weight: 600; }
-.field-label .req { color: var(--danger-dot); margin-left: 2px; }
-.field-helper { font-size: var(--font-11); color: var(--text-muted); }
-.field-helper.error { color: var(--danger-text); }
-
-.input-wrap { position: relative; }
-.input-wrap .prefix, .input-wrap .suffix {
-  position: absolute; top: 50%; transform: translateY(-50%);
-  color: var(--text-muted); font-size: var(--font-13); font-weight: 600;
-  pointer-events: none;
-}
-.input-wrap .prefix { left: 12px; }
-.input-wrap .suffix { right: 12px; }
-.input-wrap .input--prefix { padding-left: 32px; }
-.input-wrap .input--suffix { padding-right: 36px; }
-
-textarea.input { height: auto; min-height: 64px; padding-top: 10px; padding-bottom: 10px; resize: vertical; line-height: 1.5; }
-
-/* ============ MONEY ============ */
-.money {
-  font-variant-numeric: tabular-nums;
-  font-family: var(--font-family);
-  letter-spacing: -0.01em;
-}
-.money--in   { color: var(--success-text); }
-.money--out  { color: var(--danger-text); }
-.money--strong { color: var(--text-strong); }
-.money--muted  { color: var(--text-faint); }
-.money--14 { font-size: 14px; font-weight: 700; }
-.money--16 { font-size: 16px; font-weight: 700; }
-.money--22 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
-.money--28 { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
-
-.money-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--r-4);
-  padding: 16px 20px;
-  display: flex; flex-direction: column; gap: 6px;
-}
-.money-card .mc-label { font-size: 10.5px; font-weight: 700; color: var(--text-tertiary); letter-spacing: 0.05em; text-transform: uppercase; }
-.money-card .mc-meta { font-size: 11px; color: var(--text-muted); display: flex; gap: 8px; flex-wrap: wrap; }
-.money-card .mc-meta b { color: var(--text-secondary); font-weight: 600; }
-.money-card .mc-spec {
-  font-family: var(--font-mono); font-size: 10.5px;
-  color: var(--text-muted); margin-top: auto; padding-top: 8px;
-  border-top: 1px solid var(--border-soft);
-  line-height: 1.5;
-}
-
-/* ============ BADGES / CHIPS ============ */
-.chip {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 3px 9px;
-  border-radius: var(--r-1);
-  font-size: var(--font-12);
-  font-weight: 600;
-  line-height: 1.4;
-  white-space: nowrap;
-}
-.chip--filter { background: var(--bg-subtle); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer; }
-.chip--filter.is-active { background: var(--color-primary-tint); border-color: var(--color-primary-border); color: var(--color-primary-hover); font-weight: 700; }
-
-.src {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 2px 7px 2px 5px;
-  border-radius: var(--r-1);
-  font-size: 10.5px; font-weight: 600; line-height: 1; white-space: nowrap;
-  border: 1px solid;
-}
-.src svg { width: 11px; height: 11px; }
-.src--api    { background: var(--src-api-bg);    color: var(--src-api-text);    border-color: var(--src-api-border); }
-.src--manual { background: var(--src-manual-bg); color: var(--src-manual-text); border-color: var(--src-manual-border); }
-.src--bot    { background: var(--src-bot-bg);    color: var(--src-bot-text);    border-color: var(--src-bot-border); }
-.src--xls    { background: var(--src-xls-bg);    color: var(--src-xls-text);    border-color: var(--src-xls-border); }
-.src--1c     { background: var(--src-1c-bg);     color: var(--src-1c-text);     border-color: var(--src-1c-border); }
-
-.bank-badge {
-  display: inline-flex; align-items: center; gap: 10px;
-  padding: 6px 10px 6px 6px;
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--r-3);
-}
-.bank-mark {
-  width: 32px; height: 32px; border-radius: var(--r-2);
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 13px; letter-spacing: 0.02em;
-  flex-shrink: 0;
-}
-.bank-mark--tinkoff  { background: var(--bank-tinkoff);  color: var(--bank-tinkoff-fg); }
-.bank-mark--sber     { background: var(--bank-sber);     color: var(--bank-sber-fg); }
-.bank-mark--alfa     { background: var(--bank-alfa);     color: var(--bank-alfa-fg); }
-.bank-mark--tochka   { background: var(--bank-tochka);   color: var(--bank-tochka-fg); }
-.bank-mark--mts      { background: var(--bank-mts);      color: var(--bank-mts-fg); }
-.bank-mark--yookassa { background: var(--bank-yookassa); color: var(--bank-yookassa-fg); }
-.bank-name { font-size: 12.5px; font-weight: 700; line-height: 1.2; }
-.bank-token { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-top: 2px; }
-
-/* ============ STATUS PILL (canonical) ============ */
-.status {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 3px 10px 3px 8px;
-  border-radius: var(--r-pill);
-  font-size: 11.5px; font-weight: 600; line-height: 1; white-space: nowrap;
-}
-.status .dot { width: 6px; height: 6px; border-radius: 50%; }
-.status--success { background: var(--success-bg); color: var(--success-text); } .status--success .dot { background: var(--success-dot); }
-.status--danger  { background: var(--danger-bg);  color: var(--danger-text); }  .status--danger .dot  { background: var(--danger-dot); }
-.status--warning { background: var(--warning-bg); color: var(--warning-text); } .status--warning .dot { background: var(--warning-dot); }
-.status--neutral { background: var(--neutral-tint-bg); color: var(--neutral-tint-text); } .status--neutral .dot { background: var(--text-disabled); }
-.status--pending { background: var(--warning-bg); color: var(--warning-text); } .status--pending .dot { background: var(--warning-dot); }
-
-/* ============ AVATAR ============ */
-.avatar {
-  display: inline-flex; align-items: center; justify-content: center;
-  font-weight: 700; color: #fff;
-  border-radius: var(--r-circle);
-  flex-shrink: 0;
-}
-.avatar--sm { width: var(--avatar-sm); height: var(--avatar-sm); font-size: 10px; }
-.avatar--md { width: var(--avatar-md); height: var(--avatar-md); font-size: 12px; }
-.avatar--lg { width: var(--avatar-lg); height: var(--avatar-lg); font-size: 14px; }
-.avatar--square { border-radius: var(--r-3); }
-.avatar--tint-1 { background: var(--bg-dark); }
-.avatar--tint-2 { background: linear-gradient(135deg, #FBBF24, #F97316); }
-.avatar--tint-3 { background: var(--color-primary); }
-.avatar--tint-4 { background: var(--cat-payroll); }
-
-/* ============ TOGGLE ============ */
-.toggle {
-  display: inline-block;
-  width: var(--toggle-w); height: var(--toggle-h);
-  border-radius: var(--r-pill);
-  background: #D8DEE8;
-  position: relative; cursor: pointer;
-  border: 0; padding: 0;
-}
-.toggle::after {
-  content: '';
-  position: absolute; top: 2px; left: 2px;
-  width: var(--toggle-knob); height: var(--toggle-knob);
-  border-radius: 50%; background: #fff;
-  box-shadow: 0 1px 3px rgba(15,23,42,0.2);
-  transition: left .12s;
-}
-.toggle.is-on { background: var(--color-primary); }
-.toggle.is-on::after { left: calc(var(--toggle-w) - var(--toggle-knob) - 2px); }
-.toggle.is-disabled { opacity: 0.4; cursor: not-allowed; }
-
-/* ============ TABLE ============ */
-.t-table { width: 100%; border-collapse: separate; border-spacing: 0; }
-.t-table thead th {
-  text-align: left;
-  font-size: 10.5px;
-  font-weight: 700;
-  color: var(--text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 11px 12px;
-  background: var(--bg-row-hover);
-  border-bottom: 1px solid var(--border);
-}
-.t-table tbody td {
-  padding: 12px;
-  border-bottom: 1px solid var(--border-soft);
-  font-size: 12.5px;
-  color: var(--text-strong);
-  vertical-align: top;
-}
-.t-row--hover { background: var(--bg-row-hover); }
-.t-row--selected { background: var(--bg-row-selected); }
-.t-row--day td {
-  background: var(--bg-row-hover);
-  font-size: 10.5px; font-weight: 700;
-  color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;
-}
-.t-row--subtotal td {
-  background: var(--bg-subtle);
-  font-weight: 700;
-  font-size: 13.5px;
-}
-.t-cell--right { text-align: right; font-variant-numeric: tabular-nums; }
-
-/* ============ KPI ============ */
-.kpi {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--r-4);
-  padding: 16px 20px;
-  display: flex; flex-direction: column; gap: 6px;
-}
-.kpi-label {
-  font-size: 11.5px; font-weight: 600; color: var(--text-tertiary);
-  letter-spacing: 0.02em;
-  display: flex; align-items: center; gap: 6px;
-}
-.kpi-value { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: var(--text-strong); font-variant-numeric: tabular-nums; }
-.kpi-value--hero { font-size: 28px; }
-.kpi-meta { font-size: 11px; color: var(--text-muted); display: flex; gap: 6px; align-items: center; }
-.kpi--dark { background: var(--bg-dark); color: #fff; border-color: var(--bg-dark); }
-.kpi--dark .kpi-label { color: #94A3B8; }
-.kpi--dark .kpi-value { color: #fff; }
-.kpi--dark .kpi-meta { color: #94A3B8; }
-
-/* Delta chip */
-.delta {
-  display: inline-flex; align-items: center; gap: 3px;
-  padding: 2px 7px; border-radius: var(--r-1);
-  font-size: 10.5px; font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-.delta--up   { background: var(--success-bg); color: var(--success-text); }
-.delta--down { background: var(--danger-bg);  color: var(--danger-text); }
-.delta--neutral { background: var(--bg-page); color: var(--text-secondary); }
-
-/* sparkline placeholder */
-.spark {
-  width: 100%; height: 30px;
-  background: linear-gradient(180deg, rgba(26,86,219,0.16) 0%, rgba(26,86,219,0) 100%);
-  position: relative; margin-top: 4px;
-  border-radius: 3px;
-}
-.spark::before {
-  content: ''; position: absolute; bottom: 6px; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-primary) 100%);
-  clip-path: polygon(0 100%, 12% 60%, 25% 80%, 38% 40%, 52% 55%, 66% 30%, 80% 45%, 92% 20%, 100% 35%, 100% 100%);
-  height: 30px;
-}
-
-/* ============ DROPDOWN MENU ============ */
-.menu {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  box-shadow: var(--shadow-menu);
-  padding: 5px;
-  min-width: 240px;
-  display: flex; flex-direction: column;
-}
-.menu-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 10px; border-radius: var(--r-2);
-  border: 0; background: transparent;
-  font-family: inherit; font-size: 13px; color: var(--text-strong); font-weight: 500;
-  text-align: left; cursor: pointer; width: 100%;
-}
-.menu-item:hover { background: var(--bg-page); }
-.menu-item.is-primary { color: var(--color-primary-hover); font-weight: 600; }
-.menu-item.is-primary:hover { background: var(--color-primary-tint); }
-.menu-item.is-danger { color: var(--danger-text); }
-.menu-item.is-danger:hover { background: var(--danger-bg); }
-.menu-item .shortcut { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); }
-.menu-item svg { width: 14px; height: 14px; flex-shrink: 0; }
-.menu-divider { height: 1px; background: var(--border); margin: 5px 4px; }
-
-/* ============ TABS ============ */
-.tabs {
-  display: inline-flex; background: var(--bg-page);
-  padding: 3px; border-radius: var(--r-3); gap: 2px;
-}
-.tab {
-  height: 30px; padding: 0 12px;
-  border: 0; background: transparent; border-radius: var(--r-1);
-  font-family: inherit; font-size: 12.5px; font-weight: 600;
-  color: var(--text-tertiary); cursor: pointer;
-  display: inline-flex; align-items: center; gap: 6px;
-}
-.tab.is-active {
-  background: var(--bg-card);
-  color: var(--text-strong);
-  font-weight: 700;
-  box-shadow: var(--shadow-sm);
-}
-.tab .count { font-size: 11px; color: var(--text-muted); font-weight: 600; }
-.tab.is-active .count { color: var(--text-tertiary); }
-
-/* ============ DIRECTION (canonical: colored dot) ============ */
-.direction {
-  display: inline-flex; align-items: center; gap: 7px;
-  font-size: 12px; font-weight: 600;
-}
-.direction .ddot { width: 8px; height: 8px; border-radius: 50%; }
-.direction--in  { color: var(--success-text); }
-.direction--in  .ddot { background: var(--success-dot); }
-.direction--out { color: var(--danger-text); }
-.direction--out .ddot { background: var(--danger-dot); }
-.direction--neutral { color: var(--text-secondary); }
-.direction--neutral .ddot { background: var(--text-disabled); }
+.is-active.btn-primary { background: var(--color-primary-active); }
+.is-focus { outline: 3px solid var(--focus-ring-primary); outline-offset: 0; }
 
 /* ============ MISC patterns ============ */
 .code-inline {
@@ -686,485 +218,6 @@ textarea.input { height: auto; min-height: 64px; padding-top: 10px; padding-bott
 .row-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .row-3col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
 
-/* ============ SIDEBAR (main nav, product) ============ */
-.sb {
-  width: 264px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--r-4);
-  display: flex; flex-direction: column;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-.sb-head { padding: 16px 14px 12px; }
-.sb-logo { display: flex; align-items: center; gap: 10px; padding: 0 6px 12px; border-bottom: 1px solid var(--border-soft); }
-.sb-logo .mark {
-  width: 32px; height: 32px; border-radius: var(--r-3);
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
-  color: #fff; font-weight: 800; font-size: 13px;
-  display: flex; align-items: center; justify-content: center;
-  letter-spacing: 0.02em;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.4) inset;
-}
-.sb-logo .title { font-size: 14px; font-weight: 700; letter-spacing: -0.015em; }
-.sb-ws {
-  margin-top: 10px;
-  width: 100%;
-  background: var(--bg-subtle);
-  border: 1px solid var(--border);
-  border-radius: var(--r-2);
-  padding: 8px 10px;
-  display: flex; align-items: center; gap: 10px;
-  cursor: pointer; text-align: left; font-family: inherit;
-}
-.sb-ws:hover { background: #F0F3F8; }
-.sb-ws .ws-name { font-size: 12.5px; font-weight: 700; color: var(--text-strong); line-height: 1.2; }
-.sb-ws .ws-meta { font-size: 10.5px; color: var(--text-muted); margin-top: 2px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.sb-ws .ws-chev { margin-left: auto; color: var(--text-muted); }
-
-.sb-nav { flex: 1; padding: 4px 8px 8px; overflow-y: auto; }
-.sb-group-title {
-  padding: 12px 10px 4px;
-  font-size: 10.5px; font-weight: 700;
-  color: var(--text-disabled);
-  letter-spacing: 0.06em; text-transform: uppercase;
-}
-.sb-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 7px 10px;
-  border-radius: var(--r-2);
-  color: var(--text-secondary);
-  font-size: 13.5px; font-weight: 500;
-  text-decoration: none;
-  cursor: pointer; border: 0; background: transparent;
-  font-family: inherit; text-align: left; width: 100%;
-  margin-bottom: 1px;
-}
-.sb-item:hover { background: var(--bg-page); color: var(--text-strong); }
-.sb-item .ico { width: 18px; height: 18px; color: var(--text-muted); flex-shrink: 0; }
-.sb-item .lbl { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sb-item .badge {
-  font-size: 10.5px; font-weight: 700;
-  color: var(--text-muted); background: var(--bg-page);
-  padding: 1px 7px; border-radius: var(--r-1);
-  font-variant-numeric: tabular-nums;
-}
-.sb-item .chev { color: var(--text-muted); transition: transform .15s; }
-.sb-item.is-collapsed .chev { transform: rotate(-90deg); }
-.sb-item.is-active {
-  background: var(--color-primary-tint);
-  color: var(--color-primary-hover);
-  font-weight: 700;
-}
-.sb-item.is-active .ico { color: var(--color-primary); }
-.sb-item.is-active .badge { background: var(--bg-card); color: var(--color-primary); }
-
-.sb-sub { margin: 0 8px 4px 28px; padding-left: 12px; border-left: 1px solid var(--border-soft); }
-.sb-sub .sb-item { font-size: 13px; padding: 6px 10px; }
-.sb-sub .sb-item .ico-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text-faint); flex-shrink: 0; }
-.sb-sub .sb-item.is-active .ico-dot { background: var(--color-primary); }
-
-.sb-foot {
-  border-top: 1px solid var(--border-soft);
-  padding: 10px 12px;
-  display: flex; align-items: center; gap: 10px;
-}
-.sb-foot .me-name { font-size: 13px; font-weight: 600; line-height: 1.2; }
-.sb-foot .me-role { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-.sb-foot .settings {
-  width: 28px; height: 28px; border-radius: var(--r-2);
-  background: transparent; border: 0; cursor: pointer; color: var(--text-secondary);
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.sb-foot .settings:hover { background: var(--bg-page); color: var(--text-strong); }
-
-/* ============ EntityPicker / TreePicker shared ============ */
-.picker { display: flex; flex-direction: column; max-height: 560px; }
-.picker-search {
-  padding: 0 20px 12px;
-  border-bottom: 1px solid var(--border-soft);
-  position: relative;
-}
-.picker-search svg {
-  position: absolute; left: 32px; top: 50%; transform: translateY(calc(-50% - 6px));
-  color: var(--text-muted); pointer-events: none;
-}
-.picker-search input {
-  width: 100%; height: 36px;
-  padding: 0 12px 0 34px;
-  background: var(--bg-subtle);
-  border: 1px solid transparent;
-  border-radius: var(--r-3);
-  font-family: inherit; font-size: 13px; color: var(--text-strong); outline: none;
-}
-.picker-search input:focus { background: var(--bg-card); border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(26,86,219,0.12); }
-
-.picker-tabs { padding: 10px 20px 0; display: flex; gap: 14px; border-bottom: 1px solid var(--border-soft); }
-.picker-tab {
-  background: transparent; border: 0; padding: 8px 2px 10px;
-  font-family: inherit; font-size: 12.5px; font-weight: 600;
-  color: var(--text-tertiary); cursor: pointer;
-  border-bottom: 2px solid transparent; margin-bottom: -1px;
-  display: inline-flex; align-items: center; gap: 6px;
-}
-.picker-tab.is-active { color: var(--text-strong); border-bottom-color: var(--color-primary); font-weight: 700; }
-.picker-tab .count { font-size: 11px; color: var(--text-muted); font-weight: 600; font-variant-numeric: tabular-nums; }
-
-.picker-list { padding: 6px 8px; max-height: 360px; overflow-y: auto; }
-.picker-section {
-  font-size: 10.5px; font-weight: 700;
-  color: var(--text-disabled);
-  letter-spacing: 0.06em; text-transform: uppercase;
-  padding: 12px 12px 4px;
-}
-.picker-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 10px;
-  border-radius: var(--r-2);
-  cursor: pointer; border: 0; background: transparent;
-  font-family: inherit; text-align: left; width: 100%;
-  margin-bottom: 1px;
-}
-.picker-item:hover { background: var(--bg-page); }
-.picker-item.is-selected { background: var(--bg-row-selected); }
-.picker-item .pi-body { flex: 1; min-width: 0; line-height: 1.3; }
-.picker-item .pi-name { font-size: 13px; font-weight: 600; color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.picker-item .pi-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-.picker-item .pi-meta b { color: var(--text-secondary); font-weight: 600; font-variant-numeric: tabular-nums; }
-.picker-item .pi-right { flex-shrink: 0; display: flex; align-items: center; gap: 6px; }
-.picker-item .star { color: var(--text-faint); cursor: pointer; }
-.picker-item .star.is-on { color: var(--warning-dot); }
-.picker-item .role-chip {
-  font-size: 10px; font-weight: 700;
-  color: var(--text-secondary); background: var(--bg-page);
-  padding: 2px 7px; border-radius: var(--r-1);
-  letter-spacing: 0.04em; text-transform: uppercase;
-}
-.picker-item .check {
-  width: 18px; height: 18px; border-radius: 50%;
-  border: 1.5px solid var(--border);
-}
-.picker-item.is-selected .check {
-  background: var(--color-primary); border-color: var(--color-primary);
-  display: flex; align-items: center; justify-content: center; color: #fff;
-}
-
-.picker-foot {
-  padding: 12px 20px; border-top: 1px solid var(--border);
-  display: flex; align-items: center; gap: 8px;
-}
-.picker-foot .add { color: var(--color-primary); font-weight: 600; }
-
-.picker-breadcrumb {
-  padding: 8px 20px;
-  background: var(--bg-subtle);
-  border-top: 1px solid var(--border-soft);
-  font-size: 11.5px; color: var(--text-tertiary);
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-}
-.picker-breadcrumb b { color: var(--text-strong); font-weight: 700; }
-.picker-breadcrumb .sep { color: var(--text-faint); }
-
-/* Tree node */
-.tree-node {
-  display: flex; align-items: center; gap: 8px;
-  padding: 7px 10px;
-  border-radius: var(--r-2);
-  cursor: pointer; border: 0; background: transparent;
-  font-family: inherit; text-align: left; width: 100%;
-  margin-bottom: 1px;
-  position: relative;
-}
-.tree-node:hover { background: var(--bg-page); }
-.tree-node.is-selected { background: var(--bg-row-selected); }
-.tree-node.is-disabled { cursor: not-allowed; }
-.tree-node.is-disabled .tn-name { color: var(--text-tertiary); font-weight: 600; }
-.tree-node .chev {
-  width: 14px; height: 14px;
-  display: inline-flex; align-items: center; justify-content: center;
-  color: var(--text-muted); flex-shrink: 0;
-  transition: transform .15s;
-}
-.tree-node.is-collapsed .chev { transform: rotate(-90deg); }
-.tree-node .chev-spacer { width: 14px; flex-shrink: 0; }
-.tree-node .tn-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.tree-node .tn-name {
-  flex: 1; min-width: 0; font-size: 13px; color: var(--text-strong); font-weight: 500;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.tree-node .tn-name mark { background: var(--warning-bg); color: var(--warning-text); border-radius: 2px; padding: 0 2px; font-weight: 700; }
-.tree-node.is-selected .tn-name { font-weight: 700; color: var(--color-primary-hover); }
-.tree-node .tn-count {
-  font-size: 10.5px; color: var(--text-muted); font-weight: 600;
-  background: var(--bg-page); padding: 1px 7px; border-radius: var(--r-1);
-  font-variant-numeric: tabular-nums;
-}
-.tree-node .tn-amount {
-  font-size: 12px; font-variant-numeric: tabular-nums;
-  color: var(--text-strong); font-weight: 700; letter-spacing: -0.01em;
-}
-.tree-node .tn-check {
-  width: 18px; height: 18px; border-radius: 50%;
-  border: 1.5px solid var(--border);
-  display: flex; align-items: center; justify-content: center;
-  color: transparent;
-}
-.tree-node.is-selected .tn-check { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
-
-/* ============ Tags input ============ */
-.tags-input {
-  width: 100%;
-  min-height: 38px;
-  border: 1px solid var(--border); border-radius: var(--r-3);
-  background: var(--bg-card);
-  padding: 5px 6px;
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  cursor: text; position: relative;
-}
-.tags-input.is-focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(26,86,219,0.12); }
-.tags-input input {
-  border: 0; outline: 0; padding: 0 6px;
-  font-family: inherit; font-size: 13px; color: var(--text-strong);
-  background: transparent;
-  flex: 1; min-width: 80px; height: 26px;
-}
-.tags-input input::placeholder { color: var(--text-muted); }
-.tag-chip {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 3px 4px 3px 9px;
-  background: var(--bg-page);
-  border: 1px solid var(--border);
-  border-radius: var(--r-2);
-  font-size: 12px; font-weight: 600; color: var(--text-strong);
-  line-height: 1.4;
-}
-.tag-chip:hover { background: var(--bg-subtle); }
-.tag-chip.is-focused { background: var(--color-primary-tint); border-color: var(--color-primary-border); color: var(--color-primary-hover); }
-.tag-chip .x {
-  width: 18px; height: 18px; border-radius: var(--r-1);
-  display: inline-flex; align-items: center; justify-content: center;
-  color: var(--text-muted); cursor: pointer; border: 0; background: transparent;
-  font-family: inherit;
-}
-.tag-chip .x:hover { background: rgba(15,23,42,0.06); color: var(--text-strong); }
-.tag-chip.is-focused .x { color: var(--color-primary-hover); }
-
-.suggest {
-  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
-  background: var(--bg-card);
-  border: 1px solid var(--border); border-radius: var(--r-3);
-  box-shadow: var(--shadow-menu);
-  padding: 5px; z-index: 5;
-  max-height: 200px; overflow-y: auto;
-}
-.suggest-item {
-  display: flex; align-items: center; gap: 8px;
-  padding: 7px 9px; border-radius: var(--r-2);
-  cursor: pointer; font-size: 13px; color: var(--text-strong);
-}
-.suggest-item:hover, .suggest-item.is-active { background: var(--bg-page); }
-.suggest-item .hint { margin-left: auto; font-size: 10.5px; color: var(--text-muted); font-family: var(--font-mono); }
-.suggest-create {
-  display: flex; align-items: center; gap: 8px;
-  padding: 7px 9px; border-radius: var(--r-2);
-  cursor: pointer; font-size: 13px; color: var(--color-primary); font-weight: 600;
-  border-top: 1px solid var(--border-soft); margin-top: 4px;
-}
-.suggest-create:hover { background: var(--color-primary-tint); }
-
-/* Empty state */
-.empty {
-  padding: 48px 24px;
-  background: var(--bg-card);
-  border: 1px dashed var(--border);
-  border-radius: var(--r-4);
-  text-align: center;
-}
-.empty-icon {
-  width: 48px; height: 48px;
-  background: var(--bg-page); border-radius: var(--r-circle);
-  margin: 0 auto 12px;
-  display: flex; align-items: center; justify-content: center;
-  color: var(--text-disabled);
-}
-.empty-title { font-size: 14px; font-weight: 700; color: var(--text-strong); margin-bottom: 4px; }
-.empty-text { font-size: 12.5px; color: var(--text-muted); max-width: 40ch; margin: 0 auto 16px; }
-
-/* Drawer header / footer (in-place demo) */
-.dw {
-  background: var(--bg-page);
-  border-radius: var(--r-4);
-  overflow: hidden;
-  border: 1px solid var(--border);
-}
-.dw-head {
-  background: var(--bg-card);
-  padding: 18px 24px;
-  border-bottom: 1px solid var(--border);
-  display: flex; align-items: flex-start; gap: 12px;
-}
-.dw-head h3 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
-.dw-head .sub { font-size: 12px; color: var(--text-tertiary); margin-top: 5px; }
-.dw-body { padding: 16px 24px; min-height: 60px; }
-.dw-foot {
-  background: var(--bg-card);
-  padding: 14px 24px;
-  border-top: 1px solid var(--border);
-  display: flex; align-items: center; gap: 12px;
-}
-
-/* Modal (in-place demo) */
-.mdl {
-  width: 100%; max-width: var(--modal-width-standard);
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--r-4);
-  box-shadow: var(--shadow-modal);
-}
-.mdl--compact { max-width: var(--modal-width-compact); }
-.mdl-head { padding: 18px 20px 12px; display: flex; align-items: flex-start; gap: 12px; }
-.mdl-head h3 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.015em; }
-.mdl-head .sub { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
-.mdl-body { padding: 0 20px 12px; min-height: 60px; }
-.mdl-foot { border-top: 1px solid var(--border); padding: 12px 20px; display: flex; gap: 8px; justify-content: flex-end; }
-
-/* Account card hero */
-.acc-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--r-4);
-  padding: 16px 20px;
-  display: flex; flex-direction: column; gap: 10px;
-}
-.acc-top { display: flex; align-items: center; gap: 10px; }
-.acc-name { font-size: 12.5px; font-weight: 700; }
-.acc-mask { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.acc-type { font-size: 10.5px; font-weight: 600; color: var(--text-secondary); background: var(--bg-page); padding: 2px 7px; border-radius: var(--r-1); margin-left: auto; }
-.acc-balance { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-.acc-sub { font-size: 11px; color: var(--text-muted); }
-.acc-foot { padding-top: 10px; border-top: 1px solid var(--border-soft); display: flex; gap: 8px; align-items: center; font-size: 11.5px; color: var(--text-secondary); }
-
-.row-form-field {
-  display: grid;
-  grid-template-columns: 180px 1fr;
-  gap: 16px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--border-soft);
-}
-.row-form-field:last-child { border: 0; }
-.row-form-field .ll {
-  font-size: 11px; font-weight: 700; color: var(--text-tertiary);
-  letter-spacing: 0.05em; text-transform: uppercase;
-}
-.row-form-field .ee { font-size: 13px; color: var(--text-strong); font-weight: 600; }
-
-/* ============ TOAST ============ */
-.toast-stack {
-  position: fixed; top: 24px; right: 24px;
-  display: flex; flex-direction: column-reverse; gap: 10px;
-  z-index: 200; max-width: 380px;
-}
-.toast {
-  display: flex; align-items: flex-start; gap: 10px;
-  width: 360px; max-width: 100%;
-  padding: 12px 14px;
-  border-radius: var(--r-4);
-  border: 1px solid;
-  background: var(--bg-card);
-  box-shadow: var(--shadow-menu);
-}
-.toast .t-ico {
-  width: 20px; height: 20px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; margin-top: 1px;
-}
-.toast .t-body { flex: 1; min-width: 0; }
-.toast .t-title { font-size: 13px; font-weight: 600; color: var(--text-strong); line-height: 1.35; }
-.toast .t-desc  { font-size: 12.5px; color: var(--text-tertiary); margin-top: 3px; line-height: 1.45; }
-.toast .t-action {
-  background: transparent; border: 0; padding: 0 4px;
-  font-family: inherit; font-size: 12.5px; font-weight: 700;
-  color: var(--color-primary); cursor: pointer; flex-shrink: 0; align-self: center;
-}
-.toast .t-action:hover { color: var(--color-primary-hover); }
-.toast .t-close {
-  width: 22px; height: 22px; border-radius: var(--r-1);
-  background: transparent; border: 0; cursor: pointer; color: var(--text-muted);
-  display: flex; align-items: center; justify-content: center;
-  font-family: inherit; flex-shrink: 0; margin: -2px -4px 0 0;
-}
-.toast .t-close:hover { background: var(--bg-page); color: var(--text-strong); }
-.toast--success { border-color: var(--success-border); }
-.toast--success .t-ico { background: var(--success-bg); color: var(--success-text); }
-.toast--danger  { border-color: var(--danger-border); }
-.toast--danger .t-ico  { background: var(--danger-bg); color: var(--danger-text); }
-.toast--warning { border-color: var(--warning-border); }
-.toast--warning .t-ico { background: var(--warning-bg); color: var(--warning-text); }
-.toast--info    { border-color: var(--color-primary-border); }
-.toast--info .t-ico    { background: var(--color-primary-tint); color: var(--color-primary-hover); }
-
-/* ============ INLINE ALERT ============ */
-.alert {
-  display: flex; align-items: flex-start; gap: 12px;
-  padding: 12px 16px;
-  border-radius: var(--r-4);
-  border: 1px solid;
-}
-.alert .a-ico { flex-shrink: 0; margin-top: 1px; }
-.alert .a-body { flex: 1; min-width: 0; line-height: 1.45; }
-.alert .a-title { font-size: 13px; font-weight: 700; }
-.alert .a-text  { font-size: 12.5px; }
-.alert .a-title + .a-text { margin-top: 2px; }
-.alert .a-action {
-  flex-shrink: 0; align-self: center;
-  background: transparent; border: 1px solid currentColor;
-  height: 28px; padding: 0 12px; border-radius: var(--r-2);
-  font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
-  color: inherit;
-}
-.alert .a-action:hover { background: rgba(255,255,255,0.55); }
-.alert .a-link {
-  font-size: 12.5px; font-weight: 700;
-  color: inherit; text-decoration: none;
-  border-bottom: 1px dotted currentColor;
-}
-.alert .a-close {
-  width: 22px; height: 22px; border-radius: var(--r-1);
-  background: transparent; border: 0; cursor: pointer; color: inherit;
-  display: flex; align-items: center; justify-content: center;
-  font-family: inherit; flex-shrink: 0; opacity: 0.55;
-  align-self: flex-start; margin-top: -2px;
-}
-.alert .a-close:hover { opacity: 1; background: rgba(255,255,255,0.5); }
-.alert--success { background: var(--success-bg); border-color: var(--success-border); color: var(--success-text); }
-.alert--danger  { background: var(--danger-bg);  border-color: var(--danger-border);  color: var(--danger-text); }
-.alert--warning { background: var(--warning-bg); border-color: var(--warning-border); color: var(--warning-text); }
-.alert--info    { background: var(--color-primary-tint); border-color: var(--color-primary-border); color: var(--color-primary-hover); }
-
-/* ============ CONFIRMATION DIALOG ============ */
-.confirm-body { padding: 14px 20px 4px; }
-.confirm-title { font-size: 15px; font-weight: 700; color: var(--text-strong); letter-spacing: -0.015em; }
-.confirm-text  { font-size: 13px; color: var(--text-tertiary); margin-top: 6px; line-height: 1.55; }
-.confirm-text b { color: var(--text-strong); }
-.confirm-foot {
-  padding: 14px 20px;
-  border-top: 1px solid var(--border-soft);
-  display: flex; justify-content: flex-end; gap: 8px;
-  margin-top: 14px;
-}
-.btn-danger-solid {
-  background: var(--danger-text); border-color: var(--danger-text);
-  color: #fff;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.15) inset, 0 4px 10px rgba(185,28,28,0.22);
-}
-.btn-danger-solid:hover { background: #991B1B; border-color: #991B1B; }
-.btn-warning-solid {
-  background: var(--warning-text); border-color: var(--warning-text);
-  color: #fff;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.15) inset, 0 4px 10px rgba(146,64,14,0.22);
-}
-.btn-warning-solid:hover { background: #78350F; border-color: #78350F; }
-
 </style>
 </head>
 <body>
@@ -1177,7 +230,7 @@ textarea.input { height: auto; min-height: 64px; padding-top: 10px; padding-bott
       <div class="nav-logo">ВФ</div>
       <div>
         <div class="nav-title">UI Kit</div>
-        <div class="nav-version">v1.0 · 24.06.2026</div>
+        <div class="nav-version">v1.4 · 27.06.2026</div>
       </div>
     </div>
 
@@ -1201,6 +254,7 @@ textarea.input { height: auto; min-height: 64px; padding-top: 10px; padding-bott
     <a href="#tags">Tags <span class="num">new</span></a>
     <a href="#table">Table row</a>
     <a href="#kpi">KPI card</a>
+    <a href="#report">Report <span class="num">new</span></a>
     <a href="#acc-card">Account card</a>
     <a href="#card">Card</a>
     <a href="#menu">Dropdown menu</a>
@@ -1234,7 +288,7 @@ textarea.input { height: auto; min-height: 64px; padding-top: 10px; padding-bott
       Канонический источник истины для всех экранов финансового SaaS-продукта.
       Зафиксированы дизайн-токены, разрешены расхождения из аудита, собраны компоненты со всеми состояниями.
     </p>
-    <div class="page-meta">v1.0 · 24 июня 2026 · Светлая тема</div>
+    <div class="page-meta">v1.4 · 27 июня 2026 · Светлая тема</div>
 
     <!-- ===================== 01. DECISIONS ===================== -->
     <section id="decisions">
@@ -1386,8 +440,16 @@ textarea.input { height: auto; min-height: 64px; padding-top: 10px; padding-bott
             <div class="decision-why">Иконки в Toast, Alert, Confirmation — стандартные пиктограммы (info, warning, check, x). Цвет задаётся семантикой родительского компонента через currentColor. Никаких эмодзи и фирменных иллюстраций.</div>
           </div>
         </div>
+        <div class="decision-item">
+          <div class="decision-num">19</div>
+          <div class="decision-body">
+            <div class="decision-title">Двухуровневая система токенов</div>
+            <div class="decision-value">raw tokens + semantic tokens</div>
+            <div class="decision-why">Raw (--color-primary, --bg-card) — палитра. Semantic (--button-primary-bg, --card-bg) — связь с компонентом. Тёмная тема и ребрендинг затрагивают только raw, semantic остаются неизменными. Сейчас компоненты используют raw напрямую — миграция на semantic поэтапная.</div>
+          </div>
+        </div>
       </div>
-    </section> -->
+    </section>
     <section id="foundations">
       <h2 class="section-h">02 — Foundations</h2>
       <p class="section-sub">Атомарные токены: цвет, шрифт, шаг сетки, скругление, тень. Всё через CSS-переменные.</p>
@@ -1812,6 +874,170 @@ textarea.input { height: auto; min-height: 64px; padding-top: 10px; padding-bott
             <div class="kpi-label"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/></svg> Общий баланс</div>
             <div class="kpi-value kpi-value--hero">3&thinsp;829&thinsp;930 ₽</div>
             <div class="kpi-meta"><span class="delta delta--up">+12,4% за месяц</span> · в валюте: $8&thinsp;450</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- REPORT (period grid) -->
+      <div class="cb" id="report">
+        <div class="cb-head">
+          <span class="cb-name">Report (period grid)</span>
+          <span class="cb-tag">.report · .r-row · .r-cell</span>
+          <span class="cb-when">Грид-отчёт за периоды (ДДС, P&amp;L, баланс). Иерархия статей со сворачиванием, ячейки с двумя значениями (сумма + Δ%), залипающая первая колонка, фиксированная колонка итога. Формат (месяцы / кварталы) переключается на уровне страницы.</span>
+        </div>
+
+        <span class="demo-label">По кварталам · 4 периода · с раскрытием</span>
+        <div class="demo" style="padding:0; background:transparent">
+          <div class="report" style="width:100%; --r-periods:4; --r-label-w:300px; --r-total-w:150px;">
+            <div class="report-scroll">
+              <div>
+                <!-- Column header -->
+                <div class="r-row r-row--head">
+                  <div class="r-label"><span class="r-label-hint">Статья ДДС</span></div>
+                  <div class="r-cell"><div class="r-cell-head-label">III кв.</div><div class="r-cell-head-sub">2025</div></div>
+                  <div class="r-cell"><div class="r-cell-head-label">IV кв.</div><div class="r-cell-head-sub">2025</div></div>
+                  <div class="r-cell"><div class="r-cell-head-label">I кв.</div><div class="r-cell-head-sub">2026</div></div>
+                  <div class="r-cell"><div class="r-cell-head-label">II кв.</div><div class="r-cell-head-sub">2026</div></div>
+                  <div class="r-total"><div class="r-cell-head-label">Итого</div><div class="r-cell-head-sub">за период</div></div>
+                </div>
+
+                <!-- Opening balance -->
+                <div class="r-row r-row--balance">
+                  <div class="r-label">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.2"/></svg>
+                    <div class="r-label-block">
+                      <div class="r-label-text">Остаток на начало периода</div>
+                      <div class="r-label-sub">на первый день</div>
+                    </div>
+                  </div>
+                  <div class="r-cell"><div class="r-cell-val">2&thinsp;100&thinsp;000&nbsp;₽</div></div>
+                  <div class="r-cell"><div class="r-cell-val">2&thinsp;295&thinsp;000&nbsp;₽</div></div>
+                  <div class="r-cell"><div class="r-cell-val">2&thinsp;580&thinsp;000&nbsp;₽</div></div>
+                  <div class="r-cell"><div class="r-cell-val">2&thinsp;840&thinsp;000&nbsp;₽</div></div>
+                  <div class="r-total"><div class="r-cell-val">2&thinsp;100&thinsp;000&nbsp;₽</div></div>
+                </div>
+
+                <!-- Section root (Operational, expanded) -->
+                <div class="r-row r-row--section" style="--r-accent:#10B981;">
+                  <div class="r-label">
+                    <button class="r-chev"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                    <div class="r-label-block">
+                      <div class="r-label-text">1. Операционная деятельность</div>
+                      <div class="r-label-sub">текущая деятельность по продажам</div>
+                    </div>
+                  </div>
+                  <div class="r-cell"><div class="r-cell-val">+1&thinsp;195&nbsp;К</div><span class="delta delta--up">+8,2%</span></div>
+                  <div class="r-cell"><div class="r-cell-val">+1&thinsp;380&nbsp;К</div><span class="delta delta--up">+15,5%</span></div>
+                  <div class="r-cell"><div class="r-cell-val">+1&thinsp;250&nbsp;К</div><span class="delta delta--down">−9,4%</span></div>
+                  <div class="r-cell"><div class="r-cell-val">+1&thinsp;420&nbsp;К</div><span class="delta delta--up">+13,6%</span></div>
+                  <div class="r-total"><div class="r-cell-val">+5&thinsp;245&nbsp;К&nbsp;₽</div><span class="delta delta--up">+18,8%</span></div>
+                </div>
+
+                <!-- Inner group: Поступления -->
+                <div class="r-row">
+                  <div class="r-label">
+                    <button class="r-chev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                    <div class="r-label-text r-label-text--group">Поступления от продаж</div>
+                  </div>
+                  <div class="r-cell"><div class="r-cell-val r-cell-val--group">+3&thinsp;245&nbsp;К</div><span class="delta delta--up">+6,2%</span></div>
+                  <div class="r-cell"><div class="r-cell-val r-cell-val--group">+3&thinsp;420&nbsp;К</div><span class="delta delta--up">+5,4%</span></div>
+                  <div class="r-cell"><div class="r-cell-val r-cell-val--group">+3&thinsp;580&nbsp;К</div><span class="delta delta--up">+4,7%</span></div>
+                  <div class="r-cell"><div class="r-cell-val r-cell-val--group">+3&thinsp;720&nbsp;К</div><span class="delta delta--up">+3,9%</span></div>
+                  <div class="r-total"><div class="r-cell-val r-cell-val--group">+13&thinsp;965&nbsp;К&nbsp;₽</div><span class="delta delta--up">+14,6%</span></div>
+                </div>
+
+                <!-- Leaf in -->
+                <div class="r-row">
+                  <div class="r-label">
+                    <span class="r-indent" style="width:18px"></span>
+                    <span class="r-leaf-dot"></span>
+                    <span class="r-dir-dot r-dir-dot--in"></span>
+                    <div class="r-label-text">Маркетплейс — Ozon</div>
+                  </div>
+                  <div class="r-cell"><div class="r-cell-val">+1&thinsp;245&nbsp;К</div><span class="delta delta--up">+4,2%</span></div>
+                  <div class="r-cell"><div class="r-cell-val">+1&thinsp;312&nbsp;К</div><span class="delta delta--up">+5,4%</span></div>
+                  <div class="r-cell"><div class="r-cell-val">+1&thinsp;380&nbsp;К</div><span class="delta delta--up">+5,2%</span></div>
+                  <div class="r-cell"><div class="r-cell-val">+1&thinsp;420&nbsp;К</div><span class="delta delta--up">+2,9%</span></div>
+                  <div class="r-total"><div class="r-cell-val">+5&thinsp;357&nbsp;К&nbsp;₽</div><span class="delta delta--up">+14,0%</span></div>
+                </div>
+
+                <!-- Leaf out -->
+                <div class="r-row">
+                  <div class="r-label">
+                    <span class="r-indent" style="width:18px"></span>
+                    <span class="r-leaf-dot"></span>
+                    <span class="r-dir-dot r-dir-dot--out"></span>
+                    <div class="r-label-text">Закупка материалов</div>
+                  </div>
+                  <div class="r-cell"><div class="r-cell-val">−685&nbsp;К</div><span class="delta delta--down">+2,1%</span></div>
+                  <div class="r-cell"><div class="r-cell-val">−720&nbsp;К</div><span class="delta delta--down">+5,1%</span></div>
+                  <div class="r-cell"><div class="r-cell-val">−695&nbsp;К</div><span class="delta delta--up">−3,5%</span></div>
+                  <div class="r-cell"><div class="r-cell-val">−742&nbsp;К</div><span class="delta delta--down">+6,8%</span></div>
+                  <div class="r-total"><div class="r-cell-val">−2&thinsp;842&nbsp;К&nbsp;₽</div><span class="delta delta--down">+8,3%</span></div>
+                </div>
+
+                <!-- Net subtotal -->
+                <div class="r-row r-row--net" style="--r-accent:#10B981;">
+                  <div class="r-label">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    <div class="r-label-text">Чистый поток · операционная</div>
+                  </div>
+                  <div class="r-cell"><div class="r-cell-val">+1&thinsp;195&nbsp;К</div><span class="delta delta--up">+8,2%</span></div>
+                  <div class="r-cell"><div class="r-cell-val">+1&thinsp;380&nbsp;К</div><span class="delta delta--up">+15,5%</span></div>
+                  <div class="r-cell"><div class="r-cell-val">+1&thinsp;250&nbsp;К</div><span class="delta delta--down">−9,4%</span></div>
+                  <div class="r-cell"><div class="r-cell-val">+1&thinsp;420&nbsp;К</div><span class="delta delta--up">+13,6%</span></div>
+                  <div class="r-total"><div class="r-cell-val">+5&thinsp;245&nbsp;К&nbsp;₽</div><span class="delta delta--up">+18,8%</span></div>
+                </div>
+
+                <!-- Section root (Financing, collapsed) -->
+                <div class="r-row r-row--section" style="--r-accent:#1A56DB;">
+                  <div class="r-label">
+                    <button class="r-chev"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></button>
+                    <div class="r-label-block">
+                      <div class="r-label-text">2. Финансовая деятельность</div>
+                      <div class="r-label-sub">кредиты, дивиденды (свёрнуто)</div>
+                    </div>
+                  </div>
+                  <div class="r-cell"><div class="r-cell-val">−37&nbsp;К</div><span class="delta delta--down">+8,4%</span></div>
+                  <div class="r-cell"><div class="r-cell-val">−237&nbsp;К</div><span class="delta delta--down">+540%</span></div>
+                  <div class="r-cell"><div class="r-cell-val">+463&nbsp;К</div><span class="delta delta--up">+295%</span></div>
+                  <div class="r-cell"><div class="r-cell-val">−237&nbsp;К</div><span class="delta delta--down">−151%</span></div>
+                  <div class="r-total"><div class="r-cell-val">−48&nbsp;К&nbsp;₽</div><span class="delta delta--neutral">0,0%</span></div>
+                </div>
+
+                <!-- Grand net -->
+                <div class="r-row r-row--grand">
+                  <div class="r-label">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0B1220" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                    <div class="r-label-block">
+                      <div class="r-label-text">Чистое изменение денежных средств</div>
+                      <div class="r-label-sub">итог по всем видам деятельности</div>
+                    </div>
+                  </div>
+                  <div class="r-cell"><div class="r-cell-val">+195&nbsp;К</div><span class="delta delta--up">+12,8%</span></div>
+                  <div class="r-cell"><div class="r-cell-val">+285&nbsp;К</div><span class="delta delta--up">+46,2%</span></div>
+                  <div class="r-cell"><div class="r-cell-val">+260&nbsp;К</div><span class="delta delta--down">−8,8%</span></div>
+                  <div class="r-cell"><div class="r-cell-val">+490&nbsp;К</div><span class="delta delta--up">+88,5%</span></div>
+                  <div class="r-total"><div class="r-cell-val">+1&thinsp;230&nbsp;К&nbsp;₽</div><span class="delta delta--up">+136%</span></div>
+                </div>
+
+                <!-- Closing balance (dark) -->
+                <div class="r-row r-row--closing">
+                  <div class="r-label">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.2"/></svg>
+                    <div class="r-label-block">
+                      <div class="r-label-text">Остаток на конец периода</div>
+                      <div class="r-label-sub">на последний день</div>
+                    </div>
+                  </div>
+                  <div class="r-cell"><div class="r-cell-val">2&thinsp;295&thinsp;000&nbsp;₽</div></div>
+                  <div class="r-cell"><div class="r-cell-val">2&thinsp;580&thinsp;000&nbsp;₽</div></div>
+                  <div class="r-cell"><div class="r-cell-val">2&thinsp;840&thinsp;000&nbsp;₽</div></div>
+                  <div class="r-cell"><div class="r-cell-val">3&thinsp;330&thinsp;000&nbsp;₽</div></div>
+                  <div class="r-total"><div class="r-cell-val">3&thinsp;330&thinsp;000&nbsp;₽</div></div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -2980,7 +2206,7 @@ textarea.input { height: auto; min-height: 64px; padding-top: 10px; padding-bott
 
       <h3 class="sub-h">Правила (must)</h3>
       <div class="cb">
-        <ul style="margin:0; padding-left:20px; line-height:1.7; font-size:13px;">
+        <ul class="cl-list">
           <li>Знак минуса — <code class="code-inline">U+2212 (−)</code>. Не <code class="code-inline">U+002D (-)</code>.</li>
           <li>Разделитель разрядов — <code class="code-inline">U+2009 (&amp;thinsp;)</code>, не обычный пробел.</li>
           <li>Десятичные — запятая <code class="code-inline">,</code>. Только в коротких форматах и процентах.</li>
@@ -3102,7 +2328,7 @@ textarea.input { height: auto; min-height: 64px; padding-top: 10px; padding-bott
           <div style="width:100%; max-width:380px; padding:20px; background:var(--bg-page); border-radius:var(--r-4);">
             <div class="alert alert--success" style="margin-bottom:14px;">
               <svg class="a-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              <div class="a-body"><div class="a-text">Код подтверждения отправлен на <b><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="4e2f20202f0e2d21233e2f2037603c3b">[email&#160;protected]</a></b></div></div>
+              <div class="a-body"><div class="a-text">Код подтверждения отправлен на <b><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="bfded1d1deffdcd0d2cfded1c691cdca">[email&#160;protected]</a></b></div></div>
             </div>
             <div class="field"><label class="field-label">Код из письма</label><input class="input" value="" placeholder="6 цифр"></div>
           </div>
@@ -3120,10 +2346,40 @@ textarea.input { height: auto; min-height: 64px; padding-top: 10px; padding-bott
     <!-- ===================== CHANGELOG ===================== -->
     <section id="changelog">
       <h2 class="section-h">Changelog</h2>
+
       <div class="cb">
-        <div style="font-size:13.5px; font-weight:700; margin-bottom:4px;">v1.2 — 25 июня 2026</div>
-        <div style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">Feedback layer: Toast, Alert, Confirmation, Form messages.</div>
-        <ul style="margin:0; padding-left:20px; line-height:1.7; font-size:13px;">
+        <div class="cl-version">v1.4 — 27 июня 2026</div>
+        <div class="cl-summary">Audit fixes: токенизация хардкод-цветов, семантический слой токенов, чистка дублей.</div>
+        <ul class="cl-list">
+          <li>🔧 Исправлен битый HTML (<code class="code-inline">&lt;/section&gt; --&gt;</code>)</li>
+          <li>🔧 Версии в <code class="code-inline">&lt;title&gt;</code>, <code class="code-inline">.nav-version</code> и <code class="code-inline">.page-meta</code> синхронизированы с changelog</li>
+          <li>🎨 Все hex-хардкоды компонентов вынесены в токены: <code class="code-inline">--color-primary-active</code>, <code class="code-inline">--border-hover</code>, <code class="code-inline">--border-dark</code>, <code class="code-inline">--bg-subtle-hover</code>, <code class="code-inline">--danger-text-hover</code>, <code class="code-inline">--warning-text-hover</code></li>
+          <li>🎨 RGBA brand-цвета → семантические токены: <code class="code-inline">--focus-ring-primary</code>, <code class="code-inline">--focus-ring-input</code>, <code class="code-inline">--focus-ring-danger</code>, <code class="code-inline">--shadow-primary-glow</code>, <code class="code-inline">--shadow-danger-glow</code>, <code class="code-inline">--shadow-warning-glow</code></li>
+          <li>➕ Семантический слой токенов: <code class="code-inline">--button-*</code>, <code class="code-inline">--input-*</code>, <code class="code-inline">--card-*</code>, <code class="code-inline">--form-*</code>, <code class="code-inline">--status-*</code> (задел под тёмную тему / ребрендинг)</li>
+          <li>📐 Decision 19: двухуровневая система токенов (raw + semantic)</li>
+          <li>🧹 <code class="code-inline">--neutral-tint-bg</code> стал алиасом <code class="code-inline">--bg-page</code> (был дубль hex)</li>
+          <li>🧹 Шрифт Manrope перенесён из <code class="code-inline">@import</code> в <code class="code-inline">&lt;link rel="preconnect"&gt;</code>/<code class="code-inline">&lt;link rel="stylesheet"&gt;</code> в <code class="code-inline">&lt;head&gt;</code> — устранена блокировка рендера</li>
+          <li>🧹 Inline-стили в блоках Changelog заменены на классы <code class="code-inline">.cl-version</code>, <code class="code-inline">.cl-summary</code>, <code class="code-inline">.cl-list</code></li>
+          <li>🔧 Дочистка: оставшиеся хардкоды <code class="code-inline">#94A3B8</code> и <code class="code-inline">#6E89C6</code> заменены на токены (<code class="code-inline">--text-disabled</code>, новый <code class="code-inline">--report-head-meta</code>)</li>
+        </ul>
+      </div>
+
+      <div class="cb">
+        <div class="cl-version">v1.3 — 26 июня 2026</div>
+        <div class="cl-summary">Component: Report (period grid). Канонический грид для Отчёта ДДС и аналогов.</div>
+        <ul class="cl-list">
+          <li>➕ <b>Report</b> (<code class="code-inline">.report · .r-row · .r-cell</code>) — грид-отчёт за периоды с залипающей первой колонкой, иерархией со сворачиванием, двумя значениями в ячейке (сумма + Δ%) и колонкой итога</li>
+          <li>📐 6 row-вариантов: <code class="code-inline">--head</code>, <code class="code-inline">--balance</code> (остатки), <code class="code-inline">--section</code> (раздел), <code class="code-inline">--net</code> (подытог), <code class="code-inline">--grand</code> (итоговый), <code class="code-inline">--closing</code> (тёмный hero-финал)</li>
+          <li>🔧 Конфиг через CSS-переменные: <code class="code-inline">--r-periods</code> (кол-во колонок), <code class="code-inline">--r-label-w</code> / <code class="code-inline">--r-total-w</code>, <code class="code-inline">--r-accent</code> на строке раздела</li>
+          <li>♻ Delta-чипы переиспользуют существующий <code class="code-inline">.delta</code>; быстрый выбор формата — <code class="code-inline">.tabs/.tab</code>; период и проект — <code class="code-inline">.chip--filter</code></li>
+          <li>🎨 Без новых hex-токенов: <code class="code-inline">--bg-subtle</code> · <code class="code-inline">--bg-row-hover</code> · <code class="code-inline">--bg-dark</code> · <code class="code-inline">--color-primary-tint</code></li>
+        </ul>
+      </div>
+
+      <div class="cb">
+        <div class="cl-version">v1.2 — 25 июня 2026</div>
+        <div class="cl-summary">Feedback layer: Toast, Alert, Confirmation, Form messages.</div>
+        <ul class="cl-list">
           <li>➕ <b>Toast</b> (<code class="code-inline">.toast</code>) — 4 семантики (success/danger/warning/info), top-right стек, auto-dismiss 4s, action-кнопка и close</li>
           <li>➕ <b>Inline Alert</b> (<code class="code-inline">.alert</code>) — 4 семантики, без shadow, с опц. action/link/close. 4 примера в контексте</li>
           <li>➕ <b>Confirmation Dialog</b> (<code class="code-inline">.mdl--compact + .confirm-*</code>) — 3 варианта: destructive (Удалить), warning (Прервать), neutral (Закрыть без сохранения)</li>
@@ -3134,9 +2390,9 @@ textarea.input { height: auto; min-height: 64px; padding-top: 10px; padding-bott
       </div>
 
       <div class="cb">
-        <div style="font-size:13.5px; font-weight:700; margin-bottom:4px;">v1.1.1 — 24 июня 2026</div>
-        <div style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">Icon color rule unified.</div>
-        <ul style="margin:0; padding-left:20px; line-height:1.7; font-size:13px;">
+        <div class="cl-version">v1.1.1 — 24 июня 2026</div>
+        <div class="cl-summary">Icon color rule unified.</div>
+        <ul class="cl-list">
           <li>📐 Зафиксировано: иконки наследуют <code class="code-inline">currentColor</code>. Цветом окрашивается весь пункт по семантической роли.</li>
           <li>🔧 <b>Patterns → Row dropdown</b>: эмодзи (✏️ 📋 🗑) заменены на SVG-иконки, идентичные Components/Dropdown menu</li>
           <li>🔧 <b>Components → Dropdown menu</b>: inline-стиль <code class="code-inline">color:#1E40AF</code> на «Создать ОПиУ» заменён на класс <code class="code-inline">.is-primary</code></li>
@@ -3147,9 +2403,9 @@ textarea.input { height: auto; min-height: 64px; padding-top: 10px; padding-bott
       </div>
 
       <div class="cb">
-        <div style="font-size:13.5px; font-weight:700; margin-bottom:4px;">v1.1 — 24 июня 2026</div>
-        <div style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">Компоненты навигации, выбора и теги. Заполнены заглушки Modal/Drawer.</div>
-        <ul style="margin:0; padding-left:20px; line-height:1.7; font-size:13px;">
+        <div class="cl-version">v1.1 — 24 июня 2026</div>
+        <div class="cl-summary">Компоненты навигации, выбора и теги. Заполнены заглушки Modal/Drawer.</div>
+        <ul class="cl-list">
           <li>➕ <b>Sidebar</b> — 264px с workspace switcher, группами, sub-пунктами, footer с юзером</li>
           <li>➕ <b>EntityPicker</b> — универсальный плоский пикер (3 инстанса: контрагент/проект/компания)</li>
           <li>➕ <b>TreePicker</b> — иерархический (2 инстанса: Категория ДДС с агрегатами / Статья ОПиУ без)</li>
@@ -3160,9 +2416,9 @@ textarea.input { height: auto; min-height: 64px; padding-top: 10px; padding-bott
       </div>
 
       <div class="cb">
-        <div style="font-size:13.5px; font-weight:700; margin-bottom:4px;">v1.0 — 24 июня 2026</div>
-        <div style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">Первый канон. Зафиксированы все базовые токены и компоненты.</div>
-        <ul style="margin:0; padding-left:20px; line-height:1.7; font-size:13px;">
+        <div class="cl-version">v1.0 — 24 июня 2026</div>
+        <div class="cl-summary">Первый канон. Зафиксированы все базовые токены и компоненты.</div>
+        <ul class="cl-list">
           <li>Card padding унифицирован: <b>16px 20px</b></li>
           <li>KPI value: две шкалы <b>22 (compact)</b> / <b>28 (hero)</b></li>
           <li>Border: единый <b>#E8ECF3</b></li>

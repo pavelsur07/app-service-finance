@@ -1,0 +1,12 @@
+/* ============ DIRECTION (canonical: colored dot) ============ */
+.direction {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12px; font-weight: 600;
+}
+.direction .ddot { width: 8px; height: 8px; border-radius: 50%; }
+.direction--in  { color: var(--success-text); }
+.direction--in  .ddot { background: var(--success-dot); }
+.direction--out { color: var(--danger-text); }
+.direction--out .ddot { background: var(--danger-dot); }
+.direction--neutral { color: var(--text-secondary); }
+.direction--neutral .ddot { background: var(--text-disabled); }

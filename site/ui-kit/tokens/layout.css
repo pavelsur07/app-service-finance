@@ -1,0 +1,21 @@
+:root {
+  /* ===== Layout tokens ===== */
+  --card-padding: 16px 20px;
+  --card-padding-block: 24px;
+  --drawer-width: 680px;
+  --drawer-padding-body: 24px 28px;
+  --modal-width-compact: 440px;
+  --modal-width-standard: 520px;
+  --backdrop-opacity: 0.45;
+  --backdrop-blur: 6px;
+
+  /* ===== Avatar sizes (sm/md/lg) ===== */
+  --avatar-sm: 24px;
+  --avatar-md: 32px;
+  --avatar-lg: 40px;
+
+  /* ===== Toggle ===== */
+  --toggle-w: 42px;
+  --toggle-h: 24px;
+  --toggle-knob: 20px;
+}

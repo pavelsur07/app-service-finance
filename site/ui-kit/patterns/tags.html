@@ -1,0 +1,46 @@
+<!-- @react Tags -->
+<!-- @uiKit v1.4 -->
+<!-- @docs ui-kit/patterns/tags.css -->
+
+<!-- Пустое поле -->
+<div class="demo demo--column">
+  <div class="field" style="width:100%; max-width:480px;">
+    <label class="field-label">Теги</label>
+    <div class="tags-input">
+      <input placeholder="Добавьте тег…">
+    </div>
+    <div class="field-helper">Enter для добавления, Backspace — удалить последний</div>
+  </div>
+</div>
+
+<!-- С тегами -->
+<div class="demo demo--column">
+  <div class="field" style="width:100%; max-width:480px;">
+    <label class="field-label">Теги</label>
+    <div class="tags-input is-focus">
+      <span class="tag-chip">2026-Q2<button class="x"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span>
+      <span class="tag-chip">обязательный<button class="x"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span>
+      <span class="tag-chip is-focused">налоги<button class="x"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span>
+      <input value="">
+    </div>
+    <div class="field-helper">Последний chip в фокусе — повторный Backspace удалит</div>
+  </div>
+</div>
+
+<!-- С автосаджестом -->
+<div class="demo demo--column" style="padding-bottom:160px;">
+  <div class="field" style="width:100%; max-width:480px;">
+    <label class="field-label">Теги</label>
+    <div class="tags-input is-focus">
+      <span class="tag-chip">2026-Q2<button class="x"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span>
+      <input value="подо" autofocus>
+      <div class="suggest">
+        <div class="suggest-item is-active">подо<b style="color:var(--color-primary)">тчётный</b><span class="hint">7 опер.</span></div>
+        <div class="suggest-item">подо<b style="color:var(--color-primary)">ждёт</b><span class="hint">2 опер.</span></div>
+        <div class="suggest-item">под<b style="color:var(--color-primary)">отчёт</b><span class="hint">5 опер.</span></div>
+        <div class="suggest-create">+ Создать тег «подо»</div>
+      </div>
+    </div>
+    <div class="field-helper">Поиск по вхождению + опция создать новый</div>
+  </div>
+</div>

@@ -1,0 +1,18 @@
+:root {
+  /* ===== Typography ===== */
+  --font-family: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+  --font-9_5: 9.5px;
+  --font-10_5: 10.5px;
+  --font-11: 11px;
+  --font-11_5: 11.5px;
+  --font-12: 12px;
+  --font-12_5: 12.5px;
+  --font-13: 13px;
+  --font-13_5: 13.5px;
+  --font-14: 14px;
+  --font-15: 15px;
+  --font-17: 17px;
+  --font-22: 22px;
+  --font-28: 28px;
+}

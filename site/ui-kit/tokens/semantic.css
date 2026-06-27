@@ -1,0 +1,58 @@
+:root {
+  /* ============================================================
+     SEMANTIC TOKENS (component-facing)
+     Raw tokens выше — палитра. Эти токены привязаны к компоненту
+     и переживают ребрендинг / тёмную тему без правок в компонентах.
+     Миграция компонентов на этот слой — отдельная задача. (См. Decision 19.)
+     ============================================================ */
+
+  /* Buttons */
+  --button-primary-bg:           var(--color-primary);
+  --button-primary-bg-hover:     var(--color-primary-hover);
+  --button-primary-bg-active:    var(--color-primary-active);
+  --button-primary-text:         var(--text-inverse);
+
+  --button-secondary-bg:         var(--bg-card);
+  --button-secondary-bg-hover:   var(--bg-page);
+  --button-secondary-border:     var(--border);
+  --button-secondary-border-hover: var(--border-hover);
+  --button-secondary-text:       var(--text-strong);
+
+  --button-ghost-text:           var(--text-secondary);
+  --button-ghost-bg-hover:       var(--bg-page);
+
+  /* Inputs */
+  --input-bg:           var(--bg-card);
+  --input-border:       var(--border);
+  --input-border-focus: var(--color-primary);
+  --input-border-error: var(--danger-dot);
+  --input-text:         var(--text-strong);
+  --input-placeholder:  var(--text-muted);
+  --input-focus-ring:   var(--focus-ring-input);
+  --input-error-ring:   var(--focus-ring-danger);
+
+  /* Cards */
+  --card-bg:     var(--bg-card);
+  --card-border: var(--border);
+  --card-shadow: var(--shadow-sm);
+
+  /* Form messages */
+  --form-error-text:    var(--danger-text);
+  --form-helper-text:   var(--text-muted);
+  --form-label-text:    var(--text-tertiary);
+  --form-required-mark: var(--danger-dot);
+
+  /* Status pills */
+  --status-success-bg:   var(--success-bg);
+  --status-success-text: var(--success-text);
+  --status-success-dot:  var(--success-dot);
+  --status-danger-bg:    var(--danger-bg);
+  --status-danger-text:  var(--danger-text);
+  --status-danger-dot:   var(--danger-dot);
+  --status-warning-bg:   var(--warning-bg);
+  --status-warning-text: var(--warning-text);
+  --status-warning-dot:  var(--warning-dot);
+  --status-neutral-bg:   var(--neutral-tint-bg);
+  --status-neutral-text: var(--neutral-tint-text);
+  --status-neutral-dot:  var(--text-disabled);
+}

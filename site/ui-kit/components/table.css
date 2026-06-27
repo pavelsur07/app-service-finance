@@ -1,0 +1,33 @@
+/* ============ TABLE ============ */
+.t-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.t-table thead th {
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 11px 12px;
+  background: var(--bg-row-hover);
+  border-bottom: 1px solid var(--border);
+}
+.t-table tbody td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 12.5px;
+  color: var(--text-strong);
+  vertical-align: top;
+}
+.t-row--hover { background: var(--bg-row-hover); }
+.t-row--selected { background: var(--bg-row-selected); }
+.t-row--day td {
+  background: var(--bg-row-hover);
+  font-size: 10.5px; font-weight: 700;
+  color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;
+}
+.t-row--subtotal td {
+  background: var(--bg-subtle);
+  font-weight: 700;
+  font-size: 13.5px;
+}
+.t-cell--right { text-align: right; font-variant-numeric: tabular-nums; }
