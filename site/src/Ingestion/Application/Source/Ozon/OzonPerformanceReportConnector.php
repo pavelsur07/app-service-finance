@@ -15,6 +15,7 @@ use App\Ingestion\Enum\Capability;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Exception\ConnectorTransientException;
 use App\Ingestion\Exception\UnsupportedCapabilityException;
+use App\Ingestion\Infrastructure\Api\Ozon\OzonPerformanceCampaignNotFoundException;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonPerformanceReportClientInterface;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonRawPage;
 use Symfony\Component\Clock\ClockInterface;
@@ -123,21 +124,40 @@ final readonly class OzonPerformanceReportConnector implements SourceConnectorIn
             return $this->doneEmptyResult($request, OzonResourceType::PERFORMANCE_SKU_CAMPAIGN_OBJECTS, 'performance-sku-objects:done');
         }
 
-        $page = $this->client->fetchCampaignObjects($request->companyId, $request->connectionRef, $campaignId);
+        $skippedReason = null;
+        try {
+            $page = $this->client->fetchCampaignObjects($request->companyId, $request->connectionRef, $campaignId);
+            $rows = $page->rows;
+            $apiMetadata = $page->metadata;
+        } catch (OzonPerformanceCampaignNotFoundException $exception) {
+            $rows = [];
+            $skippedReason = 'campaign_not_found';
+            $apiMetadata = [
+                'endpoint' => $exception->endpoint,
+                'campaignId' => $exception->campaignId,
+                'skippedReason' => $skippedReason,
+                'responseBody' => $exception->responseBody,
+            ];
+        }
+
         $nextOffset = $offset + 1;
         $hasMore = $nextOffset < count($campaigns);
+        $metadata = [
+            'apiMetadata' => $apiMetadata,
+            'campaignId' => $campaignId,
+            'campaignOffset' => $offset,
+            'campaignCount' => count($campaigns),
+        ];
+        if (null !== $skippedReason) {
+            $metadata['skippedReason'] = $skippedReason;
+        }
 
         return $this->rawResult(
             request: $request,
             resourceType: OzonResourceType::PERFORMANCE_SKU_CAMPAIGN_OBJECTS,
             externalId: sprintf('performance-sku-objects:%s:%s', $campaignId, $this->windowId($request)),
-            rows: $page->rows,
-            metadata: [
-                'apiMetadata' => $page->metadata,
-                'campaignId' => $campaignId,
-                'campaignOffset' => $offset,
-                'campaignCount' => count($campaigns),
-            ],
+            rows: $rows,
+            metadata: $metadata,
             nextCursor: $hasMore ? $this->encodeCursor(['campaignOffset' => $nextOffset]) : null,
             hasMore: $hasMore,
         );

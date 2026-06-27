@@ -7,6 +7,7 @@ namespace App\Tests\Integration\Ingestion\Infrastructure\Api\Ozon;
 use App\Company\Entity\Company;
 use App\Ingestion\Exception\ConnectorAuthException;
 use App\Ingestion\Exception\ConnectorRateLimitedException;
+use App\Ingestion\Infrastructure\Api\Ozon\OzonPerformanceCampaignNotFoundException;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonPerformanceReportClient;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceConnectionType;
@@ -118,6 +119,66 @@ final class OzonPerformanceReportClientTest extends IntegrationTestCase
         self::assertSame('SEARCH_PROMO', $calls[1]['options']['query']['advObjectType']);
         self::assertSame('SKU', $calls[2]['options']['query']['advObjectType']);
         self::assertSame('SKU', $calls[3]['options']['query']['advObjectType']);
+    }
+
+    public function testFetchSearchPromoProductsUsesOneCanonicalPageSizeField(): void
+    {
+        $company = $this->seedCompany('11111111-1111-4111-8111-00000000b208', 9208);
+        $connection = $this->seedPerformanceConnection($company, '77777777-7777-4777-8777-00000000b208');
+        $this->em->flush();
+
+        $calls = [];
+        $http = new MockHttpClient(static function (string $method, string $url, array $options = []) use (&$calls): MockResponse {
+            $calls[] = ['method' => $method, 'url' => $url, 'options' => $options];
+
+            if (str_ends_with($url, '/api/client/token')) {
+                return new MockResponse('{"access_token":"test-token","expires_in":1800}', ['http_code' => 200]);
+            }
+            if (str_ends_with($url, '/api/client/campaign/search_promo/v2/products')) {
+                return new MockResponse('{"result":{"products":[{"sku":"sku-1"}],"total":1}}', ['http_code' => 200]);
+            }
+
+            throw new \LogicException(sprintf('Unexpected request: %s %s', $method, $url));
+        });
+
+        $page = $this->client($http)->fetchSearchPromoProducts($company->getId(), $connection->getId(), 'campaign-1', 2);
+
+        self::assertSame('POST', $calls[1]['method']);
+        $requestBody = json_decode((string) ($calls[1]['options']['body'] ?? ''), true, 512, \JSON_THROW_ON_ERROR);
+        self::assertSame([
+            'campaignId' => 'campaign-1',
+            'page' => 2,
+            'pageSize' => 1000,
+        ], $requestBody);
+        self::assertSame([
+            [
+                'sku' => 'sku-1',
+                '_ingestion_metadata' => ['campaignId' => 'campaign-1', 'page' => 2],
+            ],
+        ], $page->rows);
+    }
+
+    public function testFetchCampaignObjectsRaisesTypedExceptionWhenCampaignIsMissing(): void
+    {
+        $company = $this->seedCompany('11111111-1111-4111-8111-00000000b209', 9209);
+        $connection = $this->seedPerformanceConnection($company, '77777777-7777-4777-8777-00000000b209');
+        $this->em->flush();
+
+        $http = new MockHttpClient(static function (string $method, string $url): MockResponse {
+            if (str_ends_with($url, '/api/client/token')) {
+                return new MockResponse('{"access_token":"test-token","expires_in":1800}', ['http_code' => 200]);
+            }
+            if (str_ends_with($url, '/api/client/campaign/13815400/objects')) {
+                return new MockResponse('{"error":"campaign not found"}', ['http_code' => 404]);
+            }
+
+            throw new \LogicException(sprintf('Unexpected request: %s %s', $method, $url));
+        });
+
+        $this->expectException(OzonPerformanceCampaignNotFoundException::class);
+        $this->expectExceptionMessage('campaign "13815400" was not found');
+
+        $this->client($http)->fetchCampaignObjects($company->getId(), $connection->getId(), '13815400');
     }
 
     public function testRejectsMismatchedConnectionRefInsteadOfFallingBackToCompanyCredentials(): void
