@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Domain\ValueObject;
 
 use App\Shared\Domain\Exception\MoneyMismatchException;
+use App\Shared\Domain\Exception\MoneyOverflowException;
 use App\Shared\Infrastructure\Doctrine\MoneyAmountType;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
@@ -45,7 +46,7 @@ final readonly class Money
         $scaled = \bcmul($normalized, \bcpow('10', (string) $scale), 12);
         $minor = RoundingMode::HALF_UP->roundToInteger($scaled);
 
-        return new self((int) $minor, $currency);
+        return self::createSafe($minor, $currency);
     }
 
     public function add(self $other): self
@@ -91,6 +92,10 @@ final readonly class Money
 
     public function abs(): self
     {
+        if (\PHP_INT_MIN === $this->amountMinor) {
+            throw new MoneyOverflowException('Money amount overflows integer limits.');
+        }
+
         return $this->amountMinor < 0 ? new self(-$this->amountMinor, $this->currency) : $this;
     }
 
@@ -102,7 +107,7 @@ final readonly class Money
     {
         $product = \bcmul((string) $this->amountMinor, $factor, 12);
 
-        return new self((int) $mode->roundToInteger($product), $this->currency);
+        return self::createSafe($mode->roundToInteger($product), $this->currency);
     }
 
     /**
@@ -112,7 +117,7 @@ final readonly class Money
     {
         $value = \bcdiv(\bcmul((string) $this->amountMinor, $percent, 12), '100', 12);
 
-        return new self((int) $mode->roundToInteger($value), $this->currency);
+        return self::createSafe($mode->roundToInteger($value), $this->currency);
     }
 
     public function equals(self $other): bool
@@ -141,6 +146,20 @@ final readonly class Money
         }
 
         return \bcdiv((string) $this->amountMinor, \bcpow('10', (string) $scale), $scale);
+    }
+
+    /**
+     * Создаёт Money из строкового значения минорных единиц, защищаясь от тихого
+     * переполнения int: `(int)` для строки вне диапазона PHP_INT_MAX/MIN молча
+     * оборачивается (в т.ч. в отрицательное значение), что недопустимо в деньгах.
+     */
+    private static function createSafe(string $amountMinor, string $currency): self
+    {
+        if (\bccomp($amountMinor, (string) \PHP_INT_MAX, 0) > 0 || \bccomp($amountMinor, (string) \PHP_INT_MIN, 0) < 0) {
+            throw new MoneyOverflowException('Money amount overflows integer limits.');
+        }
+
+        return new self((int) $amountMinor, $currency);
     }
 
     private static function fractionDigits(string $currency): int

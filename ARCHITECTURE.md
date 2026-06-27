@@ -1788,7 +1788,9 @@ $money->amountMinor(): int;  $money->currency(): string
 
 - `App\Shared\Domain\ValueObject\RoundingMode` — enum `HALF_UP` (от нуля) / `HALF_EVEN` (банковское).
 - Округление масштаба — по числу знаков валюты (`Intl\Currencies::getFractionDigits`, fallback 2).
-- Ограничение: PHP `int` 64-бит ≈ ±9.2·10¹⁶ ₽ (минор). За пределами — переполнение.
+- Диапазон: PHP `int` 64-бит ≈ ±9.2·10¹⁶ ₽ (минор). Выход за пределы (в `fromString`,
+  `multiply`, `percentage`, `abs` при `PHP_INT_MIN`) бросает `MoneyOverflowException` —
+  тихого int-wrap нет.
 
 **Doctrine-маппинг (Embeddable):** `Money` помечен `#[ORM\Embeddable]` и встраивается в Entity
 через `#[ORM\Embedded(class: Money::class)]` → две колонки (`*_amount_minor` bigint + `*_currency`).

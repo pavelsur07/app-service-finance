@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Shared\Domain\ValueObject;
 
 use App\Shared\Domain\Exception\MoneyMismatchException;
+use App\Shared\Domain\Exception\MoneyOverflowException;
 use App\Shared\Domain\ValueObject\Money;
 use App\Shared\Domain\ValueObject\RoundingMode;
 use PHPUnit\Framework\TestCase;
@@ -173,6 +174,47 @@ final class MoneyTest extends TestCase
     {
         self::assertSame(12345, Money::fromMinor(-12345, 'RUB')->abs()->amountMinor());
         self::assertSame(12345, Money::fromMinor(12345, 'RUB')->abs()->amountMinor());
+    }
+
+    public function testAbsRejectsIntMinOverflow(): void
+    {
+        $this->expectException(MoneyOverflowException::class);
+
+        Money::fromMinor(\PHP_INT_MIN, 'RUB')->abs();
+    }
+
+    public function testFromStringRejectsOverflow(): void
+    {
+        $this->expectException(MoneyOverflowException::class);
+
+        // 22 цифры после умножения на 100 — заведомо больше PHP_INT_MAX (~9.2e18)
+        Money::fromString('99999999999999999999', 'RUB');
+    }
+
+    public function testMultiplyRejectsOverflow(): void
+    {
+        $this->expectException(MoneyOverflowException::class);
+
+        Money::fromMinor(\PHP_INT_MAX, 'RUB')->multiply('2');
+    }
+
+    public function testMultiplyRejectsNegativeOverflow(): void
+    {
+        $this->expectException(MoneyOverflowException::class);
+
+        Money::fromMinor(\PHP_INT_MAX, 'RUB')->multiply('-2');
+    }
+
+    public function testPercentageRejectsOverflow(): void
+    {
+        $this->expectException(MoneyOverflowException::class);
+
+        Money::fromMinor(\PHP_INT_MAX, 'RUB')->percentage('1000');
+    }
+
+    public function testArithmeticStaysWithinRangeDoesNotThrow(): void
+    {
+        self::assertSame(\PHP_INT_MAX, Money::fromMinor(\PHP_INT_MAX, 'RUB')->multiply('1')->amountMinor());
     }
 
     public function testPredicates(): void
