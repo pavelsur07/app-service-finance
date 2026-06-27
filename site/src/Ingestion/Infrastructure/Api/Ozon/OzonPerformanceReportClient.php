@@ -34,6 +34,8 @@ final readonly class OzonPerformanceReportClient implements OzonPerformanceRepor
     private const REQUEST_TIMEOUT = 60;
     private const TOKEN_TTL_SAFETY_MARGIN = 300;
     private const CACHE_KEY_TOKEN_PREFIX = 'ingestion_ozon_perf_token_';
+    private const CACHE_KEY_CAMPAIGNS_PREFIX = 'ingestion_ozon_perf_campaigns_';
+    private const CAMPAIGN_CACHE_TTL_SECONDS = 300;
 
     public function __construct(
         private HttpClientInterface $httpClient,
@@ -45,19 +47,26 @@ final readonly class OzonPerformanceReportClient implements OzonPerformanceRepor
 
     public function listCampaigns(string $companyId, string $connectionRef, array $advObjectTypes = []): OzonRawPage
     {
+        $advObjectTypes = $this->normalizeStringList($advObjectTypes);
         $query = [];
         if ([] !== $advObjectTypes) {
-            $query['advObjectType'] = array_values($advObjectTypes);
+            $query['advObjectType'] = $advObjectTypes;
         }
 
-        $payload = $this->requestJson($companyId, $connectionRef, 'GET', self::CAMPAIGN_PATH, ['query' => $query]);
-        $rows = $this->extractRows($payload);
+        $cacheKey = $this->campaignCacheKey($companyId, $connectionRef, $advObjectTypes);
 
-        return new OzonRawPage($this->sortRows($rows), false, null, [
-            'endpoint' => self::CAMPAIGN_PATH,
-            'advObjectTypes' => array_values($advObjectTypes),
-            'resultKeys' => array_keys($payload),
-        ]);
+        return $this->cache->get($cacheKey, function (ItemInterface $item) use ($companyId, $connectionRef, $query, $advObjectTypes): OzonRawPage {
+            $item->expiresAfter(self::CAMPAIGN_CACHE_TTL_SECONDS);
+
+            $payload = $this->requestJson($companyId, $connectionRef, 'GET', self::CAMPAIGN_PATH, ['query' => $query]);
+            $rows = $this->extractRows($payload);
+
+            return new OzonRawPage($this->sortRows($rows), false, null, [
+                'endpoint' => self::CAMPAIGN_PATH,
+                'advObjectTypes' => $advObjectTypes,
+                'resultKeys' => array_keys($payload),
+            ]);
+        });
     }
 
     public function fetchCampaignObjects(string $companyId, string $connectionRef, string $campaignId): OzonRawPage
@@ -441,7 +450,16 @@ final readonly class OzonPerformanceReportClient implements OzonPerformanceRepor
      */
     private function sortRows(array $rows): array
     {
-        usort($rows, static fn (array $left, array $right): int => json_encode($left, \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES) <=> json_encode($right, \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES));
+        if (count($rows) < 2) {
+            return array_values($rows);
+        }
+
+        $serialized = [];
+        foreach ($rows as $index => $row) {
+            $serialized[$index] = (string) json_encode($row, \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES);
+        }
+
+        uksort($rows, static fn (int|string $left, int|string $right): int => $serialized[$left] <=> $serialized[$right]);
 
         return array_values($rows);
     }
@@ -467,33 +485,56 @@ final readonly class OzonPerformanceReportClient implements OzonPerformanceRepor
      */
     private function decodeCsv(string $content): array
     {
-        $lines = preg_split('/\R/u', trim($content));
-        if (false === $lines || count($lines) < 2) {
+        if (str_starts_with($content, "\xEF\xBB\xBF")) {
+            $content = substr($content, 3);
+        }
+
+        $stream = fopen('php://memory', 'r+');
+        if (false === $stream) {
             return [];
         }
 
-        $header = str_getcsv((string) array_shift($lines));
-        $rows = [];
-        foreach ($lines as $line) {
-            if ('' === trim((string) $line)) {
-                continue;
+        try {
+            if (false === fwrite($stream, $content)) {
+                return [];
+            }
+            rewind($stream);
+
+            $firstLine = fgets($stream);
+            if (false === $firstLine) {
+                return [];
+            }
+            $separator = substr_count($firstLine, ';') > substr_count($firstLine, ',') ? ';' : ',';
+            rewind($stream);
+
+            $header = fgetcsv($stream, 0, $separator, '"', '');
+            if (false === $header) {
+                return [];
             }
 
-            $values = str_getcsv((string) $line);
-            $row = [];
-            foreach ($header as $index => $name) {
-                if ('' === (string) $name) {
+            $rows = [];
+            while (false !== ($values = fgetcsv($stream, 0, $separator, '"', ''))) {
+                if ([null] === $values || [''] === $values) {
                     continue;
                 }
 
-                $row[(string) $name] = $values[$index] ?? null;
-            }
-            if ([] !== $row) {
-                $rows[] = $row;
-            }
-        }
+                $row = [];
+                foreach ($header as $index => $name) {
+                    if ('' === (string) $name) {
+                        continue;
+                    }
 
-        return $rows;
+                    $row[(string) $name] = $values[$index] ?? null;
+                }
+                if ([] !== $row) {
+                    $rows[] = $row;
+                }
+            }
+
+            return $rows;
+        } finally {
+            fclose($stream);
+        }
     }
 
     /**
@@ -512,6 +553,31 @@ final readonly class OzonPerformanceReportClient implements OzonPerformanceRepor
         }
 
         return $normalized;
+    }
+
+    /**
+     * @param list<mixed> $values
+     *
+     * @return list<string>
+     */
+    private function normalizeStringList(array $values): array
+    {
+        $normalized = array_values(array_unique(array_filter(array_map(static fn (mixed $value): string => trim((string) $value), $values))));
+        sort($normalized);
+
+        return $normalized;
+    }
+
+    /**
+     * @param list<string> $advObjectTypes
+     */
+    private function campaignCacheKey(string $companyId, string $connectionRef, array $advObjectTypes): string
+    {
+        return self::CACHE_KEY_CAMPAIGNS_PREFIX.hash('sha256', implode('|', [
+            $companyId,
+            $connectionRef,
+            implode(',', $advObjectTypes),
+        ]));
     }
 
     private function hasMore(array $payload, int $page, int $rowCount, int $pageSize): bool
