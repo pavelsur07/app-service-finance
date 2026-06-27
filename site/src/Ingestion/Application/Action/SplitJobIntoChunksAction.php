@@ -14,6 +14,7 @@ use App\Ingestion\Message\RunSyncChunkMessage;
 use App\Ingestion\Repository\SyncJobRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\DelayStamp;
 
 final readonly class SplitJobIntoChunksAction
 {
@@ -64,8 +65,11 @@ final readonly class SplitJobIntoChunksAction
         $parent->markRunning();
         $this->entityManager->flush();
 
-        foreach ($chunkIds as $chunkId) {
-            $this->messageBus->dispatch(new RunSyncChunkMessage($command->companyId, $chunkId));
+        foreach ($chunkIds as $index => $chunkId) {
+            $delaySeconds = $command->initialDelaySeconds + ($index * $command->chunkDelayStepSeconds);
+            $stamps = $delaySeconds > 0 ? [new DelayStamp($delaySeconds * 1000)] : [];
+
+            $this->messageBus->dispatch(new RunSyncChunkMessage($command->companyId, $chunkId), $stamps);
         }
 
         return $chunkIds;
