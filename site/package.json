@@ -9,8 +9,7 @@
         "check:ui-kit": "node tools/check-ui-kit-classes.mjs",
         "check:uikit-react-mapping": "node tools/check-uikit-react-mapping.mjs",
         "check:all": "npm run build && npm run check:uikit-react-mapping",
-        "lint": "eslint 'assets/**/*.{ts,tsx,js,jsx}' --max-warnings=0",
-        "lint:boundaries": "eslint 'assets/**/*.{ts,tsx,js,jsx}' --rule '{\"import/no-restricted-paths\": \"error\"}' --no-eslintrc --parser @typescript-eslint/parser"
+        "lint": "eslint 'assets/**/*.{ts,tsx,js,jsx}' --max-warnings=0"
     },
     "devDependencies": {
         "@types/react": "^18.3.1",

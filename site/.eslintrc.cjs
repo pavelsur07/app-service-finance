@@ -1,4 +1,6 @@
 /* eslint-env node */
+const path = require('path');
+
 module.exports = {
   root: true,
   parser: '@typescript-eslint/parser',
@@ -11,7 +13,7 @@ module.exports = {
   settings: {
     'import/resolver': {
       typescript: {
-        project: './tsconfig.json',
+        project: path.resolve(__dirname, 'tsconfig.json'),
       },
     },
   },
@@ -21,29 +23,29 @@ module.exports = {
       zones: [
         // Никто кроме entrypoints не импортирует из _legacy/
         {
-          target: './assets/react/modules',
-          from: './assets/react/_legacy',
+          target: path.resolve(__dirname, 'assets/react/modules'),
+          from: path.resolve(__dirname, 'assets/react/_legacy'),
           message: 'Не импортировать из _legacy/. Перенесите нужное в modules/ или shared/ как часть миграции.',
         },
         {
-          target: './assets/react/ui-kit',
-          from: './assets/react/_legacy',
+          target: path.resolve(__dirname, 'assets/react/ui-kit'),
+          from: path.resolve(__dirname, 'assets/react/_legacy'),
           message: 'UI Kit не зависит от _legacy/. Никогда.',
         },
         {
-          target: './assets/react/shared',
-          from: './assets/react/_legacy',
+          target: path.resolve(__dirname, 'assets/react/shared'),
+          from: path.resolve(__dirname, 'assets/react/_legacy'),
           message: 'shared/ не зависит от _legacy/. Если нужна утилита из legacy — перепишите её в shared/ заново.',
         },
         // _legacy/ не питается новым кодом
         {
-          target: './assets/react/_legacy',
-          from: './assets/react/modules',
+          target: path.resolve(__dirname, 'assets/react/_legacy'),
+          from: path.resolve(__dirname, 'assets/react/modules'),
           message: '_legacy/ заморожен. Не добавляйте импорты из modules/ в legacy-код.',
         },
         {
-          target: './assets/react/_legacy',
-          from: './assets/react/ui-kit',
+          target: path.resolve(__dirname, 'assets/react/_legacy'),
+          from: path.resolve(__dirname, 'assets/react/ui-kit'),
           message: '_legacy/ заморожен. Не добавляйте импорты из ui-kit/ в legacy-код.',
         },
       ],
