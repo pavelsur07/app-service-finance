@@ -33,6 +33,8 @@ use Symfony\Component\Messenger\Stamp\DelayStamp;
 #[AsMessageHandler]
 final readonly class RunSyncChunkHandler
 {
+    private const MAX_RATE_LIMIT_ATTEMPTS = 12;
+
     public function __construct(
         private SyncJobRepository $syncJobRepository,
         private IngestCursorRepository $cursorRepository,
@@ -137,6 +139,21 @@ final readonly class RunSyncChunkHandler
 
             throw new UnrecoverableMessageHandlingException('Ingestion connector authentication failed.', 0, $exception);
         } catch (ConnectorRateLimitedException $exception) {
+            if ($job->getAttempts() >= self::MAX_RATE_LIMIT_ATTEMPTS) {
+                $reason = sprintf('rate_limit_exhausted_after_%d_attempts', $job->getAttempts());
+                $this->logger->warning('Ingestion connector rate-limited too many times; job failed.', [
+                    'companyId' => $job->getCompanyId(),
+                    'jobId' => $job->getId(),
+                    'source' => $job->getSource()->value,
+                    'resourceType' => $job->getResourceType(),
+                    'attempts' => $job->getAttempts(),
+                    'retryAfterSeconds' => $exception->retryAfterSeconds(),
+                ]);
+                $this->markJobFailed($job->getId(), $job->getCompanyId(), $reason);
+
+                return;
+            }
+
             $this->logger->info('Ingestion connector rate-limited; chunk continuation scheduled.', [
                 'companyId' => $job->getCompanyId(),
                 'jobId' => $job->getId(),

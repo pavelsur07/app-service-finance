@@ -17,10 +17,14 @@ final readonly class StartBackfillCommand
         public string $shopRef,
         public \DateTimeImmutable $windowFrom,
         public \DateTimeImmutable $windowTo,
+        public int $initialDelaySeconds = 0,
+        public int $chunkDelayStepSeconds = 0,
     ) {
         Assert::uuid($this->companyId);
         Assert::notEmpty($this->connectionRef);
         Assert::notEmpty($this->resourceType);
         Assert::lessThanEq($this->windowFrom, $this->windowTo);
+        Assert::range($this->initialDelaySeconds, 0, 86400);
+        Assert::range($this->chunkDelayStepSeconds, 0, 86400);
     }
 }

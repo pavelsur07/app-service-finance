@@ -16,6 +16,7 @@ use App\Ingestion\Repository\IngestCursorRepository;
 use App\Ingestion\Repository\SyncJobRepository;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\Messenger\Stamp\DelayStamp;
 use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 final class SyncFacadeTest extends IntegrationTestCase
@@ -54,6 +55,35 @@ final class SyncFacadeTest extends IntegrationTestCase
             self::assertInstanceOf(RunSyncChunkMessage::class, $envelope->getMessage());
             self::assertSame($companyId, $envelope->getMessage()->getCompanyId());
         }
+    }
+
+    public function testStartBackfillCanDelayDispatchedChunkMessages(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $transport = $this->getIngestFetchTransport();
+        $transport->reset();
+
+        /** @var SyncFacade $facade */
+        $facade = self::getContainer()->get(SyncFacade::class);
+
+        $facade->startBackfill(new StartBackfillCommand(
+            companyId: $companyId,
+            connectionRef: 'connection-1',
+            source: IngestSource::OZON,
+            resourceType: 'resource-1',
+            shopRef: 'shop-1',
+            windowFrom: new \DateTimeImmutable('2026-06-01'),
+            windowTo: new \DateTimeImmutable('2026-06-14'),
+            initialDelaySeconds: 120,
+            chunkDelayStepSeconds: 30,
+        ));
+
+        $envelopes = $transport->getSent();
+        self::assertCount(2, $envelopes);
+        self::assertSame([120000, 150000], array_map(
+            static fn ($envelope): ?int => $envelope->last(DelayStamp::class)?->getDelay(),
+            $envelopes,
+        ));
     }
 
     public function testCompletingAllChildrenFinalizesParent(): void

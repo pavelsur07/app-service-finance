@@ -451,6 +451,57 @@ final class RunSyncChunkHandlerTest extends IntegrationTestCase
         self::assertSame('2026-06-08', $cursor->getCursorValue());
     }
 
+    public function testRepeatedRateLimitMarksJobFailedInsteadOfSchedulingForever(): void
+    {
+        $fakeConnector = $this->fakeConnector();
+        $fakeConnector->reset();
+
+        $companyId = Uuid::uuid7()->toString();
+        $job = new SyncJob(
+            companyId: $companyId,
+            connectionRef: 'connection-1',
+            source: IngestSource::WILDBERRIES,
+            resourceType: FakeConnector::RESOURCE_TYPE,
+            kind: SyncJobKind::BACKFILL,
+            windowFrom: new \DateTimeImmutable('2026-06-18'),
+            windowTo: new \DateTimeImmutable('2026-06-18'),
+            shopRef: 'shop-1',
+        );
+
+        $this->em->persist($job);
+        $this->em->flush();
+
+        $fetchTransport = $this->getFetchTransport();
+        $fetchTransport->reset();
+
+        /** @var RunSyncChunkHandler $handler */
+        $handler = self::getContainer()->get(RunSyncChunkHandler::class);
+
+        for ($attempt = 1; $attempt < 12; ++$attempt) {
+            $fakeConnector->enqueuePullFailure(new ConnectorRateLimitedException('Local rate limit is active.', 70));
+            $handler(new RunSyncChunkMessage($companyId, $job->getId()));
+
+            self::assertCount(1, $fetchTransport->getSent());
+            $fetchTransport->reset();
+            $this->em->clear();
+        }
+
+        $fakeConnector->enqueuePullFailure(new ConnectorRateLimitedException('Local rate limit is active.', 70));
+        $handler(new RunSyncChunkMessage($companyId, $job->getId()));
+        $this->em->clear();
+
+        self::assertCount(0, $fetchTransport->getSent());
+
+        /** @var SyncJobRepository $jobRepository */
+        $jobRepository = self::getContainer()->get(SyncJobRepository::class);
+        $failedJob = $jobRepository->findByIdAndCompany($job->getId(), $companyId);
+
+        self::assertNotNull($failedJob);
+        self::assertSame(SyncJobStatus::FAILED, $failedJob->getStatus());
+        self::assertSame(12, $failedJob->getAttempts());
+        self::assertSame('rate_limit_exhausted_after_12_attempts', $failedJob->getLastError());
+    }
+
     public function testRateLimitLockContentionKeepsJobRetryable(): void
     {
         $this->fakeConnector()->reset();

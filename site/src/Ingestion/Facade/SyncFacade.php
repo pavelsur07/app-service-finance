@@ -44,6 +44,8 @@ final readonly class SyncFacade
             $parentJobId,
             $command->companyId,
             WbResourceType::FINANCE_SALES_REPORT_DETAILED === $command->resourceType ? 1 : 7,
+            $command->initialDelaySeconds,
+            $command->chunkDelayStepSeconds,
         ));
 
         return $parentJobId;

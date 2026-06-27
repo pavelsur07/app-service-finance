@@ -17,6 +17,7 @@ use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\Messenger\Stamp\DelayStamp;
 use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 final class OzonPerformanceLoadCommandTest extends IntegrationTestCase
@@ -76,6 +77,7 @@ final class OzonPerformanceLoadCommandTest extends IntegrationTestCase
         self::assertSame($this->sortedResourceTypes(), $this->parentResourceTypes($company->getId()));
         self::assertSame(array_fill(0, count(self::RESOURCE_TYPES), $connection->getId()), $this->parentShopRefs($company->getId()));
         self::assertCount(count(self::RESOURCE_TYPES), $transport->getSent());
+        self::assertSame([120000, 240000, 360000, 480000], $this->nonZeroSentDelays($transport));
         foreach ($transport->getSent() as $envelope) {
             self::assertInstanceOf(RunSyncChunkMessage::class, $envelope->getMessage());
         }
@@ -201,5 +203,21 @@ final class OzonPerformanceLoadCommandTest extends IntegrationTestCase
         $transport = self::getContainer()->get('messenger.transport.ingest_fetch');
 
         return $transport;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function nonZeroSentDelays(InMemoryTransport $transport): array
+    {
+        $delays = [];
+        foreach ($transport->getSent() as $envelope) {
+            $delay = $envelope->last(DelayStamp::class)?->getDelay();
+            if (null !== $delay && $delay > 0) {
+                $delays[] = $delay;
+            }
+        }
+
+        return $delays;
     }
 }

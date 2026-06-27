@@ -6,6 +6,7 @@ namespace App\Tests\Integration\Ingestion\Infrastructure\Api\Ozon;
 
 use App\Company\Entity\Company;
 use App\Ingestion\Exception\ConnectorAuthException;
+use App\Ingestion\Exception\ConnectorRateLimitedException;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonPerformanceReportClient;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceConnectionType;
@@ -21,7 +22,7 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 
 final class OzonPerformanceReportClientTest extends IntegrationTestCase
 {
-    public function testListCampaignsCachesResponseByConnectionAndTypeSet(): void
+    public function testListCampaignsCachesResponsesPerConnectionAndAdvObjectType(): void
     {
         $company = $this->seedCompany('11111111-1111-4111-8111-00000000b201', 9201);
         $connection = $this->seedPerformanceConnection($company, '77777777-7777-4777-8777-00000000b201');
@@ -66,6 +67,57 @@ final class OzonPerformanceReportClientTest extends IntegrationTestCase
         self::assertSame('GET', $calls[2]['method']);
         self::assertSame('SEARCH_PROMO', $calls[1]['options']['query']['advObjectType']);
         self::assertSame('SKU', $calls[2]['options']['query']['advObjectType']);
+    }
+
+    public function testListCampaignsKeepsSuccessfulTypeCacheWhenAnotherTypeIsRateLimited(): void
+    {
+        $company = $this->seedCompany('11111111-1111-4111-8111-00000000b207', 9207);
+        $connection = $this->seedPerformanceConnection($company, '77777777-7777-4777-8777-00000000b207');
+        $this->em->flush();
+
+        $calls = [];
+        $skuCalls = 0;
+        $http = new MockHttpClient(static function (string $method, string $url, array $options = []) use (&$calls, &$skuCalls): MockResponse {
+            $calls[] = ['method' => $method, 'url' => $url, 'options' => $options];
+
+            if (str_ends_with($url, '/api/client/token')) {
+                return new MockResponse('{"access_token":"test-token","expires_in":1800}', ['http_code' => 200]);
+            }
+            if (str_contains($url, '/api/client/campaign')) {
+                $advObjectType = $options['query']['advObjectType'] ?? null;
+                if ('SEARCH_PROMO' === $advObjectType) {
+                    return new MockResponse('{"result":{"list":[{"id":"2","advObjectType":"SEARCH_PROMO"}]}}', ['http_code' => 200]);
+                }
+                if ('SKU' === $advObjectType) {
+                    ++$skuCalls;
+
+                    return 1 === $skuCalls
+                        ? new MockResponse('{"error":"rate limit"}', ['http_code' => 429])
+                        : new MockResponse('{"result":{"list":[{"id":"1","advObjectType":"SKU"}]}}', ['http_code' => 200]);
+                }
+            }
+
+            throw new \LogicException(sprintf('Unexpected request: %s %s', $method, $url));
+        });
+
+        $client = $this->client($http);
+
+        try {
+            $client->listCampaigns($company->getId(), $connection->getId(), ['SKU', 'SEARCH_PROMO']);
+            self::fail('Expected first campaign list request to be rate-limited.');
+        } catch (ConnectorRateLimitedException) {
+        }
+
+        $page = $client->listCampaigns($company->getId(), $connection->getId(), ['SKU', 'SEARCH_PROMO']);
+
+        self::assertSame([
+            ['id' => '1', 'advObjectType' => 'SKU'],
+            ['id' => '2', 'advObjectType' => 'SEARCH_PROMO'],
+        ], $page->rows);
+        self::assertCount(4, $calls);
+        self::assertSame('SEARCH_PROMO', $calls[1]['options']['query']['advObjectType']);
+        self::assertSame('SKU', $calls[2]['options']['query']['advObjectType']);
+        self::assertSame('SKU', $calls[3]['options']['query']['advObjectType']);
     }
 
     public function testRejectsMismatchedConnectionRefInsteadOfFallingBackToCompanyCredentials(): void

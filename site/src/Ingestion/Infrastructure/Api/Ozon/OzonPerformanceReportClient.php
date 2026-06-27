@@ -51,26 +51,41 @@ final readonly class OzonPerformanceReportClient implements OzonPerformanceRepor
     public function listCampaigns(string $companyId, string $connectionRef, array $advObjectTypes = []): OzonRawPage
     {
         $advObjectTypes = $this->normalizeStringList($advObjectTypes);
-        $cacheKey = $this->campaignCacheKey($companyId, $connectionRef, $advObjectTypes);
 
-        return $this->cache->get($cacheKey, function (ItemInterface $item) use ($companyId, $connectionRef, $advObjectTypes): OzonRawPage {
-            $item->expiresAfter(self::CAMPAIGN_CACHE_TTL_SECONDS);
-
-            $rows = [];
-            $resultKeys = [];
-            foreach ([] === $advObjectTypes ? [null] : $advObjectTypes as $advObjectType) {
-                $options = null === $advObjectType ? [] : ['query' => ['advObjectType' => $advObjectType]];
-                $payload = $this->requestJson($companyId, $connectionRef, 'GET', self::CAMPAIGN_PATH, $options);
-                array_push($rows, ...$this->extractRows($payload));
-                foreach (array_keys($payload) as $key) {
+        $rows = [];
+        $resultKeys = [];
+        foreach ([] === $advObjectTypes ? [null] : $advObjectTypes as $advObjectType) {
+            $page = $this->cachedCampaignPage($companyId, $connectionRef, $advObjectType);
+            array_push($rows, ...$page->rows);
+            foreach ($page->metadata['resultKeys'] ?? [] as $key) {
+                if (is_string($key) && '' !== $key) {
                     $resultKeys[$key] = true;
                 }
             }
+        }
 
-            return new OzonRawPage($this->sortRows($rows), false, null, [
+        return new OzonRawPage($this->sortRows($rows), false, null, [
+            'endpoint' => self::CAMPAIGN_PATH,
+            'advObjectTypes' => $advObjectTypes,
+            'resultKeys' => array_keys($resultKeys),
+        ]);
+    }
+
+    private function cachedCampaignPage(string $companyId, string $connectionRef, ?string $advObjectType): OzonRawPage
+    {
+        $advObjectTypes = null === $advObjectType ? [] : [$advObjectType];
+        $cacheKey = $this->campaignCacheKey($companyId, $connectionRef, $advObjectTypes);
+
+        return $this->cache->get($cacheKey, function (ItemInterface $item) use ($companyId, $connectionRef, $advObjectType, $advObjectTypes): OzonRawPage {
+            $item->expiresAfter(self::CAMPAIGN_CACHE_TTL_SECONDS);
+
+            $options = null === $advObjectType ? [] : ['query' => ['advObjectType' => $advObjectType]];
+            $payload = $this->requestJson($companyId, $connectionRef, 'GET', self::CAMPAIGN_PATH, $options);
+
+            return new OzonRawPage($this->sortRows($this->extractRows($payload)), false, null, [
                 'endpoint' => self::CAMPAIGN_PATH,
                 'advObjectTypes' => $advObjectTypes,
-                'resultKeys' => array_keys($resultKeys),
+                'resultKeys' => array_keys($payload),
             ]);
         });
     }
