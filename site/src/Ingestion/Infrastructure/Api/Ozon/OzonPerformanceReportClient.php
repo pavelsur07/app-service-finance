@@ -51,23 +51,26 @@ final readonly class OzonPerformanceReportClient implements OzonPerformanceRepor
     public function listCampaigns(string $companyId, string $connectionRef, array $advObjectTypes = []): OzonRawPage
     {
         $advObjectTypes = $this->normalizeStringList($advObjectTypes);
-        $query = [];
-        if ([] !== $advObjectTypes) {
-            $query['advObjectType'] = $advObjectTypes;
-        }
-
         $cacheKey = $this->campaignCacheKey($companyId, $connectionRef, $advObjectTypes);
 
-        return $this->cache->get($cacheKey, function (ItemInterface $item) use ($companyId, $connectionRef, $query, $advObjectTypes): OzonRawPage {
+        return $this->cache->get($cacheKey, function (ItemInterface $item) use ($companyId, $connectionRef, $advObjectTypes): OzonRawPage {
             $item->expiresAfter(self::CAMPAIGN_CACHE_TTL_SECONDS);
 
-            $payload = $this->requestJson($companyId, $connectionRef, 'GET', self::CAMPAIGN_PATH, ['query' => $query]);
-            $rows = $this->extractRows($payload);
+            $rows = [];
+            $resultKeys = [];
+            foreach ([] === $advObjectTypes ? [null] : $advObjectTypes as $advObjectType) {
+                $options = null === $advObjectType ? [] : ['query' => ['advObjectType' => $advObjectType]];
+                $payload = $this->requestJson($companyId, $connectionRef, 'GET', self::CAMPAIGN_PATH, $options);
+                array_push($rows, ...$this->extractRows($payload));
+                foreach (array_keys($payload) as $key) {
+                    $resultKeys[$key] = true;
+                }
+            }
 
             return new OzonRawPage($this->sortRows($rows), false, null, [
                 'endpoint' => self::CAMPAIGN_PATH,
                 'advObjectTypes' => $advObjectTypes,
-                'resultKeys' => array_keys($payload),
+                'resultKeys' => array_keys($resultKeys),
             ]);
         });
     }

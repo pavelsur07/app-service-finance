@@ -35,7 +35,15 @@ final class OzonPerformanceReportClientTest extends IntegrationTestCase
                 return new MockResponse('{"access_token":"test-token","expires_in":1800}', ['http_code' => 200]);
             }
             if (str_contains($url, '/api/client/campaign')) {
-                return new MockResponse('{"result":{"list":[{"id":"2"},{"id":"1"}]}}', ['http_code' => 200]);
+                $advObjectType = $options['query']['advObjectType'] ?? null;
+                if ('SEARCH_PROMO' === $advObjectType) {
+                    return new MockResponse('{"result":{"list":[{"id":"2","advObjectType":"SEARCH_PROMO"}]}}', ['http_code' => 200]);
+                }
+                if ('SKU' === $advObjectType) {
+                    return new MockResponse('{"result":{"list":[{"id":"1","advObjectType":"SKU"}]}}', ['http_code' => 200]);
+                }
+
+                throw new \LogicException(sprintf('Unexpected campaign query: %s', json_encode($options['query'] ?? [])));
             }
 
             throw new \LogicException(sprintf('Unexpected request: %s %s', $method, $url));
@@ -46,13 +54,18 @@ final class OzonPerformanceReportClientTest extends IntegrationTestCase
         $first = $client->listCampaigns($company->getId(), $connection->getId(), ['SKU', 'SEARCH_PROMO']);
         $second = $client->listCampaigns($company->getId(), $connection->getId(), ['SEARCH_PROMO', 'SKU']);
 
-        self::assertSame([['id' => '1'], ['id' => '2']], $first->rows);
+        self::assertSame([
+            ['id' => '1', 'advObjectType' => 'SKU'],
+            ['id' => '2', 'advObjectType' => 'SEARCH_PROMO'],
+        ], $first->rows);
         self::assertSame($first->rows, $second->rows);
         self::assertSame(['SEARCH_PROMO', 'SKU'], $first->metadata['advObjectTypes']);
-        self::assertCount(2, $calls);
+        self::assertCount(3, $calls);
         self::assertSame('POST', $calls[0]['method']);
         self::assertSame('GET', $calls[1]['method']);
-        self::assertSame(['SEARCH_PROMO', 'SKU'], $calls[1]['options']['query']['advObjectType']);
+        self::assertSame('GET', $calls[2]['method']);
+        self::assertSame('SEARCH_PROMO', $calls[1]['options']['query']['advObjectType']);
+        self::assertSame('SKU', $calls[2]['options']['query']['advObjectType']);
     }
 
     public function testRejectsMismatchedConnectionRefInsteadOfFallingBackToCompanyCredentials(): void
