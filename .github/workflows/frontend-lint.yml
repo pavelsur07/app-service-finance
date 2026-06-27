@@ -1,0 +1,27 @@
+name: Frontend Lint
+
+on:
+  pull_request:
+    paths:
+      - 'site/assets/**'
+      - 'site/.eslintrc.cjs'
+      - 'site/package.json'
+      - 'site/yarn.lock'
+  push:
+    branches: [master]
+
+jobs:
+  eslint-boundaries:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: site/yarn.lock
+      - run: yarn install --frozen-lockfile
+      - run: npx eslint 'assets/**/*.{ts,tsx,js,jsx}'
