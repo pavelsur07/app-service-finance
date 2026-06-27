@@ -83,6 +83,37 @@ final class OzonPerformanceLoadCommandTest extends IntegrationTestCase
         }
     }
 
+    public function testDailyLoadExecuteSchedulesCampaignBackedResourcesPerConnection(): void
+    {
+        $companies = [
+            $this->seedCompany('11111111-1111-1111-1111-00000000a112', 9112),
+            $this->seedCompany('11111111-1111-1111-1111-00000000a113', 9113),
+            $this->seedCompany('11111111-1111-1111-1111-00000000a114', 9114),
+        ];
+        $connectionIds = [
+            '77777777-7777-7777-7777-00000000a112',
+            '77777777-7777-7777-7777-00000000a113',
+            '77777777-7777-7777-7777-00000000a114',
+        ];
+        foreach ($connectionIds as $index => $connectionId) {
+            $this->seedPerformanceConnection($companies[$index], $connectionId);
+        }
+        $this->em->flush();
+
+        $transport = $this->getIngestFetchTransport();
+        $transport->reset();
+
+        $tester = $this->tester('app:ingestion:ozon-performance:daily-load');
+        $exit = $tester->execute([
+            '--days-back' => '14',
+            '--execute' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exit);
+        self::assertCount(count($connectionIds) * count(self::RESOURCE_TYPES) * 2, $transport->getSent());
+        $this->assertTwoChunkSchedulePerConnection($connectionIds, $transport);
+    }
+
     public function testBackfillExecuteDispatchesAllPerformanceResourcesForExplicitPeriod(): void
     {
         $company = $this->seedCompany('11111111-1111-1111-1111-00000000a103', 9103);
@@ -217,6 +248,56 @@ final class OzonPerformanceLoadCommandTest extends IntegrationTestCase
                 $delays[] = $delay;
             }
         }
+
+        return $delays;
+    }
+
+    /**
+     * @param list<string> $connectionIds
+     */
+    private function assertTwoChunkSchedulePerConnection(array $connectionIds, InMemoryTransport $transport): void
+    {
+        $delays = $this->sentDelaysByConnectionAndResource($transport);
+
+        foreach ($connectionIds as $connectionId) {
+            self::assertArrayHasKey($connectionId, $delays);
+            self::assertSame([0, 120000], $delays[$connectionId][OzonResourceType::PERFORMANCE_CAMPAIGNS] ?? null);
+            self::assertSame([240000, 360000], $delays[$connectionId][OzonResourceType::PERFORMANCE_SKU_CAMPAIGN_OBJECTS] ?? null);
+            self::assertSame([480000, 600000], $delays[$connectionId][OzonResourceType::PERFORMANCE_SEARCH_PROMO_PRODUCTS] ?? null);
+            self::assertSame([720000, 840000], $delays[$connectionId][OzonResourceType::PERFORMANCE_SKU_PRODUCT_STATISTICS] ?? null);
+            self::assertSame([960000, 1080000], $delays[$connectionId][OzonResourceType::PERFORMANCE_SEARCH_PROMO_STATISTICS] ?? null);
+            self::assertSame([0, 0], $delays[$connectionId][OzonResourceType::PERFORMANCE_EXPENSE_STATISTICS] ?? null);
+        }
+    }
+
+    /**
+     * @return array<string, array<string, list<int>>>
+     */
+    private function sentDelaysByConnectionAndResource(InMemoryTransport $transport): array
+    {
+        $delays = [];
+
+        foreach ($transport->getSent() as $envelope) {
+            $message = $envelope->getMessage();
+            self::assertInstanceOf(RunSyncChunkMessage::class, $message);
+
+            $row = $this->connection->fetchAssociative(
+                'SELECT connection_ref, resource_type FROM ingest_sync_jobs WHERE id = :jobId',
+                ['jobId' => $message->jobId],
+            );
+            self::assertIsArray($row);
+
+            $connectionRef = (string) $row['connection_ref'];
+            $resourceType = (string) $row['resource_type'];
+            $delays[$connectionRef][$resourceType][] = $envelope->last(DelayStamp::class)?->getDelay() ?? 0;
+        }
+
+        foreach ($delays as &$resourceDelays) {
+            foreach ($resourceDelays as &$resourceDelayValues) {
+                sort($resourceDelayValues);
+            }
+        }
+        unset($resourceDelays, $resourceDelayValues);
 
         return $delays;
     }
