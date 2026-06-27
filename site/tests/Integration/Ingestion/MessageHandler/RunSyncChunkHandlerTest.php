@@ -344,6 +344,54 @@ final class RunSyncChunkHandlerTest extends IntegrationTestCase
         self::assertSame(RawNormalizationStatus::SKIPPED, $rawRecords[0]->getNormalizationStatus());
     }
 
+    public function testWindowedChunkSchedulesDelayedContinuationWhenConnectorReturnsNoRawBatch(): void
+    {
+        $fakeConnector = $this->fakeConnector();
+        $fakeConnector->reset();
+        $fakeConnector->enqueueContinuationOnly('cursor-page-2', 60);
+
+        $companyId = Uuid::uuid7()->toString();
+        $job = new SyncJob(
+            companyId: $companyId,
+            connectionRef: 'connection-1',
+            source: IngestSource::WILDBERRIES,
+            resourceType: FakeConnector::RESOURCE_TYPE,
+            kind: SyncJobKind::BACKFILL,
+            windowFrom: new \DateTimeImmutable('2026-06-01'),
+            windowTo: new \DateTimeImmutable('2026-06-01'),
+            shopRef: 'shop-1',
+        );
+
+        $this->em->persist($job);
+        $this->em->flush();
+
+        $fetchTransport = $this->getFetchTransport();
+        $fetchTransport->reset();
+        $this->getNormalizeTransport()->reset();
+
+        /** @var RunSyncChunkHandler $handler */
+        $handler = self::getContainer()->get(RunSyncChunkHandler::class);
+        $handler(new RunSyncChunkMessage($companyId, $job->getId()));
+        $this->em->clear();
+
+        self::assertCount(1, $fakeConnector->pullRequests());
+
+        $sent = $fetchTransport->getSent();
+        self::assertCount(1, $sent);
+
+        /** @var RunSyncChunkMessage $continuation */
+        $continuation = $sent[0]->getMessage();
+        self::assertSame('cursor-page-2', $continuation->cursorValue);
+
+        $delayStamps = $sent[0]->all(DelayStamp::class);
+        self::assertCount(1, $delayStamps);
+        self::assertSame(60000, $delayStamps[0]->getDelay());
+
+        /** @var IngestRawRecordRepository $rawRecordRepository */
+        $rawRecordRepository = self::getContainer()->get(IngestRawRecordRepository::class);
+        self::assertSame([], $rawRecordRepository->findBy(['companyId' => $companyId, 'syncJobId' => $job->getId()]));
+    }
+
     public function testRateLimitContinuationUsesCurrentCursorAfterSuccessfulChunk(): void
     {
         $fakeConnector = $this->fakeConnector();

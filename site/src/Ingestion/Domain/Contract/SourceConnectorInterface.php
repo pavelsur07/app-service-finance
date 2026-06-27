@@ -17,6 +17,11 @@ interface SourceConnectorInterface
     public function source(): IngestSource;
 
     /**
+     * @return list<string>
+     */
+    public function resourceTypes(): array;
+
+    /**
      * @return list<Capability>
      */
     public function capabilities(): array;

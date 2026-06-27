@@ -14,6 +14,7 @@ use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Inventory\CostPriceResolverInterface;
 use App\Marketplace\Infrastructure\Query\CostCategoriesQuery;
+use App\Marketplace\Infrastructure\Query\ActiveOzonPerformanceConnectionsQuery;
 use App\Marketplace\Infrastructure\Query\ListingCostAggregateQuery;
 use App\Marketplace\Infrastructure\Query\ListingMetaQuery;
 use App\Marketplace\Infrastructure\Query\ListingReturnAggregateQuery;
@@ -42,6 +43,7 @@ final readonly class MarketplaceFacade
         private ListingMetaQuery $listingMetaQuery,
         private MarketplaceCredentialsQuery $credentialsQuery,
         private ActiveOzonConnectionsQuery $activeOzonConnectionsQuery,
+        private ActiveOzonPerformanceConnectionsQuery $activeOzonPerformanceConnectionsQuery,
     ) {}
 
     /**
@@ -76,6 +78,37 @@ final readonly class MarketplaceFacade
     }
 
     /**
+     * Публичный безопасный контракт для активных Ozon PERFORMANCE-подключений.
+     *
+     * @return array<int, array{
+     *     connectionId: string,
+     *     companyId: string,
+     *     marketplace: string,
+     *     connectionType: string,
+     *     clientId: ?string
+     * }>
+     */
+    public function getActiveOzonPerformanceConnections(?string $companyId = null): array
+    {
+        if (null !== $companyId) {
+            Assert::uuid($companyId);
+        }
+
+        $rows = $this->activeOzonPerformanceConnectionsQuery->execute($companyId);
+
+        return array_map(
+            static fn (array $row): array => [
+                'connectionId' => $row['id'],
+                'companyId' => $row['company_id'],
+                'marketplace' => MarketplaceType::OZON->value,
+                'connectionType' => MarketplaceConnectionType::PERFORMANCE->value,
+                'clientId' => $row['client_id'],
+            ],
+            $rows,
+        );
+    }
+
+    /**
      * Получить учётные данные подключения к API маркетплейса.
      *
      * Используется кросс-модульно (например, из MarketplaceAds для получения
@@ -87,8 +120,13 @@ final readonly class MarketplaceFacade
         string $companyId,
         MarketplaceType $marketplace,
         MarketplaceConnectionType $connectionType,
+        ?string $connectionRef = null,
     ): ?array {
-        return $this->credentialsQuery->getCredentials($companyId, $marketplace, $connectionType);
+        if (null !== $connectionRef) {
+            Assert::uuid($connectionRef);
+        }
+
+        return $this->credentialsQuery->getCredentials($companyId, $marketplace, $connectionType, $connectionRef);
     }
 
     /**

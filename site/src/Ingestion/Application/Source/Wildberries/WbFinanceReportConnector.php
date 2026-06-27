@@ -34,6 +34,14 @@ final readonly class WbFinanceReportConnector implements SourceConnectorInterfac
     }
 
     /**
+     * @return list<string>
+     */
+    public function resourceTypes(): array
+    {
+        return [WbResourceType::FINANCE_SALES_REPORT_DETAILED];
+    }
+
+    /**
      * @return list<Capability>
      */
     public function capabilities(): array

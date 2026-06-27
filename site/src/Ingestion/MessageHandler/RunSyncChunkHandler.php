@@ -78,7 +78,7 @@ final readonly class RunSyncChunkHandler
         $lock = null;
 
         try {
-            $connector = $this->connectorRegistry->get($job->getSource());
+            $connector = $this->connectorRegistry->get($job->getSource(), $job->getResourceType());
             $lock = $this->rateLimitGuard->acquire(sprintf('%s:%s', $job->getSource()->value, $job->getConnectionRef()));
 
             do {
@@ -93,13 +93,17 @@ final readonly class RunSyncChunkHandler
                     syncJobId: $job->getId(),
                 ));
 
-                $records = $this->rawStorageFacade->store($result->rawBatch);
-                if ($result->normalizeRawRecords) {
-                    foreach ($records as $record) {
-                        $this->messageBus->dispatch(new NormalizeRawRecordMessage($record->getId(), $record->getCompanyId()));
+                if (null !== $result->rawBatch) {
+                    $records = $this->rawStorageFacade->store($result->rawBatch);
+                    if ($result->normalizeRawRecords) {
+                        foreach ($records as $record) {
+                            $this->messageBus->dispatch(new NormalizeRawRecordMessage($record->getId(), $record->getCompanyId()));
+                        }
+                    } else {
+                        $this->markNormalizationSkipped($records);
                     }
-                } else {
-                    $this->markNormalizationSkipped($records);
+                } elseif (!$result->hasMore) {
+                    throw new \RuntimeException('Ingestion connector returned no raw batch without continuation.');
                 }
 
                 if (null !== $result->nextCursorValue && '' !== $result->nextCursorValue) {
