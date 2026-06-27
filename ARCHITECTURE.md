@@ -1763,6 +1763,40 @@ App\Shared\Service\SodiumFieldEncryptionService
 App\Shared\Service\SecretRotationService
 ```
 
+### Shared Value Objects — `Money`
+
+`App\Shared\Domain\ValueObject\Money` — `final readonly`, хранит сумму в минорных единицах
+(`int $amountMinor`) и валюту ISO-4217. Вся арифметика — bcmath, без float.
+
+```php
+// Создание / конвертация
+Money::fromMinor(int $amountMinor, string $currency): self
+Money::fromString(string $decimal, string $currency): self   // '1 234,56' -> minor; scale по валюте (Intl)
+$money->toDecimalString(): string                            // 12345 (RUB) -> '123.45'
+
+// Арифметика (валюта обязана совпадать → MoneyMismatchException)
+$money->add(self): self;  $money->subtract(self): self;  $money->negate(): self
+$money->multiply(string $factor, RoundingMode = HALF_UP): self
+$money->percentage(string $percent, RoundingMode = HALF_UP): self
+$money->abs(): self
+
+// Сравнение / предикаты
+$money->compareTo(self): int;  $money->equals(self): bool
+$money->isZero(): bool;  $money->isPositive(): bool;  $money->isNegative(): bool
+$money->amountMinor(): int;  $money->currency(): string
+```
+
+- `App\Shared\Domain\ValueObject\RoundingMode` — enum `HALF_UP` (от нуля) / `HALF_EVEN` (банковское).
+- Округление масштаба — по числу знаков валюты (`Intl\Currencies::getFractionDigits`, fallback 2).
+- Ограничение: PHP `int` 64-бит ≈ ±9.2·10¹⁶ ₽ (минор). За пределами — переполнение.
+
+**Doctrine-маппинг (Embeddable):** `Money` помечен `#[ORM\Embeddable]` и встраивается в Entity
+через `#[ORM\Embedded(class: Money::class)]` → две колонки (`*_amount_minor` bigint + `*_currency`).
+Сумма мапится кастомным типом `App\Shared\Infrastructure\Doctrine\MoneyAmountType`
+(`money_amount_minor`, extends `BigIntType`) — гидрирует bigint в PHP `int`, а не string.
+Зарегистрирован в `config/packages/doctrine.yaml > dbal.types`; namespace VO покрыт маппингом
+`SharedValueObject`. SQL-агрегация по сумме (`SUM`/`ORDER BY`) работает на отдельной колонке.
+
 ---
 
 ## Tagged Services — текущие группы

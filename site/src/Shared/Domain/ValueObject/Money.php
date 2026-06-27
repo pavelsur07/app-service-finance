@@ -5,13 +5,19 @@ declare(strict_types=1);
 namespace App\Shared\Domain\ValueObject;
 
 use App\Shared\Domain\Exception\MoneyMismatchException;
+use App\Shared\Infrastructure\Doctrine\MoneyAmountType;
+use Doctrine\DBAL\Types\Types;
+use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Intl\Currencies;
 use Webmozart\Assert\Assert;
 
+#[ORM\Embeddable]
 final readonly class Money
 {
     private function __construct(
+        #[ORM\Column(type: MoneyAmountType::NAME)]
         private int $amountMinor,
+        #[ORM\Column(type: Types::STRING, length: 3)]
         private string $currency,
     ) {
         Assert::regex($this->currency, '/^[A-Z]{3}$/');
