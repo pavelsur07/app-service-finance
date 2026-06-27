@@ -1,0 +1,33 @@
+/* ============ INPUTS ============ */
+.input {
+  width: 100%; height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--border); border-radius: var(--r-3);
+  background: var(--bg-card);
+  font-family: inherit; font-size: var(--font-13);
+  color: var(--text-strong);
+  outline: none;
+}
+.input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--focus-ring-input); }
+.input::placeholder { color: var(--text-muted); }
+.input-error { border-color: var(--danger-dot); box-shadow: 0 0 0 3px var(--focus-ring-danger); }
+.input-disabled { background: var(--bg-page); color: var(--text-muted); cursor: not-allowed; }
+
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field-label { font-size: var(--font-11_5); color: var(--text-tertiary); font-weight: 600; }
+.field-label .req { color: var(--danger-dot); margin-left: 2px; }
+.field-helper { font-size: var(--font-11); color: var(--text-muted); }
+.field-helper.error { color: var(--danger-text); }
+
+.input-wrap { position: relative; }
+.input-wrap .prefix, .input-wrap .suffix {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  color: var(--text-muted); font-size: var(--font-13); font-weight: 600;
+  pointer-events: none;
+}
+.input-wrap .prefix { left: 12px; }
+.input-wrap .suffix { right: 12px; }
+.input-wrap .input--prefix { padding-left: 32px; }
+.input-wrap .input--suffix { padding-right: 36px; }
+
+textarea.input { height: auto; min-height: 64px; padding-top: 10px; padding-bottom: 10px; resize: vertical; line-height: 1.5; }

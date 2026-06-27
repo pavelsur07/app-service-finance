@@ -1,0 +1,46 @@
+/* ============ BADGES / CHIPS ============ */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 9px;
+  border-radius: var(--r-1);
+  font-size: var(--font-12);
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.chip--filter { background: var(--bg-subtle); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer; }
+.chip--filter.is-active { background: var(--color-primary-tint); border-color: var(--color-primary-border); color: var(--color-primary-hover); font-weight: 700; }
+
+.src {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 7px 2px 5px;
+  border-radius: var(--r-1);
+  font-size: 10.5px; font-weight: 600; line-height: 1; white-space: nowrap;
+  border: 1px solid;
+}
+.src svg { width: 11px; height: 11px; }
+.src--api    { background: var(--src-api-bg);    color: var(--src-api-text);    border-color: var(--src-api-border); }
+.src--manual { background: var(--src-manual-bg); color: var(--src-manual-text); border-color: var(--src-manual-border); }
+.src--bot    { background: var(--src-bot-bg);    color: var(--src-bot-text);    border-color: var(--src-bot-border); }
+.src--xls    { background: var(--src-xls-bg);    color: var(--src-xls-text);    border-color: var(--src-xls-border); }
+.src--1c     { background: var(--src-1c-bg);     color: var(--src-1c-text);     border-color: var(--src-1c-border); }
+
+.bank-badge {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 6px 10px 6px 6px;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--r-3);
+}
+.bank-mark {
+  width: 32px; height: 32px; border-radius: var(--r-2);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 13px; letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+.bank-mark--tinkoff  { background: var(--bank-tinkoff);  color: var(--bank-tinkoff-fg); }
+.bank-mark--sber     { background: var(--bank-sber);     color: var(--bank-sber-fg); }
+.bank-mark--alfa     { background: var(--bank-alfa);     color: var(--bank-alfa-fg); }
+.bank-mark--tochka   { background: var(--bank-tochka);   color: var(--bank-tochka-fg); }
+.bank-mark--mts      { background: var(--bank-mts);      color: var(--bank-mts-fg); }
+.bank-mark--yookassa { background: var(--bank-yookassa); color: var(--bank-yookassa-fg); }
+.bank-name { font-size: 12.5px; font-weight: 700; line-height: 1.2; }
+.bank-token { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-top: 2px; }

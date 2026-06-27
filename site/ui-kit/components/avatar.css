@@ -1,0 +1,15 @@
+/* ============ AVATAR ============ */
+.avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 700; color: #fff;
+  border-radius: var(--r-circle);
+  flex-shrink: 0;
+}
+.avatar--sm { width: var(--avatar-sm); height: var(--avatar-sm); font-size: 10px; }
+.avatar--md { width: var(--avatar-md); height: var(--avatar-md); font-size: 12px; }
+.avatar--lg { width: var(--avatar-lg); height: var(--avatar-lg); font-size: 14px; }
+.avatar--square { border-radius: var(--r-3); }
+.avatar--tint-1 { background: var(--bg-dark); }
+.avatar--tint-2 { background: linear-gradient(135deg, #FBBF24, #F97316); }
+.avatar--tint-3 { background: var(--color-primary); }
+.avatar--tint-4 { background: var(--cat-payroll); }

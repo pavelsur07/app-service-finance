@@ -1,0 +1,9 @@
+:root {
+  /* ===== Radii ===== */
+  --r-1: 4px;   /* chips, badges */
+  --r-2: 5px;   /* nav items, small buttons */
+  --r-3: 6px;   /* inputs, primary buttons */
+  --r-4: 8px;   /* cards, sections */
+  --r-pill: 999px;
+  --r-circle: 50%;
+}

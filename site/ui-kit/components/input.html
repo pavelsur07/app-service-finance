@@ -1,0 +1,42 @@
+<!-- @react Input -->
+<!-- @uiKit v1.4 -->
+<!-- @docs ui-kit/components/input.css -->
+
+<div class="row-2col">
+  <div class="field">
+    <label class="field-label">Default</label>
+    <input class="input" placeholder="Поиск контрагента…">
+  </div>
+  <div class="field">
+    <label class="field-label">Focus</label>
+    <input class="input" value="Тинькофф Бизнес" style="border-color:var(--color-primary); box-shadow:0 0 0 3px rgba(26,86,219,0.12)">
+  </div>
+  <div class="field">
+    <label class="field-label">Error <span class="req">*</span></label>
+    <input class="input input-error" value="abc">
+    <span class="field-helper error">ИНН должен содержать 10 или 12 цифр</span>
+  </div>
+  <div class="field">
+    <label class="field-label">Disabled</label>
+    <input class="input input-disabled" value="Заблокировано" disabled>
+  </div>
+  <div class="field">
+    <label class="field-label">С prefix</label>
+    <div class="input-wrap">
+      <span class="prefix">₽</span>
+      <input class="input input--prefix" value="245 000">
+    </div>
+  </div>
+  <div class="field">
+    <label class="field-label">С suffix · helper</label>
+    <div class="input-wrap">
+      <input class="input input--suffix" value="1.99">
+      <span class="suffix">%</span>
+    </div>
+    <span class="field-helper">Комиссия за платёжный сервис</span>
+  </div>
+  <div class="field" style="grid-column:1/-1">
+    <label class="field-label">Textarea</label>
+    <textarea class="input" rows="3" placeholder="Комментарий, виден только команде…"></textarea>
+  </div>
+</div>

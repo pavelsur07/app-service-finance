@@ -1,0 +1,112 @@
+<!-- @react Report -->
+<!-- @uiKit v1.4 -->
+<!-- @docs ui-kit/patterns/report.css -->
+
+<!-- По кварталам · 4 периода · с раскрытием -->
+<div class="report" style="width:100%; --r-periods:4; --r-label-w:300px; --r-total-w:150px;">
+  <div class="report-scroll">
+    <div>
+      <!-- Column header -->
+      <div class="r-row r-row--head">
+        <div class="r-label"><span class="r-label-hint">Статья ДДС</span></div>
+        <div class="r-cell"><div class="r-cell-head-label">III кв.</div><div class="r-cell-head-sub">2025</div></div>
+        <div class="r-cell"><div class="r-cell-head-label">IV кв.</div><div class="r-cell-head-sub">2025</div></div>
+        <div class="r-cell"><div class="r-cell-head-label">I кв.</div><div class="r-cell-head-sub">2026</div></div>
+        <div class="r-cell"><div class="r-cell-head-label">II кв.</div><div class="r-cell-head-sub">2026</div></div>
+        <div class="r-total"><div class="r-cell-head-label">Итого</div><div class="r-cell-head-sub">за период</div></div>
+      </div>
+
+      <!-- Opening balance -->
+      <div class="r-row r-row--balance">
+        <div class="r-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.2"/></svg>
+          <div class="r-label-block">
+            <div class="r-label-text">Остаток на начало периода</div>
+            <div class="r-label-sub">на первый день</div>
+          </div>
+        </div>
+        <div class="r-cell"><div class="r-cell-val">2&thinsp;100&thinsp;000&nbsp;₽</div></div>
+        <div class="r-cell"><div class="r-cell-val">2&thinsp;295&thinsp;000&nbsp;₽</div></div>
+        <div class="r-cell"><div class="r-cell-val">2&thinsp;580&thinsp;000&nbsp;₽</div></div>
+        <div class="r-cell"><div class="r-cell-val">2&thinsp;840&thinsp;000&nbsp;₽</div></div>
+        <div class="r-total"><div class="r-cell-val">2&thinsp;100&thinsp;000&nbsp;₽</div></div>
+      </div>
+
+      <!-- Section root (Operational, expanded) -->
+      <div class="r-row r-row--section" style="--r-accent:#10B981;">
+        <div class="r-label">
+          <button class="r-chev"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="r-label-block">
+            <div class="r-label-text">1. Операционная деятельность</div>
+            <div class="r-label-sub">текущая деятельность по продажам</div>
+          </div>
+        </div>
+        <div class="r-cell"><div class="r-cell-val">+1&thinsp;195&nbsp;К</div><span class="delta delta--up">+8,2%</span></div>
+        <div class="r-cell"><div class="r-cell-val">+1&thinsp;380&nbsp;К</div><span class="delta delta--up">+15,5%</span></div>
+        <div class="r-cell"><div class="r-cell-val">+1&thinsp;250&nbsp;К</div><span class="delta delta--down">−9,4%</span></div>
+        <div class="r-cell"><div class="r-cell-val">+1&thinsp;420&nbsp;К</div><span class="delta delta--up">+13,6%</span></div>
+        <div class="r-total"><div class="r-cell-val">+5&thinsp;245&nbsp;К&nbsp;₽</div><span class="delta delta--up">+18,8%</span></div>
+      </div>
+
+      <!-- Leaf rows -->
+      <div class="r-row">
+        <div class="r-label">
+          <span class="r-indent" style="width:18px"></span>
+          <span class="r-leaf-dot"></span>
+          <span class="r-dir-dot r-dir-dot--in"></span>
+          <div class="r-label-text">Маркетплейс — Ozon</div>
+        </div>
+        <div class="r-cell"><div class="r-cell-val">+1&thinsp;245&nbsp;К</div><span class="delta delta--up">+4,2%</span></div>
+        <div class="r-cell"><div class="r-cell-val">+1&thinsp;312&nbsp;К</div><span class="delta delta--up">+5,4%</span></div>
+        <div class="r-cell"><div class="r-cell-val">+1&thinsp;380&nbsp;К</div><span class="delta delta--up">+5,2%</span></div>
+        <div class="r-cell"><div class="r-cell-val">+1&thinsp;420&nbsp;К</div><span class="delta delta--up">+2,9%</span></div>
+        <div class="r-total"><div class="r-cell-val">+5&thinsp;357&nbsp;К&nbsp;₽</div><span class="delta delta--up">+14,0%</span></div>
+      </div>
+
+      <!-- Net subtotal -->
+      <div class="r-row r-row--net" style="--r-accent:#10B981;">
+        <div class="r-label">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <div class="r-label-text">Чистый поток · операционная</div>
+        </div>
+        <div class="r-cell"><div class="r-cell-val">+1&thinsp;195&nbsp;К</div><span class="delta delta--up">+8,2%</span></div>
+        <div class="r-cell"><div class="r-cell-val">+1&thinsp;380&nbsp;К</div><span class="delta delta--up">+15,5%</span></div>
+        <div class="r-cell"><div class="r-cell-val">+1&thinsp;250&nbsp;К</div><span class="delta delta--down">−9,4%</span></div>
+        <div class="r-cell"><div class="r-cell-val">+1&thinsp;420&nbsp;К</div><span class="delta delta--up">+13,6%</span></div>
+        <div class="r-total"><div class="r-cell-val">+5&thinsp;245&nbsp;К&nbsp;₽</div><span class="delta delta--up">+18,8%</span></div>
+      </div>
+
+      <!-- Grand net -->
+      <div class="r-row r-row--grand">
+        <div class="r-label">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0B1220" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+          <div class="r-label-block">
+            <div class="r-label-text">Чистое изменение денежных средств</div>
+            <div class="r-label-sub">итог по всем видам деятельности</div>
+          </div>
+        </div>
+        <div class="r-cell"><div class="r-cell-val">+195&nbsp;К</div><span class="delta delta--up">+12,8%</span></div>
+        <div class="r-cell"><div class="r-cell-val">+285&nbsp;К</div><span class="delta delta--up">+46,2%</span></div>
+        <div class="r-cell"><div class="r-cell-val">+260&nbsp;К</div><span class="delta delta--down">−8,8%</span></div>
+        <div class="r-cell"><div class="r-cell-val">+490&nbsp;К</div><span class="delta delta--up">+88,5%</span></div>
+        <div class="r-total"><div class="r-cell-val">+1&thinsp;230&nbsp;К&nbsp;₽</div><span class="delta delta--up">+136%</span></div>
+      </div>
+
+      <!-- Closing balance (dark) -->
+      <div class="r-row r-row--closing">
+        <div class="r-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.2"/></svg>
+          <div class="r-label-block">
+            <div class="r-label-text">Остаток на конец периода</div>
+            <div class="r-label-sub">на последний день</div>
+          </div>
+        </div>
+        <div class="r-cell"><div class="r-cell-val">2&thinsp;295&thinsp;000&nbsp;₽</div></div>
+        <div class="r-cell"><div class="r-cell-val">2&thinsp;580&thinsp;000&nbsp;₽</div></div>
+        <div class="r-cell"><div class="r-cell-val">2&thinsp;840&thinsp;000&nbsp;₽</div></div>
+        <div class="r-cell"><div class="r-cell-val">3&thinsp;330&thinsp;000&nbsp;₽</div></div>
+        <div class="r-total"><div class="r-cell-val">3&thinsp;330&thinsp;000&nbsp;₽</div></div>
+      </div>
+    </div>
+  </div>
+</div>

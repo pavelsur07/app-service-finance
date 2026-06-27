@@ -1,0 +1,74 @@
+<!-- @react Drawer -->
+<!-- @uiKit v1.4 -->
+<!-- @docs ui-kit/patterns/drawer.css -->
+
+<div class="dw">
+  <div class="dw-head">
+    <div style="flex:1">
+      <h3>Редактирование операции</h3>
+      <div class="sub">№ ДДС-1247 · 24.06.2026 · Тинькофф Бизнес •• 4521 · <span class="src src--api" style="vertical-align:middle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a9 9 0 1 1-9-9"/><polyline points="21 3 21 9 15 9"/></svg>API</span></div>
+    </div>
+    <span class="status status--success"><span class="dot"></span>Проведено</span>
+    <button class="btn btn-sm btn-secondary" style="width:32px; padding:0">✕</button>
+  </div>
+  <div class="dw-body" style="display:flex; flex-direction:column; gap:14px; padding:18px 24px;">
+    <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r-4); padding:16px 20px;">
+      <div style="font-size:11px; font-weight:700; color:var(--text-tertiary); letter-spacing:0.05em; text-transform:uppercase; margin-bottom:12px;">Сумма и направление</div>
+      <div class="row-2col">
+        <div class="field">
+          <label class="field-label">Сумма <span class="req">*</span></label>
+          <div class="input-wrap">
+            <input class="input" value="156 200" style="text-align:right; font-weight:700; padding-right:32px; font-variant-numeric:tabular-nums;">
+            <span class="suffix">₽</span>
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label">Направление</label>
+          <div style="display:flex; gap:6px;">
+            <button class="chip chip--filter" style="flex:1; justify-content:center; padding:8px;"><span class="direction direction--in" style="font-weight:600;"><span class="ddot"></span>Поступление</span></button>
+            <button class="chip chip--filter is-active" style="flex:1; justify-content:center; padding:8px;"><span class="direction direction--out" style="font-weight:600;"><span class="ddot"></span>Списание</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r-4); padding:16px 20px;">
+      <div style="font-size:11px; font-weight:700; color:var(--text-tertiary); letter-spacing:0.05em; text-transform:uppercase; margin-bottom:12px;">Контрагент и категория</div>
+      <div class="row-2col">
+        <div class="field">
+          <label class="field-label">Контрагент <span class="req">*</span></label>
+          <button class="input" style="display:flex; align-items:center; gap:8px; cursor:pointer; text-align:left; padding:0 10px;">
+            <span class="avatar avatar--sm avatar--square avatar--tint-1" style="width:22px; height:22px; font-size:9px;">ФНС</span>
+            <span style="flex:1; min-width:0;">ФНС России</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-muted);"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
+        <div class="field">
+          <label class="field-label">Категория ДДС <span class="req">*</span></label>
+          <button class="input" style="display:flex; align-items:center; gap:8px; cursor:pointer; text-align:left; padding:0 10px;">
+            <span style="width:8px; height:8px; border-radius:50%; background:var(--cat-tax);"></span>
+            <span style="flex:1; min-width:0;">Налоги и сборы</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-muted);"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
+        <div class="field" style="grid-column:1/-1;">
+          <label class="field-label">Назначение платежа</label>
+          <input class="input" value="НДС за 2 кв. 2026, договор № 245">
+        </div>
+        <div class="field" style="grid-column:1/-1;">
+          <label class="field-label">Теги</label>
+          <div class="tags-input">
+            <span class="tag-chip">2026-Q2 <button class="x">×</button></span>
+            <span class="tag-chip">обязательный <button class="x">×</button></span>
+            <input placeholder="Добавить тег…">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="dw-foot">
+    <button class="btn btn-md btn-danger">Удалить операцию</button>
+    <div style="flex:1"></div>
+    <button class="btn btn-md btn-secondary">Отмена</button>
+    <button class="btn btn-md btn-primary">Сохранить</button>
+  </div>
+</div>

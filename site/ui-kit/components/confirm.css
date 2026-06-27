@@ -1,0 +1,23 @@
+/* ============ CONFIRMATION DIALOG ============ */
+.confirm-body { padding: 14px 20px 4px; }
+.confirm-title { font-size: 15px; font-weight: 700; color: var(--text-strong); letter-spacing: -0.015em; }
+.confirm-text  { font-size: 13px; color: var(--text-tertiary); margin-top: 6px; line-height: 1.55; }
+.confirm-text b { color: var(--text-strong); }
+.confirm-foot {
+  padding: 14px 20px;
+  border-top: 1px solid var(--border-soft);
+  display: flex; justify-content: flex-end; gap: 8px;
+  margin-top: 14px;
+}
+.btn-danger-solid {
+  background: var(--danger-text); border-color: var(--danger-text);
+  color: #fff;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.15) inset, 0 4px 10px var(--shadow-danger-glow);
+}
+.btn-danger-solid:hover { background: var(--danger-text-hover); border-color: var(--danger-text-hover); }
+.btn-warning-solid {
+  background: var(--warning-text); border-color: var(--warning-text);
+  color: #fff;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.15) inset, 0 4px 10px var(--shadow-warning-glow);
+}
+.btn-warning-solid:hover { background: var(--warning-text-hover); border-color: var(--warning-text-hover); }

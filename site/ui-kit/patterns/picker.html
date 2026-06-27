@@ -1,0 +1,124 @@
+<!-- @react EntityPicker -->
+<!-- @uiKit v1.4 -->
+<!-- @docs ui-kit/patterns/picker.css -->
+
+<!-- EntityPicker — Контрагент -->
+<div class="mdl">
+  <div class="mdl-head">
+    <div style="flex:1">
+      <h3>Выбор контрагента</h3>
+      <div class="sub">42 контрагента · поиск по названию и ИНН</div>
+    </div>
+    <button class="btn btn-sm btn-ghost" style="width:28px; padding:0">✕</button>
+  </div>
+  <div class="picker">
+    <div class="picker-search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input placeholder="Найти по названию или ИНН…">
+    </div>
+    <div class="picker-tabs">
+      <button class="picker-tab is-active">Недавние <span class="count">8</span></button>
+      <button class="picker-tab">Избранные <span class="count">3</span></button>
+      <button class="picker-tab">Все <span class="count">42</span></button>
+    </div>
+    <div class="picker-list">
+      <button class="picker-item is-selected">
+        <span class="avatar avatar--md avatar--square avatar--tint-1" style="font-size:10px;">ТП</span>
+        <div class="pi-body">
+          <div class="pi-name">ООО «Технопарк»</div>
+          <div class="pi-meta">ИНН <b>7704123456</b> · ООО · <span class="src src--api" style="padding:1px 5px;">API</span></div>
+        </div>
+        <div class="pi-right">
+          <span class="star is-on"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15 9 22 9 17 14 19 22 12 18 5 22 7 14 2 9 9 9"/></svg></span>
+        </div>
+      </button>
+      <button class="picker-item">
+        <span class="avatar avatar--md avatar--square avatar--tint-3" style="font-size:10px;">ЯД</span>
+        <div class="pi-body">
+          <div class="pi-name">Яндекс.Директ</div>
+          <div class="pi-meta">ИНН <b>7736207543</b> · ООО · <span class="src src--api" style="padding:1px 5px;">API</span></div>
+        </div>
+        <div class="pi-right">
+          <span class="star is-on"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15 9 22 9 17 14 19 22 12 18 5 22 7 14 2 9 9 9"/></svg></span>
+        </div>
+      </button>
+      <button class="picker-item">
+        <span class="avatar avatar--md avatar--square avatar--tint-4" style="font-size:10px;">ФНС</span>
+        <div class="pi-body">
+          <div class="pi-name">ФНС России</div>
+          <div class="pi-meta">ИНН <b>7707329152</b> · Бюджетная организация</div>
+        </div>
+        <div class="pi-right">
+          <span class="star"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15 9 22 9 17 14 19 22 12 18 5 22 7 14 2 9 9 9"/></svg></span>
+        </div>
+      </button>
+    </div>
+  </div>
+  <div class="picker-foot">
+    <button class="btn btn-md btn-ghost add" style="color:var(--color-primary); margin-right:auto">+ Добавить контрагента</button>
+    <button class="btn btn-md btn-secondary">Отмена</button>
+    <button class="btn btn-md btn-primary">Выбрать</button>
+  </div>
+</div>
+
+<!-- TreePicker — Категория ДДС -->
+<div class="mdl">
+  <div class="mdl-head">
+    <div style="flex:1">
+      <h3>Выбор категории ДДС</h3>
+      <div class="sub">Серые разделы — для группировки; выбираются цветные конечные статьи</div>
+    </div>
+    <button class="btn btn-sm btn-ghost" style="width:28px; padding:0">✕</button>
+  </div>
+  <div class="picker">
+    <div class="picker-search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input value="услу" placeholder="Найти статью…">
+    </div>
+    <div class="picker-list" style="max-height:300px;">
+      <button class="tree-node is-disabled">
+        <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"/></svg></span>
+        <span class="tn-name">Доходы</span>
+        <span class="tn-amount" style="color:var(--success-text);">+5&thinsp;670&thinsp;000 ₽</span>
+      </button>
+      <div style="padding-left:16px;">
+        <button class="tree-node is-disabled">
+          <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"/></svg></span>
+          <span class="tn-name">От клиентов</span>
+          <span class="tn-amount" style="color:var(--success-text);">+4&thinsp;820&thinsp;450 ₽</span>
+        </button>
+        <div style="padding-left:16px;">
+          <button class="tree-node is-selected">
+            <span class="chev-spacer"></span>
+            <span class="tn-dot" style="background:var(--cat-revenue);"></span>
+            <span class="tn-name">Оплата за <mark>услу</mark>ги</span>
+            <span class="tn-amount" style="color:var(--success-text);">+3&thinsp;240&thinsp;000 ₽</span>
+            <span class="tn-check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>
+          </button>
+          <button class="tree-node">
+            <span class="chev-spacer"></span>
+            <span class="tn-dot" style="background:var(--cat-revenue);"></span>
+            <span class="tn-name">Оплата за товары</span>
+            <span class="tn-amount" style="color:var(--success-text);">+1&thinsp;580&thinsp;450 ₽</span>
+            <span class="tn-check"></span>
+          </button>
+        </div>
+      </div>
+      <button class="tree-node is-collapsed is-disabled">
+        <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"/></svg></span>
+        <span class="tn-name">Расходы</span>
+        <span class="tn-amount" style="color:var(--danger-text);">−2&thinsp;968&thinsp;720 ₽</span>
+      </button>
+    </div>
+    <div class="picker-breadcrumb">
+      <span>Выбрано:</span>
+      <b>Доходы</b><span class="sep">›</span>
+      <b>От клиентов</b><span class="sep">›</span>
+      <b style="color:var(--color-primary-hover);">Оплата за услуги</b>
+    </div>
+  </div>
+  <div class="mdl-foot">
+    <button class="btn btn-md btn-secondary">Отмена</button>
+    <button class="btn btn-md btn-primary">Выбрать</button>
+  </div>
+</div>

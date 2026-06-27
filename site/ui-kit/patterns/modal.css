@@ -1,0 +1,14 @@
+/* Modal (in-place demo) */
+.mdl {
+  width: 100%; max-width: var(--modal-width-standard);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-4);
+  box-shadow: var(--shadow-modal);
+}
+.mdl--compact { max-width: var(--modal-width-compact); }
+.mdl-head { padding: 18px 20px 12px; display: flex; align-items: flex-start; gap: 12px; }
+.mdl-head h3 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.015em; }
+.mdl-head .sub { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+.mdl-body { padding: 0 20px 12px; min-height: 60px; }
+.mdl-foot { border-top: 1px solid var(--border); padding: 12px 20px; display: flex; gap: 8px; justify-content: flex-end; }

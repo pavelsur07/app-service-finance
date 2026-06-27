@@ -1,0 +1,39 @@
+<!-- @react ConfirmDialog -->
+<!-- @uiKit v1.4 -->
+<!-- @docs ui-kit/components/confirm.css -->
+
+<!-- Destructive (Удалить) -->
+<div class="mdl mdl--compact">
+  <div class="confirm-body">
+    <div class="confirm-title">Удалить контрагента «ФНС России»?</div>
+    <div class="confirm-text">Это действие нельзя отменить. У контрагента <b>8 связанных операций</b> — они останутся, но потеряют связь с контрагентом.</div>
+  </div>
+  <div class="confirm-foot">
+    <button class="btn btn-md btn-secondary">Отмена</button>
+    <button class="btn btn-md btn-danger-solid">Удалить</button>
+  </div>
+</div>
+
+<!-- Warning (Прервать операцию) -->
+<div class="mdl mdl--compact">
+  <div class="confirm-body">
+    <div class="confirm-title">Отменить операцию?</div>
+    <div class="confirm-text">Операция «Оплата по счёту № 245» будет отменена. Действие можно откатить в течение 24 часов.</div>
+  </div>
+  <div class="confirm-foot">
+    <button class="btn btn-md btn-secondary">Не отменять</button>
+    <button class="btn btn-md btn-warning-solid">Отменить операцию</button>
+  </div>
+</div>
+
+<!-- Neutral (Закрыть без сохранения) -->
+<div class="mdl mdl--compact">
+  <div class="confirm-body">
+    <div class="confirm-title">Закрыть без сохранения?</div>
+    <div class="confirm-text">Введённые данные будут потеряны. Чтобы сохранить, нажмите «Отмена» и нажмите «Сохранить» в форме.</div>
+  </div>
+  <div class="confirm-foot">
+    <button class="btn btn-md btn-secondary">Отмена</button>
+    <button class="btn btn-md btn-primary">Закрыть</button>
+  </div>
+</div>
