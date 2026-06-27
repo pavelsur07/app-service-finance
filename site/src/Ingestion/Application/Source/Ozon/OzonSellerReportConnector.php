@@ -37,6 +37,18 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
     }
 
     /**
+     * @return list<string>
+     */
+    public function resourceTypes(): array
+    {
+        return [
+            OzonResourceType::ACCRUAL_POSTINGS,
+            OzonResourceType::ACCRUAL_BY_DAY,
+            OzonResourceType::ACCRUAL_TYPES,
+        ];
+    }
+
+    /**
      * @return list<Capability>
      */
     public function capabilities(): array

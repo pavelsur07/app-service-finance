@@ -26,7 +26,7 @@ final class FakeConnector implements SourceConnectorInterface
     private array $pullRequests = [];
 
     /**
-     * @var list<array{externalId: string, nextCursorValue: ?string, hasMore: bool, rowExternalId: string, normalizeRawRecords: bool, continuationDelaySeconds: ?int}|\Throwable>
+     * @var list<array{externalId: string, nextCursorValue: ?string, hasMore: bool, rowExternalId: string, normalizeRawRecords: bool, continuationDelaySeconds: ?int, rawBatch: bool}|\Throwable>
      */
     private array $queuedPullResults = [];
 
@@ -62,6 +62,20 @@ final class FakeConnector implements SourceConnectorInterface
             'rowExternalId' => $rowExternalId,
             'normalizeRawRecords' => $normalizeRawRecords,
             'continuationDelaySeconds' => $continuationDelaySeconds,
+            'rawBatch' => true,
+        ];
+    }
+
+    public function enqueueContinuationOnly(?string $nextCursorValue, int $continuationDelaySeconds = 70): void
+    {
+        $this->queuedPullResults[] = [
+            'externalId' => 'fake-continuation-only',
+            'nextCursorValue' => $nextCursorValue,
+            'hasMore' => true,
+            'rowExternalId' => '',
+            'normalizeRawRecords' => false,
+            'continuationDelaySeconds' => $continuationDelaySeconds,
+            'rawBatch' => false,
         ];
     }
 
@@ -81,6 +95,14 @@ final class FakeConnector implements SourceConnectorInterface
     public function source(): IngestSource
     {
         return IngestSource::WILDBERRIES;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function resourceTypes(): array
+    {
+        return [self::RESOURCE_TYPE];
     }
 
     /**
@@ -129,7 +151,18 @@ final class FakeConnector implements SourceConnectorInterface
             'rowExternalId' => 'fake-sale-1',
             'normalizeRawRecords' => true,
             'continuationDelaySeconds' => null,
+            'rawBatch' => true,
         ];
+        if (false === $result['rawBatch']) {
+            return new PullResult(
+                rawBatch: null,
+                nextCursorValue: $result['nextCursorValue'],
+                hasMore: $result['hasMore'],
+                normalizeRawRecords: $result['normalizeRawRecords'],
+                continuationDelaySeconds: $result['continuationDelaySeconds'],
+            );
+        }
+
         $operationGroupId = Uuid::uuid7()->toString();
 
         return new PullResult(

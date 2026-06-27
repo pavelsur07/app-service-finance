@@ -20,12 +20,12 @@ final class ConnectorRegistryTest extends TestCase
 {
     public function testReturnsConnectorBySource(): void
     {
-        $connector = $this->connector(IngestSource::OZON);
+        $connector = $this->connector(IngestSource::OZON, ['ozon_resource']);
         $registry = new ConnectorRegistry([$connector]);
 
-        self::assertTrue($registry->has(IngestSource::OZON));
-        self::assertSame($connector, $registry->get(IngestSource::OZON));
-        self::assertFalse($registry->has(IngestSource::WILDBERRIES));
+        self::assertTrue($registry->has(IngestSource::OZON, 'ozon_resource'));
+        self::assertSame($connector, $registry->get(IngestSource::OZON, 'ozon_resource'));
+        self::assertFalse($registry->has(IngestSource::WILDBERRIES, 'wb_resource'));
     }
 
     public function testMissingConnectorThrowsDomainException(): void
@@ -33,29 +33,53 @@ final class ConnectorRegistryTest extends TestCase
         $registry = new ConnectorRegistry([]);
 
         $this->expectException(ConnectorNotFoundException::class);
-        $registry->get(IngestSource::OZON);
+        $registry->get(IngestSource::OZON, 'ozon_resource');
     }
 
-    public function testDuplicateSourceIsRejected(): void
+    public function testDuplicateSourceAndResourceIsRejected(): void
     {
         $this->expectException(\InvalidArgumentException::class);
 
         new ConnectorRegistry([
-            $this->connector(IngestSource::OZON),
-            $this->connector(IngestSource::OZON),
+            $this->connector(IngestSource::OZON, ['ozon_resource']),
+            $this->connector(IngestSource::OZON, ['ozon_resource']),
         ]);
     }
 
-    private function connector(IngestSource $source): SourceConnectorInterface
+    public function testSameSourceWithDifferentResourcesIsAllowed(): void
     {
-        return new class($source) implements SourceConnectorInterface {
-            public function __construct(private readonly IngestSource $source)
+        $first = $this->connector(IngestSource::OZON, ['first_resource']);
+        $second = $this->connector(IngestSource::OZON, ['second_resource']);
+        $registry = new ConnectorRegistry([$first, $second]);
+
+        self::assertSame($first, $registry->get(IngestSource::OZON, 'first_resource'));
+        self::assertSame($second, $registry->get(IngestSource::OZON, 'second_resource'));
+    }
+
+    /**
+     * @param list<string> $resourceTypes
+     */
+    private function connector(IngestSource $source, array $resourceTypes): SourceConnectorInterface
+    {
+        return new class($source, $resourceTypes) implements SourceConnectorInterface {
+            /**
+             * @param list<string> $resourceTypes
+             */
+            public function __construct(private readonly IngestSource $source, private readonly array $resourceTypes)
             {
             }
 
             public function source(): IngestSource
             {
                 return $this->source;
+            }
+
+            /**
+             * @return list<string>
+             */
+            public function resourceTypes(): array
+            {
+                return $this->resourceTypes;
             }
 
             /**

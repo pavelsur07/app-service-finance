@@ -492,6 +492,10 @@ export interface operations {
                             shop_ref?: string;
                             /** @example ozon_finance_accrual_by_day */
                             resource_type?: string;
+                            /** @example Accrual by day */
+                            resource_label?: string;
+                            /** @example Ozon Finance */
+                            resource_group?: string;
                             /** @example 1 */
                             raw_count?: number;
                             /** @example 287 */

@@ -13,6 +13,8 @@ interface CoverageHeatmapViewProps {
 interface AggregatedCell {
     date: string;
     resourceType: string;
+    resourceLabel: string;
+    resourceGroup: string;
     rawCount: number;
     txCount: number;
     issueCount: number;
@@ -33,7 +35,8 @@ function buildCellTitle(cell: AggregatedCell): string {
         : '';
 
     return [
-        `${formatDate(cell.date)} · ${cell.resourceType}`,
+        `${formatDate(cell.date)} · ${cell.resourceGroup} · ${cell.resourceLabel}`,
+        `Тип: ${cell.resourceType}`,
         `Raw: ${formatNumber(cell.rawCount)}`,
         `Транзакции: ${formatNumber(cell.txCount)}`,
         `Проблемы: ${formatNumber(cell.issueCount)}${lastFetched}`,
@@ -55,15 +58,17 @@ function statusClass(cell: AggregatedCell | null): string {
 const CoverageHeatmapView: React.FC<CoverageHeatmapViewProps> = ({ cells, from, to }) => {
     const dates = useMemo(() => buildDateRange(from, to), [from, to]);
 
-    const { resourceTypes, cellsByKey, coveredDays, totalIssues } = useMemo(() => {
+    const { resourceTypes, resourceLabels, cellsByKey, coveredDays, totalIssues } = useMemo(() => {
         const aggregated = new Map<string, AggregatedCell>();
-        const resources = new Set<string>();
+        const resources = new Map<string, { label: string; group: string }>();
         const days = new Set<string>();
         let issues = 0;
 
         cells.forEach((cell) => {
             const date = typeof cell.date === 'string' ? cell.date : '';
             const resourceType = typeof cell.resource_type === 'string' ? cell.resource_type : '';
+            const resourceLabel = typeof cell.resource_label === 'string' ? cell.resource_label : resourceType;
+            const resourceGroup = typeof cell.resource_group === 'string' ? cell.resource_group : 'Ingestion';
 
             if (date === '' || resourceType === '') {
                 return;
@@ -76,7 +81,7 @@ const CoverageHeatmapView: React.FC<CoverageHeatmapViewProps> = ({ cells, from, 
             const issueCount = numberValue(cell.issue_count);
             const lastFetchedAt = typeof cell.last_fetched_at === 'string' ? cell.last_fetched_at : null;
 
-            resources.add(resourceType);
+            resources.set(resourceType, { label: resourceLabel, group: resourceGroup });
             issues += issueCount;
 
             if (rawCount > 0) {
@@ -87,6 +92,8 @@ const CoverageHeatmapView: React.FC<CoverageHeatmapViewProps> = ({ cells, from, 
                 aggregated.set(key, {
                     date,
                     resourceType,
+                    resourceLabel,
+                    resourceGroup,
                     rawCount,
                     txCount,
                     issueCount,
@@ -97,6 +104,8 @@ const CoverageHeatmapView: React.FC<CoverageHeatmapViewProps> = ({ cells, from, 
 
             aggregated.set(key, {
                 ...existing,
+                resourceLabel,
+                resourceGroup,
                 rawCount: existing.rawCount + rawCount,
                 txCount: existing.txCount + txCount,
                 issueCount: existing.issueCount + issueCount,
@@ -105,7 +114,8 @@ const CoverageHeatmapView: React.FC<CoverageHeatmapViewProps> = ({ cells, from, 
         });
 
         return {
-            resourceTypes: Array.from(resources).sort(),
+            resourceTypes: Array.from(resources.keys()).sort(),
+            resourceLabels: resources,
             cellsByKey: aggregated,
             coveredDays: days.size,
             totalIssues: issues,
@@ -155,28 +165,35 @@ const CoverageHeatmapView: React.FC<CoverageHeatmapViewProps> = ({ cells, from, 
                             </tr>
                         </thead>
                         <tbody>
-                            {resourceTypes.map((resourceType) => (
-                                <tr key={resourceType}>
-                                    <td className="text-nowrap">{resourceType}</td>
-                                    {dates.map((date) => {
-                                        const cell = cellsByKey.get(cellKey(date, resourceType)) ?? null;
-                                        const label = cell === null
-                                            ? '—'
-                                            : String(cell.issueCount > 0 ? cell.issueCount : cell.rawCount);
+                            {resourceTypes.map((resourceType) => {
+                                const description = resourceLabels.get(resourceType);
+                                const label = description === undefined
+                                    ? resourceType
+                                    : `${description.group} · ${description.label}`;
 
-                                        return (
-                                            <td key={date} className="text-center">
-                                                <span
-                                                    className={`avatar avatar-sm rounded-1 ${statusClass(cell)}`}
-                                                    title={cell === null ? date : buildCellTitle(cell)}
-                                                >
-                                                    {label}
-                                                </span>
-                                            </td>
-                                        );
-                                    })}
-                                </tr>
-                            ))}
+                                return (
+                                    <tr key={resourceType}>
+                                        <td className="text-nowrap" title={resourceType}>{label}</td>
+                                        {dates.map((date) => {
+                                            const cell = cellsByKey.get(cellKey(date, resourceType)) ?? null;
+                                            const countLabel = cell === null
+                                                ? '—'
+                                                : String(cell.issueCount > 0 ? cell.issueCount : cell.rawCount);
+
+                                            return (
+                                                <td key={date} className="text-center">
+                                                    <span
+                                                        className={`avatar avatar-sm rounded-1 ${statusClass(cell)}`}
+                                                        title={cell === null ? date : buildCellTitle(cell)}
+                                                    >
+                                                        {countLabel}
+                                                    </span>
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>

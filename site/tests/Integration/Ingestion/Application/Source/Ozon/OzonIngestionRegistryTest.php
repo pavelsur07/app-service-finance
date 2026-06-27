@@ -6,6 +6,7 @@ namespace App\Tests\Integration\Ingestion\Application\Source\Ozon;
 
 use App\Ingestion\Application\Source\Ozon\OzonAccrualByDayMapper;
 use App\Ingestion\Application\Source\Ozon\OzonAccrualShadowMapper;
+use App\Ingestion\Application\Source\Ozon\OzonPerformanceReportConnector;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Application\Source\Ozon\OzonSellerReportConnector;
 use App\Ingestion\Domain\Service\ConnectorRegistry;
@@ -23,7 +24,14 @@ final class OzonIngestionRegistryTest extends IntegrationTestCase
         /** @var MapperRegistry $mapperRegistry */
         $mapperRegistry = self::getContainer()->get(MapperRegistry::class);
 
-        self::assertInstanceOf(OzonSellerReportConnector::class, $connectorRegistry->get(IngestSource::OZON));
+        self::assertInstanceOf(
+            OzonSellerReportConnector::class,
+            $connectorRegistry->get(IngestSource::OZON, OzonResourceType::ACCRUAL_BY_DAY),
+        );
+        self::assertInstanceOf(
+            OzonPerformanceReportConnector::class,
+            $connectorRegistry->get(IngestSource::OZON, OzonResourceType::PERFORMANCE_CAMPAIGNS),
+        );
         self::assertInstanceOf(
             OzonAccrualShadowMapper::class,
             $mapperRegistry->get(IngestSource::OZON, OzonResourceType::ACCRUAL_POSTINGS),

@@ -6,6 +6,7 @@ namespace App\Ingestion\Infrastructure\Query;
 
 use App\Ingestion\Application\DTO\CoverageCellView;
 use App\Ingestion\Application\DTO\ShopOptionView;
+use App\Ingestion\Application\Service\IngestionResourceLabelProvider;
 use App\Ingestion\Enum\SyncJobKind;
 use App\Ingestion\Enum\SyncJobStatus;
 use Doctrine\DBAL\Connection;
@@ -16,6 +17,7 @@ final class CoverageQuery
 {
     public function __construct(
         private readonly Connection $connection,
+        private readonly IngestionResourceLabelProvider $resourceLabelProvider,
     ) {
     }
 
@@ -108,18 +110,22 @@ final class CoverageQuery
         $rows = $qb->executeQuery()->fetchAllAssociative();
         $rows = $this->mergeRows($rows, $this->failedJobIssueRows($companyId, $shopRef, $from, $to));
 
-        return array_map(
-            static fn (array $row): CoverageCellView => new CoverageCellView(
+        return array_map(function (array $row): CoverageCellView {
+            $resourceType = (string) $row['resource_type'];
+            $description = $this->resourceLabelProvider->describe($resourceType);
+
+            return new CoverageCellView(
                 date: (string) $row['record_date'],
                 shopRef: (string) $row['shop_ref'],
-                resourceType: (string) $row['resource_type'],
+                resourceType: $resourceType,
+                resourceLabel: $description['label'],
+                resourceGroup: $description['group'],
                 rawCount: (int) $row['raw_count'],
                 txCount: (int) $row['tx_count'],
                 issueCount: (int) $row['issue_count'],
                 lastFetchedAt: self::formatDateTime($row['last_fetched_at'] ?? null),
-            ),
-            $rows,
-        );
+            );
+        }, $rows);
     }
 
     /**

@@ -9,7 +9,7 @@ use App\Ingestion\DTO\RawBatch;
 final readonly class PullResult
 {
     public function __construct(
-        public RawBatch $rawBatch,
+        public ?RawBatch $rawBatch,
         public ?string $nextCursorValue,
         public bool $hasMore,
         public bool $normalizeRawRecords = true,

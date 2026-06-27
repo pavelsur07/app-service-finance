@@ -45,6 +45,12 @@ final class StartBackfillCommand extends Command
     private const ALLOWED_RESOURCE_TYPES_BY_SOURCE = [
         'ozon' => [
             OzonResourceType::ACCRUAL_BY_DAY,
+            OzonResourceType::PERFORMANCE_CAMPAIGNS,
+            OzonResourceType::PERFORMANCE_SKU_CAMPAIGN_OBJECTS,
+            OzonResourceType::PERFORMANCE_SEARCH_PROMO_PRODUCTS,
+            OzonResourceType::PERFORMANCE_SKU_PRODUCT_STATISTICS,
+            OzonResourceType::PERFORMANCE_SEARCH_PROMO_STATISTICS,
+            OzonResourceType::PERFORMANCE_EXPENSE_STATISTICS,
         ],
         'wildberries' => [
             WbResourceType::FINANCE_SALES_REPORT_DETAILED,
@@ -81,7 +87,7 @@ final class StartBackfillCommand extends Command
             $source = $this->source($input);
             $daysBack = $this->daysBack($input);
             $resourceTypes = $this->resourceTypes($source, $input);
-            $shopRef = $this->shopRef($source, $companyId, $connectionRef, $input);
+            $shopRef = $this->shopRef($source, $resourceTypes[0], $companyId, $connectionRef, $input);
         } catch (ConnectorAuthException) {
             $io->error('Auth failed: check credentials for connection.');
 
@@ -219,14 +225,14 @@ final class StartBackfillCommand extends Command
         return [$requested];
     }
 
-    private function shopRef(IngestSource $source, string $companyId, string $connectionRef, InputInterface $input): string
+    private function shopRef(IngestSource $source, string $resourceType, string $companyId, string $connectionRef, InputInterface $input): string
     {
         $shopRef = trim((string) $input->getOption('shop-ref'));
         if ('' !== $shopRef) {
             return $shopRef;
         }
 
-        $shops = $this->connectorRegistry->get($source)->discoverShops($companyId, $connectionRef);
+        $shops = $this->connectorRegistry->get($source, $resourceType)->discoverShops($companyId, $connectionRef);
         if ([] === $shops) {
             throw new \RuntimeException('No shops found for connection.');
         }
