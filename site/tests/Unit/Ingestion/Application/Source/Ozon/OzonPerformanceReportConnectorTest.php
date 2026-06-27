@@ -9,6 +9,7 @@ use App\Ingestion\Application\DTO\PushRequest;
 use App\Ingestion\Application\Source\Ozon\OzonPerformanceReportConnector;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Enum\Capability;
+use App\Ingestion\Exception\ConnectorTransientException;
 use App\Ingestion\Exception\UnsupportedCapabilityException;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonPerformanceReportClientInterface;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonRawPage;
@@ -92,8 +93,44 @@ final class OzonPerformanceReportConnectorTest extends TestCase
         self::assertNull($result->rawBatch);
         self::assertTrue($result->hasMore);
         self::assertSame(60, $result->continuationDelaySeconds);
-        self::assertSame('{"batchOffset":0,"reportType":"products","state":"poll","uuid":"report-uuid-1"}', $result->nextCursorValue);
+        self::assertSame(
+            '{"batchOffset":0,"reportType":"products","state":"poll","uuid":"report-uuid-1","pollAttempts":0,"pollStartedAt":"2026-06-27T12:00:00+00:00"}',
+            $result->nextCursorValue,
+        );
         self::assertSame([['products', ['search-1']]], $client->generatedReports);
+    }
+
+    public function testSearchPromoStatisticsRequeuesPollWithIncrementedAttempt(): void
+    {
+        $client = new FakeOzonPerformanceReportClient();
+        $client->campaignsByType['SEARCH_PROMO'] = [['id' => 'search-1']];
+
+        $result = $this->connector($client)->pull($this->request(
+            OzonResourceType::PERFORMANCE_SEARCH_PROMO_STATISTICS,
+            cursorValue: '{"batchOffset":0,"reportType":"products","state":"poll","uuid":"report-uuid-1","pollAttempts":2,"pollStartedAt":"2026-06-27T11:55:00+00:00"}',
+        ));
+
+        self::assertNull($result->rawBatch);
+        self::assertTrue($result->hasMore);
+        self::assertSame(60, $result->continuationDelaySeconds);
+        self::assertSame(
+            '{"batchOffset":0,"reportType":"products","state":"poll","uuid":"report-uuid-1","pollAttempts":3,"pollStartedAt":"2026-06-27T11:55:00+00:00"}',
+            $result->nextCursorValue,
+        );
+    }
+
+    public function testSearchPromoStatisticsFailsWhenReportPollingExceedsTimeout(): void
+    {
+        $client = new FakeOzonPerformanceReportClient();
+        $client->campaignsByType['SEARCH_PROMO'] = [['id' => 'search-1']];
+
+        $this->expectException(ConnectorTransientException::class);
+        $this->expectExceptionMessage('Ozon Search Promo report report-uuid-1 was not ready');
+
+        $this->connector($client)->pull($this->request(
+            OzonResourceType::PERFORMANCE_SEARCH_PROMO_STATISTICS,
+            cursorValue: '{"batchOffset":0,"reportType":"products","state":"poll","uuid":"report-uuid-1","pollAttempts":12,"pollStartedAt":"2026-06-27T10:59:59+00:00"}',
+        ));
     }
 
     public function testSearchPromoStatisticsPollsAndStoresDownloadedReport(): void

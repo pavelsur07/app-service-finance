@@ -138,6 +138,80 @@ final class OzonPerformanceReportClientTest extends IntegrationTestCase
         self::assertStringNotContainsString('Authorization:', implode("\n", $this->headerLines($calls[1]['options'])));
     }
 
+    public function testDownloadReportNormalizesRelativeOzonLinkAndKeepsBearerAuth(): void
+    {
+        $company = $this->seedCompany('11111111-1111-4111-8111-00000000b205', 9205);
+        $connection = $this->seedPerformanceConnection($company, '77777777-7777-4777-8777-00000000b205');
+        $this->em->flush();
+
+        $calls = [];
+        $csv = "sku,cost\nsku-2,45.60\n";
+        $http = new MockHttpClient(static function (string $method, string $url, array $options = []) use (&$calls, $csv): MockResponse {
+            $calls[] = ['method' => $method, 'url' => $url, 'options' => $options];
+
+            if (str_ends_with($url, '/api/client/token')) {
+                return new MockResponse('{"access_token":"relative-token","expires_in":1800}', ['http_code' => 200]);
+            }
+            if ('https://api-performance.ozon.ru/api/client/statistics/report?UUID=report-uuid-2' === $url) {
+                return new MockResponse($csv, ['http_code' => 200]);
+            }
+
+            throw new \LogicException(sprintf('Unexpected request: %s %s', $method, $url));
+        });
+
+        $page = $this->client($http)->downloadReport(
+            $company->getId(),
+            $connection->getId(),
+            'report-uuid-2',
+            '/api/client/statistics/report?UUID=report-uuid-2',
+        );
+
+        self::assertSame('https://api-performance.ozon.ru/api/client/statistics/report?UUID=report-uuid-2', $calls[1]['url']);
+        self::assertStringContainsString('Authorization: Bearer relative-token', implode("\n", $this->headerLines($calls[1]['options'])));
+        self::assertSame('sku-2', $page->rows[0]['sku'] ?? null);
+    }
+
+    public function testDownloadReportExtractsCsvFromZipPayload(): void
+    {
+        if (!class_exists(\ZipArchive::class)) {
+            self::markTestSkipped('ext-zip is required for this test.');
+        }
+
+        $company = $this->seedCompany('11111111-1111-4111-8111-00000000b206', 9206);
+        $connection = $this->seedPerformanceConnection($company, '77777777-7777-4777-8777-00000000b206');
+        $this->em->flush();
+
+        $calls = [];
+        $zip = $this->zipWithCsv("sku;cost\nsku-zip;78.90\n");
+        $http = new MockHttpClient(static function (string $method, string $url, array $options = []) use (&$calls, $zip): MockResponse {
+            $calls[] = ['method' => $method, 'url' => $url, 'options' => $options];
+
+            if (str_ends_with($url, '/api/client/token')) {
+                return new MockResponse('{"access_token":"zip-token","expires_in":1800}', ['http_code' => 200]);
+            }
+            if ('https://download.example.test/report.zip' === $url) {
+                return new MockResponse($zip, ['http_code' => 200]);
+            }
+
+            throw new \LogicException(sprintf('Unexpected request: %s %s', $method, $url));
+        });
+
+        $page = $this->client($http)->downloadReport(
+            $company->getId(),
+            $connection->getId(),
+            'report-uuid-zip',
+            'https://download.example.test/report.zip',
+        );
+
+        self::assertSame([
+            [
+                'sku' => 'sku-zip',
+                'cost' => '78.90',
+                '_ingestion_metadata' => ['reportUuid' => 'report-uuid-zip'],
+            ],
+        ], $page->rows);
+    }
+
     private function client(MockHttpClient $http): OzonPerformanceReportClient
     {
         return new OzonPerformanceReportClient(
@@ -213,5 +287,23 @@ final class OzonPerformanceReportClientTest extends IntegrationTestCase
             static fn (mixed $header): string => is_scalar($header) ? (string) $header : '',
             $headers,
         ));
+    }
+
+    private function zipWithCsv(string $csv): string
+    {
+        $file = tempnam(sys_get_temp_dir(), 'ozon_perf_zip_test_');
+        self::assertIsString($file);
+
+        $zip = new \ZipArchive();
+        self::assertTrue($zip->open($file, \ZipArchive::CREATE | \ZipArchive::OVERWRITE));
+        self::assertTrue($zip->addFromString('report.csv', $csv));
+        self::assertTrue($zip->close());
+
+        $content = file_get_contents($file);
+        @unlink($file);
+
+        self::assertIsString($content);
+
+        return $content;
     }
 }

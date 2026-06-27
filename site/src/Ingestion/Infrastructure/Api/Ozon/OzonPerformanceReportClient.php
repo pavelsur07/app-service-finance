@@ -273,14 +273,14 @@ final readonly class OzonPerformanceReportClient implements OzonPerformanceRepor
     {
         $absoluteUrl = isset($options['absoluteUrl']) && is_string($options['absoluteUrl']) && '' !== $options['absoluteUrl'];
         $url = $absoluteUrl
-            ? $options['absoluteUrl']
+            ? $this->normalizeReportUrl($options['absoluteUrl'])
             : $this->baseUrl.$endpoint;
         unset($options['absoluteUrl']);
 
         $options['headers'] = array_merge($options['headers'] ?? [], [
             'Accept' => 'application/json',
         ]);
-        if (!$absoluteUrl) {
+        if (!$absoluteUrl || !$this->isExternalUrl($url)) {
             $options['headers']['Authorization'] = 'Bearer '.$token;
         }
         $options['timeout'] ??= self::REQUEST_TIMEOUT;
@@ -484,7 +484,71 @@ final readonly class OzonPerformanceReportClient implements OzonPerformanceRepor
         } catch (\JsonException) {
         }
 
+        if ($this->isZipContent($content)) {
+            return $this->decodeZip($content);
+        }
+
         return $this->decodeCsv($content);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function decodeZip(string $content): array
+    {
+        if (!class_exists(\ZipArchive::class)) {
+            throw new ConnectorTransientException('Ozon Performance ZIP report cannot be read because ext-zip is unavailable.');
+        }
+
+        $file = tempnam(sys_get_temp_dir(), 'ozon_perf_report_');
+        if (false === $file) {
+            throw new ConnectorTransientException('Ozon Performance ZIP report temporary file cannot be created.');
+        }
+
+        try {
+            if (false === file_put_contents($file, $content)) {
+                throw new ConnectorTransientException('Ozon Performance ZIP report temporary file cannot be written.');
+            }
+
+            $zip = new \ZipArchive();
+            if (true !== $zip->open($file)) {
+                throw new ConnectorTransientException('Ozon Performance ZIP report cannot be opened.');
+            }
+
+            try {
+                $rows = [];
+                $csvFiles = 0;
+                for ($index = 0; $index < $zip->numFiles; ++$index) {
+                    $name = (string) ($zip->getNameIndex($index) ?: '');
+                    if ('' === $name || str_ends_with($name, '/')) {
+                        continue;
+                    }
+
+                    $extension = strtolower(pathinfo($name, \PATHINFO_EXTENSION));
+                    if (!in_array($extension, ['csv', 'txt'], true)) {
+                        continue;
+                    }
+
+                    $csv = $zip->getFromIndex($index);
+                    if (!is_string($csv)) {
+                        continue;
+                    }
+
+                    ++$csvFiles;
+                    array_push($rows, ...$this->decodeCsv($csv));
+                }
+
+                if (0 === $csvFiles) {
+                    throw new ConnectorTransientException('Ozon Performance ZIP report does not contain CSV files.');
+                }
+
+                return $rows;
+            } finally {
+                $zip->close();
+            }
+        } finally {
+            @unlink($file);
+        }
     }
 
     /**
@@ -614,6 +678,35 @@ final readonly class OzonPerformanceReportClient implements OzonPerformanceRepor
     private function stringField(mixed $value): string
     {
         return is_scalar($value) ? trim((string) $value) : '';
+    }
+
+    private function normalizeReportUrl(string $url): string
+    {
+        $url = trim($url);
+        if ('' === $url) {
+            return $url;
+        }
+
+        if (null !== parse_url($url, \PHP_URL_SCHEME)) {
+            return $url;
+        }
+
+        return $this->baseUrl.'/'.ltrim($url, '/');
+    }
+
+    private function isExternalUrl(string $url): bool
+    {
+        $baseHost = parse_url($this->baseUrl, \PHP_URL_HOST);
+        $urlHost = parse_url($url, \PHP_URL_HOST);
+
+        return is_string($urlHost) && '' !== $urlHost && $urlHost !== $baseHost;
+    }
+
+    private function isZipContent(string $content): bool
+    {
+        return str_starts_with($content, "PK\x03\x04")
+            || str_starts_with($content, "PK\x05\x06")
+            || str_starts_with($content, "PK\x07\x08");
     }
 
     private function startOfDayUtc(\DateTimeImmutable $date): string

@@ -13,6 +13,7 @@ use App\Ingestion\Domain\Contract\SourceConnectorInterface;
 use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Enum\Capability;
 use App\Ingestion\Enum\IngestSource;
+use App\Ingestion\Exception\ConnectorTransientException;
 use App\Ingestion\Exception\UnsupportedCapabilityException;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonPerformanceReportClientInterface;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonRawPage;
@@ -22,6 +23,8 @@ final readonly class OzonPerformanceReportConnector implements SourceConnectorIn
 {
     private const CAMPAIGN_BATCH_SIZE = 10;
     private const SEARCH_PROMO_POLL_DELAY_SECONDS = 60;
+    private const SEARCH_PROMO_POLL_MAX_ATTEMPTS = 60;
+    private const SEARCH_PROMO_POLL_TIMEOUT_SECONDS = 3600;
 
     private const ADV_OBJECT_TYPE_SKU = 'SKU';
     private const ADV_OBJECT_TYPE_SEARCH_PROMO = 'SEARCH_PROMO';
@@ -229,6 +232,8 @@ final readonly class OzonPerformanceReportConnector implements SourceConnectorIn
             'batchOffset' => 0,
             'reportType' => self::SEARCH_PROMO_REPORT_PRODUCTS,
             'state' => 'request',
+            'pollAttempts' => 0,
+            'pollStartedAt' => $this->clock->now()->format(\DATE_ATOM),
         ]);
         $batchOffset = $this->cursorInt($cursor, 'batchOffset');
         $reportType = $this->searchPromoReportType($cursor['reportType'] ?? self::SEARCH_PROMO_REPORT_PRODUCTS);
@@ -247,6 +252,8 @@ final readonly class OzonPerformanceReportConnector implements SourceConnectorIn
                     'reportType' => $reportType,
                     'state' => 'poll',
                     'uuid' => $uuid,
+                    'pollAttempts' => 0,
+                    'pollStartedAt' => $this->clock->now()->format(\DATE_ATOM),
                 ]),
                 hasMore: true,
                 normalizeRawRecords: false,
@@ -261,9 +268,28 @@ final readonly class OzonPerformanceReportConnector implements SourceConnectorIn
 
         $reportLink = $this->client->pollReport($request->companyId, $request->connectionRef, $uuid);
         if (null === $reportLink) {
+            $nextPollAttempts = $this->cursorInt($cursor, 'pollAttempts') + 1;
+            $pollStartedAt = $this->cursorDate($cursor, 'pollStartedAt') ?? $this->clock->now();
+            $elapsedSeconds = $this->clock->now()->getTimestamp() - $pollStartedAt->getTimestamp();
+            if ($nextPollAttempts > self::SEARCH_PROMO_POLL_MAX_ATTEMPTS || $elapsedSeconds >= self::SEARCH_PROMO_POLL_TIMEOUT_SECONDS) {
+                throw new ConnectorTransientException(sprintf(
+                    'Ozon Search Promo report %s was not ready after %d attempts and %d seconds.',
+                    $uuid,
+                    $nextPollAttempts,
+                    max(0, $elapsedSeconds),
+                ));
+            }
+
             return new PullResult(
                 rawBatch: null,
-                nextCursorValue: $request->cursorValue,
+                nextCursorValue: $this->encodeCursor([
+                    'batchOffset' => $batchOffset,
+                    'reportType' => $reportType,
+                    'state' => 'poll',
+                    'uuid' => $uuid,
+                    'pollAttempts' => $nextPollAttempts,
+                    'pollStartedAt' => $pollStartedAt->format(\DATE_ATOM),
+                ]),
                 hasMore: true,
                 normalizeRawRecords: false,
                 continuationDelaySeconds: self::SEARCH_PROMO_POLL_DELAY_SECONDS,
@@ -480,6 +506,23 @@ final readonly class OzonPerformanceReportConnector implements SourceConnectorIn
         $value = $cursor[$key] ?? null;
 
         return is_scalar($value) ? trim((string) $value) : '';
+    }
+
+    /**
+     * @param array<string, mixed> $cursor
+     */
+    private function cursorDate(array $cursor, string $key): ?\DateTimeImmutable
+    {
+        $value = $cursor[$key] ?? null;
+        if (!is_string($value) || '' === trim($value)) {
+            return null;
+        }
+
+        try {
+            return new \DateTimeImmutable($value);
+        } catch (\Exception) {
+            return null;
+        }
     }
 
     /**
