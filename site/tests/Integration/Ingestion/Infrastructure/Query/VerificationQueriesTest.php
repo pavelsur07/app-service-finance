@@ -319,6 +319,94 @@ final class VerificationQueriesTest extends IntegrationTestCase
         self::assertSame(1, $cells[0]->issueCount);
     }
 
+    public function testCoverageSuppressesFailedBackfillIssueWhenSuccessfulRawCoverageExists(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+        $failedParent = new SyncJob(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            source: IngestSource::OZON,
+            resourceType: OzonResourceType::PERFORMANCE_SEARCH_PROMO_PRODUCTS,
+            kind: SyncJobKind::BACKFILL,
+            windowFrom: new \DateTimeImmutable('2026-06-20'),
+            windowTo: new \DateTimeImmutable('2026-06-26'),
+            shopRef: $connectionRef,
+        );
+        $failedChild = new SyncJob(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            source: IngestSource::OZON,
+            resourceType: OzonResourceType::PERFORMANCE_SEARCH_PROMO_PRODUCTS,
+            kind: SyncJobKind::BACKFILL,
+            windowFrom: new \DateTimeImmutable('2026-06-20'),
+            windowTo: new \DateTimeImmutable('2026-06-26'),
+            shopRef: $connectionRef,
+            parentJobId: $failedParent->getId(),
+        );
+        $failedChild->markRunning();
+        $failedChild->markFailed('RuntimeException: stale fixed connector error.');
+
+        $successfulParent = new SyncJob(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            source: IngestSource::OZON,
+            resourceType: OzonResourceType::PERFORMANCE_SEARCH_PROMO_PRODUCTS,
+            kind: SyncJobKind::BACKFILL,
+            windowFrom: new \DateTimeImmutable('2026-06-01'),
+            windowTo: new \DateTimeImmutable('2026-06-27'),
+            shopRef: $connectionRef,
+        );
+        $successfulChild = new SyncJob(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            source: IngestSource::OZON,
+            resourceType: OzonResourceType::PERFORMANCE_SEARCH_PROMO_PRODUCTS,
+            kind: SyncJobKind::BACKFILL,
+            windowFrom: new \DateTimeImmutable('2026-06-20'),
+            windowTo: new \DateTimeImmutable('2026-06-26'),
+            shopRef: $connectionRef,
+            parentJobId: $successfulParent->getId(),
+        );
+        $successfulChild->markRunning();
+        $successfulChild->markCompleted();
+        $raw = $this->rawRecord(
+            companyId: $companyId,
+            shopRef: $connectionRef,
+            resourceType: OzonResourceType::PERFORMANCE_SEARCH_PROMO_PRODUCTS,
+            fetchedAt: new \DateTimeImmutable('2026-06-28 17:42:00+00:00'),
+            externalId: 'search-promo-products:2026-06-20:2026-06-26',
+            source: IngestSource::OZON,
+            connectionRef: $connectionRef,
+            syncJobId: $successfulChild->getId(),
+        );
+        $raw->markNormalizationSkipped();
+
+        $this->em->persist($failedParent);
+        $this->em->persist($failedChild);
+        $this->em->persist($successfulParent);
+        $this->em->persist($successfulChild);
+        $this->em->persist($raw);
+        $this->em->flush();
+
+        /** @var CoverageQuery $query */
+        $query = self::getContainer()->get(CoverageQuery::class);
+        $cells = $query->heatmap(
+            $companyId,
+            $connectionRef,
+            new \DateTimeImmutable('2026-06-20'),
+            new \DateTimeImmutable('2026-06-20'),
+        );
+
+        self::assertCount(1, $cells);
+        self::assertSame('2026-06-20', $cells[0]->date);
+        self::assertSame($connectionRef, $cells[0]->shopRef);
+        self::assertSame(OzonResourceType::PERFORMANCE_SEARCH_PROMO_PRODUCTS, $cells[0]->resourceType);
+        self::assertSame(1, $cells[0]->rawCount);
+        self::assertSame(0, $cells[0]->txCount);
+        self::assertSame(0, $cells[0]->issueCount);
+    }
+
     public function testCoverageIgnoresFailedAggregateBackfillParentIssue(): void
     {
         $companyId = Uuid::uuid7()->toString();
