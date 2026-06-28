@@ -44,6 +44,33 @@ final class DisableCompanyMemberActionTest extends TestCase
         self::assertSame(CompanyMember::STATUS_DISABLED, $member->getStatus());
     }
 
+    public function testDisablesOperatorWhenOwnerActorIsDifferentInstanceWithSameId(): void
+    {
+        $ownerId = '22222222-2222-2222-2222-000000000401';
+        $owner = UserBuilder::aUser()->withId($ownerId)->withEmail('owner@example.test')->build();
+        $actor = UserBuilder::aUser()->withId($ownerId)->withEmail('owner-proxy@example.test')->build();
+        $operator = UserBuilder::aUser()->withIndex(2)->withRoles(['ROLE_COMPANY_USER'])->build();
+        $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
+        $member = CompanyMemberBuilder::aMember()
+            ->withCompany($company)
+            ->withUser($operator)
+            ->withRole(CompanyMember::ROLE_OPERATOR)
+            ->build();
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::once())->method('flush');
+
+        $action = new DisableCompanyMemberAction(
+            $this->companyRepositoryReturning($company),
+            $this->memberRepositoryReturning($member),
+            $entityManager,
+        );
+
+        $action((string) $company->getId(), (string) $member->getId(), $actor);
+
+        self::assertSame(CompanyMember::STATUS_DISABLED, $member->getStatus());
+    }
+
     public function testRejectsNonOwnerActor(): void
     {
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();

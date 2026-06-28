@@ -45,6 +45,7 @@ class CompanyMemberController extends AbstractController
             $invites,
             static fn ($invite) => !$invite->isPending($now),
         ));
+        $user = $this->getUser();
 
         return $this->render('company/company_member/index.html.twig', [
             'company' => $company,
@@ -52,7 +53,7 @@ class CompanyMemberController extends AbstractController
             'pendingInvites' => $pendingInvites,
             'nonPendingInvites' => $nonPendingInvites,
             'inviteForm' => $this->createForm(CompanyInviteOperatorType::class)->createView(),
-            'isOwner' => $company->getUser() === $this->getUser(),
+            'isOwner' => $user instanceof User && $company->getUser()->getId() === $user->getId(),
         ]);
     }
 
@@ -325,11 +326,11 @@ class CompanyMemberController extends AbstractController
     private function assertCompanyMemberAccess(Company $company, CompanyMemberRepository $memberRepository): void
     {
         $user = $this->getUser();
-        if (!$user) {
+        if (!$user instanceof User) {
             throw new AccessDeniedException();
         }
 
-        if ($company->getUser() === $user) {
+        if ($company->getUser()->getId() === $user->getId()) {
             return;
         }
 
@@ -341,7 +342,8 @@ class CompanyMemberController extends AbstractController
 
     private function assertOwner(Company $company): void
     {
-        if ($company->getUser() !== $this->getUser()) {
+        $user = $this->getUser();
+        if (!$user instanceof User || $company->getUser()->getId() !== $user->getId()) {
             throw new AccessDeniedException('Only company owner can manage members.');
         }
     }

@@ -27,7 +27,7 @@ final readonly class EnableCompanyMemberAction
             throw new NotFoundHttpException('Company not found.');
         }
 
-        if ($company->getUser() !== $actor) {
+        if ($company->getUser()->getId() !== $actor->getId()) {
             throw new AccessDeniedException('Only company owner can manage members.');
         }
 

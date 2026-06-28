@@ -28,7 +28,7 @@ final readonly class DisableCompanyMemberAction
             throw new NotFoundHttpException('Company not found.');
         }
 
-        if ($company->getUser() !== $actor) {
+        if ($company->getUser()->getId() !== $actor->getId()) {
             throw new AccessDeniedException('Only company owner can manage members.');
         }
 
@@ -37,11 +37,13 @@ final readonly class DisableCompanyMemberAction
             throw new NotFoundHttpException('Company member not found.');
         }
 
-        if ($member->getUser() === $actor) {
+        $memberUserId = $member->getUser()->getId();
+
+        if ($memberUserId === $actor->getId()) {
             throw new AccessDeniedException('Company owner cannot disable own membership.');
         }
 
-        if ($member->getUser() === $company->getUser() || CompanyMember::ROLE_OWNER === $member->getRole()) {
+        if ($memberUserId === $company->getUser()->getId() || CompanyMember::ROLE_OWNER === $member->getRole()) {
             throw new AccessDeniedException('Company owner membership cannot be disabled.');
         }
 
