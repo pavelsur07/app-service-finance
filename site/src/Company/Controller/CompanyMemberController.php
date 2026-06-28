@@ -2,17 +2,19 @@
 
 namespace App\Company\Controller;
 
+use App\Company\Application\DisableCompanyMemberAction;
+use App\Company\Application\EnableCompanyMemberAction;
 use App\Company\Entity\Company;
+use App\Company\Entity\User;
 use App\Company\Form\CompanyInviteOperatorType;
+use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Repository\CompanyInviteRepository;
 use App\Company\Repository\CompanyMemberRepository;
-use App\Company\Repository\CompanyRepository;
 use App\Company\Service\CompanyInviteManager;
 use App\Notification\DTO\EmailMessage;
 use App\Notification\DTO\NotificationContext;
 use App\Notification\Service\NotificationRouter;
 use App\Shared\Service\ActiveCompanyService;
-use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -174,23 +176,20 @@ class CompanyMemberController extends AbstractController
         string $memberId,
         Request $request,
         ActiveCompanyService $activeCompanyService,
-        CompanyMemberRepository $memberRepository,
-        EntityManagerInterface $entityManager,
+        DisableCompanyMemberAction $disableCompanyMember,
     ): Response {
         $company = $activeCompanyService->getActiveCompany();
-        $this->assertOwner($company);
 
         if (!$this->isCsrfTokenValid('member_disable_'.$memberId, (string) $request->request->get('_token'))) {
             throw $this->createAccessDeniedException();
         }
 
-        $member = $memberRepository->find($memberId);
-        if (!$member || $member->getCompany() !== $company) {
-            throw $this->createNotFoundException();
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException();
         }
 
-        $member->disable();
-        $entityManager->flush();
+        $disableCompanyMember((string) $company->getId(), $memberId, $user);
         $this->addFlash('success', 'Участник отключен.');
 
         return $this->redirectToRoute('company_users_index');
@@ -201,23 +200,20 @@ class CompanyMemberController extends AbstractController
         string $memberId,
         Request $request,
         ActiveCompanyService $activeCompanyService,
-        CompanyMemberRepository $memberRepository,
-        EntityManagerInterface $entityManager,
+        EnableCompanyMemberAction $enableCompanyMember,
     ): Response {
         $company = $activeCompanyService->getActiveCompany();
-        $this->assertOwner($company);
 
         if (!$this->isCsrfTokenValid('member_enable_'.$memberId, (string) $request->request->get('_token'))) {
             throw $this->createAccessDeniedException();
         }
 
-        $member = $memberRepository->find($memberId);
-        if (!$member || $member->getCompany() !== $company) {
-            throw $this->createNotFoundException();
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException();
         }
 
-        $member->enable();
-        $entityManager->flush();
+        $enableCompanyMember((string) $company->getId(), $memberId, $user);
         $this->addFlash('success', 'Участник активирован.');
 
         return $this->redirectToRoute('company_users_index');
@@ -277,7 +273,7 @@ class CompanyMemberController extends AbstractController
         CompanyRepository $companyRepository,
         CompanyMemberRepository $memberRepository,
         ActiveCompanyService $activeCompanyService,
-        EntityManagerInterface $entityManager,
+        DisableCompanyMemberAction $disableCompanyMember,
     ): Response {
         $this->activateLegacyCompany($companyId, $request, $companyRepository, $memberRepository);
 
@@ -285,8 +281,7 @@ class CompanyMemberController extends AbstractController
             $memberId,
             $request,
             $activeCompanyService,
-            $memberRepository,
-            $entityManager,
+            $disableCompanyMember,
         );
     }
 
@@ -298,7 +293,7 @@ class CompanyMemberController extends AbstractController
         CompanyRepository $companyRepository,
         CompanyMemberRepository $memberRepository,
         ActiveCompanyService $activeCompanyService,
-        EntityManagerInterface $entityManager,
+        EnableCompanyMemberAction $enableCompanyMember,
     ): Response {
         $this->activateLegacyCompany($companyId, $request, $companyRepository, $memberRepository);
 
@@ -306,8 +301,7 @@ class CompanyMemberController extends AbstractController
             $memberId,
             $request,
             $activeCompanyService,
-            $memberRepository,
-            $entityManager,
+            $enableCompanyMember,
         );
     }
 
@@ -339,7 +333,7 @@ class CompanyMemberController extends AbstractController
             return;
         }
 
-        $member = $memberRepository->findOneByCompanyAndUser($company, $user);
+        $member = $memberRepository->findActiveOneByCompanyAndUser($company, $user);
         if (!$member) {
             throw new AccessDeniedException();
         }

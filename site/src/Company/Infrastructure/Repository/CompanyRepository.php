@@ -43,9 +43,8 @@ class CompanyRepository extends ServiceEntityRepository
      */
     public function getAllActiveCompanyIds(): array
     {
-        // В фасаде мы можем использовать прямой DBAL запрос для скорости (Fast Read),
-        // либо вызвать внутренний CompanyQuery класс модуля Company.
-        $sql = 'SELECT id::text FROM company WHERE is_active = true';
+        // До появления CompanyStatus/is_active все сохранённые companies считаются активными.
+        $sql = 'SELECT id::text FROM companies ORDER BY id';
 
         return $this->connection->fetchFirstColumn($sql);
     }

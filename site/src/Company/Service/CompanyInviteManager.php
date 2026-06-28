@@ -97,6 +97,10 @@ class CompanyInviteManager
         }
 
         $member = $this->memberRepository->findOneByCompanyAndUser($invite->getCompany(), $user);
+        if ($member && CompanyMember::STATUS_DISABLED === $member->getStatus()) {
+            throw new AccessDeniedException('Company member is disabled.');
+        }
+
         if (!$member) {
             $member = new CompanyMember(
                 id: Uuid::uuid4()->toString(),

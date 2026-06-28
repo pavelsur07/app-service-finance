@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Company\Controller;
 
 use App\Balance\Service\BalanceStructureSeeder;
+use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Entity\Company;
+use App\Company\Entity\User;
 use App\Company\Form\CompanyType;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -56,16 +58,25 @@ class CompanyController extends AbstractController
     }
 
     #[Route('/new', name: 'company_new', methods: ['GET', 'POST'])]
-    public function new(Request $request, EntityManagerInterface $em, BalanceStructureSeeder $balanceSeeder): Response
-    {
-        $company = new Company(id: Uuid::uuid4()->toString(), user: $this->getUser());
-        $company->setUser($this->getUser()); // Автоматически проставляем владельца
+    public function new(
+        Request $request,
+        EntityManagerInterface $em,
+        BalanceStructureSeeder $balanceSeeder,
+        CompanyOwnerMembershipCreator $companyOwnerMembershipCreator,
+    ): Response {
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException();
+        }
+
+        $company = new Company(id: Uuid::uuid4()->toString(), user: $user);
+        $company->setUser($user); // Автоматически проставляем владельца
 
         $form = $this->createForm(CompanyType::class, $company);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $em->persist($company);
+            $companyOwnerMembershipCreator->persistCompanyWithOwnerMembership($company, $user);
             $balanceSeeder->seedDefaultIfEmpty($company);
             $em->flush();
 

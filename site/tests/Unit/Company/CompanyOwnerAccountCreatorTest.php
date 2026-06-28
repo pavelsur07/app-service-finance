@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Company;
 
+use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
 use App\Company\Entity\User;
-use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Service\CompanyOwnerAccountCreator;
 use App\Company\Message\SendRegistrationEmailMessage;
 use Doctrine\ORM\EntityManagerInterface;
@@ -42,13 +42,6 @@ final class CompanyOwnerAccountCreatorTest extends TestCase
             ->expects(self::once())
             ->method('flush');
 
-        $companyMemberRepository = $this->createMock(CompanyMemberRepository::class);
-        $companyMemberRepository
-            ->expects(self::once())
-            ->method('findOneByCompanyAndUser')
-            ->with(self::isInstanceOf(Company::class), $user)
-            ->willReturn(null);
-
         $bus = $this->createMock(MessageBusInterface::class);
         $bus
             ->expects(self::once())
@@ -60,7 +53,12 @@ final class CompanyOwnerAccountCreatorTest extends TestCase
             }))
             ->willReturn(new Envelope(new \stdClass()));
 
-        $creator = new CompanyOwnerAccountCreator($passwordHasher, $entityManager, $bus, $companyMemberRepository);
+        $creator = new CompanyOwnerAccountCreator(
+            $passwordHasher,
+            $entityManager,
+            $bus,
+            new CompanyOwnerMembershipCreator($entityManager),
+        );
 
         $company = $creator->create($user, 'plain-password', '  Acme LLC  ', true);
 
@@ -81,7 +79,7 @@ final class CompanyOwnerAccountCreatorTest extends TestCase
         self::assertSame(CompanyMember::ROLE_OWNER, $persisted[2]->getRole());
     }
 
-    public function testCreateDoesNotPersistDuplicateCompanyMemberWhenRelationAlreadyExists(): void
+    public function testCreateWithoutRegistrationEmailStillCreatesOwnerCompanyMember(): void
     {
         $user = new User('22222222-2222-2222-2222-222222222222');
 
@@ -95,7 +93,7 @@ final class CompanyOwnerAccountCreatorTest extends TestCase
         $persisted = [];
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager
-            ->expects(self::exactly(2))
+            ->expects(self::exactly(3))
             ->method('persist')
             ->willReturnCallback(static function (object $entity) use (&$persisted): void {
                 $persisted[] = $entity;
@@ -104,31 +102,25 @@ final class CompanyOwnerAccountCreatorTest extends TestCase
             ->expects(self::once())
             ->method('flush');
 
-        $companyMemberRepository = $this->createMock(CompanyMemberRepository::class);
-        $companyMemberRepository
-            ->expects(self::once())
-            ->method('findOneByCompanyAndUser')
-            ->with(self::isInstanceOf(Company::class), $user)
-            ->willReturnCallback(static function (Company $company, User $user): CompanyMember {
-                return new CompanyMember(
-                    '33333333-3333-3333-3333-333333333333',
-                    $company,
-                    $user,
-                    CompanyMember::ROLE_OWNER,
-                );
-            });
-
         $bus = $this->createMock(MessageBusInterface::class);
         $bus
             ->expects(self::never())
             ->method('dispatch');
 
-        $creator = new CompanyOwnerAccountCreator($passwordHasher, $entityManager, $bus, $companyMemberRepository);
+        $creator = new CompanyOwnerAccountCreator(
+            $passwordHasher,
+            $entityManager,
+            $bus,
+            new CompanyOwnerMembershipCreator($entityManager),
+        );
 
         $company = $creator->create($user, 'plain-password', 'Acme LLC', false);
 
         self::assertInstanceOf(Company::class, $company);
-        self::assertSame([$user, $company], $persisted);
+        self::assertSame($user, $persisted[0]);
+        self::assertSame($company, $persisted[1]);
+        self::assertInstanceOf(CompanyMember::class, $persisted[2]);
+        self::assertSame(CompanyMember::ROLE_OWNER, $persisted[2]->getRole());
     }
 
     public function testCreateCanSkipRegistrationEmailDispatch(): void
@@ -150,19 +142,17 @@ final class CompanyOwnerAccountCreatorTest extends TestCase
             ->expects(self::once())
             ->method('flush');
 
-        $companyMemberRepository = $this->createMock(CompanyMemberRepository::class);
-        $companyMemberRepository
-            ->expects(self::once())
-            ->method('findOneByCompanyAndUser')
-            ->with(self::isInstanceOf(Company::class), $user)
-            ->willReturn(null);
-
         $bus = $this->createMock(MessageBusInterface::class);
         $bus
             ->expects(self::never())
             ->method('dispatch');
 
-        $creator = new CompanyOwnerAccountCreator($passwordHasher, $entityManager, $bus, $companyMemberRepository);
+        $creator = new CompanyOwnerAccountCreator(
+            $passwordHasher,
+            $entityManager,
+            $bus,
+            new CompanyOwnerMembershipCreator($entityManager),
+        );
 
         $company = $creator->create($user, 'plain-password', 'Acme LLC', false);
 

@@ -16,7 +16,7 @@ final class CompanyInviteBuilder
     public const DEFAULT_EMAIL = 'operator@example.test';
     public const DEFAULT_ROLE = CompanyMember::ROLE_OPERATOR;
     public const DEFAULT_TOKEN_HASH = 'token-hash';
-    public const DEFAULT_EXPIRES_AT = '2026-01-01 00:00:00+00:00';
+    public const DEFAULT_EXPIRES_AT = '2099-01-01 00:00:00+00:00';
     public const DEFAULT_CREATED_AT = '2024-01-01 00:00:00+00:00';
 
     private string $id;

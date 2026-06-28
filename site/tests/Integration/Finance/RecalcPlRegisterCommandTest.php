@@ -15,10 +15,8 @@ use Symfony\Component\Console\Tester\CommandTester;
  * Регрессия для прод-инцидента 2026-04-26 — `app:finance:recalc-pl-register`
  * без позиционного `companyId` падал с
  *   SQLSTATE[42P01]: Undefined table: relation "company" does not exist
- * потому что `CompanyRepository::getAllActiveCompanyIds()` запрашивает
- * `SELECT id FROM company WHERE is_active = true`, а реальная таблица —
- * `companies` без поля `is_active`. Фикс убрал зависимость команды
- * от этого репо-метода.
+ * из-за старой реализации active-company facade. Команда намеренно
+ * не зависит от этого фасада, пока у `Company` нет явного lifecycle/status.
  */
 final class RecalcPlRegisterCommandTest extends IntegrationTestCase
 {
