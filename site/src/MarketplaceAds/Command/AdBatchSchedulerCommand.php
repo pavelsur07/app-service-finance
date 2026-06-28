@@ -182,7 +182,8 @@ final class AdBatchSchedulerCommand extends Command
             // транзакцию, batch остаётся PLANNED, cron попробует на следующем тике.
             $this->connection->rollBack();
 
-            $this->logger->error('Scheduler: transient failure, batch stays PLANNED', [
+            // Transient: batch остаётся PLANNED, cron повторит → warning, не инцидент.
+            $this->logger->warning('Scheduler: transient failure, batch stays PLANNED', [
                 'error' => $e->getMessage(),
                 'exception' => $e::class,
             ]);

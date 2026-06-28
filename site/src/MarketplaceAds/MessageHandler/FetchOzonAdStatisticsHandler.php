@@ -206,8 +206,10 @@ final class FetchOzonAdStatisticsHandler
         } catch (\Throwable $e) {
             // Сетевые сбои / 5xx / JSON-ошибки на prep-стадии — transient,
             // Messenger сделает retry. prepareStatisticsBatches идемпотентен
-            // (ничего не персистит), повтор безопасен.
-            $this->logger->error('Transient failure preparing Ozon ad statistics batches', $e, [
+            // (ничего не персистит), повтор безопасен. Ожидаемо-повторяемо → warning,
+            // не error (исключение кладём в контекст: AppLogger::warning(string, array)).
+            $this->logger->warning('Transient failure preparing Ozon ad statistics batches', [
+                'exception' => $e,
                 'jobId' => $message->jobId,
                 'companyId' => $message->companyId,
                 'dateFrom' => $message->dateFrom,
