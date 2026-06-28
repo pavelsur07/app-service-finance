@@ -197,6 +197,7 @@ final class CoverageQuery
             WITH failed_jobs AS (
                 SELECT
                     j.id,
+                    j.source,
                     j.shop_ref,
                     j.resource_type,
                     COALESCE(
@@ -221,25 +222,69 @@ final class CoverageQuery
                   AND j.status = :failedStatus
                   AND (j.kind = :incrementalKind OR j.parent_job_id IS NOT NULL)
                   {$shopFilter}
+            ),
+            failed_issue_days AS (
+                SELECT
+                    fj.id,
+                    fj.source,
+                    fj.shop_ref,
+                    fj.resource_type,
+                    GREATEST(fj.from_date, :fromDate)::date AS record_date
+                FROM failed_jobs fj
+                WHERE fj.from_date <= :toDate
+                  AND fj.to_date >= :fromDate
             )
             SELECT
-                TO_CHAR(GREATEST(fj.from_date, :fromDate)::date, 'YYYY-MM-DD') AS record_date,
-                fj.shop_ref,
-                fj.resource_type,
+                TO_CHAR(fid.record_date, 'YYYY-MM-DD') AS record_date,
+                fid.shop_ref,
+                fid.resource_type,
                 0 AS raw_count,
                 0 AS tx_count,
-                COUNT(DISTINCT fj.id) AS issue_count,
+                COUNT(DISTINCT fid.id) AS issue_count,
                 NULL AS last_fetched_at
-            FROM failed_jobs fj
-            WHERE fj.from_date <= :toDate
-              AND fj.to_date >= :fromDate
-            GROUP BY record_date, fj.shop_ref, fj.resource_type
-            ORDER BY record_date ASC, fj.shop_ref ASC, fj.resource_type ASC
+            FROM failed_issue_days fid
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM ingest_raw_records r
+                LEFT JOIN ingest_sync_jobs successful_job
+                    ON successful_job.company_id = r.company_id
+                   AND successful_job.id::text = r.sync_job_id
+                LEFT JOIN ingest_financial_transactions ft
+                    ON ft.company_id = r.company_id
+                   AND ft.raw_record_id = r.id
+                WHERE r.company_id = :companyId
+                  AND r.source = fid.source
+                  AND r.resource_type = fid.resource_type
+                  AND COALESCE(NULLIF(ft.shop_ref, ''), r.shop_ref) = fid.shop_ref
+                  AND successful_job.status = :completedStatus
+                  AND (
+                      (
+                          ft.id IS NOT NULL
+                          AND ft.occurred_at >= fid.record_date::timestamp
+                          AND ft.occurred_at < fid.record_date::timestamp + interval '1 day'
+                      )
+                      OR (
+                          ft.id IS NULL
+                          AND successful_job.window_from IS NOT NULL
+                          AND successful_job.window_from <= fid.record_date
+                          AND COALESCE(successful_job.window_to, successful_job.window_from) >= fid.record_date
+                      )
+                      OR (
+                          ft.id IS NULL
+                          AND successful_job.window_from IS NULL
+                          AND r.fetched_at >= fid.record_date::timestamp
+                          AND r.fetched_at < fid.record_date::timestamp + interval '1 day'
+                      )
+                  )
+            )
+            GROUP BY record_date, fid.shop_ref, fid.resource_type
+            ORDER BY record_date ASC, fid.shop_ref ASC, fid.resource_type ASC
             SQL;
 
         $params = [
             'companyId' => $companyId,
             'failedStatus' => SyncJobStatus::FAILED->value,
+            'completedStatus' => SyncJobStatus::COMPLETED->value,
             'incrementalKind' => SyncJobKind::INCREMENTAL->value,
             'fromDate' => $from,
             'toDate' => $to,
