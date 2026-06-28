@@ -212,6 +212,20 @@ final class MoneyTest extends TestCase
         Money::fromMinor(\PHP_INT_MAX, 'RUB')->percentage('1000');
     }
 
+    public function testMultiplyRejectsNonNumericFactor(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        Money::fromMinor(1000, 'RUB')->multiply('abc');
+    }
+
+    public function testPercentageRejectsNonNumericPercent(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        Money::fromMinor(1000, 'RUB')->percentage('20%');
+    }
+
     public function testArithmeticStaysWithinRangeDoesNotThrow(): void
     {
         self::assertSame(\PHP_INT_MAX, Money::fromMinor(\PHP_INT_MAX, 'RUB')->multiply('1')->amountMinor());

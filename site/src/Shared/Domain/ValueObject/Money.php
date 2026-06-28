@@ -105,6 +105,8 @@ final readonly class Money
      */
     public function multiply(string $factor, RoundingMode $mode = RoundingMode::HALF_UP): self
     {
+        Assert::regex($factor, '/^-?\d+(\.\d+)?$/', 'Factor must be a valid decimal string.');
+
         $product = \bcmul((string) $this->amountMinor, $factor, 12);
 
         return self::createSafe($mode->roundToInteger($product), $this->currency);
@@ -115,6 +117,8 @@ final readonly class Money
      */
     public function percentage(string $percent, RoundingMode $mode = RoundingMode::HALF_UP): self
     {
+        Assert::regex($percent, '/^-?\d+(\.\d+)?$/', 'Percent must be a valid decimal string.');
+
         $value = \bcdiv(\bcmul((string) $this->amountMinor, $percent, 12), '100', 12);
 
         return self::createSafe($mode->roundToInteger($value), $this->currency);
