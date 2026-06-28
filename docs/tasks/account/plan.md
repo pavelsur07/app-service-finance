@@ -1,6 +1,32 @@
 # Account / Company module plan
 
 Дата анализа: 2026-06-28
+Дата реализации P0: 2026-06-28
+
+## Статус реализации
+
+### P0 — DONE
+
+- [x] Единое создание новой компании с обязательным owner membership вынесено в `CompanyOwnerMembershipCreator`.
+- [x] `CompanyOwnerMembershipCreator` подключён к `CompanyOwnerAccountCreator`, `CompanyController::new()` и `AccountBootstrapper`.
+- [x] `CompanyMember` привязан к `CompanyMemberRepository` в Doctrine metadata, чтобы `getRepository(CompanyMember::class)` возвращал проектный repository.
+- [x] Disable/enable участника вынесены в Application actions: `DisableCompanyMemberAction`, `EnableCompanyMemberAction`.
+- [x] Добавлены guard-правила: нельзя отключить self, `Company.user` owner и member с `ROLE_OWNER`.
+- [x] Access check для invited member в `CompanyMemberController` использует только active membership.
+- [x] Accept invite для существующего disabled member теперь возвращает отказ, а восстановление доступа остаётся явным owner-действием `enable`.
+- [x] `CompanyRepository::getAllActiveCompanyIds()` исправлен под реальную таблицу `companies`; до появления `CompanyStatus` все rows считаются активными.
+- [x] Добавлены/обновлены unit, functional и integration tests для P0-сценариев.
+- [x] Stage reports сохранены в `docs/tasks/account/stages/stage-1.md` и `docs/tasks/account/stages/stage-2.md`.
+- [x] Handoff сохранён в `docs/tasks/account/handoff.md`.
+
+### Осталось вне P0
+
+- [ ] Глобальная блокировка пользователя (`UserStatus`, block/unblock actions, login/runtime guard).
+- [ ] Company suspension/status с миграцией и влиянием на `ActiveCompanyService`/workers.
+- [ ] Audit trail для block/unblock/suspend/activate/disable/enable.
+- [ ] Admin UI для блокировок.
+- [ ] Company-scoped authorization/RBAC rollout.
+- [ ] `ProjectDirection` и `ReportApiKey` не смешивались с P0 и должны идти отдельными задачами.
 
 ## Задача
 
@@ -63,7 +89,9 @@
 - `CompanyFacade::createOwnerAccount()` зафиксирован в `ARCHITECTURE.md` как публичный контракт Company-модуля.
 - Unit-тесты покрывают создание owner-account и отсутствие `ROLE_ADMIN` у создаваемого пользователя.
 
-Ограничение: создание компании не единообразно. `CompanyController::new()` и `AccountBootstrapper::bootstrapForUser()` создают `Company`, но не создают `CompanyMember OWNER`. Также `CompanyOwnerAccountCreator` не использует `AccountBootstrapper`, поэтому дефолтные cashflow/PL/money accounts могут не создаваться тем же путём, что bootstrap.
+P0-статус: инвариант owner membership закрыт. `CompanyOwnerMembershipCreator` используется в `CompanyOwnerAccountCreator`, `CompanyController::new()` и `AccountBootstrapper`, поэтому новая компания всегда получает `CompanyMember OWNER`.
+
+Оставшееся ограничение: `CompanyOwnerAccountCreator` всё ещё не использует полный `AccountBootstrapper`, поэтому дефолтные cashflow/PL/money accounts могут создаваться не тем же путём, что bootstrap. Это отдельное решение о seed-policy.
 
 ### Компания
 
@@ -77,7 +105,9 @@
   - выбор active company через session key `active_company_id`.
 - `financeLockBefore` используется как финансовая блокировка периода, но это не блокировка аккаунта.
 
-Ограничение: у `Company` нет статуса активности/блокировки. При этом `CompanyRepository::getAllActiveCompanyIds()` уже ожидает "активные компании", но SQL ссылается на таблицу `company` и поле `is_active`, которых нет в текущей entity/table (`companies`). Это отдельный технический долг и риск для worker/CLI-сценариев.
+P0-статус: технический баг в `CompanyRepository::getAllActiveCompanyIds()` закрыт — метод читает реальные ids из `companies`.
+
+Оставшееся ограничение: у `Company` нет статуса активности/блокировки. До появления `CompanyStatus` все сохранённые companies считаются активными, поэтому полноценная company suspension остаётся P1/HIGH задачей.
 
 ### Участники компании
 
@@ -96,9 +126,9 @@
 
 - `CompanyMember::role` и `status` — строковые константы, не enum.
 - Нет `disabledAt`, `disabledBy`, `disableReason`, `enabledAt`, аудита изменения.
-- `CompanyMemberController::disableMember()` может отключить owner-member, если он есть в списке. Для owner-доступа это не блокирует `Company::user`, но создаёт неконсистентное состояние.
-- `CompanyMemberController::assertCompanyMemberAccess()` использует `findOneByCompanyAndUser()`, а не `findActiveOneByCompanyAndUser()`, поэтому часть проверок не различает disabled member.
-- Если disabled member получает новый invite, `CompanyInviteManager::acceptInvite()` найдёт существующий member и примет invite, но не включит member обратно и не сообщит о disabled-состоянии.
+- P0 закрыто: `DisableCompanyMemberAction` запрещает отключать self, `Company.user` owner и member с `ROLE_OWNER`.
+- P0 закрыто: `CompanyMemberController::assertCompanyMemberAccess()` использует active membership для invited member access.
+- P0 закрыто: если disabled member принимает invite, `CompanyInviteManager::acceptInvite()` возвращает отказ; восстановление доступа идёт через explicit enable.
 - Виджет active company (`_active_company_widget.html.twig`) показывает только `app.user.companies`, то есть owned-компании, и не показывает компании, где пользователь является invited member.
 
 ### Приглашения
@@ -202,10 +232,10 @@
 
 | Приоритет | Use case | Что добавить | Best practice | Почему важно | Risk | Acceptance criteria |
 |---|---|---|---|---|---|---|
-| P0 | Единообразно создать owner-account из public registration и admin | Единый `CreateOwnerAccountAction` / `CreateCompanyAction`, создание `Company`, `CompanyMember OWNER`, обязательный bootstrap данных | Один write-use-case = один Application Action; контроллеры только собирают input и вызывают action; все внешние модули идут через `CompanyFacade` | Сейчас разные пути создания дают разный набор связанных данных | MEDIUM | Любой owner-account имеет owner membership; public/admin tests проходят; нет дублирования создания company в контроллерах |
-| P0 | Пользователь не может работать после отключения в компании | Усилить `CompanyMember` access checks: только `ACTIVE` membership даёт доступ к invited company | Проверять доступ по active company + active membership, не по `find($id)` и не по глобальной роли | Disabled member сейчас частично может оставаться видимым в проверках | MEDIUM | Disabled member не может выбрать company и получить данные; owner по `Company.user` остаётся доступен до отдельной company/user блокировки |
-| P0 | Запретить неконсистентное отключение владельца | Guard в disable-member action: нельзя отключить owner/self без отдельного transfer-owner сценария | Доменные инварианты держать в Action/Policy, не в Twig/UI | Отключение owner-member создаёт противоречие между `Company.user` и `CompanyMember` | MEDIUM | POST disable owner/self возвращает доменную ошибку/403; тест покрывает запрет |
-| P0 | Понять, какие компании активны для workers/CLI | Исправить/спланировать `CompanyRepository::getAllActiveCompanyIds()` под `companies` и будущий status | Репозиторий Company должен быть единственным источником списка active company ids | Сейчас метод ссылается на несуществующие `company.is_active` | HIGH при миграции, LOW для фикса SQL без нового поля | Метод возвращает реальные company ids; есть тест на active list |
+| P0 — DONE | Единообразно создать owner-account из public registration и admin | Единый `CreateOwnerAccountAction` / `CreateCompanyAction`, создание `Company`, `CompanyMember OWNER`, обязательный bootstrap данных | Один write-use-case = один Application Action; контроллеры только собирают input и вызывают action; все внешние модули идут через `CompanyFacade` | Сейчас разные пути создания дают разный набор связанных данных | MEDIUM | Любой owner-account имеет owner membership; public/admin tests проходят; нет дублирования создания company в контроллерах |
+| P0 — DONE | Пользователь не может работать после отключения в компании | Усилить `CompanyMember` access checks: только `ACTIVE` membership даёт доступ к invited company | Проверять доступ по active company + active membership, не по `find($id)` и не по глобальной роли | Disabled member сейчас частично может оставаться видимым в проверках | MEDIUM | Disabled member не может выбрать company и получить данные; owner по `Company.user` остаётся доступен до отдельной company/user блокировки |
+| P0 — DONE | Запретить неконсистентное отключение владельца | Guard в disable-member action: нельзя отключить owner/self без отдельного transfer-owner сценария | Доменные инварианты держать в Action/Policy, не в Twig/UI | Отключение owner-member создаёт противоречие между `Company.user` и `CompanyMember` | MEDIUM | POST disable owner/self возвращает доменную ошибку/403; тест покрывает запрет |
+| P0 — DONE | Понять, какие компании активны для workers/CLI | Исправить/спланировать `CompanyRepository::getAllActiveCompanyIds()` под `companies` и будущий status | Репозиторий Company должен быть единственным источником списка active company ids | Сейчас метод ссылается на несуществующие `company.is_active` | HIGH при миграции, LOW для фикса SQL без нового поля | Метод возвращает реальные company ids; есть тест на active list |
 | P1 | Заблокировать пользователя глобально | `UserStatus`, `blockedAt`, `blockedBy`, `blockReason`, `BlockUserAction`, `UnblockUserAction` | Не удалять пользователя; использовать explicit lifecycle state + audit; blocked user denied на login и runtime | Это базовая account-blocking функция | HIGH | Blocked user не может войти; активная сессия получает deny/logout; admin не может заблокировать себя |
 | P1 | Заблокировать компанию целиком | `CompanyStatus` или `isActive/isSuspended`, `SuspendCompanyAction`, `ActivateCompanyAction` | Company lifecycle отдельно от user lifecycle; не смешивать manual suspension и billing suspension без policy | Нужно отключать весь tenant, включая owner и фоновые задачи | HIGH | Suspended company не выбирается active; не попадает в `getAllActiveCompanyIds()`; UI/API возвращают controlled deny |
 | P1 | Админ управляет блокировками безопасно | Admin UI/API: block/unblock user, suspend/activate company, reason field, CSRF | Все state-changing admin actions только POST + CSRF + audit; focused controllers per action | Без UI операции останутся ручными и неаудируемыми | HIGH | Admin видит status; действия защищены CSRF; audit содержит actor/reason/time |
@@ -222,19 +252,20 @@
 
 ## Предлагаемый staged plan
 
-### Stage 1: Зафиксировать текущие инварианты создания компании
+### Stage 1: Зафиксировать текущие инварианты создания компании — DONE
 
 **Risk:** MEDIUM
+**Stage report:** `docs/tasks/account/stages/stage-1.md`
 
 Цель: сделать создание компании единообразным без изменения auth/RBAC.
 
 Работы:
 
-- Добавить/выделить `CreateCompanyAction` или `CompanyCreator` в `Company/Application`.
-- Использовать его в `CompanyOwnerAccountCreator`, `CompanyController::new()` и при необходимости `AccountBootstrapper`.
-- Всегда создавать `CompanyMember OWNER` для owner.
-- Явно решить, какие seed-операции обязательны при создании компании: balance, cashflow, PL, money accounts.
-- Добавить unit/functional тесты на оба пути: public/admin owner-account и `/company/new`.
+- [x] Добавить/выделить `CreateCompanyAction` или `CompanyCreator` в `Company/Application` — реализовано как `CompanyOwnerMembershipCreator`.
+- [x] Использовать его в `CompanyOwnerAccountCreator`, `CompanyController::new()` и при необходимости `AccountBootstrapper`.
+- [x] Всегда создавать `CompanyMember OWNER` для owner.
+- [ ] Явно решить, какие seed-операции обязательны при создании компании: balance, cashflow, PL, money accounts — оставлено отдельным решением, текущие seed-пути не расширялись.
+- [x] Добавить unit/functional тесты на оба пути: public/admin owner-account и `/company/new`.
 
 Ожидаемые файлы:
 
@@ -245,20 +276,21 @@
 - `site/tests/Unit/Company/*`
 - `site/tests/Functional/Company/*` или ближайший существующий test namespace
 
-### Stage 2: Укрепить управление участниками и invite-flow
+### Stage 2: Укрепить управление участниками и invite-flow — DONE
 
 **Risk:** MEDIUM
+**Stage report:** `docs/tasks/account/stages/stage-2.md`
 
 Цель: сделать текущий per-company disable реальной и непротиворечивой функцией управления доступом.
 
 Работы:
 
-- Вынести enable/disable member в Application action.
-- Запретить отключение owner-member/self без отдельного сценария передачи владельца.
-- В `assertCompanyMemberAccess()` использовать active membership там, где нужен доступ активного участника.
-- Для disabled existing member при accept invite: либо явно re-enable, либо вернуть доменную ошибку. Правило нужно зафиксировать до реализации.
-- Обновить UI/flash messages для already-member/disabled-member cases.
-- Добавить тесты на disabled member access и invite edge cases.
+- [x] Вынести enable/disable member в Application action.
+- [x] Запретить отключение owner-member/self без отдельного сценария передачи владельца.
+- [x] В `assertCompanyMemberAccess()` использовать active membership там, где нужен доступ активного участника.
+- [x] Для disabled existing member при accept invite: вернуть доменную ошибку; re-enable остаётся явным owner-действием.
+- [ ] Обновить UI/flash messages для already-member/disabled-member cases — не делалось в P0, потому что текущий scope ограничен use case guards.
+- [x] Добавить тесты на disabled member access и invite edge cases.
 
 Ожидаемые файлы:
 
