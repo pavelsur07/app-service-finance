@@ -15,6 +15,7 @@ use App\Tests\Builders\Company\CompanyInviteBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 final class CompanyInviteManagerTest extends TestCase
 {
@@ -179,6 +180,62 @@ final class CompanyInviteManagerTest extends TestCase
 
         // user — это тот же объект, его можно сравнивать по ссылке
         self::assertSame($user, $invite->getAcceptedByUser());
+    }
+
+    public function testAcceptInviteRejectsDisabledExistingMember(): void
+    {
+        $owner = UserBuilder::aUser()->build();
+        $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
+        $user = UserBuilder::aUser()->withEmail('operator@example.test')->build();
+        $plainToken = 'disabled-member-token';
+        $tokenHash = hash('sha256', $plainToken);
+        $now = new \DateTimeImmutable('2025-03-01 12:00:00+00:00');
+
+        $invite = CompanyInviteBuilder::anInvite()
+            ->withCompany($company)
+            ->withCreatedBy($owner)
+            ->withEmail($user->getEmail())
+            ->withTokenHash($tokenHash)
+            ->withExpiresAt($now->modify('+1 day'))
+            ->build();
+
+        $member = new CompanyMember(
+            id: '33333333-3333-3333-3333-333333333333',
+            company: $company,
+            user: $user,
+            role: CompanyMember::ROLE_OPERATOR,
+            createdAt: $now,
+        );
+        $member->disable();
+
+        $inviteRepository = $this->createMock(CompanyInviteRepository::class);
+        $inviteRepository
+            ->expects(self::once())
+            ->method('findOneByTokenHash')
+            ->with($tokenHash)
+            ->willReturn($invite);
+
+        $memberRepository = $this->createMock(CompanyMemberRepository::class);
+        $memberRepository
+            ->expects(self::once())
+            ->method('findOneByCompanyAndUser')
+            ->with($company, $user)
+            ->willReturn($member);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::never())->method('persist');
+        $em->expects(self::never())->method('flush');
+
+        $manager = new CompanyInviteManager(
+            $em,
+            $inviteRepository,
+            $memberRepository,
+            new InviteTokenService(),
+        );
+
+        $this->expectException(AccessDeniedException::class);
+
+        $manager->acceptInvite($plainToken, $user, $now);
     }
 
     private function makeTokenService(string $token): InviteTokenService

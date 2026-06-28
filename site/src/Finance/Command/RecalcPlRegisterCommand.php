@@ -178,11 +178,8 @@ final class RecalcPlRegisterCommand extends Command
             return [$company];
         }
 
-        // CompanyRepository::getAllActiveCompanyIds() ходит в несуществующую
-        // таблицу `company` с несуществующим полем `is_active` — баг в репо
-        // выходит за рамки этой задачи. Здесь обходим его через стандартный
-        // ORM `findBy` с явной сортировкой: один запрос, гарантированный
-        // порядок обработки, без хардкода имени таблицы.
+        // Команда обходит active-company facade, потому что пересчёт должен
+        // обработать все компании до появления явного CompanyStatus.
         return array_values($this->companyRepository->findBy([], ['id' => 'ASC']));
     }
 

@@ -2,10 +2,11 @@
 
 namespace App\Company\Entity;
 
+use App\Company\Repository\CompanyMemberRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: CompanyMemberRepository::class)]
 #[ORM\Table(name: 'company_members')]
 #[ORM\UniqueConstraint(name: 'uniq_company_members_company_user', columns: ['company_id', 'user_id'])]
 class CompanyMember

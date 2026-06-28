@@ -8,9 +8,9 @@ use App\Admin\Application\CreateAccountAction;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
 use App\Company\Entity\User;
+use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Facade\CompanyFacade;
 use App\Company\Infrastructure\Repository\CompanyRepository;
-use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Service\CompanyOwnerAccountCreator;
 use App\Company\Message\SendRegistrationEmailMessage;
 use Doctrine\ORM\EntityManagerInterface;
@@ -50,16 +50,6 @@ final class CreateAccountActionTest extends TestCase
             ->expects(self::once())
             ->method('flush');
 
-        $companyMemberRepository = $this->createMock(CompanyMemberRepository::class);
-        $companyMemberRepository
-            ->expects(self::once())
-            ->method('findOneByCompanyAndUser')
-            ->with(
-                self::isInstanceOf(Company::class),
-                self::callback(static fn (User $user): bool => 'new-owner@example.test' === $user->getEmail()),
-            )
-            ->willReturn(null);
-
         $bus = $this->createMock(MessageBusInterface::class);
         $bus
             ->expects(self::once())
@@ -71,7 +61,7 @@ final class CreateAccountActionTest extends TestCase
             $passwordHasher,
             $entityManager,
             $bus,
-            $companyMemberRepository,
+            new CompanyOwnerMembershipCreator($entityManager),
         );
         $companyFacade = new CompanyFacade($this->createMock(CompanyRepository::class), $accountCreator);
         $action = new CreateAccountAction($companyFacade);

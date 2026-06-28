@@ -9,6 +9,7 @@ use App\Company\Entity\CompanyInvite;
 use App\Company\Entity\CompanyMember;
 use App\Company\Entity\User;
 use App\Company\Service\InviteTokenService;
+use App\Shared\Service\RateLimiter\RegistrationRateLimiter;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\CompanyInviteBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -20,6 +21,8 @@ final class InviteRegistrationFlowTest extends WebTestCaseBase
     {
         $client = static::createClient();
         $this->resetDb();
+        $client->getContainer()->set(RegistrationRateLimiter::class, new RegistrationRateLimiter());
+        $client->setServerParameter('REMOTE_ADDR', $this->uniqueClientIp());
 
         $em = $this->em();
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
@@ -40,18 +43,14 @@ final class InviteRegistrationFlowTest extends WebTestCaseBase
         $em->persist($invite);
         $em->flush();
 
-        $csrfManager = $client->getContainer()->get('security.csrf.token_manager');
-        $token = $csrfManager->getToken('registration_form')->getValue();
-
-        $client->request('POST', sprintf('/register?invite=%s', $plainToken), [
-            'registration_form' => [
-                'email' => $inviteEmail,
-                'plainPassword' => 'password123',
-                'agreeTerms' => 1,
-                'website' => '',
-                '_token' => $token,
-            ],
+        $crawler = $client->request('GET', sprintf('/register?invite=%s', $plainToken));
+        $form = $crawler->selectButton('Создать аккаунт')->form([
+            'registration_form[email]' => $inviteEmail,
+            'registration_form[plainPassword]' => 'password123',
+            'registration_form[agreeTerms]' => 1,
+            'registration_form[website]' => '',
         ]);
+        $client->submit($form);
 
         self::assertTrue($client->getResponse()->isRedirect());
 
@@ -75,5 +74,16 @@ final class InviteRegistrationFlowTest extends WebTestCaseBase
         $updatedInvite = $this->em()->getRepository(CompanyInvite::class)->find($invite->getId());
         self::assertNotNull($updatedInvite);
         self::assertNotNull($updatedInvite->getAcceptedAt());
+    }
+
+    private function uniqueClientIp(): string
+    {
+        return sprintf(
+            '2001:db8:%x:%x:%x:%x::1',
+            random_int(0, 0xffff),
+            random_int(0, 0xffff),
+            random_int(0, 0xffff),
+            random_int(0, 0xffff),
+        );
     }
 }

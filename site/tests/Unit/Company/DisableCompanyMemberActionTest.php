@@ -1,0 +1,183 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Unit\Company;
+
+use App\Company\Application\DisableCompanyMemberAction;
+use App\Company\Entity\Company;
+use App\Company\Entity\CompanyMember;
+use App\Company\Infrastructure\Repository\CompanyRepository;
+use App\Company\Repository\CompanyMemberRepository;
+use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\CompanyMemberBuilder;
+use App\Tests\Builders\Company\UserBuilder;
+use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\TestCase;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
+
+final class DisableCompanyMemberActionTest extends TestCase
+{
+    public function testDisablesOperatorMember(): void
+    {
+        $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
+        $operator = UserBuilder::aUser()->withIndex(2)->withRoles(['ROLE_COMPANY_USER'])->build();
+        $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
+        $member = CompanyMemberBuilder::aMember()
+            ->withCompany($company)
+            ->withUser($operator)
+            ->withRole(CompanyMember::ROLE_OPERATOR)
+            ->build();
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::once())->method('flush');
+
+        $action = new DisableCompanyMemberAction(
+            $this->companyRepositoryReturning($company),
+            $this->memberRepositoryReturning($member),
+            $entityManager,
+        );
+
+        $action((string) $company->getId(), (string) $member->getId(), $owner);
+
+        self::assertSame(CompanyMember::STATUS_DISABLED, $member->getStatus());
+    }
+
+    public function testDisablesOperatorWhenOwnerActorIsDifferentInstanceWithSameId(): void
+    {
+        $ownerId = '22222222-2222-2222-2222-000000000401';
+        $owner = UserBuilder::aUser()->withId($ownerId)->withEmail('owner@example.test')->build();
+        $actor = UserBuilder::aUser()->withId($ownerId)->withEmail('owner-proxy@example.test')->build();
+        $operator = UserBuilder::aUser()->withIndex(2)->withRoles(['ROLE_COMPANY_USER'])->build();
+        $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
+        $member = CompanyMemberBuilder::aMember()
+            ->withCompany($company)
+            ->withUser($operator)
+            ->withRole(CompanyMember::ROLE_OPERATOR)
+            ->build();
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::once())->method('flush');
+
+        $action = new DisableCompanyMemberAction(
+            $this->companyRepositoryReturning($company),
+            $this->memberRepositoryReturning($member),
+            $entityManager,
+        );
+
+        $action((string) $company->getId(), (string) $member->getId(), $actor);
+
+        self::assertSame(CompanyMember::STATUS_DISABLED, $member->getStatus());
+    }
+
+    public function testRejectsNonOwnerActor(): void
+    {
+        $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
+        $actor = UserBuilder::aUser()->withIndex(2)->withRoles(['ROLE_COMPANY_USER'])->build();
+        $memberUser = UserBuilder::aUser()->withIndex(3)->withRoles(['ROLE_COMPANY_USER'])->build();
+        $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
+        $member = CompanyMemberBuilder::aMember()->withCompany($company)->withUser($memberUser)->build();
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::never())->method('flush');
+
+        $action = new DisableCompanyMemberAction(
+            $this->companyRepositoryReturning($company),
+            $this->memberRepositoryReturning($member),
+            $entityManager,
+        );
+
+        $this->expectException(AccessDeniedException::class);
+
+        $action((string) $company->getId(), (string) $member->getId(), $actor);
+    }
+
+    public function testRejectsSelfDisable(): void
+    {
+        $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
+        $member = CompanyMemberBuilder::aMember()
+            ->withCompany($company)
+            ->withUser($owner)
+            ->withRole(CompanyMember::ROLE_OPERATOR)
+            ->build();
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::never())->method('flush');
+
+        $action = new DisableCompanyMemberAction(
+            $this->companyRepositoryReturning($company),
+            $this->memberRepositoryReturning($member),
+            $entityManager,
+        );
+
+        $this->expectException(AccessDeniedException::class);
+
+        $action((string) $company->getId(), (string) $member->getId(), $owner);
+    }
+
+    public function testRejectsOwnerRoleMember(): void
+    {
+        $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
+        $secondOwner = UserBuilder::aUser()->withIndex(2)->withRoles(['ROLE_COMPANY_OWNER'])->build();
+        $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
+        $member = CompanyMemberBuilder::aMember()
+            ->withCompany($company)
+            ->withUser($secondOwner)
+            ->withRole(CompanyMember::ROLE_OWNER)
+            ->build();
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::never())->method('flush');
+
+        $action = new DisableCompanyMemberAction(
+            $this->companyRepositoryReturning($company),
+            $this->memberRepositoryReturning($member),
+            $entityManager,
+        );
+
+        $this->expectException(AccessDeniedException::class);
+
+        $action((string) $company->getId(), (string) $member->getId(), $owner);
+    }
+
+    public function testRejectsMissingMember(): void
+    {
+        $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::never())->method('flush');
+
+        $action = new DisableCompanyMemberAction(
+            $this->companyRepositoryReturning($company),
+            $this->memberRepositoryReturning(null),
+            $entityManager,
+        );
+
+        $this->expectException(NotFoundHttpException::class);
+
+        $action((string) $company->getId(), '44444444-4444-4444-4444-444444444444', $owner);
+    }
+
+    private function companyRepositoryReturning(?Company $company): CompanyRepository
+    {
+        $repository = $this->createMock(CompanyRepository::class);
+        $repository
+            ->method('findById')
+            ->willReturn($company);
+
+        return $repository;
+    }
+
+    private function memberRepositoryReturning(?CompanyMember $member): CompanyMemberRepository
+    {
+        $repository = $this->createMock(CompanyMemberRepository::class);
+        $repository
+            ->method('findOneByIdAndCompanyId')
+            ->willReturn($member);
+
+        return $repository;
+    }
+}

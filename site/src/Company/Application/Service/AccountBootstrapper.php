@@ -16,7 +16,6 @@ use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Repository\PLCategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
-use Ramsey\Uuid\Uuid;
 
 final class AccountBootstrapper
 {
@@ -27,6 +26,7 @@ final class AccountBootstrapper
         private readonly PLCategoryRepository $plCategories,
         private readonly MoneyAccountRepository $moneyAccounts,
         private readonly BalanceStructureSeeder $balanceSeeder,
+        private readonly CompanyOwnerMembershipCreator $companyOwnerMembershipCreator,
     ) {
     }
 
@@ -67,15 +67,7 @@ final class AccountBootstrapper
 
     private function createCompanyFor(User $user, string $name): Company
     {
-        $company = new Company(
-            id: Uuid::uuid4()->toString(),
-            user: $user,
-        );
-        $company->setName($name);
-
-        $this->em->persist($company);
-
-        return $company;
+        return $this->companyOwnerMembershipCreator->createCompany($user, $name);
     }
 
     private function seedCashflow(Company $company): void

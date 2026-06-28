@@ -63,6 +63,18 @@ class CompanyMemberRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    public function findOneByIdAndCompanyId(string $memberId, string $companyId): ?CompanyMember
+    {
+        return $this->createQueryBuilder('companyMember')
+            ->innerJoin('companyMember.company', 'company')
+            ->andWhere('companyMember.id = :memberId')
+            ->andWhere('company.id = :companyId')
+            ->setParameter('memberId', $memberId)
+            ->setParameter('companyId', $companyId)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     public function findActiveOneByCompanyAndUser(Company $company, User $user): ?CompanyMember
     {
         return $this->createQueryBuilder('companyMember')
