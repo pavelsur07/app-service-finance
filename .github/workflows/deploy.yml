@@ -133,6 +133,7 @@ jobs:
                     export POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
                     export SITE_MAILER_DSN="${{ secrets.SITE_MAILER_DSN }}"
                     export SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
+                    export SENTRY_RELEASE="${{ github.sha }}"
                     export HEALTH_CHECK_TOKEN="${{ secrets.HEALTH_CHECK_TOKEN }}"
 
                     echo "🚚 Скачивание свежих образов из GHCR"
@@ -205,6 +206,7 @@ jobs:
                     export POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
                     export SITE_MAILER_DSN="${{ secrets.SITE_MAILER_DSN }}"
                     export SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
+                    export SENTRY_RELEASE="${{ github.sha }}"
                     export HEALTH_CHECK_TOKEN="${{ secrets.HEALTH_CHECK_TOKEN }}"
 
                     docker compose -f docker-compose.prod.yml run --rm site-php-cli bin/console doctrine:migrations:migrate --no-interaction
