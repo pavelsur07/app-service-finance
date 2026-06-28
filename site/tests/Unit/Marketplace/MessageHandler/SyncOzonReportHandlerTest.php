@@ -358,6 +358,38 @@ final class SyncOzonReportHandlerTest extends TestCase
         self::assertSame(1, $otherCompanyDoc->getRecordsCount());
     }
 
+    public function testInvalidDateIsLoggedAsWarningNotError(): void
+    {
+        // Регрессия follow-up: невалидный вход (дата) — это skip, не инцидент.
+        // Должен логироваться как warning (не уходит в GlitchTip), а не error.
+        $company = CompanyBuilder::aCompany()->withId(self::COMPANY_ID)->build();
+        $connection = new MarketplaceConnection(self::CONNECTION_ID, $company, MarketplaceType::OZON);
+
+        $em = $this->createEmMock($company, $connection);
+        $em->expects(self::never())->method('persist');
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::never())->method('error');
+        $logger->expects(self::once())
+            ->method('warning')
+            ->with(
+                self::stringContains('Invalid date in SyncOzonReportMessage'),
+                self::arrayHasKey('date'),
+            );
+
+        $adapter = $this->createMock(MarketplaceAdapterInterface::class);
+        $adapter->method('getMarketplaceType')->willReturn(MarketplaceType::OZON->value);
+        $adapter->expects(self::never())->method('fetchRawReport');
+
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $rawDocRepo = $this->createMock(MarketplaceRawDocumentRepository::class);
+
+        $handler = $this->createHandler($em, $adapter, $messageBus, $rawDocRepo, $logger);
+        $handler(new SyncOzonReportMessage(self::COMPANY_ID, self::CONNECTION_ID, 'not-a-date'));
+    }
+
     private function buildDocForDate(Company $company): MarketplaceRawDocument
     {
         $day = new \DateTimeImmutable(self::DATE);

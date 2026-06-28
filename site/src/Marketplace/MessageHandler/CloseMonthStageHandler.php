@@ -46,8 +46,9 @@ final class CloseMonthStageHandler
                 'pl_documents'   => count($result['plDocumentIds']),
             ]);
         } catch (\DomainException $e) {
-            // DomainException — не ретраим, данные не готовы
-            $this->logger->error('[MonthClose] Domain error — no retry', [
+            // DomainException — ожидаемое доменное условие («данные не готовы»),
+            // не ретраим и НЕ инцидент → warning (в GlitchTip не уходит).
+            $this->logger->warning('[MonthClose] Domain error — no retry', [
                 'company_id' => $message->companyId,
                 'stage'      => $message->stage,
                 'error'      => $e->getMessage(),

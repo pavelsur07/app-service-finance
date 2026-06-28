@@ -16,6 +16,7 @@ use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Console\Tester\CommandTester;
 
@@ -171,6 +172,40 @@ final class AdBatchSchedulerCommandTest extends TestCase
         // Объект batch в памяти не изменился на successful path'е,
         // но мог быть частично модифицирован — это неважно, rollback на уровне БД
         // вернёт запись к исходному состоянию.
+    }
+
+    public function testTransientFailureIsLoggedAsWarningNotError(): void
+    {
+        // Регрессия follow-up: transient (batch остаётся PLANNED, cron повторит)
+        // не инцидент → warning, не error.
+        $batch = $this->buildBatch();
+
+        $this->batchRepo->method('findNextPlanned')->willReturn($batch);
+        $this->ozonClient->method('postStatistics')
+            ->willThrowException(new \RuntimeException('Ozon POST вернул HTTP 502'));
+
+        $this->connection->expects(self::once())->method('beginTransaction');
+        $this->connection->expects(self::once())->method('rollBack');
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::never())->method('error');
+        $logger->expects(self::once())
+            ->method('warning')
+            ->with(
+                self::stringContains('Scheduler: transient failure, batch stays PLANNED'),
+                self::arrayHasKey('exception'),
+            );
+
+        $command = new AdBatchSchedulerCommand(
+            $this->ozonClient,
+            $this->batchRepo,
+            $this->em,
+            $this->connection,
+            $logger,
+        );
+
+        $tester = new CommandTester($command);
+        self::assertSame(1, $tester->execute([]));
     }
 
     private function buildBatch(): AdScheduledBatch

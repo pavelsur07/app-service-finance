@@ -702,6 +702,51 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         ));
     }
 
+    public function testTransientErrorIsLoggedAsWarningNotError(): void
+    {
+        // Регрессия follow-up: transient prep-сбой повторяется Messenger'ом —
+        // ожидаемо-повторяемо → warning, не error.
+        $job = AdLoadJobBuilder::aJob()->asRunning()->build();
+
+        $jobRepo = $this->createMock(AdLoadJobRepository::class);
+        $jobRepo->method('findByIdAndCompany')->willReturn($job);
+
+        $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->method('prepareStatisticsBatches')
+            ->willThrowException(new \RuntimeException('Ozon 502 Bad Gateway'));
+
+        $appLogger = $this->createMock(AppLogger::class);
+        $appLogger->expects(self::never())->method('error');
+        $appLogger->expects(self::once())
+            ->method('warning')
+            ->with(
+                self::stringContains('Transient failure preparing Ozon ad statistics batches'),
+                self::arrayHasKey('exception'),
+            );
+
+        $handler = new FetchOzonAdStatisticsHandler(
+            $ozonClient,
+            $jobRepo,
+            $this->createMock(AdScheduledBatchRepositoryInterface::class),
+            $this->createMock(AdChunkProgressRepositoryInterface::class),
+            $this->createMock(OzonAdPendingReportRepository::class),
+            $this->createMock(AdLoadJobFinalizer::class),
+            $this->createMock(MessageBusInterface::class),
+            $appLogger,
+            new NullLogger(),
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Ozon 502 Bad Gateway');
+
+        $handler(new FetchOzonAdStatisticsMessage(
+            AdLoadJobBuilder::DEFAULT_ID,
+            self::COMPANY_ID,
+            self::DATE_FROM,
+            self::DATE_TO,
+        ));
+    }
+
     private function createHandler(
         OzonAdClient $ozonClient,
         AdLoadJobRepository $jobRepo,

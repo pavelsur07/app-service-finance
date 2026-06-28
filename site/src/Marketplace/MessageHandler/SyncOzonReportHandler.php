@@ -93,7 +93,8 @@ final class SyncOzonReportHandler
         if ($date !== null) {
             $parsed = \DateTimeImmutable::createFromFormat('!Y-m-d', $date, $timezone);
             if ($parsed === false || $parsed->format('Y-m-d') !== $date) {
-                $this->logger->error('Invalid date in SyncOzonReportMessage, skipping', [
+                // Невалидный вход → skip. Это не системный сбой → warning (не в GlitchTip).
+                $this->logger->warning('Invalid date in SyncOzonReportMessage, skipping', [
                     'company_id' => $companyId,
                     'date'       => $date,
                 ]);
