@@ -15,8 +15,8 @@ sentry:
         send_default_pii: false
         # Ограничиваем тело запроса в событии: меньше payload и риска утечки.
         max_request_body_size: 'small'
-        # Скраббер секретов/PII перед отправкой (чистит extra/tags/request).
-        before_send: 'App\Shared\Infrastructure\Sentry\EventScrubber'
+        # Композитный before_send: троттлинг бёрстов + скраб секретов/PII.
+        before_send: 'App\Shared\Infrastructure\Sentry\SentryBeforeSend'
 
         ignore_exceptions:
             - 'Symfony\Component\ErrorHandler\Error\FatalError'
