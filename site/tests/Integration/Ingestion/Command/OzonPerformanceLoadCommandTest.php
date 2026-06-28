@@ -114,6 +114,33 @@ final class OzonPerformanceLoadCommandTest extends IntegrationTestCase
         $this->assertTwoChunkSchedulePerConnection($connectionIds, $transport);
     }
 
+    public function testDailyLoadMonthToDateExecuteDispatchesCurrentMonthWindow(): void
+    {
+        $company = $this->seedCompany('11111111-1111-1111-1111-00000000a115', 9115);
+        $this->seedPerformanceConnection($company, '77777777-7777-7777-7777-00000000a115');
+        $this->em->flush();
+
+        $transport = $this->getIngestFetchTransport();
+        $transport->reset();
+
+        $tester = $this->tester('app:ingestion:ozon-performance:daily-load');
+        $exit = $tester->execute([
+            '--company-id' => $company->getId(),
+            '--window' => 'month-to-date',
+            '--execute' => true,
+        ]);
+
+        $yesterday = (new \DateTimeImmutable('today'))->modify('-1 day');
+        $expectedFrom = $yesterday->modify('first day of this month')->format('Y-m-d');
+        $expectedTo = $yesterday->format('Y-m-d');
+
+        self::assertSame(Command::SUCCESS, $exit);
+        self::assertStringContainsString('month-to-date', $tester->getDisplay());
+        self::assertStringContainsString('n/a', $tester->getDisplay());
+        self::assertSame([[$expectedFrom, $expectedTo]], $this->distinctParentWindows($company->getId()));
+        self::assertCount(count(self::RESOURCE_TYPES) * $this->expectedChunkCount($expectedFrom, $expectedTo), $transport->getSent());
+    }
+
     public function testBackfillExecuteDispatchesAllPerformanceResourcesForExplicitPeriod(): void
     {
         $company = $this->seedCompany('11111111-1111-1111-1111-00000000a103', 9103);
@@ -200,6 +227,34 @@ final class OzonPerformanceLoadCommandTest extends IntegrationTestCase
         );
 
         return array_map(static fn (mixed $value): string => (string) $value, $rows);
+    }
+
+    /**
+     * @return list<array{0: string, 1: string}>
+     */
+    private function distinctParentWindows(string $companyId): array
+    {
+        $rows = $this->connection->fetchAllAssociative(
+            "SELECT DISTINCT to_char(window_from, 'YYYY-MM-DD') AS window_from, to_char(window_to, 'YYYY-MM-DD') AS window_to
+             FROM ingest_sync_jobs
+             WHERE company_id = :companyId AND parent_job_id IS NULL
+             ORDER BY window_from, window_to",
+            ['companyId' => $companyId],
+        );
+
+        return array_map(
+            static fn (array $row): array => [(string) $row['window_from'], (string) $row['window_to']],
+            $rows,
+        );
+    }
+
+    private function expectedChunkCount(string $from, string $to): int
+    {
+        $fromDate = new \DateTimeImmutable($from);
+        $toDate = new \DateTimeImmutable($to);
+        $days = ((int) $fromDate->diff($toDate)->days) + 1;
+
+        return max(1, (int) ceil($days / 7));
     }
 
     private function syncJobCount(string $companyId): int

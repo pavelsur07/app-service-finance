@@ -2159,6 +2159,7 @@ paths:
 | `app:marketplace:wb-financial-reports:sync --mode=daily` | `03:10 daily` | Ежедневное планирование WB financial sync за рабочий день (новая date-based команда) |
 | `app:marketplace:wb-financial-reports:sync --mode=refresh14` | `04:20 daily` | Планирование пересинхронизации последних 14 дней WB financial reports |
 | `app:marketplace:wb-financial-reports:sync --mode=missing --max-days=10` | `05:30 daily` | Планирование дозагрузки пропущенных дней (до 10 дней на подключение) |
+| `app:ingestion:ozon-performance:daily-load --window=month-to-date` | `07:25 daily` | Планирование Ozon Performance ingestion с начала месяца до вчерашнего дня; HTTP-загрузка выполняется `ingest_fetch` worker'ом |
 
 **Правила для новых cron-команд:**
 - Класс в `src/{Module}/Command/`, `final class`, `#[AsCommand]`

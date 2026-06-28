@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Ingestion\Command;
 
 use App\Ingestion\Application\Command\StartBackfillCommand as StartBackfillApplicationCommand;
+use App\Ingestion\Application\Service\OzonPerformanceLoadWindowResolver;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Exception\ActiveBackfillExistsException;
@@ -18,7 +19,6 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\Clock\ClockInterface;
 use Webmozart\Assert\Assert;
 
 #[AsCommand(
@@ -59,7 +59,7 @@ final class OzonPerformanceDailyLoadCommand extends Command
     public function __construct(
         private readonly MarketplaceFacade $marketplaceFacade,
         private readonly SyncFacade $syncFacade,
-        private readonly ClockInterface $clock,
+        private readonly OzonPerformanceLoadWindowResolver $windowResolver,
         private readonly LoggerInterface $logger,
     ) {
         parent::__construct();
@@ -69,6 +69,7 @@ final class OzonPerformanceDailyLoadCommand extends Command
     {
         $this
             ->addOption('days-back', null, InputOption::VALUE_REQUIRED, 'Rewind depth in days, 1..62.', 14)
+            ->addOption('window', null, InputOption::VALUE_REQUIRED, 'Date window: rolling or month-to-date.', OzonPerformanceLoadWindowResolver::WINDOW_ROLLING)
             ->addOption('company-id', null, InputOption::VALUE_REQUIRED, 'Optional company UUID filter.')
             ->addOption('dispatch-spacing-seconds', null, InputOption::VALUE_REQUIRED, 'Delay between campaign-backed job dispatches, 0..3600.', self::DEFAULT_DISPATCH_SPACING_SECONDS)
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Print planned jobs without dispatching them.')
@@ -102,6 +103,7 @@ final class OzonPerformanceDailyLoadCommand extends Command
             }
 
             $daysBack = $this->daysBack($input);
+            $window = $this->window($input);
             $companyId = $this->companyId($input);
             $dispatchSpacingSeconds = $this->dispatchSpacingSeconds($input);
         } catch (\Throwable $exception) {
@@ -110,17 +112,18 @@ final class OzonPerformanceDailyLoadCommand extends Command
             return Command::FAILURE;
         }
 
-        $today = $this->clock->now()->setTime(0, 0);
-        $from = $today->modify(sprintf('-%d days', $daysBack));
-        $to = $today->modify('-1 day');
+        $loadWindow = $this->windowResolver->resolve($window, $daysBack);
+        $from = $loadWindow->from;
+        $to = $loadWindow->to;
         $connections = $this->marketplaceFacade->getActiveOzonPerformanceConnections($companyId);
 
         $io->title('Ozon Performance daily load');
         $io->table(['setting', 'value'], [
             ['mode', $dryRun ? 'dry-run' : 'execute'],
+            ['window', $loadWindow->label],
             ['from', $from->format('Y-m-d')],
             ['to', $to->format('Y-m-d')],
-            ['daysBack', (string) $daysBack],
+            ['daysBack', OzonPerformanceLoadWindowResolver::WINDOW_ROLLING === $window ? (string) $daysBack : 'n/a'],
             ['companyId', $companyId ?? 'all'],
             ['connections', (string) count($connections)],
             ['dispatchSpacingSeconds', (string) $dispatchSpacingSeconds],
@@ -219,6 +222,16 @@ final class OzonPerformanceDailyLoadCommand extends Command
         }
 
         return $daysBack;
+    }
+
+    private function window(InputInterface $input): string
+    {
+        $window = trim((string) $input->getOption('window'));
+        if (!in_array($window, OzonPerformanceLoadWindowResolver::allowedWindows(), true)) {
+            throw new \InvalidArgumentException('Invalid --window. Allowed values: rolling, month-to-date.');
+        }
+
+        return $window;
     }
 
     private function dispatchSpacingSeconds(InputInterface $input): int
