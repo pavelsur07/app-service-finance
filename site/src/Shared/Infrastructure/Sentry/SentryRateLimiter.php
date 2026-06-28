@@ -23,8 +23,6 @@ use Sentry\EventHint;
  */
 final class SentryRateLimiter
 {
-    private const MAX_KEYS = 1000;
-
     /** @var array<string, array{windowStart: int, count: int}> */
     private array $buckets = [];
 
@@ -32,6 +30,7 @@ final class SentryRateLimiter
         private readonly ClockInterface $clock,
         private readonly int $limit = 10,
         private readonly int $windowSeconds = 60,
+        private readonly int $maxKeys = 1000,
     ) {
     }
 
@@ -40,14 +39,18 @@ final class SentryRateLimiter
         $now = $this->clock->now()->getTimestamp();
         $key = $this->keyFor($event);
 
-        $this->pruneExpired($now);
-
         $bucket = $this->buckets[$key] ?? null;
 
         // Новое или истёкшее окно — пропускаем и начинаем отсчёт заново.
         if (null === $bucket || ($now - $bucket['windowStart']) >= $this->windowSeconds) {
             $this->buckets[$key] = ['windowStart' => $now, 'count' => 1];
-            $this->enforceCap($key);
+
+            // Чистку/обрезку держим вне горячего пути: запускаем только когда карта
+            // реально разрослась сверх лимита (для остальных событий путь O(1)).
+            if (\count($this->buckets) > $this->maxKeys) {
+                $this->pruneExpired($now);
+                $this->enforceCap();
+            }
 
             return $event;
         }
@@ -88,16 +91,17 @@ final class SentryRateLimiter
     }
 
     /**
-     * Патологический случай: >MAX_KEYS различных сигнатур в окне.
-     * Сбрасываем карту, оставляя только текущий ключ — троттлинг прочих обнуляется,
-     * но рост памяти исключён.
+     * Патологический случай: >maxKeys различных сигнатур в окне.
+     * Оставляем самые свежие maxKeys ключей (массив хранит порядок вставки),
+     * отбрасываем только старейшие — троттлинг активных ошибок сохраняется,
+     * рост памяти исключён.
      */
-    private function enforceCap(string $currentKey): void
+    private function enforceCap(): void
     {
-        if (\count($this->buckets) <= self::MAX_KEYS) {
+        if (\count($this->buckets) <= $this->maxKeys) {
             return;
         }
 
-        $this->buckets = [$currentKey => $this->buckets[$currentKey]];
+        $this->buckets = \array_slice($this->buckets, -$this->maxKeys, null, true);
     }
 }

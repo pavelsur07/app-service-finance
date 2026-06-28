@@ -58,6 +58,28 @@ final class SentryRateLimiterTest extends TestCase
         self::assertNull($limiter($second), 'identical message must be throttled');
     }
 
+    public function testEvictsOldestKeysBeyondCapKeepingRecentOnes(): void
+    {
+        $limiter = new SentryRateLimiter(
+            new MockClock('2024-01-01T00:00:00+00:00'),
+            limit: 1,
+            windowSeconds: 60,
+            maxKeys: 3,
+        );
+
+        // 4 разные сигнатуры при cap=3: вставка 'd' вытесняет старейшую 'a'.
+        self::assertNotNull($limiter($this->exceptionEvent('a')));
+        self::assertNotNull($limiter($this->exceptionEvent('b')));
+        self::assertNotNull($limiter($this->exceptionEvent('c')));
+        self::assertNotNull($limiter($this->exceptionEvent('d')));
+
+        // 'd' — свежий, всё ещё отслеживается → троттлится.
+        self::assertNull($limiter($this->exceptionEvent('d')), 'recent key must stay throttled');
+
+        // 'a' — вытеснен из карты → считается новым и снова проходит.
+        self::assertNotNull($limiter($this->exceptionEvent('a')), 'evicted oldest key resets');
+    }
+
     private function exceptionEvent(string $message, string $class = \RuntimeException::class): Event
     {
         $event = Event::createEvent();
