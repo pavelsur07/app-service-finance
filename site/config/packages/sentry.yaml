@@ -1,6 +1,23 @@
 sentry:
     dsn: '%env(SENTRY_DSN)%'
     options:
+        # Окружение и релиз. Бандл sentry-symfony уже подставляет по умолчанию
+        # environment=%kernel.environment% и release=%env(default::SENTRY_RELEASE)%,
+        # но фиксируем явно — контракт наблюдаемости должен быть виден в конфиге.
+        # Staging и prod разведены отдельными GlitchTip-проектами (разные DSN),
+        # поэтому environment здесь — это dev/test/prod ядра, а не staging/prod.
+        environment: '%env(APP_ENV)%'
+        # release заполняется git sha из деплоя (переменная SENTRY_RELEASE).
+        # Если не задан — default:: даёт пустое значение, релиз-трекинг просто выключен.
+        release: '%env(default::SENTRY_RELEASE)%'
+
+        # PII не отправляем (явно, хотя это и дефолт SDK).
+        send_default_pii: false
+        # Ограничиваем тело запроса в событии: меньше payload и риска утечки.
+        max_request_body_size: 'small'
+        # Композитный before_send: троттлинг бёрстов + скраб секретов/PII.
+        before_send: 'App\Shared\Infrastructure\Sentry\SentryBeforeSend'
+
         ignore_exceptions:
             - 'Symfony\Component\ErrorHandler\Error\FatalError'
             - 'Symfony\Component\Debug\Exception\FatalErrorException'

@@ -27,6 +27,7 @@
 - [20. Событийная модель: Доменные события](#20-событийная-модель-доменные-события)
 - [21. Оптимистичная блокировка](#21-оптимистичная-блокировка)
 - [22. Idempotency в Messenger](#22-idempotency-в-messenger)
+- [23. Логирование: выбор уровня (error vs warning)](#23-логирование-выбор-уровня-error-vs-warning)
 
 ---
 
@@ -1003,3 +1004,85 @@ final class ImportBankStatementHandler
 ```
 
 **Когда:** импорты из внешних систем · финансовые операции · любой Handler с деструктивными или неотменяемыми эффектами. Не нужно для read-only и вычислительных Handler.
+
+---
+
+## 23. Логирование: выбор уровня (error vs warning)
+
+> Правила уровней, инжекта и запретов — в `CLAUDE.md` (раздел «Логирование»).
+> Здесь — как на практике выбрать `error` vs `warning` и не засорять GlitchTip.
+
+### Главное правило
+
+**В GlitchTip (Sentry) уходит только `ERROR`+** (см. `config/packages/monolog.yaml` — отдельный `sentry`-handler на `level: error`). Значит уровень — это не «насколько громко», а **«нужен ли человек»**:
+
+| Уровень | Семантика | Идёт в GlitchTip? |
+|---|---|---|
+| `error` | Инцидент: нужно вмешательство человека (неустранимый сбой, баг, повреждение данных) | **Да** — создаёт алерт |
+| `warning` | Нештатно, но **ожидаемо** и обрабатывается само (ретрай, 429, таймаут, невалидный вход, skip) | Нет — только файл/stderr |
+| `info` | Бизнес-события (старт/финиш задачи, импорт завершён) | Нет |
+
+Вопрос для выбора: **«если это сработает в 3 ночи — кого-то надо будить?»** Нет → `warning`, не `error`.
+
+### Messenger Handler — канонический паттерн
+
+Эталон: `App\Marketplace\MessageHandler\SyncWbFinancialReportDayHandler`.
+
+```php
+try {
+    // ... работа handler'а
+} catch (MarketplaceRateLimitException|MarketplaceTemporaryApiException $e) {
+    // Ожидаемо и повторяемо → warning + Recoverable (Messenger сделает retry)
+    $this->logger->warning('WB sync: temporary API failure, will retry.', [
+        'company_id' => $message->companyId,
+        'error' => $e->getMessage(),
+    ]);
+    throw new RecoverableMessageHandlingException($e->getMessage(), 0, $e);
+} catch (MarketplaceAuthException|MarketplaceBadRequestException $e) {
+    // Неустранимо → error (нужен человек) + Unrecoverable (без retry)
+    $this->logger->error('WB sync: non-retryable failure.', [
+        'company_id' => $message->companyId,
+        'error' => $e->getMessage(),
+    ]);
+    throw new UnrecoverableMessageHandlingException($e->getMessage(), 0, $e);
+}
+```
+
+Антипаттерны (создают ложные алерты в GlitchTip):
+- `error` на transient-сбое, который тут же ретраится → **это `warning`**.
+- `error` на ожидаемом доменном условии («данные не готовы», «период не закрыт») → **`warning`** или `info`.
+- `error` на невалидном входе с последующим `skip`/`return` → **`warning`**.
+
+### Batch/циклы — агрегируй, не логируй по записи
+
+```php
+// ❌ N ошибок в GlitchTip из одного прогона
+foreach ($rows as $row) {
+    try { $this->process($row); }
+    catch (\Throwable $e) { $this->logger->error('Row failed', ['id' => $row->id]); }
+}
+
+// ✅ Один error со сводкой (rate-limiter в before_send схлопнёт остаток, но не полагайся на него)
+$failures = [];
+foreach ($rows as $row) {
+    try { $this->process($row); }
+    catch (\Throwable $e) { $failures[] = ['id' => $row->id, 'error' => $e->getMessage()]; }
+}
+if ($failures !== []) {
+    $this->logger->error('Batch finished with failures.', [
+        'failed' => count($failures),
+        'total' => count($rows),
+        'sample' => array_slice($failures, 0, 5),
+    ]);
+}
+```
+
+> Перед `before_send` стоит in-process rate-limiter (`SentryRateLimiter`): первые N одинаковых событий за окно проходят, остальные дропаются. Это страховка от заливки, **а не замена** агрегации в коде.
+
+### HTTP 4xx — не инцидент
+
+Клиентские 4xx (`404/403/405/422/…`) логируются **ниже `error`** через `framework.exceptions` (см. `config/packages/framework.yaml`) и в GlitchTip не попадают. Бросай **конкретные** подклассы (`NotFoundHttpException`, `UnprocessableEntityHttpException`, …), а не базовый `new HttpException(422, …)` — маппинг уровней идёт по классу.
+
+### Секреты/PII
+
+`before_send` (`EventScrubber`) чистит `extra`/`tags`/`request` по ключам, но это страховка. Не клади токены/пароли/ИНН/ФИО в context логов — см. запреты в `CLAUDE.md`.
