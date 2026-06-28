@@ -21,7 +21,6 @@ use App\Tests\Builders\MarketplaceAds\AdLoadJobBuilder;
 use DG\BypassFinals;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
-use Sentry\State\HubInterface;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -393,7 +392,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             $pendingRepo,
             $finalizer,
             $messageBus,
-            new AppLogger(new NullLogger(), $this->createMock(HubInterface::class)),
+            new AppLogger(new NullLogger()),
             $marketplaceAdsLogger,
         );
 
@@ -769,7 +768,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             $pendingRepo,
             $finalizer ?? $this->createMock(AdLoadJobFinalizer::class),
             $messageBus,
-            new AppLogger(new NullLogger(), $this->createMock(HubInterface::class)),
+            new AppLogger(new NullLogger()),
             new NullLogger(),
         );
     }

@@ -20,7 +20,6 @@ use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
-use Sentry\State\HubInterface;
 
 // Bootstrap pins BypassFinals to an allowlist; extend it so the action and finalizer
 // under test can be doubled without touching the global bootstrap configuration.
@@ -69,7 +68,7 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
         $this->jobRepo = $this->createMock(AdLoadJobRepositoryInterface::class);
         $this->finalizer = $this->createMock(AdLoadJobFinalizer::class);
         $this->entityManager = $this->createMock(EntityManagerInterface::class);
-        $this->logger = new AppLogger(new NullLogger(), $this->createMock(HubInterface::class));
+        $this->logger = new AppLogger(new NullLogger());
 
         $this->handler = new ProcessAdRawDocumentHandler(
             $this->action,

@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Shared\Service;
 
 use Psr\Log\LoggerInterface;
-use Sentry\State\HubInterface;
-use Sentry\Severity;
 
 /**
  * Единая точка входа для логирования бизнес-событий и метрик.
@@ -15,7 +13,6 @@ class AppLogger
 {
     public function __construct(
         private readonly LoggerInterface $logger,
-        private readonly HubInterface $sentryHub
     ) {
     }
 
@@ -51,7 +48,11 @@ class AppLogger
     }
 
     /**
-     * Точечная отправка аномалий производительности (деградации) в Sentry
+     * Фиксация деградации производительности.
+     *
+     * Пишет ТОЛЬКО в локальный лог как warning. В GlitchTip намеренно не уходит:
+     * по конвенции туда попадает только ERROR (медленное выполнение — не инцидент).
+     * Перформанс отслеживается отдельно (Sentry tracing выключен осознанно).
      */
     public function logSlowExecution(string $operationName, int $durationMs, int $thresholdMs = 0): void
     {
@@ -65,10 +66,6 @@ class AppLogger
             $message .= sprintf(' (лимит: %d мс)', $thresholdMs);
         }
 
-        // 1. Пишем в локальный лог как Warning
         $this->logger->warning($message);
-
-        // 2. Отправляем алерт в GlitchTip вручную
-        $this->sentryHub->captureMessage($message, Severity::warning());
     }
 }
