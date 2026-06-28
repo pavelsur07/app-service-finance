@@ -1,0 +1,12 @@
+# Test-only: capturing handler so functional tests can assert at which level
+# the ErrorListener logs HTTP exceptions (regression guard for Stage 1).
+monolog:
+    handlers:
+        test_capture:
+            type: service
+            id: Monolog\Handler\TestHandler
+
+services:
+    Monolog\Handler\TestHandler:
+        class: Monolog\Handler\TestHandler
+        public: true

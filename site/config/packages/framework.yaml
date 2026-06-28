@@ -2,6 +2,31 @@
 framework:
     secret: '%env(APP_SECRET)%'
 
+    # Уровни логирования для исключений.
+    # По умолчанию Symfony логирует 4xx HttpException на уровне ERROR, из-за чего
+    # клиентские ошибки (404/403/405/422/…) попадают в отдельный sentry-handler (level: error)
+    # и засоряют GlitchTip. Понижаем уровень ТОЛЬКО у конкретных 4xx-подклассов.
+    # Базовый HttpException и все 5xx НЕ трогаем — они должны оставаться error/critical.
+    exceptions:
+        Symfony\Component\HttpKernel\Exception\NotFoundHttpException:
+            log_level: notice
+        Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException:
+            log_level: notice
+        Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException:
+            log_level: notice
+        Symfony\Component\Security\Core\Exception\AccessDeniedException:
+            log_level: notice
+        Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException:
+            log_level: notice
+        Symfony\Component\HttpKernel\Exception\BadRequestHttpException:
+            log_level: warning
+        Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException:
+            log_level: warning
+        Symfony\Component\HttpKernel\Exception\ConflictHttpException:
+            log_level: warning
+        Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException:
+            log_level: warning
+
     # Note that the session will be started ONLY if you read or write from it.
     session:
         #handler_id: null

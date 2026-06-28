@@ -88,10 +88,14 @@
 
 ---
 
-🛑 **Phase 0 STOP. Жду одобрения плана Владельцем. Без подтверждения код не пишу.**
+## Решения Владельца (2026-06-28) — план одобрен
 
-Открытые вопросы к Владельцу:
-1. GlitchTip staging и prod — один проект (id=1) или разводим? (влияет на Stage 2)
-2. `legacy_wb_sync`-карантин и `marketplace_ads`-blind-spot — оставляем как есть или поднимаем в алерты? (Stage 0/6)
-3. Stage 5 (глобальное обогащение через middleware) — делаем сейчас или выносим в follow-up?
-4. Нужен ли минимальный `traces_sample_rate` (например 0.05) для перфоманса, или performance не включаем вовсе?
+1. **GlitchTip:** prod — **отдельный проект** (не staging id=1). `environment: '%env(APP_ENV)%'` всё равно добавляем для чистоты фильтрации внутри проекта.
+2. **`release`:** из **git sha** (источник — переменная деплоя/CI, пробрасывается как `SENTRY_RELEASE`).
+3. **`marketplace_ads`:** пока **остаётся только файловым каналом**. Роутинг реальных ERROR-инцидентов ads в GlitchTip — follow-up, **вне scope** этой задачи. Чистка уровней (transient→warning) в `MarketplaceAds` на Stage 6 допустима, но без подключения канала к Sentry.
+4. **`legacy_wb_sync`:** карантин **оставляем как есть** (намеренные fail-fast tripwire'ы).
+
+Открытые на потом (не блокируют): Stage 5 (middleware-обогащение) — по решению после Stage 1–4; `traces_sample_rate` — не включаем (performance вне scope).
+
+### Уточнение дизайна Stage 1 (по итогам анализа)
+Базовый `HttpException` мапить на `warning` **нельзя** — он покрывает и 5xx (`ServiceUnavailableHttpException` и т.п.), это скрыло бы серверные ошибки. Понижаем уровень **только у конкретных 4xx-подклассов** (`NotFoundHttpException`, `MethodNotAllowedHttpException`, `AccessDeniedHttpException`, `Security\…\AccessDeniedException`, `UnauthorizedHttpException`, `BadRequestHttpException`, `UnprocessableEntityHttpException`, `ConflictHttpException`, `TooManyRequestsHttpException`). Базовый `HttpException` и все 5xx остаются на дефолтном `error`/`critical`. Generic `new HttpException(4xx, …)` (без конкретного класса) — редкий кейс, выносится в конвенцию Stage 6 (использовать конкретные классы).
