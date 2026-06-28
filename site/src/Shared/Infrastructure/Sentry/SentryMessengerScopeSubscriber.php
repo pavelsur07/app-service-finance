@@ -53,15 +53,31 @@ final class SentryMessengerScopeSubscriber implements EventSubscriberInterface
     private function companyId(object $message): ?string
     {
         if (method_exists($message, 'getCompanyId')) {
-            $value = $message->getCompanyId();
-
-            return \is_string($value) ? $value : null;
+            return $this->stringify($message->getCompanyId());
         }
 
-        if (property_exists($message, 'companyId')) {
-            $value = $message->companyId;
+        // isset() (а не property_exists + прямой доступ) безопасно вернёт false
+        // для private/protected/неинициализированного свойства — воркер не упадёт.
+        if (isset($message->companyId)) {
+            return $this->stringify($message->companyId);
+        }
 
-            return \is_string($value) ? $value : null;
+        return null;
+    }
+
+    private function stringify(mixed $value): ?string
+    {
+        if (\is_string($value)) {
+            return $value;
+        }
+
+        if (\is_int($value)) {
+            return (string) $value;
+        }
+
+        // PHP 8: класс с __toString() неявно реализует Stringable (UUID VO и т.п.).
+        if ($value instanceof \Stringable) {
+            return (string) $value;
         }
 
         return null;

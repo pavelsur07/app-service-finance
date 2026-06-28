@@ -10,6 +10,7 @@ use PHPUnit\Framework\TestCase;
 use Sentry\Event;
 use Sentry\State\HubInterface;
 use Sentry\State\Scope;
+use Sentry\UserDataBag;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
@@ -37,13 +38,18 @@ final class SentryRequestScopeSubscriberTest extends TestCase
         self::assertSame('comp-1', $event->getTags()['company_id'] ?? null);
     }
 
-    public function testSkipsWhenNoUserOrCompany(): void
+    public function testClearsStaleUserAndCompanyForAnonymousRequest(): void
     {
+        // Переиспользование scope (тесты/RoadRunner/Swoole): анонимный запрос
+        // не должен унаследовать user/company предыдущего.
         $audit = $this->createMock(AuditContextProvider::class);
         $audit->method('getActorUserId')->willReturn(null);
         $audit->method('getCompanyId')->willReturn(null);
 
         $scope = new Scope();
+        $scope->setUser(UserDataBag::createFromUserIdentifier('stale-user'));
+        $scope->setTag('company_id', 'stale-company');
+
         $hub = $this->createMock(HubInterface::class);
         $hub->method('configureScope')->willReturnCallback(static fn (callable $cb) => $cb($scope));
 

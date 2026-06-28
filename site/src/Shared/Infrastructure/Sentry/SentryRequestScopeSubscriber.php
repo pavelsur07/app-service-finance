@@ -43,13 +43,21 @@ final class SentryRequestScopeSubscriber implements EventSubscriberInterface
         $userId = $this->auditContext->getActorUserId();
         $companyId = $this->auditContext->getCompanyId();
 
+        // Явно сбрасываем в else-ветках: при переиспользовании процесса/scope
+        // (тесты, RoadRunner/Swoole/FrankenPHP) анонимный запрос не должен
+        // унаследовать user/company предыдущего. setUser(null) бросает TypeError —
+        // для сброса используем removeUser().
         $this->hub->configureScope(static function (Scope $scope) use ($userId, $companyId): void {
             if (null !== $userId) {
                 $scope->setUser(UserDataBag::createFromUserIdentifier($userId));
+            } else {
+                $scope->removeUser();
             }
 
             if (null !== $companyId) {
                 $scope->setTag('company_id', $companyId);
+            } else {
+                $scope->removeTag('company_id');
             }
         });
     }

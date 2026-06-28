@@ -54,6 +54,31 @@ final class SentryMessengerScopeSubscriberTest extends TestCase
         self::assertSame('from-getter', $event->getTags()['company_id'] ?? null);
     }
 
+    public function testIgnoresInaccessiblePrivateCompanyIdWithoutGetter(): void
+    {
+        // Приватное свойство без геттера: isset() извне вернёт false — без фатала.
+        $message = new class('secret') {
+            public function __construct(private readonly string $companyId)
+            {
+            }
+        };
+
+        $event = $this->scopeAfterReceiving($message, new Scope());
+
+        self::assertArrayNotHasKey('company_id', $event->getTags());
+    }
+
+    public function testStringifiesIntCompanyId(): void
+    {
+        $message = new class {
+            public int $companyId = 42;
+        };
+
+        $event = $this->scopeAfterReceiving($message, new Scope());
+
+        self::assertSame('42', $event->getTags()['company_id'] ?? null);
+    }
+
     private function scopeAfterReceiving(object $message, Scope $scope): Event
     {
         $hub = $this->createMock(HubInterface::class);
