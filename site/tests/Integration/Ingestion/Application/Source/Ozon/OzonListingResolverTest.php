@@ -129,6 +129,18 @@ final class OzonListingResolverTest extends IntegrationTestCase
         self::assertSame('preview-marketplace-sku', $missingPreview->resolution->listingSku);
         self::assertNull($listingRepository->findByMarketplaceSku((string) $company->getId(), MarketplaceType::OZON, 'preview-marketplace-sku'));
         self::assertFalse($ambiguousPreview->wouldCreate);
+
+        $numericSkuPreview = $resolver->previewMany((string) $company->getId(), [
+            'numeric-sku-row' => [
+                'sku' => '1234567890',
+                'name' => 'Numeric SKU Listing',
+            ],
+        ])['numeric-sku-row'];
+
+        self::assertTrue($numericSkuPreview->wouldCreate);
+        self::assertNotNull($numericSkuPreview->resolution);
+        self::assertSame('1234567890', $numericSkuPreview->resolution->listingSku);
+        self::assertNull($listingRepository->findByMarketplaceSku((string) $company->getId(), MarketplaceType::OZON, '1234567890'));
     }
 
     private function createCompany(): Company

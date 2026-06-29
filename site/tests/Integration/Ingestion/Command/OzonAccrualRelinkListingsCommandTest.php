@@ -53,8 +53,8 @@ final class OzonAccrualRelinkListingsCommandTest extends IntegrationTestCase
 
         self::assertSame(Command::SUCCESS, $dryRunExit, $dryRun->getDisplay());
         self::assertStringContainsString('would-create-listing+update', $dryRun->getDisplay());
-        self::assertStringContainsString('old-ozon-sku', $dryRun->getDisplay());
-        self::assertNull($this->listingId($companyId, 'old-ozon-sku'));
+        self::assertStringContainsString('1234567890', $dryRun->getDisplay());
+        self::assertNull($this->listingId($companyId, '1234567890'));
         self::assertSame([null, null], $this->transactionListing($transaction->getId()));
 
         $execute = $this->tester();
@@ -67,9 +67,9 @@ final class OzonAccrualRelinkListingsCommandTest extends IntegrationTestCase
 
         self::assertSame(Command::SUCCESS, $executeExit, $execute->getDisplay());
         self::assertStringContainsString('updated', $execute->getDisplay());
-        $createdListingId = $this->listingId($companyId, 'old-ozon-sku');
+        $createdListingId = $this->listingId($companyId, '1234567890');
         self::assertNotNull($createdListingId);
-        self::assertSame([$createdListingId, 'old-ozon-sku'], $this->transactionListing($transaction->getId()));
+        self::assertSame([$createdListingId, '1234567890'], $this->transactionListing($transaction->getId()));
     }
 
     private function tester(): CommandTester
@@ -156,7 +156,7 @@ final class OzonAccrualRelinkListingsCommandTest extends IntegrationTestCase
             'accrued_category' => 'POSTING',
             'posting' => [
                 'products' => [[
-                    'sku' => 'old-ozon-sku',
+                    'sku' => '1234567890',
                     'offer_id' => 'old-offer',
                     'name' => 'Old Ozon Product',
                     'commission' => [
