@@ -21,8 +21,7 @@ const ReconciliationSummaryWidget: React.FC = () => {
         month: period.month,
     }), [period.month, period.year, shopRef]);
     const debouncedParams = useDebouncedValue(queryParams, 500);
-    const canLoadReconciliation = shops.length > 0 && shopRef !== null;
-    const reconciliation = useReconciliationData(debouncedParams, canLoadReconciliation);
+    const reconciliation = useReconciliationData(debouncedParams);
 
     return (
         <div>
@@ -34,7 +33,6 @@ const ReconciliationSummaryWidget: React.FC = () => {
                                 shops={shops}
                                 value={shopRef}
                                 onChange={setShopRef}
-                                includeAll={false}
                                 disabled={shopOptions.isLoading}
                             />
                         </div>
@@ -53,31 +51,15 @@ const ReconciliationSummaryWidget: React.FC = () => {
                 <LoadingState message="Загрузка списка магазинов..." />
             )}
 
-            {!shopOptions.isError && !shopOptions.isLoading && shops.length === 0 && (
-                <EmptyState
-                    title="Магазины не найдены"
-                    message="Для сверки нужен магазин с ingestion-загрузками за последние 90 дней"
-                />
-            )}
-
-            {!shopOptions.isError && !shopOptions.isLoading && shops.length > 0 && shopRef === null && (
-                <EmptyState
-                    title="Выберите магазин"
-                    message="Сверка выполняется по конкретному магазину"
-                />
-            )}
-
-            {!shopOptions.isError && shops.length > 0 && shopRef !== null && reconciliation.isError && (
+            {!shopOptions.isError && reconciliation.isError && (
                 <ErrorState message={reconciliation.errorMessage} onRetry={reconciliation.reload} />
             )}
 
-            {!shopOptions.isError && shops.length > 0 && shopRef !== null && !reconciliation.isError && reconciliation.isLoading && (
+            {!shopOptions.isError && !reconciliation.isError && reconciliation.isLoading && (
                 <LoadingState />
             )}
 
             {!shopOptions.isError
-                && shops.length > 0
-                && shopRef !== null
                 && !reconciliation.isError
                 && !reconciliation.isLoading
                 && reconciliation.data.summary === undefined && (
@@ -85,8 +67,6 @@ const ReconciliationSummaryWidget: React.FC = () => {
             )}
 
             {!shopOptions.isError
-                && shops.length > 0
-                && shopRef !== null
                 && !reconciliation.isError
                 && !reconciliation.isLoading
                 && reconciliation.data.summary !== undefined && (

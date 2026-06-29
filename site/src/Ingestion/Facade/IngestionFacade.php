@@ -102,7 +102,7 @@ final readonly class IngestionFacade
     /**
      * @return array{summary: ReconciliationSummaryView, byType: list<ReconciliationByTypeView>}
      */
-    public function getReconciliation(string $companyId, string $shopRef, int $year, int $month): array
+    public function getReconciliation(string $companyId, ?string $shopRef, int $year, int $month): array
     {
         return [
             'summary' => $this->reconciliationQuery->summary($companyId, $shopRef, $year, $month),

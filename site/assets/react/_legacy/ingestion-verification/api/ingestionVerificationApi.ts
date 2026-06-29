@@ -120,15 +120,18 @@ export function useReconciliationData(
     const reload = useCallback((): void => {
         const shopRef = nullableShopRef(params.shopRef);
 
-        if (!enabled || shopRef === undefined) {
+        if (!enabled) {
             return;
         }
 
         const query: ReconciliationQuery = {
-            shop_ref: shopRef,
             year: params.year,
             month: params.month,
         };
+
+        if (shopRef !== undefined) {
+            query.shop_ref = shopRef;
+        }
 
         void run({
             url: '/api/ingestion/verification/reconciliation',

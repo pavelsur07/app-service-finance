@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Ingestion\Controller\Api\Verification;
 
 use App\Ingestion\Application\Service\VerificationPeriodValidator;
-use App\Ingestion\Exception\InvalidPeriodException;
 use App\Ingestion\Facade\IngestionFacade;
 use App\Shared\Service\ActiveCompanyService;
 use OpenApi\Attributes as OA;
@@ -29,7 +28,7 @@ final class GetReconciliationController extends AbstractController
     }
 
     #[OA\Get(summary: 'Ingestion reconciliation summary', tags: ['Ingestion verification'])]
-    #[OA\Parameter(name: 'shop_ref', in: 'query', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\Parameter(name: 'shop_ref', in: 'query', required: false, schema: new OA\Schema(type: 'string'))]
     #[OA\Parameter(name: 'year', in: 'query', required: true, schema: new OA\Schema(type: 'integer', minimum: 2020, maximum: 2100))]
     #[OA\Parameter(name: 'month', in: 'query', required: true, schema: new OA\Schema(type: 'integer', minimum: 1, maximum: 12))]
     #[OA\Response(
@@ -88,7 +87,7 @@ final class GetReconciliationController extends AbstractController
     public function __invoke(Request $request): JsonResponse
     {
         $companyId = (string) $this->activeCompanyService->getActiveCompany()->getId();
-        $shopRef = $this->requiredString($request->query->get('shop_ref'));
+        $shopRef = $this->nullableString($request->query->get('shop_ref'));
         $year = $request->query->getInt('year');
         $month = $request->query->getInt('month');
         $this->periodValidator->assertYearMonth($year, $month);
@@ -102,10 +101,10 @@ final class GetReconciliationController extends AbstractController
         ]);
     }
 
-    private function requiredString(mixed $value): string
+    private function nullableString(mixed $value): ?string
     {
         if (!is_string($value) || '' === trim($value)) {
-            throw new InvalidPeriodException();
+            return null;
         }
 
         return trim($value);

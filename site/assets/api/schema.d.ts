@@ -682,7 +682,7 @@ export interface operations {
     get_api_ingestion_verification_reconciliation: {
         parameters: {
             query: {
-                shop_ref: string;
+                shop_ref?: string;
                 year: number;
                 month: number;
             };
