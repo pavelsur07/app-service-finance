@@ -93,6 +93,26 @@ final class FinancialTransactionRepository extends ServiceEntityRepository imple
     }
 
     /**
+     * @param list<string> $ids
+     *
+     * @return list<FinancialTransaction>
+     */
+    public function findByCompanyAndIds(string $companyId, array $ids): array
+    {
+        if ([] === $ids) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('transaction')
+            ->andWhere('transaction.companyId = :companyId')
+            ->andWhere('transaction.id IN (:ids)')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('ids', array_values(array_unique($ids)))
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * @return iterable<FinancialTransaction>
      */
     public function iterateByPeriod(

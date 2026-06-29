@@ -15,6 +15,8 @@ use App\Ingestion\Enum\TransactionType;
 use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Repository\IngestRawRecordRepository;
 use App\Shared\Domain\ValueObject\Money;
+use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -23,6 +25,59 @@ use Symfony\Component\Console\Tester\CommandTester;
 
 final class OzonAccrualRefreshFinancialVerificationCommandTest extends IntegrationTestCase
 {
+    public function testExecuteDoesNotDoubleCountUnresolvedEnrichmentRowsAcrossBatches(): void
+    {
+        $owner = UserBuilder::aUser()->withIndex(9510)->build();
+        $company = CompanyBuilder::aCompany()
+            ->withId('11111111-1111-4111-8111-111111119510')
+            ->withOwner($owner)
+            ->build();
+        $companyId = (string) $company->getId();
+        $connectionRef = Uuid::uuid7()->toString();
+        $rawRecordId = Uuid::uuid7()->toString();
+
+        $this->em->persist($owner);
+        $this->em->persist($company);
+        $this->persistExistingTransaction(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            rawRecordId: $rawRecordId,
+            operationGroupId: Uuid::uuid7()->toString(),
+            externalId: 'ozon:accrual-by-day:95100000001:bonus:product-0',
+            type: TransactionType::BONUS,
+            direction: TransactionDirection::IN,
+            amountMinor: 100,
+            sourceData: ['sku' => 'metric-sku-1', 'name' => 'Metric SKU 1'],
+        );
+        $this->persistExistingTransaction(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            rawRecordId: $rawRecordId,
+            operationGroupId: Uuid::uuid7()->toString(),
+            externalId: 'ozon:accrual-by-day:95100000002:non_item_fee:type-12',
+            type: TransactionType::OTHER,
+            direction: TransactionDirection::OUT,
+            amountMinor: -50,
+        );
+        $this->em->flush();
+
+        $tester = $this->tester();
+        $exit = $tester->execute([
+            '--company-id' => $companyId,
+            '--shop-ref' => $connectionRef,
+            '--from' => '2026-06-01',
+            '--to' => '2026-06-07',
+            '--raw-limit' => 10,
+            '--relink-limit' => 2,
+            '--max-relink-batches' => 2,
+            '--execute' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exit, $tester->getDisplay());
+        self::assertSame(1, $this->linkedTransactionCount($companyId));
+        self::assertMatchesRegularExpression('/Listing enrichment repair[\s\S]*selected\s+2[\s\S]*updated\s+1[\s\S]*unresolved\s+1/', $tester->getDisplay());
+    }
+
     public function testExecuteProcessesPendingRawRecordByDefault(): void
     {
         $companyId = Uuid::uuid7()->toString();
@@ -165,6 +220,7 @@ final class OzonAccrualRefreshFinancialVerificationCommandTest extends Integrati
         TransactionType $type,
         TransactionDirection $direction,
         int $amountMinor,
+        array $sourceData = [],
     ): void {
         $this->em->persist(new FinancialTransaction(
             companyId: $companyId,
@@ -180,7 +236,7 @@ final class OzonAccrualRefreshFinancialVerificationCommandTest extends Integrati
             occurredAt: new \DateTimeImmutable('2026-06-01 00:00:00+03:00'),
             rawRecordId: $rawRecordId,
             description: 'Existing Ozon accrual transaction',
-            sourceData: [],
+            sourceData: $sourceData,
             sourceTz: 'Europe/Moscow',
         ));
     }
@@ -229,6 +285,14 @@ final class OzonAccrualRefreshFinancialVerificationCommandTest extends Integrati
         return (int) $this->connection->fetchOne(
             'SELECT COUNT(*) FROM ingest_financial_transactions WHERE company_id = :companyId AND raw_record_id = :rawRecordId AND type = :type',
             ['companyId' => $companyId, 'rawRecordId' => $rawRecordId, 'type' => $type->value],
+        );
+    }
+
+    private function linkedTransactionCount(string $companyId): int
+    {
+        return (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM ingest_financial_transactions WHERE company_id = :companyId AND listing_id IS NOT NULL',
+            ['companyId' => $companyId],
         );
     }
 

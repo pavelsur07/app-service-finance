@@ -221,8 +221,17 @@ final class OzonListingResolver implements BulkListingResolverInterface
         }
 
         $items = $sourceData['items'] ?? null;
-        if (is_array($items) && isset($items[0]) && is_array($items[0])) {
-            return $this->stringValue($items[0]['sku'] ?? null);
+        if (is_array($items)) {
+            foreach ($items as $itemRow) {
+                if (!is_array($itemRow)) {
+                    continue;
+                }
+
+                $itemSku = $this->stringValue($itemRow['sku'] ?? null);
+                if (null !== $itemSku) {
+                    return $itemSku;
+                }
+            }
         }
 
         return null;
@@ -247,8 +256,17 @@ final class OzonListingResolver implements BulkListingResolverInterface
         }
 
         $items = $sourceData['items'] ?? null;
-        if (is_array($items) && isset($items[0]) && is_array($items[0])) {
-            return $this->stringValue($items[0]['name'] ?? null);
+        if (is_array($items)) {
+            foreach ($items as $itemRow) {
+                if (!is_array($itemRow)) {
+                    continue;
+                }
+
+                $itemName = $this->stringValue($itemRow['name'] ?? null);
+                if (null !== $itemName) {
+                    return $itemName;
+                }
+            }
         }
 
         return null;

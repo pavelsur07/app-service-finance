@@ -370,11 +370,16 @@ final class OzonAccrualRefreshFinancialVerificationCommand extends Command
         bool $execute,
     ): array {
         $metrics = ['batches' => 0, 'selected' => 0, 'resolved' => 0, 'updated' => 0, 'wouldCreateListings' => 0, 'unresolved' => 0];
+        $seenIds = [];
 
         for ($batch = 0; $batch < $maxBatches; ++$batch) {
-            $rows = $this->selectUnlinkedRows($companyId, $shopRef, $from, $to, $limit);
+            $rows = $this->selectUnlinkedRows($companyId, $shopRef, $from, $to, $limit, array_values($seenIds));
             if ([] === $rows) {
                 break;
+            }
+
+            foreach ($rows as $row) {
+                $seenIds[(string) $row['id']] = (string) $row['id'];
             }
 
             ++$metrics['batches'];
@@ -402,6 +407,7 @@ final class OzonAccrualRefreshFinancialVerificationCommand extends Command
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
         int $limit,
+        array $excludeIds = [],
     ): array {
         $where = [
             'source = :source',
@@ -426,6 +432,12 @@ final class OzonAccrualRefreshFinancialVerificationCommand extends Command
             $where[] = 'shop_ref = :shopRef';
             $params['shopRef'] = $shopRef;
         }
+        $types = [];
+        if ([] !== $excludeIds) {
+            $where[] = 'id NOT IN (:excludeIds)';
+            $params['excludeIds'] = $excludeIds;
+            $types['excludeIds'] = ArrayParameterType::STRING;
+        }
 
         return $this->connection->fetchAllAssociative(
             sprintf(
@@ -438,6 +450,7 @@ final class OzonAccrualRefreshFinancialVerificationCommand extends Command
                 $limit,
             ),
             $params,
+            $types,
         );
     }
 
@@ -574,13 +587,34 @@ final class OzonAccrualRefreshFinancialVerificationCommand extends Command
         }
 
         $transactionsById = [];
-        foreach ($this->transactionRepository->findBy(['id' => array_values($ids)]) as $transaction) {
-            if ($transaction instanceof FinancialTransaction) {
+        foreach ($this->idsByCompany($rows, $ids) as $companyId => $companyIds) {
+            foreach ($this->transactionRepository->findByCompanyAndIds($companyId, array_values($companyIds)) as $transaction) {
                 $transactionsById[$transaction->getId()] = $transaction;
             }
         }
 
         return $transactionsById;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @param array<string, string>      $ids
+     *
+     * @return array<string, array<string, string>>
+     */
+    private function idsByCompany(array $rows, array $ids): array
+    {
+        $idsByCompany = [];
+        foreach ($rows as $row) {
+            $id = (string) $row['id'];
+            if (!isset($ids[$id])) {
+                continue;
+            }
+
+            $idsByCompany[(string) $row['company_id']][$id] = $id;
+        }
+
+        return $idsByCompany;
     }
 
     /**
@@ -616,8 +650,12 @@ final class OzonAccrualRefreshFinancialVerificationCommand extends Command
         }
 
         $items = $sourceData['items'] ?? null;
-        if (is_array($items) && isset($items[0]) && is_array($items[0])) {
-            return null !== $this->stringValue($items[0]['sku'] ?? null);
+        if (is_array($items)) {
+            foreach ($items as $itemRow) {
+                if (is_array($itemRow) && null !== $this->stringValue($itemRow['sku'] ?? null)) {
+                    return true;
+                }
+            }
         }
 
         return false;
