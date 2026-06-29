@@ -69,19 +69,27 @@ final readonly class OzonAccrualProjectionHealthQuery
         $rows = $this->connection->fetchAllAssociative(
             sprintf(
                 "WITH raw AS (
-                    SELECT r.company_id,
-                           r.shop_ref,
-                           r.id AS raw_id,
-                           r.external_id,
-                           r.normalization_status,
-                           r.fetched_at,
-                           r.last_seen_at,
-                           r.updated_at AS raw_updated_at,
-                           %s AS window_from,
-                           %s AS window_to
-                    FROM ingest_raw_records r
-                    LEFT JOIN ingest_sync_jobs j ON j.id::text = r.sync_job_id AND j.company_id = r.company_id
-                    WHERE %s
+                    SELECT *
+                    FROM (
+                        SELECT r.company_id,
+                               r.shop_ref,
+                               r.id AS raw_id,
+                               r.external_id,
+                               r.normalization_status,
+                               r.fetched_at,
+                               r.last_seen_at,
+                               r.updated_at AS raw_updated_at,
+                               %s AS window_from,
+                               %s AS window_to,
+                               ROW_NUMBER() OVER (
+                                   PARTITION BY r.company_id, r.shop_ref, r.external_id
+                                   ORDER BY r.fetched_at DESC, r.id DESC
+                               ) AS raw_rank
+                        FROM ingest_raw_records r
+                        LEFT JOIN ingest_sync_jobs j ON j.id::text = r.sync_job_id AND j.company_id = r.company_id
+                        WHERE %s
+                    ) ranked_raw
+                    WHERE raw_rank = 1
                 ),
                 tx AS (
                     SELECT raw.raw_id,
@@ -192,6 +200,45 @@ final readonly class OzonAccrualProjectionHealthQuery
         }
 
         return $result;
+    }
+
+    /**
+     * @param list<string> $externalIds
+     */
+    public function reattributeProjectedExternalIds(
+        string $companyId,
+        string $shopRef,
+        string $rawRecordId,
+        \DateTimeImmutable $rawFetchedAt,
+        array $externalIds,
+    ): int {
+        if ([] === $externalIds) {
+            return 0;
+        }
+
+        return (int) $this->connection->executeStatement(
+            'UPDATE ingest_financial_transactions
+             SET raw_record_id = :rawRecordId,
+                 external_updated_at = GREATEST(external_updated_at, CAST(:rawFetchedAt AS TIMESTAMP)),
+                 updated_at = NOW()
+             WHERE company_id = :companyId
+               AND shop_ref = :shopRef
+               AND source = :source
+               AND external_id IN (:externalIds)
+               AND external_updated_at <= CAST(:rawFetchedAt AS TIMESTAMP)
+               AND raw_record_id <> :rawRecordId',
+            [
+                'companyId' => $companyId,
+                'shopRef' => $shopRef,
+                'rawRecordId' => $rawRecordId,
+                'rawFetchedAt' => $rawFetchedAt->format('Y-m-d H:i:s.u'),
+                'source' => IngestSource::OZON->value,
+                'externalIds' => $externalIds,
+            ],
+            [
+                'externalIds' => ArrayParameterType::STRING,
+            ],
+        );
     }
 
     /**

@@ -117,10 +117,10 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
             return Command::FAILURE;
         }
 
-        $rawRows = $this->resolveNaturalProjectionCoverage(
+        $projectionRows = $this->resolveNaturalProjectionCoverage(
             $this->healthQuery->rawProjectionRows($from, $to, $companyId, $shopRef, self::MAX_RAW_PROJECTION_CANDIDATES, problemsOnly: true),
         );
-        $rawRows = array_values(array_filter($rawRows, fn (array $row): bool => $this->needsNormalization($row)));
+        $rawRows = array_values(array_filter($projectionRows, fn (array $row): bool => $this->needsNormalization($row)));
         $rawRows = array_slice($rawRows, 0, $rawLimit);
         $integrityBefore = $this->healthQuery->integritySummary($from, $to, $companyId, $shopRef);
         $staleRows = $rawRows;
@@ -137,6 +137,12 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
             'failed' => 0,
             'rows' => [],
         ];
+        $naturalProjectionAttributionResult = [
+            'selected' => 0,
+            'changed' => 0,
+            'failed' => 0,
+            'rows' => [],
+        ];
         $relinkResult = [
             'batches' => 0,
             'selected' => 0,
@@ -148,6 +154,10 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
             'rows' => [],
         ];
         $relinkDeferred = false;
+
+        if ($execute) {
+            $naturalProjectionAttributionResult = $this->repairNaturalProjectionAttribution($projectionRows);
+        }
 
         if ($execute && [] !== $staleRows) {
             if ('dispatch' === $normalizationMode) {
@@ -206,6 +216,7 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
                 'summary' => $this->rawSummary($rawRows),
             ],
             'normalization' => $this->withoutRows($normalizationResult),
+            'naturalProjectionAttribution' => $this->withoutRows($naturalProjectionAttributionResult),
             'relink' => $this->withoutRows($relinkResult),
             'relinkDeferred' => $relinkDeferred,
             'integrityBefore' => $integrityBefore,
@@ -225,11 +236,76 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
             payload: $payload,
             rawRows: $rawRows,
             normalizationRows: $normalizationResult['rows'],
+            naturalProjectionAttributionRows: $naturalProjectionAttributionResult['rows'],
             relinkRows: $relinkResult['rows'],
             summaryOnly: $summaryOnly,
         );
 
         return $this->exitCode($payload);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     *
+     * @return array{selected: int, changed: int, failed: int, rows: list<array<string, string|int>>}
+     */
+    private function repairNaturalProjectionAttribution(array $rows): array
+    {
+        $resultRows = [];
+        $selected = 0;
+        $changed = 0;
+        $failed = 0;
+
+        foreach ($rows as $row) {
+            if ('natural-key-covered' !== ($row['projection_status'] ?? null)) {
+                continue;
+            }
+
+            ++$selected;
+            $companyId = (string) $row['company_id'];
+            $shopRef = (string) $row['shop_ref'];
+            $rawRecordId = (string) $row['raw_id'];
+
+            try {
+                $expectedSourceKeys = $this->expectedSourceKeys($companyId, $rawRecordId);
+                $updated = $this->healthQuery->reattributeProjectedExternalIds(
+                    companyId: $companyId,
+                    shopRef: $shopRef,
+                    rawRecordId: $rawRecordId,
+                    rawFetchedAt: new \DateTimeImmutable((string) $row['fetched_at']),
+                    externalIds: array_keys($expectedSourceKeys),
+                );
+            } catch (\Throwable $exception) {
+                ++$failed;
+                $this->logger->warning('Ozon accrual natural projection attribution repair failed.', [
+                    'companyId' => $companyId,
+                    'rawRecordId' => $rawRecordId,
+                    'exceptionClass' => $exception::class,
+                    'message' => $exception->getMessage(),
+                ]);
+                $resultRows[] = [
+                    'rawId' => $rawRecordId,
+                    'status' => 'error',
+                    'updated' => 0,
+                    'error' => $exception->getMessage(),
+                ];
+                continue;
+            }
+
+            $changed += $updated;
+            $resultRows[] = [
+                'rawId' => $rawRecordId,
+                'status' => $updated > 0 ? 'updated' : 'unchanged',
+                'updated' => $updated,
+            ];
+        }
+
+        return [
+            'selected' => $selected,
+            'changed' => $changed,
+            'failed' => $failed,
+            'rows' => $resultRows,
+        ];
     }
 
     /**
@@ -634,6 +710,7 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
      * @param array<string, mixed> $payload
      * @param list<array<string, mixed>> $rawRows
      * @param list<array<string, mixed>> $normalizationRows
+     * @param list<array<string, string|int>> $naturalProjectionAttributionRows
      * @param list<array<string, mixed>> $relinkRows
      */
     private function printReport(
@@ -641,6 +718,7 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
         array $payload,
         array $rawRows,
         array $normalizationRows,
+        array $naturalProjectionAttributionRows,
         array $relinkRows,
         bool $summaryOnly,
     ): void {
@@ -716,6 +794,20 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
             );
         }
 
+        $io->section('Natural projection attribution repair');
+        $this->printMetrics($io, $payload['naturalProjectionAttribution']);
+        if (!$summaryOnly && [] !== $naturalProjectionAttributionRows) {
+            $io->table(
+                ['rawId', 'status', 'updated', 'error'],
+                array_map(static fn (array $row): array => [
+                    (string) $row['rawId'],
+                    (string) $row['status'],
+                    (string) $row['updated'],
+                    (string) ($row['error'] ?? ''),
+                ], $naturalProjectionAttributionRows),
+            );
+        }
+
         $io->section('Listing enrichment repair');
         $this->printMetrics($io, $payload['relink']);
         if (!$summaryOnly && [] !== $relinkRows) {
@@ -766,6 +858,10 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
     private function exitCode(array $payload): int
     {
         if (($payload['normalization']['failed'] ?? 0) > 0) {
+            return Command::FAILURE;
+        }
+
+        if (($payload['naturalProjectionAttribution']['failed'] ?? 0) > 0) {
             return Command::FAILURE;
         }
 

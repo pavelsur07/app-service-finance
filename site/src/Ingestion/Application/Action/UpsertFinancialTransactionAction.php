@@ -71,9 +71,7 @@ final readonly class UpsertFinancialTransactionAction
         // changing amount/period/source data.
         if ($this->sourceDataHasher->hash($mapped->sourceData) === $this->sourceDataHasher->hash($transaction->getSourceData())) {
             $changed = $this->updateListingEnrichment($transaction, $command->listingId, $command->listingSku);
-            if ($mapped->externalUpdatedAt >= $transaction->getExternalUpdatedAt()) {
-                $changed = $transaction->reattributeRawRecord($command->rawRecordId) || $changed;
-            }
+            $changed = $transaction->reattributeRawRecord($command->rawRecordId, $mapped->externalUpdatedAt) || $changed;
 
             if ($changed) {
                 return new UpsertResult(

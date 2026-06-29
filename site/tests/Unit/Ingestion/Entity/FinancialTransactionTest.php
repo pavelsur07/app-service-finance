@@ -88,10 +88,14 @@ final class FinancialTransactionTest extends TestCase
     {
         $transaction = $this->newTransaction();
         $rawRecordId = Uuid::uuid7()->toString();
+        $externalUpdatedAt = new \DateTimeImmutable('2026-06-03 00:00:00');
 
-        self::assertTrue($transaction->reattributeRawRecord($rawRecordId));
+        self::assertTrue($transaction->reattributeRawRecord($rawRecordId, $externalUpdatedAt));
         self::assertSame($rawRecordId, $transaction->getRawRecordId());
-        self::assertFalse($transaction->reattributeRawRecord($rawRecordId));
+        self::assertSame($externalUpdatedAt, $transaction->getExternalUpdatedAt());
+        self::assertFalse($transaction->reattributeRawRecord($rawRecordId, $externalUpdatedAt));
+        self::assertFalse($transaction->reattributeRawRecord(Uuid::uuid7()->toString(), new \DateTimeImmutable('2026-06-02 00:00:00')));
+        self::assertSame($rawRecordId, $transaction->getRawRecordId());
     }
 
     private function newTransaction(): FinancialTransaction

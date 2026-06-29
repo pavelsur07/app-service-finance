@@ -213,6 +213,7 @@ final class UpsertFinancialTransactionActionTest extends TestCase
 
         self::assertNotNull($result);
         self::assertSame($newRawRecordId, $transaction->getRawRecordId());
+        self::assertSame($newExternalUpdatedAt, $transaction->getExternalUpdatedAt());
         self::assertFalse($result->periodChanged);
     }
 
@@ -277,5 +278,6 @@ final class UpsertFinancialTransactionActionTest extends TestCase
 
         self::assertNull($result);
         self::assertSame($currentRawRecordId, $transaction->getRawRecordId());
+        self::assertSame($currentExternalUpdatedAt, $transaction->getExternalUpdatedAt());
     }
 }

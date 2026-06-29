@@ -222,15 +222,29 @@ class FinancialTransaction implements TenantOwnedInterface
         $this->updatedAt = new \DateTimeImmutable();
     }
 
-    public function reattributeRawRecord(string $rawRecordId): bool
+    public function reattributeRawRecord(string $rawRecordId, \DateTimeImmutable $externalUpdatedAt): bool
     {
         Assert::uuid($rawRecordId);
 
-        if ($this->rawRecordId === $rawRecordId) {
+        if ($externalUpdatedAt < $this->externalUpdatedAt) {
             return false;
         }
 
-        $this->rawRecordId = $rawRecordId;
+        $changed = false;
+        if ($this->rawRecordId !== $rawRecordId) {
+            $this->rawRecordId = $rawRecordId;
+            $changed = true;
+        }
+
+        if ($externalUpdatedAt > $this->externalUpdatedAt) {
+            $this->externalUpdatedAt = $externalUpdatedAt;
+            $changed = true;
+        }
+
+        if (!$changed) {
+            return false;
+        }
+
         $this->updatedAt = new \DateTimeImmutable();
 
         return true;
