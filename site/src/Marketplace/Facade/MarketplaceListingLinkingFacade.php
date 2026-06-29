@@ -115,16 +115,18 @@ final readonly class MarketplaceListingLinkingFacade
         $result = [];
         $missingSkusWithNames = [];
         $supplierSkusBySku = [];
+        $marketplaceSkus = $this->marketplaceSkusFromSeeds($uniqueSeeds);
         $existingListingsBySku = $this->groupListingsByKey(
             $this->listingRepository->findAllByCompanyMarketplaceAndMarketplaceSkus(
                 $companyId,
                 MarketplaceType::OZON,
-                array_keys($uniqueSeeds),
+                $marketplaceSkus,
             ),
             static fn (MarketplaceListing $listing): string => $listing->getMarketplaceSku(),
         );
 
-        foreach ($uniqueSeeds as $sku => $seed) {
+        foreach ($uniqueSeeds as $seed) {
+            $sku = $seed->marketplaceSku;
             $matches = $existingListingsBySku[$sku] ?? [];
             if (1 === count($matches)) {
                 $listing = $matches[0];
@@ -166,17 +168,19 @@ final readonly class MarketplaceListingLinkingFacade
             return [];
         }
 
+        $marketplaceSkus = $this->marketplaceSkusFromSeeds($uniqueSeeds);
         $existingListingsBySku = $this->groupListingsByKey(
             $this->listingRepository->findAllByCompanyMarketplaceAndMarketplaceSkus(
                 $companyId,
                 MarketplaceType::OZON,
-                array_keys($uniqueSeeds),
+                $marketplaceSkus,
             ),
             static fn (MarketplaceListing $listing): string => $listing->getMarketplaceSku(),
         );
 
         $result = [];
-        foreach ($uniqueSeeds as $sku => $seed) {
+        foreach ($uniqueSeeds as $seed) {
+            $sku = $seed->marketplaceSku;
             $matches = $existingListingsBySku[$sku] ?? [];
             if (1 === count($matches)) {
                 $result[$sku] = new MarketplaceListingEnsurePreviewDTO(
@@ -228,7 +232,7 @@ final readonly class MarketplaceListingLinkingFacade
     /**
      * @param iterable<MarketplaceListingSeedDTO> $seeds
      *
-     * @return array<string, MarketplaceListingSeedDTO>
+     * @return list<MarketplaceListingSeedDTO>
      */
     private function uniqueSeeds(iterable $seeds): array
     {
@@ -249,7 +253,22 @@ final readonly class MarketplaceListingLinkingFacade
             }
         }
 
-        return $uniqueSeeds;
+        return array_values($uniqueSeeds);
+    }
+
+    /**
+     * @param list<MarketplaceListingSeedDTO> $seeds
+     *
+     * @return list<string>
+     */
+    private function marketplaceSkusFromSeeds(array $seeds): array
+    {
+        $skus = [];
+        foreach ($seeds as $seed) {
+            $skus[] = $seed->marketplaceSku;
+        }
+
+        return $skus;
     }
 
     /**
