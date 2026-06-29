@@ -73,31 +73,7 @@ final readonly class OzonAccrualByDayMapper implements SourceMapperInterface, Ra
                 occurredAt: $this->occurredAt($row->date),
                 sourceTz: self::SOURCE_TZ,
                 description: $this->description($row),
-                sourceData: [
-                    '_ingestion_resource' => OzonResourceType::ACCRUAL_BY_DAY,
-                    '_ingestion_component' => $row->component,
-                    '_ingestion_category' => $row->category,
-                    '_ingestion_type_id' => $row->typeId,
-                    '_ingestion_external_code' => $row->externalCode,
-                    '_ingestion_provider_label' => $row->providerLabel,
-                    '_ingestion_field' => $row->field,
-                    '_ingestion_unit_number' => $row->unitNumber,
-                    '_ingestion_source_key' => $row->sourceKey,
-                    '_ozon_category_code' => $row->ozonCategoryCode,
-                    '_ozon_category_label' => $row->ozonCategoryLabel,
-                    '_ozon_category_group' => $row->ozonCategoryGroup,
-                    '_ozon_category_parent' => $row->ozonCategoryParent,
-                    '_ozon_category_sort_order' => $row->ozonCategorySortOrder,
-                    '_ozon_category_known' => $row->ozonCategoryKnown,
-                    'date' => $row->date,
-                    'accrued_category' => $row->category,
-                    'component' => $row->component,
-                    'type_id' => $row->typeId,
-                    'external_code' => $row->externalCode,
-                    'provider_label' => $row->providerLabel,
-                    'field' => $row->field,
-                    'unit_number' => $row->unitNumber,
-                ],
+                sourceData: $this->sourceData($row),
             );
         }
 
@@ -155,5 +131,51 @@ final readonly class OzonAccrualByDayMapper implements SourceMapperInterface, Ra
         }
 
         return sprintf('Ozon accrual %s %s', strtolower($row->category), $row->field ?? $row->component);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function sourceData(OzonAccrualPreviewTransaction $row): array
+    {
+        $sourceData = [
+            '_ingestion_resource' => OzonResourceType::ACCRUAL_BY_DAY,
+            '_ingestion_component' => $row->component,
+            '_ingestion_category' => $row->category,
+            '_ingestion_type_id' => $row->typeId,
+            '_ingestion_external_code' => $row->externalCode,
+            '_ingestion_provider_label' => $row->providerLabel,
+            '_ingestion_field' => $row->field,
+            '_ingestion_unit_number' => $row->unitNumber,
+            '_ingestion_source_key' => $row->sourceKey,
+            '_ozon_category_code' => $row->ozonCategoryCode,
+            '_ozon_category_label' => $row->ozonCategoryLabel,
+            '_ozon_category_group' => $row->ozonCategoryGroup,
+            '_ozon_category_parent' => $row->ozonCategoryParent,
+            '_ozon_category_sort_order' => $row->ozonCategorySortOrder,
+            '_ozon_category_known' => $row->ozonCategoryKnown,
+            'date' => $row->date,
+            'accrued_category' => $row->category,
+            'component' => $row->component,
+            'type_id' => $row->typeId,
+            'external_code' => $row->externalCode,
+            'provider_label' => $row->providerLabel,
+            'field' => $row->field,
+            'unit_number' => $row->unitNumber,
+        ];
+
+        if (null !== $row->marketplaceSku) {
+            $sourceData['sku'] = $row->marketplaceSku;
+        }
+
+        if (null !== $row->supplierSku) {
+            $sourceData['offer_id'] = $row->supplierSku;
+        }
+
+        if (null !== $row->listingName) {
+            $sourceData['name'] = $row->listingName;
+        }
+
+        return $sourceData;
     }
 }

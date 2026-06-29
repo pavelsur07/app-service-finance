@@ -26,6 +26,9 @@ final class OzonAccrualByDayPreviewMapperTest extends TestCase
                     'accrued_category' => 'POSTING',
                     'posting' => [
                         'products' => [[
+                            'sku' => 'ozon-sku-1',
+                            'offer_id' => 'offer-1',
+                            'name' => 'Ozon Product 1',
                             'delivery' => [
                                 'services' => [
                                     ['type_id' => 29, 'accrued' => ['amount' => '-7.86', 'currency' => 'RUB']],
@@ -47,6 +50,9 @@ final class OzonAccrualByDayPreviewMapperTest extends TestCase
                     'accrued_category' => 'ITEM',
                     'item_fees' => [
                         'fees' => [[
+                            'sku' => 'item-sku-1',
+                            'offer_id' => 'item-offer-1',
+                            'name' => 'Item Product 1',
                             'fees' => [
                                 ['type_id' => 1, 'accrued' => ['amount' => '18.66', 'currency' => 'RUB']],
                             ],
@@ -84,6 +90,9 @@ final class OzonAccrualByDayPreviewMapperTest extends TestCase
         self::assertSame('ozon_revenue', $sale->ozonCategoryCode);
         self::assertSame('Выручка', $sale->ozonCategoryLabel);
         self::assertSame('Продажи', $sale->ozonCategoryGroup);
+        self::assertSame('ozon-sku-1', $sale->marketplaceSku);
+        self::assertSame('offer-1', $sale->supplierSku);
+        self::assertSame('Ozon Product 1', $sale->listingName);
 
         $bonus = $this->row($rows, 'bonus:product-0');
         self::assertSame(TransactionType::BONUS, $bonus->type);
@@ -114,6 +123,9 @@ final class OzonAccrualByDayPreviewMapperTest extends TestCase
         self::assertSame(TransactionDirection::IN, $item->direction);
         self::assertSame(1866, $item->amountMinor);
         self::assertFalse($item->ozonCategoryKnown);
+        self::assertSame('item-sku-1', $item->marketplaceSku);
+        self::assertSame('item-offer-1', $item->supplierSku);
+        self::assertSame('Item Product 1', $item->listingName);
 
         $nonItem = $this->row($rows, 'non_item_fee:type-46');
         self::assertSame(TransactionType::OTHER, $nonItem->type);
