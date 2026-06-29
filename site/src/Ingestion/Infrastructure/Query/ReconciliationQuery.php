@@ -6,6 +6,8 @@ namespace App\Ingestion\Infrastructure\Query;
 
 use App\Ingestion\Application\DTO\ReconciliationByTypeView;
 use App\Ingestion\Application\DTO\ReconciliationSummaryView;
+use App\Ingestion\Application\Source\Ozon\OzonResourceType;
+use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\TransactionType;
 use App\Marketplace\Repository\OzonTransactionTotalsCheckRepository;
 use Doctrine\DBAL\Connection;
@@ -22,14 +24,13 @@ final class ReconciliationQuery
     ) {
     }
 
-    public function summary(string $companyId, string $shopRef, int $year, int $month): ReconciliationSummaryView
+    public function summary(string $companyId, ?string $shopRef, int $year, int $month): ReconciliationSummaryView
     {
         Assert::uuid($companyId);
-        Assert::notEmpty($shopRef);
 
         [$from, $toExclusive] = $this->monthBounds($year, $month);
 
-        $row = $this->connection->createQueryBuilder()
+        $queryBuilder = $this->connection->createQueryBuilder()
             ->select(
                 'COALESCE(SUM(ft.amount_minor), 0) AS canon_total_minor',
                 "COALESCE(MIN(ft.currency), 'RUB') AS currency",
@@ -37,15 +38,24 @@ final class ReconciliationQuery
             )
             ->from('ingest_financial_transactions', 'ft')
             ->where('ft.company_id = :companyId')
-            ->andWhere('ft.shop_ref = :shopRef')
+            ->andWhere('ft.source = :source')
+            ->andWhere("(ft.external_id LIKE :externalIdPrefix OR ft.source_data->>'_ingestion_resource' = :resourceType)")
             ->andWhere('ft.occurred_at >= :from')
             ->andWhere('ft.occurred_at < :toExclusive')
             ->setParameter('companyId', $companyId)
-            ->setParameter('shopRef', $shopRef)
+            ->setParameter('source', IngestSource::OZON->value)
+            ->setParameter('externalIdPrefix', 'ozon:accrual-by-day:%')
+            ->setParameter('resourceType', OzonResourceType::ACCRUAL_BY_DAY)
             ->setParameter('from', $from, Types::DATETIME_IMMUTABLE)
-            ->setParameter('toExclusive', $toExclusive, Types::DATETIME_IMMUTABLE)
-            ->executeQuery()
-            ->fetchAssociative();
+            ->setParameter('toExclusive', $toExclusive, Types::DATETIME_IMMUTABLE);
+
+        if (null !== $shopRef && '' !== trim($shopRef)) {
+            $queryBuilder
+                ->andWhere('ft.shop_ref = :shopRef')
+                ->setParameter('shopRef', trim($shopRef));
+        }
+
+        $row = $queryBuilder->executeQuery()->fetchAssociative();
 
         $canonTotalMinor = (int) ($row['canon_total_minor'] ?? 0);
         $currency = (string) ($row['currency'] ?? 'RUB');
@@ -72,14 +82,13 @@ final class ReconciliationQuery
     /**
      * @return list<ReconciliationByTypeView>
      */
-    public function breakdownByType(string $companyId, string $shopRef, int $year, int $month): array
+    public function breakdownByType(string $companyId, ?string $shopRef, int $year, int $month): array
     {
         Assert::uuid($companyId);
-        Assert::notEmpty($shopRef);
 
         [$from, $toExclusive] = $this->monthBounds($year, $month);
 
-        $rows = $this->connection->createQueryBuilder()
+        $queryBuilder = $this->connection->createQueryBuilder()
             ->select(
                 'ft.type',
                 'COALESCE(SUM(ft.amount_minor), 0) AS canon_amount_minor',
@@ -87,11 +96,14 @@ final class ReconciliationQuery
             )
             ->from('ingest_financial_transactions', 'ft')
             ->where('ft.company_id = :companyId')
-            ->andWhere('ft.shop_ref = :shopRef')
+            ->andWhere('ft.source = :source')
+            ->andWhere("(ft.external_id LIKE :externalIdPrefix OR ft.source_data->>'_ingestion_resource' = :resourceType)")
             ->andWhere('ft.occurred_at >= :from')
             ->andWhere('ft.occurred_at < :toExclusive')
             ->setParameter('companyId', $companyId)
-            ->setParameter('shopRef', $shopRef)
+            ->setParameter('source', IngestSource::OZON->value)
+            ->setParameter('externalIdPrefix', 'ozon:accrual-by-day:%')
+            ->setParameter('resourceType', OzonResourceType::ACCRUAL_BY_DAY)
             ->setParameter('from', $from, Types::DATETIME_IMMUTABLE)
             ->setParameter('toExclusive', $toExclusive, Types::DATETIME_IMMUTABLE)
             ->groupBy('ft.type')
@@ -103,9 +115,15 @@ final class ReconciliationQuery
                 ),
                 'ASC',
             )
-            ->addOrderBy('ft.type', 'ASC')
-            ->executeQuery()
-            ->fetchAllAssociative();
+            ->addOrderBy('ft.type', 'ASC');
+
+        if (null !== $shopRef && '' !== trim($shopRef)) {
+            $queryBuilder
+                ->andWhere('ft.shop_ref = :shopRef')
+                ->setParameter('shopRef', trim($shopRef));
+        }
+
+        $rows = $queryBuilder->executeQuery()->fetchAllAssociative();
 
         return array_map(
             static function (array $row): ReconciliationByTypeView {

@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Ingestion\Infrastructure\Query;
 
-use App\Finance\Entity\PLMonthlySnapshot;
-use App\Finance\Enum\PLFlow;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Entity\FinancialTransaction;
 use App\Ingestion\Entity\IngestRawRecord;
@@ -23,9 +21,6 @@ use App\Ingestion\Infrastructure\Query\IssuesQuery;
 use App\Ingestion\Infrastructure\Query\ReconciliationQuery;
 use App\Marketplace\Entity\OzonTransactionTotalsCheck;
 use App\Shared\Domain\ValueObject\Money;
-use App\Tests\Builders\Company\CompanyBuilder;
-use App\Tests\Builders\Company\UserBuilder;
-use App\Tests\Builders\Finance\PLCategoryBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
 
@@ -469,6 +464,7 @@ final class VerificationQueriesTest extends IntegrationTestCase
         $this->em->persist($this->transaction($companyId, $rawRecordId, 'refund-1', -300, TransactionType::REFUND));
         $this->em->persist($this->transaction($companyId, $rawRecordId, 'commission-1', -200, TransactionType::COMMISSION));
         $this->em->persist($this->transaction($companyId, $rawRecordId, 'other-shop-sale', 999, TransactionType::SALE, 'shop-2'));
+        $this->em->persist($this->transaction($companyId, $rawRecordId, 'wb-sale-noise', 7777, TransactionType::SALE, source: IngestSource::WILDBERRIES));
 
         $check = new OzonTransactionTotalsCheck(
             companyId: $companyId,
@@ -484,11 +480,14 @@ final class VerificationQueriesTest extends IntegrationTestCase
         $query = self::getContainer()->get(ReconciliationQuery::class);
 
         $summary = $query->summary($companyId, 'shop-1', 2026, 6);
+        $companySummary = $query->summary($companyId, null, 2026, 6);
         $byType = $query->breakdownByType($companyId, 'shop-1', 2026, 6);
 
         self::assertSame(500, $summary->canonTotalMinor);
         self::assertSame(750, $summary->ozonControlTotalMinor);
         self::assertSame(-250, $summary->canonVsOzonDeltaMinor);
+        self::assertSame(1499, $companySummary->canonTotalMinor);
+        self::assertSame(749, $companySummary->canonVsOzonDeltaMinor);
         self::assertSame('RUB', $summary->currency);
         self::assertSame(['sale', 'refund', 'commission'], array_column($byType, 'type'));
         self::assertSame(
@@ -546,66 +545,63 @@ final class VerificationQueriesTest extends IntegrationTestCase
         );
     }
 
-    public function testFinancialSummaryUsesOnlyRebuiltMonthlySnapshots(): void
+    public function testFinancialSummaryUsesNormalizedTransactionsAndOptionalShopScope(): void
     {
-        $owner = UserBuilder::aUser()->withIndex(9001)->build();
-        $company = CompanyBuilder::aCompany()
-            ->withId('11111111-1111-4111-8111-111111119001')
-            ->withOwner($owner)
-            ->build();
-        $incomeCategory = PLCategoryBuilder::aPLCategory()
-            ->withId('33333333-3333-4333-8333-333333339001')
-            ->forCompany($company)
-            ->withName('Продажи')
-            ->withFlow(PLFlow::INCOME)
-            ->build();
-        $expenseCategory = PLCategoryBuilder::aPLCategory()
-            ->withId('33333333-3333-4333-8333-333333339002')
-            ->forCompany($company)
-            ->withName('Комиссии')
-            ->withFlow(PLFlow::EXPENSE)
-            ->build();
-        $legacyCategory = PLCategoryBuilder::aPLCategory()
-            ->withId('33333333-3333-4333-8333-333333339003')
-            ->forCompany($company)
-            ->withName('Legacy')
-            ->withFlow(PLFlow::INCOME)
-            ->build();
+        $companyId = Uuid::uuid7()->toString();
+        $raw = $this->rawRecord(
+            companyId: $companyId,
+            shopRef: 'shop-1',
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            fetchedAt: new \DateTimeImmutable('2026-06-15 10:00:00+00:00'),
+            externalId: 'financial-summary-raw-1',
+        );
+        $otherShopRaw = $this->rawRecord(
+            companyId: $companyId,
+            shopRef: 'shop-2',
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            fetchedAt: new \DateTimeImmutable('2026-06-15 10:00:00+00:00'),
+            externalId: 'financial-summary-raw-2',
+        );
 
-        $incomeSnapshot = new PLMonthlySnapshot(Uuid::uuid7()->toString(), $company, '2026-06', $incomeCategory);
-        $incomeSnapshot->setAmountIncome('123.45');
-        $incomeSnapshot->setRebuiltAt(new \DateTimeImmutable('2026-06-20 10:00:00+00:00'));
-
-        $expenseSnapshot = new PLMonthlySnapshot(Uuid::uuid7()->toString(), $company, '2026-06', $expenseCategory);
-        $expenseSnapshot->setAmountExpense('23.45');
-        $expenseSnapshot->setRebuiltAt(new \DateTimeImmutable('2026-06-20 10:00:00+00:00'));
-
-        $legacySnapshot = new PLMonthlySnapshot(Uuid::uuid7()->toString(), $company, '2026-06', $legacyCategory);
-        $legacySnapshot->setAmountIncome('999.99');
-
-        $this->em->persist($owner);
-        $this->em->persist($company);
-        $this->em->persist($incomeCategory);
-        $this->em->persist($expenseCategory);
-        $this->em->persist($legacyCategory);
-        $this->em->persist($incomeSnapshot);
-        $this->em->persist($expenseSnapshot);
-        $this->em->persist($legacySnapshot);
+        $this->em->persist($raw);
+        $this->em->persist($otherShopRaw);
+        $this->em->persist($this->transaction($companyId, $raw->getId(), 'summary-sale-1', 1000, TransactionType::SALE));
+        $this->em->persist($this->transaction($companyId, $raw->getId(), 'summary-commission-1', -200, TransactionType::COMMISSION));
+        $this->em->persist($this->transaction($companyId, $otherShopRaw->getId(), 'summary-sale-2', 500, TransactionType::SALE, 'shop-2'));
+        $this->em->persist($this->transaction($companyId, $otherShopRaw->getId(), 'summary-refund-2', -100, TransactionType::REFUND, 'shop-2'));
+        $this->em->persist($this->transaction(
+            $companyId,
+            $raw->getId(),
+            'summary-july-ignored',
+            99999,
+            TransactionType::SALE,
+            occurredAt: new \DateTimeImmutable('2026-07-01 00:00:00+00:00'),
+        ));
         $this->em->flush();
 
         /** @var FinancialSummaryQuery $query */
         $query = self::getContainer()->get(FinancialSummaryQuery::class);
 
-        $byMonth = $query->byMonth($company->getId(), null, 2026, 6, 2026, 6);
-        $byCategory = $query->byCategory($company->getId(), null, 2026, 6);
+        $allShopsMonth = $query->byMonth($companyId, null, 2026, 6, 2026, 6);
+        $shopOneMonth = $query->byMonth($companyId, 'shop-1', 2026, 6, 2026, 6);
+        $byCategory = $query->byCategory($companyId, null, 2026, 6);
 
-        self::assertCount(1, $byMonth);
-        self::assertSame(12345, $byMonth[0]->incomeMinor);
-        self::assertSame(2345, $byMonth[0]->expenseMinor);
-        self::assertSame(10000, $byMonth[0]->netMinor);
+        self::assertCount(1, $allShopsMonth);
+        self::assertSame(1500, $allShopsMonth[0]->incomeMinor);
+        self::assertSame(300, $allShopsMonth[0]->expenseMinor);
+        self::assertSame(1200, $allShopsMonth[0]->netMinor);
+        self::assertSame(1000, $shopOneMonth[0]->incomeMinor);
+        self::assertSame(200, $shopOneMonth[0]->expenseMinor);
+        $categoryAmounts = array_column($byCategory, 'amountMinor', 'categoryId');
+        ksort($categoryAmounts);
+
         self::assertSame(
-            ['Комиссии' => 2345, 'Продажи' => 12345],
-            array_column($byCategory, 'amountMinor', 'categoryName'),
+            [
+                'commission:out' => 200,
+                'refund:out' => 100,
+                'sale:in' => 1500,
+            ],
+            $categoryAmounts,
         );
     }
 
@@ -836,20 +832,27 @@ final class VerificationQueriesTest extends IntegrationTestCase
         int $amountMinor,
         TransactionType $type,
         string $shopRef = 'shop-1',
+        ?\DateTimeImmutable $occurredAt = null,
+        ?IngestSource $source = null,
+        ?array $sourceData = null,
     ): FinancialTransaction {
+        $source ??= IngestSource::OZON;
+        $sourceData ??= IngestSource::OZON === $source ? ['_ingestion_resource' => OzonResourceType::ACCRUAL_BY_DAY] : [];
+
         return new FinancialTransaction(
             companyId: $companyId,
             connectionRef: 'connection-1',
             shopRef: $shopRef,
-            source: IngestSource::OZON,
+            source: $source,
             externalId: $externalId,
             externalUpdatedAt: new \DateTimeImmutable('2026-06-15 10:00:00+00:00'),
             operationGroupId: Uuid::uuid7()->toString(),
             type: $type,
             direction: $amountMinor >= 0 ? TransactionDirection::IN : TransactionDirection::OUT,
             money: Money::fromMinor($amountMinor, 'RUB'),
-            occurredAt: new \DateTimeImmutable('2026-06-15 10:00:00+00:00'),
+            occurredAt: $occurredAt ?? new \DateTimeImmutable('2026-06-15 10:00:00+00:00'),
             rawRecordId: $rawRecordId,
+            sourceData: $sourceData,
         );
     }
 }

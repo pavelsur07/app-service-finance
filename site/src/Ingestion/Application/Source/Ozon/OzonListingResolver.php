@@ -134,7 +134,8 @@ final class OzonListingResolver implements BulkListingResolverInterface
             $result[$key] = null;
 
             $supplierSku = $this->stringValue($sourceData['offer_id'] ?? $sourceData['item_code'] ?? null);
-            $marketplaceSku = $this->marketplaceSku($sourceData);
+            $itemContext = $this->itemContext($sourceData);
+            $marketplaceSku = $this->marketplaceSku($sourceData, $itemContext);
 
             if (null !== $supplierSku) {
                 $supplierSkus[] = $supplierSku;
@@ -143,7 +144,7 @@ final class OzonListingResolver implements BulkListingResolverInterface
             $contextByKey[$key] = [
                 'supplierSku' => $supplierSku,
                 'marketplaceSku' => $marketplaceSku,
-                'name' => $this->listingName($sourceData),
+                'name' => $this->listingName($sourceData, $itemContext),
             ];
         }
 
@@ -204,8 +205,9 @@ final class OzonListingResolver implements BulkListingResolverInterface
 
     /**
      * @param array<string, mixed> $sourceData
+     * @param array{sku: string|null, name: string|null} $itemContext
      */
-    private function marketplaceSku(array $sourceData): ?string
+    private function marketplaceSku(array $sourceData, array $itemContext): ?string
     {
         $direct = $this->stringValue($sourceData['sku'] ?? null);
         if (null !== $direct) {
@@ -220,18 +222,14 @@ final class OzonListingResolver implements BulkListingResolverInterface
             }
         }
 
-        $items = $sourceData['items'] ?? null;
-        if (is_array($items) && isset($items[0]) && is_array($items[0])) {
-            return $this->stringValue($items[0]['sku'] ?? null);
-        }
-
-        return null;
+        return $itemContext['sku'];
     }
 
     /**
      * @param array<string, mixed> $sourceData
+     * @param array{sku: string|null, name: string|null} $itemContext
      */
-    private function listingName(array $sourceData): ?string
+    private function listingName(array $sourceData, array $itemContext): ?string
     {
         $direct = $this->stringValue($sourceData['name'] ?? null);
         if (null !== $direct) {
@@ -246,12 +244,32 @@ final class OzonListingResolver implements BulkListingResolverInterface
             }
         }
 
+        return $itemContext['name'];
+    }
+
+    /**
+     * @param array<string, mixed> $sourceData
+     *
+     * @return array{sku: string|null, name: string|null}
+     */
+    private function itemContext(array $sourceData): array
+    {
         $items = $sourceData['items'] ?? null;
-        if (is_array($items) && isset($items[0]) && is_array($items[0])) {
-            return $this->stringValue($items[0]['name'] ?? null);
+        if (is_array($items)) {
+            foreach ($items as $itemRow) {
+                if (!is_array($itemRow)) {
+                    continue;
+                }
+
+                $itemName = $this->stringValue($itemRow['name'] ?? null);
+                $itemSku = $this->stringValue($itemRow['sku'] ?? null);
+                if (null !== $itemSku) {
+                    return ['sku' => $itemSku, 'name' => $itemName];
+                }
+            }
         }
 
-        return null;
+        return ['sku' => null, 'name' => null];
     }
 
     private function stringValue(mixed $value): ?string

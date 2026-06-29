@@ -6,8 +6,6 @@ namespace App\Tests\Functional\Ingestion\Controller;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
-use App\Finance\Entity\PLMonthlySnapshot;
-use App\Finance\Enum\PLFlow;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Entity\FinancialTransaction;
 use App\Ingestion\Entity\IngestRawRecord;
@@ -22,7 +20,6 @@ use App\Marketplace\Entity\OzonTransactionTotalsCheck;
 use App\Shared\Domain\ValueObject\Money;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
-use App\Tests\Builders\Finance\PLCategoryBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -66,10 +63,20 @@ final class VerificationApiControllerTest extends WebTestCaseBase
         $client->request('GET', '/api/ingestion/verification/financial-summary?year_from=2026&month_from=6&year_to=2026&month_to=6');
         self::assertResponseIsSuccessful();
         $summary = $this->json($client);
-        self::assertSame(12345, $summary['by_month'][0]['income_minor']);
-        self::assertSame(2345, $summary['by_month'][0]['expense_minor']);
-        self::assertSame(10000, $summary['by_month'][0]['net_minor']);
-        self::assertSame('income', $summary['by_category'][1]['flow']);
+        self::assertSame(1000, $summary['by_month'][0]['income_minor']);
+        self::assertSame(500, $summary['by_month'][0]['expense_minor']);
+        self::assertSame(500, $summary['by_month'][0]['net_minor']);
+        $categoryAmounts = array_column($summary['by_category'], 'amount_minor', 'category_id');
+        ksort($categoryAmounts);
+
+        self::assertSame(
+            [
+                'commission:out' => 200,
+                'refund:out' => 300,
+                'sale:in' => 1000,
+            ],
+            $categoryAmounts,
+        );
         self::assertSame('Услуги доставки', $summary['marketplace_categories'][0]['category_group']);
         self::assertSame('Логистика', $summary['marketplace_categories'][0]['category_name']);
         self::assertSame(-200, $summary['marketplace_categories'][0]['amount_minor']);
@@ -316,7 +323,7 @@ final class VerificationApiControllerTest extends WebTestCaseBase
         self::assertSame([1], array_column($coverage['cells'], 'issue_count'));
         self::assertSame(['shop-a'], array_column($coverage['shops'], 'shop_ref'));
 
-        $client->request('GET', '/api/ingestion/verification/reconciliation?shop_ref=shop-a&year=2026&month=6');
+        $client->request('GET', '/api/ingestion/verification/reconciliation?year=2026&month=6');
         self::assertResponseIsSuccessful();
         $reconciliation = $this->json($client);
         self::assertSame(1000, $reconciliation['summary']['canon_total_minor']);
@@ -355,25 +362,6 @@ final class VerificationApiControllerTest extends WebTestCaseBase
         );
         $check->markOk([], ['total_minor' => 750], []);
 
-        $incomeCategory = PLCategoryBuilder::aPLCategory()
-            ->withId('33333333-3333-4333-8333-333333339100')
-            ->forCompany($company)
-            ->withName('Продажи')
-            ->withFlow(PLFlow::INCOME)
-            ->build();
-        $expenseCategory = PLCategoryBuilder::aPLCategory()
-            ->withId('33333333-3333-4333-8333-333333339101')
-            ->forCompany($company)
-            ->withName('Комиссии')
-            ->withFlow(PLFlow::EXPENSE)
-            ->build();
-        $incomeSnapshot = new PLMonthlySnapshot(Uuid::uuid7()->toString(), $company, '2026-06', $incomeCategory);
-        $incomeSnapshot->setAmountIncome('123.45');
-        $incomeSnapshot->setRebuiltAt(new \DateTimeImmutable('2026-06-20 10:00:00+00:00'));
-        $expenseSnapshot = new PLMonthlySnapshot(Uuid::uuid7()->toString(), $company, '2026-06', $expenseCategory);
-        $expenseSnapshot->setAmountExpense('23.45');
-        $expenseSnapshot->setRebuiltAt(new \DateTimeImmutable('2026-06-20 10:00:00+00:00'));
-
         $em = $this->em();
         $em->persist($owner);
         $em->persist($company);
@@ -401,10 +389,6 @@ final class VerificationApiControllerTest extends WebTestCaseBase
             ['raw' => 'hidden'],
         ));
         $em->persist($check);
-        $em->persist($incomeCategory);
-        $em->persist($expenseCategory);
-        $em->persist($incomeSnapshot);
-        $em->persist($expenseSnapshot);
         $em->flush();
 
         return [$owner, $company];
@@ -444,25 +428,6 @@ final class VerificationApiControllerTest extends WebTestCaseBase
         );
         $checkB->markOk([], ['total_minor' => 99999], []);
 
-        $categoryA = PLCategoryBuilder::aPLCategory()
-            ->withId('33333333-3333-4333-8333-333333339200')
-            ->forCompany($companyA)
-            ->withName('Company A Sales')
-            ->withFlow(PLFlow::INCOME)
-            ->build();
-        $categoryB = PLCategoryBuilder::aPLCategory()
-            ->withId('33333333-3333-4333-8333-333333339201')
-            ->forCompany($companyB)
-            ->withName('Company B Sales')
-            ->withFlow(PLFlow::INCOME)
-            ->build();
-        $snapshotA = new PLMonthlySnapshot(Uuid::uuid7()->toString(), $companyA, '2026-06', $categoryA);
-        $snapshotA->setAmountIncome('10.00');
-        $snapshotA->setRebuiltAt(new \DateTimeImmutable('2026-06-20 10:00:00+00:00'));
-        $snapshotB = new PLMonthlySnapshot(Uuid::uuid7()->toString(), $companyB, '2026-06', $categoryB);
-        $snapshotB->setAmountIncome('999.99');
-        $snapshotB->setRebuiltAt(new \DateTimeImmutable('2026-06-20 10:00:00+00:00'));
-
         $em = $this->em();
         foreach ([$ownerA, $ownerB, $companyA, $companyB, $rawA, $rawB] as $entity) {
             $em->persist($entity);
@@ -490,7 +455,7 @@ final class VerificationApiControllerTest extends WebTestCaseBase
             NormalizationIssueKind::MAPPER_FAILURE,
             [],
         ));
-        foreach ([$checkA, $checkB, $categoryA, $categoryB, $snapshotA, $snapshotB] as $entity) {
+        foreach ([$checkA, $checkB] as $entity) {
             $em->persist($entity);
         }
         $em->flush();
@@ -534,6 +499,8 @@ final class VerificationApiControllerTest extends WebTestCaseBase
         ?TransactionDirection $direction = null,
         array $sourceData = [],
     ): FinancialTransaction {
+        $sourceData['_ingestion_resource'] ??= OzonResourceType::ACCRUAL_BY_DAY;
+
         return new FinancialTransaction(
             companyId: $companyId,
             connectionRef: 'connection-1',

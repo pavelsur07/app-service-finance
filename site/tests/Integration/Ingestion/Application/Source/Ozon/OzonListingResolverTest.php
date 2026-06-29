@@ -50,6 +50,12 @@ final class OzonListingResolverTest extends IntegrationTestCase
         $marketplaceResolution = $registry->resolve(IngestSource::OZON, (string) $company->getId(), [
             'item' => ['sku' => 'marketplace-sku-1'],
         ]);
+        $marketplaceResolutionFromLaterItem = $registry->resolve(IngestSource::OZON, (string) $company->getId(), [
+            'items' => [
+                ['name' => 'Item without SKU'],
+                ['sku' => 'marketplace-sku-1'],
+            ],
+        ]);
         $missingResolution = $registry->resolve(IngestSource::OZON, (string) $company->getId(), [
             'offer_id' => 'missing-offer',
         ]);
@@ -64,6 +70,12 @@ final class OzonListingResolverTest extends IntegrationTestCase
             'sku' => 'new-marketplace-sku',
             'name' => 'New Ozon Listing',
         ]);
+        $createdFromLaterItemResolution = $registry->resolve(IngestSource::OZON, (string) $company->getId(), [
+            'items' => [
+                ['name' => 'Wrong Item Name'],
+                ['sku' => 'new-later-item-sku', 'name' => 'Correct Item Name'],
+            ],
+        ]);
 
         self::assertNotNull($supplierResolution);
         self::assertSame($listing->getId(), $supplierResolution->listingId);
@@ -74,6 +86,9 @@ final class OzonListingResolverTest extends IntegrationTestCase
         self::assertNotNull($marketplaceResolution);
         self::assertSame($listing->getId(), $marketplaceResolution->listingId);
         self::assertSame('marketplace-sku-1', $marketplaceResolution->listingSku);
+        self::assertNotNull($marketplaceResolutionFromLaterItem);
+        self::assertSame($listing->getId(), $marketplaceResolutionFromLaterItem->listingId);
+        self::assertSame('marketplace-sku-1', $marketplaceResolutionFromLaterItem->listingSku);
         self::assertNotNull($missingResolution);
         self::assertNull($missingResolution->listingId);
         self::assertSame('missing-offer', $missingResolution->listingSku);
@@ -86,14 +101,21 @@ final class OzonListingResolverTest extends IntegrationTestCase
         self::assertNotNull($createdResolution);
         self::assertNotNull($createdResolution->listingId);
         self::assertSame('new-marketplace-sku', $createdResolution->listingSku);
+        self::assertNotNull($createdFromLaterItemResolution);
+        self::assertNotNull($createdFromLaterItemResolution->listingId);
+        self::assertSame('new-later-item-sku', $createdFromLaterItemResolution->listingSku);
 
         /** @var MarketplaceListingRepository $listingRepository */
         $listingRepository = self::getContainer()->get(MarketplaceListingRepository::class);
         $createdListing = $listingRepository->findByMarketplaceSku((string) $company->getId(), MarketplaceType::OZON, 'new-marketplace-sku');
+        $createdFromLaterItemListing = $listingRepository->findByMarketplaceSku((string) $company->getId(), MarketplaceType::OZON, 'new-later-item-sku');
         self::assertNotNull($createdListing);
         self::assertSame($createdResolution->listingId, $createdListing->getId());
         self::assertSame('new-offer', $createdListing->getSupplierSku());
         self::assertSame('New Ozon Listing', $createdListing->getName());
+        self::assertNotNull($createdFromLaterItemListing);
+        self::assertSame($createdFromLaterItemResolution->listingId, $createdFromLaterItemListing->getId());
+        self::assertSame('Correct Item Name', $createdFromLaterItemListing->getName());
 
         /** @var OzonListingResolver $resolver */
         $resolver = self::getContainer()->get(OzonListingResolver::class);
