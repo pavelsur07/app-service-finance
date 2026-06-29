@@ -58,15 +58,38 @@ final class OzonListingResolver implements BulkListingResolverInterface
     private function resolveManyInternal(string $companyId, array $sourceDataRows, bool $createMissing): array
     {
         $result = [];
+        $contextByKey = [];
+        $supplierSkus = [];
         $seedsByKey = [];
 
         foreach ($sourceDataRows as $key => $sourceData) {
             $result[$key] = null;
 
-            $supplierResolution = null;
             $supplierSku = $this->stringValue($sourceData['offer_id'] ?? $sourceData['item_code'] ?? null);
+            $marketplaceSku = $this->marketplaceSku($sourceData);
+
             if (null !== $supplierSku) {
-                $supplierReference = $this->marketplaceListingFacade->findBySupplierSku($companyId, MarketplaceType::OZON->value, $supplierSku);
+                $supplierSkus[] = $supplierSku;
+            }
+
+            $contextByKey[$key] = [
+                'supplierSku' => $supplierSku,
+                'marketplaceSku' => $marketplaceSku,
+                'name' => $this->listingName($sourceData),
+            ];
+        }
+
+        $supplierReferences = $this->marketplaceListingFacade->findBySupplierSkus(
+            $companyId,
+            MarketplaceType::OZON->value,
+            array_values(array_unique($supplierSkus)),
+        );
+
+        foreach ($contextByKey as $key => $context) {
+            $supplierResolution = null;
+            $supplierSku = $context['supplierSku'];
+            if (null !== $supplierSku) {
+                $supplierReference = $supplierReferences[$supplierSku] ?? null;
                 $supplierResolution = new ListingResolution($supplierReference?->listingId, $supplierSku);
 
                 if (null !== $supplierResolution->listingId) {
@@ -75,7 +98,7 @@ final class OzonListingResolver implements BulkListingResolverInterface
                 }
             }
 
-            $marketplaceSku = $this->marketplaceSku($sourceData);
+            $marketplaceSku = $context['marketplaceSku'];
             if (null === $marketplaceSku) {
                 $result[$key] = $supplierResolution;
                 continue;
@@ -84,7 +107,7 @@ final class OzonListingResolver implements BulkListingResolverInterface
             $seedsByKey[$key] = new MarketplaceListingSeedDTO(
                 marketplaceSku: $marketplaceSku,
                 supplierSku: $supplierSku,
-                name: $this->listingName($sourceData),
+                name: $context['name'],
             );
             $result[$key] = $supplierResolution ?? new ListingResolution(null, $marketplaceSku);
         }
@@ -121,16 +144,16 @@ final class OzonListingResolver implements BulkListingResolverInterface
      */
     private function findExistingMarketplaceReferences(string $companyId, array $seeds): array
     {
-        $references = [];
+        $marketplaceSkus = [];
         foreach ($seeds as $seed) {
-            $references[$seed->marketplaceSku] ??= $this->marketplaceListingFacade->findByMarketplaceSku(
-                $companyId,
-                MarketplaceType::OZON->value,
-                $seed->marketplaceSku,
-            );
+            $marketplaceSkus[] = $seed->marketplaceSku;
         }
 
-        return array_filter($references);
+        return $this->marketplaceListingFacade->findByMarketplaceSkus(
+            $companyId,
+            MarketplaceType::OZON->value,
+            array_values(array_unique($marketplaceSkus)),
+        );
     }
 
     /**

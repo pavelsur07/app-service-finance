@@ -59,6 +59,33 @@ class MarketplaceListingRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * @param list<string> $skus
+     *
+     * @return MarketplaceListing[]
+     */
+    public function findAllByCompanyMarketplaceAndMarketplaceSkus(
+        string $companyId,
+        MarketplaceType $marketplace,
+        array $skus,
+    ): array {
+        if ([] === $skus) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('l')
+            ->where('IDENTITY(l.company) = :companyId')
+            ->andWhere('l.marketplace = :marketplace')
+            ->andWhere('l.marketplaceSku IN (:skus)')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('skus', array_values(array_unique($skus)))
+            ->orderBy('l.marketplaceSku', 'ASC')
+            ->addOrderBy('l.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
     /** @return MarketplaceListing[] */
     public function findAllByCompanyMarketplaceAndSupplierSku(
         string $companyId,
@@ -72,6 +99,33 @@ class MarketplaceListingRepository extends ServiceEntityRepository
             ->setParameter('companyId', $companyId)
             ->setParameter('marketplace', $marketplace)
             ->setParameter('supplierSku', $supplierSku)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * @param list<string> $supplierSkus
+     *
+     * @return MarketplaceListing[]
+     */
+    public function findAllByCompanyMarketplaceAndSupplierSkus(
+        string $companyId,
+        MarketplaceType $marketplace,
+        array $supplierSkus,
+    ): array {
+        if ([] === $supplierSkus) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('l')
+            ->where('IDENTITY(l.company) = :companyId')
+            ->andWhere('l.marketplace = :marketplace')
+            ->andWhere('l.supplierSku IN (:supplierSkus)')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('supplierSkus', array_values(array_unique($supplierSkus)))
+            ->orderBy('l.supplierSku', 'ASC')
+            ->addOrderBy('l.id', 'ASC')
             ->getQuery()
             ->getResult();
     }

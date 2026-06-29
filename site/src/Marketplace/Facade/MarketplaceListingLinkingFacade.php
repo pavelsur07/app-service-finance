@@ -34,6 +34,29 @@ final readonly class MarketplaceListingLinkingFacade
         return null === $listing ? null : $this->reference($listing);
     }
 
+    /**
+     * @param list<string> $supplierSkus
+     *
+     * @return array<string, MarketplaceListingReferenceDTO>
+     */
+    public function findBySupplierSkus(string $companyId, string $marketplace, array $supplierSkus): array
+    {
+        $marketplaceType = MarketplaceType::tryFrom($marketplace);
+        if (null === $marketplaceType) {
+            return [];
+        }
+
+        $supplierSkus = $this->normalizeStringList($supplierSkus);
+        if ([] === $supplierSkus) {
+            return [];
+        }
+
+        return $this->uniqueReferencesFromGroups($this->groupListingsByKey(
+            $this->listingRepository->findAllByCompanyMarketplaceAndSupplierSkus($companyId, $marketplaceType, $supplierSkus),
+            static fn (MarketplaceListing $listing): ?string => $listing->getSupplierSku(),
+        ));
+    }
+
     public function findByMarketplaceSku(string $companyId, string $marketplace, string $marketplaceSku): ?MarketplaceListingReferenceDTO
     {
         $marketplaceType = MarketplaceType::tryFrom($marketplace);
@@ -44,6 +67,29 @@ final readonly class MarketplaceListingLinkingFacade
         $listing = $this->listingRepository->findByMarketplaceSku($companyId, $marketplaceType, $marketplaceSku);
 
         return null === $listing ? null : $this->reference($listing);
+    }
+
+    /**
+     * @param list<string> $marketplaceSkus
+     *
+     * @return array<string, MarketplaceListingReferenceDTO>
+     */
+    public function findByMarketplaceSkus(string $companyId, string $marketplace, array $marketplaceSkus): array
+    {
+        $marketplaceType = MarketplaceType::tryFrom($marketplace);
+        if (null === $marketplaceType) {
+            return [];
+        }
+
+        $marketplaceSkus = $this->normalizeStringList($marketplaceSkus);
+        if ([] === $marketplaceSkus) {
+            return [];
+        }
+
+        return $this->uniqueReferencesFromGroups($this->groupListingsByKey(
+            $this->listingRepository->findAllByCompanyMarketplaceAndMarketplaceSkus($companyId, $marketplaceType, $marketplaceSkus),
+            static fn (MarketplaceListing $listing): string => $listing->getMarketplaceSku(),
+        ));
     }
 
     /**
@@ -83,9 +129,17 @@ final readonly class MarketplaceListingLinkingFacade
         $result = [];
         $missingSkusWithNames = [];
         $supplierSkusBySku = [];
+        $existingListingsBySku = $this->groupListingsByKey(
+            $this->listingRepository->findAllByCompanyMarketplaceAndMarketplaceSkus(
+                $companyId,
+                MarketplaceType::OZON,
+                array_keys($uniqueSeeds),
+            ),
+            static fn (MarketplaceListing $listing): string => $listing->getMarketplaceSku(),
+        );
 
         foreach ($uniqueSeeds as $sku => $seed) {
-            $matches = $this->listingRepository->findAllByCompanyMarketplaceAndMarketplaceSku($companyId, MarketplaceType::OZON, $sku);
+            $matches = $existingListingsBySku[$sku] ?? [];
             if (1 === count($matches)) {
                 $listing = $matches[0];
                 $metadataChanged = $this->fillMissingMetadata($listing, $seed) || $metadataChanged;
@@ -138,5 +192,63 @@ final readonly class MarketplaceListingLinkingFacade
         }
 
         return $changed;
+    }
+
+    /**
+     * @param list<string> $values
+     *
+     * @return list<string>
+     */
+    private function normalizeStringList(array $values): array
+    {
+        $normalized = [];
+        foreach ($values as $value) {
+            $value = trim($value);
+            if ('' === $value) {
+                continue;
+            }
+
+            $normalized[$value] = $value;
+        }
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @param list<MarketplaceListing> $listings
+     * @param callable(MarketplaceListing): ?string $keyExtractor
+     *
+     * @return array<string, list<MarketplaceListing>>
+     */
+    private function groupListingsByKey(array $listings, callable $keyExtractor): array
+    {
+        $grouped = [];
+        foreach ($listings as $listing) {
+            $key = $keyExtractor($listing);
+            if (null === $key || '' === trim($key)) {
+                continue;
+            }
+
+            $grouped[$key][] = $listing;
+        }
+
+        return $grouped;
+    }
+
+    /**
+     * @param array<string, list<MarketplaceListing>> $groups
+     *
+     * @return array<string, MarketplaceListingReferenceDTO>
+     */
+    private function uniqueReferencesFromGroups(array $groups): array
+    {
+        $references = [];
+        foreach ($groups as $key => $matches) {
+            if (1 === count($matches)) {
+                $references[$key] = $this->reference($matches[0]);
+            }
+        }
+
+        return $references;
     }
 }

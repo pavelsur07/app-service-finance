@@ -101,6 +101,7 @@ final class OzonAccrualRelinkListingsCommand extends Command
         $tableRows = [];
         $resolved = 0;
         $updated = 0;
+        $transactionsById = $execute ? $this->fetchTransactionsToUpdate($rows, $resolutions) : [];
 
         foreach ($rows as $row) {
             $transactionId = (string) $row['id'];
@@ -112,7 +113,7 @@ final class OzonAccrualRelinkListingsCommand extends Command
                 $status = $execute ? 'updated' : 'would-update';
 
                 if ($execute) {
-                    $transaction = $this->transactionRepository->find($transactionId);
+                    $transaction = $transactionsById[$transactionId] ?? null;
                     if ($transaction instanceof FinancialTransaction && null === $transaction->getListingId()) {
                         $transaction->setListing($resolution->listingId, $resolution->listingSku);
                         ++$updated;
@@ -207,6 +208,37 @@ final class OzonAccrualRelinkListingsCommand extends Command
         )->fetchAllAssociative();
 
         return $rows;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @param array<string, \App\Ingestion\Application\DTO\ListingResolution|null> $resolutions
+     *
+     * @return array<string, FinancialTransaction>
+     */
+    private function fetchTransactionsToUpdate(array $rows, array $resolutions): array
+    {
+        $ids = [];
+        foreach ($rows as $row) {
+            $transactionId = (string) $row['id'];
+            $resolution = $resolutions[$transactionId] ?? null;
+            if (null !== $resolution?->listingId && null !== $resolution->listingSku) {
+                $ids[$transactionId] = $transactionId;
+            }
+        }
+
+        if ([] === $ids) {
+            return [];
+        }
+
+        $transactionsById = [];
+        foreach ($this->transactionRepository->findBy(['id' => array_values($ids)]) as $transaction) {
+            if ($transaction instanceof FinancialTransaction) {
+                $transactionsById[$transaction->getId()] = $transaction;
+            }
+        }
+
+        return $transactionsById;
     }
 
     /**
