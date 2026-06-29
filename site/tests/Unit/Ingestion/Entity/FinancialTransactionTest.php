@@ -35,6 +35,7 @@ final class FinancialTransactionTest extends TestCase
         $transaction = $this->newTransaction();
         $oldOccurredAt = $transaction->getOccurredAt();
         $newOccurredAt = new \DateTimeImmutable('2026-06-03 12:00:00');
+        $newRawRecordId = Uuid::uuid7()->toString();
 
         $transaction->replaceFromNewerVersion(
             money: Money::fromMinor(15000, 'RUB'),
@@ -47,6 +48,7 @@ final class FinancialTransactionTest extends TestCase
             counterpartyId: null,
             description: 'updated',
             sourceData: ['row' => 2],
+            rawRecordId: $newRawRecordId,
             listingId: '55555555-5555-4555-8555-555555555555',
             listingSku: 'sku-2',
         );
@@ -56,6 +58,7 @@ final class FinancialTransactionTest extends TestCase
         self::assertSame($oldOccurredAt, $transaction->oldOccurredAt());
         self::assertSame('order-2', $transaction->getOrderRef());
         self::assertSame(['row' => 2], $transaction->getSourceData());
+        self::assertSame($newRawRecordId, $transaction->getRawRecordId());
         self::assertSame('55555555-5555-4555-8555-555555555555', $transaction->getListingId());
         self::assertSame('sku-2', $transaction->getListingSku());
     }
@@ -77,7 +80,18 @@ final class FinancialTransactionTest extends TestCase
             counterpartyId: null,
             description: null,
             sourceData: [],
+            rawRecordId: Uuid::uuid7()->toString(),
         );
+    }
+
+    public function testReattributesRawRecord(): void
+    {
+        $transaction = $this->newTransaction();
+        $rawRecordId = Uuid::uuid7()->toString();
+
+        self::assertTrue($transaction->reattributeRawRecord($rawRecordId));
+        self::assertSame($rawRecordId, $transaction->getRawRecordId());
+        self::assertFalse($transaction->reattributeRawRecord($rawRecordId));
     }
 
     private function newTransaction(): FinancialTransaction

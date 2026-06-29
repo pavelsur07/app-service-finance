@@ -189,6 +189,7 @@ class FinancialTransaction implements TenantOwnedInterface
         ?string $counterpartyId,
         ?string $description,
         array $sourceData,
+        string $rawRecordId,
         ?string $listingId = null,
         ?string $listingSku = null,
     ): void {
@@ -200,6 +201,7 @@ class FinancialTransaction implements TenantOwnedInterface
             Assert::uuid($counterpartyId);
         }
 
+        Assert::uuid($rawRecordId);
         $this->assertListing($listingId, $listingSku);
 
         $this->oldOccurredAt = $this->occurredAt;
@@ -216,7 +218,22 @@ class FinancialTransaction implements TenantOwnedInterface
         $this->listingSku = $listingSku;
         $this->description = $description;
         $this->sourceData = $sourceData;
+        $this->rawRecordId = $rawRecordId;
         $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function reattributeRawRecord(string $rawRecordId): bool
+    {
+        Assert::uuid($rawRecordId);
+
+        if ($this->rawRecordId === $rawRecordId) {
+            return false;
+        }
+
+        $this->rawRecordId = $rawRecordId;
+        $this->updatedAt = new \DateTimeImmutable();
+
+        return true;
     }
 
     /**

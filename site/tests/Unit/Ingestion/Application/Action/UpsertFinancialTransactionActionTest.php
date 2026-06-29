@@ -151,4 +151,131 @@ final class UpsertFinancialTransactionActionTest extends TestCase
         self::assertSame('33333333-3333-4333-8333-333333333333', $transaction->getListingId());
         self::assertSame('old-sku', $transaction->getListingSku());
     }
+
+    public function testSameSourceDataStillRefreshesRawRecordAttribution(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $oldRawRecordId = Uuid::uuid7()->toString();
+        $newRawRecordId = Uuid::uuid7()->toString();
+        $operationGroupId = Uuid::uuid7()->toString();
+        $sourceData = ['sku' => '286079488', 'amount' => '100.00'];
+        $externalUpdatedAt = new \DateTimeImmutable('2026-06-01 00:00:00');
+        $newExternalUpdatedAt = new \DateTimeImmutable('2026-06-02 00:00:00');
+        $occurredAt = new \DateTimeImmutable('2026-06-01 12:00:00');
+
+        $transaction = new FinancialTransaction(
+            companyId: $companyId,
+            connectionRef: 'connection-1',
+            shopRef: 'shop-1',
+            source: IngestSource::OZON,
+            externalId: 'ozon:accrual-by-day:1:sale:product-0',
+            externalUpdatedAt: $externalUpdatedAt,
+            operationGroupId: $operationGroupId,
+            type: TransactionType::SALE,
+            direction: TransactionDirection::IN,
+            money: Money::fromMinor(10000, 'RUB'),
+            occurredAt: $occurredAt,
+            rawRecordId: $oldRawRecordId,
+            sourceData: $sourceData,
+        );
+
+        $repository = $this->createMock(FinancialTransactionRepository::class);
+        $repository
+            ->method('findByNaturalKey')
+            ->with($companyId, IngestSource::OZON, 'ozon:accrual-by-day:1:sale:product-0', TransactionType::SALE)
+            ->willReturn($transaction);
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::never())->method('persist');
+
+        $action = new UpsertFinancialTransactionAction($repository, $entityManager);
+
+        $result = $action(new UpsertFinancialTransactionCommand(
+            companyId: $companyId,
+            connectionRef: 'connection-1',
+            shopRef: 'shop-1',
+            source: IngestSource::OZON,
+            mapped: new MappedTransaction(
+                externalId: 'ozon:accrual-by-day:1:sale:product-0',
+                externalUpdatedAt: $newExternalUpdatedAt,
+                operationGroupId: $operationGroupId,
+                type: TransactionType::SALE,
+                direction: TransactionDirection::IN,
+                money: Money::fromMinor(10000, 'RUB'),
+                occurredAt: $occurredAt,
+                sourceData: $sourceData,
+            ),
+            rawRecordId: $newRawRecordId,
+            counterpartyId: null,
+            listingId: null,
+            listingSku: null,
+        ));
+
+        self::assertNotNull($result);
+        self::assertSame($newRawRecordId, $transaction->getRawRecordId());
+        self::assertFalse($result->periodChanged);
+    }
+
+    public function testSameSourceDataDoesNotMoveRawRecordAttributionBackwards(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $currentRawRecordId = Uuid::uuid7()->toString();
+        $staleRawRecordId = Uuid::uuid7()->toString();
+        $operationGroupId = Uuid::uuid7()->toString();
+        $sourceData = ['sku' => '286079488', 'amount' => '100.00'];
+        $currentExternalUpdatedAt = new \DateTimeImmutable('2026-06-02 00:00:00');
+        $staleExternalUpdatedAt = new \DateTimeImmutable('2026-06-01 00:00:00');
+        $occurredAt = new \DateTimeImmutable('2026-06-01 12:00:00');
+
+        $transaction = new FinancialTransaction(
+            companyId: $companyId,
+            connectionRef: 'connection-1',
+            shopRef: 'shop-1',
+            source: IngestSource::OZON,
+            externalId: 'ozon:accrual-by-day:1:sale:product-0',
+            externalUpdatedAt: $currentExternalUpdatedAt,
+            operationGroupId: $operationGroupId,
+            type: TransactionType::SALE,
+            direction: TransactionDirection::IN,
+            money: Money::fromMinor(10000, 'RUB'),
+            occurredAt: $occurredAt,
+            rawRecordId: $currentRawRecordId,
+            sourceData: $sourceData,
+        );
+
+        $repository = $this->createMock(FinancialTransactionRepository::class);
+        $repository
+            ->method('findByNaturalKey')
+            ->with($companyId, IngestSource::OZON, 'ozon:accrual-by-day:1:sale:product-0', TransactionType::SALE)
+            ->willReturn($transaction);
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::never())->method('persist');
+
+        $action = new UpsertFinancialTransactionAction($repository, $entityManager);
+
+        $result = $action(new UpsertFinancialTransactionCommand(
+            companyId: $companyId,
+            connectionRef: 'connection-1',
+            shopRef: 'shop-1',
+            source: IngestSource::OZON,
+            mapped: new MappedTransaction(
+                externalId: 'ozon:accrual-by-day:1:sale:product-0',
+                externalUpdatedAt: $staleExternalUpdatedAt,
+                operationGroupId: $operationGroupId,
+                type: TransactionType::SALE,
+                direction: TransactionDirection::IN,
+                money: Money::fromMinor(10000, 'RUB'),
+                occurredAt: $occurredAt,
+                sourceData: $sourceData,
+            ),
+            rawRecordId: $staleRawRecordId,
+            counterpartyId: null,
+            listingId: null,
+            listingSku: null,
+        ));
+
+        self::assertNull($result);
+        self::assertSame($currentRawRecordId, $transaction->getRawRecordId());
+    }
 }

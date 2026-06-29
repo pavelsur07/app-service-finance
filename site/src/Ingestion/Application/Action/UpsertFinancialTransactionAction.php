@@ -70,7 +70,12 @@ final readonly class UpsertFinancialTransactionAction
         // allowed to converge after listing metadata appears later, without
         // changing amount/period/source data.
         if ($this->sourceDataHasher->hash($mapped->sourceData) === $this->sourceDataHasher->hash($transaction->getSourceData())) {
-            if ($this->updateListingEnrichment($transaction, $command->listingId, $command->listingSku)) {
+            $changed = $this->updateListingEnrichment($transaction, $command->listingId, $command->listingSku);
+            if ($mapped->externalUpdatedAt >= $transaction->getExternalUpdatedAt()) {
+                $changed = $transaction->reattributeRawRecord($command->rawRecordId) || $changed;
+            }
+
+            if ($changed) {
                 return new UpsertResult(
                     transactionId: $transaction->getId(),
                     oldOccurredAt: $transaction->getOccurredAt(),
@@ -96,6 +101,7 @@ final readonly class UpsertFinancialTransactionAction
                 counterpartyId: $command->counterpartyId,
                 description: $mapped->description,
                 sourceData: $mapped->sourceData,
+                rawRecordId: $command->rawRecordId,
                 listingId: $command->listingId,
                 listingSku: $command->listingSku,
             );

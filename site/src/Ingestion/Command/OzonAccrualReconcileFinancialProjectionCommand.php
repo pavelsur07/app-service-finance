@@ -425,7 +425,7 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
             $totals['resolved'] += $result['resolved'];
             $totals['updated'] += $result['updated'];
             $totals['wouldCreateListings'] += $result['wouldCreateListings'];
-            $totals['unresolved'] = $result['unresolved'];
+            $totals['unresolved'] += $result['unresolved'];
 
             if (0 === $result['selected'] || 0 === $result['updated']) {
                 break;
