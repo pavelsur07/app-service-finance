@@ -14,6 +14,7 @@ use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\TransactionDirection;
 use App\Ingestion\Enum\TransactionType;
 use App\Ingestion\Facade\RawStorageFacade;
+use App\Ingestion\Infrastructure\Query\OzonAccrualProjectionHealthQuery;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Shared\Domain\ValueObject\Money;
@@ -72,11 +73,130 @@ final class OzonAccrualRelinkListingsCommandTest extends IntegrationTestCase
         self::assertSame([$createdListingId, '1234567890'], $this->transactionListing($transaction->getId()));
     }
 
+    public function testExecuteCanBeScopedByShopRef(): void
+    {
+        $company = $this->createCompany();
+        $companyId = (string) $company->getId();
+        $firstShopRef = Uuid::uuid7()->toString();
+        $secondShopRef = Uuid::uuid7()->toString();
+        $firstRecord = $this->storeRawRecord(
+            companyId: $companyId,
+            connectionRef: $firstShopRef,
+            rows: [$this->postingRow(53675409101, '1234567891')],
+        );
+        $secondRecord = $this->storeRawRecord(
+            companyId: $companyId,
+            connectionRef: $secondShopRef,
+            rows: [$this->postingRow(53675409102, '1234567892')],
+        );
+        $firstTransaction = $this->persistExistingTransaction(
+            companyId: $companyId,
+            connectionRef: $firstShopRef,
+            rawRecordId: $firstRecord->getId(),
+            externalId: 'ozon:accrual-by-day:53675409101:sale:product-0',
+        );
+        $secondTransaction = $this->persistExistingTransaction(
+            companyId: $companyId,
+            connectionRef: $secondShopRef,
+            rawRecordId: $secondRecord->getId(),
+            externalId: 'ozon:accrual-by-day:53675409102:sale:product-0',
+        );
+        $this->em->flush();
+
+        $execute = $this->tester();
+        $executeExit = $execute->execute([
+            '--company-id' => $companyId,
+            '--shop-ref' => $firstShopRef,
+            '--from' => '2026-06-01',
+            '--to' => '2026-06-01',
+            '--execute' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $executeExit, $execute->getDisplay());
+        $firstListingId = $this->listingId($companyId, '1234567891');
+        self::assertNotNull($firstListingId);
+        self::assertSame([$firstListingId, '1234567891'], $this->transactionListing($firstTransaction->getId()));
+        self::assertSame([null, null], $this->transactionListing($secondTransaction->getId()));
+    }
+
+    public function testProjectionHealthUsesWindowProjectionAndIgnoresRawUpdatedAt(): void
+    {
+        $company = $this->createCompany();
+        $companyId = (string) $company->getId();
+        $shopRef = Uuid::uuid7()->toString();
+        $record = $this->storeRawRecord(
+            companyId: $companyId,
+            connectionRef: $shopRef,
+            rows: [$this->postingRow(53675409103, '1234567893')],
+        );
+        $record->markNormalizationDone();
+        $transaction = $this->persistExistingTransaction(
+            companyId: $companyId,
+            connectionRef: $shopRef,
+            rawRecordId: Uuid::uuid7()->toString(),
+            externalId: 'ozon:accrual-by-day:53675409103:sale:product-0',
+        );
+        $this->em->flush();
+        $this->connection->executeStatement(
+            'UPDATE ingest_financial_transactions SET updated_at = :updatedAt WHERE id = :id',
+            ['updatedAt' => '2026-06-03 00:00:00', 'id' => $transaction->getId()],
+        );
+        $this->connection->executeStatement(
+            'UPDATE ingest_raw_records SET updated_at = :updatedAt WHERE id = :id',
+            ['updatedAt' => '2026-06-29 00:00:00', 'id' => $record->getId()],
+        );
+
+        /** @var OzonAccrualProjectionHealthQuery $query */
+        $query = self::getContainer()->get(OzonAccrualProjectionHealthQuery::class);
+        $rows = $query->rawProjectionRows(
+            from: new \DateTimeImmutable('2026-06-01'),
+            to: new \DateTimeImmutable('2026-06-01'),
+            companyId: $companyId,
+            shopRef: $shopRef,
+            limit: 10,
+            problemsOnly: false,
+        );
+
+        self::assertCount(1, $rows);
+        self::assertSame(1, (int) $rows[0]['tx_count']);
+        self::assertSame(0, (int) $rows[0]['direct_raw_tx_count']);
+        self::assertSame(1, (int) $rows[0]['needs_normalization']);
+        self::assertCount(1, $query->rawProjectionRows(
+            from: new \DateTimeImmutable('2026-06-01'),
+            to: new \DateTimeImmutable('2026-06-01'),
+            companyId: $companyId,
+            shopRef: $shopRef,
+            limit: 10,
+            problemsOnly: true,
+        ));
+
+        $reconcile = $this->reconcileTester();
+        $reconcileExit = $reconcile->execute([
+            '--company-id' => $companyId,
+            '--shop-ref' => $shopRef,
+            '--from' => '2026-06-01',
+            '--to' => '2026-06-01',
+            '--execute' => true,
+            '--summary-only' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $reconcileExit, $reconcile->getDisplay());
+        self::assertStringContainsString('rawNeedsNormalization', $reconcile->getDisplay());
+        self::assertStringContainsString('0', $reconcile->getDisplay());
+    }
+
     private function tester(): CommandTester
     {
         $app = new Application(self::$kernel);
 
         return new CommandTester($app->find('app:ingestion:ozon-accrual:relink-listings'));
+    }
+
+    private function reconcileTester(): CommandTester
+    {
+        $app = new Application(self::$kernel);
+
+        return new CommandTester($app->find('app:ingestion:ozon-accrual:reconcile-financial-projection'));
     }
 
     private function createCompany(): Company
@@ -147,16 +267,16 @@ final class OzonAccrualRelinkListingsCommandTest extends IntegrationTestCase
     /**
      * @return array<string, mixed>
      */
-    private function postingRow(): array
+    private function postingRow(int $accrualId = 53675409100, string $sku = '1234567890'): array
     {
         return [
-            'accrual_id' => 53675409100,
+            'accrual_id' => $accrualId,
             'date' => '2026-06-01',
             'unit_number' => '41774559-0885-1',
             'accrued_category' => 'POSTING',
             'posting' => [
                 'products' => [[
-                    'sku' => '1234567890',
+                    'sku' => $sku,
                     'offer_id' => 'old-offer',
                     'name' => 'Old Ozon Product',
                     'commission' => [

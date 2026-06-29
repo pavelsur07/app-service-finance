@@ -66,11 +66,22 @@ final readonly class UpsertFinancialTransactionAction
             );
         }
 
-        // No-change short-circuit: if the canonical source content is identical
-        // to what is already stored, skip the update entirely so updated_at /
-        // externalUpdatedAt do not move and no NormalizationCompletedEvent is
-        // raised for an unchanged period. Solves P0.2 without a schema change.
+        // No-change short-circuit for financial content. Enrichment fields are
+        // allowed to converge after listing metadata appears later, without
+        // changing amount/period/source data.
         if ($this->sourceDataHasher->hash($mapped->sourceData) === $this->sourceDataHasher->hash($transaction->getSourceData())) {
+            $changed = $this->updateListingEnrichment($transaction, $command->listingId, $command->listingSku);
+            $changed = $transaction->reattributeRawRecord($command->rawRecordId, $mapped->externalUpdatedAt) || $changed;
+
+            if ($changed) {
+                return new UpsertResult(
+                    transactionId: $transaction->getId(),
+                    oldOccurredAt: $transaction->getOccurredAt(),
+                    newOccurredAt: $transaction->getOccurredAt(),
+                    periodChanged: false,
+                );
+            }
+
             return null;
         }
 
@@ -88,6 +99,7 @@ final readonly class UpsertFinancialTransactionAction
                 counterpartyId: $command->counterpartyId,
                 description: $mapped->description,
                 sourceData: $mapped->sourceData,
+                rawRecordId: $command->rawRecordId,
                 listingId: $command->listingId,
                 listingSku: $command->listingSku,
             );
@@ -101,5 +113,23 @@ final readonly class UpsertFinancialTransactionAction
             newOccurredAt: $mapped->occurredAt,
             periodChanged: $oldOccurredAt != $mapped->occurredAt,
         );
+    }
+
+    private function updateListingEnrichment(
+        FinancialTransaction $transaction,
+        ?string $listingId,
+        ?string $listingSku,
+    ): bool {
+        if (null === $listingId || null === $listingSku) {
+            return false;
+        }
+
+        if (null !== $transaction->getListingId()) {
+            return false;
+        }
+
+        $transaction->setListing($listingId, $listingSku);
+
+        return true;
     }
 }
