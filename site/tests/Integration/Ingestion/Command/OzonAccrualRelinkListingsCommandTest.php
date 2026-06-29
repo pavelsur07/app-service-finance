@@ -160,8 +160,8 @@ final class OzonAccrualRelinkListingsCommandTest extends IntegrationTestCase
         self::assertCount(1, $rows);
         self::assertSame(1, (int) $rows[0]['tx_count']);
         self::assertSame(0, (int) $rows[0]['direct_raw_tx_count']);
-        self::assertSame(0, (int) $rows[0]['needs_normalization']);
-        self::assertSame([], $query->rawProjectionRows(
+        self::assertSame(1, (int) $rows[0]['needs_normalization']);
+        self::assertCount(1, $query->rawProjectionRows(
             from: new \DateTimeImmutable('2026-06-01'),
             to: new \DateTimeImmutable('2026-06-01'),
             companyId: $companyId,
@@ -169,6 +169,20 @@ final class OzonAccrualRelinkListingsCommandTest extends IntegrationTestCase
             limit: 10,
             problemsOnly: true,
         ));
+
+        $reconcile = $this->reconcileTester();
+        $reconcileExit = $reconcile->execute([
+            '--company-id' => $companyId,
+            '--shop-ref' => $shopRef,
+            '--from' => '2026-06-01',
+            '--to' => '2026-06-01',
+            '--execute' => true,
+            '--summary-only' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $reconcileExit, $reconcile->getDisplay());
+        self::assertStringContainsString('rawNeedsNormalization', $reconcile->getDisplay());
+        self::assertStringContainsString('0', $reconcile->getDisplay());
     }
 
     private function tester(): CommandTester
@@ -176,6 +190,13 @@ final class OzonAccrualRelinkListingsCommandTest extends IntegrationTestCase
         $app = new Application(self::$kernel);
 
         return new CommandTester($app->find('app:ingestion:ozon-accrual:relink-listings'));
+    }
+
+    private function reconcileTester(): CommandTester
+    {
+        $app = new Application(self::$kernel);
+
+        return new CommandTester($app->find('app:ingestion:ozon-accrual:reconcile-financial-projection'));
     }
 
     private function createCompany(): Company

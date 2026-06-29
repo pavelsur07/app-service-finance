@@ -7,6 +7,7 @@ namespace App\Ingestion\Infrastructure\Query;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\RawNormalizationStatus;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 
 final readonly class OzonAccrualProjectionHealthQuery
@@ -58,8 +59,8 @@ final readonly class OzonAccrualProjectionHealthQuery
         $problemPredicate = '(
             r.normalization_status <> :doneStatus
             OR COALESCE(tx.tx_count, 0) = 0
+            OR COALESCE(direct_tx.direct_raw_tx_count, 0) = 0
             OR COALESCE(issues.open_issues, 0) > 0
-            OR (tx.last_tx_updated_at IS NOT NULL AND r.fetched_at > tx.last_tx_updated_at)
         )';
 
         $problemFilter = $problemsOnly ? sprintf('AND %s', $problemPredicate) : '';
@@ -97,19 +98,23 @@ final readonly class OzonAccrualProjectionHealthQuery
                     GROUP BY raw.raw_id
                 ),
                 direct_tx AS (
-                    SELECT company_id,
-                           raw_record_id,
-                           COUNT(*) AS direct_raw_tx_count
-                    FROM ingest_financial_transactions
-                    WHERE source = :source
-                    GROUP BY company_id, raw_record_id
+                    SELECT raw.raw_id,
+                           COUNT(ft.id) AS direct_raw_tx_count
+                    FROM raw
+                    LEFT JOIN ingest_financial_transactions ft
+                      ON ft.company_id = raw.company_id
+                     AND ft.raw_record_id = raw.raw_id
+                     AND ft.source = :source
+                    GROUP BY raw.raw_id
                 ),
                 issues AS (
-                    SELECT company_id,
-                           raw_record_id,
-                           COUNT(*) FILTER (WHERE resolved_at IS NULL) AS open_issues
-                    FROM ingest_normalization_issues
-                    GROUP BY company_id, raw_record_id
+                    SELECT raw.raw_id,
+                           COUNT(i.id) FILTER (WHERE i.resolved_at IS NULL) AS open_issues
+                    FROM raw
+                    LEFT JOIN ingest_normalization_issues i
+                      ON i.company_id = raw.company_id
+                     AND i.raw_record_id = raw.raw_id
+                    GROUP BY raw.raw_id
                 )
                 SELECT r.company_id,
                        r.shop_ref,
@@ -128,8 +133,8 @@ final readonly class OzonAccrualProjectionHealthQuery
                        CASE WHEN %s THEN 1 ELSE 0 END AS needs_normalization
                 FROM raw r
                 LEFT JOIN tx ON tx.raw_id = r.raw_id
-                LEFT JOIN direct_tx ON direct_tx.company_id = r.company_id AND direct_tx.raw_record_id = r.raw_id
-                LEFT JOIN issues ON issues.company_id = r.company_id AND issues.raw_record_id = r.raw_id
+                LEFT JOIN direct_tx ON direct_tx.raw_id = r.raw_id
+                LEFT JOIN issues ON issues.raw_id = r.raw_id
                 WHERE TRUE
                 %s
                 ORDER BY needs_normalization DESC,
@@ -150,6 +155,43 @@ final readonly class OzonAccrualProjectionHealthQuery
         );
 
         return $rows;
+    }
+
+    /**
+     * @param list<string> $externalIds
+     *
+     * @return array<string, true>
+     */
+    public function projectedExternalIdSet(string $companyId, string $shopRef, array $externalIds): array
+    {
+        if ([] === $externalIds) {
+            return [];
+        }
+
+        $rows = $this->connection->executeQuery(
+            'SELECT DISTINCT external_id
+             FROM ingest_financial_transactions
+             WHERE company_id = :companyId
+               AND shop_ref = :shopRef
+               AND source = :source
+               AND external_id IN (:externalIds)',
+            [
+                'companyId' => $companyId,
+                'shopRef' => $shopRef,
+                'source' => IngestSource::OZON->value,
+                'externalIds' => $externalIds,
+            ],
+            [
+                'externalIds' => ArrayParameterType::STRING,
+            ],
+        )->fetchFirstColumn();
+
+        $result = [];
+        foreach ($rows as $row) {
+            $result[(string) $row] = true;
+        }
+
+        return $result;
     }
 
     /**

@@ -120,7 +120,7 @@ final readonly class UpsertFinancialTransactionAction
             return false;
         }
 
-        if ($transaction->getListingId() === $listingId && $transaction->getListingSku() === $listingSku) {
+        if (null !== $transaction->getListingId()) {
             return false;
         }
 

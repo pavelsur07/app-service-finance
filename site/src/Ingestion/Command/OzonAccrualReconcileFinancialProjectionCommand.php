@@ -9,9 +9,11 @@ use App\Ingestion\Application\Action\RecordNormalizationIssueAction;
 use App\Ingestion\Application\Command\NormalizeRawRecordCommand;
 use App\Ingestion\Application\Command\RecordNormalizationIssueCommand;
 use App\Ingestion\Application\Service\OzonAccrualListingRelinker;
+use App\Ingestion\Application\Source\Ozon\OzonAccrualByDayPreviewMapper;
 use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Enum\NormalizationIssueKind;
 use App\Ingestion\Enum\RawNormalizationStatus;
+use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Infrastructure\Query\OzonAccrualProjectionHealthQuery;
 use App\Ingestion\Message\NormalizeRawRecordMessage;
 use App\Ingestion\Repository\IngestRawRecordRepository;
@@ -38,6 +40,7 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
     use LockableTrait;
 
     private const BUSINESS_TIMEZONE = 'Europe/Moscow';
+    private const MAX_RAW_PROJECTION_CANDIDATES = 500;
 
     public function __construct(
         private readonly ClockInterface $clock,
@@ -49,6 +52,8 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
         private readonly NormalizeRawRecordAction $normalizeRawRecordAction,
         private readonly RecordNormalizationIssueAction $recordNormalizationIssueAction,
         private readonly OzonAccrualListingRelinker $listingRelinker,
+        private readonly RawStorageFacade $rawStorageFacade,
+        private readonly OzonAccrualByDayPreviewMapper $previewMapper,
         private readonly LoggerInterface $logger,
     ) {
         parent::__construct();
@@ -67,6 +72,7 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
             ->addOption('max-relink-batches', null, InputOption::VALUE_REQUIRED, 'Maximum relink batches per run, 1..50.', 20)
             ->addOption('dispatch-normalization', null, InputOption::VALUE_NONE, 'Reset stale raw records and dispatch async normalization messages.')
             ->addOption('execute-inline-normalization', null, InputOption::VALUE_NONE, 'Reset stale raw records and normalize them synchronously.')
+            ->addOption('repair-enrichment-only', null, InputOption::VALUE_NONE, 'Skip raw normalization actions and only repair listing enrichment.')
             ->addOption('summary-only', null, InputOption::VALUE_NONE, 'Print only summary tables.')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Print machine-readable JSON result.')
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Inspect stale projection and planned enrichment repair without writing.')
@@ -99,6 +105,10 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
             $maxRelinkBatches = $this->intOption($input, 'max-relink-batches', 1, 50);
             $execute = $this->mode($input);
             $normalizationMode = $this->normalizationMode($input, $execute);
+            $repairEnrichmentOnly = (bool) $input->getOption('repair-enrichment-only');
+            if ($repairEnrichmentOnly && null !== $normalizationMode) {
+                throw new \InvalidArgumentException('--repair-enrichment-only cannot be combined with normalization actions.');
+            }
             $summaryOnly = (bool) $input->getOption('summary-only');
             $json = (bool) $input->getOption('json');
         } catch (\Throwable $exception) {
@@ -107,17 +117,21 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
             return Command::FAILURE;
         }
 
-        $rawRows = $this->healthQuery->rawProjectionRows($from, $to, $companyId, $shopRef, $rawLimit, problemsOnly: true);
+        $rawRows = $this->resolveNaturalProjectionCoverage(
+            $this->healthQuery->rawProjectionRows($from, $to, $companyId, $shopRef, self::MAX_RAW_PROJECTION_CANDIDATES, problemsOnly: true),
+        );
+        $rawRows = array_values(array_filter($rawRows, fn (array $row): bool => $this->needsNormalization($row)));
+        $rawRows = array_slice($rawRows, 0, $rawLimit);
         $integrityBefore = $this->healthQuery->integritySummary($from, $to, $companyId, $shopRef);
-        $staleRows = array_values(array_filter($rawRows, fn (array $row): bool => $this->needsNormalization($row)));
-        if ($execute && [] !== $staleRows && null === $normalizationMode) {
+        $staleRows = $rawRows;
+        if ($execute && [] !== $staleRows && null === $normalizationMode && !$repairEnrichmentOnly) {
             $io->error('Stale raw records were found. Use --dispatch-normalization or --execute-inline-normalization with --execute.');
 
             return Command::FAILURE;
         }
 
         $normalizationResult = [
-            'mode' => $normalizationMode ?? 'none',
+            'mode' => $repairEnrichmentOnly ? 'repair-enrichment-only' : ($normalizationMode ?? 'none'),
             'selected' => count($staleRows),
             'changed' => 0,
             'failed' => 0,
@@ -177,6 +191,7 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
         $payload = [
             'mode' => $execute ? 'execute' : 'dry-run',
             'normalizationMode' => $normalizationMode ?? 'none',
+            'repairEnrichmentOnly' => $repairEnrichmentOnly,
             'from' => $from->format('Y-m-d'),
             'to' => $to->format('Y-m-d'),
             'daysBack' => $daysBack,
@@ -287,8 +302,6 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
 
             try {
                 ($this->normalizeRawRecordAction)(new NormalizeRawRecordCommand($rawRecordId, $companyId));
-                ++$changed;
-                $resultRows[] = ['rawId' => $rawRecordId, 'status' => $this->normalizationStatus($record), 'txCount' => -1, 'openIssues' => 0];
             } catch (\Throwable $exception) {
                 ++$failed;
                 if (!$this->entityManager->isOpen()) {
@@ -340,6 +353,27 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
                     ];
                     break;
                 }
+
+                continue;
+            }
+
+            try {
+                $status = $this->normalizationStatus($record);
+            } catch (\Throwable $exception) {
+                $status = 'normalized-status-unavailable';
+                $this->logger->warning('Ozon accrual inline normalization status refresh failed after successful action.', [
+                    'companyId' => $companyId,
+                    'rawRecordId' => $rawRecordId,
+                    'exceptionClass' => $exception::class,
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+
+            ++$changed;
+            $resultRows[] = ['rawId' => $rawRecordId, 'status' => $status, 'txCount' => -1, 'openIssues' => 0];
+
+            if (!$this->entityManager->isOpen()) {
+                break;
             }
         }
 
@@ -464,6 +498,89 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
     /**
      * @param list<array<string, mixed>> $rows
      *
+     * @return list<array<string, mixed>>
+     */
+    private function resolveNaturalProjectionCoverage(array $rows): array
+    {
+        foreach ($rows as $index => $row) {
+            $rows[$index]['projection_status'] = 'sql-candidate';
+            $rows[$index]['expected_tx_count'] = null;
+            $rows[$index]['projected_natural_key_count'] = null;
+            $rows[$index]['missing_natural_key_count'] = null;
+
+            if (!$this->needsNaturalProjectionCheck($row)) {
+                continue;
+            }
+
+            $companyId = (string) $row['company_id'];
+            $rawRecordId = (string) $row['raw_id'];
+
+            try {
+                $expectedSourceKeys = $this->expectedSourceKeys($companyId, $rawRecordId);
+                $expectedExternalIds = [];
+                foreach ($expectedSourceKeys as $sourceKey => $_) {
+                    $expectedExternalIds[] = $sourceKey;
+                }
+
+                $projectedSourceKeys = $this->healthQuery->projectedExternalIdSet(
+                    companyId: $companyId,
+                    shopRef: (string) $row['shop_ref'],
+                    externalIds: $expectedExternalIds,
+                );
+                $missingSourceKeys = array_diff_key($expectedSourceKeys, $projectedSourceKeys);
+
+                $rows[$index]['expected_tx_count'] = count($expectedSourceKeys);
+                $rows[$index]['projected_natural_key_count'] = count($projectedSourceKeys);
+                $rows[$index]['missing_natural_key_count'] = count($missingSourceKeys);
+
+                if ([] === $missingSourceKeys) {
+                    $rows[$index]['needs_normalization'] = 0;
+                    $rows[$index]['projection_status'] = 'natural-key-covered';
+                    continue;
+                }
+
+                $rows[$index]['projection_status'] = 'natural-key-missing';
+            } catch (\Throwable $exception) {
+                $rows[$index]['projection_status'] = 'natural-key-check-failed';
+                $this->logger->warning('Ozon accrual natural projection coverage check failed.', [
+                    'companyId' => $companyId,
+                    'rawRecordId' => $rawRecordId,
+                    'exceptionClass' => $exception::class,
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private function needsNaturalProjectionCheck(array $row): bool
+    {
+        return $this->needsNormalization($row)
+            && RawNormalizationStatus::DONE->value === (string) $row['normalization_status']
+            && 0 === (int) $row['open_issues']
+            && 0 === (int) $row['direct_raw_tx_count'];
+    }
+
+    /**
+     * @return array<string, true>
+     */
+    private function expectedSourceKeys(string $companyId, string $rawRecordId): array
+    {
+        $sourceKeys = [];
+        foreach ($this->previewMapper->preview($companyId, $this->rawStorageFacade->read($rawRecordId, $companyId), includeSaleRefund: true) as $row) {
+            $sourceKeys[$row->sourceKey] = true;
+        }
+
+        return $sourceKeys;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     *
      * @return array<string, int>
      */
     private function rawSummary(array $rows): array
@@ -471,8 +588,9 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
         $summary = [
             'notDoneRaw' => 0,
             'zeroTxRaw' => 0,
+            'zeroDirectTxRaw' => 0,
             'openIssueRaw' => 0,
-            'lateRawSnapshot' => 0,
+            'naturalKeyMissingRaw' => 0,
         ];
 
         foreach ($rows as $row) {
@@ -484,15 +602,16 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
                 ++$summary['zeroTxRaw'];
             }
 
+            if (0 === (int) $row['direct_raw_tx_count']) {
+                ++$summary['zeroDirectTxRaw'];
+            }
+
             if ((int) $row['open_issues'] > 0) {
                 ++$summary['openIssueRaw'];
             }
 
-            if (null !== $row['last_tx_updated_at']) {
-                $lastTransactionUpdatedAt = new \DateTimeImmutable((string) $row['last_tx_updated_at']);
-                if (new \DateTimeImmutable((string) $row['fetched_at']) > $lastTransactionUpdatedAt) {
-                    ++$summary['lateRawSnapshot'];
-                }
+            if ('natural-key-missing' === ($row['projection_status'] ?? null)) {
+                ++$summary['naturalKeyMissingRaw'];
             }
         }
 
@@ -512,7 +631,7 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
     }
 
     /**
-     * @param array<string, mixed>       $payload
+     * @param array<string, mixed> $payload
      * @param list<array<string, mixed>> $rawRows
      * @param list<array<string, mixed>> $normalizationRows
      * @param list<array<string, mixed>> $relinkRows
@@ -536,6 +655,7 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
                 ['daysBack', null === $payload['daysBack'] ? 'custom' : (string) $payload['daysBack']],
                 ['companyId', (string) ($payload['companyId'] ?? 'all')],
                 ['shopRef', (string) ($payload['shopRef'] ?? 'all')],
+                ['repairEnrichmentOnly', true === $payload['repairEnrichmentOnly'] ? 'yes' : 'no'],
                 ['rawLimit', (string) $payload['rawLimit']],
                 ['relinkLimit', (string) $payload['relinkLimit']],
                 ['maxRelinkBatches', (string) $payload['maxRelinkBatches']],
@@ -550,8 +670,9 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
                 ['rawNeedsNormalization', (string) $payload['rawProblems']['needsNormalization']],
                 ['notDoneRaw', (string) $payload['rawProblems']['summary']['notDoneRaw']],
                 ['zeroTxRaw', (string) $payload['rawProblems']['summary']['zeroTxRaw']],
+                ['zeroDirectTxRaw', (string) $payload['rawProblems']['summary']['zeroDirectTxRaw']],
                 ['openIssueRaw', (string) $payload['rawProblems']['summary']['openIssueRaw']],
-                ['lateRawSnapshot', (string) $payload['rawProblems']['summary']['lateRawSnapshot']],
+                ['naturalKeyMissingRaw', (string) $payload['rawProblems']['summary']['naturalKeyMissingRaw']],
                 ['relinkDeferred', true === $payload['relinkDeferred'] ? 'yes' : 'no'],
             ],
         );
@@ -559,7 +680,7 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
         if (!$summaryOnly && [] !== $rawRows) {
             $io->section('Raw projection problems');
             $io->table(
-                ['companyId', 'shopRef', 'windowFrom', 'windowTo', 'rawId', 'status', 'txCount', 'directTxCount', 'openIssues', 'fetchedAt', 'lastTxUpdatedAt'],
+                ['companyId', 'shopRef', 'windowFrom', 'windowTo', 'rawId', 'status', 'projectionStatus', 'txCount', 'directTxCount', 'expectedTx', 'projectedKeys', 'missingKeys', 'openIssues', 'fetchedAt', 'lastTxUpdatedAt'],
                 array_map(static fn (array $row): array => [
                     (string) $row['company_id'],
                     (string) $row['shop_ref'],
@@ -567,8 +688,12 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
                     (string) $row['window_to'],
                     (string) $row['raw_id'],
                     (string) $row['normalization_status'],
+                    (string) ($row['projection_status'] ?? ''),
                     (string) $row['tx_count'],
                     (string) $row['direct_raw_tx_count'],
+                    (string) ($row['expected_tx_count'] ?? ''),
+                    (string) ($row['projected_natural_key_count'] ?? ''),
+                    (string) ($row['missing_natural_key_count'] ?? ''),
                     (string) $row['open_issues'],
                     (string) $row['fetched_at'],
                     (string) ($row['last_tx_updated_at'] ?? ''),
