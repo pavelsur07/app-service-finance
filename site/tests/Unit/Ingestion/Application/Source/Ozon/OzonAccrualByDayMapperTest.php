@@ -31,6 +31,9 @@ final class OzonAccrualByDayMapperTest extends TestCase
             'accrued_category' => 'POSTING',
             'posting' => [
                 'products' => [[
+                    'sku' => 'ozon-sku-1',
+                    'offer_id' => 'offer-1',
+                    'name' => 'Ozon Product 1',
                     'delivery' => [
                         'services' => [
                             ['type_id' => 29, 'accrued' => ['amount' => '-7.86', 'currency' => 'RUB']],
@@ -53,6 +56,9 @@ final class OzonAccrualByDayMapperTest extends TestCase
         self::assertSame(6671800, $sale->money->amountMinor());
         self::assertSame('sale:product-0', $sale->sourceData['_ingestion_component']);
         self::assertSame('sale_amount', $sale->sourceData['_ingestion_field']);
+        self::assertSame('ozon-sku-1', $sale->sourceData['sku']);
+        self::assertSame('offer-1', $sale->sourceData['offer_id']);
+        self::assertSame('Ozon Product 1', $sale->sourceData['name']);
         self::assertSame('ozon_revenue', $sale->sourceData['_ozon_category_code']);
         self::assertSame('Выручка', $sale->sourceData['_ozon_category_label']);
 

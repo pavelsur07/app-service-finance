@@ -90,10 +90,12 @@ final readonly class OzonAccrualByDayPreviewMapper
                 continue;
             }
 
+            $listingContext = $this->listingContext($product);
+
             if ($includeSaleRefund) {
-                $this->collectSaleOrRefund($transactions, $product['commission'] ?? null, $operationGroupId, $date, $category, $accrualId, (int) $productIndex, $unitNumber);
+                $this->collectSaleOrRefund($transactions, $product['commission'] ?? null, $operationGroupId, $date, $category, $accrualId, (int) $productIndex, $unitNumber, $listingContext);
             }
-            $this->collectCommissionField($transactions, $product['commission'] ?? null, ['bonus'], $operationGroupId, $date, $category, $accrualId, (int) $productIndex, $unitNumber);
+            $this->collectCommissionField($transactions, $product['commission'] ?? null, ['bonus'], $operationGroupId, $date, $category, $accrualId, (int) $productIndex, $unitNumber, listingContext: $listingContext);
             $this->collectCommissionField(
                 transactions: $transactions,
                 commission: $product['commission'] ?? null,
@@ -105,14 +107,16 @@ final readonly class OzonAccrualByDayPreviewMapper
                 productIndex: (int) $productIndex,
                 unitNumber: $unitNumber,
                 canonicalComponent: 'partner_programs',
+                listingContext: $listingContext,
             );
-            $this->collectCommission($transactions, $product['commission'] ?? null, $operationGroupId, $date, $category, $accrualId, (int) $productIndex, $unitNumber);
-            $this->collectDeliveryServices($transactions, $companyId, $product['delivery']['services'] ?? null, $operationGroupId, $date, $category, $accrualId, (int) $productIndex, $unitNumber, $recordUnknownCategories);
+            $this->collectCommission($transactions, $product['commission'] ?? null, $operationGroupId, $date, $category, $accrualId, (int) $productIndex, $unitNumber, $listingContext);
+            $this->collectDeliveryServices($transactions, $companyId, $product['delivery']['services'] ?? null, $operationGroupId, $date, $category, $accrualId, (int) $productIndex, $unitNumber, $recordUnknownCategories, $listingContext);
         }
     }
 
     /**
      * @param list<OzonAccrualPreviewTransaction> $transactions
+     * @param array{marketplaceSku: ?string, supplierSku: ?string, name: ?string} $listingContext
      */
     private function collectSaleOrRefund(
         array &$transactions,
@@ -123,6 +127,7 @@ final readonly class OzonAccrualByDayPreviewMapper
         string $accrualId,
         int $productIndex,
         ?string $unitNumber,
+        array $listingContext,
     ): void {
         if (!is_array($commission)) {
             return;
@@ -150,12 +155,14 @@ final readonly class OzonAccrualByDayPreviewMapper
             field: $field,
             unitNumber: $unitNumber,
             ozonCategory: $this->categoryForField($field, $amount),
+            listingContext: $listingContext,
         );
     }
 
     /**
      * @param list<OzonAccrualPreviewTransaction> $transactions
      * @param list<string> $fields
+     * @param array{marketplaceSku: ?string, supplierSku: ?string, name: ?string} $listingContext
      */
     private function collectCommissionField(
         array &$transactions,
@@ -168,6 +175,7 @@ final readonly class OzonAccrualByDayPreviewMapper
         int $productIndex,
         ?string $unitNumber,
         ?string $canonicalComponent = null,
+        array $listingContext = ['marketplaceSku' => null, 'supplierSku' => null, 'name' => null],
     ): void {
         if (!is_array($commission)) {
             return;
@@ -196,6 +204,7 @@ final readonly class OzonAccrualByDayPreviewMapper
                 field: $field,
                 unitNumber: $unitNumber,
                 ozonCategory: $ozonCategory,
+                listingContext: $listingContext,
             );
 
             return;
@@ -204,6 +213,7 @@ final readonly class OzonAccrualByDayPreviewMapper
 
     /**
      * @param list<OzonAccrualPreviewTransaction> $transactions
+     * @param array{marketplaceSku: ?string, supplierSku: ?string, name: ?string} $listingContext
      */
     private function collectCommission(
         array &$transactions,
@@ -214,6 +224,7 @@ final readonly class OzonAccrualByDayPreviewMapper
         string $accrualId,
         int $productIndex,
         ?string $unitNumber,
+        array $listingContext,
     ): void {
         if (!is_array($commission)) {
             return;
@@ -239,11 +250,13 @@ final readonly class OzonAccrualByDayPreviewMapper
             field: $field,
             unitNumber: $unitNumber,
             ozonCategory: $this->categoryForField($field, $amount),
+            listingContext: $listingContext,
         );
     }
 
     /**
      * @param list<OzonAccrualPreviewTransaction> $transactions
+     * @param array{marketplaceSku: ?string, supplierSku: ?string, name: ?string} $listingContext
      */
     private function collectDeliveryServices(
         array &$transactions,
@@ -256,6 +269,7 @@ final readonly class OzonAccrualByDayPreviewMapper
         int $productIndex,
         ?string $unitNumber,
         bool $recordUnknownCategories,
+        array $listingContext,
     ): void {
         if (!is_array($services)) {
             return;
@@ -299,6 +313,7 @@ final readonly class OzonAccrualByDayPreviewMapper
                 providerLabel: $providerLabel,
                 unitNumber: $unitNumber,
                 ozonCategory: $ozonCategory,
+                listingContext: $listingContext,
             );
         }
     }
@@ -331,6 +346,8 @@ final readonly class OzonAccrualByDayPreviewMapper
                 continue;
             }
 
+            $listingContext = $this->listingContext($skuFeeGroup);
+
             foreach ($skuFeeGroup['fees'] as $feeIndex => $fee) {
                 $this->collectTypedFee(
                     transactions: $transactions,
@@ -345,6 +362,7 @@ final readonly class OzonAccrualByDayPreviewMapper
                     unitNumber: $unitNumber,
                     scope: OzonAccrualCategoryTaxonomyResolver::SCOPE_ITEM,
                     recordUnknownCategories: $recordUnknownCategories,
+                    listingContext: $listingContext,
                 );
             }
         }
@@ -424,6 +442,7 @@ final readonly class OzonAccrualByDayPreviewMapper
 
     /**
      * @param list<OzonAccrualPreviewTransaction> $transactions
+     * @param array{marketplaceSku: ?string, supplierSku: ?string, name: ?string} $listingContext
      */
     private function collectTypedFee(
         array &$transactions,
@@ -438,6 +457,7 @@ final readonly class OzonAccrualByDayPreviewMapper
         ?string $unitNumber,
         string $scope,
         bool $recordUnknownCategories,
+        array $listingContext = ['marketplaceSku' => null, 'supplierSku' => null, 'name' => null],
     ): void {
         if (!is_array($fee) || !array_key_exists('accrued', $fee)) {
             return;
@@ -476,11 +496,13 @@ final readonly class OzonAccrualByDayPreviewMapper
             providerLabel: $providerLabel,
             unitNumber: $unitNumber,
             ozonCategory: $ozonCategory,
+            listingContext: $listingContext,
         );
     }
 
     /**
      * @param list<OzonAccrualPreviewTransaction> $transactions
+     * @param array{marketplaceSku: ?string, supplierSku: ?string, name: ?string} $listingContext
      */
     private function add(
         array &$transactions,
@@ -497,6 +519,7 @@ final readonly class OzonAccrualByDayPreviewMapper
         ?string $field = null,
         ?string $unitNumber = null,
         ?OzonAccrualCategory $ozonCategory = null,
+        array $listingContext = ['marketplaceSku' => null, 'supplierSku' => null, 'name' => null],
     ): void {
         $transactions[] = new OzonAccrualPreviewTransaction(
             sourceKey: sprintf('ozon:accrual-by-day:%s:%s', $accrualId, $this->normalizeComponent($component)),
@@ -518,6 +541,9 @@ final readonly class OzonAccrualByDayPreviewMapper
             ozonCategoryParent: $ozonCategory?->parentLabel,
             ozonCategorySortOrder: $ozonCategory?->sortOrder,
             ozonCategoryKnown: $ozonCategory?->known ?? true,
+            marketplaceSku: $listingContext['marketplaceSku'],
+            supplierSku: $listingContext['supplierSku'],
+            listingName: $listingContext['name'],
         );
     }
 
@@ -674,6 +700,20 @@ final readonly class OzonAccrualByDayPreviewMapper
         $value = trim((string) $value);
 
         return '' !== $value ? $value : null;
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     *
+     * @return array{marketplaceSku: ?string, supplierSku: ?string, name: ?string}
+     */
+    private function listingContext(array $row): array
+    {
+        return [
+            'marketplaceSku' => $this->optionalString($row['sku'] ?? $row['marketplace_sku'] ?? $row['marketplaceSku'] ?? null),
+            'supplierSku' => $this->optionalString($row['offer_id'] ?? $row['offerId'] ?? $row['item_code'] ?? $row['itemCode'] ?? null),
+            'name' => $this->optionalString($row['name'] ?? $row['title'] ?? null),
+        ];
     }
 
     private function stringValue(mixed $value): string

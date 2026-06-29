@@ -30,6 +30,9 @@ final readonly class OzonAccrualPreviewTransaction
         public ?string $ozonCategoryParent = null,
         public ?int $ozonCategorySortOrder = null,
         public bool $ozonCategoryKnown = true,
+        public ?string $marketplaceSku = null,
+        public ?string $supplierSku = null,
+        public ?string $listingName = null,
     ) {
     }
 

@@ -98,8 +98,19 @@ final readonly class NormalizeRawRecordAction
                 ]);
             }
 
-            foreach ($mappedTransactions as $mappedTransaction) {
-                $listingResolution = $this->listingResolverRegistry->resolve(
+            $sourceDataRows = [];
+            foreach ($mappedTransactions as $index => $mappedTransaction) {
+                $sourceDataRows[$index] = $mappedTransaction->sourceData;
+            }
+
+            $listingResolutions = $this->listingResolverRegistry->resolveMany(
+                $rawRecord->getSource(),
+                $command->companyId,
+                $sourceDataRows,
+            );
+
+            foreach ($mappedTransactions as $index => $mappedTransaction) {
+                $listingResolution = $listingResolutions[$index] ?? $this->listingResolverRegistry->resolve(
                     $rawRecord->getSource(),
                     $command->companyId,
                     $mappedTransaction->sourceData,
