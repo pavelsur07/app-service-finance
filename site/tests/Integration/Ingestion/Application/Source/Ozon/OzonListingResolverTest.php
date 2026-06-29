@@ -109,6 +109,26 @@ final class OzonListingResolverTest extends IntegrationTestCase
         self::assertNull($readOnlyResolution->listingId);
         self::assertSame('dry-run-offer', $readOnlyResolution->listingSku);
         self::assertNull($listingRepository->findByMarketplaceSku((string) $company->getId(), MarketplaceType::OZON, 'dry-run-marketplace-sku'));
+
+        $missingPreview = $resolver->previewMany((string) $company->getId(), [
+            'preview-row' => [
+                'offer_id' => 'preview-offer',
+                'sku' => 'preview-marketplace-sku',
+                'name' => 'Preview Listing',
+            ],
+        ])['preview-row'];
+        $ambiguousPreview = $resolver->previewMany((string) $company->getId(), [
+            'ambiguous-row' => [
+                'sku' => 'ambiguous-marketplace-sku',
+            ],
+        ])['ambiguous-row'];
+
+        self::assertTrue($missingPreview->wouldCreate);
+        self::assertNotNull($missingPreview->resolution);
+        self::assertNull($missingPreview->resolution->listingId);
+        self::assertSame('preview-marketplace-sku', $missingPreview->resolution->listingSku);
+        self::assertNull($listingRepository->findByMarketplaceSku((string) $company->getId(), MarketplaceType::OZON, 'preview-marketplace-sku'));
+        self::assertFalse($ambiguousPreview->wouldCreate);
     }
 
     private function createCompany(): Company

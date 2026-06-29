@@ -6,6 +6,7 @@ namespace App\Marketplace\Facade;
 
 use App\Company\Entity\Company;
 use App\Marketplace\Application\Service\OzonListingEnsureService;
+use App\Marketplace\DTO\MarketplaceListingEnsurePreviewDTO;
 use App\Marketplace\DTO\MarketplaceListingReferenceDTO;
 use App\Marketplace\DTO\MarketplaceListingSeedDTO;
 use App\Marketplace\Entity\MarketplaceListing;
@@ -105,22 +106,7 @@ final readonly class MarketplaceListingLinkingFacade
         }
 
         $metadataChanged = false;
-        $uniqueSeeds = [];
-        foreach ($seeds as $seed) {
-            if (!isset($uniqueSeeds[$seed->marketplaceSku])) {
-                $uniqueSeeds[$seed->marketplaceSku] = $seed;
-                continue;
-            }
-
-            $existing = $uniqueSeeds[$seed->marketplaceSku];
-            if ((null === $existing->supplierSku && null !== $seed->supplierSku) || (null === $existing->name && null !== $seed->name)) {
-                $uniqueSeeds[$seed->marketplaceSku] = new MarketplaceListingSeedDTO(
-                    marketplaceSku: $existing->marketplaceSku,
-                    supplierSku: $existing->supplierSku ?? $seed->supplierSku,
-                    name: $existing->name ?? $seed->name,
-                );
-            }
-        }
+        $uniqueSeeds = $this->uniqueSeeds($seeds);
 
         if ([] === $uniqueSeeds) {
             return [];
@@ -168,6 +154,51 @@ final readonly class MarketplaceListingLinkingFacade
         return $result;
     }
 
+    /**
+     * @param iterable<MarketplaceListingSeedDTO> $seeds
+     *
+     * @return array<string, MarketplaceListingEnsurePreviewDTO>
+     */
+    public function previewOzonListings(string $companyId, iterable $seeds): array
+    {
+        $uniqueSeeds = $this->uniqueSeeds($seeds);
+        if ([] === $uniqueSeeds) {
+            return [];
+        }
+
+        $existingListingsBySku = $this->groupListingsByKey(
+            $this->listingRepository->findAllByCompanyMarketplaceAndMarketplaceSkus(
+                $companyId,
+                MarketplaceType::OZON,
+                array_keys($uniqueSeeds),
+            ),
+            static fn (MarketplaceListing $listing): string => $listing->getMarketplaceSku(),
+        );
+
+        $result = [];
+        foreach ($uniqueSeeds as $sku => $seed) {
+            $matches = $existingListingsBySku[$sku] ?? [];
+            if (1 === count($matches)) {
+                $result[$sku] = new MarketplaceListingEnsurePreviewDTO(
+                    marketplaceSku: $sku,
+                    reference: $this->reference($matches[0]),
+                    canCreate: false,
+                    ambiguous: false,
+                );
+                continue;
+            }
+
+            $result[$sku] = new MarketplaceListingEnsurePreviewDTO(
+                marketplaceSku: $sku,
+                reference: null,
+                canCreate: 0 === count($matches),
+                ambiguous: count($matches) > 1,
+            );
+        }
+
+        return $result;
+    }
+
     private function reference(MarketplaceListing $listing): MarketplaceListingReferenceDTO
     {
         return new MarketplaceListingReferenceDTO(
@@ -192,6 +223,33 @@ final readonly class MarketplaceListingLinkingFacade
         }
 
         return $changed;
+    }
+
+    /**
+     * @param iterable<MarketplaceListingSeedDTO> $seeds
+     *
+     * @return array<string, MarketplaceListingSeedDTO>
+     */
+    private function uniqueSeeds(iterable $seeds): array
+    {
+        $uniqueSeeds = [];
+        foreach ($seeds as $seed) {
+            if (!isset($uniqueSeeds[$seed->marketplaceSku])) {
+                $uniqueSeeds[$seed->marketplaceSku] = $seed;
+                continue;
+            }
+
+            $existing = $uniqueSeeds[$seed->marketplaceSku];
+            if ((null === $existing->supplierSku && null !== $seed->supplierSku) || (null === $existing->name && null !== $seed->name)) {
+                $uniqueSeeds[$seed->marketplaceSku] = new MarketplaceListingSeedDTO(
+                    marketplaceSku: $existing->marketplaceSku,
+                    supplierSku: $existing->supplierSku ?? $seed->supplierSku,
+                    name: $existing->name ?? $seed->name,
+                );
+            }
+        }
+
+        return $uniqueSeeds;
     }
 
     /**

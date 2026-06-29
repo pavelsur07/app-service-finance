@@ -53,9 +53,77 @@ final class OzonListingResolver implements BulkListingResolverInterface
     /**
      * @param array<int|string, array<string, mixed>> $sourceDataRows
      *
+     * @return array<int|string, OzonListingResolutionPreview>
+     */
+    public function previewMany(string $companyId, array $sourceDataRows): array
+    {
+        [$result, $seedsByKey] = $this->prepareSeedResolutions($companyId, $sourceDataRows);
+        $wouldCreateByKey = [];
+
+        if ([] !== $seedsByKey) {
+            $previews = $this->marketplaceListingFacade->previewOzonListings($companyId, array_values($seedsByKey));
+            foreach ($seedsByKey as $key => $seed) {
+                $preview = $previews[$seed->marketplaceSku] ?? null;
+                if (null !== $preview?->reference) {
+                    $result[$key] = new ListingResolution($preview->reference->listingId, $preview->reference->marketplaceSku);
+                    continue;
+                }
+
+                if (true === $preview?->canCreate) {
+                    $result[$key] = new ListingResolution(null, $seed->marketplaceSku);
+                    $wouldCreateByKey[$key] = true;
+                }
+            }
+        }
+
+        $previews = [];
+        foreach ($result as $key => $resolution) {
+            $previews[$key] = new OzonListingResolutionPreview($resolution, $wouldCreateByKey[$key] ?? false);
+        }
+
+        return $previews;
+    }
+
+    /**
+     * @param array<int|string, array<string, mixed>> $sourceDataRows
+     *
      * @return array<int|string, ListingResolution|null>
      */
     private function resolveManyInternal(string $companyId, array $sourceDataRows, bool $createMissing): array
+    {
+        [$result, $seedsByKey] = $this->prepareSeedResolutions($companyId, $sourceDataRows);
+
+        if ([] === $seedsByKey) {
+            return $result;
+        }
+
+        $references = $createMissing
+            ? $this->marketplaceListingFacade->ensureOzonListings($companyId, array_values($seedsByKey))
+            : $this->findExistingMarketplaceReferences($companyId, array_values($seedsByKey));
+
+        foreach ($seedsByKey as $key => $seed) {
+            $reference = $references[$seed->marketplaceSku] ?? null;
+            if (null === $reference) {
+                if ($result[$key] instanceof ListingResolution && null !== $result[$key]?->listingSku) {
+                    continue;
+                }
+
+                $result[$key] = new ListingResolution(null, $seed->marketplaceSku);
+                continue;
+            }
+
+            $result[$key] = new ListingResolution($reference->listingId, $reference->marketplaceSku);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<int|string, array<string, mixed>> $sourceDataRows
+     *
+     * @return array{0: array<int|string, ListingResolution|null>, 1: array<int|string, MarketplaceListingSeedDTO>}
+     */
+    private function prepareSeedResolutions(string $companyId, array $sourceDataRows): array
     {
         $result = [];
         $contextByKey = [];
@@ -112,29 +180,7 @@ final class OzonListingResolver implements BulkListingResolverInterface
             $result[$key] = $supplierResolution ?? new ListingResolution(null, $marketplaceSku);
         }
 
-        if ([] === $seedsByKey) {
-            return $result;
-        }
-
-        $references = $createMissing
-            ? $this->marketplaceListingFacade->ensureOzonListings($companyId, array_values($seedsByKey))
-            : $this->findExistingMarketplaceReferences($companyId, array_values($seedsByKey));
-
-        foreach ($seedsByKey as $key => $seed) {
-            $reference = $references[$seed->marketplaceSku] ?? null;
-            if (null === $reference) {
-                if ($result[$key] instanceof ListingResolution && null !== $result[$key]?->listingSku) {
-                    continue;
-                }
-
-                $result[$key] = new ListingResolution(null, $seed->marketplaceSku);
-                continue;
-            }
-
-            $result[$key] = new ListingResolution($reference->listingId, $reference->marketplaceSku);
-        }
-
-        return $result;
+        return [$result, $seedsByKey];
     }
 
     /**

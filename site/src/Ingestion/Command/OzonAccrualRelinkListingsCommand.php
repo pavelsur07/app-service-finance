@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace App\Ingestion\Command;
 
+use App\Ingestion\Application\Source\Ozon\OzonAccrualByDayPreviewMapper;
+use App\Ingestion\Application\Source\Ozon\OzonAccrualPreviewTransaction;
 use App\Ingestion\Application\Source\Ozon\OzonListingResolver;
+use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Entity\FinancialTransaction;
 use App\Ingestion\Enum\IngestSource;
+use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Repository\FinancialTransactionRepository;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -21,7 +25,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 #[AsCommand(
     name: 'app:ingestion:ozon-accrual:relink-listings',
-    description: 'Relinks existing Ozon accrual ingestion transactions to Marketplace listings from stored source_data.',
+    description: 'Relinks existing Ozon accrual ingestion transactions to Marketplace listings from stored source data or raw records.',
 )]
 final class OzonAccrualRelinkListingsCommand extends Command
 {
@@ -30,6 +34,8 @@ final class OzonAccrualRelinkListingsCommand extends Command
     public function __construct(
         private readonly Connection $connection,
         private readonly OzonListingResolver $listingResolver,
+        private readonly RawStorageFacade $rawStorageFacade,
+        private readonly OzonAccrualByDayPreviewMapper $previewMapper,
         private readonly FinancialTransactionRepository $transactionRepository,
         private readonly EntityManagerInterface $entityManager,
     ) {
@@ -81,26 +87,38 @@ final class OzonAccrualRelinkListingsCommand extends Command
         }
 
         $rows = $this->selectRows($companyId, $from, $to, $limit);
+        $recoveredSourceData = $this->recoverListingSourceData($rows);
         $sourceDataByCompany = [];
         foreach ($rows as $row) {
             $sourceData = $this->decodeSourceData($row['source_data'] ?? null);
-            if ([] === $sourceData) {
-                continue;
+            if (!$this->hasMarketplaceSkuContext($sourceData)) {
+                $sourceData = array_merge(
+                    $sourceData,
+                    $recoveredSourceData[(string) $row['company_id']][(string) $row['raw_record_id']][(string) $row['external_id']] ?? [],
+                );
             }
 
             $sourceDataByCompany[(string) $row['company_id']][(string) $row['id']] = $sourceData;
         }
 
         $resolutions = [];
+        $wouldCreateById = [];
         foreach ($sourceDataByCompany as $rowCompanyId => $sourceDataRows) {
-            $resolutions += $execute
-                ? $this->listingResolver->resolveMany($rowCompanyId, $sourceDataRows)
-                : $this->listingResolver->resolveManyReadOnly($rowCompanyId, $sourceDataRows);
+            if ($execute) {
+                $resolutions += $this->listingResolver->resolveMany($rowCompanyId, $sourceDataRows);
+                continue;
+            }
+
+            foreach ($this->listingResolver->previewMany($rowCompanyId, $sourceDataRows) as $transactionId => $preview) {
+                $resolutions[$transactionId] = $preview->resolution;
+                $wouldCreateById[$transactionId] = $preview->wouldCreate;
+            }
         }
 
         $tableRows = [];
         $resolved = 0;
         $updated = 0;
+        $wouldCreateListings = 0;
         $transactionsById = $execute ? $this->fetchTransactionsToUpdate($rows, $resolutions) : [];
 
         foreach ($rows as $row) {
@@ -119,6 +137,10 @@ final class OzonAccrualRelinkListingsCommand extends Command
                         ++$updated;
                     }
                 }
+            } elseif (!$execute && true === ($wouldCreateById[$transactionId] ?? false) && null !== $resolution?->listingSku) {
+                ++$resolved;
+                ++$wouldCreateListings;
+                $status = 'would-create-listing+update';
             }
 
             $tableRows[] = [
@@ -159,6 +181,7 @@ final class OzonAccrualRelinkListingsCommand extends Command
                 ['selected', (string) count($rows)],
                 ['resolved', (string) $resolved],
                 ['updated', (string) $updated],
+                ['wouldCreateListings', (string) $wouldCreateListings],
                 ['unresolved', (string) (count($rows) - $resolved)],
             ],
         );
@@ -178,9 +201,13 @@ final class OzonAccrualRelinkListingsCommand extends Command
         $where = [
             'source = :source',
             'listing_id IS NULL',
-            "(jsonb_exists(source_data, 'sku') OR jsonb_exists(source_data, 'offer_id') OR jsonb_exists(source_data, 'item_code') OR jsonb_exists(source_data, 'item') OR jsonb_exists(source_data, 'items'))",
+            "(external_id LIKE :external_id_prefix OR source_data->>'_ingestion_resource' = :resource_type)",
         ];
-        $params = ['source' => IngestSource::OZON->value];
+        $params = [
+            'source' => IngestSource::OZON->value,
+            'external_id_prefix' => 'ozon:accrual-by-day:%',
+            'resource_type' => OzonResourceType::ACCRUAL_BY_DAY,
+        ];
 
         if (null !== $companyId) {
             $where[] = 'company_id = :company_id';
@@ -200,7 +227,7 @@ final class OzonAccrualRelinkListingsCommand extends Command
         /** @var list<array<string, mixed>> $rows */
         $rows = $this->connection->executeQuery(
             sprintf(
-                'SELECT id, company_id, external_id, occurred_at, source_data FROM ingest_financial_transactions WHERE %s ORDER BY occurred_at ASC, id ASC LIMIT %d',
+                'SELECT id, company_id, external_id, occurred_at, source_data, raw_record_id FROM ingest_financial_transactions WHERE %s ORDER BY occurred_at ASC, id ASC LIMIT %d',
                 implode(' AND ', $where),
                 $limit,
             ),
@@ -208,6 +235,53 @@ final class OzonAccrualRelinkListingsCommand extends Command
         )->fetchAllAssociative();
 
         return $rows;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     *
+     * @return array<string, array<string, array<string, array<string, mixed>>>>
+     */
+    private function recoverListingSourceData(array $rows): array
+    {
+        $rawRecordIdsByCompany = [];
+        foreach ($rows as $row) {
+            $sourceData = $this->decodeSourceData($row['source_data'] ?? null);
+            if ($this->hasMarketplaceSkuContext($sourceData)) {
+                continue;
+            }
+
+            $companyId = $this->stringValue($row['company_id'] ?? null);
+            $rawRecordId = $this->stringValue($row['raw_record_id'] ?? null);
+            if (null === $companyId || null === $rawRecordId) {
+                continue;
+            }
+
+            $rawRecordIdsByCompany[$companyId][$rawRecordId] = $rawRecordId;
+        }
+
+        $recovered = [];
+        foreach ($rawRecordIdsByCompany as $companyId => $rawRecordIds) {
+            foreach ($rawRecordIds as $rawRecordId) {
+                try {
+                    $rawRows = $this->rawStorageFacade->read($rawRecordId, $companyId);
+                    $previewRows = $this->previewMapper->preview($companyId, $rawRows, includeSaleRefund: true);
+                } catch (\Throwable) {
+                    continue;
+                }
+
+                foreach ($previewRows as $previewRow) {
+                    $sourceData = $this->listingSourceData($previewRow);
+                    if ([] === $sourceData) {
+                        continue;
+                    }
+
+                    $recovered[$companyId][$rawRecordId][$previewRow->sourceKey] = $sourceData;
+                }
+            }
+        }
+
+        return $recovered;
     }
 
     /**
@@ -257,6 +331,60 @@ final class OzonAccrualRelinkListingsCommand extends Command
         $decoded = json_decode($sourceData, true);
 
         return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * @param array<string, mixed> $sourceData
+     */
+    private function hasMarketplaceSkuContext(array $sourceData): bool
+    {
+        if (null !== $this->stringValue($sourceData['sku'] ?? $sourceData['marketplace_sku'] ?? $sourceData['marketplaceSku'] ?? null)) {
+            return true;
+        }
+
+        $item = $sourceData['item'] ?? null;
+        if (is_array($item) && null !== $this->stringValue($item['sku'] ?? null)) {
+            return true;
+        }
+
+        $items = $sourceData['items'] ?? null;
+        if (is_array($items) && isset($items[0]) && is_array($items[0])) {
+            return null !== $this->stringValue($items[0]['sku'] ?? null);
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function listingSourceData(OzonAccrualPreviewTransaction $row): array
+    {
+        $sourceData = [];
+        if (null !== $row->marketplaceSku) {
+            $sourceData['sku'] = $row->marketplaceSku;
+        }
+
+        if (null !== $row->supplierSku) {
+            $sourceData['offer_id'] = $row->supplierSku;
+        }
+
+        if (null !== $row->listingName) {
+            $sourceData['name'] = $row->listingName;
+        }
+
+        return $sourceData;
+    }
+
+    private function stringValue(mixed $value): ?string
+    {
+        if (null === $value) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        return '' === $value ? null : $value;
     }
 
     private function optionalUuidOption(InputInterface $input, string $name): ?string

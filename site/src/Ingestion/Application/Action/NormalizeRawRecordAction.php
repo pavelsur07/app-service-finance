@@ -110,11 +110,15 @@ final readonly class NormalizeRawRecordAction
             );
 
             foreach ($mappedTransactions as $index => $mappedTransaction) {
-                $listingResolution = $listingResolutions[$index] ?? $this->listingResolverRegistry->resolve(
-                    $rawRecord->getSource(),
-                    $command->companyId,
-                    $mappedTransaction->sourceData,
-                );
+                if (array_key_exists($index, $listingResolutions)) {
+                    $listingResolution = $listingResolutions[$index];
+                } else {
+                    $listingResolution = $this->listingResolverRegistry->resolve(
+                        $rawRecord->getSource(),
+                        $command->companyId,
+                        $mappedTransaction->sourceData,
+                    );
+                }
 
                 if (null !== $listingResolution?->listingSku && null === $listingResolution->listingId) {
                     $this->logger->warning('Marketplace listing was not found for ingestion transaction.', [
