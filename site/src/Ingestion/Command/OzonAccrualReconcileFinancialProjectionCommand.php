@@ -141,6 +141,7 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
                 $relinkDeferred = true;
             } elseif ('inline' === $normalizationMode) {
                 $normalizationResult = $this->executeInlineNormalization($staleRows);
+                $relinkDeferred = ($normalizationResult['failed'] ?? 0) > 0;
             }
         }
 
@@ -289,8 +290,55 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
                 $resultRows[] = ['rawId' => $rawRecordId, 'status' => $this->normalizationStatus($record), 'txCount' => -1, 'openIssues' => 0];
             } catch (\Throwable $exception) {
                 ++$failed;
-                $this->markInlineFailure($record, $exception);
-                $resultRows[] = ['rawId' => $rawRecordId, 'status' => 'error', 'txCount' => (int) $row['tx_count'], 'openIssues' => (int) $row['open_issues'], 'error' => $exception->getMessage()];
+                if (!$this->entityManager->isOpen()) {
+                    $this->logger->error('Ozon accrual inline normalization aborted because the entity manager is closed.', [
+                        'companyId' => $companyId,
+                        'rawRecordId' => $rawRecordId,
+                        'exceptionClass' => $exception::class,
+                        'message' => $exception->getMessage(),
+                    ]);
+                    $resultRows[] = [
+                        'rawId' => $rawRecordId,
+                        'status' => 'entity-manager-closed',
+                        'txCount' => (int) $row['tx_count'],
+                        'openIssues' => (int) $row['open_issues'],
+                        'error' => $exception->getMessage(),
+                    ];
+                    break;
+                }
+
+                try {
+                    $this->markInlineFailure($record, $exception);
+                    $resultRows[] = [
+                        'rawId' => $rawRecordId,
+                        'status' => 'error',
+                        'txCount' => (int) $row['tx_count'],
+                        'openIssues' => (int) $row['open_issues'],
+                        'error' => $exception->getMessage(),
+                    ];
+                } catch (\Throwable $failureRecordingException) {
+                    $this->logger->error('Ozon accrual inline normalization aborted because failure recording failed.', [
+                        'companyId' => $companyId,
+                        'rawRecordId' => $rawRecordId,
+                        'exceptionClass' => $exception::class,
+                        'message' => $exception->getMessage(),
+                        'failureRecordingExceptionClass' => $failureRecordingException::class,
+                        'failureRecordingMessage' => $failureRecordingException->getMessage(),
+                    ]);
+                    $status = $this->entityManager->isOpen() ? 'failure-recording-error' : 'entity-manager-closed';
+                    $resultRows[] = [
+                        'rawId' => $rawRecordId,
+                        'status' => $status,
+                        'txCount' => (int) $row['tx_count'],
+                        'openIssues' => (int) $row['open_issues'],
+                        'error' => sprintf(
+                            '%s; failure recording failed: %s',
+                            $exception->getMessage(),
+                            $failureRecordingException->getMessage(),
+                        ),
+                    ];
+                    break;
+                }
             }
         }
 
@@ -463,7 +511,7 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param array<string, mixed>       $payload
      * @param list<array<string, mixed>> $rawRows
      * @param list<array<string, mixed>> $normalizationRows
      * @param list<array<string, mixed>> $relinkRows
@@ -629,9 +677,9 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
         }
 
         $daysBack = $this->intOption($input, 'days-back', 1, 365);
-        $today = \DateTimeImmutable::createFromInterface(
-            $this->clock->now()->setTimezone(new \DateTimeZone(self::BUSINESS_TIMEZONE)),
-        )->setTime(0, 0);
+        $today = $this->clock->now()
+            ->setTimezone(new \DateTimeZone(self::BUSINESS_TIMEZONE))
+            ->setTime(0, 0);
 
         return [
             $today->modify(sprintf('-%d days', $daysBack)),
