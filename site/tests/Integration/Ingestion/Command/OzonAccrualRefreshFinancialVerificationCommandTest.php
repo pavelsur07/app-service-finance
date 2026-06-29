@@ -43,21 +43,23 @@ final class OzonAccrualRefreshFinancialVerificationCommandTest extends Integrati
             connectionRef: $connectionRef,
             rawRecordId: $rawRecordId,
             operationGroupId: Uuid::uuid7()->toString(),
-            externalId: 'ozon:accrual-by-day:95100000001:bonus:product-0',
-            type: TransactionType::BONUS,
-            direction: TransactionDirection::IN,
-            amountMinor: 100,
-            sourceData: ['sku' => 'metric-sku-1', 'name' => 'Metric SKU 1'],
+            externalId: 'ozon:accrual-by-day:95100000001:non_item_fee:type-12',
+            type: TransactionType::OTHER,
+            direction: TransactionDirection::OUT,
+            amountMinor: -50,
+            occurredAt: new \DateTimeImmutable('2026-06-01 00:00:00+03:00'),
         );
         $this->persistExistingTransaction(
             companyId: $companyId,
             connectionRef: $connectionRef,
             rawRecordId: $rawRecordId,
             operationGroupId: Uuid::uuid7()->toString(),
-            externalId: 'ozon:accrual-by-day:95100000002:non_item_fee:type-12',
-            type: TransactionType::OTHER,
-            direction: TransactionDirection::OUT,
-            amountMinor: -50,
+            externalId: 'ozon:accrual-by-day:95100000002:bonus:product-0',
+            type: TransactionType::BONUS,
+            direction: TransactionDirection::IN,
+            amountMinor: 100,
+            sourceData: ['sku' => 'metric-sku-1', 'name' => 'Metric SKU 1'],
+            occurredAt: new \DateTimeImmutable('2026-06-01 00:01:00+03:00'),
         );
         $this->em->flush();
 
@@ -68,7 +70,7 @@ final class OzonAccrualRefreshFinancialVerificationCommandTest extends Integrati
             '--from' => '2026-06-01',
             '--to' => '2026-06-07',
             '--raw-limit' => 10,
-            '--relink-limit' => 2,
+            '--relink-limit' => 1,
             '--max-relink-batches' => 2,
             '--execute' => true,
         ]);
@@ -221,6 +223,7 @@ final class OzonAccrualRefreshFinancialVerificationCommandTest extends Integrati
         TransactionDirection $direction,
         int $amountMinor,
         array $sourceData = [],
+        ?\DateTimeImmutable $occurredAt = null,
     ): void {
         $this->em->persist(new FinancialTransaction(
             companyId: $companyId,
@@ -233,7 +236,7 @@ final class OzonAccrualRefreshFinancialVerificationCommandTest extends Integrati
             type: $type,
             direction: $direction,
             money: Money::fromMinor($amountMinor, 'RUB'),
-            occurredAt: new \DateTimeImmutable('2026-06-01 00:00:00+03:00'),
+            occurredAt: $occurredAt ?? new \DateTimeImmutable('2026-06-01 00:00:00+03:00'),
             rawRecordId: $rawRecordId,
             description: 'Existing Ozon accrual transaction',
             sourceData: $sourceData,

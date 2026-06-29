@@ -499,6 +499,8 @@ final class VerificationApiControllerTest extends WebTestCaseBase
         ?TransactionDirection $direction = null,
         array $sourceData = [],
     ): FinancialTransaction {
+        $sourceData['_ingestion_resource'] ??= OzonResourceType::ACCRUAL_BY_DAY;
+
         return new FinancialTransaction(
             companyId: $companyId,
             connectionRef: 'connection-1',

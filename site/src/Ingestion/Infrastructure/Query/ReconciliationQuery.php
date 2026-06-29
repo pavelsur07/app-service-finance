@@ -6,6 +6,8 @@ namespace App\Ingestion\Infrastructure\Query;
 
 use App\Ingestion\Application\DTO\ReconciliationByTypeView;
 use App\Ingestion\Application\DTO\ReconciliationSummaryView;
+use App\Ingestion\Application\Source\Ozon\OzonResourceType;
+use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\TransactionType;
 use App\Marketplace\Repository\OzonTransactionTotalsCheckRepository;
 use Doctrine\DBAL\Connection;
@@ -36,9 +38,14 @@ final class ReconciliationQuery
             )
             ->from('ingest_financial_transactions', 'ft')
             ->where('ft.company_id = :companyId')
+            ->andWhere('ft.source = :source')
+            ->andWhere("(ft.external_id LIKE :externalIdPrefix OR ft.source_data->>'_ingestion_resource' = :resourceType)")
             ->andWhere('ft.occurred_at >= :from')
             ->andWhere('ft.occurred_at < :toExclusive')
             ->setParameter('companyId', $companyId)
+            ->setParameter('source', IngestSource::OZON->value)
+            ->setParameter('externalIdPrefix', 'ozon:accrual-by-day:%')
+            ->setParameter('resourceType', OzonResourceType::ACCRUAL_BY_DAY)
             ->setParameter('from', $from, Types::DATETIME_IMMUTABLE)
             ->setParameter('toExclusive', $toExclusive, Types::DATETIME_IMMUTABLE);
 
@@ -89,9 +96,14 @@ final class ReconciliationQuery
             )
             ->from('ingest_financial_transactions', 'ft')
             ->where('ft.company_id = :companyId')
+            ->andWhere('ft.source = :source')
+            ->andWhere("(ft.external_id LIKE :externalIdPrefix OR ft.source_data->>'_ingestion_resource' = :resourceType)")
             ->andWhere('ft.occurred_at >= :from')
             ->andWhere('ft.occurred_at < :toExclusive')
             ->setParameter('companyId', $companyId)
+            ->setParameter('source', IngestSource::OZON->value)
+            ->setParameter('externalIdPrefix', 'ozon:accrual-by-day:%')
+            ->setParameter('resourceType', OzonResourceType::ACCRUAL_BY_DAY)
             ->setParameter('from', $from, Types::DATETIME_IMMUTABLE)
             ->setParameter('toExclusive', $toExclusive, Types::DATETIME_IMMUTABLE)
             ->groupBy('ft.type')

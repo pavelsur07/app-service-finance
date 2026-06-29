@@ -390,7 +390,7 @@ final class OzonAccrualRefreshFinancialVerificationCommand extends Command
             $metrics['wouldCreateListings'] += $result['wouldCreateListings'];
             $metrics['unresolved'] += count($rows) - $result['resolved'];
 
-            if (!$execute || 0 === $result['updated']) {
+            if (!$execute) {
                 break;
             }
         }

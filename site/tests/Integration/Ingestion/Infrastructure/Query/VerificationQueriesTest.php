@@ -464,6 +464,7 @@ final class VerificationQueriesTest extends IntegrationTestCase
         $this->em->persist($this->transaction($companyId, $rawRecordId, 'refund-1', -300, TransactionType::REFUND));
         $this->em->persist($this->transaction($companyId, $rawRecordId, 'commission-1', -200, TransactionType::COMMISSION));
         $this->em->persist($this->transaction($companyId, $rawRecordId, 'other-shop-sale', 999, TransactionType::SALE, 'shop-2'));
+        $this->em->persist($this->transaction($companyId, $rawRecordId, 'wb-sale-noise', 7777, TransactionType::SALE, source: IngestSource::WILDBERRIES));
 
         $check = new OzonTransactionTotalsCheck(
             companyId: $companyId,
@@ -832,12 +833,17 @@ final class VerificationQueriesTest extends IntegrationTestCase
         TransactionType $type,
         string $shopRef = 'shop-1',
         ?\DateTimeImmutable $occurredAt = null,
+        ?IngestSource $source = null,
+        ?array $sourceData = null,
     ): FinancialTransaction {
+        $source ??= IngestSource::OZON;
+        $sourceData ??= IngestSource::OZON === $source ? ['_ingestion_resource' => OzonResourceType::ACCRUAL_BY_DAY] : [];
+
         return new FinancialTransaction(
             companyId: $companyId,
             connectionRef: 'connection-1',
             shopRef: $shopRef,
-            source: IngestSource::OZON,
+            source: $source,
             externalId: $externalId,
             externalUpdatedAt: new \DateTimeImmutable('2026-06-15 10:00:00+00:00'),
             operationGroupId: Uuid::uuid7()->toString(),
@@ -846,6 +852,7 @@ final class VerificationQueriesTest extends IntegrationTestCase
             money: Money::fromMinor($amountMinor, 'RUB'),
             occurredAt: $occurredAt ?? new \DateTimeImmutable('2026-06-15 10:00:00+00:00'),
             rawRecordId: $rawRecordId,
+            sourceData: $sourceData,
         );
     }
 }
