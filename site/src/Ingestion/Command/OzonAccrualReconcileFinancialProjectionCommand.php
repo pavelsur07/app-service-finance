@@ -152,6 +152,7 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
                 to: $to,
                 limit: $relinkLimit,
                 execute: false,
+                shopRef: $shopRef,
                 componentFilter: OzonAccrualListingRelinker::COMPONENT_FILTER_LINKABLE,
                 includeRows: !$summaryOnly && !$json,
             );
@@ -166,7 +167,7 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
                 'rows' => $preview['rows'],
             ]);
         } elseif (!$relinkDeferred) {
-            $relinkResult = $this->executeRelinkBatches($companyId, $from, $to, $relinkLimit, $maxRelinkBatches);
+            $relinkResult = $this->executeRelinkBatches($companyId, $shopRef, $from, $to, $relinkLimit, $maxRelinkBatches);
         }
 
         $integrityAfter = $execute && !$relinkDeferred
@@ -356,6 +357,7 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
      */
     private function executeRelinkBatches(
         ?string $companyId,
+        ?string $shopRef,
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
         int $limit,
@@ -379,6 +381,7 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
                 to: $to,
                 limit: $limit,
                 execute: true,
+                shopRef: $shopRef,
                 componentFilter: OzonAccrualListingRelinker::COMPONENT_FILTER_LINKABLE,
                 includeRows: false,
             );
@@ -401,6 +404,7 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
             to: $to,
             limit: $limit,
             execute: false,
+            shopRef: $shopRef,
             componentFilter: OzonAccrualListingRelinker::COMPONENT_FILTER_LINKABLE,
             includeRows: false,
         );
@@ -486,10 +490,7 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
 
             if (null !== $row['last_tx_updated_at']) {
                 $lastTransactionUpdatedAt = new \DateTimeImmutable((string) $row['last_tx_updated_at']);
-                if (
-                    new \DateTimeImmutable((string) $row['fetched_at']) > $lastTransactionUpdatedAt
-                    || new \DateTimeImmutable((string) $row['raw_updated_at']) > $lastTransactionUpdatedAt
-                ) {
+                if (new \DateTimeImmutable((string) $row['fetched_at']) > $lastTransactionUpdatedAt) {
                     ++$summary['lateRawSnapshot'];
                 }
             }
@@ -558,7 +559,7 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
         if (!$summaryOnly && [] !== $rawRows) {
             $io->section('Raw projection problems');
             $io->table(
-                ['companyId', 'shopRef', 'windowFrom', 'windowTo', 'rawId', 'status', 'txCount', 'openIssues', 'fetchedAt', 'lastTxUpdatedAt'],
+                ['companyId', 'shopRef', 'windowFrom', 'windowTo', 'rawId', 'status', 'txCount', 'directTxCount', 'openIssues', 'fetchedAt', 'lastTxUpdatedAt'],
                 array_map(static fn (array $row): array => [
                     (string) $row['company_id'],
                     (string) $row['shop_ref'],
@@ -567,6 +568,7 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
                     (string) $row['raw_id'],
                     (string) $row['normalization_status'],
                     (string) $row['tx_count'],
+                    (string) $row['direct_raw_tx_count'],
                     (string) $row['open_issues'],
                     (string) $row['fetched_at'],
                     (string) ($row['last_tx_updated_at'] ?? ''),

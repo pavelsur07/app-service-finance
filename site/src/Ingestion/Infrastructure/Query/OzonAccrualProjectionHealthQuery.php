@@ -60,7 +60,6 @@ final readonly class OzonAccrualProjectionHealthQuery
             OR COALESCE(tx.tx_count, 0) = 0
             OR COALESCE(issues.open_issues, 0) > 0
             OR (tx.last_tx_updated_at IS NOT NULL AND r.fetched_at > tx.last_tx_updated_at)
-            OR (tx.last_tx_updated_at IS NOT NULL AND r.updated_at > tx.last_tx_updated_at)
         )';
 
         $problemFilter = $problemsOnly ? sprintf('AND %s', $problemPredicate) : '';
@@ -68,11 +67,39 @@ final readonly class OzonAccrualProjectionHealthQuery
         /** @var list<array<string, mixed>> $rows */
         $rows = $this->connection->fetchAllAssociative(
             sprintf(
-                "WITH tx AS (
+                "WITH raw AS (
+                    SELECT r.company_id,
+                           r.shop_ref,
+                           r.id AS raw_id,
+                           r.external_id,
+                           r.normalization_status,
+                           r.fetched_at,
+                           r.last_seen_at,
+                           r.updated_at AS raw_updated_at,
+                           %s AS window_from,
+                           %s AS window_to
+                    FROM ingest_raw_records r
+                    LEFT JOIN ingest_sync_jobs j ON j.id::text = r.sync_job_id AND j.company_id = r.company_id
+                    WHERE %s
+                ),
+                tx AS (
+                    SELECT raw.raw_id,
+                           COUNT(ft.id) AS tx_count,
+                           MAX(ft.updated_at) AS last_tx_updated_at
+                    FROM raw
+                    LEFT JOIN ingest_financial_transactions ft
+                      ON ft.company_id = raw.company_id
+                     AND ft.shop_ref = raw.shop_ref
+                     AND ft.source = :source
+                     AND ft.external_id LIKE 'ozon:accrual-by-day:%%'
+                     AND ft.occurred_at >= raw.window_from
+                     AND ft.occurred_at < raw.window_to + INTERVAL '1 day'
+                    GROUP BY raw.raw_id
+                ),
+                direct_tx AS (
                     SELECT company_id,
                            raw_record_id,
-                           COUNT(*) AS tx_count,
-                           MAX(updated_at) AS last_tx_updated_at
+                           COUNT(*) AS direct_raw_tx_count
                     FROM ingest_financial_transactions
                     WHERE source = :source
                     GROUP BY company_id, raw_record_id
@@ -86,38 +113,37 @@ final readonly class OzonAccrualProjectionHealthQuery
                 )
                 SELECT r.company_id,
                        r.shop_ref,
-                       r.id AS raw_id,
+                       r.raw_id,
                        r.external_id,
                        r.normalization_status,
                        r.fetched_at,
                        r.last_seen_at,
-                       r.updated_at AS raw_updated_at,
-                       TO_CHAR(%s, 'YYYY-MM-DD') AS window_from,
-                       TO_CHAR(%s, 'YYYY-MM-DD') AS window_to,
+                       r.raw_updated_at,
+                       TO_CHAR(r.window_from, 'YYYY-MM-DD') AS window_from,
+                       TO_CHAR(r.window_to, 'YYYY-MM-DD') AS window_to,
                        COALESCE(tx.tx_count, 0) AS tx_count,
+                       COALESCE(direct_tx.direct_raw_tx_count, 0) AS direct_raw_tx_count,
                        tx.last_tx_updated_at,
                        COALESCE(issues.open_issues, 0) AS open_issues,
                        CASE WHEN %s THEN 1 ELSE 0 END AS needs_normalization
-                FROM ingest_raw_records r
-                LEFT JOIN ingest_sync_jobs j ON j.id::text = r.sync_job_id AND j.company_id = r.company_id
-                LEFT JOIN tx ON tx.company_id = r.company_id AND tx.raw_record_id = r.id
-                LEFT JOIN issues ON issues.company_id = r.company_id AND issues.raw_record_id = r.id
-                WHERE %s
+                FROM raw r
+                LEFT JOIN tx ON tx.raw_id = r.raw_id
+                LEFT JOIN direct_tx ON direct_tx.company_id = r.company_id AND direct_tx.raw_record_id = r.raw_id
+                LEFT JOIN issues ON issues.company_id = r.company_id AND issues.raw_record_id = r.raw_id
+                WHERE TRUE
                 %s
                 ORDER BY needs_normalization DESC,
-                         %s ASC,
-                         %s ASC,
+                         r.window_from ASC,
+                         r.window_to ASC,
                          r.company_id ASC,
                          r.shop_ref ASC,
                          r.fetched_at ASC
                 LIMIT %d",
                 $windowFrom,
                 $windowTo,
-                $problemPredicate,
                 implode(' AND ', $conditions),
+                $problemPredicate,
                 $problemFilter,
-                $windowFrom,
-                $windowTo,
                 $limit,
             ),
             $params,

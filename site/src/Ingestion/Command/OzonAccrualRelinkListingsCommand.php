@@ -32,6 +32,7 @@ final class OzonAccrualRelinkListingsCommand extends Command
     {
         $this
             ->addOption('company-id', null, InputOption::VALUE_REQUIRED, 'Optional company UUID filter.')
+            ->addOption('shop-ref', null, InputOption::VALUE_REQUIRED, 'Optional shop reference filter.')
             ->addOption('from', null, InputOption::VALUE_REQUIRED, 'Optional occurred_at start date YYYY-MM-DD.')
             ->addOption('to', null, InputOption::VALUE_REQUIRED, 'Optional occurred_at end date YYYY-MM-DD.')
             ->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Maximum transactions to inspect, 1..5000.', 500)
@@ -61,6 +62,7 @@ final class OzonAccrualRelinkListingsCommand extends Command
     {
         try {
             $companyId = $this->optionalUuidOption($input, 'company-id');
+            $shopRef = $this->optionalStringOption($input, 'shop-ref');
             $from = $this->optionalDateOption($input, 'from');
             $to = $this->optionalDateOption($input, 'to');
             $limit = $this->intOption($input, 'limit', 1, 5000);
@@ -84,6 +86,7 @@ final class OzonAccrualRelinkListingsCommand extends Command
             to: $to,
             limit: $limit,
             execute: $execute,
+            shopRef: $shopRef,
             componentFilter: $componentFilter,
             includeRows: !$summaryOnly && !$json,
         );
@@ -92,6 +95,7 @@ final class OzonAccrualRelinkListingsCommand extends Command
             $io->writeln((string) json_encode([
                 'mode' => $execute ? 'execute' : 'dry-run',
                 'companyId' => $companyId,
+                'shopRef' => $shopRef,
                 'from' => $from?->format('Y-m-d'),
                 'to' => $to?->format('Y-m-d'),
                 'limit' => $limit,
@@ -114,6 +118,7 @@ final class OzonAccrualRelinkListingsCommand extends Command
             [
                 ['mode', $execute ? 'execute' : 'dry-run'],
                 ['companyId', $companyId ?? 'all'],
+                ['shopRef', $shopRef ?? 'all'],
                 ['from', $from?->format('Y-m-d') ?? 'any'],
                 ['to', $to?->format('Y-m-d') ?? 'any'],
                 ['limit', (string) $limit],
@@ -192,6 +197,13 @@ final class OzonAccrualRelinkListingsCommand extends Command
         }
 
         return $date;
+    }
+
+    private function optionalStringOption(InputInterface $input, string $name): ?string
+    {
+        $value = trim((string) ($input->getOption($name) ?? ''));
+
+        return '' === $value ? null : $value;
     }
 
     private function intOption(InputInterface $input, string $name, int $min, int $max): int

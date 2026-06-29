@@ -46,6 +46,7 @@ final readonly class OzonAccrualListingRelinker
         ?\DateTimeImmutable $to,
         int $limit,
         bool $execute,
+        ?string $shopRef = null,
         string $componentFilter = self::COMPONENT_FILTER_ALL,
         bool $includeRows = true,
     ): array {
@@ -53,7 +54,7 @@ final readonly class OzonAccrualListingRelinker
             throw new \InvalidArgumentException('Unsupported component filter.');
         }
 
-        $rows = $this->selectRows($companyId, $from, $to, $limit, $componentFilter);
+        $rows = $this->selectRows($companyId, $shopRef, $from, $to, $limit, $componentFilter);
         $recoveredSourceData = $this->recoverListingSourceData($rows);
         $sourceDataByCompany = [];
         foreach ($rows as $row) {
@@ -142,6 +143,7 @@ final readonly class OzonAccrualListingRelinker
      */
     private function selectRows(
         ?string $companyId,
+        ?string $shopRef,
         ?\DateTimeImmutable $from,
         ?\DateTimeImmutable $to,
         int $limit,
@@ -166,6 +168,11 @@ final readonly class OzonAccrualListingRelinker
         if (null !== $companyId) {
             $where[] = 'company_id = :company_id';
             $params['company_id'] = $companyId;
+        }
+
+        if (null !== $shopRef) {
+            $where[] = 'shop_ref = :shop_ref';
+            $params['shop_ref'] = $shopRef;
         }
 
         if (null !== $from) {
