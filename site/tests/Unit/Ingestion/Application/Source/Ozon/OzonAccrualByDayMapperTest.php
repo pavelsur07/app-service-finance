@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Ingestion\Application\Source\Ozon;
 use App\Ingestion\Application\DTO\MappedTransaction;
 use App\Ingestion\Application\Source\Ozon\OzonAccrualByDayMapper;
 use App\Ingestion\Application\Source\Ozon\OzonAccrualByDayPreviewMapper;
+use App\Ingestion\Application\Source\Ozon\OzonAccrualPreviewTransaction;
 use App\Ingestion\Application\Source\Ozon\OzonMoneyParser;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Domain\Service\SourceDataHasher;
@@ -155,6 +156,28 @@ final class OzonAccrualByDayMapperTest extends TestCase
         self::assertSame(130502, $commission->money->amountMinor());
     }
 
+    public function testPreviewSourceKeysMatchMappedExternalIdsForCronCoverageCheck(): void
+    {
+        $companyId = '19621cff-b028-45d9-9193-11f47ad9a8b2';
+        $rawRecord = $this->rawRecord($companyId);
+        $rawRows = $this->representativeAccrualRows();
+
+        $mappedExternalIds = array_map(
+            static fn (MappedTransaction $transaction): string => $transaction->externalId,
+            $this->mapper()->map($rawRecord, $rawRows),
+        );
+        $previewSourceKeys = array_map(
+            static fn (OzonAccrualPreviewTransaction $row): string => $row->sourceKey,
+            $this->previewMapper()->preview($companyId, $rawRows, includeSaleRefund: true),
+        );
+
+        sort($mappedExternalIds);
+        sort($previewSourceKeys);
+
+        self::assertSame($mappedExternalIds, $previewSourceKeys);
+        self::assertNotEmpty($previewSourceKeys);
+    }
+
     /**
      * @param list<MappedTransaction> $transactions
      */
@@ -171,7 +194,12 @@ final class OzonAccrualByDayMapperTest extends TestCase
 
     private function mapper(): OzonAccrualByDayMapper
     {
-        return new OzonAccrualByDayMapper(new OzonAccrualByDayPreviewMapper(new OzonMoneyParser(), new SourceDataHasher()));
+        return new OzonAccrualByDayMapper($this->previewMapper());
+    }
+
+    private function previewMapper(): OzonAccrualByDayPreviewMapper
+    {
+        return new OzonAccrualByDayPreviewMapper(new OzonMoneyParser(), new SourceDataHasher());
     }
 
     private function rawRecord(string $companyId): IngestRawRecord
@@ -189,5 +217,103 @@ final class OzonAccrualByDayMapperTest extends TestCase
             fetchedAt: new \DateTimeImmutable('2026-06-20 20:35:35'),
             syncJobId: Uuid::uuid7()->toString(),
         );
+    }
+
+    /**
+     * Covers the component families that the reconciliation cron compares by natural source key.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function representativeAccrualRows(): array
+    {
+        return [
+            [
+                'accrual_id' => 53675409100,
+                'date' => '2026-06-13',
+                'unit_number' => '41774559-0885-1',
+                'accrued_category' => 'POSTING',
+                'posting' => [
+                    'products' => [[
+                        'sku' => 'ozon-sku-1',
+                        'offer_id' => 'offer-1',
+                        'name' => 'Ozon Product 1',
+                        'delivery' => [
+                            'services' => [
+                                ['type_id' => 29, 'accrued' => ['amount' => '-7.86', 'currency' => 'RUB']],
+                                ['type_id' => 45, 'accrued' => ['amount' => '-15', 'currency' => 'RUB']],
+                            ],
+                        ],
+                        'commission' => [
+                            'bonus' => ['amount' => '12.79', 'currency' => 'RUB'],
+                            'commission' => ['amount' => '-120.05', 'currency' => 'RUB'],
+                            'sale_amount' => ['amount' => '66718', 'currency' => 'RUB'],
+                        ],
+                    ]],
+                ],
+            ],
+            [
+                'accrual_id' => 53675409104,
+                'date' => '2026-06-13',
+                'accrued_category' => 'POSTING',
+                'posting' => [
+                    'products' => [[
+                        'commission' => [
+                            'commission' => ['amount' => '1305.02', 'currency' => 'RUB'],
+                            'sale_amount' => ['amount' => '-2837.00', 'currency' => 'RUB'],
+                        ],
+                    ]],
+                ],
+            ],
+            [
+                'accrual_id' => 53675409101,
+                'date' => '2026-06-13',
+                'accrued_category' => 'ITEM',
+                'item_fees' => [
+                    'fees' => [[
+                        'sku' => 'item-sku-1',
+                        'offer_id' => 'item-offer-1',
+                        'name' => 'Item Product 1',
+                        'fees' => [
+                            ['type_id' => 1, 'accrued' => ['amount' => '18.66', 'currency' => 'RUB']],
+                        ],
+                    ]],
+                ],
+            ],
+            [
+                'accrual_id' => 53675409102,
+                'date' => '2026-06-14',
+                'accrued_category' => 'NON_ITEM',
+                'non_item_fee' => ['type_id' => 46, 'accrued' => ['amount' => '-78.28', 'currency' => 'RUB']],
+            ],
+            [
+                'accrual_id' => 53675409103,
+                'date' => '2026-06-14',
+                'accrued_category' => 'CONTAINER',
+                'container_fees' => [
+                    'fees' => [
+                        ['type_id' => 77, 'accrued' => ['amount' => '-3.50', 'currency' => 'RUB']],
+                    ],
+                ],
+            ],
+            [
+                'accrual_id' => 53675409105,
+                'date' => '2026-06-14',
+                'accrued_category' => 'POSTING',
+                'posting' => [
+                    'products' => [[
+                        'commission' => [
+                            'commission' => ['amount' => '0', 'currency' => 'RUB'],
+                            'sale_amount' => ['amount' => '0', 'currency' => 'RUB'],
+                        ],
+                    ]],
+                ],
+            ],
+            [
+                'accrual_id' => 53675409106,
+                'date' => '2026-06-14',
+                'accrued_category' => 'UNKNOWN',
+                'total_amount' => ['amount' => '99', 'currency' => 'RUB'],
+            ],
+        ];
     }
 }
