@@ -26,7 +26,7 @@ final class FakeOzonAccrualClient implements OzonAccrualClientInterface
         return new OzonRawPage(rows: [], hasMore: false);
     }
 
-    public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date): OzonRawPage
+    public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date, ?string $lastId = null): OzonRawPage
     {
         return new OzonRawPage(
             rows: [[

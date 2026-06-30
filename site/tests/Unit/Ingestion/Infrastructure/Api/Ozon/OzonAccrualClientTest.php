@@ -77,6 +77,65 @@ final class OzonAccrualClientTest extends TestCase
         self::assertSame('2026-06-13', $requestPayload['date']);
         self::assertSame([['date' => '2026-06-13', 'accrual_id' => 1]], $page->rows);
         self::assertFalse($page->hasMore);
+        self::assertNull($page->nextPageToken);
+    }
+
+    public function testFetchByDaySendsLastIdAndReturnsNextLastId(): void
+    {
+        $capturedOptions = null;
+        $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$capturedOptions): MockResponse {
+            $capturedOptions = $options;
+
+            return new MockResponse(
+                '{"result":{"accruals":[{"date":"2026-06-13","accrual_id":2}],"last_id":"next-last-id"}}',
+                ['http_code' => 200],
+            );
+        });
+
+        $client = new OzonAccrualClient(
+            $http,
+            $this->credentialProvider(),
+            new NullLogger(),
+        );
+
+        $page = $client->fetchByDay(
+            '0192f0c2-0000-7000-8000-000000000001',
+            '0192f0c2-0000-7000-8000-000000000002',
+            new \DateTimeImmutable('2026-06-13'),
+            'previous-last-id',
+        );
+
+        $requestPayload = $capturedOptions['json'] ?? json_decode((string) ($capturedOptions['body'] ?? ''), true, 512, \JSON_THROW_ON_ERROR);
+        self::assertSame('2026-06-13', $requestPayload['date']);
+        self::assertSame('previous-last-id', $requestPayload['last_id']);
+        self::assertSame([['date' => '2026-06-13', 'accrual_id' => 2]], $page->rows);
+        self::assertTrue($page->hasMore);
+        self::assertSame('next-last-id', $page->nextPageToken);
+    }
+
+    public function testFetchByDayIgnoresHasNextWhenLastIdIsEmpty(): void
+    {
+        $http = new MockHttpClient(static fn (): MockResponse => new MockResponse(
+            '{"result":{"accruals":[{"date":"2026-06-13","accrual_id":3}],"last_id":"","has_next":true}}',
+            ['http_code' => 200],
+        ));
+
+        $client = new OzonAccrualClient(
+            $http,
+            $this->credentialProvider(),
+            new NullLogger(),
+        );
+
+        $page = $client->fetchByDay(
+            '0192f0c2-0000-7000-8000-000000000001',
+            '0192f0c2-0000-7000-8000-000000000002',
+            new \DateTimeImmutable('2026-06-13'),
+            'previous-last-id',
+        );
+
+        self::assertSame([['date' => '2026-06-13', 'accrual_id' => 3]], $page->rows);
+        self::assertFalse($page->hasMore);
+        self::assertNull($page->nextPageToken);
     }
 
     public function testFetchTypesSendsEmptyJsonObjectAndExtractsAccrualTypes(): void

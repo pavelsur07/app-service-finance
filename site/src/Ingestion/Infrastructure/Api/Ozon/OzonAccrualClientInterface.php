@@ -19,6 +19,7 @@ interface OzonAccrualClientInterface
         string $companyId,
         string $connectionRef,
         \DateTimeImmutable $date,
+        ?string $lastId = null,
     ): OzonRawPage;
 
     public function fetchTypes(string $companyId, string $connectionRef): OzonRawPage;

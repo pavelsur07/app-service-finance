@@ -95,23 +95,11 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
     {
         [$from, $to] = $this->resolveDailyWindow($request);
         $rows = [];
-        $apiMetadata = [];
 
         foreach ($this->eachDay($from, $to) as $date) {
-            $page = $this->accrualClient->fetchByDay(
-                $request->companyId,
-                $request->connectionRef,
-                $date,
-            );
+            $dailyRows = $this->fetchAccrualByDayPages($request, $date);
 
-            if ([] !== $page->rows) {
-                array_push($rows, ...$page->rows);
-            }
-
-            $apiMetadata[] = [
-                'date' => $date->format('Y-m-d'),
-                'metadata' => $page->metadata,
-            ];
+            array_push($rows, ...$dailyRows);
         }
 
         $rows = $this->sortRowsCanonically($rows);
@@ -138,7 +126,6 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
                     [
                         'windowFrom' => $from->format('Y-m-d'),
                         'windowTo' => $to->format('Y-m-d'),
-                        'apiMetadata' => $apiMetadata,
                     ],
                 ),
             ),
@@ -146,6 +133,46 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
             hasMore: $windowHasMore || $incrementalHasMore,
             continuationDelaySeconds: $incrementalHasMore ? self::INCREMENTAL_CONTINUATION_DELAY_SECONDS : null,
         );
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function fetchAccrualByDayPages(PullRequest $request, \DateTimeImmutable $date): array
+    {
+        $rows = [];
+        $seenLastIds = [];
+        $lastId = null;
+
+        while (true) {
+            $page = $this->accrualClient->fetchByDay(
+                $request->companyId,
+                $request->connectionRef,
+                $date,
+                $lastId,
+            );
+
+            if ([] !== $page->rows) {
+                array_push($rows, ...$page->rows);
+            }
+
+            $nextLastId = null !== $page->nextPageToken && '' !== trim($page->nextPageToken)
+                ? trim($page->nextPageToken)
+                : null;
+
+            if (null === $nextLastId) {
+                break;
+            }
+
+            if (isset($seenLastIds[$nextLastId])) {
+                throw new \RuntimeException(sprintf('Ozon accrual by-day page for %s repeated last_id "%s".', $date->format('Y-m-d'), $nextLastId));
+            }
+
+            $seenLastIds[$nextLastId] = true;
+            $lastId = $nextLastId;
+        }
+
+        return $rows;
     }
 
     private function pullAccrualTypes(PullRequest $request): PullResult
