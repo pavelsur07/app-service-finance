@@ -46,14 +46,22 @@ final readonly class OzonAccrualClient implements OzonAccrualClientInterface
         string $companyId,
         string $connectionRef,
         \DateTimeImmutable $date,
+        ?string $lastId = null,
     ): OzonRawPage {
+        $json = [
+            'date' => $date->format('Y-m-d'),
+        ];
+
+        if (null !== $lastId && '' !== trim($lastId)) {
+            $json['last_id'] = trim($lastId);
+        }
+
         return $this->requestPage(
             companyId: $companyId,
             connectionRef: $connectionRef,
             endpoint: self::BY_DAY_ENDPOINT,
-            json: [
-                'date' => $date->format('Y-m-d'),
-            ],
+            json: $json,
+            lastIdPagination: true,
         );
     }
 
@@ -78,26 +86,32 @@ final readonly class OzonAccrualClient implements OzonAccrualClientInterface
         int $page = 1,
         int $pageSize = 0,
         int $offset = 0,
+        bool $lastIdPagination = false,
     ): OzonRawPage {
         $payload = $this->requestJson($companyId, $connectionRef, $endpoint, $json);
         $rows = $this->extractRows($payload);
         $result = is_array($payload['result'] ?? null) ? $payload['result'] : [];
+        $nextLastId = $lastIdPagination ? $this->stringValue($result['last_id'] ?? $payload['last_id'] ?? null) : null;
         $total = $this->intValue($result['total'] ?? $payload['total'] ?? null);
-        $hasMore = (bool) ($result['has_next'] ?? $result['has_more'] ?? $payload['has_next'] ?? $payload['has_more'] ?? false);
+        $hasMore = null !== $nextLastId
+            || (bool) ($result['has_next'] ?? $result['has_more'] ?? $payload['has_next'] ?? $payload['has_more'] ?? false);
 
-        if (!$hasMore && $total > 0 && $pageSize > 0) {
+        if (!$hasMore && !$lastIdPagination && $total > 0 && $pageSize > 0) {
             $hasMore = ($offset + \count($rows)) < $total;
         }
 
         return new OzonRawPage(
             rows: $rows,
             hasMore: $hasMore,
-            nextPageToken: $hasMore ? (string) ($page + 1) : null,
+            nextPageToken: $lastIdPagination ? $nextLastId : ($hasMore ? (string) ($page + 1) : null),
             metadata: [
                 'endpoint' => $endpoint,
                 'page' => $page,
                 'pageSize' => $pageSize,
                 'offset' => $offset,
+                'lastId' => $lastIdPagination && is_array($json) ? ($json['last_id'] ?? null) : null,
+                'nextLastId' => $nextLastId,
+                'rows' => \count($rows),
                 'total' => $total > 0 ? $total : null,
                 'resultKeys' => array_keys($result),
             ],
@@ -202,6 +216,17 @@ final readonly class OzonAccrualClient implements OzonAccrualClientInterface
         }
 
         return 0;
+    }
+
+    private function stringValue(mixed $value): ?string
+    {
+        if (!is_scalar($value)) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        return '' !== $value ? $value : null;
     }
 
     /**

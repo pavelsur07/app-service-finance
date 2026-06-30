@@ -68,7 +68,7 @@ final class OzonSellerReportConnectorTest extends TestCase
                 throw new \LogicException('Not used.');
             }
 
-            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date): OzonRawPage
+            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date, ?string $lastId = null): OzonRawPage
             {
                 throw new \LogicException('Not used.');
             }
@@ -113,7 +113,7 @@ final class OzonSellerReportConnectorTest extends TestCase
                 throw new \LogicException('Not used.');
             }
 
-            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date): OzonRawPage
+            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date, ?string $lastId = null): OzonRawPage
             {
                 $this->dates[] = $date->format('Y-m-d');
 
@@ -151,11 +151,31 @@ final class OzonSellerReportConnectorTest extends TestCase
                     'apiMetadata' => [
                         [
                             'date' => '2026-06-01',
-                            'metadata' => ['endpoint' => '/v1/finance/accrual/by-day'],
+                            'metadata' => [
+                                'pageCount' => 1,
+                                'rowCount' => 0,
+                                'pages' => [[
+                                    'page' => 1,
+                                    'lastId' => null,
+                                    'nextLastId' => null,
+                                    'rowCount' => 0,
+                                    'metadata' => ['endpoint' => '/v1/finance/accrual/by-day'],
+                                ]],
+                            ],
                         ],
                         [
                             'date' => '2026-06-02',
-                            'metadata' => ['endpoint' => '/v1/finance/accrual/by-day'],
+                            'metadata' => [
+                                'pageCount' => 1,
+                                'rowCount' => 0,
+                                'pages' => [[
+                                    'page' => 1,
+                                    'lastId' => null,
+                                    'nextLastId' => null,
+                                    'rowCount' => 0,
+                                    'metadata' => ['endpoint' => '/v1/finance/accrual/by-day'],
+                                ]],
+                            ],
                         ],
                     ],
                 ],
@@ -178,7 +198,7 @@ final class OzonSellerReportConnectorTest extends TestCase
                 throw new \LogicException('Not used.');
             }
 
-            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date): OzonRawPage
+            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date, ?string $lastId = null): OzonRawPage
             {
                 $dateString = $date->format('Y-m-d');
                 $this->dates[] = $dateString;
@@ -212,6 +232,114 @@ final class OzonSellerReportConnectorTest extends TestCase
         self::assertSame('accrual-by-day:2026-06-01:2026-06-02', $result->rawBatch->externalId);
     }
 
+    public function testPullAccrualByDayCollectsAllPagesForDate(): void
+    {
+        $accrualClient = new class implements OzonAccrualClientInterface {
+            /**
+             * @var list<array{date: string, lastId: string|null}>
+             */
+            public array $calls = [];
+
+            public function fetchPostings(string $companyId, string $connectionRef, array $postingNumbers): OzonRawPage
+            {
+                throw new \LogicException('Not used.');
+            }
+
+            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date, ?string $lastId = null): OzonRawPage
+            {
+                $dateString = $date->format('Y-m-d');
+                $this->calls[] = ['date' => $dateString, 'lastId' => $lastId];
+
+                return match ($lastId) {
+                    null => new OzonRawPage(
+                        rows: [['date' => $dateString, 'accrual_id' => 'row-1']],
+                        hasMore: true,
+                        nextPageToken: 'cursor-1',
+                        metadata: ['page' => 1],
+                    ),
+                    'cursor-1' => new OzonRawPage(
+                        rows: [['date' => $dateString, 'accrual_id' => 'row-2']],
+                        hasMore: true,
+                        nextPageToken: 'cursor-2',
+                        metadata: ['page' => 2],
+                    ),
+                    'cursor-2' => new OzonRawPage(
+                        rows: [['date' => $dateString, 'accrual_id' => 'row-3']],
+                        hasMore: false,
+                        metadata: ['page' => 3],
+                    ),
+                    default => throw new \LogicException('Unexpected last_id.'),
+                };
+            }
+
+            public function fetchTypes(string $companyId, string $connectionRef): OzonRawPage
+            {
+                throw new \LogicException('Not used.');
+            }
+        };
+
+        $connector = $this->connector($accrualClient);
+        $result = $connector->pull(new PullRequest(
+            companyId: Uuid::uuid7()->toString(),
+            connectionRef: 'connection-1',
+            shopRef: 'shop-1',
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            cursorValue: null,
+            windowFrom: new \DateTimeImmutable('2026-06-01'),
+            windowTo: new \DateTimeImmutable('2026-06-01'),
+            syncJobId: Uuid::uuid7()->toString(),
+        ));
+
+        self::assertSame([
+            ['date' => '2026-06-01', 'lastId' => null],
+            ['date' => '2026-06-01', 'lastId' => 'cursor-1'],
+            ['date' => '2026-06-01', 'lastId' => 'cursor-2'],
+        ], $accrualClient->calls);
+        self::assertSame([
+            ['date' => '2026-06-01', 'accrual_id' => 'row-1'],
+            ['date' => '2026-06-01', 'accrual_id' => 'row-2'],
+            ['date' => '2026-06-01', 'accrual_id' => 'row-3'],
+        ], $result->rawBatch->rows);
+    }
+
+    public function testPullAccrualByDayRejectsRepeatedLastId(): void
+    {
+        $accrualClient = new class implements OzonAccrualClientInterface {
+            public function fetchPostings(string $companyId, string $connectionRef, array $postingNumbers): OzonRawPage
+            {
+                throw new \LogicException('Not used.');
+            }
+
+            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date, ?string $lastId = null): OzonRawPage
+            {
+                return new OzonRawPage(
+                    rows: [['date' => $date->format('Y-m-d'), 'accrual_id' => $lastId ?? 'first']],
+                    hasMore: true,
+                    nextPageToken: 'same-cursor',
+                );
+            }
+
+            public function fetchTypes(string $companyId, string $connectionRef): OzonRawPage
+            {
+                throw new \LogicException('Not used.');
+            }
+        };
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('repeated last_id');
+
+        $this->connector($accrualClient)->pull(new PullRequest(
+            companyId: Uuid::uuid7()->toString(),
+            connectionRef: 'connection-1',
+            shopRef: 'shop-1',
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            cursorValue: null,
+            windowFrom: new \DateTimeImmutable('2026-06-01'),
+            windowTo: new \DateTimeImmutable('2026-06-01'),
+            syncJobId: Uuid::uuid7()->toString(),
+        ));
+    }
+
     public function testIncrementalAccrualByDayContinuesWhileNextCursorIsOverdue(): void
     {
         $accrualClient = new class implements OzonAccrualClientInterface {
@@ -225,7 +353,7 @@ final class OzonSellerReportConnectorTest extends TestCase
                 throw new \LogicException('Not used.');
             }
 
-            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date): OzonRawPage
+            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date, ?string $lastId = null): OzonRawPage
             {
                 $this->dates[] = $date->format('Y-m-d');
 
@@ -268,7 +396,7 @@ final class OzonSellerReportConnectorTest extends TestCase
                 throw new \LogicException('Not used.');
             }
 
-            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date): OzonRawPage
+            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date, ?string $lastId = null): OzonRawPage
             {
                 $this->dates[] = $date->format('Y-m-d');
 
@@ -308,7 +436,7 @@ final class OzonSellerReportConnectorTest extends TestCase
                 throw new \LogicException('Not used.');
             }
 
-            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date): OzonRawPage
+            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date, ?string $lastId = null): OzonRawPage
             {
                 throw new \LogicException('Not used.');
             }
@@ -381,7 +509,7 @@ final class OzonSellerReportConnectorTest extends TestCase
                 throw new \LogicException('Not used.');
             }
 
-            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date): OzonRawPage
+            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date, ?string $lastId = null): OzonRawPage
             {
                 return new OzonRawPage(rows: $this->rows, hasMore: false);
             }
@@ -429,7 +557,7 @@ final class OzonSellerReportConnectorTest extends TestCase
                 throw new \LogicException('Not used.');
             }
 
-            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date): OzonRawPage
+            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date, ?string $lastId = null): OzonRawPage
             {
                 throw new \LogicException('Not used.');
             }
