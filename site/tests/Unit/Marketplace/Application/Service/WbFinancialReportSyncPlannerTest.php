@@ -606,9 +606,10 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
         $planner = $this->planner();
         $this->connections->method('execute')->willReturn([$this->conn('c1', 'co1')]);
         $this->statuses->method('findStatusesForDateRange')->willReturn([
-            $this->statusEntity('2026-05-18', FinancialReportSyncStatus::EMPTY, null, '2026-05-18T09:00:00+03:00', attempts: 5),
+            $this->statusEntity('2026-05-17', FinancialReportSyncStatus::EMPTY, null, '2026-05-17T07:00:00+03:00', attempts: 5),
+            $this->statusEntity('2026-05-18', FinancialReportSyncStatus::EMPTY, null, '2026-05-20T09:00:00+03:00', attempts: 2),
             $this->statusEntity('2026-05-19', FinancialReportSyncStatus::SUCCESS, null, '2026-05-19T09:00:00+03:00'),
-            $this->statusEntity('2026-05-20', FinancialReportSyncStatus::EMPTY, null, '2026-05-20T09:00:00+03:00', attempts: 2),
+            $this->statusEntity('2026-05-20', FinancialReportSyncStatus::EMPTY, null, '2026-05-18T09:00:00+03:00', attempts: 2),
         ]);
         $this->claimForQueueCallback = function (
             string $connectionId,

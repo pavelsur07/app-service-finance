@@ -229,17 +229,28 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
                     continue;
                 }
 
-                $emptyDays[] = $status->getBusinessDate();
+                $emptyDays[] = [
+                    'day' => $status->getBusinessDate(),
+                    'updated_at' => $status->getUpdatedAt(),
+                ];
             }
 
-            usort($emptyDays, static fn (DateTimeImmutable $a, DateTimeImmutable $b): int => $a->getTimestamp() <=> $b->getTimestamp());
+            usort($emptyDays, static function (array $a, array $b): int {
+                $updatedAtCompare = $a['updated_at']->getTimestamp() <=> $b['updated_at']->getTimestamp();
+                if (0 !== $updatedAtCompare) {
+                    return $updatedAtCompare;
+                }
+
+                return $a['day']->getTimestamp() <=> $b['day']->getTimestamp();
+            });
 
             $scheduledForConnection = 0;
-            foreach ($emptyDays as $day) {
+            foreach ($emptyDays as $emptyDay) {
                 if ($scheduledForConnection >= $maxDays) {
                     break;
                 }
 
+                $day = $emptyDay['day'];
                 if (!$this->claimAndDispatch($connection['company_id'], $connection['connection_id'], $day, FinancialReportSyncMode::REFRESH_14D, true)) {
                     continue;
                 }
