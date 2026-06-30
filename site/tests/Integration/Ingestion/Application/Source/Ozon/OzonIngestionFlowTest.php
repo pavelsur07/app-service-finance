@@ -91,6 +91,59 @@ final class OzonIngestionFlowTest extends IntegrationTestCase
         self::assertSame([], $issueRepository->findOpenByRawRecord($companyId, $normalizeMessage->rawRecordId));
     }
 
+    public function testRunSyncChunkDoesNotDispatchNormalizationForUnchangedDoneRaw(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+
+        $firstJob = new SyncJob(
+            companyId: $companyId,
+            connectionRef: 'marketplace:ozon:seller',
+            source: IngestSource::OZON,
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            kind: SyncJobKind::BACKFILL,
+            windowFrom: new \DateTimeImmutable('2026-06-18'),
+            windowTo: new \DateTimeImmutable('2026-06-18'),
+            shopRef: 'ozon-shop',
+        );
+        $this->em->persist($firstJob);
+        $this->em->flush();
+
+        $normalizeTransport = $this->getNormalizeTransport();
+        $normalizeTransport->reset();
+
+        /** @var RunSyncChunkHandler $syncHandler */
+        $syncHandler = self::getContainer()->get(RunSyncChunkHandler::class);
+        $syncHandler(new RunSyncChunkMessage($companyId, $firstJob->getId()));
+
+        $envelopes = $normalizeTransport->getSent();
+        self::assertCount(1, $envelopes);
+
+        /** @var NormalizeRawRecordMessage $normalizeMessage */
+        $normalizeMessage = $envelopes[0]->getMessage();
+        /** @var NormalizeRawRecordHandler $normalizeHandler */
+        $normalizeHandler = self::getContainer()->get(NormalizeRawRecordHandler::class);
+        $normalizeHandler($normalizeMessage);
+        $this->em->clear();
+
+        $secondJob = new SyncJob(
+            companyId: $companyId,
+            connectionRef: 'marketplace:ozon:seller',
+            source: IngestSource::OZON,
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            kind: SyncJobKind::BACKFILL,
+            windowFrom: new \DateTimeImmutable('2026-06-18'),
+            windowTo: new \DateTimeImmutable('2026-06-18'),
+            shopRef: 'ozon-shop',
+        );
+        $this->em->persist($secondJob);
+        $this->em->flush();
+
+        $normalizeTransport->reset();
+        $syncHandler(new RunSyncChunkMessage($companyId, $secondJob->getId()));
+
+        self::assertCount(0, $normalizeTransport->getSent());
+    }
+
     public function testPreviewMapperUsesStoredAccrualTypesDictionary(): void
     {
         $companyId = Uuid::uuid7()->toString();

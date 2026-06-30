@@ -87,6 +87,10 @@
 # Ежедневный инкрементальный запуск нового Ingestion pipeline.
 0 3 * * * cd /app && php bin/console app:ingestion:run-incremental --no-interaction --quiet
 
+# Ежедневный rolling refresh Ozon accrual by-day: пере-fetch последних 45 дней,
+# HTTP-загрузка выполняется async worker'ом, unchanged raw по hash не перенормализуется.
+30 2 * * * cd /app && php bin/console app:ingestion:ozon-accrual:rolling-refresh --days-back=45 --limit=50 --execute --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Ежедневное обслуживание справочника категорий Ozon accrual:
 # seed code mappings → refresh metadata for all companies/shops → discover/rebuild taxonomy → health-check.
 15 5 * * * cd /app && php -d memory_limit=1G bin/console app:ingestion:ozon-accrual:daily-maintenance --days-back=45 --execute --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
@@ -96,6 +100,9 @@
 # после ingest_normalize workers дочищает товарное enrichment-связывание без повторного dispatch.
 45 5 * * * cd /app && php -d memory_limit=1G bin/console app:ingestion:ozon-accrual:reconcile-financial-projection --days-back=30 --execute --dispatch-normalization --summary-only --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 30 6 * * * cd /app && php -d memory_limit=1G bin/console app:ingestion:ozon-accrual:reconcile-financial-projection --days-back=30 --execute --repair-enrichment-only --summary-only --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
+# Read-only контроль после rolling refresh и normalize workers: latest raw coverage vs canonical.
+45 6 * * * cd /app && php -d memory_limit=1G bin/console app:ingestion:ozon-accrual:verify-rolling-refresh --days-back=45 --limit=100 --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 
 # Ежедневная загрузка Ozon Performance ingestion с начала месяца до вчерашнего дня.
 # Команда только планирует SyncJob/chunks; HTTP-загрузка выполняется async worker'ом.

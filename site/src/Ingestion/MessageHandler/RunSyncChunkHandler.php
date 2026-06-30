@@ -11,6 +11,7 @@ use App\Ingestion\Application\Command\UpdateCursorCommand;
 use App\Ingestion\Application\DTO\PullRequest;
 use App\Ingestion\Application\Service\IngestRateLimitGuard;
 use App\Ingestion\Domain\Service\ConnectorRegistry;
+use App\Ingestion\Enum\RawNormalizationStatus;
 use App\Ingestion\Entity\SyncJob;
 use App\Ingestion\Exception\ConnectorAuthException;
 use App\Ingestion\Exception\ConnectorRateLimitedException;
@@ -99,6 +100,10 @@ final readonly class RunSyncChunkHandler
                     $records = $this->rawStorageFacade->store($result->rawBatch);
                     if ($result->normalizeRawRecords) {
                         foreach ($records as $record) {
+                            if (RawNormalizationStatus::DONE === $record->getNormalizationStatus()) {
+                                continue;
+                            }
+
                             $this->messageBus->dispatch(new NormalizeRawRecordMessage($record->getId(), $record->getCompanyId()));
                         }
                     } else {
