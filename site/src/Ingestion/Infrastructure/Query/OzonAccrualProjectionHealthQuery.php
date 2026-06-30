@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Ingestion\Infrastructure\Query;
 
-use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\RawNormalizationStatus;
 use Doctrine\DBAL\ArrayParameterType;
@@ -12,8 +11,10 @@ use Doctrine\DBAL\Connection;
 
 final readonly class OzonAccrualProjectionHealthQuery
 {
-    public function __construct(private Connection $connection)
-    {
+    public function __construct(
+        private Connection $connection,
+        private OzonAccrualRawRecordQuery $rawRecordQuery,
+    ) {
     }
 
     /**
@@ -27,142 +28,253 @@ final readonly class OzonAccrualProjectionHealthQuery
         int $limit,
         bool $problemsOnly,
     ): array {
-        $externalWindowFrom = "substring(r.external_id from '^accrual-by-day:([0-9]{4}-[0-9]{2}-[0-9]{2}):[0-9]{4}-[0-9]{2}-[0-9]{2}$')::date";
-        $externalWindowTo = "substring(r.external_id from '^accrual-by-day:[0-9]{4}-[0-9]{2}-[0-9]{2}:([0-9]{4}-[0-9]{2}-[0-9]{2})$')::date";
-        $windowFrom = sprintf('COALESCE(j.window_from, %s, DATE(r.fetched_at))', $externalWindowFrom);
-        $windowTo = sprintf('COALESCE(j.window_to, j.window_from, %s, %s, DATE(r.fetched_at))', $externalWindowTo, $externalWindowFrom);
-
-        $conditions = [
-            'r.source = :source',
-            'r.resource_type = :resourceType',
-            sprintf('%s <= :toDate', $windowFrom),
-            sprintf('%s >= :fromDate', $windowTo),
-        ];
-        $params = [
-            'source' => IngestSource::OZON->value,
-            'resourceType' => OzonResourceType::ACCRUAL_BY_DAY,
-            'fromDate' => $from->format('Y-m-d'),
-            'toDate' => $to->format('Y-m-d'),
-            'doneStatus' => RawNormalizationStatus::DONE->value,
-        ];
-
-        if (null !== $companyId) {
-            $conditions[] = 'r.company_id = :companyId';
-            $params['companyId'] = $companyId;
+        $rows = $this->rawRecordQuery->latestCoverageRows($companyId, $shopRef, $from, $to, 0);
+        if ([] === $rows) {
+            return [];
         }
 
-        if (null !== $shopRef) {
-            $conditions[] = 'r.shop_ref = :shopRef';
-            $params['shopRef'] = $shopRef;
+        $details = $this->projectionDetails($rows);
+        $result = [];
+        foreach ($rows as $row) {
+            $rawId = (string) $row['id'];
+            $tx = $details['tx'][$rawId] ?? ['tx_count' => 0, 'last_tx_updated_at' => null];
+            $directRawTxCount = (int) ($details['direct'][$rawId] ?? 0);
+            $openIssues = (int) ($details['issues'][$rawId] ?? 0);
+            $needsNormalization = RawNormalizationStatus::DONE->value !== (string) $row['normalization_status']
+                || 0 === (int) $tx['tx_count']
+                || 0 === $directRawTxCount
+                || $openIssues > 0;
+
+            if ($problemsOnly && !$needsNormalization) {
+                continue;
+            }
+
+            $result[] = [
+                'company_id' => (string) $row['company_id'],
+                'shop_ref' => (string) $row['shop_ref'],
+                'raw_id' => $rawId,
+                'external_id' => (string) $row['external_id'],
+                'normalization_status' => (string) $row['normalization_status'],
+                'fetched_at' => $row['fetched_at'],
+                'last_seen_at' => $row['last_seen_at'] ?? null,
+                'raw_updated_at' => $row['raw_updated_at'] ?? null,
+                'window_from' => (string) $row['window_from'],
+                'window_to' => (string) $row['window_to'],
+                'tx_count' => (int) $tx['tx_count'],
+                'direct_raw_tx_count' => $directRawTxCount,
+                'last_tx_updated_at' => $tx['last_tx_updated_at'],
+                'open_issues' => $openIssues,
+                'needs_normalization' => $needsNormalization ? 1 : 0,
+            ];
         }
 
-        $problemPredicate = '(
-            r.normalization_status <> :doneStatus
-            OR COALESCE(tx.tx_count, 0) = 0
-            OR COALESCE(direct_tx.direct_raw_tx_count, 0) = 0
-            OR COALESCE(issues.open_issues, 0) > 0
-        )';
+        usort($result, static fn (array $left, array $right): int => [
+            -(int) $left['needs_normalization'],
+            (string) $left['window_from'],
+            (string) $left['window_to'],
+            (string) $left['company_id'],
+            (string) $left['shop_ref'],
+            (string) $left['fetched_at'],
+        ] <=> [
+            -(int) $right['needs_normalization'],
+            (string) $right['window_from'],
+            (string) $right['window_to'],
+            (string) $right['company_id'],
+            (string) $right['shop_ref'],
+            (string) $right['fetched_at'],
+        ]);
 
-        $problemFilter = $problemsOnly ? sprintf('AND %s', $problemPredicate) : '';
+        return array_slice($result, 0, $limit);
+    }
 
-        /** @var list<array<string, mixed>> $rows */
+    /**
+     * @param list<array<string, mixed>> $rawRows
+     *
+     * @return array{tx: array<string, array{tx_count: int, last_tx_updated_at: mixed}>, direct: array<string, int>, issues: array<string, int>}
+     */
+    private function projectionDetails(array $rawRows): array
+    {
+        $rawIds = array_values(array_unique(array_map(static fn (array $row): string => (string) $row['id'], $rawRows)));
+
+        return [
+            'tx' => $this->txCountsByWindow($rawRows),
+            'direct' => $this->directRawTxCounts($rawIds),
+            'issues' => $this->openIssueCounts($rawIds),
+        ];
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rawRows
+     *
+     * @return array<string, array{tx_count: int, last_tx_updated_at: mixed}>
+     */
+    private function txCountsByWindow(array $rawRows): array
+    {
+        $params = ['source' => IngestSource::OZON->value];
+        $values = $this->rawDateValues($rawRows, $params);
+        if ('' === $values) {
+            return [];
+        }
+
         $rows = $this->connection->fetchAllAssociative(
             sprintf(
-                "WITH raw AS (
-                    SELECT *
-                    FROM (
-                        SELECT r.company_id,
-                               r.shop_ref,
-                               r.id AS raw_id,
-                               r.external_id,
-                               r.normalization_status,
-                               r.fetched_at,
-                               r.last_seen_at,
-                               r.updated_at AS raw_updated_at,
-                               %s AS window_from,
-                               %s AS window_to,
-                               ROW_NUMBER() OVER (
-                                   PARTITION BY r.company_id, r.shop_ref, r.external_id
-                                   ORDER BY r.fetched_at DESC, r.id DESC
-                               ) AS raw_rank
-                        FROM ingest_raw_records r
-                        LEFT JOIN ingest_sync_jobs j ON j.id::text = r.sync_job_id AND j.company_id = r.company_id
-                        WHERE %s
-                    ) ranked_raw
-                    WHERE raw_rank = 1
-                ),
-                tx AS (
-                    SELECT raw.raw_id,
-                           COUNT(ft.id) AS tx_count,
-                           MAX(ft.updated_at) AS last_tx_updated_at
-                    FROM raw
-                    LEFT JOIN ingest_financial_transactions ft
-                      ON ft.company_id = raw.company_id
-                     AND ft.shop_ref = raw.shop_ref
-                     AND ft.source = :source
-                     AND ft.external_id LIKE 'ozon:accrual-by-day:%%'
-                     AND ft.occurred_at >= raw.window_from
-                     AND ft.occurred_at < raw.window_to + INTERVAL '1 day'
-                    GROUP BY raw.raw_id
-                ),
-                direct_tx AS (
-                    SELECT raw.raw_id,
-                           COUNT(ft.id) AS direct_raw_tx_count
-                    FROM raw
-                    LEFT JOIN ingest_financial_transactions ft
-                      ON ft.company_id = raw.company_id
-                     AND ft.raw_record_id = raw.raw_id
-                     AND ft.source = :source
-                    GROUP BY raw.raw_id
-                ),
-                issues AS (
-                    SELECT raw.raw_id,
-                           COUNT(i.id) FILTER (WHERE i.resolved_at IS NULL) AS open_issues
-                    FROM raw
-                    LEFT JOIN ingest_normalization_issues i
-                      ON i.company_id = raw.company_id
-                     AND i.raw_record_id = raw.raw_id
-                    GROUP BY raw.raw_id
-                )
-                SELECT r.company_id,
-                       r.shop_ref,
-                       r.raw_id,
-                       r.external_id,
-                       r.normalization_status,
-                       r.fetched_at,
-                       r.last_seen_at,
-                       r.raw_updated_at,
-                       TO_CHAR(r.window_from, 'YYYY-MM-DD') AS window_from,
-                       TO_CHAR(r.window_to, 'YYYY-MM-DD') AS window_to,
-                       COALESCE(tx.tx_count, 0) AS tx_count,
-                       COALESCE(direct_tx.direct_raw_tx_count, 0) AS direct_raw_tx_count,
-                       tx.last_tx_updated_at,
-                       COALESCE(issues.open_issues, 0) AS open_issues,
-                       CASE WHEN %s THEN 1 ELSE 0 END AS needs_normalization
-                FROM raw r
-                LEFT JOIN tx ON tx.raw_id = r.raw_id
-                LEFT JOIN direct_tx ON direct_tx.raw_id = r.raw_id
-                LEFT JOIN issues ON issues.raw_id = r.raw_id
-                WHERE TRUE
-                %s
-                ORDER BY needs_normalization DESC,
-                         r.window_from ASC,
-                         r.window_to ASC,
-                         r.company_id ASC,
-                         r.shop_ref ASC,
-                         r.fetched_at ASC
-                LIMIT %d",
-                $windowFrom,
-                $windowTo,
-                implode(' AND ', $conditions),
-                $problemPredicate,
-                $problemFilter,
-                $limit,
+                "WITH raw(raw_id, company_id, shop_ref, selected_date) AS (VALUES %s)
+                 SELECT raw.raw_id,
+                        COUNT(ft.id) AS tx_count,
+                        MAX(ft.updated_at) AS last_tx_updated_at
+                 FROM raw
+                 LEFT JOIN ingest_financial_transactions ft
+                   ON ft.company_id = raw.company_id
+                  AND ft.shop_ref = raw.shop_ref
+                  AND ft.source = :source
+                  AND ft.external_id LIKE 'ozon:accrual-by-day:%%'
+                  AND ft.occurred_at >= raw.selected_date
+                  AND ft.occurred_at < raw.selected_date + INTERVAL '1 day'
+                 GROUP BY raw.raw_id",
+                $values,
             ),
             $params,
         );
 
-        return $rows;
+        $indexed = [];
+        foreach ($rows as $row) {
+            $indexed[(string) $row['raw_id']] = [
+                'tx_count' => (int) $row['tx_count'],
+                'last_tx_updated_at' => $row['last_tx_updated_at'] ?? null,
+            ];
+        }
+
+        return $indexed;
+    }
+
+    /**
+     * @param list<string> $rawIds
+     *
+     * @return array<string, int>
+     */
+    private function directRawTxCounts(array $rawIds): array
+    {
+        if ([] === $rawIds) {
+            return [];
+        }
+
+        $rows = $this->connection->executeQuery(
+            'SELECT raw_record_id, COUNT(id) AS tx_count
+             FROM ingest_financial_transactions
+             WHERE source = :source
+               AND raw_record_id IN (:rawIds)
+             GROUP BY raw_record_id',
+            [
+                'source' => IngestSource::OZON->value,
+                'rawIds' => $rawIds,
+            ],
+            [
+                'rawIds' => ArrayParameterType::STRING,
+            ],
+        )->fetchAllAssociative();
+
+        $indexed = [];
+        foreach ($rows as $row) {
+            $indexed[(string) $row['raw_record_id']] = (int) $row['tx_count'];
+        }
+
+        return $indexed;
+    }
+
+    /**
+     * @param list<string> $rawIds
+     *
+     * @return array<string, int>
+     */
+    private function openIssueCounts(array $rawIds): array
+    {
+        if ([] === $rawIds) {
+            return [];
+        }
+
+        $rows = $this->connection->executeQuery(
+            'SELECT raw_record_id, COUNT(id) FILTER (WHERE resolved_at IS NULL) AS open_issues
+             FROM ingest_normalization_issues
+             WHERE raw_record_id IN (:rawIds)
+             GROUP BY raw_record_id',
+            [
+                'rawIds' => $rawIds,
+            ],
+            [
+                'rawIds' => ArrayParameterType::STRING,
+            ],
+        )->fetchAllAssociative();
+
+        $indexed = [];
+        foreach ($rows as $row) {
+            $indexed[(string) $row['raw_record_id']] = (int) $row['open_issues'];
+        }
+
+        return $indexed;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rawRows
+     * @param array<string, mixed> $params
+     */
+    private function rawDateValues(array $rawRows, array &$params): string
+    {
+        $values = [];
+        $index = 0;
+        foreach ($rawRows as $row) {
+            foreach ($this->selectedDates($row) as $date) {
+                $params[sprintf('rawId%d', $index)] = (string) $row['id'];
+                $params[sprintf('companyId%d', $index)] = (string) $row['company_id'];
+                $params[sprintf('shopRef%d', $index)] = (string) $row['shop_ref'];
+                $params[sprintf('selectedDate%d', $index)] = $date;
+                $values[] = sprintf(
+                    '(CAST(:rawId%d AS UUID), CAST(:companyId%d AS UUID), :shopRef%d, CAST(:selectedDate%d AS DATE))',
+                    $index,
+                    $index,
+                    $index,
+                    $index,
+                );
+                ++$index;
+            }
+        }
+
+        return implode(', ', $values);
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     *
+     * @return list<string>
+     */
+    private function selectedDates(array $row): array
+    {
+        $dates = [];
+        if (is_array($row['selected_dates'] ?? null)) {
+            foreach ($row['selected_dates'] as $date) {
+                $date = trim((string) $date);
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+                    $dates[$date] = $date;
+                }
+            }
+        }
+
+        if ([] !== $dates) {
+            sort($dates);
+
+            return array_values($dates);
+        }
+
+        $from = \DateTimeImmutable::createFromFormat('!Y-m-d', substr((string) ($row['window_from'] ?? ''), 0, 10));
+        $to = \DateTimeImmutable::createFromFormat('!Y-m-d', substr((string) ($row['window_to'] ?? ''), 0, 10));
+        if (false === $from || false === $to || $from > $to) {
+            return [];
+        }
+
+        for ($cursor = $from; $cursor <= $to; $cursor = $cursor->modify('+1 day')) {
+            $dates[] = $cursor->format('Y-m-d');
+        }
+
+        return $dates;
     }
 
     /**

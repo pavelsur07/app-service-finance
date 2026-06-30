@@ -6,9 +6,9 @@ namespace App\Ingestion\Command;
 
 use App\Ingestion\Application\Source\Ozon\OzonAccrualByDayPreviewMapper;
 use App\Ingestion\Application\Source\Ozon\OzonAccrualPreviewTransaction;
-use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Facade\RawStorageFacade;
+use App\Ingestion\Infrastructure\Query\OzonAccrualRawRecordQuery;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -34,6 +34,7 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
         private readonly Connection $connection,
         private readonly RawStorageFacade $rawStorageFacade,
         private readonly OzonAccrualByDayPreviewMapper $previewMapper,
+        private readonly OzonAccrualRawRecordQuery $rawRecordQuery,
     ) {
         parent::__construct();
     }
@@ -106,32 +107,7 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
      */
     private function rawRecords(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, int $limit): array
     {
-        return $this->connection->fetchAllAssociative(
-            sprintf(
-                'SELECT r.id,
-                        r.resource_type,
-                        r.external_id,
-                        r.fetched_at,
-                        r.byte_size,
-                        r.normalization_status
-                 FROM ingest_raw_records r
-                 LEFT JOIN ingest_sync_jobs j ON j.id::text = r.sync_job_id AND j.company_id = r.company_id
-                 WHERE r.company_id = :companyId
-                   AND r.source = :source
-                   AND r.resource_type = :resourceType
-                   AND (j.id IS NULL OR j.window_from IS NULL OR j.window_to IS NULL OR (j.window_from <= :toDate AND j.window_to >= :fromDate))
-                 ORDER BY r.fetched_at DESC, r.created_at DESC
-                 LIMIT %d',
-                $limit,
-            ),
-            [
-                'companyId' => $companyId,
-                'source' => IngestSource::OZON->value,
-                'resourceType' => OzonResourceType::ACCRUAL_BY_DAY,
-                'fromDate' => $from->format('Y-m-d'),
-                'toDate' => $to->format('Y-m-d'),
-            ],
-        );
+        return $this->rawRecordQuery->latestCoverageRows($companyId, null, $from, $to, $limit);
     }
 
     /**
@@ -172,13 +148,14 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
     ): \Generator {
         foreach ($rawRecords as $rawRecord) {
             $recordRows = 0;
+            $selectedDates = $this->selectedDateSet($rawRecord);
             foreach ($this->rawStorageFacade->read((string) $rawRecord['id'], $companyId) as $row) {
                 if ($recordRows >= $rowLimit) {
                     break;
                 }
 
                 ++$recordRows;
-                if (!$this->rowDateInWindow($row, $from, $to)) {
+                if (!$this->rowDateInWindow($row, $from, $to, $selectedDates)) {
                     continue;
                 }
 
@@ -190,14 +167,38 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
     /**
      * @param array<string, mixed> $row
      */
-    private function rowDateInWindow(array $row, \DateTimeImmutable $from, \DateTimeImmutable $to): bool
+    private function rowDateInWindow(array $row, \DateTimeImmutable $from, \DateTimeImmutable $to, array $selectedDates): bool
     {
         $date = trim((string) ($row['date'] ?? ''));
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
             return false;
         }
 
+        if ([] !== $selectedDates) {
+            return isset($selectedDates[$date]);
+        }
+
         return $date >= $from->format('Y-m-d') && $date <= $to->format('Y-m-d');
+    }
+
+    /**
+     * @param array<string, mixed> $rawRecord
+     *
+     * @return array<string, true>
+     */
+    private function selectedDateSet(array $rawRecord): array
+    {
+        $dates = $rawRecord['selected_dates'] ?? [];
+        if (!is_array($dates)) {
+            return [];
+        }
+
+        $set = [];
+        foreach ($dates as $date) {
+            $set[(string) $date] = true;
+        }
+
+        return $set;
     }
 
     /**

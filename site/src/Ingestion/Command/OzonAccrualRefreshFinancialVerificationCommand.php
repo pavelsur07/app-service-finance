@@ -18,6 +18,7 @@ use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\NormalizationIssueKind;
 use App\Ingestion\Enum\RawNormalizationStatus;
 use App\Ingestion\Facade\RawStorageFacade;
+use App\Ingestion\Infrastructure\Query\OzonAccrualRawRecordQuery;
 use App\Ingestion\Repository\FinancialTransactionRepository;
 use App\Ingestion\Repository\IngestRawRecordRepository;
 use App\Ingestion\Repository\NormalizationIssueRepository;
@@ -56,6 +57,7 @@ final class OzonAccrualRefreshFinancialVerificationCommand extends Command
         private readonly RawStorageFacade $rawStorageFacade,
         private readonly OzonAccrualByDayPreviewMapper $previewMapper,
         private readonly FinancialTransactionRepository $transactionRepository,
+        private readonly OzonAccrualRawRecordQuery $rawRecordQuery,
     ) {
         parent::__construct();
     }
@@ -183,10 +185,6 @@ final class OzonAccrualRefreshFinancialVerificationCommand extends Command
         int $limit,
         bool $includeDone,
     ): array {
-        $externalWindowFrom = "substring(r.external_id from '^accrual-by-day:([0-9]{4}-[0-9]{2}-[0-9]{2}):[0-9]{4}-[0-9]{2}-[0-9]{2}$')::date";
-        $externalWindowTo = "substring(r.external_id from '^accrual-by-day:[0-9]{4}-[0-9]{2}-[0-9]{2}:([0-9]{4}-[0-9]{2}-[0-9]{2})$')::date";
-        $windowFrom = sprintf('COALESCE(j.window_from, %s, DATE(r.fetched_at))', $externalWindowFrom);
-        $windowTo = sprintf('COALESCE(j.window_to, j.window_from, %s, %s, DATE(r.fetched_at))', $externalWindowTo, $externalWindowFrom);
         $statuses = [
             RawNormalizationStatus::PENDING->value,
             RawNormalizationStatus::SKIPPED->value,
@@ -196,66 +194,34 @@ final class OzonAccrualRefreshFinancialVerificationCommand extends Command
             $statuses[] = RawNormalizationStatus::DONE->value;
         }
 
-        $conditions = [
-            'r.source = :source',
-            'r.resource_type = :resourceType',
-            'r.normalization_status IN (:statuses)',
-            sprintf('%s <= :toDate', $windowFrom),
-            sprintf('%s >= :fromDate', $windowTo),
-        ];
-        $params = [
-            'source' => IngestSource::OZON->value,
-            'resourceType' => OzonResourceType::ACCRUAL_BY_DAY,
-            'statuses' => $statuses,
-            'fromDate' => $from->format('Y-m-d'),
-            'toDate' => $to->format('Y-m-d'),
-        ];
-        $types = ['statuses' => ArrayParameterType::STRING];
+        $rows = $this->rawRecordQuery->latestCoverageRows($companyId, $shopRef, $from, $to, 0, $statuses);
+        usort($rows, static fn (array $left, array $right): int => [
+            self::statusSort((string) $left['normalization_status']),
+            (string) $left['window_from'],
+            (string) $left['window_to'],
+            (string) $left['company_id'],
+            (string) $left['shop_ref'],
+            (string) $left['fetched_at'],
+        ] <=> [
+            self::statusSort((string) $right['normalization_status']),
+            (string) $right['window_from'],
+            (string) $right['window_to'],
+            (string) $right['company_id'],
+            (string) $right['shop_ref'],
+            (string) $right['fetched_at'],
+        ]);
 
-        if (null !== $companyId) {
-            $conditions[] = 'r.company_id = :companyId';
-            $params['companyId'] = $companyId;
-        }
-        if (null !== $shopRef && '' !== $shopRef) {
-            $conditions[] = 'r.shop_ref = :shopRef';
-            $params['shopRef'] = $shopRef;
-        }
+        return array_slice($rows, 0, $limit);
+    }
 
-        return $this->connection->fetchAllAssociative(
-            sprintf(
-                'SELECT r.company_id,
-                        r.id,
-                        r.external_id,
-                        r.shop_ref,
-                        r.fetched_at,
-                        r.byte_size,
-                        r.normalization_status,
-                        TO_CHAR(%s, \'YYYY-MM-DD\') AS window_from,
-                        TO_CHAR(%s, \'YYYY-MM-DD\') AS window_to
-                 FROM ingest_raw_records r
-                 LEFT JOIN ingest_sync_jobs j ON j.id::text = r.sync_job_id AND j.company_id = r.company_id
-                 WHERE %s
-                 ORDER BY CASE r.normalization_status
-                              WHEN \'pending\' THEN 0
-                              WHEN \'failed\' THEN 1
-                              WHEN \'skipped\' THEN 2
-                              ELSE 3
-                          END ASC,
-                          %s ASC,
-                          %s ASC,
-                          r.fetched_at ASC,
-                          r.created_at ASC
-                 LIMIT %d',
-                $windowFrom,
-                $windowTo,
-                implode(' AND ', $conditions),
-                $windowFrom,
-                $windowTo,
-                $limit,
-            ),
-            $params,
-            $types,
-        );
+    private static function statusSort(string $status): int
+    {
+        return match ($status) {
+            RawNormalizationStatus::PENDING->value => 0,
+            RawNormalizationStatus::FAILED->value => 1,
+            RawNormalizationStatus::SKIPPED->value => 2,
+            default => 3,
+        };
     }
 
     /**
@@ -598,7 +564,7 @@ final class OzonAccrualRefreshFinancialVerificationCommand extends Command
 
     /**
      * @param list<array<string, mixed>> $rows
-     * @param array<string, string>      $ids
+     * @param array<string, string> $ids
      *
      * @return array<string, array<string, string>>
      */
