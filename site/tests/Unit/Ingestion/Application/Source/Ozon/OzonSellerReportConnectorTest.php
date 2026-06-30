@@ -148,36 +148,6 @@ final class OzonSellerReportConnectorTest extends TestCase
                 '_ingestion_metadata' => [
                     'windowFrom' => '2026-06-01',
                     'windowTo' => '2026-06-02',
-                    'apiMetadata' => [
-                        [
-                            'date' => '2026-06-01',
-                            'metadata' => [
-                                'pageCount' => 1,
-                                'rowCount' => 0,
-                                'pages' => [[
-                                    'page' => 1,
-                                    'lastId' => null,
-                                    'nextLastId' => null,
-                                    'rowCount' => 0,
-                                    'metadata' => ['endpoint' => '/v1/finance/accrual/by-day'],
-                                ]],
-                            ],
-                        ],
-                        [
-                            'date' => '2026-06-02',
-                            'metadata' => [
-                                'pageCount' => 1,
-                                'rowCount' => 0,
-                                'pages' => [[
-                                    'page' => 1,
-                                    'lastId' => null,
-                                    'nextLastId' => null,
-                                    'rowCount' => 0,
-                                    'metadata' => ['endpoint' => '/v1/finance/accrual/by-day'],
-                                ]],
-                            ],
-                        ],
-                    ],
                 ],
             ],
         ], $result->rawBatch->rows);
@@ -300,6 +270,48 @@ final class OzonSellerReportConnectorTest extends TestCase
             ['date' => '2026-06-01', 'accrual_id' => 'row-2'],
             ['date' => '2026-06-01', 'accrual_id' => 'row-3'],
         ], $result->rawBatch->rows);
+    }
+
+    public function testPullAccrualByDayDoesNotStopAfterOneHundredPages(): void
+    {
+        $accrualClient = new class implements OzonAccrualClientInterface {
+            public int $calls = 0;
+
+            public function fetchPostings(string $companyId, string $connectionRef, array $postingNumbers): OzonRawPage
+            {
+                throw new \LogicException('Not used.');
+            }
+
+            public function fetchByDay(string $companyId, string $connectionRef, \DateTimeImmutable $date, ?string $lastId = null): OzonRawPage
+            {
+                ++$this->calls;
+
+                return new OzonRawPage(
+                    rows: [['date' => $date->format('Y-m-d'), 'accrual_id' => sprintf('row-%03d', $this->calls)]],
+                    hasMore: $this->calls < 101,
+                    nextPageToken: $this->calls < 101 ? sprintf('cursor-%03d', $this->calls) : null,
+                );
+            }
+
+            public function fetchTypes(string $companyId, string $connectionRef): OzonRawPage
+            {
+                throw new \LogicException('Not used.');
+            }
+        };
+
+        $result = $this->connector($accrualClient)->pull(new PullRequest(
+            companyId: Uuid::uuid7()->toString(),
+            connectionRef: 'connection-1',
+            shopRef: 'shop-1',
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            cursorValue: null,
+            windowFrom: new \DateTimeImmutable('2026-06-01'),
+            windowTo: new \DateTimeImmutable('2026-06-01'),
+            syncJobId: Uuid::uuid7()->toString(),
+        ));
+
+        self::assertSame(101, $accrualClient->calls);
+        self::assertCount(101, $result->rawBatch->rows);
     }
 
     public function testPullAccrualByDayRejectsRepeatedLastId(): void

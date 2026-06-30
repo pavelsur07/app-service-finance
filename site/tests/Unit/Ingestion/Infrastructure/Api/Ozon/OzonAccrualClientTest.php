@@ -113,6 +113,31 @@ final class OzonAccrualClientTest extends TestCase
         self::assertSame('next-last-id', $page->nextPageToken);
     }
 
+    public function testFetchByDayIgnoresHasNextWhenLastIdIsEmpty(): void
+    {
+        $http = new MockHttpClient(static fn (): MockResponse => new MockResponse(
+            '{"result":{"accruals":[{"date":"2026-06-13","accrual_id":3}],"last_id":"","has_next":true}}',
+            ['http_code' => 200],
+        ));
+
+        $client = new OzonAccrualClient(
+            $http,
+            $this->credentialProvider(),
+            new NullLogger(),
+        );
+
+        $page = $client->fetchByDay(
+            '0192f0c2-0000-7000-8000-000000000001',
+            '0192f0c2-0000-7000-8000-000000000002',
+            new \DateTimeImmutable('2026-06-13'),
+            'previous-last-id',
+        );
+
+        self::assertSame([['date' => '2026-06-13', 'accrual_id' => 3]], $page->rows);
+        self::assertFalse($page->hasMore);
+        self::assertNull($page->nextPageToken);
+    }
+
     public function testFetchTypesSendsEmptyJsonObjectAndExtractsAccrualTypes(): void
     {
         $capturedUrl = null;

@@ -93,8 +93,9 @@ final readonly class OzonAccrualClient implements OzonAccrualClientInterface
         $result = is_array($payload['result'] ?? null) ? $payload['result'] : [];
         $nextLastId = $lastIdPagination ? $this->stringValue($result['last_id'] ?? $payload['last_id'] ?? null) : null;
         $total = $this->intValue($result['total'] ?? $payload['total'] ?? null);
-        $hasMore = null !== $nextLastId
-            || (bool) ($result['has_next'] ?? $result['has_more'] ?? $payload['has_next'] ?? $payload['has_more'] ?? false);
+        $hasMore = $lastIdPagination
+            ? null !== $nextLastId
+            : (bool) ($result['has_next'] ?? $result['has_more'] ?? $payload['has_next'] ?? $payload['has_more'] ?? false);
 
         if (!$hasMore && !$lastIdPagination && $total > 0 && $pageSize > 0) {
             $hasMore = ($offset + \count($rows)) < $total;

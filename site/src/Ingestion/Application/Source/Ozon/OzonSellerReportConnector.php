@@ -21,7 +21,6 @@ use Symfony\Component\Clock\ClockInterface;
 final readonly class OzonSellerReportConnector implements SourceConnectorInterface
 {
     private const INCREMENTAL_CONTINUATION_DELAY_SECONDS = 1;
-    private const MAX_ACCRUAL_BY_DAY_PAGES_PER_DAY = 100;
 
     public function __construct(
         private OzonAccrualClientInterface $accrualClient,
@@ -96,19 +95,11 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
     {
         [$from, $to] = $this->resolveDailyWindow($request);
         $rows = [];
-        $apiMetadata = [];
 
         foreach ($this->eachDay($from, $to) as $date) {
-            $daily = $this->fetchAccrualByDayPages($request, $date);
+            $dailyRows = $this->fetchAccrualByDayPages($request, $date);
 
-            if ([] !== $daily['rows']) {
-                array_push($rows, ...$daily['rows']);
-            }
-
-            $apiMetadata[] = [
-                'date' => $date->format('Y-m-d'),
-                'metadata' => $daily['metadata'],
-            ];
+            array_push($rows, ...$dailyRows);
         }
 
         $rows = $this->sortRowsCanonically($rows);
@@ -135,7 +126,6 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
                     [
                         'windowFrom' => $from->format('Y-m-d'),
                         'windowTo' => $to->format('Y-m-d'),
-                        'apiMetadata' => $apiMetadata,
                     ],
                 ),
             ),
@@ -146,15 +136,13 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
     }
 
     /**
-     * @return array{rows: list<array<string, mixed>>, metadata: array<string, mixed>}
+     * @return list<array<string, mixed>>
      */
     private function fetchAccrualByDayPages(PullRequest $request, \DateTimeImmutable $date): array
     {
         $rows = [];
-        $pages = [];
         $seenLastIds = [];
         $lastId = null;
-        $pageNumber = 1;
 
         while (true) {
             $page = $this->accrualClient->fetchByDay(
@@ -172,43 +160,19 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
                 ? trim($page->nextPageToken)
                 : null;
 
-            $pages[] = [
-                'page' => $pageNumber,
-                'lastId' => $lastId,
-                'nextLastId' => $nextLastId,
-                'rowCount' => \count($page->rows),
-                'metadata' => $page->metadata,
-            ];
-
-            if (!$page->hasMore) {
-                break;
-            }
-
             if (null === $nextLastId) {
-                throw new \RuntimeException(sprintf('Ozon accrual by-day page for %s has more rows but no next last_id.', $date->format('Y-m-d')));
+                break;
             }
 
             if (isset($seenLastIds[$nextLastId])) {
                 throw new \RuntimeException(sprintf('Ozon accrual by-day page for %s repeated last_id "%s".', $date->format('Y-m-d'), $nextLastId));
             }
 
-            if ($pageNumber >= self::MAX_ACCRUAL_BY_DAY_PAGES_PER_DAY) {
-                throw new \RuntimeException(sprintf('Ozon accrual by-day page limit exceeded for %s.', $date->format('Y-m-d')));
-            }
-
             $seenLastIds[$nextLastId] = true;
             $lastId = $nextLastId;
-            ++$pageNumber;
         }
 
-        return [
-            'rows' => $rows,
-            'metadata' => [
-                'pageCount' => \count($pages),
-                'rowCount' => \count($rows),
-                'pages' => $pages,
-            ],
-        ];
+        return $rows;
     }
 
     private function pullAccrualTypes(PullRequest $request): PullResult
