@@ -32,6 +32,7 @@ final class WbFinancialReportsOrchestrateCommand extends Command
     private const GLOBAL_BUCKET = 'global';
     private const MODE_OPERATIONAL = 'operational';
     private const MODE_HISTORICAL_RECOVERY = 'historical-recovery';
+    private const EMPTY_REFRESH_MAX_ATTEMPTS = 5;
 
     public function __construct(
         private readonly ActiveWbConnectionsQuery $activeWbConnectionsQuery,
@@ -108,6 +109,9 @@ final class WbFinancialReportsOrchestrateCommand extends Command
                 $recoveryMissingCount = $hasRecoveryWindow
                     ? $this->countMissing($companyIdValue, $connectionIdValue, $recoveryFrom, $yesterday)
                     : 0;
+                $recoveryEmptyCount = $hasRecoveryWindow
+                    ? $this->countRetryableEmpty($companyIdValue, $connectionIdValue, $recoveryFrom, $yesterday)
+                    : 0;
                 $historicalMissingCount = $historicalTo >= $currentYearStart
                     ? $this->countMissing($companyIdValue, $connectionIdValue, $currentYearStart, $historicalTo)
                     : 0;
@@ -147,7 +151,20 @@ final class WbFinancialReportsOrchestrateCommand extends Command
                                 }
                             }
 
-                            if (0 === $dispatched && 0 === $recoveryDueRetryCount && 0 === $recoveryMissingCount) {
+                            if (0 === $dispatched && 0 === $recoveryDueRetryCount && 0 === $recoveryMissingCount && $recoveryEmptyCount > 0) {
+                                $dispatched = $this->planner->planEmptyRefresh(
+                                    $companyIdValue,
+                                    $connectionIdValue,
+                                    1,
+                                    $recoveryFrom,
+                                    $yesterday,
+                                    self::EMPTY_REFRESH_MAX_ATTEMPTS,
+                                );
+                                $action = $dispatched > 0 ? 'recovery empty refresh' : 'recovery empty skipped by claim';
+                                $reason = $dispatched > 0 ? 'planned' : 'status not claimable';
+                            }
+
+                            if (0 === $dispatched && 0 === $recoveryDueRetryCount && 0 === $recoveryMissingCount && 0 === $recoveryEmptyCount) {
                                 $dispatched = $this->planner->planRefreshRecentDays($companyIdValue, $connectionIdValue, $refreshDaysBack, 1);
                                 if ($dispatched > 0) {
                                     $action = 'refresh last '.$refreshDaysBack.' days';
@@ -182,6 +199,7 @@ final class WbFinancialReportsOrchestrateCommand extends Command
                     (string) $recoveryDueRetryCount,
                     (string) $historicalDueRetryCount,
                     (string) $recoveryMissingCount,
+                    (string) $recoveryEmptyCount,
                     (string) $historicalMissingCount,
                 ];
             }
@@ -195,6 +213,7 @@ final class WbFinancialReportsOrchestrateCommand extends Command
                 'recovery_due_retry_count',
                 'historical_due_retry_count',
                 'recovery_missing_count',
+                'recovery_empty_count',
                 'historical_missing_count',
             ], $rows);
             $io->success(sprintf('WB finance orchestration completed. Dispatched %d task(s).', $totalDispatched));
@@ -254,6 +273,29 @@ final class WbFinancialReportsOrchestrateCommand extends Command
                 'reportType' => self::REPORT_TYPE,
                 'fromDate' => $from->format('Y-m-d'),
                 'toDate' => $to->format('Y-m-d'),
+            ],
+        );
+    }
+
+    private function countRetryableEmpty(string $companyId, string $connectionId, \DateTimeImmutable $from, \DateTimeImmutable $to): int
+    {
+        return (int) $this->connection->fetchOne(
+            "SELECT COUNT(*)
+             FROM marketplace_financial_report_sync_statuses
+             WHERE company_id = :companyId
+               AND connection_id = :connectionId
+               AND marketplace = 'wildberries'
+               AND report_type = :reportType
+               AND business_date BETWEEN :fromDate AND :toDate
+               AND status = 'empty'
+               AND attempts < :maxAttempts",
+            [
+                'companyId' => $companyId,
+                'connectionId' => $connectionId,
+                'reportType' => self::REPORT_TYPE,
+                'fromDate' => $from->format('Y-m-d'),
+                'toDate' => $to->format('Y-m-d'),
+                'maxAttempts' => self::EMPTY_REFRESH_MAX_ATTEMPTS,
             ],
         );
     }

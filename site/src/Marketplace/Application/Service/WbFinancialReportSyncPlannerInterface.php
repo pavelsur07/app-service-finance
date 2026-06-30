@@ -17,6 +17,15 @@ interface WbFinancialReportSyncPlannerInterface
 
     public function planDueRetry(?string $companyId = null, ?string $connectionId = null, int $maxDays = 1, ?DateTimeImmutable $from = null, ?DateTimeImmutable $to = null): int;
 
+    public function planEmptyRefresh(
+        ?string $companyId = null,
+        ?string $connectionId = null,
+        int $maxDays = 1,
+        ?DateTimeImmutable $from = null,
+        ?DateTimeImmutable $to = null,
+        int $maxAttempts = 5,
+    ): int;
+
     /**
      * @deprecated Use planRangeLimited() from console commands. planRange() schedules full explicit range without dispatch limit.
      */

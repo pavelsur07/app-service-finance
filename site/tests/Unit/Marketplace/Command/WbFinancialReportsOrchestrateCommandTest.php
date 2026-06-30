@@ -315,6 +315,47 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
         self::assertSame(Command::SUCCESS, $this->execute($this->rateLimiter()));
     }
 
+    public function testRecoveryEmptyRefreshRunsBeforeRecentRefresh(): void
+    {
+        $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
+        $this->db->method('fetchOne')->willReturnCallback($this->dbFetchOneCallback(
+            ['company-a:conn-a' => 'success'],
+            ['company-a:conn-a:2026-05-01:2026-05-20' => 0],
+            [],
+            ['company-a:conn-a:2026-05-01:2026-05-20' => 20],
+            ['company-a:conn-a:2026-05-01:2026-05-20' => 2],
+        ));
+        $this->planner->expects(self::never())->method('planDueRetry');
+        $this->planner->expects(self::never())->method('planMissing');
+        $this->planner->expects(self::never())->method('planRefreshRecentDays');
+        $this->planner->expects(self::once())->method('planEmptyRefresh')->with(
+            'company-a',
+            'conn-a',
+            1,
+            self::callback(static fn (\DateTimeImmutable $date): bool => '2026-05-01' === $date->format('Y-m-d')),
+            self::callback(static fn (\DateTimeImmutable $date): bool => '2026-05-20' === $date->format('Y-m-d')),
+            5,
+        )->willReturn(1);
+
+        self::assertSame(Command::SUCCESS, $this->execute($this->rateLimiter()));
+    }
+
+    public function testRecentRefreshRunsWhenRetryableEmptyRowsDoNotExist(): void
+    {
+        $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
+        $this->db->method('fetchOne')->willReturnCallback($this->dbFetchOneCallback(
+            ['company-a:conn-a' => 'success'],
+            ['company-a:conn-a:2026-05-01:2026-05-20' => 0],
+            [],
+            ['company-a:conn-a:2026-05-01:2026-05-20' => 20],
+            ['company-a:conn-a:2026-05-01:2026-05-20' => 0],
+        ));
+        $this->planner->expects(self::never())->method('planEmptyRefresh');
+        $this->planner->expects(self::once())->method('planRefreshRecentDays')->with('company-a', 'conn-a', 2, 1)->willReturn(1);
+
+        self::assertSame(Command::SUCCESS, $this->execute($this->rateLimiter()));
+    }
+
     public function testFirstBusinessDayOfMonthDoesNotQueryEmptyRecoveryWindow(): void
     {
         $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
@@ -364,10 +405,11 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
      * @param array<string, int> $dueRetryCounts keyed by company:connection or company:connection:from:to
      * @param array<string, int> $futureQueuedCounts
      * @param array<string, int> $knownDayCounts keyed by company:connection or company:connection:from:to
+     * @param array<string, int> $emptyCounts keyed by company:connection or company:connection:from:to
      */
-    private function dbFetchOneCallback(array $dailyStatuses, array $dueRetryCounts = [], array $futureQueuedCounts = [], array $knownDayCounts = []): \Closure
+    private function dbFetchOneCallback(array $dailyStatuses, array $dueRetryCounts = [], array $futureQueuedCounts = [], array $knownDayCounts = [], array $emptyCounts = []): \Closure
     {
-        return static function (string $sql, array $params = []) use ($dailyStatuses, $dueRetryCounts, $futureQueuedCounts, $knownDayCounts): mixed {
+        return static function (string $sql, array $params = []) use ($dailyStatuses, $dueRetryCounts, $futureQueuedCounts, $knownDayCounts, $emptyCounts): mixed {
             $key = ($params['companyId'] ?? '').':'.($params['connectionId'] ?? '');
             $rangeKey = $key.':'.($params['fromDate'] ?? '').':'.($params['toDate'] ?? '');
             if (str_contains($sql, 'COUNT(DISTINCT business_date)')) {
@@ -382,6 +424,9 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
             }
             if (str_contains($sql, "status = 'queued'") && str_contains($sql, 'next_retry_at > NOW()')) {
                 return $futureQueuedCounts[$rangeKey] ?? $futureQueuedCounts[$key] ?? 0;
+            }
+            if (str_contains($sql, "status = 'empty'")) {
+                return $emptyCounts[$rangeKey] ?? $emptyCounts[$key] ?? 0;
             }
             if (str_contains($sql, "status IN ('queued', 'failed')")) {
                 return $dueRetryCounts[$rangeKey] ?? $dueRetryCounts[$key] ?? 0;
