@@ -601,6 +601,43 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
         self::assertSame('refresh_14d', $this->dispatchedMessages[0]->mode);
     }
 
+    public function testPlanEmptyRefreshForceRefreshesRetryableEmptyDaysOnly(): void
+    {
+        $planner = $this->planner();
+        $this->connections->method('execute')->willReturn([$this->conn('c1', 'co1')]);
+        $this->statuses->method('findStatusesForDateRange')->willReturn([
+            $this->statusEntity('2026-05-18', FinancialReportSyncStatus::EMPTY, null, '2026-05-18T09:00:00+03:00', attempts: 5),
+            $this->statusEntity('2026-05-19', FinancialReportSyncStatus::SUCCESS, null, '2026-05-19T09:00:00+03:00'),
+            $this->statusEntity('2026-05-20', FinancialReportSyncStatus::EMPTY, null, '2026-05-20T09:00:00+03:00', attempts: 2),
+        ]);
+        $this->claimForQueueCallback = function (
+            string $connectionId,
+            string $companyId,
+            MarketplaceType $marketplace,
+            string $reportType,
+            string $apiEndpoint,
+            \DateTimeImmutable $businessDate,
+            FinancialReportSyncMode $mode,
+            bool $forceRefresh,
+            \DateTimeImmutable $now,
+        ): MarketplaceFinancialReportSyncStatus {
+            self::assertSame(FinancialReportSyncMode::REFRESH_14D, $mode);
+            self::assertTrue($forceRefresh);
+
+            return $this->statusEntity(
+                $businessDate->format('Y-m-d'),
+                FinancialReportSyncStatus::QUEUED,
+                null,
+                $now->format(DATE_ATOM),
+            );
+        };
+
+        self::assertSame(1, $planner->planEmptyRefresh(null, null, 1, new \DateTimeImmutable('2026-05-01'), new \DateTimeImmutable('2026-05-20'), 5));
+        self::assertSame('2026-05-20', $this->dispatchedMessages[0]->businessDate);
+        self::assertSame('refresh_14d', $this->dispatchedMessages[0]->mode);
+        self::assertTrue($this->dispatchedMessages[0]->forceRefresh);
+    }
+
     private function planner(): WbFinancialReportSyncPlanner
     {
         return new WbFinancialReportSyncPlanner(
@@ -620,6 +657,7 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
         ?int $nextRrdId = null,
         ?string $stagingRawDocumentId = null,
         ?FinancialReportSyncMode $mode = FinancialReportSyncMode::REFRESH_14D,
+        int $attempts = 0,
     ): MarketplaceFinancialReportSyncStatus&MockObject {
         $entity = $this->createMock(MarketplaceFinancialReportSyncStatus::class);
         $entity->method('getBusinessDate')->willReturn(new \DateTimeImmutable($day.' 00:00:00 Europe/Moscow'));
@@ -629,6 +667,7 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
         $entity->method('getNextRrdId')->willReturn($nextRrdId);
         $entity->method('getStagingRawDocumentId')->willReturn($stagingRawDocumentId);
         $entity->method('getMode')->willReturn($mode);
+        $entity->method('getAttempts')->willReturn($attempts);
 
         return $entity;
     }

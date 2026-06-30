@@ -87,7 +87,7 @@ class MarketplaceController extends AbstractController
             $row['status_enum'] = FinancialReportSyncStatus::from((string) $row['status']);
 
             return $row;
-        }, $this->wbFinanceSyncStatusListQuery->findRecentDays((string) $company->getId(), 14));
+        }, $this->wbFinanceSyncStatusListQuery->findCurrentMonthDays((string) $company->getId()));
 
         return $this->render('marketplace/index.html.twig', [
             'connections'           => $connections,

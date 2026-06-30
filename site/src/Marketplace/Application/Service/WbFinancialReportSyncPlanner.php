@@ -197,6 +197,61 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         return $dispatched;
     }
 
+    public function planEmptyRefresh(
+        ?string $companyId = null,
+        ?string $connectionId = null,
+        int $maxDays = 1,
+        ?DateTimeImmutable $from = null,
+        ?DateTimeImmutable $to = null,
+        int $maxAttempts = 5,
+    ): int {
+        if ($maxDays <= 0 || $maxAttempts <= 0) {
+            return 0;
+        }
+
+        $dispatched = 0;
+        $from ??= $this->periodResolver->currentMonthStart();
+        $to ??= $this->periodResolver->yesterday();
+
+        foreach ($this->activeConnections($companyId, $connectionId) as $connection) {
+            $statuses = $this->syncStatusRepository->findStatusesForDateRange(
+                $connection['company_id'],
+                $connection['connection_id'],
+                MarketplaceType::WILDBERRIES,
+                self::REPORT_TYPE,
+                $from,
+                $to,
+            );
+
+            $emptyDays = [];
+            foreach ($statuses as $status) {
+                if (FinancialReportSyncStatus::EMPTY !== $status->getStatus() || $status->getAttempts() >= $maxAttempts) {
+                    continue;
+                }
+
+                $emptyDays[] = $status->getBusinessDate();
+            }
+
+            usort($emptyDays, static fn (DateTimeImmutable $a, DateTimeImmutable $b): int => $a->getTimestamp() <=> $b->getTimestamp());
+
+            $scheduledForConnection = 0;
+            foreach ($emptyDays as $day) {
+                if ($scheduledForConnection >= $maxDays) {
+                    break;
+                }
+
+                if (!$this->claimAndDispatch($connection['company_id'], $connection['connection_id'], $day, FinancialReportSyncMode::REFRESH_14D, true)) {
+                    continue;
+                }
+
+                ++$dispatched;
+                ++$scheduledForConnection;
+            }
+        }
+
+        return $dispatched;
+    }
+
 
     /**
      * @deprecated Use planRangeLimited() from console commands. planRange() schedules full explicit range without dispatch limit.
