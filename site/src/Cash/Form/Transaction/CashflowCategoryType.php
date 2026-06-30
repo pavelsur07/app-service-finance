@@ -32,16 +32,22 @@ class CashflowCategoryType extends AbstractType
             ->add('status', EnumType::class, [
                 'class' => CashflowCategoryStatus::class,
                 'label' => 'Статус',
-            ])
-            ->add('flowKind', ChoiceType::class, [
-                'label' => 'Вид потока',
+            ]);
+
+        if ($options['allow_flow_kind_edit']) {
+            $builder->add('flowKind', ChoiceType::class, [
+                'label' => 'Вид деятельности',
                 'choices' => [
-                    CashflowFlowKind::OPERATING->value => CashflowFlowKind::OPERATING,
-                    CashflowFlowKind::INVESTING->value => CashflowFlowKind::INVESTING,
-                    CashflowFlowKind::FINANCING->value => CashflowFlowKind::FINANCING,
+                    CashflowFlowKind::OPERATING->label() => CashflowFlowKind::OPERATING,
+                    CashflowFlowKind::INVESTING->label() => CashflowFlowKind::INVESTING,
+                    CashflowFlowKind::FINANCING->label() => CashflowFlowKind::FINANCING,
+                    CashflowFlowKind::TECHNICAL->label() => CashflowFlowKind::TECHNICAL,
                 ],
                 'choice_value' => static fn (?CashflowFlowKind $flowKind) => $flowKind?->value,
-            ])
+            ]);
+        }
+
+        $builder
             ->add('isSystem', CheckboxType::class, [
                 'label' => 'Системная категория',
                 'required' => false,
@@ -70,7 +76,7 @@ class CashflowCategoryType extends AbstractType
             ->add('parent', EntityType::class, [
                 'class' => CashflowCategory::class,
                 'choices' => $options['parents'],
-                'choice_label' => function (CashflowCategory $item) {
+                'choice_label' => static function (CashflowCategory $item) {
                     return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
                 },
                 'required' => false,
@@ -79,7 +85,7 @@ class CashflowCategoryType extends AbstractType
             ->add('plCategory', EntityType::class, [
                 'class' => PLCategory::class,
                 'choices' => $options['plCategories'],
-                'choice_label' => function (PLCategory $item) {
+                'choice_label' => static function (PLCategory $item) {
                     return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
                 },
                 'required' => false,
@@ -94,6 +100,7 @@ class CashflowCategoryType extends AbstractType
             'data_class' => CashflowCategory::class,
             'parents' => [],
             'plCategories' => [],
+            'allow_flow_kind_edit' => false,
         ]);
     }
 }

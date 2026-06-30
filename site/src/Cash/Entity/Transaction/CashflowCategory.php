@@ -2,12 +2,12 @@
 
 namespace App\Cash\Entity\Transaction;
 
+use App\Cash\Enum\PaymentPlan\PaymentPlanType;
 use App\Cash\Enum\Transaction\CashflowCategoryStatus;
 use App\Cash\Enum\Transaction\CashflowFlowKind;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Entity\Company;
 use App\Finance\Entity\PLCategory;
-use App\Cash\Enum\PaymentPlan\PaymentPlanType;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -134,9 +134,23 @@ class CashflowCategory
 
     public function setParent(?self $parent): self
     {
+        if ($this->parent === $parent) {
+            return $this;
+        }
+
+        $this->parent?->children->removeElement($this);
         $this->parent = $parent;
 
+        if (null !== $parent && !$parent->children->contains($this)) {
+            $parent->children->add($this);
+        }
+
         return $this;
+    }
+
+    public function isRoot(): bool
+    {
+        return null === $this->parent;
     }
 
     public function getChildren(): Collection
@@ -212,6 +226,31 @@ class CashflowCategory
     public function setFlowKind(CashflowFlowKind $kind): self
     {
         $this->flowKind = $kind;
+
+        return $this;
+    }
+
+    public function getEffectiveFlowKind(): CashflowFlowKind
+    {
+        return $this->parent?->getEffectiveFlowKind() ?? $this->flowKind;
+    }
+
+    public function syncFlowKindWithParent(): self
+    {
+        if (null !== $this->parent) {
+            $this->flowKind = $this->parent->getEffectiveFlowKind();
+        }
+
+        return $this;
+    }
+
+    public function syncFlowKindSubtree(): self
+    {
+        $this->syncFlowKindWithParent();
+
+        foreach ($this->children as $child) {
+            $child->syncFlowKindSubtree();
+        }
 
         return $this;
     }
