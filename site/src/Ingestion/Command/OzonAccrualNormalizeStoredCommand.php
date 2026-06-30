@@ -8,15 +8,13 @@ use App\Ingestion\Application\Action\NormalizeRawRecordAction;
 use App\Ingestion\Application\Action\RecordNormalizationIssueAction;
 use App\Ingestion\Application\Command\NormalizeRawRecordCommand;
 use App\Ingestion\Application\Command\RecordNormalizationIssueCommand;
-use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Entity\IngestRawRecord;
-use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\NormalizationIssueKind;
 use App\Ingestion\Enum\RawNormalizationStatus;
+use App\Ingestion\Infrastructure\Query\OzonAccrualRawRecordQuery;
 use App\Ingestion\Message\NormalizeRawRecordMessage;
 use App\Ingestion\Repository\IngestRawRecordRepository;
 use App\Ingestion\Repository\NormalizationIssueRepository;
-use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -42,6 +40,7 @@ final class OzonAccrualNormalizeStoredCommand extends Command
         private readonly MessageBusInterface $messageBus,
         private readonly NormalizeRawRecordAction $normalizeRawRecordAction,
         private readonly RecordNormalizationIssueAction $recordNormalizationIssueAction,
+        private readonly OzonAccrualRawRecordQuery $rawRecordQuery,
     ) {
         parent::__construct();
     }
@@ -126,18 +125,6 @@ final class OzonAccrualNormalizeStoredCommand extends Command
         int $limit,
         bool $includeDone,
     ): array {
-        $externalWindowFrom = "substring(r.external_id from '^accrual-by-day:([0-9]{4}-[0-9]{2}-[0-9]{2}):[0-9]{4}-[0-9]{2}-[0-9]{2}$')::date";
-        $externalWindowTo = "substring(r.external_id from '^accrual-by-day:[0-9]{4}-[0-9]{2}-[0-9]{2}:([0-9]{4}-[0-9]{2}-[0-9]{2})$')::date";
-        $windowFrom = sprintf('COALESCE(j.window_from, %s, DATE(r.fetched_at))', $externalWindowFrom);
-        $windowTo = sprintf('COALESCE(j.window_to, j.window_from, %s, %s, DATE(r.fetched_at))', $externalWindowTo, $externalWindowFrom);
-        $conditions = [
-            'r.company_id = :companyId',
-            'r.source = :source',
-            'r.resource_type = :resourceType',
-            'r.normalization_status IN (:statuses)',
-            sprintf('%s <= :toDate', $windowFrom),
-            sprintf('%s >= :fromDate', $windowTo),
-        ];
         $statuses = [
             RawNormalizationStatus::SKIPPED->value,
             RawNormalizationStatus::FAILED->value,
@@ -145,48 +132,8 @@ final class OzonAccrualNormalizeStoredCommand extends Command
         if ($includeDone) {
             $statuses[] = RawNormalizationStatus::DONE->value;
         }
-        $params = [
-            'companyId' => $companyId,
-            'source' => IngestSource::OZON->value,
-            'resourceType' => OzonResourceType::ACCRUAL_BY_DAY,
-            'statuses' => $statuses,
-            'fromDate' => $from->format('Y-m-d'),
-            'toDate' => $to->format('Y-m-d'),
-        ];
-        $types = [
-            'statuses' => ArrayParameterType::STRING,
-        ];
 
-        if (null !== $shopRef && '' !== $shopRef) {
-            $conditions[] = 'r.shop_ref = :shopRef';
-            $params['shopRef'] = $shopRef;
-        }
-
-        return $this->connection->fetchAllAssociative(
-            sprintf(
-                'SELECT r.id,
-                        r.external_id,
-                        r.shop_ref,
-                        r.fetched_at,
-                        r.byte_size,
-                        r.normalization_status,
-                        TO_CHAR(%s, \'YYYY-MM-DD\') AS window_from,
-                        TO_CHAR(%s, \'YYYY-MM-DD\') AS window_to
-                 FROM ingest_raw_records r
-                 LEFT JOIN ingest_sync_jobs j ON j.id::text = r.sync_job_id AND j.company_id = r.company_id
-                 WHERE %s
-                 ORDER BY %s ASC, %s ASC, r.fetched_at ASC, r.created_at ASC
-                 LIMIT %d',
-                $windowFrom,
-                $windowTo,
-                implode(' AND ', $conditions),
-                $windowFrom,
-                $windowTo,
-                $limit,
-            ),
-            $params,
-            $types,
-        );
+        return $this->rawRecordQuery->latestCoverageRows($companyId, $shopRef, $from, $to, $limit, $statuses);
     }
 
     /**

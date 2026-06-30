@@ -9,6 +9,7 @@ use App\Ingestion\Application\Source\Ozon\OzonAccrualByDayRawAggregator;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Facade\RawStorageFacade;
+use App\Ingestion\Infrastructure\Query\OzonAccrualRawRecordQuery;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -37,6 +38,7 @@ final class OzonAccrualCompareCommand extends Command
         private readonly Connection $connection,
         private readonly RawStorageFacade $rawStorageFacade,
         private readonly OzonAccrualByDayRawAggregator $byDayRawAggregator,
+        private readonly OzonAccrualRawRecordQuery $rawRecordQuery,
     ) {
         parent::__construct();
     }
@@ -72,9 +74,9 @@ final class OzonAccrualCompareCommand extends Command
         $this->printCanonicalSummary($io, $companyId, $from, $to);
         $rawRecords = $this->rawRecords($companyId, $resourceType, $from, $to, $rawLimit);
         $this->printRawRecords($io, $rawRecords);
-        $this->printRawStructureSummary($io, $companyId, $rawRecords, $rawRowLimit);
+        $this->printRawStructureSummary($io, $companyId, $rawRecords, $rawRowLimit, $from, $to);
         if (OzonResourceType::ACCRUAL_BY_DAY === $resourceType) {
-            $aggregate = $this->byDayRawAggregator->aggregate($this->rawRows($companyId, $rawRecords, $rawRowLimit));
+            $aggregate = $this->byDayRawAggregator->aggregate($this->rawRows($companyId, $rawRecords, $rawRowLimit, $from, $to));
             $this->printByDayAggregate($io, $aggregate);
             $this->printDailyComparison($io, $aggregate, $this->canonicalDailyNetRows($companyId, $from, $to));
         }
@@ -169,6 +171,10 @@ final class OzonAccrualCompareCommand extends Command
         \DateTimeImmutable $to,
         int $limit,
     ): array {
+        if (OzonResourceType::ACCRUAL_BY_DAY === $resourceType) {
+            return $this->rawRecordQuery->latestCoverageRows($companyId, null, $from, $to, $limit);
+        }
+
         return $this->connection->fetchAllAssociative(
             sprintf(
                 'SELECT r.id,
@@ -225,8 +231,14 @@ final class OzonAccrualCompareCommand extends Command
     /**
      * @param list<array<string, mixed>> $rawRecords
      */
-    private function printRawStructureSummary(SymfonyStyle $io, string $companyId, array $rawRecords, int $rowLimit): void
-    {
+    private function printRawStructureSummary(
+        SymfonyStyle $io,
+        string $companyId,
+        array $rawRecords,
+        int $rowLimit,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+    ): void {
         if ([] === $rawRecords) {
             return;
         }
@@ -238,12 +250,17 @@ final class OzonAccrualCompareCommand extends Command
 
         foreach ($rawRecords as $rawRecord) {
             $recordRows = 0;
+            $selectedDates = $this->selectedDateSet($rawRecord);
             foreach ($this->rawStorageFacade->read((string) $rawRecord['id'], $companyId) as $row) {
                 if ($recordRows >= $rowLimit) {
                     break;
                 }
 
                 ++$recordRows;
+                if (!$this->rowDateInWindow($row, $from, $to, $selectedDates)) {
+                    continue;
+                }
+
                 ++$scannedRows;
 
                 foreach ($row as $key => $value) {
@@ -320,19 +337,66 @@ final class OzonAccrualCompareCommand extends Command
      *
      * @return \Generator<int, array<string, mixed>>
      */
-    private function rawRows(string $companyId, array $rawRecords, int $rowLimit): \Generator
-    {
+    private function rawRows(
+        string $companyId,
+        array $rawRecords,
+        int $rowLimit,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+    ): \Generator {
         foreach ($rawRecords as $rawRecord) {
             $recordRows = 0;
+            $selectedDates = $this->selectedDateSet($rawRecord);
             foreach ($this->rawStorageFacade->read((string) $rawRecord['id'], $companyId) as $row) {
                 if ($recordRows >= $rowLimit) {
                     break;
                 }
 
                 ++$recordRows;
+                if (!$this->rowDateInWindow($row, $from, $to, $selectedDates)) {
+                    continue;
+                }
+
                 yield $row;
             }
         }
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private function rowDateInWindow(array $row, \DateTimeImmutable $from, \DateTimeImmutable $to, array $selectedDates): bool
+    {
+        $date = trim((string) ($row['date'] ?? ''));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            return [] === $selectedDates;
+        }
+
+        if ([] !== $selectedDates) {
+            return isset($selectedDates[$date]);
+        }
+
+        return $date >= $from->format('Y-m-d') && $date <= $to->format('Y-m-d');
+    }
+
+    /**
+     * @param array<string, mixed> $rawRecord
+     *
+     * @return array<string, true>
+     */
+    private function selectedDateSet(array $rawRecord): array
+    {
+        $dates = $rawRecord['selected_dates'] ?? [];
+        if (!is_array($dates)) {
+            return [];
+        }
+
+        $set = [];
+        foreach ($dates as $date) {
+            $set[(string) $date] = true;
+        }
+
+        return $set;
     }
 
     private function printByDayAggregate(SymfonyStyle $io, OzonAccrualByDayRawAggregate $aggregate): void

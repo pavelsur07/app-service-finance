@@ -6,11 +6,11 @@ namespace App\Ingestion\Application\Action;
 
 use App\Ingestion\Application\DTO\MappedTransaction;
 use App\Ingestion\Application\Source\Ozon\OzonAccrualByDayMapper;
-use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Entity\FinancialTransaction;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\RawNormalizationStatus;
 use App\Ingestion\Facade\RawStorageFacade;
+use App\Ingestion\Infrastructure\Query\OzonAccrualRawRecordQuery;
 use App\Ingestion\Repository\FinancialTransactionRepository;
 use App\Ingestion\Repository\IngestRawRecordRepository;
 use Doctrine\DBAL\Connection;
@@ -40,6 +40,7 @@ final readonly class RefreshOzonAccrualCategoryMetadataAction
         private RawStorageFacade $rawStorageFacade,
         private OzonAccrualByDayMapper $mapper,
         private EntityManagerInterface $entityManager,
+        private OzonAccrualRawRecordQuery $rawRecordQuery,
     ) {
     }
 
@@ -73,59 +74,14 @@ final readonly class RefreshOzonAccrualCategoryMetadataAction
         int $limit,
         int $offset = 0,
     ): array {
-        $limit = max(1, min(500, $limit));
-        $offset = max(0, $offset);
-        $externalWindowFrom = "substring(r.external_id from '^accrual-by-day:([0-9]{4}-[0-9]{2}-[0-9]{2}):[0-9]{4}-[0-9]{2}-[0-9]{2}$')::date";
-        $externalWindowTo = "substring(r.external_id from '^accrual-by-day:[0-9]{4}-[0-9]{2}-[0-9]{2}:([0-9]{4}-[0-9]{2}-[0-9]{2})$')::date";
-        $windowFrom = sprintf('COALESCE(j.window_from, %s, DATE(r.fetched_at))', $externalWindowFrom);
-        $windowTo = sprintf('COALESCE(j.window_to, j.window_from, %s, %s, DATE(r.fetched_at))', $externalWindowTo, $externalWindowFrom);
-        $conditions = [
-            'r.company_id = :companyId',
-            'r.source = :source',
-            'r.resource_type = :resourceType',
-            'r.normalization_status = :status',
-            sprintf('%s <= :toDate', $windowFrom),
-            sprintf('%s >= :fromDate', $windowTo),
-        ];
-        $params = [
-            'companyId' => $companyId,
-            'source' => IngestSource::OZON->value,
-            'resourceType' => OzonResourceType::ACCRUAL_BY_DAY,
-            'status' => RawNormalizationStatus::DONE->value,
-            'fromDate' => $from->format('Y-m-d'),
-            'toDate' => $to->format('Y-m-d'),
-        ];
-
-        if (null !== $shopRef && '' !== $shopRef) {
-            $conditions[] = 'r.shop_ref = :shopRef';
-            $params['shopRef'] = $shopRef;
-        }
-
-        return $this->connection->fetchAllAssociative(
-            sprintf(
-                'SELECT r.id,
-                        r.external_id,
-                        r.shop_ref,
-                        r.fetched_at,
-                        r.byte_size,
-                        r.normalization_status,
-                        TO_CHAR(%s, \'YYYY-MM-DD\') AS window_from,
-                        TO_CHAR(%s, \'YYYY-MM-DD\') AS window_to
-                 FROM ingest_raw_records r
-                 LEFT JOIN ingest_sync_jobs j ON j.id::text = r.sync_job_id AND j.company_id = r.company_id
-                 WHERE %s
-                 ORDER BY %s ASC, %s ASC, r.fetched_at ASC, r.created_at ASC
-                 LIMIT %d
-                 OFFSET %d',
-                $windowFrom,
-                $windowTo,
-                implode(' AND ', $conditions),
-                $windowFrom,
-                $windowTo,
-                $limit,
-                $offset,
-            ),
-            $params,
+        return $this->rawRecordQuery->latestCoverageRows(
+            $companyId,
+            $shopRef,
+            $from,
+            $to,
+            max(1, min(500, $limit)),
+            [RawNormalizationStatus::DONE->value],
+            max(0, $offset),
         );
     }
 
@@ -134,42 +90,7 @@ final readonly class RefreshOzonAccrualCategoryMetadataAction
      */
     public function rawRecord(string $companyId, string $rawRecordId): ?array
     {
-        $externalWindowFrom = "substring(r.external_id from '^accrual-by-day:([0-9]{4}-[0-9]{2}-[0-9]{2}):[0-9]{4}-[0-9]{2}-[0-9]{2}$')::date";
-        $externalWindowTo = "substring(r.external_id from '^accrual-by-day:[0-9]{4}-[0-9]{2}-[0-9]{2}:([0-9]{4}-[0-9]{2}-[0-9]{2})$')::date";
-        $windowFrom = sprintf('COALESCE(j.window_from, %s, DATE(r.fetched_at))', $externalWindowFrom);
-        $windowTo = sprintf('COALESCE(j.window_to, j.window_from, %s, %s, DATE(r.fetched_at))', $externalWindowTo, $externalWindowFrom);
-
-        $row = $this->connection->fetchAssociative(
-            sprintf(
-                'SELECT r.id,
-                        r.external_id,
-                        r.shop_ref,
-                        r.fetched_at,
-                        r.byte_size,
-                        r.normalization_status,
-                        TO_CHAR(%s, \'YYYY-MM-DD\') AS window_from,
-                        TO_CHAR(%s, \'YYYY-MM-DD\') AS window_to
-                 FROM ingest_raw_records r
-                 LEFT JOIN ingest_sync_jobs j ON j.id::text = r.sync_job_id AND j.company_id = r.company_id
-                 WHERE r.id = :rawRecordId
-                   AND r.company_id = :companyId
-                   AND r.source = :source
-                   AND r.resource_type = :resourceType
-                   AND r.normalization_status = :status
-                 LIMIT 1',
-                $windowFrom,
-                $windowTo,
-            ),
-            [
-                'rawRecordId' => $rawRecordId,
-                'companyId' => $companyId,
-                'source' => IngestSource::OZON->value,
-                'resourceType' => OzonResourceType::ACCRUAL_BY_DAY,
-                'status' => RawNormalizationStatus::DONE->value,
-            ],
-        );
-
-        return false === $row ? null : $row;
+        return $this->rawRecordQuery->doneRawRecord($companyId, $rawRecordId);
     }
 
     /**

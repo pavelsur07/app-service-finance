@@ -55,7 +55,7 @@ final class CoverageQuery
                 'COUNT(DISTINCT r.id) AS raw_count',
                 'COUNT(DISTINCT ft.id) AS tx_count',
                 'COUNT(DISTINCT ni.id) AS issue_count',
-                'MAX(r.fetched_at) AS last_fetched_at',
+                'MAX(GREATEST(r.fetched_at, COALESCE(r.last_seen_at, r.fetched_at))) AS last_fetched_at',
             )
             ->from('ingest_raw_records', 'r')
             ->leftJoin(
