@@ -66,6 +66,40 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
         self::assertSame(Command::SUCCESS, $this->execute($rateLimiter));
     }
 
+    public function testFutureQueuedRecoveryRowDoesNotBlockDailyYesterday(): void
+    {
+        $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
+        $this->db->method('fetchOne')->willReturnCallback($this->dbFetchOneCallback(
+            ['company-a:conn-a' => null],
+            [],
+            ['company-a:conn-a:2026-05-01:2026-05-20' => 1],
+        ));
+        $this->planner->expects(self::once())->method('planDaily')->with('company-a', 'conn-a', false)->willReturn(1);
+        $this->planner->expects(self::never())->method('planDueRetry');
+        $this->planner->expects(self::never())->method('planMissing');
+        $this->planner->expects(self::never())->method('planRefreshRecentDays');
+
+        self::assertSame(Command::SUCCESS, $this->execute($this->rateLimiter()));
+    }
+
+    public function testFutureQueuedRecoveryRowStillBlocksRecoveryAfterDailyComplete(): void
+    {
+        $tester = null;
+        $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
+        $this->db->method('fetchOne')->willReturnCallback($this->dbFetchOneCallback(
+            ['company-a:conn-a' => 'success'],
+            [],
+            ['company-a:conn-a:2026-05-01:2026-05-20' => 1],
+        ));
+        $this->planner->expects(self::never())->method('planDaily');
+        $this->planner->expects(self::never())->method('planDueRetry');
+        $this->planner->expects(self::never())->method('planMissing');
+        $this->planner->expects(self::never())->method('planRefreshRecentDays');
+
+        self::assertSame(Command::SUCCESS, $this->execute($this->rateLimiter(), [], $tester));
+        self::assertStringContainsString('queued future retry exists in recovery window', $tester->getDisplay());
+    }
+
     public function testDailyStatusIsReadOnlyForDailyMode(): void
     {
         $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);

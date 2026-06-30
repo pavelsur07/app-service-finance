@@ -117,8 +117,6 @@ final class WbFinancialReportsOrchestrateCommand extends Command
 
                 if (null !== $connectionCooldownUntil) {
                     $reason = 'connection cooldown until '.$connectionCooldownUntil->format(\DateTimeInterface::ATOM);
-                } elseif ($futureQueuedCount > 0) {
-                    $reason = 'queued future retry exists in recovery window';
                 } else {
                     if (self::MODE_HISTORICAL_RECOVERY !== $mode) {
                         $dailyStatus = $this->findDailyStatus($companyIdValue, $connectionIdValue, $yesterday);
@@ -127,41 +125,49 @@ final class WbFinancialReportsOrchestrateCommand extends Command
                             $action = $dispatched > 0 ? 'daily yesterday' : 'daily skipped by claim';
                             $reason = $dispatched > 0 ? 'planned' : 'status not claimable';
                         }
+                    }
 
-                        if (0 === $dispatched && $recoveryDueRetryCount > 0) {
-                            $dispatched = $this->planner->planDueRetry($companyIdValue, $connectionIdValue, 1, $recoveryFrom, $yesterday);
-                            $action = $dispatched > 0 ? 'recovery due retry' : 'recovery due retry skipped by claim';
+                    if (0 === $dispatched && $futureQueuedCount > 0) {
+                        if ('skipped' === $action) {
+                            $reason = 'queued future retry exists in recovery window';
+                        }
+                    } else {
+                        if (self::MODE_HISTORICAL_RECOVERY !== $mode) {
+                            if (0 === $dispatched && $recoveryDueRetryCount > 0) {
+                                $dispatched = $this->planner->planDueRetry($companyIdValue, $connectionIdValue, 1, $recoveryFrom, $yesterday);
+                                $action = $dispatched > 0 ? 'recovery due retry' : 'recovery due retry skipped by claim';
+                                $reason = $dispatched > 0 ? 'planned' : 'status not claimable';
+                            }
+
+                            if (0 === $dispatched && 0 === $recoveryDueRetryCount && $recoveryMissingCount > 0) {
+                                $dispatched = $this->planner->planMissing($companyIdValue, $connectionIdValue, 1, $recoveryFrom, $yesterday);
+                                if ($dispatched > 0) {
+                                    $action = 'recovery missing';
+                                    $reason = 'planned';
+                                }
+                            }
+
+                            if (0 === $dispatched && 0 === $recoveryDueRetryCount && 0 === $recoveryMissingCount) {
+                                $dispatched = $this->planner->planRefreshRecentDays($companyIdValue, $connectionIdValue, $refreshDaysBack, 1);
+                                if ($dispatched > 0) {
+                                    $action = 'refresh last '.$refreshDaysBack.' days';
+                                    $reason = 'planned';
+                                }
+                            }
+                        }
+
+                        if (0 === $dispatched && $includeHistoricalRetry && $historicalDueRetryCount > 0) {
+                            $dispatched = $this->planner->planDueRetry($companyIdValue, $connectionIdValue, $historicalMaxDays, $currentYearStart, $historicalTo);
+                            $action = $dispatched > 0 ? 'historical due retry' : 'historical due retry skipped by claim';
                             $reason = $dispatched > 0 ? 'planned' : 'status not claimable';
                         }
 
-                        if (0 === $dispatched && 0 === $recoveryDueRetryCount && $recoveryMissingCount > 0) {
-                            $dispatched = $this->planner->planMissing($companyIdValue, $connectionIdValue, 1, $recoveryFrom, $yesterday);
+                        if (0 === $dispatched && $includeHistoricalRetry && 0 === $historicalDueRetryCount && $historicalMissingCount > 0) {
+                            $dispatched = $this->planner->planMissing($companyIdValue, $connectionIdValue, $historicalMaxDays, $currentYearStart, $historicalTo);
                             if ($dispatched > 0) {
-                                $action = 'recovery missing';
+                                $action = 'historical missing';
                                 $reason = 'planned';
                             }
-                        }
-
-                        if (0 === $dispatched && 0 === $recoveryDueRetryCount && 0 === $recoveryMissingCount) {
-                            $dispatched = $this->planner->planRefreshRecentDays($companyIdValue, $connectionIdValue, $refreshDaysBack, 1);
-                            if ($dispatched > 0) {
-                                $action = 'refresh last '.$refreshDaysBack.' days';
-                                $reason = 'planned';
-                            }
-                        }
-                    }
-
-                    if (0 === $dispatched && $includeHistoricalRetry && $historicalDueRetryCount > 0) {
-                        $dispatched = $this->planner->planDueRetry($companyIdValue, $connectionIdValue, $historicalMaxDays, $currentYearStart, $historicalTo);
-                        $action = $dispatched > 0 ? 'historical due retry' : 'historical due retry skipped by claim';
-                        $reason = $dispatched > 0 ? 'planned' : 'status not claimable';
-                    }
-
-                    if (0 === $dispatched && $includeHistoricalRetry && 0 === $historicalDueRetryCount && $historicalMissingCount > 0) {
-                        $dispatched = $this->planner->planMissing($companyIdValue, $connectionIdValue, $historicalMaxDays, $currentYearStart, $historicalTo);
-                        if ($dispatched > 0) {
-                            $action = 'historical missing';
-                            $reason = 'planned';
                         }
                     }
                 }
