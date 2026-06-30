@@ -23,12 +23,15 @@ export interface UnitExtendedItem {
     revenue: number;
     quantity: number;
     returnsTotal: number;
+    returnsQuantity: number;
     costPriceTotal: number;
     costPriceUnit: number;
     stockQty: number;
     stockCapitalRub: number;
     commission: number;
+    commissionAverageRub: number | null;
     adSpend: number;
+    cacRub: number | null;
     drrPercent: number | null;
     logistics: number;
     otherCosts: number;
@@ -44,9 +47,12 @@ export interface UnitExtendedTotals {
     revenue: number;
     quantity: number;
     returnsTotal: number;
+    returnsQuantity: number;
     costPriceTotal: number;
     commission: number;
+    commissionAverageRub: number | null;
     adSpend: number;
+    cacRub: number | null;
     drrPercent: number | null;
     logistics: number;
     otherCosts: number;

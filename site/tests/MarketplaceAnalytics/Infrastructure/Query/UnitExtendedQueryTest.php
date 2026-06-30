@@ -4,16 +4,22 @@ declare(strict_types=1);
 
 namespace App\Tests\MarketplaceAnalytics\Infrastructure\Query;
 
+use App\Inventory\Facade\InventoryFacade;
 use App\Marketplace\DTO\ListingCostCategoryAggregateDTO;
 use App\Marketplace\DTO\ListingMetaDTO;
 use App\Marketplace\DTO\ListingReturnAggregateDTO;
 use App\Marketplace\DTO\ListingSalesAggregateDTO;
 use App\Marketplace\Facade\MarketplaceFacade;
-use App\Inventory\Facade\InventoryFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
 use App\MarketplaceAnalytics\Infrastructure\Query\UnitExtendedQuery;
+use DG\BypassFinals;
 use PHPUnit\Framework\TestCase;
+
+BypassFinals::allowPaths([
+    '*/src/MarketplaceAds/Facade/MarketplaceAdsFacade.php',
+    '*/src/Inventory/Facade/InventoryFacade.php',
+]);
 
 final class UnitExtendedQueryTest extends TestCase
 {
@@ -25,6 +31,24 @@ final class UnitExtendedQueryTest extends TestCase
     private MarketplaceAdsFacade $adsFacade;
     private InventoryFacade $inventoryFacade;
     private UnitExtendedQuery $query;
+
+    /** @var array<string, ListingSalesAggregateDTO> */
+    private array $salesAggregates = [];
+    /** @var array<string, ListingReturnAggregateDTO> */
+    private array $returnAggregates = [];
+    /** @var array<string, list<ListingCostCategoryAggregateDTO>> */
+    private array $costAggregates = [];
+    /** @var array<string, ListingMetaDTO> */
+    private array $listingMeta = [];
+    /** @var array<string, float> */
+    private array $stockQtyByListing = [];
+    /** @var array<string, string> */
+    private array $adSpendByListing = [];
+    private string $totalAdSpend = '0';
+    /** @var array{string, \DateTimeImmutable, \DateTimeImmutable, ?string}|null */
+    private ?array $lastAdSpendCall = null;
+    /** @var array{string, \DateTimeImmutable, \DateTimeImmutable, ?string}|null */
+    private ?array $lastTotalAdSpendCall = null;
 
     protected function setUp(): void
     {
@@ -38,11 +62,38 @@ final class UnitExtendedQueryTest extends TestCase
             new MarketplaceCostAnalyticsGroupResolver(),
         );
 
-        // Defaults — overridden per test where needed
-        $this->marketplaceFacade->method('getReturnAggregatesByListing')->willReturn([]);
-        $this->marketplaceFacade->method('getCostAggregatesByListing')->willReturn([]);
-        $this->marketplaceFacade->method('getListingsMetaByIds')->willReturn([]);
-        $this->inventoryFacade->method('getStockQtyByListingOnReportDate')->willReturn([]);
+        $this->marketplaceFacade->method('getSalesAggregatesByListing')
+            ->willReturnCallback(fn (): array => $this->salesAggregates);
+        $this->marketplaceFacade->method('getReturnAggregatesByListing')
+            ->willReturnCallback(fn (): array => $this->returnAggregates);
+        $this->marketplaceFacade->method('getCostAggregatesByListing')
+            ->willReturnCallback(fn (): array => $this->costAggregates);
+        $this->marketplaceFacade->method('getListingsMetaByIds')
+            ->willReturnCallback(fn (): array => $this->listingMeta);
+        $this->inventoryFacade->method('getStockQtyByListingOnReportDate')
+            ->willReturnCallback(fn (): array => $this->stockQtyByListing);
+        $this->adsFacade->method('getAdSpendByListingForPeriod')
+            ->willReturnCallback(function (
+                string $companyId,
+                \DateTimeImmutable $from,
+                \DateTimeImmutable $to,
+                ?string $marketplace,
+            ): array {
+                $this->lastAdSpendCall = [$companyId, $from, $to, $marketplace];
+
+                return $this->adSpendByListing;
+            });
+        $this->adsFacade->method('getTotalAdCostForPeriod')
+            ->willReturnCallback(function (
+                string $companyId,
+                \DateTimeImmutable $from,
+                \DateTimeImmutable $to,
+                ?string $marketplace,
+            ): string {
+                $this->lastTotalAdSpendCall = [$companyId, $from, $to, $marketplace];
+
+                return $this->totalAdSpend;
+            });
     }
 
     public function testRowFormulaWithAdSpend(): void
@@ -170,6 +221,60 @@ final class UnitExtendedQueryTest extends TestCase
         self::assertSame(150.0, $result['totals']['roiPercent']);
     }
 
+    public function testAverageCommissionAndCacUseNetSoldQuantity(): void
+    {
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l-avg', 'Товар', 'SKU-AVG', 'ozon', '1000.00', 5, '300.00', 5),
+        ]);
+        $this->stubReturns([
+            new ListingReturnAggregateDTO('l-avg', '100.00', 1),
+        ]);
+        $this->stubCosts([
+            'l-avg' => [
+                new ListingCostCategoryAggregateDTO('l-avg', 'ozon_sale_commission', 'Комиссия Ozon', '100.00', '100.00', '0.00'),
+            ],
+        ]);
+        $this->stubAdSpend(['l-avg' => '80.00']);
+        $this->stubTotalAdSpend('120.00');
+
+        $result = $this->execute();
+        $row = $this->findRow($result['items'], 'l-avg');
+
+        self::assertNotNull($row);
+        self::assertSame(1, $row['returnsQuantity']);
+        self::assertSame(25.0, $row['commissionAverageRub']);
+        self::assertSame(20.0, $row['cacRub']);
+        self::assertSame(1, $result['totals']['returnsQuantity']);
+        self::assertSame(25.0, $result['totals']['commissionAverageRub']);
+        self::assertSame(30.0, $result['totals']['cacRub']);
+    }
+
+    public function testAverageCommissionAndCacAreNullWhenNetSoldQuantityIsNotPositive(): void
+    {
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l-zero-net', 'Товар', 'SKU-ZN', 'ozon', '100.00', 1, '20.00', 1),
+        ]);
+        $this->stubReturns([
+            new ListingReturnAggregateDTO('l-zero-net', '100.00', 1),
+        ]);
+        $this->stubCosts([
+            'l-zero-net' => [
+                new ListingCostCategoryAggregateDTO('l-zero-net', 'ozon_sale_commission', 'Комиссия Ozon', '10.00', '10.00', '0.00'),
+            ],
+        ]);
+        $this->stubAdSpend(['l-zero-net' => '5.00']);
+        $this->stubTotalAdSpend('5.00');
+
+        $result = $this->execute();
+        $row = $this->findRow($result['items'], 'l-zero-net');
+
+        self::assertNotNull($row);
+        self::assertNull($row['commissionAverageRub']);
+        self::assertNull($row['cacRub']);
+        self::assertNull($result['totals']['commissionAverageRub']);
+        self::assertNull($result['totals']['cacRub']);
+    }
+
     public function testWbAndOzonClassificationAndTotalsBeforeLimit(): void
     {
         $this->stubSales([
@@ -227,6 +332,7 @@ final class UnitExtendedQueryTest extends TestCase
         $penalty = $this->findBreakdownGroup($wb['allCostsBreakdown'], 'Другие услуги и штрафы');
         self::assertNotNull($penalty);
     }
+
     public function testMarketplaceFilterIsPropagatedToBothAdsFacadeCalls(): void
     {
         $this->stubSales([]);
@@ -236,21 +342,20 @@ final class UnitExtendedQueryTest extends TestCase
         $from = new \DateTimeImmutable(self::PERIOD_FROM);
         $to = new \DateTimeImmutable(self::PERIOD_TO);
 
-        $this->adsFacade
-            ->expects(self::once())
-            ->method('getAdSpendByListingForPeriod')
-            ->with(self::COMPANY_ID, $from, $to, $marketplaceArg)
-            ->willReturn([]);
-
-        $this->adsFacade
-            ->expects(self::once())
-            ->method('getTotalAdCostForPeriod')
-            ->with(self::COMPANY_ID, $from, $to, $marketplaceArg)
-            ->willReturn('0');
-
         $this->query->execute(self::COMPANY_ID, $marketplaceArg, self::PERIOD_FROM, self::PERIOD_TO);
-    }
 
+        self::assertNotNull($this->lastAdSpendCall);
+        self::assertSame(self::COMPANY_ID, $this->lastAdSpendCall[0]);
+        self::assertEquals($from, $this->lastAdSpendCall[1]);
+        self::assertEquals($to, $this->lastAdSpendCall[2]);
+        self::assertSame($marketplaceArg, $this->lastAdSpendCall[3]);
+
+        self::assertNotNull($this->lastTotalAdSpendCall);
+        self::assertSame(self::COMPANY_ID, $this->lastTotalAdSpendCall[0]);
+        self::assertEquals($from, $this->lastTotalAdSpendCall[1]);
+        self::assertEquals($to, $this->lastTotalAdSpendCall[2]);
+        self::assertSame($marketplaceArg, $this->lastTotalAdSpendCall[3]);
+    }
 
     public function testStockQtyAndCapitalCalculatedFromInventoryFacade(): void
     {
@@ -259,7 +364,7 @@ final class UnitExtendedQueryTest extends TestCase
         ]);
         $this->stubAdSpend([]);
         $this->stubTotalAdSpend('0');
-        $this->inventoryFacade->method('getStockQtyByListingOnReportDate')->willReturn(['l-stock' => 12.5]);
+        $this->stubStockQty(['l-stock' => 12.5]);
 
         $result = $this->execute();
         $row = $this->findRow($result['items'], 'l-stock');
@@ -275,7 +380,7 @@ final class UnitExtendedQueryTest extends TestCase
         ]);
         $this->stubAdSpend([]);
         $this->stubTotalAdSpend('0');
-        $this->inventoryFacade->method('getStockQtyByListingOnReportDate')->willReturn(['l-zero' => 7.0]);
+        $this->stubStockQty(['l-zero' => 7.0]);
 
         $result = $this->execute();
         $row = $this->findRow($result['items'], 'l-zero');
@@ -311,7 +416,7 @@ final class UnitExtendedQueryTest extends TestCase
         foreach ($sales as $s) {
             $keyed[$s->listingId] = $s;
         }
-        $this->marketplaceFacade->method('getSalesAggregatesByListing')->willReturn($keyed);
+        $this->salesAggregates = $keyed;
     }
 
     /**
@@ -319,7 +424,19 @@ final class UnitExtendedQueryTest extends TestCase
      */
     private function stubCosts(array $costs): void
     {
-        $this->marketplaceFacade->method('getCostAggregatesByListing')->willReturn($costs);
+        $this->costAggregates = $costs;
+    }
+
+    /**
+     * @param list<ListingReturnAggregateDTO> $returns
+     */
+    private function stubReturns(array $returns): void
+    {
+        $keyed = [];
+        foreach ($returns as $ret) {
+            $keyed[$ret->listingId] = $ret;
+        }
+        $this->returnAggregates = $keyed;
     }
 
     /**
@@ -331,7 +448,15 @@ final class UnitExtendedQueryTest extends TestCase
         foreach ($meta as $m) {
             $keyed[$m->id] = $m;
         }
-        $this->marketplaceFacade->method('getListingsMetaByIds')->willReturn($keyed);
+        $this->listingMeta = $keyed;
+    }
+
+    /**
+     * @param array<string, float> $stockQtyByListing
+     */
+    private function stubStockQty(array $stockQtyByListing): void
+    {
+        $this->stockQtyByListing = $stockQtyByListing;
     }
 
     /**
@@ -339,18 +464,17 @@ final class UnitExtendedQueryTest extends TestCase
      */
     private function stubAdSpend(array $byListing): void
     {
-        $this->adsFacade->method('getAdSpendByListingForPeriod')->willReturn($byListing);
+        $this->adSpendByListing = $byListing;
     }
 
     private function stubTotalAdSpend(string $value): void
     {
-        $this->adsFacade->method('getTotalAdCostForPeriod')->willReturn($value);
+        $this->totalAdSpend = $value;
     }
-
-
 
     /**
      * @param list<array<string, mixed>> $groups
+     *
      * @return array<string, mixed>|null
      */
     private function findBreakdownGroup(array $groups, string $serviceGroup): ?array
@@ -363,6 +487,7 @@ final class UnitExtendedQueryTest extends TestCase
 
         return null;
     }
+
     /**
      * @return array{items: list<array<string, mixed>>, totals: array<string, mixed>}
      */
@@ -378,6 +503,7 @@ final class UnitExtendedQueryTest extends TestCase
 
     /**
      * @param list<array<string, mixed>> $items
+     *
      * @return array<string, mixed>|null
      */
     private function findRow(array $items, string $listingId): ?array
