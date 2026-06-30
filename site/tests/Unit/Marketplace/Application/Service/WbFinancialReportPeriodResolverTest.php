@@ -33,6 +33,13 @@ final class WbFinancialReportPeriodResolverTest extends TestCase
         self::assertSame('2026-01-01 00:00:00 Europe/Moscow', $resolver->currentYearStart()->format('Y-m-d H:i:s e'));
     }
 
+    public function testCurrentMonthStartUsesCurrentBusinessMonth(): void
+    {
+        $resolver = new WbFinancialReportPeriodResolver(new MockClock('2026-05-20 12:00:00 Europe/Moscow'));
+
+        self::assertSame('2026-05-01 00:00:00 Europe/Moscow', $resolver->currentMonthStart()->format('Y-m-d H:i:s e'));
+    }
+
     public function testLast14DaysReturnsFourteenDatesIncludingYesterday(): void
     {
         $resolver = new WbFinancialReportPeriodResolver(new MockClock('2026-05-20 12:00:00 Europe/Moscow'));

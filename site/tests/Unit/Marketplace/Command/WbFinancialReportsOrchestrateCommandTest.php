@@ -77,6 +77,9 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
 
                 return 'success';
             }
+            if (str_contains($sql, 'COUNT(DISTINCT business_date)')) {
+                return 20;
+            }
 
             return 0;
         });
@@ -118,6 +121,9 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
             if (str_contains($sql, "status = 'queued'") && str_contains($sql, 'next_retry_at > NOW()')) {
                 return 0;
             }
+            if (str_contains($sql, 'COUNT(DISTINCT business_date)')) {
+                return 20;
+            }
             if (str_contains($sql, "status IN ('queued', 'failed')")) {
                 ++$dueRetrySqlAssertions;
                 self::assertStringContainsString('last_error_class = :rateLimitErrorClass', $sql);
@@ -135,18 +141,24 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
         self::assertSame(2, $dueRetrySqlAssertions);
     }
 
-    public function testOldDueRetryOutsideDefaultWindowFallsThroughToRefresh(): void
+    public function testCurrentMonthDueRetryOutsideLegacyWindowRunsBeforeRefresh(): void
     {
         $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
         $this->db->method('fetchOne')->willReturnCallback($this->dbFetchOneCallback(
             ['company-a:conn-a' => 'success'],
-            ['company-a:conn-a:2026-05-07:2026-05-20' => 0, 'company-a:conn-a:2026-01-01:2026-05-06' => 1],
+            ['company-a:conn-a:2026-05-01:2026-05-20' => 1],
         ));
-        $this->planner->expects(self::never())->method('planDueRetry');
-        $this->planner->expects(self::once())->method('planRefreshRecentDays')->with('company-a', 'conn-a', 2, 1)->willReturn(1);
+        $this->planner->expects(self::once())->method('planDueRetry')->with(
+            'company-a',
+            'conn-a',
+            1,
+            self::callback(static fn (\DateTimeImmutable $date): bool => '2026-05-01' === $date->format('Y-m-d')),
+            self::callback(static fn (\DateTimeImmutable $date): bool => '2026-05-20' === $date->format('Y-m-d')),
+        )->willReturn(1);
+        $this->planner->expects(self::never())->method('planRefreshRecentDays');
         $this->planner->expects(self::never())->method('planMissing');
 
-        self::assertSame(Command::SUCCESS, $this->execute($this->rateLimiter()));
+        self::assertSame(Command::SUCCESS, $this->execute($this->rateLimiter(), ['--retry-window-days' => '7']));
     }
 
     public function testRecentDueRetryInsideWindowRunsBeforeRefresh(): void
@@ -154,13 +166,13 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
         $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
         $this->db->method('fetchOne')->willReturnCallback($this->dbFetchOneCallback(
             ['company-a:conn-a' => 'success'],
-            ['company-a:conn-a:2026-05-07:2026-05-20' => 1],
+            ['company-a:conn-a:2026-05-01:2026-05-20' => 1],
         ));
         $this->planner->expects(self::once())->method('planDueRetry')->with(
             'company-a',
             'conn-a',
             1,
-            self::callback(static fn (\DateTimeImmutable $date): bool => '2026-05-07' === $date->format('Y-m-d')),
+            self::callback(static fn (\DateTimeImmutable $date): bool => '2026-05-01' === $date->format('Y-m-d')),
             self::callback(static fn (\DateTimeImmutable $date): bool => '2026-05-20' === $date->format('Y-m-d')),
         )->willReturn(1);
         $this->planner->expects(self::never())->method('planRefreshRecentDays');
@@ -174,7 +186,7 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
         $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
         $this->db->method('fetchOne')->willReturnCallback($this->dbFetchOneCallback(
             ['company-a:conn-a' => 'success'],
-            ['company-a:conn-a:2026-05-07:2026-05-20' => 0, 'company-a:conn-a:2026-01-01:2026-05-06' => 1],
+            ['company-a:conn-a:2026-05-01:2026-05-20' => 0, 'company-a:conn-a:2026-01-01:2026-04-30' => 1],
         ));
         $this->planner->expects(self::once())->method('planRefreshRecentDays')->with('company-a', 'conn-a', 2, 1)->willReturn(0);
         $this->planner->expects(self::once())->method('planDueRetry')->with(
@@ -182,7 +194,7 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
             'conn-a',
             1,
             self::callback(static fn (\DateTimeImmutable $date): bool => '2026-01-01' === $date->format('Y-m-d')),
-            self::callback(static fn (\DateTimeImmutable $date): bool => '2026-05-06' === $date->format('Y-m-d')),
+            self::callback(static fn (\DateTimeImmutable $date): bool => '2026-04-30' === $date->format('Y-m-d')),
         )->willReturn(1);
         $this->planner->expects(self::never())->method('planMissing');
 
@@ -194,7 +206,7 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
         $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
         $this->db->method('fetchOne')->willReturnCallback($this->dbFetchOneCallback(
             ['company-a:conn-a' => 'success'],
-            ['company-a:conn-a:2026-05-07:2026-05-20' => 0, 'company-a:conn-a:2026-01-01:2026-05-06' => 1],
+            ['company-a:conn-a:2026-05-01:2026-05-20' => 0, 'company-a:conn-a:2026-01-01:2026-04-30' => 1],
         ));
         $this->planner->expects(self::never())->method('planDueRetry');
         $this->planner->expects(self::once())->method('planRefreshRecentDays')->with('company-a', 'conn-a', 2, 1)->willReturn(1);
@@ -209,16 +221,16 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
         $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
         $this->db->method('fetchOne')->willReturnCallback($this->dbFetchOneCallback(
             ['company-a:conn-a' => 'success'],
-            ['company-a:conn-a:2026-05-07:2026-05-20' => 1],
+            ['company-a:conn-a:2026-05-01:2026-05-20' => 1],
             [],
-            ['company-a:conn-a:2026-05-07:2026-05-20' => 13],
+            ['company-a:conn-a:2026-05-01:2026-05-20' => 19],
         ));
         $this->planner->expects(self::once())->method('planDueRetry')->willReturn(0);
         $this->planner->expects(self::never())->method('planRefreshRecentDays');
         $this->planner->expects(self::never())->method('planMissing');
 
         self::assertSame(Command::SUCCESS, $this->execute($this->rateLimiter(), [], $tester));
-        self::assertStringContainsString('recent due retry skipped by claim', $tester->getDisplay());
+        self::assertStringContainsString('recovery due retry skipped by claim', $tester->getDisplay());
         self::assertStringContainsString('Dispatched 0 task(s).', $tester->getDisplay());
     }
 
@@ -228,9 +240,9 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
         $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
         $this->db->method('fetchOne')->willReturnCallback($this->dbFetchOneCallback(
             ['company-a:conn-a' => 'success'],
-            ['company-a:conn-a:2026-05-07:2026-05-20' => 0, 'company-a:conn-a:2026-01-01:2026-05-06' => 1],
+            ['company-a:conn-a:2026-05-01:2026-05-20' => 0, 'company-a:conn-a:2026-01-01:2026-04-30' => 1],
             [],
-            ['company-a:conn-a:2026-01-01:2026-05-06' => 0],
+            ['company-a:conn-a:2026-01-01:2026-04-30' => 0],
         ));
         $this->planner->expects(self::once())->method('planRefreshRecentDays')->with('company-a', 'conn-a', 2, 1)->willReturn(0);
         $this->planner->expects(self::once())->method('planDueRetry')->with(
@@ -238,7 +250,7 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
             'conn-a',
             1,
             self::callback(static fn (\DateTimeImmutable $date): bool => '2026-01-01' === $date->format('Y-m-d')),
-            self::callback(static fn (\DateTimeImmutable $date): bool => '2026-05-06' === $date->format('Y-m-d')),
+            self::callback(static fn (\DateTimeImmutable $date): bool => '2026-04-30' === $date->format('Y-m-d')),
         )->willReturn(0);
         $this->planner->expects(self::never())->method('planMissing');
 
@@ -252,29 +264,57 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
         $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
         $this->db->method('fetchOne')->willReturnCallback($this->dbFetchOneCallback(
             ['company-a:conn-a' => 'success'],
-            ['company-a:conn-a:2026-05-07:2026-05-20' => 0],
+            ['company-a:conn-a:2026-05-01:2026-05-20' => 0],
             [],
-            ['company-a:conn-a:2026-05-07:2026-05-20' => 13],
+            ['company-a:conn-a:2026-05-01:2026-05-20' => 19],
         ));
         $this->planner->expects(self::never())->method('planDueRetry');
-        $this->planner->expects(self::once())->method('planRefreshRecentDays')->with('company-a', 'conn-a', 2, 1)->willReturn(0);
+        $this->planner->expects(self::never())->method('planRefreshRecentDays');
         $this->planner->expects(self::once())->method('planMissing')->with(
             'company-a',
             'conn-a',
             1,
-            self::callback(static fn (\DateTimeImmutable $date): bool => '2026-05-07' === $date->format('Y-m-d')),
+            self::callback(static fn (\DateTimeImmutable $date): bool => '2026-05-01' === $date->format('Y-m-d')),
             self::callback(static fn (\DateTimeImmutable $date): bool => '2026-05-20' === $date->format('Y-m-d')),
         )->willReturn(1);
 
         self::assertSame(Command::SUCCESS, $this->execute($this->rateLimiter()));
     }
 
-    private function execute(WbFinanceRateLimiter $rateLimiter, array $input = [], ?CommandTester &$tester = null): int
+    public function testFirstBusinessDayOfMonthDoesNotQueryEmptyRecoveryWindow(): void
+    {
+        $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
+        $this->db->method('fetchOne')->willReturnCallback(static function (string $sql, array $params = []): mixed {
+            self::assertFalse(
+                ($params['fromDate'] ?? null) === '2026-06-01' && ($params['toDate'] ?? null) === '2026-05-31',
+                'Recovery range must not be queried when current month start is after yesterday.',
+            );
+
+            if (str_contains($sql, 'AND business_date = :businessDate')) {
+                return 'success';
+            }
+            if (str_contains($sql, 'COUNT(DISTINCT business_date)')) {
+                $from = new \DateTimeImmutable((string) $params['fromDate']);
+                $to = new \DateTimeImmutable((string) $params['toDate']);
+
+                return $from->diff($to)->days + 1;
+            }
+
+            return 0;
+        });
+        $this->planner->expects(self::never())->method('planDueRetry');
+        $this->planner->expects(self::never())->method('planMissing');
+        $this->planner->expects(self::once())->method('planRefreshRecentDays')->with('company-a', 'conn-a', 2, 1)->willReturn(1);
+
+        self::assertSame(Command::SUCCESS, $this->execute($this->rateLimiter(), [], now: '2026-06-01 00:00:00 Europe/Moscow'));
+    }
+
+    private function execute(WbFinanceRateLimiter $rateLimiter, array $input = [], ?CommandTester &$tester = null, string $now = '2026-05-21 00:00:00 Europe/Moscow'): int
     {
         $command = new WbFinancialReportsOrchestrateCommand(
             $this->connections,
             $rateLimiter,
-            new WbFinancialReportPeriodResolver(new MockClock('2026-05-21 00:00:00 Europe/Moscow')),
+            new WbFinancialReportPeriodResolver(new MockClock($now)),
             $this->planner,
             $this->db,
             $this->logger,

@@ -32,6 +32,13 @@ final class WbFinancialReportPeriodResolver
         return $now->setDate((int) $now->format('Y'), 1, 1);
     }
 
+    public function currentMonthStart(): DateTimeImmutable
+    {
+        $now = $this->nowInBusinessTimezone();
+
+        return $now->setDate((int) $now->format('Y'), (int) $now->format('n'), 1);
+    }
+
     /**
      * @return list<DateTimeImmutable>
      */
