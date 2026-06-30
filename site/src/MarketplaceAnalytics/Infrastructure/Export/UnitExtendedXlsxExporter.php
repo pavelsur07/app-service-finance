@@ -39,7 +39,7 @@ final readonly class UnitExtendedXlsxExporter
         ['label' => 'Себестоимость',   'field' => 'costPriceTotal', 'type' => 'money'],
         ['label' => 'Себест. ед.',     'field' => 'costPriceUnit',  'type' => 'money'],
         ['label' => 'Ост. шт.',        'field' => 'stockQty',      'type' => 'number'],
-        ['label' => 'Кап. р.',         'field' => 'stockCapitalRub','type' => 'money'],
+        ['label' => 'Остаток на МП FBO/FBS/RFBS', 'field' => 'stockCapitalRub', 'type' => 'money'],
         ['label' => 'Комиссия',        'field' => 'commission',     'type' => 'money'],
         ['label' => 'РР',              'field' => 'adSpend',        'type' => 'money'],
         ['label' => 'ДРР(п) %',        'field' => 'drrPercent',     'type' => 'percent'],

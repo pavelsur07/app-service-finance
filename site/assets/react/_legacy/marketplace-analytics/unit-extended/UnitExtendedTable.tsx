@@ -136,7 +136,7 @@ function resolveScrollContainer(wrapper: HTMLDivElement | null): HTMLElement | n
     return wrapper;
 }
 
-const HEADERS: { field: SortField; label: string; align?: string; tooltip?: string }[] = [
+const HEADERS: { field: SortField; label: React.ReactNode; align?: string; tooltip?: string }[] = [
     { field: 'sku', label: 'SKU' },
     { field: 'title', label: 'Наименование' },
     { field: 'sellerArticle', label: 'Артикул' },
@@ -146,7 +146,7 @@ const HEADERS: { field: SortField; label: string; align?: string; tooltip?: stri
     { field: 'costPriceTotal', label: 'Себестоимость', align: 'text-end' },
     { field: 'costPriceUnit', label: 'Себест. ед.', align: 'text-end' },
     { field: 'stockQty', label: 'Ост. шт.', align: 'text-end' },
-    { field: 'stockCapitalRub', label: 'Кап. р.', align: 'text-end' },
+    { field: 'stockCapitalRub', label: <>Остаток на МП<br />FBO/FBS/RFBS</>, align: 'text-end' },
     { field: 'commission', label: 'Комиссия', align: 'text-end' },
     { field: 'adSpend', label: 'РР', align: 'text-end', tooltip: 'Рекламные расходы' },
     { field: 'drrPercent', label: 'ДРР(п) %', align: 'text-end', tooltip: 'Доля рекламных расходов от продаж' },

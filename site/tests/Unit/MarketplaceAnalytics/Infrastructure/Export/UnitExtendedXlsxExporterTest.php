@@ -154,7 +154,7 @@ final class UnitExtendedXlsxExporterTest extends TestCase
         self::assertContains('ROI %', $header);
         $costUnitColumnIndex = array_search('Себест. ед.', $header, true);
         $stockQtyColumnIndex = array_search('Ост. шт.', $header, true);
-        $stockCapitalColumnIndex = array_search('Кап. р.', $header, true);
+        $stockCapitalColumnIndex = array_search('Остаток на МП FBO/FBS/RFBS', $header, true);
         self::assertSame($costUnitColumnIndex + 1, $stockQtyColumnIndex);
         self::assertSame($stockQtyColumnIndex + 1, $stockCapitalColumnIndex);
 
