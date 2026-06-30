@@ -10,9 +10,9 @@ use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -46,7 +46,7 @@ class CashflowCategoryController extends AbstractController
             $items,
         );
 
-        $response = new Response(json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+        $response = new Response(json_encode($payload, \JSON_UNESCAPED_UNICODE | \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR));
         $response->headers->set('Content-Type', 'application/json; charset=utf-8');
         $response->headers->set(
             'Content-Disposition',
@@ -76,6 +76,7 @@ class CashflowCategoryController extends AbstractController
         $form = $this->createForm(CashflowCategoryType::class, $article, [
             'parents' => $parents,
             'plCategories' => $plCategories,
+            'allow_flow_kind_edit' => $article->isRoot(),
         ]);
         $form->handleRequest($request);
 
@@ -83,6 +84,7 @@ class CashflowCategoryController extends AbstractController
             if ($article->getParent() && $article->getParent()->getLevel() >= 5) {
                 $this->addFlash('danger', 'Максимальная вложенность — 5 уровней');
             } else {
+                $article->syncFlowKindSubtree();
                 $em->persist($article);
                 $em->flush();
 
@@ -115,6 +117,7 @@ class CashflowCategoryController extends AbstractController
         $form = $this->createForm(CashflowCategoryType::class, $article, [
             'parents' => $parents,
             'plCategories' => $plCategories,
+            'allow_flow_kind_edit' => $article->isRoot(),
         ]);
         $form->handleRequest($request);
 
@@ -122,6 +125,7 @@ class CashflowCategoryController extends AbstractController
             if ($article->getParent() && $article->getParent()->getLevel() >= 5) {
                 $this->addFlash('danger', 'Максимальная вложенность — 5 уровней');
             } else {
+                $article->syncFlowKindSubtree();
                 $em->flush();
 
                 return $this->redirectToRoute('cashflow_category_index');
