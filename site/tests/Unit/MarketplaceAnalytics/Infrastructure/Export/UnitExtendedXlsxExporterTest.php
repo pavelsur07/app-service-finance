@@ -37,11 +37,16 @@ final class UnitExtendedXlsxExporterTest extends TestCase
                 'revenue' => 1000.0,
                 'quantity' => 5,
                 'returnsTotal' => 50.0,
+                'returnsQuantity' => 1,
                 'costPriceTotal' => 400.0,
                 'costPriceUnit' => 80.0,
                 'stockQty' => 10.5,
                 'stockCapitalRub' => 840.0,
                 'commission' => 100.0,
+                'commissionAverageRub' => 25.0,
+                'adSpend' => 80.0,
+                'cacRub' => 20.0,
+                'drrPercent' => 8.0,
                 'logistics' => 50.0,
                 'otherCosts' => 20.0,
                 'totalCosts' => 170.0,
@@ -60,11 +65,16 @@ final class UnitExtendedXlsxExporterTest extends TestCase
                 'revenue' => 500.0,
                 'quantity' => 2,
                 'returnsTotal' => 0.0,
+                'returnsQuantity' => 0,
                 'costPriceTotal' => 200.0,
                 'costPriceUnit' => 100.0,
                 'stockQty' => 2.0,
                 'stockCapitalRub' => 200.0,
                 'commission' => 60.0,
+                'commissionAverageRub' => 30.0,
+                'adSpend' => 40.0,
+                'cacRub' => 20.0,
+                'drrPercent' => 8.0,
                 'logistics' => 30.0,
                 'otherCosts' => 10.0,
                 'totalCosts' => 100.0,
@@ -83,11 +93,16 @@ final class UnitExtendedXlsxExporterTest extends TestCase
                 'revenue' => 0.0,
                 'quantity' => 0,
                 'returnsTotal' => 0.0,
+                'returnsQuantity' => 0,
                 'costPriceTotal' => 0.0,
                 'costPriceUnit' => 0.0,
                 'stockQty' => 0.0,
                 'stockCapitalRub' => 0.0,
                 'commission' => 0.0,
+                'commissionAverageRub' => null,
+                'adSpend' => 0.0,
+                'cacRub' => null,
+                'drrPercent' => null,
                 'logistics' => 0.0,
                 'otherCosts' => 0.0,
                 'totalCosts' => 0.0,
@@ -103,8 +118,13 @@ final class UnitExtendedXlsxExporterTest extends TestCase
             'revenue' => 1500.0,
             'quantity' => 7,
             'returnsTotal' => 50.0,
+            'returnsQuantity' => 1,
             'costPriceTotal' => 600.0,
             'commission' => 160.0,
+            'commissionAverageRub' => 26.67,
+            'adSpend' => 120.0,
+            'cacRub' => 20.0,
+            'drrPercent' => 8.0,
             'logistics' => 80.0,
             'otherCosts' => 30.0,
             'totalCosts' => 270.0,
@@ -117,7 +137,7 @@ final class UnitExtendedXlsxExporterTest extends TestCase
         $query
             ->expects(self::once())
             ->method('execute')
-            ->with(self::COMPANY_ID, 'ozon', '2026-01-01', '2026-01-31', PHP_INT_MAX)
+            ->with(self::COMPANY_ID, 'ozon', '2026-01-01', '2026-01-31', \PHP_INT_MAX)
             ->willReturn(['items' => $items, 'totals' => $totals]);
 
         $exporter = new UnitExtendedXlsxExporter($query);
@@ -155,8 +175,17 @@ final class UnitExtendedXlsxExporterTest extends TestCase
         $costUnitColumnIndex = array_search('Себест. ед.', $header, true);
         $stockQtyColumnIndex = array_search('Ост. шт.', $header, true);
         $stockCapitalColumnIndex = array_search('Остаток на МП FBO/FBS/RFBS', $header, true);
+        $commissionColumnIndex = array_search('Комиссия', $header, true);
+        $commissionAverageColumnIndex = array_search('Ком. сред.', $header, true);
+        $adSpendColumnIndex = array_search('РР', $header, true);
+        $cacColumnIndex = array_search('CAC,р', $header, true);
+        $drrColumnIndex = array_search('ДРР(п) %', $header, true);
         self::assertSame($costUnitColumnIndex + 1, $stockQtyColumnIndex);
         self::assertSame($stockQtyColumnIndex + 1, $stockCapitalColumnIndex);
+        self::assertSame($commissionColumnIndex + 1, $commissionAverageColumnIndex);
+        self::assertSame($commissionAverageColumnIndex + 1, $adSpendColumnIndex);
+        self::assertSame($adSpendColumnIndex + 1, $cacColumnIndex);
+        self::assertSame($cacColumnIndex + 1, $drrColumnIndex);
 
         $skuColumnIndex = array_search('SKU', $header, true);
         $titleColumnIndex = array_search('Наименование', $header, true);
@@ -181,9 +210,15 @@ final class UnitExtendedXlsxExporterTest extends TestCase
         self::assertSame('ART-A', (string) ($dataRows[0][$articleColumnIndex] ?? ''));
         self::assertSame('ART-B', (string) ($dataRows[1][$articleColumnIndex] ?? ''));
         self::assertSame('', (string) ($dataRows[2][$articleColumnIndex] ?? ''));
+        self::assertSame('25', (string) ($dataRows[0][$commissionAverageColumnIndex] ?? ''));
+        self::assertSame('20', (string) ($dataRows[0][$cacColumnIndex] ?? ''));
+        self::assertSame('', (string) ($dataRows[2][$commissionAverageColumnIndex] ?? ''));
+        self::assertSame('', (string) ($dataRows[2][$cacColumnIndex] ?? ''));
 
         $totalsRow = $rows[$headerRowIndex + 4];
         self::assertSame('ИТОГО', (string) $totalsRow[0]);
+        self::assertSame('26.67', (string) ($totalsRow[$commissionAverageColumnIndex] ?? ''));
+        self::assertSame('20', (string) ($totalsRow[$cacColumnIndex] ?? ''));
     }
 
     /**

@@ -17,7 +17,9 @@ type SortField =
     | 'stockQty'
     | 'stockCapitalRub'
     | 'commission'
+    | 'commissionAverageRub'
     | 'adSpend'
+    | 'cacRub'
     | 'drrPercent'
     | 'logistics'
     | 'otherCosts'
@@ -148,7 +150,9 @@ const HEADERS: { field: SortField; label: React.ReactNode; align?: string; toolt
     { field: 'stockQty', label: 'Ост. шт.', align: 'text-end' },
     { field: 'stockCapitalRub', label: <>Остаток на МП<br />FBO/FBS/RFBS</>, align: 'text-end' },
     { field: 'commission', label: 'Комиссия', align: 'text-end' },
+    { field: 'commissionAverageRub', label: 'Ком. сред.', align: 'text-end' },
     { field: 'adSpend', label: 'РР', align: 'text-end', tooltip: 'Рекламные расходы' },
+    { field: 'cacRub', label: 'CAC,р', align: 'text-end' },
     { field: 'drrPercent', label: 'ДРР(п) %', align: 'text-end', tooltip: 'Доля рекламных расходов от продаж' },
     { field: 'logistics', label: 'Логистика', align: 'text-end' },
     { field: 'otherCosts', label: 'Прочие затраты', align: 'text-end' },
@@ -487,7 +491,9 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
                                         <td className="text-end">{row.stockQty.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 3 })}</td>
                                         <td className="text-end">{formatMoney(row.stockCapitalRub)}</td>
                                         <td className="text-end">{formatMoney(row.commission)}</td>
+                                        <td className="text-end">{formatMoney(row.commissionAverageRub)}</td>
                                         <td className="text-end">{formatMoney(row.adSpend)}</td>
+                                        <td className="text-end">{formatMoney(row.cacRub)}</td>
                                         <td className="text-end">{formatPercent(row.drrPercent)}</td>
                                         <td className="text-end">{formatMoney(row.logistics)}</td>
                                         <td className="text-end">
@@ -562,7 +568,9 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
                                 <td className="text-end">{'—'}</td>
                                 <td className="text-end">{'—'}</td>
                                 <td className="text-end">{formatMoney(totals.commission)}</td>
+                                <td className="text-end">{formatMoney(totals.commissionAverageRub)}</td>
                                 <td className="text-end">{formatMoney(totals.adSpend)}</td>
+                                <td className="text-end">{formatMoney(totals.cacRub)}</td>
                                 <td className="text-end">{formatPercent(totals.drrPercent)}</td>
                                 <td className="text-end">{formatMoney(totals.logistics)}</td>
                                 <td className="text-end">{formatMoney(totals.otherCosts)}</td>
