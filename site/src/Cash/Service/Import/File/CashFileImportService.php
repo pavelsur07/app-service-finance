@@ -8,9 +8,11 @@ use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Import\ImportLogger;
 use App\Company\Entity\Company;
-use App\Company\Enum\CounterpartyType;
 use App\Company\Entity\Counterparty;
+use App\Company\Enum\CounterpartyType;
 use App\Company\Repository\CounterpartyRepository;
+use App\Shared\Service\Storage\ObjectStorageInterface;
+use App\Shared\Service\Storage\TemporaryLocalFile;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenSpout\Reader\CSV\Options as CsvOptions;
 use OpenSpout\Reader\CSV\Reader as CsvReader;
@@ -18,7 +20,6 @@ use OpenSpout\Reader\ReaderInterface;
 use OpenSpout\Reader\XLS\Reader as XlsReader;
 use OpenSpout\Reader\XLSX\Reader as XlsxReader;
 use Ramsey\Uuid\Uuid;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 final class CashFileImportService
 {
@@ -32,12 +33,25 @@ final class CashFileImportService
         private readonly ImportLogger $importLogger,
         private readonly EntityManagerInterface $entityManager,
         private readonly AccountBalanceService $accountBalanceService,
-        #[Autowire('%kernel.project_dir%')]
-        private readonly string $projectDir,
+        private readonly ObjectStorageInterface $objectStorage,
+        private readonly TemporaryLocalFile $temporaryLocalFile,
     ) {
     }
 
     public function import(CashFileImportJob $job): void
+    {
+        $storageKey = $this->resolveStorageKey($job);
+
+        // Файл читается воркером через объектное хранилище: скачиваем во временную
+        // локальную копию (readers OpenSpout требуют реальный путь), обрабатываем,
+        // TemporaryLocalFile гарантированно удаляет её после.
+        $this->temporaryLocalFile->with(
+            $storageKey,
+            fn (string $filePath) => $this->readAndPersist($filePath, $job),
+        );
+    }
+
+    private function readAndPersist(string $filePath, CashFileImportJob $job): void
     {
         $company = $job->getCompany();
         $moneyAccount = $job->getMoneyAccount();
@@ -45,8 +59,6 @@ final class CashFileImportService
         $mapping = $job->getMapping();
         $companyId = $company->getId();
         $accountId = $moneyAccount->getId();
-
-        $filePath = $this->resolveFilePath($job);
 
         $created = 0;
         $createdMinDate = null;
@@ -213,9 +225,14 @@ final class CashFileImportService
         }
     }
 
-    private function resolveFilePath(CashFileImportJob $job): string
+    /**
+     * Ключ файла в объектном хранилище. Кандидаты в порядке приоритета
+     * (stored_ext → расширение из имени файла → без расширения) — первый,
+     * который существует. Кандидат по имени файла сохраняет совместимость
+     * с job'ами, созданными до персиста stored_ext в options.
+     */
+    private function resolveStorageKey(CashFileImportJob $job): string
     {
-        $storageDir = sprintf('%s/var/storage/cash-file-imports', $this->projectDir);
         $fileHash = $job->getFileHash();
 
         $extensions = [];
@@ -233,23 +250,16 @@ final class CashFileImportService
             $extensions[] = strtolower($fileExtension);
         }
 
-        $extensions = array_values(array_unique($extensions));
+        $candidates = [];
+        foreach (array_values(array_unique($extensions)) as $extension) {
+            $candidates[] = sprintf('cash-file-imports/%s.%s', $fileHash, $extension);
+        }
+        $candidates[] = sprintf('cash-file-imports/%s', $fileHash);
 
-        foreach ($extensions as $extension) {
-            $candidate = sprintf('%s/%s.%s', $storageDir, $fileHash, $extension);
-            if (is_file($candidate)) {
+        foreach ($candidates as $candidate) {
+            if ($this->objectStorage->exists($candidate)) {
                 return $candidate;
             }
-        }
-
-        $noExtensionPath = sprintf('%s/%s', $storageDir, $fileHash);
-        if (is_file($noExtensionPath)) {
-            return $noExtensionPath;
-        }
-
-        $fallbackMatches = glob(sprintf('%s/%s.*', $storageDir, $fileHash)) ?: [];
-        if ([] !== $fallbackMatches) {
-            return $fallbackMatches[0];
         }
 
         throw new \RuntimeException(sprintf('Import file not found for hash %s', $fileHash));

@@ -12,6 +12,8 @@ use App\Cash\Service\Import\File\FileTabularReader;
 use App\Cash\Service\Import\File\HeaderAutoMapper;
 use App\Company\Entity\User;
 use App\Shared\Service\ActiveCompanyService;
+use App\Shared\Service\Storage\ObjectStorageInterface;
+use App\Shared\Service\Storage\TemporaryLocalFile;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -28,11 +30,27 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[Route('/cash/import/file')]
 class CashFileImportController extends AbstractController
 {
+    /**
+     * Префикс ключей объектного хранилища для загруженных файлов cash-импорта.
+     * Совпадает с прежним подкаталогом var/storage, поэтому под драйвером local
+     * файлы физически лежат на тех же местах.
+     */
+    private const STORAGE_PREFIX = 'cash-file-imports';
+
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly CashFileImportFacade $importFacade,
         private readonly MessageBusInterface $messageBus,
+        private readonly ObjectStorageInterface $storage,
+        private readonly TemporaryLocalFile $temporaryLocalFile,
     ) {
+    }
+
+    private function buildStorageKey(string $fileHash, string $storedExtension): string
+    {
+        $suffix = '' !== $storedExtension ? '.'.$storedExtension : '';
+
+        return sprintf('%s/%s%s', self::STORAGE_PREFIX, $fileHash, $suffix);
     }
 
     #[Route('', name: 'cash_file_import_upload', methods: ['GET'])]
@@ -94,18 +112,12 @@ class CashFileImportController extends AbstractController
         $fileHash = hash('sha256', $fileContent);
         $extension = pathinfo($file->getClientOriginalName(), \PATHINFO_EXTENSION);
         $normalizedExtension = '' !== $extension ? strtolower($extension) : '';
-        $normalizedExtensionWithDot = '' !== $normalizedExtension ? '.'.$normalizedExtension : '';
 
-        $storageDir = sprintf('%s/var/storage/cash-file-imports', $this->getParameter('kernel.project_dir'));
-        if (!is_dir($storageDir) && !mkdir($storageDir, 0775, true) && !is_dir($storageDir)) {
-            $this->addFlash('error', 'Не удалось подготовить директорию для файлов импорта.');
-
-            return $this->redirectToRoute('cash_file_import_upload');
-        }
-
-        $targetPath = sprintf('%s/%s%s', $storageDir, $fileHash, $normalizedExtensionWithDot);
-        if (false === file_put_contents($targetPath, $fileContent)) {
-            $this->addFlash('error', 'Не удалось сохранить файл на диск.');
+        $storageKey = $this->buildStorageKey($fileHash, $normalizedExtension);
+        try {
+            $this->storage->write($storageKey, $fileContent);
+        } catch (\Throwable) {
+            $this->addFlash('error', 'Не удалось сохранить файл импорта.');
 
             return $this->redirectToRoute('cash_file_import_upload');
         }
@@ -142,26 +154,21 @@ class CashFileImportController extends AbstractController
             return $this->redirectToRoute('cash_file_import_upload');
         }
 
-        $extensionSuffix = '';
-        if (is_string($storedExtension) && '' !== $storedExtension) {
-            $extensionSuffix = '.'.$storedExtension;
-        }
+        $storageKey = $this->buildStorageKey($fileHash, is_string($storedExtension) ? $storedExtension : '');
 
-        $filePath = sprintf(
-            '%s/var/storage/cash-file-imports/%s%s',
-            $this->getParameter('kernel.project_dir'),
-            $fileHash,
-            $extensionSuffix
-        );
-
-        if (!is_file($filePath)) {
+        if (!$this->storage->exists($storageKey)) {
             $this->addFlash('error', 'Файл импорта не найден. Загрузите файл заново.');
 
             return $this->redirectToRoute('cash_file_import_upload');
         }
 
-        $headers = $fileTabularReader->readHeader($filePath);
-        $sampleRows = $fileTabularReader->readSampleRows($filePath);
+        [$headers, $sampleRows] = $this->temporaryLocalFile->with(
+            $storageKey,
+            static fn (string $filePath): array => [
+                $fileTabularReader->readHeader($filePath),
+                $fileTabularReader->readSampleRows($filePath),
+            ],
+        );
         $mapping = [];
         if (isset($importPayload['mapping']) && is_array($importPayload['mapping'])) {
             $mapping = $importPayload['mapping'];
@@ -432,26 +439,21 @@ class CashFileImportController extends AbstractController
             return $this->redirectToRoute('cash_file_import_upload');
         }
 
-        $extensionSuffix = '';
-        if (is_string($storedExtension) && '' !== $storedExtension) {
-            $extensionSuffix = '.'.$storedExtension;
-        }
+        $storageKey = $this->buildStorageKey($fileHash, is_string($storedExtension) ? $storedExtension : '');
 
-        $filePath = sprintf(
-            '%s/var/storage/cash-file-imports/%s%s',
-            $this->getParameter('kernel.project_dir'),
-            $fileHash,
-            $extensionSuffix
-        );
-
-        if (!is_file($filePath)) {
+        if (!$this->storage->exists($storageKey)) {
             $this->addFlash('error', 'Файл импорта не найден. Загрузите файл заново.');
 
             return $this->redirectToRoute('cash_file_import_upload');
         }
 
-        $headers = $fileTabularReader->readHeader($filePath);
-        $sampleRows = $fileTabularReader->readSampleRows($filePath, 100);
+        [$headers, $sampleRows] = $this->temporaryLocalFile->with(
+            $storageKey,
+            static fn (string $filePath): array => [
+                $fileTabularReader->readHeader($filePath),
+                $fileTabularReader->readSampleRows($filePath, 100),
+            ],
+        );
 
         $headerLabels = [];
         foreach ($headers as $index => $header) {
@@ -529,6 +531,8 @@ class CashFileImportController extends AbstractController
             return $this->redirectToRoute('cash_file_import_upload');
         }
 
+        $storedExtension = $importPayload['stored_ext'] ?? null;
+
         $accountId = $importPayload['account_id'] ?? null;
         if (!$accountId) {
             $this->addFlash('error', 'Не удалось определить кассу для импорта.');
@@ -568,7 +572,7 @@ class CashFileImportController extends AbstractController
             $fileName,
             $fileHash,
             $mapping,
-            [],
+            is_string($storedExtension) && '' !== $storedExtension ? ['stored_ext' => $storedExtension] : [],
             $userIdentifier
         );
         $this->importFacade->commitJob($job);
