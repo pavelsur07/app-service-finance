@@ -11,7 +11,8 @@ use App\MarketplaceAds\Enum\AdScheduledBatchState;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
 use App\MarketplaceAds\Repository\AdScheduledBatchRepository;
-use App\Shared\Service\Storage\StorageService;
+use App\Shared\Service\Storage\ObjectStorageInterface;
+use App\Shared\Service\Storage\StoredObject;
 use App\Tests\Builders\MarketplaceAds\AdScheduledBatchBuilder;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -38,8 +39,8 @@ final class AdBatchPollerCommandTest extends TestCase
     private OzonAdClient $ozonClient;
     /** @var AdScheduledBatchRepository&MockObject */
     private AdScheduledBatchRepository $batchRepo;
-    /** @var StorageService&MockObject */
-    private StorageService $storage;
+    /** @var ObjectStorageInterface&MockObject */
+    private ObjectStorageInterface $storage;
     /** @var EntityManagerInterface&MockObject */
     private EntityManagerInterface $em;
     /** @var ExtractBatchesToRawDocumentsAction&MockObject */
@@ -51,7 +52,7 @@ final class AdBatchPollerCommandTest extends TestCase
     {
         $this->ozonClient = $this->createMock(OzonAdClient::class);
         $this->batchRepo = $this->createMock(AdScheduledBatchRepository::class);
-        $this->storage = $this->createMock(StorageService::class);
+        $this->storage = $this->createMock(ObjectStorageInterface::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
         $this->extractAction = $this->createMock(ExtractBatchesToRawDocumentsAction::class);
 
@@ -90,18 +91,14 @@ final class AdBatchPollerCommandTest extends TestCase
             ->method('fetchReportContent')
             ->willReturn(['body' => 'a,b,c', 'contentType' => 'text/csv']);
 
+        $expectedPath = sprintf('marketplace-ads/%s/%s.csv', $batch->getCompanyId(), (string) $batch->getOzonUuid());
         $this->storage->expects(self::once())
-            ->method('storeBytes')
+            ->method('write')
             ->with(
+                self::stringContains($expectedPath),
                 'a,b,c',
-                self::stringContains(sprintf('marketplace-ads/%s/%s.csv', $batch->getCompanyId(), (string) $batch->getOzonUuid())),
             )
-            ->willReturn([
-                'storagePath' => sprintf('marketplace-ads/%s/%s.csv', $batch->getCompanyId(), (string) $batch->getOzonUuid()),
-                'fileHash' => 'abc123',
-                'sizeBytes' => 5,
-                'mimeType' => null,
-            ]);
+            ->willReturn(new StoredObject($expectedPath, 5));
 
         $this->em->expects(self::once())->method('flush');
 
@@ -115,7 +112,7 @@ final class AdBatchPollerCommandTest extends TestCase
         self::assertSame(0, $tester->execute([]));
 
         self::assertSame(AdScheduledBatchState::OK, $batch->getState());
-        self::assertSame('abc123', $batch->getFileHash());
+        self::assertSame(hash('sha256', 'a,b,c'), $batch->getFileHash());
         self::assertSame(5, $batch->getFileSize());
         self::assertNotNull($batch->getFinishedAt());
         self::assertNull($batch->getLastError());
@@ -131,12 +128,10 @@ final class AdBatchPollerCommandTest extends TestCase
         $this->ozonClient->method('fetchReportContent')
             ->willReturn(['body' => 'a,b,c', 'contentType' => 'text/csv']);
 
-        $this->storage->method('storeBytes')->willReturn([
-            'storagePath' => sprintf('marketplace-ads/%s/%s.csv', $batch->getCompanyId(), (string) $batch->getOzonUuid()),
-            'fileHash' => 'abc123',
-            'sizeBytes' => 5,
-            'mimeType' => null,
-        ]);
+        $this->storage->method('write')->willReturn(new StoredObject(
+            sprintf('marketplace-ads/%s/%s.csv', $batch->getCompanyId(), (string) $batch->getOzonUuid()),
+            5,
+        ));
 
         // Auto-extract падает — это НЕ должно перевести batch в FAILED.
         $this->extractAction->expects(self::once())
@@ -160,7 +155,7 @@ final class AdBatchPollerCommandTest extends TestCase
             ->willReturn(['state' => 'ERROR', 'raw' => ['state' => 'ERROR']]);
 
         $this->ozonClient->expects(self::never())->method('fetchReportContent');
-        $this->storage->expects(self::never())->method('storeBytes');
+        $this->storage->expects(self::never())->method('write');
         $this->em->expects(self::once())->method('flush');
 
         $tester = new CommandTester($this->command);
@@ -202,7 +197,7 @@ final class AdBatchPollerCommandTest extends TestCase
             ->method('fetchReportContent')
             ->willThrowException(new OzonPermanentApiException('403 revoked mid-download'));
 
-        $this->storage->expects(self::never())->method('storeBytes');
+        $this->storage->expects(self::never())->method('write');
         $this->em->expects(self::once())->method('flush');
 
         $tester = new CommandTester($this->command);
@@ -241,7 +236,7 @@ final class AdBatchPollerCommandTest extends TestCase
 
         // Не трогаем batch — ни flush, ни mutation.
         $this->ozonClient->expects(self::never())->method('fetchReportContent');
-        $this->storage->expects(self::never())->method('storeBytes');
+        $this->storage->expects(self::never())->method('write');
         $this->em->expects(self::never())->method('flush');
 
         $tester = new CommandTester($this->command);

@@ -14,7 +14,7 @@ use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
 use App\MarketplaceAds\Message\DownloadOzonAdReportMessage;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
 use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
-use App\Shared\Service\Storage\StorageService;
+use App\Shared\Service\Storage\ObjectStorageInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -57,7 +57,7 @@ final class DownloadOzonAdReportHandler
         private readonly AdRawDocumentRepository $rawRepo,
         private readonly OzonAdClient $client,
         private readonly EntityManagerInterface $em,
-        private readonly StorageService $storageService,
+        private readonly ObjectStorageInterface $storage,
         private readonly AdLoadJobFinalizer $finalizer,
         #[Autowire(service: 'monolog.logger.marketplace_ads')]
         private readonly LoggerInterface $logger,
@@ -141,10 +141,10 @@ final class DownloadOzonAdReportHandler
             $extension,
         );
 
-        $stored = $this->storageService->storeBytes($body, $relativePath);
-        $storagePath = (string) $stored['storagePath'];
-        $fileHash = (string) $stored['fileHash'];
-        $sizeBytes = (int) $stored['sizeBytes'];
+        $stored = $this->storage->write($relativePath, $body);
+        $storagePath = $stored->path;
+        $fileHash = hash('sha256', $body);
+        $sizeBytes = $stored->byteSize;
 
         // Для каждого дня pending-диапазона — upsert AdRawDocument. Один файл
         // на диске, N документов в БД (по дню). Парсинг отключён, поэтому

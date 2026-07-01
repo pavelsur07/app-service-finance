@@ -11,7 +11,9 @@ use App\MarketplaceAds\Enum\AdScheduledBatchState;
 use App\MarketplaceAds\Message\ProcessAdRawDocumentMessage;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
 use App\MarketplaceAds\Repository\AdScheduledBatchRepository;
+use App\Shared\Service\Storage\LocalObjectStorage;
 use App\Shared\Service\Storage\StorageService;
+use App\Shared\Service\Storage\TemporaryLocalFile;
 use App\Tests\Builders\MarketplaceAds\AdScheduledBatchBuilder;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
@@ -47,7 +49,7 @@ final class ExtractBatchesToRawDocumentsActionTest extends TestCase
         $this->action = new ExtractBatchesToRawDocumentsAction(
             $this->createMock(AdScheduledBatchRepository::class),
             $this->createMock(AdRawDocumentRepository::class),
-            new StorageService($this->tmpDir),
+            new TemporaryLocalFile(new LocalObjectStorage(new StorageService($this->tmpDir))),
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(MessageBusInterface::class),
             new NullLogger(),
@@ -161,8 +163,10 @@ final class ExtractBatchesToRawDocumentsActionTest extends TestCase
             ->withStorage('marketplace-ads/nowhere/ghost.csv', 'hash', 10)
             ->build();
 
+        // Файл отсутствует в хранилище → readStream внутри TemporaryLocalFile
+        // бросает ObjectStorageException (extends RuntimeException).
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessageMatches('/Batch file missing on disk/');
+        $this->expectExceptionMessageMatches('/Failed to open object/');
 
         $this->action->extractCsvsFromBatch($batch);
     }
@@ -215,7 +219,7 @@ final class ExtractBatchesToRawDocumentsActionTest extends TestCase
         $action = new ExtractBatchesToRawDocumentsAction(
             $this->createMock(AdScheduledBatchRepository::class),
             $rawDocRepo,
-            new StorageService($this->tmpDir),
+            new TemporaryLocalFile(new LocalObjectStorage(new StorageService($this->tmpDir))),
             $em,
             $messageBus,
             new NullLogger(),
@@ -264,7 +268,7 @@ final class ExtractBatchesToRawDocumentsActionTest extends TestCase
         $action = new ExtractBatchesToRawDocumentsAction(
             $this->createMock(AdScheduledBatchRepository::class),
             $rawDocRepo,
-            new StorageService($this->tmpDir),
+            new TemporaryLocalFile(new LocalObjectStorage(new StorageService($this->tmpDir))),
             $em,
             $messageBus,
             new NullLogger(),
@@ -310,7 +314,7 @@ final class ExtractBatchesToRawDocumentsActionTest extends TestCase
         $action = new ExtractBatchesToRawDocumentsAction(
             $this->createMock(AdScheduledBatchRepository::class),
             $rawDocRepo,
-            new StorageService($this->tmpDir),
+            new TemporaryLocalFile(new LocalObjectStorage(new StorageService($this->tmpDir))),
             $em,
             $messageBus,
             new NullLogger(),
@@ -388,7 +392,7 @@ final class ExtractBatchesToRawDocumentsActionTest extends TestCase
         $action = new ExtractBatchesToRawDocumentsAction(
             $this->createMock(AdScheduledBatchRepository::class),
             $rawDocRepo,
-            new StorageService($this->tmpDir),
+            new TemporaryLocalFile(new LocalObjectStorage(new StorageService($this->tmpDir))),
             $em,
             $messageBus,
             new NullLogger(),
@@ -421,7 +425,7 @@ final class ExtractBatchesToRawDocumentsActionTest extends TestCase
         $action = new ExtractBatchesToRawDocumentsAction(
             $this->createMock(AdScheduledBatchRepository::class),
             $rawDocRepo,
-            new StorageService($this->tmpDir),
+            new TemporaryLocalFile(new LocalObjectStorage(new StorageService($this->tmpDir))),
             $em,
             $messageBus,
             new NullLogger(),

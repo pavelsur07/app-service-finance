@@ -11,7 +11,7 @@ use App\MarketplaceAds\Enum\AdScheduledBatchState;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
 use App\MarketplaceAds\Repository\AdScheduledBatchRepository;
-use App\Shared\Service\Storage\StorageService;
+use App\Shared\Service\Storage\ObjectStorageInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -29,7 +29,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  *     возвращает normalized state (uppercase).
  *  2) по state:
  *      - `OK` / `READY`  → {@see OzonAdClient::fetchReportContent()} → сохранить
- *        файл через {@see StorageService::storeBytes()} → batch в OK;
+ *        файл через {@see ObjectStorageInterface::write()} → batch в OK;
  *      - `ERROR` / `CANCELLED` / `NOT_FOUND` → batch в FAILED с причиной;
  *      - `NOT_STARTED` / `IN_PROGRESS` → проверяется возраст:
  *          - moложе {@see self::MAX_AGE_BEFORE_ABANDON_HOURS}ч — без изменений
@@ -78,7 +78,7 @@ final class AdBatchPollerCommand extends Command
     public function __construct(
         private readonly OzonAdClient $ozonClient,
         private readonly AdScheduledBatchRepository $batchRepo,
-        private readonly StorageService $storageService,
+        private readonly ObjectStorageInterface $storage,
         private readonly EntityManagerInterface $em,
         private readonly ExtractBatchesToRawDocumentsAction $extractAction,
         #[Autowire(service: 'monolog.logger.marketplace_ads')]
@@ -309,12 +309,12 @@ final class AdBatchPollerCommand extends Command
             $extension,
         );
 
-        $stored = $this->storageService->storeBytes($body, $relativePath);
+        $stored = $this->storage->write($relativePath, $body);
 
         $batch->setState(AdScheduledBatchState::OK);
-        $batch->setStoragePath((string) $stored['storagePath']);
-        $batch->setFileHash((string) $stored['fileHash']);
-        $batch->setFileSize((int) $stored['sizeBytes']);
+        $batch->setStoragePath($stored->path);
+        $batch->setFileHash(hash('sha256', $body));
+        $batch->setFileSize($stored->byteSize);
         $batch->setFinishedAt(new \DateTimeImmutable('now', new \DateTimeZone('UTC')));
 
         $this->em->flush();
@@ -323,8 +323,8 @@ final class AdBatchPollerCommand extends Command
             'batchId' => $batch->getId(),
             'companyId' => $companyId,
             'ozonUuid' => $uuid,
-            'storagePath' => $stored['storagePath'],
-            'fileSize' => $stored['sizeBytes'],
+            'storagePath' => $stored->path,
+            'fileSize' => $stored->byteSize,
             'extension' => $extension,
         ]);
 

@@ -10,7 +10,7 @@ use App\MarketplaceAds\Entity\AdScheduledBatch;
 use App\MarketplaceAds\Message\ProcessAdRawDocumentMessage;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
 use App\MarketplaceAds\Repository\AdScheduledBatchRepository;
-use App\Shared\Service\Storage\StorageService;
+use App\Shared\Service\Storage\TemporaryLocalFile;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -40,7 +40,7 @@ final readonly class ExtractBatchesToRawDocumentsAction
     public function __construct(
         private AdScheduledBatchRepository $batchRepo,
         private AdRawDocumentRepository $rawDocRepo,
-        private StorageService $storageService,
+        private TemporaryLocalFile $temporaryLocalFile,
         private EntityManagerInterface $em,
         private MessageBusInterface $messageBus,
         #[Autowire(service: 'monolog.logger.marketplace_ads')]
@@ -278,28 +278,28 @@ final readonly class ExtractBatchesToRawDocumentsAction
             throw new \RuntimeException('Batch has no storage_path');
         }
 
-        $absolutePath = $this->storageService->getAbsolutePath($storagePath);
-        if (!file_exists($absolutePath)) {
-            throw new \RuntimeException('Batch file missing on disk: '.$absolutePath);
-        }
+        return $this->temporaryLocalFile->with(
+            $storagePath,
+            function (string $absolutePath) use ($storagePath): array {
+                $extension = strtolower(pathinfo($storagePath, \PATHINFO_EXTENSION));
 
-        $extension = strtolower(pathinfo($storagePath, \PATHINFO_EXTENSION));
+                if ('csv' === $extension) {
+                    $filename = basename($storagePath);
+                    $content = file_get_contents($absolutePath);
+                    if (false === $content) {
+                        throw new \RuntimeException('Cannot read csv file: '.$absolutePath);
+                    }
 
-        if ('csv' === $extension) {
-            $filename = basename($storagePath);
-            $content = file_get_contents($absolutePath);
-            if (false === $content) {
-                throw new \RuntimeException('Cannot read csv file: '.$absolutePath);
-            }
+                    return [$filename => $content];
+                }
 
-            return [$filename => $content];
-        }
+                if ('zip' === $extension) {
+                    return $this->extractCsvsFromZip($absolutePath);
+                }
 
-        if ('zip' === $extension) {
-            return $this->extractCsvsFromZip($absolutePath);
-        }
-
-        throw new \RuntimeException('Unknown batch file extension: '.$extension);
+                throw new \RuntimeException('Unknown batch file extension: '.$extension);
+            },
+        );
     }
 
     /**
