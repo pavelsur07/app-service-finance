@@ -36,6 +36,18 @@ x-php-env: &php-env
     TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
     # Базовый URL Telegram Bot API через шлюз tg-gateway (app-сервер не имеет прямого доступа к api.telegram.org)
     TELEGRAM_API_BASE_URL: ${TELEGRAM_API_BASE_URL:-https://tg.vashfindir.ru/bot-api}
+    # ─── Объектное хранилище файлов (timeweb S3) ───────────────────────────
+    # DRIVER=local до завершения `aws s3 sync`. Флип на s3 — отдельным однострочным
+    # коммитом (S3-гейт: сначала данные в бакете, потом переключение). Откат — обратно на local.
+    APP_OBJECT_STORAGE_DRIVER: local
+    APP_OBJECT_STORAGE_S3_ENDPOINT: "https://s3.twcstorage.ru"
+    APP_OBJECT_STORAGE_S3_BUCKET: "ccd24eb8-1c82-4de4-bd69-9706a7b5443b"
+    APP_OBJECT_STORAGE_S3_REGION: "ru-1"
+    # Если бакет не резолвится virtual-hosted стилем — переключить на "1" (path-style)
+    APP_OBJECT_STORAGE_S3_PATH_STYLE_ENDPOINT: "0"
+    # Ключи — только через GitHub Secrets (deploy.yml экспортирует их в host-env)
+    APP_OBJECT_STORAGE_S3_ACCESS_KEY: ${APP_OBJECT_STORAGE_S3_ACCESS_KEY:-}
+    APP_OBJECT_STORAGE_S3_SECRET_KEY: ${APP_OBJECT_STORAGE_S3_SECRET_KEY:-}
 
 services:
 
@@ -411,6 +423,14 @@ services:
             WB_LEGACY_RECONCILE_ENABLED: ${WB_LEGACY_RECONCILE_ENABLED:-0}
             # Нужно для app:telegram:send-reports (исходящие в Telegram через шлюз)
             TELEGRAM_API_BASE_URL: ${TELEGRAM_API_BASE_URL:-https://tg.vashfindir.ru/bot-api}
+            # ─── Объектное хранилище (timeweb S3) — cron-команды тоже читают/пишут файлы ───
+            APP_OBJECT_STORAGE_DRIVER: local
+            APP_OBJECT_STORAGE_S3_ENDPOINT: "https://s3.twcstorage.ru"
+            APP_OBJECT_STORAGE_S3_BUCKET: "ccd24eb8-1c82-4de4-bd69-9706a7b5443b"
+            APP_OBJECT_STORAGE_S3_REGION: "ru-1"
+            APP_OBJECT_STORAGE_S3_PATH_STYLE_ENDPOINT: "0"
+            APP_OBJECT_STORAGE_S3_ACCESS_KEY: ${APP_OBJECT_STORAGE_S3_ACCESS_KEY:-}
+            APP_OBJECT_STORAGE_S3_SECRET_KEY: ${APP_OBJECT_STORAGE_S3_SECRET_KEY:-}
         volumes:
             - ./docker/cron/app.cron:/etc/crontabs/app.cron:ro
             - site_storage:/app/var/storage
