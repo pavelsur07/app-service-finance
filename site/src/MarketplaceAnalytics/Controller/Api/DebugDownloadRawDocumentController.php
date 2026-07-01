@@ -6,11 +6,11 @@ namespace App\MarketplaceAnalytics\Controller\Api;
 
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Shared\Service\ActiveCompanyService;
-use App\Shared\Service\Storage\StorageService;
+use App\Shared\Service\Storage\ObjectStorageInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -44,7 +44,7 @@ final class DebugDownloadRawDocumentController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly MarketplaceRawDocumentRepository $rawDocumentRepository,
-        private readonly StorageService $storageService,
+        private readonly ObjectStorageInterface $storage,
     ) {
     }
 
@@ -77,19 +77,28 @@ final class DebugDownloadRawDocumentController extends AbstractController
 
     private function serveFromDisk(array $rawData, string $periodFrom): Response
     {
-        $absolutePath = $this->storageService->getAbsolutePath($rawData['file_path']);
+        $storagePath = $rawData['file_path'];
 
-        if (!file_exists($absolutePath)) {
-            throw $this->createNotFoundException('Файл не найден на диске.');
+        if (!$this->storage->exists($storagePath)) {
+            throw $this->createNotFoundException('Файл не найден в хранилище.');
         }
 
         $contentType = $rawData['content_type'] ?? 'application/octet-stream';
-        $extension = self::EXTENSION_MAP[$contentType] ?? pathinfo($absolutePath, PATHINFO_EXTENSION) ?: 'bin';
+        $extension = self::EXTENSION_MAP[$contentType] ?? pathinfo($storagePath, \PATHINFO_EXTENSION) ?: 'bin';
         $filename = sprintf('mutual_settlement_%s.%s', $periodFrom, $extension);
 
-        $response = new BinaryFileResponse($absolutePath);
-        $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, $filename);
+        $stream = $this->storage->readStream($storagePath);
+        $response = new StreamedResponse(static function () use ($stream): void {
+            fpassthru($stream);
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+        });
         $response->headers->set('Content-Type', $contentType);
+        $response->headers->set(
+            'Content-Disposition',
+            $response->headers->makeDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, $filename),
+        );
 
         return $response;
     }
