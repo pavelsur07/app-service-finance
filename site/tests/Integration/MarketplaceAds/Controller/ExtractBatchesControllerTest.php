@@ -8,7 +8,7 @@ use App\MarketplaceAds\Enum\AdRawDocumentStatus;
 use App\MarketplaceAds\Enum\AdScheduledBatchState;
 use App\MarketplaceAds\Message\ProcessAdRawDocumentMessage;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
-use App\Shared\Service\Storage\StorageService;
+use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\MarketplaceAds\AdLoadJobBuilder;
@@ -61,8 +61,8 @@ final class ExtractBatchesControllerTest extends WebTestCaseBase
         $em->persist($job);
         $em->flush();
 
-        /** @var StorageService $storage */
-        $storage = static::getContainer()->get(StorageService::class);
+        /** @var ObjectStorageInterface $storage */
+        $storage = static::getContainer()->get(ObjectStorageInterface::class);
 
         $csvBody = "\xEF\xBB\xBF;Кампания по продвижению товаров № 22655731, период 23.04.2026-23.04.2026\n"
             ."sku;spend\n"
@@ -71,14 +71,14 @@ final class ExtractBatchesControllerTest extends WebTestCaseBase
             'marketplace-ads/%s/happy-path-batch.csv',
             self::COMPANY_ID,
         );
-        $stored = $storage->storeBytes($csvBody, $relativePath);
+        $stored = $storage->write($relativePath, $csvBody);
 
         $batch = AdScheduledBatchBuilder::aBatch()
             ->withJobId($job->getId())
             ->withCompanyId(self::COMPANY_ID)
             ->withIndex(0)
             ->withState(AdScheduledBatchState::OK)
-            ->withStorage($stored['storagePath'], $stored['fileHash'], (int) $stored['sizeBytes'])
+            ->withStorage($stored->path, 'fixture-hash', $stored->byteSize)
             ->build();
         $em->persist($batch);
         $em->flush();
@@ -113,9 +113,9 @@ final class ExtractBatchesControllerTest extends WebTestCaseBase
         self::assertSame(self::COMPANY_ID, $message->companyId);
         self::assertSame($docs[0]->getId(), $message->adRawDocumentId);
 
-        // Файл на диске остаётся — Task-13 удалит его, когда парсинг подтвердится.
-        self::assertFileExists($storage->getAbsolutePath($relativePath));
-        @unlink($storage->getAbsolutePath($relativePath));
+        // Файл в хранилище остаётся — Task-13 удалит его, когда парсинг подтвердится.
+        self::assertTrue($storage->exists($relativePath));
+        $storage->delete($relativePath);
     }
 
     public function testSecondInvocationSkipsExistingDocumentAndDispatchesNothing(): void
@@ -144,20 +144,20 @@ final class ExtractBatchesControllerTest extends WebTestCaseBase
         $em->persist($job);
         $em->flush();
 
-        /** @var StorageService $storage */
-        $storage = static::getContainer()->get(StorageService::class);
+        /** @var ObjectStorageInterface $storage */
+        $storage = static::getContainer()->get(ObjectStorageInterface::class);
         $relativePath = sprintf(
             'marketplace-ads/%s/idempotent-batch.csv',
             self::COMPANY_ID,
         );
-        $stored = $storage->storeBytes('sku;spend\nsku-1;1.00', $relativePath);
+        $stored = $storage->write($relativePath, 'sku;spend\nsku-1;1.00');
 
         $batch = AdScheduledBatchBuilder::aBatch()
             ->withJobId($job->getId())
             ->withCompanyId(self::COMPANY_ID)
             ->withIndex(0)
             ->withState(AdScheduledBatchState::OK)
-            ->withStorage($stored['storagePath'], $stored['fileHash'], (int) $stored['sizeBytes'])
+            ->withStorage($stored->path, 'fixture-hash', $stored->byteSize)
             ->build();
         $em->persist($batch);
         $em->flush();
@@ -196,7 +196,7 @@ final class ExtractBatchesControllerTest extends WebTestCaseBase
         $transportAfterSecondPost = static::getContainer()->get('messenger.transport.async_pipeline');
         self::assertCount(0, $transportAfterSecondPost->getSent());
 
-        @unlink($storage->getAbsolutePath($relativePath));
+        $storage->delete($relativePath);
     }
 
     public function testForeignJobIdReturns0ProcessedWithoutException(): void
@@ -235,20 +235,20 @@ final class ExtractBatchesControllerTest extends WebTestCaseBase
         $em->persist($foreignJob);
         $em->flush();
 
-        /** @var StorageService $storage */
-        $storage = static::getContainer()->get(StorageService::class);
+        /** @var ObjectStorageInterface $storage */
+        $storage = static::getContainer()->get(ObjectStorageInterface::class);
         $relativePath = sprintf(
             'marketplace-ads/%s/foreign-batch.csv',
             self::OTHER_COMPANY_ID,
         );
-        $stored = $storage->storeBytes('foreign-csv', $relativePath);
+        $stored = $storage->write($relativePath, 'foreign-csv');
 
         $foreignBatch = AdScheduledBatchBuilder::aBatch()
             ->withJobId($foreignJob->getId())
             ->withCompanyId(self::OTHER_COMPANY_ID)
             ->withIndex(0)
             ->withState(AdScheduledBatchState::OK)
-            ->withStorage($stored['storagePath'], $stored['fileHash'], (int) $stored['sizeBytes'])
+            ->withStorage($stored->path, 'fixture-hash', $stored->byteSize)
             ->build();
         $em->persist($foreignBatch);
         $em->flush();
@@ -274,7 +274,7 @@ final class ExtractBatchesControllerTest extends WebTestCaseBase
         $transport = static::getContainer()->get('messenger.transport.async_pipeline');
         self::assertCount(0, $transport->getSent());
 
-        @unlink($storage->getAbsolutePath($relativePath));
+        $storage->delete($relativePath);
     }
 
     public function testInvalidCsrfTokenReturns400(): void

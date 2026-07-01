@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\MarketplaceAds\Controller;
 
 use App\Marketplace\Enum\MarketplaceType;
-use App\Shared\Service\Storage\StorageService;
+use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\MarketplaceAds\AdRawDocumentBuilder;
@@ -47,8 +47,8 @@ final class AdRawDocumentDownloadControllerTest extends WebTestCaseBase
         $em->persist($company);
         $em->flush();
 
-        /** @var StorageService $storage */
-        $storage = static::getContainer()->get(StorageService::class);
+        /** @var ObjectStorageInterface $storage */
+        $storage = static::getContainer()->get(ObjectStorageInterface::class);
 
         $csvBody = "date;sku;spend\n2026-04-01;SKU-1;1.00";
         $relativePath = sprintf(
@@ -56,7 +56,7 @@ final class AdRawDocumentDownloadControllerTest extends WebTestCaseBase
             self::COMPANY_ID,
             'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         );
-        $stored = $storage->storeBytes($csvBody, $relativePath);
+        $stored = $storage->write($relativePath, $csvBody);
 
         $doc = AdRawDocumentBuilder::aRawDocument()
             ->withCompanyId(self::COMPANY_ID)
@@ -65,9 +65,9 @@ final class AdRawDocumentDownloadControllerTest extends WebTestCaseBase
             ->withReportDate(new \DateTimeImmutable('2026-04-01'))
             ->build();
         $doc->setFileStorage(
-            $stored['storagePath'],
-            $stored['fileHash'],
-            (int) $stored['sizeBytes'],
+            $stored->path,
+            hash('sha256', $csvBody),
+            $stored->byteSize,
         );
 
         $em->persist($doc);
@@ -89,7 +89,7 @@ final class AdRawDocumentDownloadControllerTest extends WebTestCaseBase
         self::assertStringContainsString('ozon-ad-2026-04-01.csv', $disposition);
 
         // Cleanup — storage-файл на реальном диске, удаляем, чтобы не копить мусор между запусками.
-        @unlink($storage->getAbsolutePath($relativePath));
+        $storage->delete($relativePath);
     }
 
     public function testDownloadReturns404ForOtherCompanyDocument(): void
@@ -122,15 +122,15 @@ final class AdRawDocumentDownloadControllerTest extends WebTestCaseBase
         $em->persist($otherCompany);
         $em->flush();
 
-        /** @var StorageService $storage */
-        $storage = static::getContainer()->get(StorageService::class);
+        /** @var ObjectStorageInterface $storage */
+        $storage = static::getContainer()->get(ObjectStorageInterface::class);
 
         $relativePath = sprintf(
             'marketplace-ads/%s/%s.csv',
             self::OTHER_COMPANY_ID,
             'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
         );
-        $stored = $storage->storeBytes('foreign-body', $relativePath);
+        $stored = $storage->write($relativePath, 'foreign-body');
 
         $foreignDoc = AdRawDocumentBuilder::aRawDocument()
             ->withCompanyId(self::OTHER_COMPANY_ID)
@@ -139,9 +139,9 @@ final class AdRawDocumentDownloadControllerTest extends WebTestCaseBase
             ->withReportDate(new \DateTimeImmutable('2026-04-05'))
             ->build();
         $foreignDoc->setFileStorage(
-            $stored['storagePath'],
-            $stored['fileHash'],
-            (int) $stored['sizeBytes'],
+            $stored->path,
+            hash('sha256', 'foreign-body'),
+            $stored->byteSize,
         );
 
         $em->persist($foreignDoc);
@@ -156,7 +156,7 @@ final class AdRawDocumentDownloadControllerTest extends WebTestCaseBase
 
         self::assertResponseStatusCodeSame(404);
 
-        @unlink($storage->getAbsolutePath($relativePath));
+        $storage->delete($relativePath);
     }
 
     public function testDownloadReturns404WhenStoragePathIsNull(): void
