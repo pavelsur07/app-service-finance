@@ -8,7 +8,8 @@ use App\Marketplace\Application\Processor\OzonMutualSettlementProcessor;
 use App\Marketplace\Enum\PipelineStep;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Shared\Service\ActiveCompanyService;
-use App\Shared\Service\Storage\StorageService;
+use App\Shared\Service\Storage\ObjectStorageInterface;
+use App\Shared\Service\Storage\TemporaryLocalFile;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -36,7 +37,8 @@ final class DebugReparseMutualSettlementController extends AbstractController
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly MarketplaceRawDocumentRepository $rawDocumentRepository,
         private readonly OzonMutualSettlementProcessor $processor,
-        private readonly StorageService $storageService,
+        private readonly ObjectStorageInterface $storage,
+        private readonly TemporaryLocalFile $temporaryLocalFile,
         private readonly EntityManagerInterface $em,
     ) {
     }
@@ -61,17 +63,18 @@ final class DebugReparseMutualSettlementController extends AbstractController
             ], 422);
         }
 
-        $absolutePath = $this->storageService->getAbsolutePath($rawData['file_path']);
-
-        if (!file_exists($absolutePath)) {
+        if (!$this->storage->exists($rawData['file_path'])) {
             return $this->json([
                 'success' => false,
-                'error' => 'Файл не найден на диске: ' . $rawData['file_path'],
+                'error' => 'Файл не найден в хранилище: ' . $rawData['file_path'],
             ], 404);
         }
 
         try {
-            $parsed = $this->processor->parse($absolutePath);
+            $parsed = $this->temporaryLocalFile->with(
+                $rawData['file_path'],
+                fn (string $absolutePath): array => $this->processor->parse($absolutePath),
+            );
 
             $rawData['parsed'] = $parsed;
             unset($rawData['parsing_error']);

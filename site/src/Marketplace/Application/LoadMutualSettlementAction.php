@@ -12,7 +12,8 @@ use App\Marketplace\Enum\PipelineStatus;
 use App\Marketplace\Enum\PipelineStep;
 use App\Marketplace\Infrastructure\Api\Ozon\OzonMutualSettlementClient;
 use App\Shared\Service\AppLogger;
-use App\Shared\Service\Storage\StorageService;
+use App\Shared\Service\Storage\ObjectStorageInterface;
+use App\Shared\Service\Storage\TemporaryLocalFile;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 
@@ -32,7 +33,8 @@ final class LoadMutualSettlementAction
     public function __construct(
         private readonly OzonMutualSettlementClient $client,
         private readonly OzonMutualSettlementProcessor $processor,
-        private readonly StorageService $storageService,
+        private readonly ObjectStorageInterface $storage,
+        private readonly TemporaryLocalFile $temporaryLocalFile,
         private readonly EntityManagerInterface $em,
         private readonly AppLogger $appLogger,
     ) {
@@ -116,13 +118,8 @@ final class LoadMutualSettlementAction
             $extension,
         );
 
-        // Сохраняем файл на диск
-        $dir = sprintf('%s/%s', self::STORAGE_DIR, $companyId);
-        $this->storageService->ensureDir($dir);
-        $absolutePath = $this->storageService->getAbsolutePath($relativePath);
-        if (false === file_put_contents($absolutePath, $binaryContent)) {
-            throw new \RuntimeException(sprintf('Не удалось сохранить файл на диск: %s', $relativePath));
-        }
+        // Сохраняем файл в объектное хранилище
+        $this->storage->write($relativePath, $binaryContent);
 
         $this->appLogger->info('LoadMutualSettlement: файл сохранён', [
             'companyId' => $companyId,
@@ -142,7 +139,10 @@ final class LoadMutualSettlementAction
         $processingStatus = PipelineStatus::COMPLETED;
 
         try {
-            $parsed = $this->processor->parse($absolutePath);
+            $parsed = $this->temporaryLocalFile->with(
+                $relativePath,
+                fn (string $absolutePath): array => $this->processor->parse($absolutePath),
+            );
             $rawData['parsed'] = $parsed;
             $recordsCount = $parsed['meta']['rows_parsed'] ?? $parsed['totals']['rows_count'] ?? 0;
 

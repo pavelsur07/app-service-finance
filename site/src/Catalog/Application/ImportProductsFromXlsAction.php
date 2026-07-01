@@ -19,7 +19,7 @@ use App\Catalog\Infrastructure\Repository\ProductImportRepository;
 use App\Catalog\Infrastructure\XlsProductRowParser;
 use App\Company\Entity\Company;
 use App\Company\Facade\CompanyFacade;
-use App\Shared\Service\Storage\StorageService;
+use App\Shared\Service\Storage\TemporaryLocalFile;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 
@@ -44,7 +44,7 @@ final class ImportProductsFromXlsAction
         private readonly InternalArticleGenerator $articleGenerator,
         private readonly SetPurchasePriceAction $setPurchasePriceAction,
         private readonly CompanyFacade $companyFacade,
-        private readonly StorageService $storageService,
+        private readonly TemporaryLocalFile $temporaryLocalFile,
         private readonly EntityManagerInterface $entityManager,
     ) {
     }
@@ -61,8 +61,10 @@ final class ImportProductsFromXlsAction
                 throw new \DomainException(sprintf('Компания "%s" не найдена.', $command->companyId));
             }
 
-            $filePath = $this->storageService->getAbsolutePath($import->getFilePath());
-            $rows     = $this->parser->parse($filePath);
+            $rows = $this->temporaryLocalFile->with(
+                $import->getFilePath(),
+                fn (string $filePath) => $this->parser->parse($filePath),
+            );
             $result   = $this->processRows($rows, $command->companyId, $company);
 
             $import->markDone(
