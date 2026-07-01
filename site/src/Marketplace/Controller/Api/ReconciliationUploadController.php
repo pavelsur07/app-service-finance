@@ -9,7 +9,7 @@ use App\Marketplace\Entity\ReconciliationSession;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\ReconciliationSessionStatus;
 use App\Shared\Service\ActiveCompanyService;
-use App\Shared\Service\Storage\StorageService;
+use App\Shared\Service\Storage\ObjectStorageInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -28,7 +28,7 @@ final class ReconciliationUploadController extends AbstractController
 {
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
-        private readonly StorageService $storageService,
+        private readonly ObjectStorageInterface $storage,
         private readonly RunUserReconciliationAction $reconciliationAction,
         private readonly EntityManagerInterface $em,
     ) {
@@ -83,7 +83,7 @@ final class ReconciliationUploadController extends AbstractController
             $dateFrom->format('Y-m'),
             Uuid::uuid4()->toString(),
         );
-        $stored = $this->storageService->storeUploadedFile($file, $relativePath);
+        $stored = $this->storage->write($relativePath, $file->getContent());
 
         // --- Создание сессии ---
 
@@ -92,8 +92,8 @@ final class ReconciliationUploadController extends AbstractController
             $marketplace,
             $dateFrom,
             $dateTo,
-            $stored['originalFilename'],
-            $stored['storagePath'],
+            $file->getClientOriginalName(),
+            $stored->path,
         );
 
         $this->em->persist($session);

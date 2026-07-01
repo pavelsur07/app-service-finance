@@ -8,7 +8,7 @@ use App\Marketplace\Application\Reconciliation\OzonReportParserFacade;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\CostReconciliationQuery;
 use App\Marketplace\Repository\MarketplaceMonthCloseRepository;
-use App\Shared\Service\Storage\StorageService;
+use App\Shared\Service\Storage\ObjectStorageInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
@@ -16,7 +16,7 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
  * Use-case: загрузить xlsx и выполнить сверку затрат за период.
  *
  * Поток:
- *   1. Сохранить файл через StorageService
+ *   1. Сохранить файл через ObjectStorageInterface
  *   2. Распарсить через OzonReportParserFacade
  *   3. Сверить с данными из marketplace_costs через CostReconciliationQuery
  *   4. Сохранить результат в MarketplaceMonthClose.settings
@@ -27,7 +27,7 @@ final class ReconcileCostsAction
         private readonly OzonReportParserFacade          $parserFacade,
         private readonly CostReconciliationQuery         $reconciliationQuery,
         private readonly MarketplaceMonthCloseRepository $monthCloseRepository,
-        private readonly StorageService                  $storageService,
+        private readonly ObjectStorageInterface          $storage,
     ) {
     }
 
@@ -54,10 +54,11 @@ final class ReconcileCostsAction
             $month,
             Uuid::uuid4()->toString(),
         );
-        $stored = $this->storageService->storeUploadedFile($file, $relativePath);
+        $contents = $file->getContent();
+        $stored = $this->storage->write($relativePath, $contents);
 
         // 2. Распарсить xlsx
-        $reportResult = $this->parserFacade->parseFromStoragePath($stored['storagePath']);
+        $reportResult = $this->parserFacade->parseFromStoragePath($stored->path);
 
         // 3. Сверить с API данными
         $reconciliationResult = $this->reconciliationQuery->reconcile(
@@ -78,9 +79,9 @@ final class ReconcileCostsAction
         }
 
         $monthClose->setCostsReconciliation(array_merge($reconciliationResult, [
-            'file_path'         => $stored['storagePath'],
-            'file_hash'         => $stored['fileHash'],
-            'original_filename' => $stored['originalFilename'],
+            'file_path'         => $stored->path,
+            'file_hash'         => hash('sha256', $contents),
+            'original_filename' => $file->getClientOriginalName(),
             'reconciled_at'     => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
         ]));
 

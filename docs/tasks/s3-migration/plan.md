@@ -85,11 +85,18 @@
 - Тесты: unit на `TemporaryLocalFile` (создаёт/удаляет tmp, пробрасывает исключение),
   unit на `Local.readStream/delete`.
 
-### PR 2 — простые store/read сайты → интерфейс — 🟡 MEDIUM
-- Catalog (`ProductImportController` ×2, `ImportProductsFromXlsAction` — часть store),
-  прочие места, где только `storeUploadedFile`/`storeBytes`/`exists`.
-- Пути сохраняем как есть.
-- Тесты: functional на импорт продукта (файл сохраняется и читается по тому же пути).
+### PR 2 — upload-контроллеры (write side) → интерфейс — 🟡 MEDIUM ✅ DONE
+- 5 сайтов с чистой записью загрузки: `Catalog\ProductImportController` (web + Api),
+  `Marketplace\ReconciliationUploadController`, `Marketplace\Inventory\InventoryImportController`,
+  `Marketplace\ReconcileCostsAction`.
+- `storeUploadedFile()` → `write($path, $file->getContent())`; путь сохраняем как есть;
+  `originalFilename` из `$file->getClientOriginalName()`; `fileHash` считаем на месте
+  (`hash('sha256', …)`, как в `StoreRawBatchAction`).
+- **Scope-корректировка:** 2 storeBytes-сайта MarketplaceAds
+  (`DownloadOzonAdReportHandler`, `AdBatchPollerCommand`) вынесены в PR 5 — они плотно
+  связаны с `ExtractBatchesToRawDocumentsAction` (читает `getAbsolutePath` сразу после
+  записи) и их тесты мокают `StorageService` для обеих сторон; узел нельзя разрывать.
+- Тесты: functional `ProductImportUploadTest` — файл сохраняется и читается по пути из БД.
 
 ### PR 3 — тип C: cash-импорт → интерфейс — 🟡 MEDIUM
 - `CashFileImportController` пишет через `write()`, ключ = прежний относительный путь.
@@ -101,11 +108,15 @@
 - `TelegramWebhookController` → `write()`; читатель → `TemporaryLocalFile`.
 - Тесты: приём файла из webhook → обработка воркером.
 
-### PR 5 — тип B: парсеры через `TemporaryLocalFile` — 🟡 MEDIUM
+### PR 5 — тип B: парсеры через `TemporaryLocalFile` (+ узел MarketplaceAds) — 🟡 MEDIUM
 - `LoadMutualSettlementAction`, `OzonReportParserFacade`, `ImportInventoryCostPriceHandler`,
   `ExtractBatchesToRawDocumentsAction`, `DebugReparseMutualSettlementController`.
+- **Плюс из PR 2:** `DownloadOzonAdReportHandler`, `AdBatchPollerCommand` (storeBytes-запись)
+  — мигрируются вместе с `ExtractBatchesToRawDocumentsAction`, т.к. store→getAbsolutePath
+  handoff и общие тесты, мокающие `StorageService`. Обновить эти тесты один раз здесь.
 - Можно разбить на 2 PR: `Marketplace` / `MarketplaceAds`.
-- Тесты: по одному happy-path на каждый парсер (файл читается из хранилища, парсится).
+- Тесты: по одному happy-path на каждый парсер; обновить unit+integration тесты
+  `DownloadOzonAdReportHandler` / `AdBatchPollerCommand` под `ObjectStorageInterface`.
 
 ### PR 6 — тип A: download-контроллеры → `readStream()` — 🟢 LOW
 - 4 контроллера: `getAbsolutePath()`+`BinaryFileResponse` → `readStream()`+`StreamedResponse`.
@@ -119,6 +130,20 @@
 - Тесты: `make stan` (нет внешних импортов `StorageService`).
 
 ### PR 8 — инфра + флип на S3 — 🔴 HIGH (STOP перед выполнением)
+
+> ⛔ **S3-ГЕЙТ (жёсткое предусловие флипа).** Не выставлять
+> `APP_OBJECT_STORAGE_DRIVER=s3`, пока **PR 3, 4 и 5 не в проде**.
+> Причина: часть сайтов уже пишет через `ObjectStorageInterface`, но читает файл
+> обратно через `StorageService::getAbsolutePath()` (локальный диск) — это чинит
+> только PR 5. Под драйвером `local` путь один и тот же, поэтому безопасно; но при
+> флипе на S3 раньше PR 5 такой сайт запишет в S3, а прочитает с локального диска →
+> «файл не найден». Затронуто минимум:
+> `ReconcileCostsAction`, `ReconciliationUploadController` (пишут в PR 2, парсят в PR 5),
+> плюс все тип-B/тип-C потоки до их миграции.
+> **Чек перед флипом:** `grep -rn "getAbsolutePath" src/` вне
+> `Shared/Service/Storage/` должен быть пустым (все читатели переведены на
+> `read()`/`readStream()`/`TemporaryLocalFile`).
+
 1. Бакет timeweb (приватный, TLS-only, versioning вкл., lifecycle 30 дней на
    неактуальные версии; SSE-S3 подготовлен, но выключен).
 2. `APP_OBJECT_STORAGE_*` в host-env + прокинуть в `x-php-env` и в блок env

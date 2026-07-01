@@ -8,7 +8,7 @@ use App\Catalog\Entity\ProductImport;
 use App\Catalog\Infrastructure\Repository\ProductImportRepository;
 use App\Catalog\Message\ImportProductsMessage;
 use App\Shared\Service\ActiveCompanyService;
-use App\Shared\Service\Storage\StorageService;
+use App\Shared\Service\Storage\ObjectStorageInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -27,7 +27,7 @@ final class ProductImportController extends AbstractController
     public function import(
         Request $request,
         ActiveCompanyService $activeCompanyService,
-        StorageService $storageService,
+        ObjectStorageInterface $storage,
         ProductImportRepository $importRepository,
         MessageBusInterface $bus,
     ): Response {
@@ -53,13 +53,13 @@ final class ProductImportController extends AbstractController
         $importId     = Uuid::uuid7()->toString();
         $relativePath = sprintf('product_imports/%s/%s.%s', $companyId, $importId, $extension);
 
-        $stored = $storageService->storeUploadedFile($file, $relativePath);
+        $stored = $storage->write($relativePath, $file->getContent());
 
         $import = new ProductImport(
             id:           $importId,
             companyId:    $companyId,
-            filePath:     $stored['storagePath'],
-            originalName: $stored['originalFilename'],
+            filePath:     $stored->path,
+            originalName: $file->getClientOriginalName(),
         );
         $importRepository->save($import);
 
