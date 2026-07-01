@@ -7,7 +7,7 @@ namespace App\Marketplace\Controller\Inventory;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Message\ImportInventoryCostPriceMessage;
 use App\Shared\Service\ActiveCompanyService;
-use App\Shared\Service\Storage\StorageService;
+use App\Shared\Service\Storage\ObjectStorageInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -21,9 +21,9 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class InventoryImportController extends AbstractController
 {
     public function __construct(
-        private readonly ActiveCompanyService $companyService,
-        private readonly StorageService       $storageService,
-        private readonly MessageBusInterface  $messageBus,
+        private readonly ActiveCompanyService  $companyService,
+        private readonly ObjectStorageInterface $storage,
+        private readonly MessageBusInterface   $messageBus,
     ) {
     }
 
@@ -87,17 +87,19 @@ final class InventoryImportController extends AbstractController
         );
 
         try {
-            $stored = $this->storageService->storeUploadedFile($file, $relativePath);
+            $stored = $this->storage->write($relativePath, $file->getContent());
         } catch (\Exception $e) {
             $this->addFlash('error', 'Ошибка сохранения файла: ' . $e->getMessage());
 
             return $this->redirectToRoute('marketplace_inventory_index');
         }
 
+        $originalFilename = $file->getClientOriginalName();
+
         $this->messageBus->dispatch(new ImportInventoryCostPriceMessage(
             companyId:        $companyId,
-            storagePath:      $stored['storagePath'],
-            originalFilename: $stored['originalFilename'],
+            storagePath:      $stored->path,
+            originalFilename: $originalFilename,
             effectiveFrom:    $effectiveFrom,
             marketplace:      $marketplaceType->value,
             identifierType:   $identifierType,
@@ -105,7 +107,7 @@ final class InventoryImportController extends AbstractController
 
         $this->addFlash('success', sprintf(
             'Файл "%s" принят в обработку. Себестоимость будет обновлена в течение нескольких секунд.',
-            $stored['originalFilename'],
+            $originalFilename,
         ));
 
         return $this->redirectToRoute('marketplace_inventory_index');

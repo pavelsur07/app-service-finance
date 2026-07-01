@@ -85,11 +85,18 @@
 - Тесты: unit на `TemporaryLocalFile` (создаёт/удаляет tmp, пробрасывает исключение),
   unit на `Local.readStream/delete`.
 
-### PR 2 — простые store/read сайты → интерфейс — 🟡 MEDIUM
-- Catalog (`ProductImportController` ×2, `ImportProductsFromXlsAction` — часть store),
-  прочие места, где только `storeUploadedFile`/`storeBytes`/`exists`.
-- Пути сохраняем как есть.
-- Тесты: functional на импорт продукта (файл сохраняется и читается по тому же пути).
+### PR 2 — upload-контроллеры (write side) → интерфейс — 🟡 MEDIUM ✅ DONE
+- 5 сайтов с чистой записью загрузки: `Catalog\ProductImportController` (web + Api),
+  `Marketplace\ReconciliationUploadController`, `Marketplace\Inventory\InventoryImportController`,
+  `Marketplace\ReconcileCostsAction`.
+- `storeUploadedFile()` → `write($path, $file->getContent())`; путь сохраняем как есть;
+  `originalFilename` из `$file->getClientOriginalName()`; `fileHash` считаем на месте
+  (`hash('sha256', …)`, как в `StoreRawBatchAction`).
+- **Scope-корректировка:** 2 storeBytes-сайта MarketplaceAds
+  (`DownloadOzonAdReportHandler`, `AdBatchPollerCommand`) вынесены в PR 5 — они плотно
+  связаны с `ExtractBatchesToRawDocumentsAction` (читает `getAbsolutePath` сразу после
+  записи) и их тесты мокают `StorageService` для обеих сторон; узел нельзя разрывать.
+- Тесты: functional `ProductImportUploadTest` — файл сохраняется и читается по пути из БД.
 
 ### PR 3 — тип C: cash-импорт → интерфейс — 🟡 MEDIUM
 - `CashFileImportController` пишет через `write()`, ключ = прежний относительный путь.
@@ -101,11 +108,15 @@
 - `TelegramWebhookController` → `write()`; читатель → `TemporaryLocalFile`.
 - Тесты: приём файла из webhook → обработка воркером.
 
-### PR 5 — тип B: парсеры через `TemporaryLocalFile` — 🟡 MEDIUM
+### PR 5 — тип B: парсеры через `TemporaryLocalFile` (+ узел MarketplaceAds) — 🟡 MEDIUM
 - `LoadMutualSettlementAction`, `OzonReportParserFacade`, `ImportInventoryCostPriceHandler`,
   `ExtractBatchesToRawDocumentsAction`, `DebugReparseMutualSettlementController`.
+- **Плюс из PR 2:** `DownloadOzonAdReportHandler`, `AdBatchPollerCommand` (storeBytes-запись)
+  — мигрируются вместе с `ExtractBatchesToRawDocumentsAction`, т.к. store→getAbsolutePath
+  handoff и общие тесты, мокающие `StorageService`. Обновить эти тесты один раз здесь.
 - Можно разбить на 2 PR: `Marketplace` / `MarketplaceAds`.
-- Тесты: по одному happy-path на каждый парсер (файл читается из хранилища, парсится).
+- Тесты: по одному happy-path на каждый парсер; обновить unit+integration тесты
+  `DownloadOzonAdReportHandler` / `AdBatchPollerCommand` под `ObjectStorageInterface`.
 
 ### PR 6 — тип A: download-контроллеры → `readStream()` — 🟢 LOW
 - 4 контроллера: `getAbsolutePath()`+`BinaryFileResponse` → `readStream()`+`StreamedResponse`.
