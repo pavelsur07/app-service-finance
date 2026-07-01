@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceAds\Controller\Api\Admin;
 
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
-use App\Shared\Service\Storage\StorageService;
+use App\Shared\Service\Storage\ObjectStorageInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
@@ -31,7 +31,7 @@ final class DownloadBronzeController extends AbstractController
 {
     public function __construct(
         private readonly AdRawDocumentRepository $adRawDocumentRepository,
-        private readonly StorageService $storageService,
+        private readonly ObjectStorageInterface $storage,
     ) {
     }
 
@@ -50,17 +50,20 @@ final class DownloadBronzeController extends AbstractController
             throw $this->createNotFoundException('Bronze file missing: document has no storage_path');
         }
 
-        $absolutePath = $this->storageService->getAbsolutePath($storagePath);
-        if (!is_file($absolutePath)) {
-            throw $this->createNotFoundException('Bronze file missing: file not found on disk');
+        if (!$this->storage->exists($storagePath)) {
+            throw $this->createNotFoundException('Bronze file missing: file not found in storage');
         }
 
         $extension = str_ends_with(strtolower($storagePath), '.zip') ? 'zip' : 'csv';
         $contentType = 'zip' === $extension ? 'application/zip' : 'text/csv';
         $filename = basename($storagePath);
 
-        $response = new StreamedResponse(static function () use ($absolutePath): void {
-            readfile($absolutePath);
+        $stream = $this->storage->readStream($storagePath);
+        $response = new StreamedResponse(static function () use ($stream): void {
+            fpassthru($stream);
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
         });
         $response->headers->set('Content-Type', $contentType);
         $response->headers->set(

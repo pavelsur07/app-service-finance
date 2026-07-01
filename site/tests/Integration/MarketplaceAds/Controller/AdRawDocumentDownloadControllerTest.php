@@ -10,6 +10,7 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\MarketplaceAds\AdRawDocumentBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * End-to-end тесты {@see \App\MarketplaceAds\Controller\AdRawDocumentDownloadController}.
@@ -82,6 +83,7 @@ final class AdRawDocumentDownloadControllerTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
 
         $response = $client->getResponse();
+        self::assertInstanceOf(StreamedResponse::class, $response);
         $disposition = (string) $response->headers->get('Content-Disposition');
         self::assertStringContainsString('attachment', $disposition);
         self::assertStringContainsString('ozon-ad-2026-04-01.csv', $disposition);
