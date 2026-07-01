@@ -45,7 +45,10 @@ final readonly class LocalObjectStorage implements ObjectStorageInterface
     public function delete(string $path): void
     {
         $absolutePath = $this->storageService->getAbsolutePath($path);
-        if (is_file($absolutePath) && !@unlink($absolutePath)) {
+        // Идемпотентность: бросаем только если файл всё ещё на месте после
+        // неудачного unlink. Гонка (кто-то удалил между is_file и unlink) —
+        // не ошибка, итог тот же: файла нет.
+        if (is_file($absolutePath) && !@unlink($absolutePath) && is_file($absolutePath)) {
             throw new ObjectStorageException(sprintf('Failed to delete object "%s".', $path));
         }
     }
