@@ -6,6 +6,14 @@ namespace App\Shared\Service\Storage;
 
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
+/**
+ * Низкоуровневый драйвер локального диска для {@see LocalObjectStorage}.
+ *
+ * @internal Прикладной код обязан работать через {@see ObjectStorageInterface}
+ *           (запись — {@see ObjectStorageInterface::write()}, чтение файла для
+ *           парсеров — {@see TemporaryLocalFile}). Напрямую инжектить/использовать
+ *           этот класс вне пакета Storage запрещено.
+ */
 final class StorageService
 {
     public function __construct(private readonly string $storageRoot)

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\MarketplaceAds\Controller;
 
 use App\MarketplaceAds\Enum\AdScheduledBatchState;
-use App\Shared\Service\Storage\StorageService;
+use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\MarketplaceAds\AdLoadJobBuilder;
@@ -56,8 +56,8 @@ final class AdScheduledBatchDownloadControllerTest extends WebTestCaseBase
         $em->persist($job);
         $em->flush();
 
-        /** @var StorageService $storage */
-        $storage = static::getContainer()->get(StorageService::class);
+        /** @var ObjectStorageInterface $storage */
+        $storage = static::getContainer()->get(ObjectStorageInterface::class);
 
         $csvBody = "date,campaign_id,spend\n2026-04-01,camp-1,1.00";
         $relativePath = sprintf(
@@ -65,7 +65,7 @@ final class AdScheduledBatchDownloadControllerTest extends WebTestCaseBase
             self::COMPANY_ID,
             'cccccccc-cccc-cccc-cccc-cccccccccccc',
         );
-        $stored = $storage->storeBytes($csvBody, $relativePath);
+        $stored = $storage->write($relativePath, $csvBody);
 
         $batch = AdScheduledBatchBuilder::aBatch()
             ->withJobId($job->getId())
@@ -76,7 +76,7 @@ final class AdScheduledBatchDownloadControllerTest extends WebTestCaseBase
                 new \DateTimeImmutable('2026-04-15'),
             )
             ->withState(AdScheduledBatchState::OK)
-            ->withStorage($stored['storagePath'], $stored['fileHash'], (int) $stored['sizeBytes'])
+            ->withStorage($stored->path, hash('sha256', $csvBody), $stored->byteSize)
             ->build();
         $em->persist($batch);
         $em->flush();
@@ -94,7 +94,7 @@ final class AdScheduledBatchDownloadControllerTest extends WebTestCaseBase
         self::assertStringContainsString('attachment', $disposition);
         self::assertStringContainsString('ozon-ad-batch-3-2026-04-01_2026-04-15.csv', $disposition);
 
-        @unlink($storage->getAbsolutePath($relativePath));
+        $storage->delete($relativePath);
     }
 
     public function testDownloadReturns404ForOtherCompanyBatch(): void
@@ -132,22 +132,22 @@ final class AdScheduledBatchDownloadControllerTest extends WebTestCaseBase
         $em->persist($foreignJob);
         $em->flush();
 
-        /** @var StorageService $storage */
-        $storage = static::getContainer()->get(StorageService::class);
+        /** @var ObjectStorageInterface $storage */
+        $storage = static::getContainer()->get(ObjectStorageInterface::class);
 
         $relativePath = sprintf(
             'marketplace-ads/%s/%s.csv',
             self::OTHER_COMPANY_ID,
             'dddddddd-dddd-dddd-dddd-dddddddddddd',
         );
-        $stored = $storage->storeBytes('foreign-body', $relativePath);
+        $stored = $storage->write($relativePath, 'foreign-body');
 
         $foreignBatch = AdScheduledBatchBuilder::aBatch()
             ->withJobId($foreignJob->getId())
             ->withCompanyId(self::OTHER_COMPANY_ID)
             ->withIndex(0)
             ->withState(AdScheduledBatchState::OK)
-            ->withStorage($stored['storagePath'], $stored['fileHash'], (int) $stored['sizeBytes'])
+            ->withStorage($stored->path, hash('sha256', 'foreign-body'), $stored->byteSize)
             ->build();
         $em->persist($foreignBatch);
         $em->flush();
@@ -161,7 +161,7 @@ final class AdScheduledBatchDownloadControllerTest extends WebTestCaseBase
 
         self::assertResponseStatusCodeSame(404);
 
-        @unlink($storage->getAbsolutePath($relativePath));
+        $storage->delete($relativePath);
     }
 
     public function testDownloadReturns404WhenStoragePathIsNull(): void
