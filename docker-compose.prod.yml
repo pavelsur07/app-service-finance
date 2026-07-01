@@ -37,9 +37,10 @@ x-php-env: &php-env
     # Базовый URL Telegram Bot API через шлюз tg-gateway (app-сервер не имеет прямого доступа к api.telegram.org)
     TELEGRAM_API_BASE_URL: ${TELEGRAM_API_BASE_URL:-https://tg.vashfindir.ru/bot-api}
     # ─── Объектное хранилище файлов (timeweb S3) ───────────────────────────
-    # DRIVER=local до завершения `aws s3 sync`. Флип на s3 — отдельным однострочным
-    # коммитом (S3-гейт: сначала данные в бакете, потом переключение). Откат — обратно на local.
-    APP_OBJECT_STORAGE_DRIVER: local
+    # Флип выполнен после `aws s3 sync` (данные уже в бакете). Откат — вернуть `local`
+    # (локальный том сохранён как холодный бэкап на грейс-период). Менять в ДВУХ местах
+    # (здесь и в блоке scheduler).
+    APP_OBJECT_STORAGE_DRIVER: s3
     APP_OBJECT_STORAGE_S3_ENDPOINT: "https://s3.twcstorage.ru"
     APP_OBJECT_STORAGE_S3_BUCKET: "ccd24eb8-1c82-4de4-bd69-9706a7b5443b"
     APP_OBJECT_STORAGE_S3_REGION: "ru-1"
@@ -424,7 +425,7 @@ services:
             # Нужно для app:telegram:send-reports (исходящие в Telegram через шлюз)
             TELEGRAM_API_BASE_URL: ${TELEGRAM_API_BASE_URL:-https://tg.vashfindir.ru/bot-api}
             # ─── Объектное хранилище (timeweb S3) — cron-команды тоже читают/пишут файлы ───
-            APP_OBJECT_STORAGE_DRIVER: local
+            APP_OBJECT_STORAGE_DRIVER: s3
             APP_OBJECT_STORAGE_S3_ENDPOINT: "https://s3.twcstorage.ru"
             APP_OBJECT_STORAGE_S3_BUCKET: "ccd24eb8-1c82-4de4-bd69-9706a7b5443b"
             APP_OBJECT_STORAGE_S3_REGION: "ru-1"
