@@ -18,6 +18,9 @@ final readonly class TemporaryLocalFile
     }
 
     /**
+     * Временный файл получает то же расширение, что и ключ объекта — некоторые
+     * парсеры/ридеры (OpenSpout, PhpSpreadsheet) выбирают формат по расширению пути.
+     *
      * @template T
      *
      * @param callable(string $localPath): T $consumer
@@ -29,6 +32,17 @@ final readonly class TemporaryLocalFile
         $tmpPath = tempnam(sys_get_temp_dir(), 'objstore-');
         if (false === $tmpPath) {
             throw new ObjectStorageException('Failed to allocate a temporary file.');
+        }
+
+        $extension = pathinfo($path, \PATHINFO_EXTENSION);
+        if ('' !== $extension) {
+            $tmpWithExt = $tmpPath.'.'.$extension;
+            if (!@rename($tmpPath, $tmpWithExt)) {
+                @unlink($tmpPath);
+
+                throw new ObjectStorageException(sprintf('Failed to prepare a temporary file for object "%s".', $path));
+            }
+            $tmpPath = $tmpWithExt;
         }
 
         try {

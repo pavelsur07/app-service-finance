@@ -10,6 +10,8 @@ use App\Cash\Service\Import\File\CashFileImportService;
 use App\Cash\Service\Import\File\CashFileRowNormalizer;
 use App\Cash\Service\Import\ImportLogger;
 use App\Company\Repository\CounterpartyRepository;
+use App\Shared\Service\Storage\ObjectStorageInterface;
+use App\Shared\Service\Storage\TemporaryLocalFile;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 
@@ -24,7 +26,8 @@ final class CashFileImportServiceTest extends TestCase
             new ImportLogger($this->createMock(EntityManagerInterface::class)),
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(AccountBalanceService::class),
-            '/tmp'
+            $objectStorage = $this->createMock(ObjectStorageInterface::class),
+            new TemporaryLocalFile($objectStorage),
         );
 
         $method = new \ReflectionMethod(CashFileImportService::class, 'makeDedupeHash');

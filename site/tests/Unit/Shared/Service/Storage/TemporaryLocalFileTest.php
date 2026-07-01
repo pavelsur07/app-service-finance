@@ -26,6 +26,18 @@ final class TemporaryLocalFileTest extends TestCase
         self::assertSame('parsed', $result);
     }
 
+    public function testTemporaryFileKeepsExtensionOfKey(): void
+    {
+        $temporaryLocalFile = new TemporaryLocalFile($this->storageReturning('col1;col2'));
+
+        $seenExtension = null;
+        $temporaryLocalFile->with('cash-file-imports/abc123.csv', function (string $localPath) use (&$seenExtension): void {
+            $seenExtension = pathinfo($localPath, \PATHINFO_EXTENSION);
+        });
+
+        self::assertSame('csv', $seenExtension);
+    }
+
     public function testTemporaryFileRemovedAfterSuccess(): void
     {
         $temporaryLocalFile = new TemporaryLocalFile($this->storageReturning('payload'));
