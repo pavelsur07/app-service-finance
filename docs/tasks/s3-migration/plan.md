@@ -130,6 +130,20 @@
 - Тесты: `make stan` (нет внешних импортов `StorageService`).
 
 ### PR 8 — инфра + флип на S3 — 🔴 HIGH (STOP перед выполнением)
+
+> ⛔ **S3-ГЕЙТ (жёсткое предусловие флипа).** Не выставлять
+> `APP_OBJECT_STORAGE_DRIVER=s3`, пока **PR 3, 4 и 5 не в проде**.
+> Причина: часть сайтов уже пишет через `ObjectStorageInterface`, но читает файл
+> обратно через `StorageService::getAbsolutePath()` (локальный диск) — это чинит
+> только PR 5. Под драйвером `local` путь один и тот же, поэтому безопасно; но при
+> флипе на S3 раньше PR 5 такой сайт запишет в S3, а прочитает с локального диска →
+> «файл не найден». Затронуто минимум:
+> `ReconcileCostsAction`, `ReconciliationUploadController` (пишут в PR 2, парсят в PR 5),
+> плюс все тип-B/тип-C потоки до их миграции.
+> **Чек перед флипом:** `grep -rn "getAbsolutePath" src/` вне
+> `Shared/Service/Storage/` должен быть пустым (все читатели переведены на
+> `read()`/`readStream()`/`TemporaryLocalFile`).
+
 1. Бакет timeweb (приватный, TLS-only, versioning вкл., lifecycle 30 дней на
    неактуальные версии; SSE-S3 подготовлен, но выключен).
 2. `APP_OBJECT_STORAGE_*` в host-env + прокинуть в `x-php-env` и в блок env
