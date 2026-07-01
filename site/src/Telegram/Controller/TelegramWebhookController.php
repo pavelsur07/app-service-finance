@@ -7,6 +7,7 @@ namespace App\Telegram\Controller;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Exception\CurrencyMismatchException;
 use App\Shared\Domain\Exception\UserFacingException;
+use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Telegram\Application\CreateTelegramCashTransactionAction;
 use App\Telegram\Application\DTO\CreateTelegramCashTransactionCommand;
 use App\Telegram\Entity\ClientBinding;
@@ -35,6 +36,7 @@ final class TelegramWebhookController extends AbstractController
         private readonly HttpClientInterface $httpClient,
         private readonly LoggerInterface $logger,
         private readonly CreateTelegramCashTransactionAction $createTelegramCashTransactionAction,
+        private readonly ObjectStorageInterface $storage,
         private readonly string $telegramWebhookSecret = '',
         private readonly string $telegramApiBaseUrl = 'https://api.telegram.org',
     ) {
@@ -735,14 +737,11 @@ final class TelegramWebhookController extends AbstractController
         $extension = pathinfo($originalFilename, \PATHINFO_EXTENSION);
         $normalizedExtension = '' !== $extension ? '.'.strtolower($extension) : '';
 
-        $storageDir = sprintf('%s/var/storage/telegram-imports', $this->getParameter('kernel.project_dir'));
-        if (!is_dir($storageDir) && !mkdir($storageDir, 0775, true) && !is_dir($storageDir)) {
-            return $this->respondWithMessage($bot, $message, 'Не удалось подготовить директорию для файлов импорта.');
-        }
-
-        $targetPath = sprintf('%s/%s%s', $storageDir, $fileHash, $normalizedExtension);
-        if (false === file_put_contents($targetPath, $fileContent)) {
-            return $this->respondWithMessage($bot, $message, 'Не удалось сохранить файл на диск.');
+        $storageKey = sprintf('telegram-imports/%s%s', $fileHash, $normalizedExtension);
+        try {
+            $this->storage->write($storageKey, $fileContent);
+        } catch (\Throwable) {
+            return $this->respondWithMessage($bot, $message, 'Не удалось сохранить файл импорта.');
         }
 
         // Создаем задачу импорта, чтобы не смешивать загрузку из Telegram с существующей системой импорта

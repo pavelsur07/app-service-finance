@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Telegram\Functional;
 
+use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Telegram\Entity\ClientBinding;
+use App\Telegram\Entity\ImportJob;
 use App\Telegram\Entity\TelegramBot;
 use App\Telegram\Entity\TelegramUser;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
@@ -117,6 +119,70 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         $body = $this->lastSentMessageText($captured);
         self::assertStringContainsString('расход', $body);
+    }
+
+    public function testDocumentUploadIsStoredInObjectStorage(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        $this->seedBoundUserWithAccount(financeLockBefore: null);
+
+        $csv = "Дата;Сумма\n01.12.2025;1000\n";
+        $client->getContainer()->set('http_client', new MockHttpClient(
+            static function (string $method, string $url) use ($csv): MockResponse {
+                if (str_contains($url, '/getFile')) {
+                    return new MockResponse(json_encode(
+                        ['ok' => true, 'result' => ['file_path' => 'documents/file_5.csv']],
+                        \JSON_THROW_ON_ERROR,
+                    ));
+                }
+                if (str_contains($url, '/file/bot')) {
+                    return new MockResponse($csv);
+                }
+
+                return new MockResponse(json_encode(['ok' => true, 'result' => true], \JSON_THROW_ON_ERROR));
+            },
+        ));
+
+        $this->postDocument($client, 'statement.csv');
+
+        self::assertResponseIsSuccessful();
+
+        /** @var ObjectStorageInterface $storage */
+        $storage = $client->getContainer()->get(ObjectStorageInterface::class);
+        $key = sprintf('telegram-imports/%s.csv', hash('sha256', $csv));
+
+        self::assertTrue($storage->exists($key), 'Файл документа должен быть записан в объектное хранилище.');
+        self::assertSame($csv, $storage->read($key));
+        self::assertCount(1, $this->em()->getRepository(ImportJob::class)->findAll());
+
+        $storage->delete($key);
+    }
+
+    private function postDocument(KernelBrowser $client, string $fileName): void
+    {
+        $payload = [
+            'update_id' => 2002,
+            'message' => [
+                'message_id' => 77,
+                'date' => 1718000000,
+                'chat' => ['id' => self::CHAT_ID],
+                'from' => ['id' => (int) self::TG_USER_ID, 'first_name' => 'Test'],
+                'document' => ['file_id' => 'FILE123', 'file_name' => $fileName],
+            ],
+        ];
+
+        $client->request(
+            'POST',
+            '/telegram/webhook',
+            [],
+            [],
+            [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN' => 'test-secret-123',
+            ],
+            json_encode($payload, \JSON_THROW_ON_ERROR),
+        );
     }
 
     private function seedBoundUserWithAccount(?\DateTimeImmutable $financeLockBefore): void
