@@ -11,8 +11,8 @@
 
 | Контроллер | Content-Type |
 |---|---|
-| `MarketplaceAds\AdRawDocumentDownloadController` | `application/octet-stream` (было — авто-guess BinaryFileResponse) |
-| `MarketplaceAds\AdScheduledBatchDownloadController` | `application/octet-stream` |
+| `MarketplaceAds\AdRawDocumentDownloadController` | `application/octet-stream` (было — авто-guess BinaryFileResponse) + `Content-Length` из `getFileSizeBytes()` |
+| `MarketplaceAds\AdScheduledBatchDownloadController` | `application/octet-stream` + `Content-Length` из `getFileSize()` |
 | `MarketplaceAds\Api\Admin\DownloadBronzeController` | сохранён (`application/zip` / `text/csv`) + Content-Length |
 | `MarketplaceAnalytics\Api\DebugDownloadRawDocumentController` | сохранён (`rawData.content_type`); base64-ветка (legacy) не тронута |
 

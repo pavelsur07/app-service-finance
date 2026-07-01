@@ -85,6 +85,11 @@ final class AdScheduledBatchDownloadController extends AbstractController
             $response->headers->makeDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, $filename),
         );
 
+        $sizeBytes = $batch->getFileSize();
+        if (null !== $sizeBytes) {
+            $response->headers->set('Content-Length', (string) $sizeBytes);
+        }
+
         return $response;
     }
 }

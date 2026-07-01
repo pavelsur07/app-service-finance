@@ -80,6 +80,11 @@ final class AdRawDocumentDownloadController extends AbstractController
             $response->headers->makeDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, $filename),
         );
 
+        $sizeBytes = $document->getFileSizeBytes();
+        if (null !== $sizeBytes) {
+            $response->headers->set('Content-Length', (string) $sizeBytes);
+        }
+
         return $response;
     }
 }
