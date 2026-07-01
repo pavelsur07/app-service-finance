@@ -15,6 +15,8 @@ parameters:
     app.object_storage_s3_access_key_default: ''
     app.object_storage_s3_secret_key_default: ''
     app.object_storage_s3_path_style_endpoint_default: '0'
+    # Порог «медленной» операции хранилища (мс) для LoggingObjectStorage → warning
+    app.object_storage_slow_ms: 1000
     wb_finance.rate_limit_interval_seconds: 70
     wb_finance.retry_delay_ms: 70000
     ozon_performance.api_base_url_default: 'https://api-performance.ozon.ru'
@@ -112,6 +114,13 @@ services:
     App\Ingestion\Command\OzonAccrualCategoryMetadataBulkRunnerInterface: '@App\Ingestion\Command\OzonAccrualCategoryMetadataBulkRunner'
     App\Shared\Service\Storage\ObjectStorageInterface:
         factory: ['@App\Shared\Service\Storage\ObjectStorageFactory', 'create']
+
+    # Инструментация: таймит операции, warning на медленных, error на сбоях → GlitchTip.
+    App\Shared\Service\Storage\LoggingObjectStorage:
+        decorates: App\Shared\Service\Storage\ObjectStorageInterface
+        arguments:
+            $inner: '@.inner'
+            $slowMs: '%app.object_storage_slow_ms%'
 
     App\Shared\Service\Storage\ObjectStorageFactory:
         arguments:

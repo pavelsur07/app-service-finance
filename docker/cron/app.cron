@@ -115,3 +115,7 @@
 
 # Ежедневно в 03:00: чистка логов/временных таблиц
 #0 3 * * * php /app/bin/console app:maintenance:cleanup --env=prod
+
+# Каждые 5 минут: синтетическая проверка живости объектного хранилища (write→read→delete).
+# Сбой → logger->error → GlitchTip. Успех печатает "OK (N ms)" в docker logs (heartbeat).
+*/5 * * * * cd /app && php bin/console app:storage:healthcheck --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
