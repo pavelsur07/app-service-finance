@@ -68,12 +68,30 @@ final class FlysystemS3ObjectStorage implements ObjectStorageInterface
         }
     }
 
+    public function readStream(string $path)
+    {
+        try {
+            return $this->filesystem->readStream($path);
+        } catch (FilesystemException $exception) {
+            throw new ObjectStorageException(sprintf('Failed to read object "%s".', $path), 0, $exception);
+        }
+    }
+
     public function exists(string $path): bool
     {
         try {
             return $this->filesystem->fileExists($path);
         } catch (FilesystemException $exception) {
             throw new ObjectStorageException(sprintf('Failed to check object "%s".', $path), 0, $exception);
+        }
+    }
+
+    public function delete(string $path): void
+    {
+        try {
+            $this->filesystem->delete($path);
+        } catch (FilesystemException $exception) {
+            throw new ObjectStorageException(sprintf('Failed to delete object "%s".', $path), 0, $exception);
         }
     }
 }
