@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Application\Reconciliation;
 
-use App\Shared\Service\Storage\StorageService;
+use App\Shared\Service\Storage\TemporaryLocalFile;
 
 /**
  * Оркестрирует парсинг xlsx отчёта «Детализация начислений» Ozon.
@@ -19,7 +19,7 @@ final class OzonReportParserFacade
         private readonly BaseSignResolverService  $baseSignResolver,
         private readonly RowClassifierService     $classifier,
         private readonly ReportAggregatorService  $aggregator,
-        private readonly StorageService           $storageService,
+        private readonly TemporaryLocalFile        $temporaryLocalFile,
     ) {
     }
 
@@ -38,14 +38,15 @@ final class OzonReportParserFacade
     }
 
     /**
-     * Парсит файл по relative path из StorageService.
+     * Парсит файл по ключу в объектном хранилище (скачивая во временную локальную копию).
      *
      * @return array<string, mixed> ReportResult
      */
     public function parseFromStoragePath(string $relativePath): array
     {
-        return $this->parseFromPath(
-            $this->storageService->getAbsolutePath($relativePath),
+        return $this->temporaryLocalFile->with(
+            $relativePath,
+            fn (string $absolutePath): array => $this->parseFromPath($absolutePath),
         );
     }
 }

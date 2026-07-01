@@ -11,7 +11,7 @@ use App\Marketplace\Inventory\Application\Command\ImportInventoryCostPriceFromFi
 use App\Marketplace\Inventory\Application\ImportInventoryCostPriceFromFileAction;
 use App\Marketplace\Message\ImportInventoryCostPriceMessage;
 use App\Marketplace\Repository\MarketplaceJobLogRepository;
-use App\Shared\Service\Storage\StorageService;
+use App\Shared\Service\Storage\TemporaryLocalFile;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -21,7 +21,7 @@ final class ImportInventoryCostPriceHandler
 {
     public function __construct(
         private readonly ImportInventoryCostPriceFromFileAction $action,
-        private readonly StorageService                        $storageService,
+        private readonly TemporaryLocalFile                    $temporaryLocalFile,
         private readonly MarketplaceJobLogRepository           $jobLogRepository,
         private readonly LoggerInterface                       $logger,
     ) {
@@ -45,22 +45,21 @@ final class ImportInventoryCostPriceHandler
         ]);
 
         try {
-            $absolutePath = $this->storageService->getAbsolutePath($message->storagePath);
+            $result = $this->temporaryLocalFile->with(
+                $message->storagePath,
+                function (string $absolutePath) use ($message): array {
+                    $command = new ImportInventoryCostPriceFromFileCommand(
+                        companyId:        $message->companyId,
+                        absoluteFilePath: $absolutePath,
+                        originalFilename: $message->originalFilename,
+                        effectiveFrom:    new \DateTimeImmutable($message->effectiveFrom),
+                        marketplace:      MarketplaceType::from($message->marketplace),
+                        identifierType:   $message->identifierType,
+                    );
 
-            if (!file_exists($absolutePath)) {
-                throw new \RuntimeException('File not found: ' . $absolutePath);
-            }
-
-            $command = new ImportInventoryCostPriceFromFileCommand(
-                companyId:        $message->companyId,
-                absoluteFilePath: $absolutePath,
-                originalFilename: $message->originalFilename,
-                effectiveFrom:    new \DateTimeImmutable($message->effectiveFrom),
-                marketplace:      MarketplaceType::from($message->marketplace),
-                identifierType:   $message->identifierType,
+                    return ($this->action)($command);
+                },
             );
-
-            $result = ($this->action)($command);
 
             // Формируем details из ошибок
             $details = array_map(
