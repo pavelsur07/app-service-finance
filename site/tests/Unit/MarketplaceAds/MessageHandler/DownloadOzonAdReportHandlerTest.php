@@ -16,7 +16,8 @@ use App\MarketplaceAds\Message\DownloadOzonAdReportMessage;
 use App\MarketplaceAds\MessageHandler\DownloadOzonAdReportHandler;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
 use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
-use App\Shared\Service\Storage\StorageService;
+use App\Shared\Service\Storage\ObjectStorageInterface;
+use App\Shared\Service\Storage\StoredObject;
 use DG\BypassFinals;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -24,10 +25,8 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
 
-// StorageService — final class, нужен BypassFinals для createMock.
 // AdLoadJobFinalizer — final readonly, нужен BypassFinals для createMock.
 BypassFinals::allowPaths([
-    '*/src/Shared/Service/Storage/StorageService.php',
     '*/src/MarketplaceAds/Application/Service/AdLoadJobFinalizer.php',
 ]);
 
@@ -61,8 +60,8 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
     private OzonAdClient $client;
     /** @var EntityManagerInterface&MockObject */
     private EntityManagerInterface $em;
-    /** @var StorageService&MockObject */
-    private StorageService $storage;
+    /** @var ObjectStorageInterface&MockObject */
+    private ObjectStorageInterface $storage;
     /** @var AdLoadJobFinalizer&MockObject */
     private AdLoadJobFinalizer $finalizer;
 
@@ -72,7 +71,7 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
         $this->rawRepo = $this->createMock(AdRawDocumentRepository::class);
         $this->client = $this->createMock(OzonAdClient::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
-        $this->storage = $this->createMock(StorageService::class);
+        $this->storage = $this->createMock(ObjectStorageInterface::class);
         $this->finalizer = $this->createMock(AdLoadJobFinalizer::class);
     }
 
@@ -86,7 +85,7 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
         $this->client->expects(self::never())->method('fetchReportContent');
         $this->pendingRepo->expects(self::never())->method('markFinalized');
         $this->em->expects(self::never())->method('flush');
-        $this->storage->expects(self::never())->method('storeBytes');
+        $this->storage->expects(self::never())->method('write');
 
         $this->makeHandler()(new DownloadOzonAdReportMessage(
             companyId: self::COMPANY_ID,
@@ -103,7 +102,7 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
         $this->client->expects(self::never())->method('fetchReportContent');
         $this->pendingRepo->expects(self::never())->method('markFinalized');
         $this->em->expects(self::never())->method('flush');
-        $this->storage->expects(self::never())->method('storeBytes');
+        $this->storage->expects(self::never())->method('write');
 
         $this->makeHandler()(new DownloadOzonAdReportMessage(
             companyId: self::COMPANY_ID,
@@ -131,7 +130,7 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
             ->willReturn(1);
 
         $this->em->expects(self::never())->method('flush');
-        $this->storage->expects(self::never())->method('storeBytes');
+        $this->storage->expects(self::never())->method('write');
 
         $this->expectException(\Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException::class);
         $this->expectExceptionMessage('Ozon permanent failure');
@@ -152,7 +151,7 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
 
         $this->pendingRepo->expects(self::never())->method('markFinalized');
         $this->em->expects(self::never())->method('flush');
-        $this->storage->expects(self::never())->method('storeBytes');
+        $this->storage->expects(self::never())->method('write');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('network timeout');
@@ -188,14 +187,9 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
 
         $expectedPath = sprintf('marketplace-ads/%s/%s.csv', self::COMPANY_ID, self::OZON_UUID);
         $this->storage->expects(self::once())
-            ->method('storeBytes')
-            ->with($csvBody, $expectedPath)
-            ->willReturn([
-                'storagePath' => $expectedPath,
-                'fileHash' => 'sha256:deadbeef',
-                'sizeBytes' => \strlen($csvBody),
-                'mimeType' => 'text/csv',
-            ]);
+            ->method('write')
+            ->with($expectedPath, $csvBody)
+            ->willReturn(new StoredObject($expectedPath, \strlen($csvBody)));
 
         // Строгий порядок: flush → markFinalized(OK).
         $trace = [];
@@ -225,7 +219,7 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
             self::assertSame('{}', $doc->getRawPayload(), 'raw_payload = "{}" — контент на диске, не в БД');
             self::assertSame(AdRawDocumentStatus::DRAFT, $doc->getStatus());
             self::assertSame($expectedPath, $doc->getStoragePath());
-            self::assertSame('sha256:deadbeef', $doc->getFileHash());
+            self::assertSame(hash('sha256', $csvBody), $doc->getFileHash());
             self::assertSame(\strlen($csvBody), $doc->getFileSizeBytes());
         }
 
@@ -251,14 +245,9 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
 
         $expectedPath = sprintf('marketplace-ads/%s/%s.zip', self::COMPANY_ID, self::OZON_UUID);
         $this->storage->expects(self::once())
-            ->method('storeBytes')
-            ->with(self::anything(), $expectedPath)
-            ->willReturn([
-                'storagePath' => $expectedPath,
-                'fileHash' => 'h',
-                'sizeBytes' => 15,
-                'mimeType' => 'application/zip',
-            ]);
+            ->method('write')
+            ->with($expectedPath, self::anything())
+            ->willReturn(new StoredObject($expectedPath, 15));
 
         $this->pendingRepo->method('markFinalized')->willReturn(1);
 
@@ -285,14 +274,9 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
 
         $expectedPath = sprintf('marketplace-ads/%s/%s.zip', self::COMPANY_ID, self::OZON_UUID);
         $this->storage->expects(self::once())
-            ->method('storeBytes')
-            ->with($zipBody, $expectedPath)
-            ->willReturn([
-                'storagePath' => $expectedPath,
-                'fileHash' => 'h',
-                'sizeBytes' => \strlen($zipBody),
-                'mimeType' => 'application/zip',
-            ]);
+            ->method('write')
+            ->with($expectedPath, $zipBody)
+            ->willReturn(new StoredObject($expectedPath, \strlen($zipBody)));
 
         $this->pendingRepo->method('markFinalized')->willReturn(1);
 
@@ -316,14 +300,9 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
 
         $expectedPath = sprintf('marketplace-ads/%s/%s.csv', self::COMPANY_ID, self::OZON_UUID);
         $this->storage->expects(self::once())
-            ->method('storeBytes')
-            ->with(self::anything(), $expectedPath)
-            ->willReturn([
-                'storagePath' => $expectedPath,
-                'fileHash' => 'h',
-                'sizeBytes' => 14,
-                'mimeType' => 'text/plain',
-            ]);
+            ->method('write')
+            ->with($expectedPath, self::anything())
+            ->willReturn(new StoredObject($expectedPath, 14));
 
         $this->pendingRepo->method('markFinalized')->willReturn(1);
 
@@ -360,12 +339,7 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
             'body' => 'body',
             'contentType' => 'text/csv',
         ]);
-        $this->storage->method('storeBytes')->willReturn([
-            'storagePath' => 'path',
-            'fileHash' => 'h',
-            'sizeBytes' => 4,
-            'mimeType' => 'text/csv',
-        ]);
+        $this->storage->method('write')->willReturn(new StoredObject('path', 4));
         $this->pendingRepo->method('markFinalized')->willReturn(1);
 
         $this->makeHandler()(new DownloadOzonAdReportMessage(
