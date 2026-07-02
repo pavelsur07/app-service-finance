@@ -30,6 +30,50 @@ BypassFinals::allowPaths([
 
 final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
 {
+    public function testLegacySerializedMessageWithoutForceRefreshKeepsOldBehavior(): void
+    {
+        $user    = UserBuilder::aUser()->withIndex(6)->build();
+        $company = CompanyBuilder::aCompany()->withIndex(6)->withOwner($user)->build();
+        $doc     = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)->build();
+
+        $repo = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $repo->method('find')->with($doc->getId())->willReturn($doc);
+
+        $captured = null;
+        $processAction = $this->createMock(ProcessMarketplaceRawDocumentAction::class);
+        $processAction->expects(self::once())
+            ->method('__invoke')
+            ->willReturnCallback(static function (ProcessMarketplaceRawDocumentCommand $command) use (&$captured): int {
+                $captured = $command;
+
+                return 1;
+            });
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('flush');
+
+        $updater = $this->createMock(WbFinancialReportSyncStatusUpdaterInterface::class);
+        $updater->expects(self::once())->method('syncByRawPipelineResult')->with($doc);
+
+        $handler = new ProcessRawDocumentStepMessageHandler(
+            $repo,
+            $processAction,
+            $em,
+            $this->createMock(ManagerRegistry::class),
+            new NullLogger(),
+            $updater,
+        );
+
+        $message = $this->legacySerializedStepMessage($doc->getId(), PipelineStep::SALES->value, $company->getId());
+        self::assertFalse($message->shouldForceRefresh());
+
+        $handler($message);
+
+        self::assertInstanceOf(ProcessMarketplaceRawDocumentCommand::class, $captured);
+        self::assertSame(PipelineStep::SALES->value, $captured->kind);
+        self::assertFalse($captured->forceReprocess);
+    }
+
     public function testForceRefreshForcesEveryPipelineStepToReprocessGeneratedRows(): void
     {
         $user    = UserBuilder::aUser()->withIndex(5)->build();
@@ -291,4 +335,24 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
         self::assertNotContains(PipelineStep::SALES->value, $doc->getFailedSteps());
     }
 
+    private function legacySerializedStepMessage(string $rawDocumentId, string $step, string $companyId): ProcessRawDocumentStepMessage
+    {
+        $class = ProcessRawDocumentStepMessage::class;
+        $payload = sprintf(
+            'O:%d:"%s":9:{s:13:"rawDocumentId";s:%d:"%s";s:4:"step";s:%d:"%s";s:9:"companyId";s:%d:"%s";s:12:"syncStatusId";N;s:12:"connectionId";N;s:11:"marketplace";N;s:10:"reportType";N;s:4:"mode";N;s:12:"businessDate";N;}',
+            strlen($class),
+            $class,
+            strlen($rawDocumentId),
+            $rawDocumentId,
+            strlen($step),
+            $step,
+            strlen($companyId),
+            $companyId,
+        );
+
+        $message = unserialize($payload, ['allowed_classes' => [ProcessRawDocumentStepMessage::class]]);
+        self::assertInstanceOf(ProcessRawDocumentStepMessage::class, $message);
+
+        return $message;
+    }
 }

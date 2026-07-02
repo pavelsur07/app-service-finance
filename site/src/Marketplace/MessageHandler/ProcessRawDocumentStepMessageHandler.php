@@ -55,7 +55,7 @@ final class ProcessRawDocumentStepMessageHandler
             companyId:      $message->companyId,
             rawDocId:       $message->rawDocumentId,
             kind:           $message->step,
-            forceReprocess: $message->forceRefresh || $message->step === PipelineStep::COSTS->value,
+            forceReprocess: $message->shouldForceRefresh() || $message->step === PipelineStep::COSTS->value,
         );
 
         $step = PipelineStep::tryFrom($message->step);
