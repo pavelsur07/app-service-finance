@@ -94,6 +94,7 @@ final class ProcessDayReportHandler
                 reportType: $message->reportType,
                 mode: $message->mode,
                 businessDate: $message->businessDate,
+                forceRefresh: $message->forceRefresh,
             ));
         }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Marketplace\MessageHandler;
 
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
+use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdaterInterface;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\PipelineStep;
@@ -29,6 +30,58 @@ BypassFinals::allowPaths([
 
 final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
 {
+    public function testForceRefreshForcesEveryPipelineStepToReprocessGeneratedRows(): void
+    {
+        $user    = UserBuilder::aUser()->withIndex(5)->build();
+        $company = CompanyBuilder::aCompany()->withIndex(5)->withOwner($user)->build();
+        $doc     = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)->build();
+
+        $repo = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $repo->method('find')->with($doc->getId())->willReturn($doc);
+
+        $forceByStep = [];
+        $processAction = $this->createMock(ProcessMarketplaceRawDocumentAction::class);
+        $processAction->expects(self::exactly(count(PipelineStep::cases())))
+            ->method('__invoke')
+            ->willReturnCallback(static function (ProcessMarketplaceRawDocumentCommand $command) use (&$forceByStep): int {
+                $forceByStep[$command->kind] = $command->forceReprocess;
+
+                return 1;
+            });
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::exactly(count(PipelineStep::cases())))->method('flush');
+
+        $updater = $this->createMock(WbFinancialReportSyncStatusUpdaterInterface::class);
+        $updater->expects(self::exactly(count(PipelineStep::cases())))
+            ->method('syncByRawPipelineResult')
+            ->with($doc);
+
+        $handler = new ProcessRawDocumentStepMessageHandler(
+            $repo,
+            $processAction,
+            $em,
+            $this->createMock(ManagerRegistry::class),
+            new NullLogger(),
+            $updater,
+        );
+
+        foreach (PipelineStep::cases() as $step) {
+            $handler(new ProcessRawDocumentStepMessage(
+                rawDocumentId: $doc->getId(),
+                step: $step->value,
+                companyId: $company->getId(),
+                forceRefresh: true,
+            ));
+        }
+
+        self::assertSame([
+            PipelineStep::SALES->value => true,
+            PipelineStep::RETURNS->value => true,
+            PipelineStep::COSTS->value => true,
+        ], $forceByStep);
+    }
+
     /**
      * Regression: when the inner pipeline throws AND closes the EM, the handler must
      * reset the manager, re-fetch the document, mark the step failed, flush on the

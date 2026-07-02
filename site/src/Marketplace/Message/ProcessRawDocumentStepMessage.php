@@ -21,6 +21,7 @@ final readonly class ProcessRawDocumentStepMessage
         public ?string $reportType = null,
         public ?string $mode = null,
         public ?string $businessDate = null,
+        public bool $forceRefresh = false,
     ) {
     }
 }
