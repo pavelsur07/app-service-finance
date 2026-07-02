@@ -28,6 +28,11 @@ final class FlysystemS3ObjectStorage implements ObjectStorageInterface
         $clientConfig = [
             'version' => 'latest',
             'region' => $region,
+            // Не декодировать Content-Encoding на стороне HTTP-клиента: мы храним уже
+            // сжатые байты (напр. .ndjson.gz) как opaque-payload и разжимаем сами.
+            // Иначе Guzzle/curl пытается авто-декодировать ответ GetObject и падает с
+            // cURL error 61 "Unrecognized content encoding type".
+            'http' => ['decode_content' => false],
         ];
 
         if ('' !== $endpoint) {
