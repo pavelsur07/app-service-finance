@@ -99,14 +99,14 @@ final class WildberriesAdapterTest extends TestCase
         self::assertSame('wildberries::finance-sales-reports-detailed', $adapter->getApiEndpointName());
     }
 
-    public function testLegacyFetchSalesUsesRetailPriceWithDiscInsteadOfRetailAmount(): void
+    public function testLegacyFetchSalesUsesRetailAmountAndGrossWithoutSpp(): void
     {
-        $payload = json_encode([['doc_type_name' => 'Продажа', 'rrdId' => 123, 'rrd_id' => '123', 'sale_dt' => '2026-01-10 10:00:00', 'sa_name' => 'SKU-1', 'quantity' => 2, 'retail_amount' => 9999, 'retail_price_withdisc_rub' => 1125]], JSON_THROW_ON_ERROR);
+        $payload = json_encode([['doc_type_name' => 'Продажа', 'rrdId' => 123, 'rrd_id' => '123', 'sale_dt' => '2026-01-10 10:00:00', 'sa_name' => 'SKU-1', 'quantity' => 2, 'retail_amount' => 9999, 'retail_price_withdisc_rub' => 1125, 'ppvz_for_pay' => 800, 'acquiring_fee' => 40, 'ppvz_vw' => 100, 'ppvz_vw_nds' => 60]], JSON_THROW_ON_ERROR);
         $adapter = $this->createAdapter(new MockHttpClient([new MockResponse($payload, ['http_code' => 200]), new MockResponse('', ['http_code' => 204])]));
         $sales = $adapter->fetchSales($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-31'));
         self::assertCount(1, $sales);
-        self::assertSame('1125', $sales[0]->totalRevenue);
-        self::assertSame('562.5', $sales[0]->pricePerUnit);
+        self::assertSame('9999.00', $sales[0]->totalRevenue);
+        self::assertSame('500.00', $sales[0]->pricePerUnit);
     }
 
     public function testLegacyFetchReturnsUsesRetailPriceWithDiscInsteadOfRetailAmount(): void
@@ -127,7 +127,7 @@ final class WildberriesAdapterTest extends TestCase
 
     public function testLegacyFetchCostsForSaleUsesCommissionFormulaAndExternalIdByRrdId(): void
     {
-        $payload = json_encode([['doc_type_name' => 'Продажа', 'rrdId' => 126, 'rrd_id' => '126', 'rr_dt' => '2026-01-10 10:00:00', 'sale_dt' => '2026-01-10 10:00:00', 'sa_name' => 'SKU-1', 'quantity' => 1, 'retail_price_withdisc_rub' => 1125.00, 'ppvz_for_pay' => 680.99, 'acquiring_fee' => 27.76]], JSON_THROW_ON_ERROR);
+        $payload = json_encode([['doc_type_name' => 'Продажа', 'rrdId' => 126, 'rrd_id' => '126', 'rr_dt' => '2026-01-10 10:00:00', 'sale_dt' => '2026-01-10 10:00:00', 'sa_name' => 'SKU-1', 'quantity' => 1, 'retail_price_withdisc_rub' => 1125.00, 'ppvz_for_pay' => 680.99, 'acquiring_fee' => 27.76, 'ppvz_vw' => 350.00, 'ppvz_vw_nds' => 66.25]], JSON_THROW_ON_ERROR);
         $adapter = $this->createAdapter(new MockHttpClient([new MockResponse($payload, ['http_code' => 200]), new MockResponse('', ['http_code' => 204])]));
         $costs = $adapter->fetchCosts($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-31'));
         self::assertCount(1, $costs);

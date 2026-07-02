@@ -149,6 +149,6 @@ C — 10%
 - `rrd_id` / `rrdId` — уникальный ID строки отчёта (пагинация/дедуп).
 - `realizationreport_id` — ID отчёта, не уникальный ID строки.
 - `commission_percent` — процент комиссии, не сумма.
-- Денежная комиссия: `retail_price_withdisc_rub - ppvz_for_pay - acquiring_fee`.
+- Денежная комиссия: `abs(ppvz_vw) + abs(ppvz_vw_nds)`.
 - `retail_amount` — оплата покупателя с учётом СПП.
 - `ppvz_for_pay` (`forPay`) — к перечислению продавцу / к удержанию на возврате.

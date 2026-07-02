@@ -104,11 +104,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
             return;
         }
 
-        $retailMinor = $this->minor($row, 'retailPriceWithDisc', 'retail_price_withdisc_rub');
-        if (0 === $retailMinor) {
-            $retailMinor = $this->minor($row, 'retailAmount', 'retail_amount');
-        }
-
+        $retailMinor = $this->minor($row, 'retailAmount', 'retail_amount');
         $forPayMinor = $this->minor($row, 'forPay', 'ppvz_for_pay');
         $acquiringMinor = $this->minor($row, 'acquiringFee', 'acquiring_fee');
         if (
@@ -136,7 +132,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
             return;
         }
 
-        $commissionMinor = $retailMinor - $forPayMinor - $acquiringMinor;
+        $commissionMinor = abs($this->minor($row, 'ppvzVw', 'ppvz_vw')) + abs($this->minor($row, 'ppvzVwNds', 'ppvz_vw_nds'));
         $isReturn = $this->isReturn($docTypeName);
 
         if (0 !== $retailMinor) {
@@ -149,7 +145,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
                 signedAmountMinor: $isReturn ? -abs($retailMinor) : abs($retailMinor),
                 currency: $currency,
                 occurredAt: $occurredAt,
-                field: 0 !== $this->minor($row, 'retailPriceWithDisc', 'retail_price_withdisc_rub') ? 'retailPriceWithDisc' : 'retailAmount',
+                field: 'retailAmount',
                 sellerOperName: $sellerOperName,
                 docTypeName: $docTypeName,
                 description: $isReturn ? 'WB refund gross amount' : 'WB sale gross amount',
@@ -167,7 +163,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
                 signedAmountMinor: $isReturn ? abs($commissionMinor) : -abs($commissionMinor),
                 currency: $currency,
                 occurredAt: $occurredAt,
-                field: 'retailPriceWithDisc-forPay-acquiringFee',
+                field: 'ppvzVw+ppvzVwNds',
                 sellerOperName: $sellerOperName,
                 docTypeName: $docTypeName,
                 description: 'WB marketplace commission',
@@ -426,8 +422,11 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
                 'nmId' => $this->string($row, 'nmId', 'nm_id'),
                 'sku' => $this->string($row, 'sku', 'barcode'),
                 'retailPriceWithDisc' => $this->raw($row, 'retailPriceWithDisc', 'retail_price_withdisc_rub'),
+                'retailAmount' => $this->raw($row, 'retailAmount', 'retail_amount'),
                 'forPay' => $this->raw($row, 'forPay', 'ppvz_for_pay'),
                 'acquiringFee' => $this->raw($row, 'acquiringFee', 'acquiring_fee'),
+                'ppvzVw' => $this->raw($row, 'ppvzVw', 'ppvz_vw'),
+                'ppvzVwNds' => $this->raw($row, 'ppvzVwNds', 'ppvz_vw_nds'),
                 'ppvzReward' => $this->raw($row, 'ppvzReward', 'ppvz_reward'),
                 'cashbackDiscount' => $this->raw($row, 'cashbackDiscount', 'cashback_discount'),
             ],
@@ -443,8 +442,11 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
     {
         $fields = [
             ['retailPriceWithDisc', 'retail_price_withdisc_rub'],
+            ['retailAmount', 'retail_amount'],
             ['forPay', 'ppvz_for_pay'],
             ['acquiringFee', 'acquiring_fee'],
+            ['ppvzVw', 'ppvz_vw'],
+            ['ppvzVwNds', 'ppvz_vw_nds'],
             ['deliveryService', 'delivery_rub'],
             ['paidStorage', 'storage_fee'],
             ['paidAcceptance', 'acceptance'],
@@ -523,7 +525,9 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
         return 0 !== $this->minor($row, 'retailPriceWithDisc', 'retail_price_withdisc_rub')
             || 0 !== $this->minor($row, 'retailAmount', 'retail_amount')
             || 0 !== $this->minor($row, 'forPay', 'ppvz_for_pay')
-            || 0 !== $this->minor($row, 'acquiringFee', 'acquiring_fee');
+            || 0 !== $this->minor($row, 'acquiringFee', 'acquiring_fee')
+            || 0 !== $this->minor($row, 'ppvzVw', 'ppvz_vw')
+            || 0 !== $this->minor($row, 'ppvzVwNds', 'ppvz_vw_nds');
     }
 
     private function isSale(string $docTypeName): bool

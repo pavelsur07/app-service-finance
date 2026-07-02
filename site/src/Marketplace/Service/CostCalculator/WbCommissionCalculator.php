@@ -33,10 +33,7 @@ class WbCommissionCalculator implements CostCalculatorInterface
 
     public function calculate(array $item, ?MarketplaceListing $listing): array
     {
-        $retailPriceWithDisc = $this->normalizer->retailPriceWithDisc($item);
-        $acquiringFee = $this->normalizer->acquiringFee($item);
-        $forPay = $this->normalizer->forPay($item);
-        $commission = $retailPriceWithDisc - $forPay - $acquiringFee;
+        $commission = $this->normalizer->fullMarketplaceCommission($item);
 
         // Пропускаем нулевые комиссии
         if (abs($commission) < 0.01) {

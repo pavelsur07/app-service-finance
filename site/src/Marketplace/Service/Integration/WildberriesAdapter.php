@@ -119,14 +119,15 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                 continue;
             }
 
+            $grossWithoutSpp = number_format($this->normalizer->grossWithoutSpp($item), 2, '.', '');
             $sales[] = new SaleData(
                 marketplace: MarketplaceType::WILDBERRIES,
                 externalOrderId: $externalOrderId,
                 saleDate: $this->normalizer->operationDate($item),
                 marketplaceSku: $this->normalizer->vendorCode($item),
                 quantity: $quantity,
-                pricePerUnit: (string) ($quantity > 0 ? $retailPriceWithDisc / $quantity : 0.0),
-                totalRevenue: (string) $retailPriceWithDisc,
+                pricePerUnit: $quantity > 0 ? bcdiv($grossWithoutSpp, (string) $quantity, 2) : '0.00',
+                totalRevenue: number_format($this->normalizer->retailAmount($item), 2, '.', ''),
                 rawData: null
             );
         }
@@ -160,7 +161,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
             $barcode = isset($item['barcode']) ? (string) $item['barcode'] : null;
 
             $isReturn = $this->normalizer->isReturn($item);
-            $commissionAmount = abs($this->normalizer->fullMarketplaceCommission($item));
+            $commissionAmount = $this->normalizer->fullMarketplaceCommission($item);
             if (!$isReturn && $commissionAmount > 0) {
                 // Legacy CostData does not support operation_type/STORNO.
                 // Return commission/acquiring is handled by WB raw cost processors only.

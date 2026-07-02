@@ -126,12 +126,13 @@ final class ProcessWbSalesAction
                 $sale->setExternalOrderId($externalOrderId);
                 $sale->setSaleDate($this->normalizer->operationDate($item));
                 $quantity = abs($this->normalizer->quantity($item));
-                $retailPriceWithDisc = $this->normalizer->retailPriceWithDisc($item);
-                $pricePerUnit = $quantity > 0 ? $retailPriceWithDisc / $quantity : 0.0;
+                $grossWithoutSpp = number_format($this->normalizer->grossWithoutSpp($item), 2, '.', '');
+                $retailAmount = number_format($this->normalizer->retailAmount($item), 2, '.', '');
+                $pricePerUnit = $quantity > 0 ? bcdiv($grossWithoutSpp, (string) $quantity, 2) : '0.00';
 
                 $sale->setQuantity($quantity);
-                $sale->setPricePerUnit((string) $pricePerUnit);
-                $sale->setTotalRevenue((string) $retailPriceWithDisc);
+                $sale->setPricePerUnit($pricePerUnit);
+                $sale->setTotalRevenue($retailAmount);
                 $sale->setRawDocumentId($rawDocId);
                 $sale->setRawData($item);
 

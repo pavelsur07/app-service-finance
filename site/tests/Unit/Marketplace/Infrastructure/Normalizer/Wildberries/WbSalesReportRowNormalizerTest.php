@@ -26,6 +26,8 @@ final class WbSalesReportRowNormalizerTest extends TestCase
             'retail_price_withdisc_rub' => '1300.40',
             'ppvz_for_pay' => '1200.30',
             'acquiring_fee' => '20.10',
+            'ppvz_vw' => '60.00',
+            'ppvz_vw_nds' => '19.90',
             'delivery_amount' => '2',
             'return_amount' => '0',
             'delivery_rub' => '15.5',
@@ -52,6 +54,8 @@ final class WbSalesReportRowNormalizerTest extends TestCase
             'retailPriceWithDisc' => '1300.40',
             'forPay' => '1200.30',
             'acquiringFee' => '20.10',
+            'ppvzVw' => '60.00',
+            'ppvzVwNds' => '19.90',
             'deliveryAmount' => '2',
             'returnAmount' => '0',
             'deliveryService' => '15.5',
@@ -77,6 +81,9 @@ final class WbSalesReportRowNormalizerTest extends TestCase
         self::assertSame($normalizer->retailPriceWithDisc($snakeCase), $normalizer->retailPriceWithDisc($camelCase));
         self::assertSame($normalizer->forPay($snakeCase), $normalizer->forPay($camelCase));
         self::assertSame($normalizer->acquiringFee($snakeCase), $normalizer->acquiringFee($camelCase));
+        self::assertSame($normalizer->ppvzVw($snakeCase), $normalizer->ppvzVw($camelCase));
+        self::assertSame($normalizer->ppvzVwNds($snakeCase), $normalizer->ppvzVwNds($camelCase));
+        self::assertSame($normalizer->fullMarketplaceCommission($snakeCase), $normalizer->fullMarketplaceCommission($camelCase));
         self::assertSame($normalizer->deliveryAmount($snakeCase), $normalizer->deliveryAmount($camelCase));
         self::assertSame($normalizer->returnAmount($snakeCase), $normalizer->returnAmount($camelCase));
         self::assertSame($normalizer->deliveryService($snakeCase), $normalizer->deliveryService($camelCase));

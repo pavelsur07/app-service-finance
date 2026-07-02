@@ -11,7 +11,7 @@ namespace App\Marketplace\Enum;
  *   SALE_GROSS      → price_per_unit × quantity  (цена продавца × кол-во)
  *                     ⚠ Для Ozon разворачивается в total_revenue: у Ozon
  *                       price_per_unit хранит accrual за posting целиком.
- *   SALE_REVENUE    → total_revenue              (accruals_for_sale из финансовых транзакций)
+ *   SALE_REVENUE    → total_revenue              (retailAmount/accruals_for_sale из финансовых транзакций)
  *   SALE_COST_PRICE → cost_price × quantity      (себестоимость)
  *
  * Реализация Ozon (из marketplace_ozon_realizations):
@@ -62,7 +62,7 @@ enum AmountSource: string
     {
         return match ($this) {
             self::SALE_GROSS        => 'Выручка без СПП (цена продавца × кол-во)',
-            self::SALE_REVENUE      => 'Выручка (accruals_for_sale)',
+            self::SALE_REVENUE      => 'Выручка с СПП',
             self::SALE_COST_PRICE   => 'Себестоимость продаж (costPrice × кол-во)',
             self::SALE_REALIZATION  => 'Реализация Ozon (price_per_instance × кол-во)',
             self::RETURN_REFUND     => 'Сумма возврата (refundAmount)',

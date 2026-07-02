@@ -106,16 +106,14 @@ final class WbCostsRawProcessorTest extends TestCase
 
     #[DataProvider('commissionScenarios')]
     public function testWbCommissionCalculatorEmitsPositiveAmount(
-        float $retailPriceWithDisc,
-        float $acquiringFee,
-        float $ppvzForPay,
+        float $ppvzVw,
+        float $ppvzVwNds,
         float $expectedAbs,
     ): void {
         $entries = (new WbCommissionCalculator())->calculate(
             $this->saleItem([
-                'retail_price_withdisc_rub'  => $retailPriceWithDisc,
-                'acquiring_fee' => $acquiringFee,
-                'ppvz_for_pay'  => $ppvzForPay,
+                'ppvz_vw' => $ppvzVw,
+                'ppvz_vw_nds' => $ppvzVwNds,
             ]),
             null,
         );
@@ -126,12 +124,11 @@ final class WbCostsRawProcessorTest extends TestCase
         self::assertEqualsWithDelta($expectedAbs, (float) $entries[0]['amount'], 0.01);
     }
 
-    /** @return iterable<string, array{0:float,1:float,2:float,3:float}> */
+    /** @return iterable<string, array{0:float,1:float,2:float}> */
     public static function commissionScenarios(): iterable
     {
-        // commission = retailPriceWithDisc - acquiring - forPay
-        yield 'positive commission'  => [1000.0,  20.0, 800.0, 180.0];
-        yield 'negative commission'  => [1000.0,  20.0, 1100.0,  120.0]; // commission = -120 → abs
+        yield 'commission with vat' => [700.0, 147.62, 847.62];
+        yield 'negative commission fields' => [-100.0, -20.0, 120.0];
     }
 
     public function testWbAcquiringCalculatorEmitsPositiveAmountFromNegativeFee(): void
@@ -152,9 +149,11 @@ final class WbCostsRawProcessorTest extends TestCase
     {
         $entries = (new WbCommissionCalculator())->calculate(
             $this->saleItem([
-                'retail_price_withdisc_rub' => 2493.00,
+                'retail_price_withdisc_rub' => 3000.00,
                 'ppvz_for_pay' => 1581.10,
                 'acquiring_fee' => 64.28,
+                'ppvz_vw' => 700.00,
+                'ppvz_vw_nds' => 147.62,
             ]),
             null,
         );
@@ -172,6 +171,8 @@ final class WbCostsRawProcessorTest extends TestCase
                 'retail_price_withdisc_rub' => 1125.00,
                 'ppvz_for_pay' => 680.99,
                 'acquiring_fee' => 27.76,
+                'ppvz_vw' => 350.00,
+                'ppvz_vw_nds' => 66.25,
             ]),
             null,
         );
@@ -423,18 +424,16 @@ final class WbCostsRawProcessorTest extends TestCase
     {
         $calculator = new WbCommissionCalculator();
         $snakeEntries = $calculator->calculate($this->saleItem([
-            'retail_price_withdisc_rub' => 2493.00,
-            'ppvz_for_pay' => 1581.10,
-            'acquiring_fee' => 64.28,
+            'ppvz_vw' => 700.00,
+            'ppvz_vw_nds' => 147.62,
         ]), null);
         $camelEntries = $calculator->calculate([
             'docTypeName' => 'Продажа',
             'srid' => 'SRID-1',
             'saleDt' => '2026-01-15 10:00:00',
             'rrdId' => '1001',
-            'retailPriceWithDisc' => 2493.00,
-            'forPay' => 1581.10,
-            'acquiringFee' => 64.28,
+            'ppvzVw' => 700.00,
+            'ppvzVwNds' => 147.62,
         ], null);
 
         self::assertCount(1, $snakeEntries);
@@ -554,9 +553,8 @@ final class WbCostsRawProcessorTest extends TestCase
         // Это важно потому что persist-loop не выставит operation_type на пустом результате.
         self::assertSame([], (new WbCommissionCalculator())->calculate(
             $this->saleItem([
-                'retail_price_withdisc_rub' => 1000.0,
-                'acquiring_fee'             => 0,
-                'ppvz_for_pay'              => 1000.0, // commission = 0
+                'ppvz_vw' => 0,
+                'ppvz_vw_nds' => 0,
             ]),
             null,
         ));
@@ -700,6 +698,8 @@ final class WbCostsRawProcessorTest extends TestCase
                 'retail_price_withdisc_rub' => 1000.00,
                 'ppvz_for_pay' => 800.00,
                 'acquiring_fee' => 40.00,
+                'ppvz_vw' => 120.00,
+                'ppvz_vw_nds' => 40.00,
                 'quantity' => 1,
                 'sale_dt' => '2026-01-10 10:00:00',
                 'rr_dt' => '2026-01-10 10:00:00',
@@ -718,6 +718,8 @@ final class WbCostsRawProcessorTest extends TestCase
                 'retail_price_withdisc_rub' => 500.00,
                 'ppvz_for_pay' => 430.00,
                 'acquiring_fee' => 12.00,
+                'ppvz_vw' => 48.00,
+                'ppvz_vw_nds' => 10.00,
                 'quantity' => 1,
                 'sale_dt' => '2026-01-10 10:00:00',
                 'rr_dt' => '2026-01-10 10:00:00',

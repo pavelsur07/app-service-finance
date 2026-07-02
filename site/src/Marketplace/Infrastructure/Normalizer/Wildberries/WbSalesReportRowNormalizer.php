@@ -91,6 +91,23 @@ final readonly class WbSalesReportRowNormalizer
         return $this->float($row, 'acquiringFee', 'acquiring_fee');
     }
 
+    public function ppvzVw(array $row): float
+    {
+        return $this->float($row, 'ppvzVw', 'ppvz_vw');
+    }
+
+    public function ppvzVwNds(array $row): float
+    {
+        return $this->float($row, 'ppvzVwNds', 'ppvz_vw_nds');
+    }
+
+    public function grossWithoutSpp(array $row): float
+    {
+        return abs($this->forPay($row))
+            + $this->fullMarketplaceCommission($row)
+            + abs($this->acquiringFee($row));
+    }
+
     public function deliveryAmount(array $row): float
     {
         return $this->float($row, 'deliveryAmount', 'delivery_amount');
@@ -173,7 +190,7 @@ final readonly class WbSalesReportRowNormalizer
 
     public function fullMarketplaceCommission(array $row): float
     {
-        return $this->retailPriceWithDisc($row) - $this->forPay($row) - $this->acquiringFee($row);
+        return abs($this->ppvzVw($row)) + abs($this->ppvzVwNds($row));
     }
 
     private function raw(array $row, string ...$keys): mixed
