@@ -140,6 +140,31 @@ class MarketplaceReturnRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
     }
 
+    /**
+     * @param string[] $externalReturnIds
+     */
+    public function countDocumentLinkedByExternalIds(
+        Company $company,
+        MarketplaceType $marketplace,
+        array $externalReturnIds,
+    ): int {
+        if (empty($externalReturnIds)) {
+            return 0;
+        }
+
+        return (int) $this->createQueryBuilder('r')
+            ->select('COUNT(r.id)')
+            ->where('r.company = :company')
+            ->andWhere('r.marketplace = :marketplace')
+            ->andWhere('r.externalReturnId IN (:externalReturnIds)')
+            ->andWhere('r.document IS NOT NULL')
+            ->setParameter('company', $company)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('externalReturnIds', array_values(array_unique($externalReturnIds)))
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
     public function deleteByRawDocument(
         Company $company,
         MarketplaceType $marketplace,
@@ -154,6 +179,31 @@ class MarketplaceReturnRepository extends ServiceEntityRepository
             ->setParameter('company', $company)
             ->setParameter('marketplace', $marketplace)
             ->setParameter('rawDocumentId', $rawDocumentId)
+            ->getQuery()
+            ->execute();
+    }
+
+    /**
+     * @param string[] $externalReturnIds
+     */
+    public function deleteOpenByExternalIds(
+        Company $company,
+        MarketplaceType $marketplace,
+        array $externalReturnIds,
+    ): int {
+        if (empty($externalReturnIds)) {
+            return 0;
+        }
+
+        return (int) $this->createQueryBuilder('r')
+            ->delete()
+            ->where('r.company = :company')
+            ->andWhere('r.marketplace = :marketplace')
+            ->andWhere('r.externalReturnId IN (:externalReturnIds)')
+            ->andWhere('r.document IS NULL')
+            ->setParameter('company', $company)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('externalReturnIds', array_values(array_unique($externalReturnIds)))
             ->getQuery()
             ->execute();
     }

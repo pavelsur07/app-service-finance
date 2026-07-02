@@ -6,14 +6,81 @@ namespace App\Tests\Integration\Marketplace\Application;
 
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
+use App\Marketplace\Application\ReprocessMarketplacePeriodAction;
+use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Marketplace\MarketplaceListingBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceRawDocumentBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Ramsey\Uuid\Uuid;
 
 final class WbRawForceReprocessRegressionTest extends IntegrationTestCase
 {
+    public function testPeriodReprocessReplacesOpenWbSalesBySridSoSaleGrossUsesNewFormula(): void
+    {
+        $company = CompanyBuilder::aCompany()->withIndex(402)->build();
+        $this->em->persist($company->getUser());
+        $this->em->persist($company);
+
+        $listing = MarketplaceListingBuilder::aListing()
+            ->forCompany($company)
+            ->withMarketplace(MarketplaceType::WILDBERRIES)
+            ->withMarketplaceSku('10001')
+            ->build();
+        $this->em->persist($listing);
+
+        $day = new \DateTimeImmutable('2026-04-21');
+        $staleSale = new MarketplaceSale(
+            Uuid::uuid4()->toString(),
+            $company,
+            $listing,
+            MarketplaceType::WILDBERRIES,
+        );
+        $staleSale->setExternalOrderId('SRID-SALE-REPROCESS-1');
+        $staleSale->setSaleDate($day);
+        $staleSale->setQuantity(1);
+        $staleSale->setPricePerUnit('1584.00');
+        $staleSale->setTotalRevenue('1584.00');
+        $this->em->persist($staleSale);
+
+        $rawDocId = '99999999-aaaa-4aaa-8aaa-111111111142';
+        $rawDoc = MarketplaceRawDocumentBuilder::aDocument()
+            ->withId($rawDocId)
+            ->forCompany($company)
+            ->withMarketplace(MarketplaceType::WILDBERRIES)
+            ->withPeriod($day, $day)
+            ->withSyncedAt(new \DateTimeImmutable('2026-04-22 10:00:00'))
+            ->build();
+        $rawDoc->setRawData([$this->makeWbSaleRowWithAmounts(
+            srid: 'SRID-SALE-REPROCESS-1',
+            retailAmount: 1584.00,
+            forPay: 1308.04,
+            acquiringFee: 77.30,
+            ppvzVw: 600.00,
+            ppvzVwNds: 113.66,
+        )]);
+        $this->em->persist($rawDoc);
+        $this->em->flush();
+        $this->em->clear();
+
+        $action = self::getContainer()->get(ReprocessMarketplacePeriodAction::class);
+        $result = $action(
+            companyId: (string) $company->getId(),
+            marketplace: MarketplaceType::WILDBERRIES->value,
+            periodFrom: $day,
+            periodTo: $day,
+            type: 'sales_report',
+        );
+
+        self::assertSame(1, $result['docs']);
+        self::assertSame(1, $result['sales']);
+        self::assertSame(1, $this->saleRowsCountBySrid($company->getId(), 'SRID-SALE-REPROCESS-1'));
+        self::assertSame(1584.0, $this->saleRevenueBySrid($company->getId(), 'SRID-SALE-REPROCESS-1'));
+        self::assertSame(2099.0, $this->saleGrossBySrid($company->getId(), 'SRID-SALE-REPROCESS-1'));
+    }
+
     public function testForceReprocessReplacesWbSalesAndReturnsByRawDocument(): void
     {
         $company = CompanyBuilder::aCompany()->withIndex(401)->build();
@@ -84,6 +151,35 @@ final class WbRawForceReprocessRegressionTest extends IntegrationTestCase
         ];
     }
 
+    private function makeWbSaleRowWithAmounts(
+        string $srid,
+        float $retailAmount,
+        float $forPay,
+        float $acquiringFee,
+        float $ppvzVw,
+        float $ppvzVwNds,
+    ): array {
+        return [
+            'doc_type_name' => 'Продажа',
+            'supplier_oper_name' => 'Продажа',
+            'srid' => $srid,
+            'nm_id' => '10001',
+            'ts_name' => 'UNKNOWN',
+            'sa_name' => 'ART-1',
+            'barcode' => '1234567890123',
+            'quantity' => 1,
+            'retail_price_withdisc_rub' => $retailAmount,
+            'retail_amount' => $retailAmount,
+            'ppvz_for_pay' => $forPay,
+            'acquiring_fee' => $acquiringFee,
+            'ppvz_vw' => $ppvzVw,
+            'ppvz_vw_nds' => $ppvzVwNds,
+            'retail_price' => 3000.0,
+            'sale_dt' => '2026-04-21 12:00:00',
+            'rr_dt' => '2026-04-21 12:00:00',
+        ];
+    }
+
     private function makeWbReturnRow(string $srid, float $retailPriceWithDisc): array
     {
         return [
@@ -111,6 +207,14 @@ final class WbRawForceReprocessRegressionTest extends IntegrationTestCase
         );
     }
 
+    private function saleRowsCountBySrid(string $companyId, string $srid): int
+    {
+        return (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM marketplace_sales WHERE company_id = :companyId AND external_order_id = :srid',
+            ['companyId' => $companyId, 'srid' => $srid],
+        );
+    }
+
     private function returnRowsCount(string $companyId, string $rawDocId, string $srid): int
     {
         return (int) $this->connection->fetchOne(
@@ -124,6 +228,22 @@ final class WbRawForceReprocessRegressionTest extends IntegrationTestCase
         return (float) $this->connection->fetchOne(
             'SELECT total_revenue FROM marketplace_sales WHERE company_id = :companyId AND raw_document_id = :rawDocId AND external_order_id = :srid',
             ['companyId' => $companyId, 'rawDocId' => $rawDocId, 'srid' => $srid],
+        );
+    }
+
+    private function saleRevenueBySrid(string $companyId, string $srid): float
+    {
+        return (float) $this->connection->fetchOne(
+            'SELECT total_revenue FROM marketplace_sales WHERE company_id = :companyId AND external_order_id = :srid',
+            ['companyId' => $companyId, 'srid' => $srid],
+        );
+    }
+
+    private function saleGrossBySrid(string $companyId, string $srid): float
+    {
+        return (float) $this->connection->fetchOne(
+            'SELECT price_per_unit * quantity FROM marketplace_sales WHERE company_id = :companyId AND external_order_id = :srid',
+            ['companyId' => $companyId, 'srid' => $srid],
         );
     }
 

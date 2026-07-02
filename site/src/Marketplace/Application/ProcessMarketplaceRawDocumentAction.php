@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Application;
 
+use App\Company\Entity\Company;
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistryInterface;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
+use App\Marketplace\Exception\WbGeneratedRowsConflictException;
+use App\Marketplace\Infrastructure\Normalizer\Contract\RowClassifierInterface;
 use App\Marketplace\Infrastructure\Normalizer\RowClassifierRegistryInterface;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
@@ -122,6 +125,19 @@ final readonly class ProcessMarketplaceRawDocumentAction
         }
 
         $classifier = $this->classifierRegistry->get($marketplace);
+
+        if ($command->forceReprocess && $marketplace === MarketplaceType::WILDBERRIES) {
+            $this->cleanupWbOpenRowsByExternalIds(
+                company: $document->getCompany(),
+                marketplace: $marketplace,
+                kind: $command->kind,
+                targetBucketKey: $targetBucketKey,
+                rows: $rows,
+                classifier: $classifier,
+                rawDocId: $command->rawDocId,
+            );
+        }
+
         $totalProcessed = 0;
 
 
@@ -182,5 +198,70 @@ final readonly class ProcessMarketplaceRawDocumentAction
         $this->costCategoryResolver->clearCache();
 
         return $totalProcessed;
+    }
+
+    /**
+     * @param array<int|string, mixed> $rows
+     */
+    private function cleanupWbOpenRowsByExternalIds(
+        Company $company,
+        MarketplaceType $marketplace,
+        string $kind,
+        string $targetBucketKey,
+        array $rows,
+        RowClassifierInterface $classifier,
+        string $rawDocId,
+    ): void {
+        if (!in_array($kind, ['sales', 'returns'], true)) {
+            return;
+        }
+
+        $externalIds = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $type = $classifier->classify($row);
+            if ($type->value !== $targetBucketKey) {
+                continue;
+            }
+
+            $srid = trim((string) ($row['srid'] ?? ''));
+            if ('' !== $srid) {
+                $externalIds[] = $srid;
+            }
+        }
+
+        $externalIds = array_values(array_unique($externalIds));
+        if ([] === $externalIds) {
+            return;
+        }
+
+        if ('sales' === $kind) {
+            $linkedRows = $this->saleRepository->countDocumentLinkedByExternalIds($company, $marketplace, $externalIds);
+            if ($linkedRows > 0) {
+                throw new WbGeneratedRowsConflictException(sprintf(
+                    'Cannot force reprocess WB raw document %s: %d sales rows are linked to closed documents.',
+                    $rawDocId,
+                    $linkedRows,
+                ));
+            }
+
+            $this->saleRepository->deleteOpenByExternalIds($company, $marketplace, $externalIds);
+
+            return;
+        }
+
+        $linkedRows = $this->returnRepository->countDocumentLinkedByExternalIds($company, $marketplace, $externalIds);
+        if ($linkedRows > 0) {
+            throw new WbGeneratedRowsConflictException(sprintf(
+                'Cannot force reprocess WB raw document %s: %d return rows are linked to closed documents.',
+                $rawDocId,
+                $linkedRows,
+            ));
+        }
+
+        $this->returnRepository->deleteOpenByExternalIds($company, $marketplace, $externalIds);
     }
 }
