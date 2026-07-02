@@ -31,6 +31,7 @@ final class WbSalesReportRowNormalizerTest extends TestCase
         self::assertSame(2, $this->normalizer->quantity($row));
         self::assertSame(1300.0, $this->normalizer->retailPriceWithDisc($row));
         self::assertSame(80.0, $this->normalizer->fullMarketplaceCommission($row));
+        self::assertSame(1300.0, $this->normalizer->grossWithoutSpp($row));
         self::assertTrue($this->normalizer->isSale($row));
         self::assertFalse($this->normalizer->isReturn($row));
     }
@@ -60,6 +61,7 @@ final class WbSalesReportRowNormalizerTest extends TestCase
         self::assertSame(1200.0, $this->normalizer->forPay($row));
         self::assertSame(20.0, $this->normalizer->acquiringFee($row));
         self::assertSame(80.0, $this->normalizer->fullMarketplaceCommission($row));
+        self::assertSame(1300.0, $this->normalizer->grossWithoutSpp($row));
         self::assertTrue($this->normalizer->isSale($row));
     }
 
@@ -145,6 +147,8 @@ final class WbSalesReportRowNormalizerTest extends TestCase
             'retail_price_withdisc_rub' => '1300',
             'ppvz_for_pay' => '1200',
             'acquiring_fee' => '20',
+            'ppvz_vw' => '60',
+            'ppvz_vw_nds' => '20',
             'quantity' => 2,
             'srid' => 'srid-1',
             'rr_dt' => '2026-05-01 12:00:00',
@@ -176,6 +180,8 @@ final class WbSalesReportRowNormalizerTest extends TestCase
             'retailPriceWithDisc' => '1300',
             'forPay' => '1200',
             'acquiringFee' => '20',
+            'ppvzVw' => '60',
+            'ppvzVwNds' => '20',
             'quantity' => 2,
             'srid' => 'srid-1',
             'rrDate' => '2026-05-01 12:00:00',

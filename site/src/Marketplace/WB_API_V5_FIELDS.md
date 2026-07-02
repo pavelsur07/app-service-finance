@@ -38,11 +38,18 @@ POST /api/finance/v1/sales-reports/detailed
 - `retail_amount` / `retailAmount` — **сумма, оплаченная покупателем с учётом СПП**.
 - `ppvz_for_pay` / `forPay` — **к перечислению продавцу** (продажа) / **к удержанию** (возврат).
 - `acquiring_fee` / `acquiringFee` — **эквайринг**.
+- `ppvz_vw` / `ppvzVw` — **вознаграждение WB без НДС**.
+- `ppvz_vw_nds` / `ppvzVwNds` — **НДС вознаграждения WB**.
 - `commission_percent` — **процент комиссии**, не сумма.
 
-### Полная денежная комиссия
+### Полная денежная комиссия WB
 ```text
-full_commission = retailPriceWithDisc - forPay - acquiringFee
+full_commission = abs(ppvzVw) + abs(ppvzVwNds)
+```
+
+### Выручка без СПП
+```text
+gross_without_spp = abs(forPay) + full_commission + abs(acquiringFee)
 ```
 
 ## ПРАВИЛА ЗНАКОВ ДЛЯ УЧЁТА
@@ -58,8 +65,8 @@ externalOrderId: rrd_id
 saleDate: rr_dt
 marketplaceSku: sa_name
 quantity: abs(quantity)
-totalRevenue: retailPriceWithDisc
-pricePerUnit: retailPriceWithDisc / abs(quantity)
+totalRevenue: retailAmount
+pricePerUnit: gross_without_spp / abs(quantity)
 ```
 
 **Фильтр:** `doc_type_name === "Продажа"`
@@ -67,7 +74,7 @@ pricePerUnit: retailPriceWithDisc / abs(quantity)
 ### MarketplaceCost (Затраты)
 ```php
 wb_commission_percent: commission_percent
-wb_commission_amount: retail_price_withdisc_rub - ppvz_for_pay - acquiring_fee
+wb_commission_amount: abs(ppvz_vw) + abs(ppvz_vw_nds)
 wb_acquiring: acquiring_fee
 wb_logistics: delivery_rub
 wb_return_logistics: return_amount
@@ -92,6 +99,7 @@ returnLogisticsCost: return_amount
 ## УСТАРЕВШИЕ/ЗАПРЕЩЁННЫЕ ИНТЕРПРЕТАЦИИ
 - ❌ `retail_amount = quantity × retail_price`.
 - ❌ `commission_percent` как денежная комиссия.
+- ❌ `retail_price_withdisc_rub - ppvz_for_pay - acquiring_fee` как денежная комиссия.
 - ❌ `refundAmount = abs(retail_amount)` как универсальная формула возврата.
 - ❌ `realizationreport_id` как уникальный ID строки.
 

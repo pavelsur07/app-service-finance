@@ -27,12 +27,16 @@ use Psr\Log\NullLogger;
 
 final class WbSalesRawProcessorRevenueTest extends TestCase
 {
-    public function testUsesRetailPriceWithDiscAsRevenueForOldSnakeCase(): void
+    public function testUsesRetailAmountAsRevenueAndGrossWithoutSppAsPriceForOldSnakeCase(): void
     {
         $result = $this->runProcessorWithRow([
             'doc_type_name' => 'Продажа',
-            'retail_price_withdisc_rub' => 2493,
+            'retail_price_withdisc_rub' => 3000,
             'retail_amount' => 1607,
+            'ppvz_for_pay' => 1581.10,
+            'acquiring_fee' => 64.28,
+            'ppvz_vw' => 700,
+            'ppvz_vw_nds' => 147.62,
             'quantity' => 1,
             'srid' => 'WB-ORDER-1',
             'nm_id' => '123',
@@ -42,9 +46,9 @@ final class WbSalesRawProcessorRevenueTest extends TestCase
 
         self::assertCount(1, $result['sales']);
         self::assertSame([['123']], $result['nmIdsCalls']);
-        self::assertSame('2493.00', $result['sales'][0]->getTotalRevenue());
+        self::assertSame('1607.00', $result['sales'][0]->getTotalRevenue());
         self::assertSame('2493.00', $result['sales'][0]->getPricePerUnit());
-        self::assertNotSame('1607', $result['sales'][0]->getTotalRevenue());
+        self::assertNotSame('3000', $result['sales'][0]->getPricePerUnit());
         self::assertSame('2026-01-10', $result['sales'][0]->getSaleDate()->format('Y-m-d'));
     }
 
@@ -57,6 +61,11 @@ final class WbSalesRawProcessorRevenueTest extends TestCase
         $result = $this->runProcessorWithRow([
             'doc_type_name' => 'Продажа',
             'retail_price_withdisc_rub' => 1000,
+            'retail_amount' => 777,
+            'ppvz_for_pay' => 800,
+            'acquiring_fee' => 20,
+            'ppvz_vw' => 100,
+            'ppvz_vw_nds' => 80,
             'quantity' => 3,
             'srid' => 'WB-ORDER-DIV',
             'nm_id' => '123',
@@ -65,7 +74,7 @@ final class WbSalesRawProcessorRevenueTest extends TestCase
         ]);
 
         self::assertCount(1, $result['sales']);
-        self::assertSame('1000.00', $result['sales'][0]->getTotalRevenue());
+        self::assertSame('777.00', $result['sales'][0]->getTotalRevenue());
         self::assertSame('333.33', $result['sales'][0]->getPricePerUnit());
     }
 
@@ -77,6 +86,10 @@ final class WbSalesRawProcessorRevenueTest extends TestCase
             'quantity' => 1,
             'retailPriceWithDisc' => 2099,
             'retailAmount' => 1584,
+            'forPay' => 1308.04,
+            'acquiringFee' => 77.30,
+            'ppvzVw' => 600,
+            'ppvzVwNds' => 36.66,
             'nmId' => '123456',
             'techSize' => 'M',
             'sku' => '200000000001',
@@ -91,8 +104,9 @@ final class WbSalesRawProcessorRevenueTest extends TestCase
 
         self::assertCount(1, $result['sales']);
         self::assertSame('test-sale-srid-1', $result['sales'][0]->getExternalOrderId());
-        self::assertSame('2099.00', $result['sales'][0]->getTotalRevenue());
-        self::assertNotSame('1584', $result['sales'][0]->getTotalRevenue());
+        self::assertSame('1584.00', $result['sales'][0]->getTotalRevenue());
+        self::assertSame('2022.00', $result['sales'][0]->getPricePerUnit());
+        self::assertNotSame('2099', $result['sales'][0]->getPricePerUnit());
 
         self::assertCount(1, $result['createdListings']);
         $listing = $result['createdListings'][0];

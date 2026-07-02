@@ -50,6 +50,8 @@ final class WbCamelCaseRawDocumentPipelineRegressionTest extends IntegrationTest
                 'commissionPercent' => 34,
                 'forPay' => '1308.04',
                 'acquiringFee' => '77.30',
+                'ppvzVw' => '600.00',
+                'ppvzVwNds' => '113.66',
                 'nmId' => 123456,
                 'techSize' => 'M',
                 'sku' => '200000000001',
@@ -71,6 +73,8 @@ final class WbCamelCaseRawDocumentPipelineRegressionTest extends IntegrationTest
                 'commissionPercent' => 34,
                 'forPay' => '1308.04',
                 'acquiringFee' => '77.30',
+                'ppvzVw' => '600.00',
+                'ppvzVwNds' => '113.66',
                 'nmId' => 123456,
                 'techSize' => 'M',
                 'sku' => '200000000001',
@@ -112,7 +116,7 @@ final class WbCamelCaseRawDocumentPipelineRegressionTest extends IntegrationTest
         $action(new ProcessMarketplaceRawDocumentCommand((string) $company->getId(), $rawDocId, 'costs'));
 
         self::assertSame(1, $this->salesCount($company->getId(), $rawDocId));
-        self::assertSame(2099.0, $this->saleRevenue($company->getId(), $rawDocId, 'test-sale-srid-1'));
+        self::assertSame(1584.0, $this->saleRevenue($company->getId(), $rawDocId, 'test-sale-srid-1'));
         self::assertSame(1, $this->returnsCount($company->getId(), $rawDocId));
 
         self::assertEqualsWithDelta(
@@ -158,6 +162,10 @@ final class WbCamelCaseRawDocumentPipelineRegressionTest extends IntegrationTest
                 'quantity' => 1,
                 'retail_price_withdisc_rub' => '2099',
                 'retail_amount' => '1584',
+                'ppvz_for_pay' => '1308.04',
+                'acquiring_fee' => '77.30',
+                'ppvz_vw' => '600.00',
+                'ppvz_vw_nds' => '113.66',
                 'nm_id' => 123456,
                 'barcode' => '200000000001',
                 'sale_dt' => '2026-05-21 10:00:00',
@@ -173,7 +181,7 @@ final class WbCamelCaseRawDocumentPipelineRegressionTest extends IntegrationTest
         $action(new ProcessMarketplaceRawDocumentCommand((string) $company->getId(), $rawDocId, 'sales'));
 
         self::assertSame(1, $this->salesCount($company->getId(), $rawDocId));
-        self::assertSame(2099.0, $this->saleRevenue($company->getId(), $rawDocId, 'snake-sale-1'));
+        self::assertSame(1584.0, $this->saleRevenue($company->getId(), $rawDocId, 'snake-sale-1'));
     }
 
     private function salesCount(string $companyId, string $rawDocId): int

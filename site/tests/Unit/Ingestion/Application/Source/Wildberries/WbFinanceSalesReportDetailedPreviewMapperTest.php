@@ -23,8 +23,11 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
             'sellerOperName' => 'Продажа',
             'saleDt' => '2026-06-21T10:15:00Z',
             'retailPriceWithDisc' => '1000.00',
+            'retailAmount' => '920.00',
             'forPay' => '850.00',
             'acquiringFee' => '20.00',
+            'ppvzVw' => '40.00',
+            'ppvzVwNds' => '10.00',
             'srid' => 'sale-srid',
             'nmId' => 123,
             'sku' => 'sku-1',
@@ -35,14 +38,14 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
         $sale = $this->transaction($result->transactions, 'wb:sales-report-detailed:101:sale');
         self::assertSame(TransactionType::SALE, $sale->type);
         self::assertSame(TransactionDirection::IN, $sale->direction);
-        self::assertSame(100000, $sale->amountMinor);
+        self::assertSame(92000, $sale->amountMinor);
         self::assertSame('2026-06-21 10:15:00', $sale->occurredAt->format('Y-m-d H:i:s'));
 
         $commission = $this->transaction($result->transactions, 'wb:sales-report-detailed:101:commission');
         self::assertSame(TransactionType::COMMISSION, $commission->type);
         self::assertSame(TransactionDirection::OUT, $commission->direction);
-        self::assertSame(13000, $commission->amountMinor);
-        self::assertSame('retailPriceWithDisc-forPay-acquiringFee', $commission->field);
+        self::assertSame(5000, $commission->amountMinor);
+        self::assertSame('ppvzVw+ppvzVwNds', $commission->field);
 
         $acquiring = $this->transaction($result->transactions, 'wb:sales-report-detailed:101:acquiring');
         self::assertSame(TransactionType::ACQUIRING, $acquiring->type);
@@ -64,8 +67,11 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
             'sellerOperName' => 'Продажа',
             'saleDt' => '2026-06-21T10:15:00Z',
             'retailPriceWithDisc' => '1000.00',
+            'retailAmount' => '920.00',
             'forPay' => '850.00',
             'acquiringFee' => '20.00',
+            'ppvzVw' => '40.00',
+            'ppvzVwNds' => '10.00',
             'deliveryAmount' => 1,
             'deliveryService' => '-50.00',
             'ppvzReward' => '-17.25',
@@ -126,8 +132,11 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
             'sellerOperName' => 'Возврат',
             'saleDt' => '2026-06-21T12:00:00Z',
             'retailPriceWithDisc' => '1000.00',
+            'retailAmount' => '920.00',
             'forPay' => '850.00',
             'acquiringFee' => '20.00',
+            'ppvzVw' => '40.00',
+            'ppvzVwNds' => '10.00',
         ]]);
 
         self::assertCount(3, $result->transactions);
@@ -135,12 +144,12 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
         $refund = $this->transaction($result->transactions, 'wb:sales-report-detailed:102:refund');
         self::assertSame(TransactionType::REFUND, $refund->type);
         self::assertSame(TransactionDirection::OUT, $refund->direction);
-        self::assertSame(100000, $refund->amountMinor);
+        self::assertSame(92000, $refund->amountMinor);
 
         $commission = $this->transaction($result->transactions, 'wb:sales-report-detailed:102:commission');
         self::assertSame(TransactionType::COMMISSION, $commission->type);
         self::assertSame(TransactionDirection::IN, $commission->direction);
-        self::assertSame(13000, $commission->amountMinor);
+        self::assertSame(5000, $commission->amountMinor);
 
         $acquiring = $this->transaction($result->transactions, 'wb:sales-report-detailed:102:acquiring');
         self::assertSame(TransactionType::ACQUIRING, $acquiring->type);

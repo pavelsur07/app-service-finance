@@ -51,6 +51,8 @@ final class WbCostExternalIdBuilderTest extends TestCase
             'retail_price_withdisc_rub' => 1000.00,
             'acquiring_fee' => 20.00,
             'ppvz_for_pay' => 800.00,
+            'ppvz_vw' => 150.00,
+            'ppvz_vw_nds' => 30.00,
         ], $overrides);
     }
 }
