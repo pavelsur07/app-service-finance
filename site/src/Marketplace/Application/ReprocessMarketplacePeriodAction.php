@@ -88,10 +88,12 @@ final class ReprocessMarketplacePeriodAction
                 $result = ($this->processRealizationAction)($companyId, $docId);
                 $stats['realization'] += $result['created'] + $result['updated'];
             } elseif ($docType === 'sales_report') {
-                $cmd = new ProcessMarketplaceRawDocumentCommand($companyId, $docId, 'sales');
+                $forceGeneratedRowsReplace = $marketplaceEnum === MarketplaceType::WILDBERRIES;
+
+                $cmd = new ProcessMarketplaceRawDocumentCommand($companyId, $docId, 'sales', forceReprocess: $forceGeneratedRowsReplace);
                 $stats['sales'] += ($this->processRawAction)($cmd);
 
-                $cmd = new ProcessMarketplaceRawDocumentCommand($companyId, $docId, 'returns');
+                $cmd = new ProcessMarketplaceRawDocumentCommand($companyId, $docId, 'returns', forceReprocess: $forceGeneratedRowsReplace);
                 $stats['returns'] += ($this->processRawAction)($cmd);
 
                 $cmd = new ProcessMarketplaceRawDocumentCommand($companyId, $docId, 'costs', forceReprocess: true);
