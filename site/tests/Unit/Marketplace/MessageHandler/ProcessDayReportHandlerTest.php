@@ -13,6 +13,7 @@ use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Exception\WbGeneratedRowsConflictException;
 use App\Marketplace\Message\ProcessDayReportMessage;
+use App\Marketplace\Message\ProcessRawDocumentStepMessage;
 use App\Marketplace\MessageHandler\ProcessDayReportHandler;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusLookupInterface;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
@@ -101,16 +102,27 @@ final class ProcessDayReportHandlerTest extends TestCase
 
         $statusRepo = $this->createMock(MarketplaceFinancialReportSyncStatusLookupInterface::class);
         $updater = $this->createMock(WbFinancialReportSyncStatusUpdaterInterface::class);
+        $dispatched = [];
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::exactly(3))
             ->method('dispatch')
             ->willReturnCallback(
-                static fn (object $message, array $stamps = []): Envelope => new Envelope($message, $stamps)
+                static function (object $message, array $stamps = []) use (&$dispatched): Envelope {
+                    $dispatched[] = $message;
+
+                    return new Envelope($message, $stamps);
+                },
             );
         $em = $this->createMock(EntityManagerInterface::class);
 
         $handler = new ProcessDayReportHandler($repo, $bus, $em, new NullLogger(), $safe, $statusRepo, $updater);
         $handler(new ProcessDayReportMessage((string)$company->getId(), $doc->getId(), true));
+
+        self::assertCount(3, $dispatched);
+        foreach ($dispatched as $message) {
+            self::assertInstanceOf(ProcessRawDocumentStepMessage::class, $message);
+            self::assertTrue($message->forceRefresh);
+        }
 
         self::assertTrue(true);
     }

@@ -21,6 +21,13 @@ final readonly class ProcessRawDocumentStepMessage
         public ?string $reportType = null,
         public ?string $mode = null,
         public ?string $businessDate = null,
+        public bool $forceRefresh = false,
     ) {
+    }
+
+    public function shouldForceRefresh(): bool
+    {
+        // Old native-serialized Messenger messages do not have this property initialized.
+        return isset($this->forceRefresh) && $this->forceRefresh;
     }
 }
