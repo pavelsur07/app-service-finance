@@ -43,7 +43,7 @@ final readonly class StoreRawBatchAction
         );
 
         if (null !== $latestRecord && $latestRecord->getHash() === $hash) {
-            $latestRecord->markSeen();
+            $this->repairMissingObject($latestRecord, $ndjson);
             $this->entityManager->flush();
 
             return [$latestRecord];
@@ -58,7 +58,7 @@ final readonly class StoreRawBatchAction
         );
 
         if (null !== $existingRecord) {
-            $existingRecord->markSeen();
+            $this->repairMissingObject($existingRecord, $ndjson);
             $this->entityManager->flush();
 
             return [$existingRecord];
@@ -94,6 +94,20 @@ final readonly class StoreRawBatchAction
         }
 
         return [$record];
+    }
+
+    private function repairMissingObject(IngestRawRecord $record, string $ndjson): void
+    {
+        if (!$this->objectStorage->exists($record->getStoragePath())) {
+            $compressed = gzencode($ndjson, 6);
+            if (false === $compressed) {
+                throw new RawStorageException('Failed to gzip raw payload.');
+            }
+
+            $this->objectStorage->write($record->getStoragePath(), $compressed);
+        }
+
+        $record->markSeen();
     }
 
     private function recoverConcurrentDuplicate(
@@ -133,7 +147,7 @@ final readonly class StoreRawBatchAction
             throw $exception;
         }
 
-        $existingRecord->markSeen();
+        $this->repairMissingObject($existingRecord, $this->ndjsonCodec->encodeRows($batch->rows));
         $entityManager->flush();
 
         return $existingRecord;

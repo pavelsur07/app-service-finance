@@ -13,6 +13,7 @@ final readonly class UpsertResult
         public ?\DateTimeImmutable $oldOccurredAt,
         public \DateTimeImmutable $newOccurredAt,
         public bool $periodChanged,
+        public bool $affectsFinancialReport = true,
     ) {
         Assert::uuid($this->transactionId);
     }

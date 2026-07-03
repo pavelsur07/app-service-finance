@@ -79,6 +79,7 @@ final class UpsertFinancialTransactionActionTest extends TestCase
         self::assertNotNull($result);
         self::assertSame($transaction->getId(), $result->transactionId);
         self::assertFalse($result->periodChanged);
+        self::assertFalse($result->affectsFinancialReport);
         self::assertSame($occurredAt, $result->oldOccurredAt);
         self::assertSame($occurredAt, $result->newOccurredAt);
         self::assertSame(10000, $transaction->getAmountMinor());
@@ -215,6 +216,7 @@ final class UpsertFinancialTransactionActionTest extends TestCase
         self::assertSame($newRawRecordId, $transaction->getRawRecordId());
         self::assertSame($newExternalUpdatedAt, $transaction->getExternalUpdatedAt());
         self::assertFalse($result->periodChanged);
+        self::assertFalse($result->affectsFinancialReport);
     }
 
     public function testSameSourceDataDoesNotMoveRawRecordAttributionBackwards(): void

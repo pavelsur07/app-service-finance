@@ -64,6 +64,7 @@ final class OzonAccrualRollingRefreshCommandTest extends IntegrationTestCase
         self::assertSame(Command::SUCCESS, $exit);
         self::assertSame(1, $this->parentBackfillJobCount($ozonCompany->getId()));
         self::assertSame(0, $this->parentBackfillJobCount($wbCompany->getId()));
+        self::assertSame(1, $this->jobCount($ozonCompany->getId(), OzonResourceType::ACCRUAL_TYPES, SyncJobKind::INCREMENTAL));
 
         $parent = $this->connection->fetchAssociative(
             'SELECT resource_type, shop_ref, progress_total
@@ -78,7 +79,7 @@ final class OzonAccrualRollingRefreshCommandTest extends IntegrationTestCase
         self::assertSame(2, (int) $parent['progress_total']);
 
         $envelopes = $transport->getSent();
-        self::assertCount(2, $envelopes);
+        self::assertCount(3, $envelopes);
         foreach ($envelopes as $envelope) {
             self::assertInstanceOf(RunSyncChunkMessage::class, $envelope->getMessage());
         }
@@ -115,7 +116,8 @@ final class OzonAccrualRollingRefreshCommandTest extends IntegrationTestCase
         self::assertSame(Command::SUCCESS, $exit);
         self::assertStringContainsString('active', $tester->getDisplay());
         self::assertSame(1, $this->parentBackfillJobCount($company->getId()));
-        self::assertCount(0, $transport->getSent());
+        self::assertSame(1, $this->jobCount($company->getId(), OzonResourceType::ACCRUAL_TYPES, SyncJobKind::INCREMENTAL));
+        self::assertCount(1, $transport->getSent());
     }
 
     private function seedCompany(int $index): Company
@@ -166,6 +168,16 @@ final class OzonAccrualRollingRefreshCommandTest extends IntegrationTestCase
              FROM ingest_sync_jobs
              WHERE company_id = :companyId AND kind = :kind AND parent_job_id IS NULL',
             ['companyId' => $companyId, 'kind' => SyncJobKind::BACKFILL->value],
+        );
+    }
+
+    private function jobCount(string $companyId, string $resourceType, SyncJobKind $kind): int
+    {
+        return (int) $this->connection->fetchOne(
+            'SELECT COUNT(*)
+             FROM ingest_sync_jobs
+             WHERE company_id = :companyId AND resource_type = :resourceType AND kind = :kind',
+            ['companyId' => $companyId, 'resourceType' => $resourceType, 'kind' => $kind->value],
         );
     }
 

@@ -32,7 +32,15 @@ final class CoverageQuery
     ): array {
         Assert::uuid($companyId);
 
-        $recordDate = "COALESCE(TO_CHAR(ft.occurred_at, 'YYYY-MM-DD'), TO_CHAR(raw_window.day, 'YYYY-MM-DD'), TO_CHAR(r.fetched_at, 'YYYY-MM-DD'))";
+        $rawExternalDate = "(CASE
+            WHEN r.resource_type = 'wildberries_finance_sales_report_detailed'
+                THEN substring(r.external_id from '^wb-sales-report-detailed:([0-9]{4}-[0-9]{2}-[0-9]{2}):rrd-[0-9]+$')::date
+            WHEN r.resource_type = 'ozon_finance_accrual_by_day'
+                THEN substring(r.external_id from '^accrual-by-day:([0-9]{4}-[0-9]{2}-[0-9]{2}):[0-9]{4}-[0-9]{2}-[0-9]{2}$')::date
+            ELSE NULL
+        END)";
+        $rawRecordDate = "COALESCE(raw_window.day, {$rawExternalDate}, r.fetched_at::date)";
+        $recordDate = "COALESCE(TO_CHAR(ft.occurred_at, 'YYYY-MM-DD'), TO_CHAR({$rawRecordDate}, 'YYYY-MM-DD'))";
         $shopExpression = "COALESCE(NULLIF(ft.shop_ref, ''), r.shop_ref)";
         $dateFilter = <<<'SQL'
             (
@@ -41,11 +49,12 @@ final class CoverageQuery
                     ft.id IS NULL
                     AND (
                         (j.window_from IS NOT NULL AND j.window_from <= :toDate AND COALESCE(j.window_to, j.window_from) >= :fromDate)
-                        OR (j.window_from IS NULL AND r.fetched_at >= :from AND r.fetched_at < :toExclusive)
+                        OR (j.window_from IS NULL AND RAW_RECORD_DATE >= :fromDate AND RAW_RECORD_DATE <= :toDate)
                     )
                 )
             )
             SQL;
+        $dateFilter = str_replace('RAW_RECORD_DATE', $rawRecordDate, $dateFilter);
 
         $qb = $this->connection->createQueryBuilder()
             ->select(
@@ -193,6 +202,23 @@ final class CoverageQuery
         \DateTimeImmutable $to,
     ): array {
         $shopFilter = null !== $shopRef && '' !== $shopRef ? 'AND j.shop_ref = :shopRef' : '';
+        $cursorDate = "CASE
+            WHEN j.cursor_snapshot ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+                THEN j.cursor_snapshot::date
+            WHEN j.cursor_snapshot ~ '\"date\"\\s*:\\s*\"[0-9]{4}-[0-9]{2}-[0-9]{2}\"'
+                THEN substring(j.cursor_snapshot from '\"date\"\\s*:\\s*\"([0-9]{4}-[0-9]{2}-[0-9]{2})\"')::date
+            ELSE j.created_at::date
+        END";
+        $successfulRawDate = "COALESCE(
+            CASE
+                WHEN r.resource_type = 'wildberries_finance_sales_report_detailed'
+                    THEN substring(r.external_id from '^wb-sales-report-detailed:([0-9]{4}-[0-9]{2}-[0-9]{2}):rrd-[0-9]+$')::date
+                WHEN r.resource_type = 'ozon_finance_accrual_by_day'
+                    THEN substring(r.external_id from '^accrual-by-day:([0-9]{4}-[0-9]{2}-[0-9]{2}):[0-9]{4}-[0-9]{2}-[0-9]{2}$')::date
+                ELSE NULL
+            END,
+            r.fetched_at::date
+        )";
         $sql = <<<SQL
             WITH failed_jobs AS (
                 SELECT
@@ -202,20 +228,12 @@ final class CoverageQuery
                     j.resource_type,
                     COALESCE(
                         j.window_from,
-                        CASE
-                            WHEN j.cursor_snapshot ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
-                                THEN j.cursor_snapshot::date
-                            ELSE j.created_at::date
-                        END
+                        {$cursorDate}
                     ) AS from_date,
                     COALESCE(
                         j.window_to,
                         j.window_from,
-                        CASE
-                            WHEN j.cursor_snapshot ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
-                                THEN j.cursor_snapshot::date
-                            ELSE j.created_at::date
-                        END
+                        {$cursorDate}
                     ) AS to_date
                 FROM ingest_sync_jobs j
                 WHERE j.company_id = :companyId
@@ -272,8 +290,7 @@ final class CoverageQuery
                       OR (
                           ft.id IS NULL
                           AND successful_job.window_from IS NULL
-                          AND r.fetched_at >= fid.record_date::timestamp
-                          AND r.fetched_at < fid.record_date::timestamp + interval '1 day'
+                          AND {$successfulRawDate} = fid.record_date
                       )
                   )
             )

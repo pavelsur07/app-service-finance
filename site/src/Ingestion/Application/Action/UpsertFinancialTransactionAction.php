@@ -79,6 +79,7 @@ final readonly class UpsertFinancialTransactionAction
                     oldOccurredAt: $transaction->getOccurredAt(),
                     newOccurredAt: $transaction->getOccurredAt(),
                     periodChanged: false,
+                    affectsFinancialReport: false,
                 );
             }
 

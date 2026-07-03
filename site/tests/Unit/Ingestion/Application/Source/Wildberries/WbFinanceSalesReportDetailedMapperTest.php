@@ -10,6 +10,7 @@ use App\Ingestion\Application\Source\Wildberries\WbFinanceSalesReportDetailedPre
 use App\Ingestion\Application\Source\Wildberries\WbResourceType;
 use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Enum\IngestSource;
+use App\Ingestion\Enum\NormalizationIssueKind;
 use App\Ingestion\Enum\TransactionDirection;
 use App\Ingestion\Enum\TransactionType;
 use PHPUnit\Framework\TestCase;
@@ -127,12 +128,10 @@ final class WbFinanceSalesReportDetailedMapperTest extends TestCase
         self::assertSame(19722, $compensation->money->amountMinor());
     }
 
-    public function testRejectsPayoutMismatches(): void
+    public function testPayoutMismatchStillMapsAndIsReportedAsPreviewIssue(): void
     {
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('WB finance payout check mismatch');
-
-        $this->mapper()->map($this->rawRecord(), [[
+        $rawRecord = $this->rawRecord();
+        $rows = [[
             'rrdId' => 102,
             'currency' => 'RUB',
             'docTypeName' => 'Продажа',
@@ -144,20 +143,60 @@ final class WbFinanceSalesReportDetailedMapperTest extends TestCase
             'acquiringFee' => '0',
             'ppvzVw' => '0',
             'ppvzVwNds' => '0',
-        ]]);
+        ]];
+
+        $transactions = $this->mapper()->map($rawRecord, $rows);
+        self::assertCount(1, $transactions);
+        self::assertSame(100000, $this->transaction($transactions, 'wb:sales-report-detailed:102:sale')->money->amountMinor());
+
+        $issues = $this->mapper()->previewIssues($rawRecord, $rows);
+        self::assertCount(1, $issues);
+        self::assertSame(NormalizationIssueKind::SUM_MISMATCH, $issues[0]->kind);
+        self::assertNotNull($issues[0]->operationGroupId);
+        self::assertSame('wb_payout_check', $issues[0]->details['check']);
+        self::assertSame('102', $issues[0]->details['rowKey']);
+        self::assertSame(110000, $issues[0]->details['expectedAmountMinor']);
+        self::assertSame(100000, $issues[0]->details['actualAmountMinor']);
+        self::assertSame(-10000, $issues[0]->details['deltaMinor']);
     }
 
-    public function testRejectsUnknownRowsWithNonZeroKnownAmounts(): void
+    public function testUnknownRowsWithNonZeroAmountsStillMapAndAreReportedAsPreviewIssue(): void
     {
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('unmapped non-zero fields');
-
-        $this->mapper()->map($this->rawRecord(), [[
+        $rawRecord = $this->rawRecord();
+        $rows = [[
             'rrdId' => 103,
             'sellerOperName' => 'Новая операция',
             'rrDate' => '2026-06-21',
             'forPay' => '12.34',
-        ]]);
+        ]];
+
+        self::assertSame([], $this->mapper()->map($rawRecord, $rows));
+
+        $issues = $this->mapper()->previewIssues($rawRecord, $rows);
+        self::assertCount(1, $issues);
+        self::assertSame(NormalizationIssueKind::UNKNOWN_FIELD, $issues[0]->kind);
+        self::assertNull($issues[0]->operationGroupId);
+        self::assertSame('wb_unknown_row', $issues[0]->details['check']);
+        self::assertSame('103', $issues[0]->details['rowKey']);
+        self::assertSame('Новая операция', $issues[0]->details['sellerOperName']);
+        self::assertSame(['forPay'], $issues[0]->details['nonZeroFields']);
+    }
+
+    public function testPreviewIssuesAreEmptyForConsistentRows(): void
+    {
+        self::assertSame([], $this->mapper()->previewIssues($this->rawRecord(), [[
+            'rrdId' => 101,
+            'currency' => 'RUB',
+            'docTypeName' => 'Продажа',
+            'sellerOperName' => 'Продажа',
+            'saleDt' => '2026-06-21T10:15:00Z',
+            'retailPriceWithDisc' => '1000.00',
+            'retailAmount' => '920.00',
+            'forPay' => '850.00',
+            'acquiringFee' => '20.00',
+            'ppvzVw' => '40.00',
+            'ppvzVwNds' => '10.00',
+        ]]));
     }
 
     /**

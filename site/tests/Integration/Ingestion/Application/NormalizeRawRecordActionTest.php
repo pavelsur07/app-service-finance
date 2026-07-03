@@ -136,9 +136,10 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
 
         /** @var FinancialTransactionRepository $transactionRepository */
         $transactionRepository = self::getContainer()->get(FinancialTransactionRepository::class);
-        // No duplicate created; the transaction still belongs to the first raw record.
-        self::assertCount(1, $transactionRepository->findByRawRecordId($companyId, $first->getId()));
-        self::assertCount(0, $transactionRepository->findByRawRecordId($companyId, $second->getId()));
+        // No duplicate created; raw attribution moves to the latest identical snapshot
+        // without publishing a financial rebuild event.
+        self::assertCount(0, $transactionRepository->findByRawRecordId($companyId, $first->getId()));
+        self::assertCount(1, $transactionRepository->findByRawRecordId($companyId, $second->getId()));
     }
 
     public function testDispatchesEventOnlyForTransactionsThatChanged(): void
@@ -223,6 +224,36 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
             RawNormalizationStatus::DONE,
             $rawRecordRepository->findByIdAndCompany($record->getId(), $companyId)?->getNormalizationStatus(),
         );
+    }
+
+    public function testSuccessfulNormalizationResolvesPreviousOpenIssues(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $record = $this->storeRawRecord($companyId, [[
+            'externalId' => 'sale-with-old-issue',
+            'externalUpdatedAt' => '2026-06-18T10:00:00+00:00',
+            'operationGroupId' => Uuid::uuid7()->toString(),
+            'amountMinor' => 10000,
+            'controlAmountMinor' => 10000,
+            'currency' => 'RUB',
+            'occurredAt' => '2026-06-18T09:00:00+00:00',
+        ]]);
+
+        $this->em->persist(new \App\Ingestion\Entity\NormalizationIssue(
+            $companyId,
+            $record->getId(),
+            null,
+            NormalizationIssueKind::MAPPER_FAILURE,
+            ['message' => 'old failure'],
+        ));
+        $this->em->flush();
+
+        $this->normalize($record->getId(), $companyId);
+        $this->em->clear();
+
+        /** @var NormalizationIssueRepository $issueRepository */
+        $issueRepository = self::getContainer()->get(NormalizationIssueRepository::class);
+        self::assertSame([], $issueRepository->findOpenByRawRecord($companyId, $record->getId()));
     }
 
     public function testMapperFailureRecordsIssueAndMarksRawRecordFailed(): void

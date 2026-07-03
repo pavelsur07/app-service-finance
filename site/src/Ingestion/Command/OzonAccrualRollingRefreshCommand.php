@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Ingestion\Command;
 
 use App\Ingestion\Application\Command\StartBackfillCommand as StartBackfillApplicationCommand;
+use App\Ingestion\Application\Command\StartIncrementalCommand as StartIncrementalApplicationCommand;
 use App\Ingestion\Application\DTO\ShopDescriptor;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Domain\Service\ConnectorRegistry;
@@ -120,6 +121,9 @@ final class OzonAccrualRollingRefreshCommand extends Command
 
         $rows = [];
         $started = 0;
+        $typesStarted = 0;
+        $typesSkippedActive = 0;
+        $typesFailed = 0;
         $skippedActive = 0;
         $failed = 0;
 
@@ -133,8 +137,34 @@ final class OzonAccrualRollingRefreshCommand extends Command
                     $target['shopRef'],
                     $this->delayLabel($initialDelaySeconds),
                     'dry-run',
+                    'dry-run',
                 ];
                 continue;
+            }
+
+            $typesStatus = 'not-started';
+            try {
+                $typesStatus = $this->syncFacade->startIncremental(new StartIncrementalApplicationCommand(
+                    companyId: $target['companyId'],
+                    connectionRef: $target['connectionRef'],
+                    source: IngestSource::OZON,
+                    resourceType: OzonResourceType::ACCRUAL_TYPES,
+                    shopRef: $target['shopRef'],
+                ));
+                ++$typesStarted;
+            } catch (ActiveBackfillExistsException) {
+                $typesStatus = 'active';
+                ++$typesSkippedActive;
+            } catch (\Throwable $exception) {
+                $typesStatus = 'failed';
+                ++$typesFailed;
+                $this->logger->warning('Failed to dispatch Ozon accrual types refresh job.', [
+                    'companyId' => $target['companyId'],
+                    'connectionRef' => $target['connectionRef'],
+                    'shopRef' => $target['shopRef'],
+                    'exceptionClass' => $exception::class,
+                    'errorMessage' => $exception->getMessage(),
+                ]);
             }
 
             try {
@@ -150,13 +180,13 @@ final class OzonAccrualRollingRefreshCommand extends Command
                 ));
 
                 ++$started;
-                $rows[] = [$target['companyId'], $target['connectionRef'], $target['shopRef'], $this->delayLabel($initialDelaySeconds), $jobId];
+                $rows[] = [$target['companyId'], $target['connectionRef'], $target['shopRef'], $this->delayLabel($initialDelaySeconds), $typesStatus, $jobId];
             } catch (ActiveBackfillExistsException) {
                 ++$skippedActive;
-                $rows[] = [$target['companyId'], $target['connectionRef'], $target['shopRef'], $this->delayLabel($initialDelaySeconds), 'active'];
+                $rows[] = [$target['companyId'], $target['connectionRef'], $target['shopRef'], $this->delayLabel($initialDelaySeconds), $typesStatus, 'active'];
             } catch (\Throwable $exception) {
                 ++$failed;
-                $rows[] = [$target['companyId'], $target['connectionRef'], $target['shopRef'], $this->delayLabel($initialDelaySeconds), 'failed'];
+                $rows[] = [$target['companyId'], $target['connectionRef'], $target['shopRef'], $this->delayLabel($initialDelaySeconds), $typesStatus, 'failed'];
                 $this->logger->warning('Failed to dispatch Ozon accrual rolling refresh job.', [
                     'companyId' => $target['companyId'],
                     'connectionRef' => $target['connectionRef'],
@@ -168,9 +198,12 @@ final class OzonAccrualRollingRefreshCommand extends Command
         }
 
         $io->section('Dispatch result');
-        $io->table(['companyId', 'connectionRef', 'shopRef', 'delay', 'status'], $rows);
+        $io->table(['companyId', 'connectionRef', 'shopRef', 'delay', 'typesStatus', 'byDayStatus'], $rows);
         $io->table(['metric', 'value'], [
             ['targets', (string) count($targets)],
+            ['typesStarted', (string) $typesStarted],
+            ['typesSkippedActive', (string) $typesSkippedActive],
+            ['typesFailed', (string) $typesFailed],
             ['started', (string) $started],
             ['skippedActive', (string) $skippedActive],
             ['failed', (string) $failed],
@@ -184,6 +217,9 @@ final class OzonAccrualRollingRefreshCommand extends Command
             'companyId' => $companyId,
             'shopRef' => $shopRef,
             'targets' => count($targets),
+            'typesStarted' => $typesStarted,
+            'typesSkippedActive' => $typesSkippedActive,
+            'typesFailed' => $typesFailed,
             'started' => $started,
             'skippedActive' => $skippedActive,
             'failed' => $failed,

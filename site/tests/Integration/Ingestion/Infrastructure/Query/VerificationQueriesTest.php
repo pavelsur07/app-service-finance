@@ -226,6 +226,55 @@ final class VerificationQueriesTest extends IntegrationTestCase
         self::assertSame(0, $cells[0]->issueCount);
     }
 
+    public function testCoverageUsesWildberriesReportDateFromExternalIdWithoutJobWindow(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+        $job = new SyncJob(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            source: IngestSource::WILDBERRIES,
+            resourceType: 'wildberries_finance_sales_report_detailed',
+            kind: SyncJobKind::INCREMENTAL,
+            shopRef: $connectionRef,
+        );
+        $raw = $this->rawRecord(
+            companyId: $companyId,
+            shopRef: $connectionRef,
+            resourceType: 'wildberries_finance_sales_report_detailed',
+            fetchedAt: new \DateTimeImmutable('2026-07-03 03:00:05+00:00'),
+            externalId: 'wb-sales-report-detailed:2026-07-02:rrd-0',
+            source: IngestSource::WILDBERRIES,
+            connectionRef: $connectionRef,
+            syncJobId: $job->getId(),
+        );
+        $raw->markNormalizationFailed();
+        $this->em->persist($job);
+        $this->em->persist($raw);
+        $this->em->persist(new NormalizationIssue(
+            $companyId,
+            $raw->getId(),
+            null,
+            NormalizationIssueKind::MAPPER_FAILURE,
+            ['message' => 'WB finance payout check mismatch'],
+        ));
+        $this->em->flush();
+
+        /** @var CoverageQuery $query */
+        $query = self::getContainer()->get(CoverageQuery::class);
+        $cells = $query->heatmap(
+            $companyId,
+            $connectionRef,
+            new \DateTimeImmutable('2026-07-01'),
+            new \DateTimeImmutable('2026-07-03'),
+        );
+
+        self::assertCount(1, $cells);
+        self::assertSame('2026-07-02', $cells[0]->date);
+        self::assertSame(1, $cells[0]->rawCount);
+        self::assertSame(1, $cells[0]->issueCount);
+    }
+
     public function testCoverageCountsFailedSyncJobsAsOpenIssues(): void
     {
         $companyId = Uuid::uuid7()->toString();
@@ -517,7 +566,7 @@ final class VerificationQueriesTest extends IntegrationTestCase
             $raw->getId(),
             Uuid::uuid7()->toString(),
             NormalizationIssueKind::SUM_MISMATCH,
-            ['raw' => 'must-not-leak'],
+            ['message' => 'Expected 1000, actual 900', 'exceptionClass' => 'RuntimeException'],
         ));
         $this->em->persist(new NormalizationIssue(
             $companyId,
@@ -543,6 +592,11 @@ final class VerificationQueriesTest extends IntegrationTestCase
             'Сумма операций не сходится с контрольной суммой источника',
             $result['items'][0]->humanDescription,
         );
+        self::assertSame('Expected 1000, actual 900', $result['items'][0]->detailsMessage);
+        self::assertSame('RuntimeException', $result['items'][0]->exceptionClass);
+        self::assertSame('ozon_finance_accrual_by_day', $result['items'][0]->resourceType);
+        self::assertSame('issue-raw-1', $result['items'][0]->externalId);
+        self::assertNotNull($result['items'][0]->fetchedAt);
     }
 
     public function testFinancialSummaryUsesNormalizedTransactionsAndOptionalShopScope(): void
