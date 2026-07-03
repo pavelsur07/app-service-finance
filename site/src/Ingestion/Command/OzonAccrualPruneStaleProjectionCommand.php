@@ -116,6 +116,7 @@ final class OzonAccrualPruneStaleProjectionCommand extends Command
 
         $totals = ['rawRecords' => count($rawRows), 'candidates' => 0, 'deleted' => 0, 'failed' => 0];
         $groupedRows = [];
+        $seenDryRunTransactionIds = [];
 
         foreach ($rawRows as $rawRow) {
             $rawRecord = $this->rawRecordRepository->findByIdAndCompany((string) $rawRow['id'], (string) $rawRow['company_id']);
@@ -139,9 +140,25 @@ final class OzonAccrualPruneStaleProjectionCommand extends Command
                 continue;
             }
 
-            $totals['candidates'] += $result->candidates;
+            $rows = $result->rows;
+            $candidates = $result->candidates;
+            if (!$execute) {
+                $rows = [];
+                foreach ($result->rows as $row) {
+                    $transactionId = (string) $row['id'];
+                    if (isset($seenDryRunTransactionIds[$transactionId])) {
+                        continue;
+                    }
+
+                    $seenDryRunTransactionIds[$transactionId] = true;
+                    $rows[] = $row;
+                }
+                $candidates = count($rows);
+            }
+
+            $totals['candidates'] += $candidates;
             $totals['deleted'] += $result->deleted;
-            $this->collectGroupedRows($groupedRows, $rawRecord, $result->rows);
+            $this->collectGroupedRows($groupedRows, $rawRecord, $rows);
 
             if ($execute && $result->deleted > 0) {
                 $this->eventDispatcher->dispatch(new NormalizationCompletedEvent(

@@ -41,6 +41,17 @@ final class OzonAccrualPruneStaleProjectionCommandTest extends IntegrationTestCa
             rows: [$this->postingRow('2026-06-25', 222222222)],
         );
         $newRecord->markNormalizationDone();
+        $newerRecord = $this->storeRawRecord(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            externalId: 'accrual-by-day:2026-06-24:2026-06-30',
+            fetchedAt: new \DateTimeImmutable('2026-07-04 03:00:00+00:00'),
+            rows: [
+                $this->postingRow('2026-06-25', 222222222),
+                $this->postingRow('2026-06-25', 333333333),
+            ],
+        );
+        $newerRecord->markNormalizationDone();
 
         $this->persistTransaction(
             companyId: $companyId,
@@ -55,6 +66,13 @@ final class OzonAccrualPruneStaleProjectionCommandTest extends IntegrationTestCa
             rawRecordId: $newRecord->getId(),
             externalId: 'ozon:accrual-by-day:222222222:sale:product-0',
             amountMinor: 10000,
+        );
+        $this->persistTransaction(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            rawRecordId: $newerRecord->getId(),
+            externalId: 'ozon:accrual-by-day:333333333:sale:product-0',
+            amountMinor: 20000,
         );
         $this->em->flush();
 
@@ -71,6 +89,8 @@ final class OzonAccrualPruneStaleProjectionCommandTest extends IntegrationTestCa
         self::assertSame(Command::SUCCESS, $dryRunExit, $dryRun->getDisplay());
         self::assertStringContainsString('accrual-by-day:2026-06-22:2026-06-28', $dryRun->getDisplay());
         self::assertStringContainsString('2402.00', $dryRun->getDisplay());
+        self::assertStringNotContainsString('4804.00', $dryRun->getDisplay());
+        self::assertSame(1, substr_count($dryRun->getDisplay(), '2402.00'), $dryRun->getDisplay());
         self::assertSame(1, $this->transactionCountByExternalId($companyId, 'ozon:accrual-by-day:111111111:sale:product-0'));
 
         $execute = $this->tester();
@@ -87,6 +107,7 @@ final class OzonAccrualPruneStaleProjectionCommandTest extends IntegrationTestCa
         self::assertStringContainsString('deleted', $execute->getDisplay());
         self::assertSame(0, $this->transactionCountByExternalId($companyId, 'ozon:accrual-by-day:111111111:sale:product-0'));
         self::assertSame(1, $this->transactionCountByExternalId($companyId, 'ozon:accrual-by-day:222222222:sale:product-0'));
+        self::assertSame(1, $this->transactionCountByExternalId($companyId, 'ozon:accrual-by-day:333333333:sale:product-0'));
     }
 
     private function tester(): CommandTester

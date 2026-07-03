@@ -64,12 +64,35 @@ final readonly class OzonAccrualStaleProjectionPruner
         if ($execute && [] !== $deleteIds) {
             foreach (array_chunk($deleteIds, 1000) as $chunk) {
                 $deleted += (int) $this->connection->executeStatement(
-                    'DELETE FROM ingest_financial_transactions
-                     WHERE company_id = :companyId
-                       AND id IN (:ids)',
+                    "DELETE FROM ingest_financial_transactions ft
+                     USING ingest_raw_records old_raw
+                     WHERE ft.company_id = :companyId
+                       AND ft.shop_ref = :shopRef
+                       AND ft.source = :source
+                       AND ft.id IN (:ids)
+                       AND ft.raw_record_id <> :rawRecordId
+                       AND ft.occurred_at >= :fromAt
+                       AND ft.occurred_at < :toExclusive
+                       AND old_raw.id = ft.raw_record_id
+                       AND old_raw.company_id = ft.company_id
+                       AND old_raw.source = :source
+                       AND old_raw.resource_type = :resourceType
+                       AND old_raw.fetched_at < :fetchedAt
+                       AND (
+                            ft.source_data->>'_ingestion_resource' = :resourceType
+                            OR ft.external_id LIKE :externalIdPrefix
+                       )",
                     [
                         'companyId' => $rawRecord->getCompanyId(),
+                        'shopRef' => $rawRecord->getShopRef(),
+                        'source' => IngestSource::OZON->value,
                         'ids' => $chunk,
+                        'rawRecordId' => $rawRecord->getId(),
+                        'fromAt' => $from->format('Y-m-d H:i:sP'),
+                        'toExclusive' => $to->modify('+1 day')->format('Y-m-d H:i:sP'),
+                        'resourceType' => OzonResourceType::ACCRUAL_BY_DAY,
+                        'fetchedAt' => $rawRecord->getFetchedAt()->format('Y-m-d H:i:s.u'),
+                        'externalIdPrefix' => 'ozon:accrual-by-day:%',
                     ],
                     [
                         'ids' => ArrayParameterType::STRING,
