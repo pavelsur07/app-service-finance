@@ -26,8 +26,8 @@ entry inside the monolith. Reason: many new components + reorganization.
 | Layer | Result |
 |---|---|
 | `tokens/*.css` | `:root` re-split across 7 files by category (colors, typography, spacing, radius, shadows, layout, semantic). `tokens/index.css` regenerated. |
-| `components/*.{html,css}` | 41 demos, 35 css files. |
-| `patterns/*.{html,css}` | 2 demos, 2 css files. |
+| `components/*.{html,css}` | 32 demos, 28 css files (primitives / atoms). |
+| `patterns/*.{html,css}` | 11 demos, 11 css files (composites / molecules). |
 | `storybook.html` | Rebuilt as shell: `<head>` links `tokens/index.css` + `components/all.css` + `patterns/all.css`; `<style>` reduced to storybook-shell only (no `:root`, no component CSS); `<body>` taken wholesale from the monolith. |
 | `all.css` (both dirs) | Regenerated, alphabetical `@import` order. |
 
@@ -56,20 +56,19 @@ from the v1.4 shared `picker`.
 
 ## Structural notes / decisions
 
-- **Directory by body section.** The monolith moved most demos under
-  `#components` (sidebar, modal, drawer, pickers, tags, report, acc-card…), so
-  those files now live in `components/` rather than `patterns/`. Only demos under
-  the monolith's `#patterns` section (`heavy-table`, `auth-msg`, +
-  `row-form-field.css`) stay in `patterns/`. Both dirs are imported by
-  `assets/styles/app.css` and scanned by both linters, so the move is functional
-  no-op for the build.
-- **Marker-faithful CSS split.** CSS was split on the monolith's
-  `/* ===== NAME ===== */` markers (37 blocks). Where the designer did *not* give
-  a block its own marker, its rules stay under the adjacent marker — e.g.
-  `.empty*` and `.drawer*` rules live in `tags.css` because the monolith groups
-  them there. This mirrors the designer's structure so the next diff-mode update
-  lines up cleanly. `drawer.html` / `empty.html` therefore have no same-named
-  `.css` (and no `@docs` line); their classes are defined in `tags.css`.
+- **Directory = taxonomy, not monolith section.** Placement follows
+  `CLAUDE.frontend.md` (§ ui-kit tree) and `uikit-split.md`: `components/` = atoms
+  (primitives — Button, Input, Card, Badge, Status, form controls…), `patterns/` =
+  composites/molecules. So `sidebar, modal, drawer, entity-picker, tree-picker,
+  tags, report, acc-card, empty` live in **`patterns/`** even though the monolith
+  groups their demos under `#components`. `card` stays a component (atom, per the
+  doc). Both dirs are imported by `assets/styles/app.css` and scanned by both
+  linters, so placement is a no-op for the build — it's about correct taxonomy.
+- **CSS split.** CSS was split on the monolith's `/* ===== NAME ===== */` markers.
+  The monolith folded `.empty*` and `.drawer*` under the TAGS block (no own
+  marker); these were **split out** into `patterns/empty.css` and
+  `patterns/drawer.css` so each component owns its file, and `tags.css` holds only
+  tags. `all.css` in both dirs regenerated alphabetically.
 - **Demo-only references** (no `@react`, expected `ref-no-react-mapping`):
   `modals-live`, `t-sort`, `t-totals`, `t-pg` (table usage rows), `auth-msg`
   (Alert usage). These are compositional examples, not canonical components.
