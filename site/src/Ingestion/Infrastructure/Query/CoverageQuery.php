@@ -39,7 +39,12 @@ final class CoverageQuery
                 THEN substring(r.external_id from '^accrual-by-day:([0-9]{4}-[0-9]{2}-[0-9]{2}):[0-9]{4}-[0-9]{2}-[0-9]{2}$')::date
             ELSE NULL
         END)";
-        $rawRecordDate = "COALESCE(raw_window.day, {$rawExternalDate}, r.fetched_at::date)";
+        $rawSnapshotDate = "(CASE
+            WHEN r.resource_type = 'ozon_finance_accrual_types'
+                THEN COALESCE(r.last_seen_at, r.fetched_at)::date
+            ELSE r.fetched_at::date
+        END)";
+        $rawRecordDate = "COALESCE(raw_window.day, {$rawExternalDate}, {$rawSnapshotDate})";
         $recordDate = "COALESCE(TO_CHAR(ft.occurred_at, 'YYYY-MM-DD'), TO_CHAR({$rawRecordDate}, 'YYYY-MM-DD'))";
         $shopExpression = "COALESCE(NULLIF(ft.shop_ref, ''), r.shop_ref)";
         $dateFilter = <<<'SQL'
@@ -217,7 +222,11 @@ final class CoverageQuery
                     THEN substring(r.external_id from '^accrual-by-day:([0-9]{4}-[0-9]{2}-[0-9]{2}):[0-9]{4}-[0-9]{2}-[0-9]{2}$')::date
                 ELSE NULL
             END,
-            r.fetched_at::date
+            CASE
+                WHEN r.resource_type = 'ozon_finance_accrual_types'
+                    THEN COALESCE(r.last_seen_at, r.fetched_at)::date
+                ELSE r.fetched_at::date
+            END
         )";
         $sql = <<<SQL
             WITH failed_jobs AS (
