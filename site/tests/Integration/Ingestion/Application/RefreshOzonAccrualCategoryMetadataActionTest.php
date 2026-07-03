@@ -15,6 +15,7 @@ use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\TransactionDirection;
 use App\Ingestion\Enum\TransactionType;
 use App\Ingestion\Facade\RawStorageFacade;
+use App\Ingestion\Infrastructure\Query\OzonAccrualRawRecordQuery;
 use App\Ingestion\Repository\ExternalCategoryRepository;
 use App\Ingestion\Repository\FinancialTransactionRepository;
 use App\Ingestion\Repository\IngestRawRecordRepository;
@@ -268,6 +269,7 @@ final class RefreshOzonAccrualCategoryMetadataActionTest extends IntegrationTest
             rawStorageFacade: self::getContainer()->get(RawStorageFacade::class),
             mapper: self::getContainer()->get(OzonAccrualByDayMapper::class),
             entityManager: $entityManager,
+            rawRecordQuery: self::getContainer()->get(OzonAccrualRawRecordQuery::class),
         );
     }
 
