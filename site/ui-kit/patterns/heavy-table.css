@@ -1,0 +1,183 @@
+/* ============ HEAVY-TABLE ============ */
+
+/* In-cell expand button (toggle row breakdown) */
+.t-expand-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-primary);
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  padding: 5px 7px 5px 9px;
+  border-radius: var(--r-2);
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 5px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.t-expand-btn:hover {
+  background: var(--color-primary-tint);
+  border-color: var(--color-primary-selection);
+}
+.t-expand-btn.is-open {
+  background: var(--color-primary-tint);
+  border-color: var(--color-primary-selection);
+}
+
+/* In-cell profit bar (mini sparkline under value) */
+.t-profit-bar {
+  display: block;
+  width: 64px; height: 3px;
+  background: var(--border-soft);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+.t-profit-bar-fill { display: block; height: 100%; border-radius: 2px; }
+.t-profit-bar-fill--up   { background: var(--success-dot); }
+.t-profit-bar-fill--mid  { background: var(--warning-dot); }
+.t-profit-bar-fill--down { background: var(--danger-dot); }
+
+/* In-row breakdown panel — expanded sub-table inside row */
+.t-breakdown {
+  background: var(--bg-row-hover);
+  padding: 16px 20px 18px;
+}
+.t-breakdown-title {
+  font-size: 11.5px; font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+.t-breakdown-head {
+  display: flex; align-items: center;
+  padding: 6px 12px 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 10.5px; font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.06em; text-transform: uppercase;
+}
+.t-breakdown-head .label { flex: 1; }
+.t-breakdown-group { border-bottom: 1px solid var(--border-soft); }
+.t-breakdown-group-row {
+  width: 100%;
+  background: transparent; border: 0;
+  padding: 10px 12px;
+  display: flex; align-items: center; gap: 8px;
+  cursor: pointer;
+  font-family: inherit; text-align: left;
+}
+.t-breakdown-group-row:hover { background: var(--border-soft); }
+.t-breakdown-group-row .label {
+  flex: 1;
+  font-size: 13px; font-weight: 700; color: var(--text-strong);
+}
+.t-breakdown-group-row .total {
+  font-size: 13px; font-weight: 700; color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+.t-breakdown-item {
+  display: flex; align-items: center;
+  padding: var(--s-2) var(--s-3) var(--s-2) var(--s-7);
+  border-top: 1px solid var(--border-soft);
+  font-size: 12.5px; color: var(--text-secondary);
+}
+.t-breakdown-item .label { flex: 1; }
+.t-breakdown-item .value { font-variant-numeric: tabular-nums; }
+
+/* Two-tier sticky table header — tier 1 (group labels) */
+.t-tier1 {
+  display: flex;
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border-soft);
+}
+.t-tier1-group {
+  padding: 6px 12px;
+  font-size: 9.5px; font-weight: 700;
+  color: var(--text-disabled);
+  letter-spacing: 0.08em; text-transform: uppercase;
+  border-left: 1px solid var(--border);
+  white-space: nowrap;
+}
+.t-tier1-group:first-child { border-left: 0; }
+.t-tier1-group--accent { background: var(--color-primary-tint); color: var(--color-primary-hover); }
+
+/* Dual scrollbar (top/bottom synced) */
+.t-scrollbar {
+  overflow-x: auto; overflow-y: hidden;
+  height: 14px;
+  background: var(--bg-row-hover);
+}
+.t-scrollbar--top    { border-bottom: 1px solid var(--border-soft); }
+.t-scrollbar--bottom {
+  position: sticky; bottom: 0; z-index: 9;
+  border-top: 1px solid var(--border-soft);
+}
+
+/* Columns popover (preset radios + per-column checkboxes) */
+.cols-popover {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
+  box-shadow: var(--shadow-menu);
+  width: 280px;
+  overflow: hidden;
+}
+.cols-popover-section {
+  padding: 10px 14px 4px;
+  font-size: 10px; font-weight: 700;
+  color: var(--text-disabled);
+  letter-spacing: 0.06em; text-transform: uppercase;
+}
+.cols-popover-row {
+  width: 100%;
+  background: transparent; border: 0;
+  padding: 7px 14px;
+  display: flex; align-items: center; gap: 10px;
+  cursor: pointer;
+  font-family: inherit; text-align: left;
+  font-size: 13px; color: var(--text-strong);
+}
+.cols-popover-row:hover { background: var(--bg-page); }
+.cols-popover-row .radio {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 1.5px solid var(--border-hover);
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.cols-popover-row.is-active .radio {
+  border-color: var(--color-primary);
+  background: var(--bg-card);
+}
+.cols-popover-row.is-active .radio::after {
+  content: ''; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--color-primary);
+}
+.cols-popover-row .check {
+  width: 16px; height: 16px; border-radius: 4px;
+  border: 1.5px solid var(--border-hover);
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: transparent;
+}
+.cols-popover-row.is-checked .check {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--text-inverse);
+}
+.cols-popover-row .label { flex: 1; }
+.cols-popover-row .count {
+  font-size: 11px; color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+
+/* ============ A11Y · REDUCED MOTION ============
+   Users with vestibular disorders or OS-level "reduce motion" enabled
+   opt out of non-essential animation. Neutralise transitions/animations
+   globally instead of auditing every component. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

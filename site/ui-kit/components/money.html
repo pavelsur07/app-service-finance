@@ -1,48 +1,127 @@
 <!-- @react Money -->
-<!-- @uiKit v1.4 -->
+<!-- @uiKit v2.1 -->
 <!-- @docs ui-kit/components/money.css -->
 
-<div class="row-2col">
-  <!-- 01 Signed transaction -->
-  <div class="money-card">
-    <div class="mc-label">01 · Signed transaction</div>
-    <div><span class="money money--14 money--in">+245&thinsp;000 ₽</span></div>
-    <div><span class="money money--14 money--out">−156&thinsp;200 ₽</span></div>
-    <div class="mc-meta"><b>Где:</b> строки таблицы ДДС, drawer редактирования</div>
-    <div class="mc-spec">14px / 700 / tabular / цветной</div>
-  </div>
+      <div class="row-2col">
+        <!-- 1 Signed transaction -->
+        <div class="money-card">
+          <div class="mc-label">01 · Signed transaction</div>
+          <div><span class="money money--14 money--in">+245&thinsp;000 ₽</span></div>
+          <div><span class="money money--14 money--out">−156&thinsp;200 ₽</span></div>
+          <div class="mc-meta"><b>Где:</b> строки таблицы ДДС, drawer редактирования</div>
+          <div class="mc-spec">14px / 700 / tabular / цветной</div>
+        </div>
 
-  <!-- 02 Balance (unsigned) -->
-  <div class="money-card">
-    <div class="mc-label">02 · Balance (unsigned)</div>
-    <div><span class="money money--22 money--strong">3&thinsp;829&thinsp;930 ₽</span></div>
-    <div class="mc-meta"><b>Где:</b> total balance KPI, account card balance</div>
-    <div class="mc-spec">22px / 700 / tabular / нейтральный — балансы НЕ цветные</div>
-  </div>
+        <!-- 2 Balance (unsigned) -->
+        <div class="money-card">
+          <div class="mc-label">02 · Balance (unsigned)</div>
+          <div><span class="money money--22 money--strong">3&thinsp;829&thinsp;930 ₽</span></div>
+          <div class="mc-meta"><b>Где:</b> total balance KPI, account card balance, итог по группе валют</div>
+          <div class="mc-spec">22px / 700 / tabular / нейтральный — балансы НЕ цветные</div>
+        </div>
 
-  <!-- 08 Zero state -->
-  <div class="money-card">
-    <div class="mc-label">08 · Zero state</div>
-    <div><span class="money money--14 money--muted">0</span></div>
-    <div><span class="money money--14 money--muted">— ₽</span></div>
-    <div class="mc-meta"><b>Где:</b> нулевая активность, отсутствие данных</div>
-    <div class="mc-spec">Цвет --text-faint (#CBD5E1). Em-dash (—), не hyphen</div>
-  </div>
+        <!-- 3 Short metric -->
+        <div class="money-card">
+          <div class="mc-label">03 · Short metric (М/К)</div>
+          <div><span class="money money--14 money--strong">2,0 М ₽</span></div>
+          <div><span class="money money--14 money--strong">500 К ₽</span></div>
+          <div class="mc-meta"><b>Где:</b> ось Y графика, buffer-линия, узкие колонки</div>
+          <div class="mc-spec">10–14px / 500–700 / запятая для десятых · «М», не «млн»</div>
+        </div>
 
-  <!-- 09 Percentage delta -->
-  <div class="money-card">
-    <div class="mc-label">09 · Percentage delta</div>
-    <div><span class="delta delta--up">+12,4%</span> <span class="delta delta--down" style="margin-left:6px">−4,1%</span></div>
-    <div><span class="delta delta--neutral">±0,0%</span></div>
-    <div class="mc-meta"><b>Где:</b> KPI-meta, dashboard deltas</div>
-    <div class="mc-spec">10.5px / 700 / chip с tinted bg / десятичные через запятую</div>
-  </div>
+        <!-- 4 Foreign currency -->
+        <div class="money-card">
+          <div class="mc-label">04 · Foreign currency</div>
+          <div><span class="money money--22 money--strong">$8&thinsp;450</span></div>
+          <div><span class="money money--14 money--strong">€12&thinsp;200</span></div>
+          <div class="mc-meta"><b>Где:</b> валютные счета в AccountsCash</div>
+          <div class="mc-spec">Символ ₽/$/€ всегда префиксом для иностранной, суффиксом для ₽</div>
+        </div>
 
-  <!-- 12 Hero balance dark -->
-  <div class="money-card" style="background:var(--bg-dark); color:#fff">
-    <div class="mc-label" style="color:#94A3B8">12 · Hero balance (dark)</div>
-    <div><span class="money money--28" style="color:#fff">3&thinsp;829&thinsp;930 ₽</span></div>
-    <div class="mc-meta" style="color:#94A3B8"><b style="color:#fff">Где:</b> главный KPI на дашборде</div>
-    <div class="mc-spec" style="color:#94A3B8; border-top-color:rgba(255,255,255,0.1)">28px / 700 / tabular / на тёмной подложке</div>
-  </div>
-</div>
+        <!-- 5 No currency (column-context) -->
+        <div class="money-card">
+          <div class="mc-label">05 · No currency (column-context)</div>
+          <div><span class="money money--14 money--strong">1&thinsp;245&thinsp;230</span></div>
+          <div><span class="money money--14 money--strong">845&thinsp;600</span></div>
+          <div class="mc-meta"><b>Где:</b> ячейки таблицы с отдельной колонкой валюты</div>
+          <div class="mc-spec">Без знака валюты — она вынесена в колонку. tabular-nums</div>
+        </div>
+
+        <!-- 6 Inline meta -->
+        <div class="money-card">
+          <div class="mc-label">06 · Inline meta</div>
+          <div style="font-size:11.5px; color:var(--warning-text); font-weight:600">в обработке: 18&thinsp;200 ₽</div>
+          <div style="font-size:11.5px; color:var(--text-muted)">лимит 200&thinsp;000 ₽</div>
+          <div class="mc-meta"><b>Где:</b> подстрочки в account-card</div>
+          <div class="mc-spec">11.5px / 500–600 / цвет по контексту (warning, muted)</div>
+        </div>
+
+        <!-- 7 Input value (raw) -->
+        <div class="money-card">
+          <div class="mc-label">07 · Input value (raw)</div>
+          <div class="input-wrap" style="max-width:200px">
+            <input class="input" value="95 000" style="text-align:right; font-weight:700; padding-right:32px">
+            <span class="suffix">₽</span>
+          </div>
+          <div class="mc-meta"><b>Где:</b> поля ввода сумм (split-rows, amount-input)</div>
+          <div class="mc-spec">13–18px / 700 / без знака / валюта suffix-иконкой</div>
+        </div>
+
+        <!-- 8 Zero state -->
+        <div class="money-card">
+          <div class="mc-label">08 · Zero state</div>
+          <div><span class="money money--14 money--muted">0</span></div>
+          <div><span class="money money--14 money--muted">— ₽</span></div>
+          <div class="mc-meta"><b>Где:</b> нулевая активность, отсутствие данных</div>
+          <div class="mc-spec">Цвет --text-faint (#CBD5E1). Em-dash (—), не hyphen</div>
+        </div>
+
+        <!-- 9 Percentage delta -->
+        <div class="money-card">
+          <div class="mc-label">09 · Percentage delta</div>
+          <div><span class="delta delta--up">+12,4%</span> <span class="delta delta--down" style="margin-left:6px">−4,1%</span></div>
+          <div><span class="delta delta--neutral">±0,0%</span></div>
+          <div class="mc-meta"><b>Где:</b> KPI-meta, dashboard deltas</div>
+          <div class="mc-spec">10.5px / 700 / chip с tinted bg / десятичные через запятую</div>
+        </div>
+
+        <!-- 10 Day total / subtotal -->
+        <div class="money-card">
+          <div class="mc-label">10 · Day total / subtotal</div>
+          <div style="font-size:11.5px; color:var(--text-tertiary)">итого по дню: <span class="money money--in" style="font-weight:700">+206&thinsp;500 ₽</span></div>
+          <div style="font-size:13.5px; font-weight:700">Всего по RUB: <span class="money money--strong">3&thinsp;079&thinsp;930</span></div>
+          <div class="mc-meta"><b>Где:</b> day-divider, subtotal-row таблицы</div>
+          <div class="mc-spec">Подпись 11.5px тусклая · сумма цветная (если знаковая) / нейтральная (если итог)</div>
+        </div>
+
+        <!-- 11 Rate / annualized -->
+        <div class="money-card">
+          <div class="mc-label">11 · Rate / annualized</div>
+          <div style="font-size:11px; color:var(--success-text); font-weight:700">+12% год.</div>
+          <div style="font-size:11px; color:var(--text-secondary)">ставка 1,99%</div>
+          <div class="mc-meta"><b>Где:</b> депозит-карточка, эквайринг-комиссия</div>
+          <div class="mc-spec">11px / 600–700 / контекстный цвет (success для дохода)</div>
+        </div>
+
+        <!-- 12 Hero balance dark -->
+        <div class="money-card money-card--dark">
+          <div class="mc-label">12 · Hero balance (dark)</div>
+          <div><span class="money money--28" style="color:var(--text-inverse)">3&thinsp;829&thinsp;930 ₽</span></div>
+          <div class="mc-meta"><b>Где:</b> главный KPI на дашборде / Counts (один на странице)</div>
+          <div class="mc-spec">28px / 700 / tabular / на тёмной подложке</div>
+        </div>
+      </div>
+
+      <h3 class="sub-h">Правила (must)</h3>
+      <div class="cb">
+        <ul class="cl-list">
+          <li>Знак минуса — <code class="code-inline">U+2212 (−)</code>. Не <code class="code-inline">U+002D (-)</code>.</li>
+          <li>Разделитель разрядов — <code class="code-inline">U+2009 (&amp;thinsp;)</code>, не обычный пробел.</li>
+          <li>Десятичные — запятая <code class="code-inline">,</code>. Только в коротких форматах и процентах.</li>
+          <li>«млн» и «тыс.» — нет. Используем <b>М</b> и <b>К</b> для коротких форм.</li>
+          <li>₽ — суффикс, всегда после числа с пробелом. $/€ — префикс без пробела.</li>
+          <li>Цвет: <b>signed transactions, deltas</b> — да; <b>балансы, итоги по дню, остаток на конец</b> — нет.</li>
+          <li>Шрифтовое начертание — <code class="code-inline">font-variant-numeric: tabular-nums</code> в любой ячейке таблицы или блоке суммы.</li>
+          <li>Если значение ноль и контекст денежный — приглушённый <code class="code-inline">--text-faint</code>, цифра <code class="code-inline">0</code> или em-dash <code class="code-inline">— ₽</code>.</li>
+        </ul>
+      </div>

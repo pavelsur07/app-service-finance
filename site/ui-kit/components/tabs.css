@@ -1,10 +1,10 @@
-/* ============ TABS ============ */
+/* ============ TAB ============ */
 .tabs {
   display: inline-flex; background: var(--bg-page);
   padding: 3px; border-radius: var(--r-3); gap: 2px;
 }
 .tab {
-  height: 30px; padding: 0 12px;
+  height: 30px; padding: 0 var(--s-3);
   border: 0; background: transparent; border-radius: var(--r-1);
   font-family: inherit; font-size: 12.5px; font-weight: 600;
   color: var(--text-tertiary); cursor: pointer;
@@ -18,3 +18,36 @@
 }
 .tab .count { font-size: 11px; color: var(--text-muted); font-weight: 600; }
 .tab.is-active .count { color: var(--text-tertiary); }
+
+/* Tabs · count with inner dot (status counters) */
+.tab .count--dot {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  background: var(--bg-page);
+  font-weight: 700;
+  line-height: 1.4;
+}
+.tab .count--dot::before {
+  content: ''; width: 4px; height: 4px; border-radius: 50%;
+  background: var(--text-disabled);
+}
+.tab .count--dot.count--danger  { color: var(--danger-text);  background: var(--danger-bg);  }
+.tab .count--dot.count--danger::before  { background: var(--danger-dot); }
+.tab .count--dot.count--warning { color: var(--warning-text); background: var(--warning-bg); }
+.tab .count--dot.count--warning::before { background: var(--warning-dot); }
+.tab .count--dot.count--success { color: var(--success-text); background: var(--success-bg); }
+.tab .count--dot.count--success::before { background: var(--success-dot); }
+.tab.is-active .count--dot { background: var(--bg-card); }
+
+/* Tabs row · auxiliary meta-caption (data-freshness alongside tabs) */
+.tabs-meta {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11.5px; color: var(--text-muted);
+}
+.tabs-meta svg { color: currentColor; flex-shrink: 0; }
+.tabs-meta b { color: var(--text-secondary); font-weight: 600; font-variant-numeric: tabular-nums; }
+.tabs-row {
+  display: flex; align-items: center; gap: 14px;
+  flex-wrap: wrap;
+}

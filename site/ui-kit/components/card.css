@@ -1,0 +1,11 @@
+/* ============ CARD ============ */
+/* Generic content card — base surface for section blocks on pages and
+   drawers. All specialized cards (.acc-card, .money-card, .kpi) share the
+   same visual language via --card-* semantic tokens. */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--r-4);
+  padding: var(--card-padding);
+  box-shadow: var(--card-shadow);
+}

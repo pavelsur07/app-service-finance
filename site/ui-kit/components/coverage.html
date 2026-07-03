@@ -1,0 +1,280 @@
+<!-- @react CoverageMatrix -->
+<!-- @uiKit v2.1 -->
+<!-- @docs ui-kit/components/coverage.css -->
+
+        <span class="demo-label">Header + legend</span>
+        <div class="demo" style="padding:0; background:transparent">
+          <div style="display:flex; align-items:flex-start; gap:20px; flex-wrap:wrap; width:100%;">
+            <div style="flex:1; min-width:240px;">
+              <div style="font-size:15px; font-weight:700; color:var(--text-strong); letter-spacing:-0.015em;">Матрица покрытия загрузок</div>
+              <div style="font-size:12px; color:var(--text-muted); margin-top:3px;">Строки — типы отчётов, колонки — дни периода. В ячейке — число найденных загрузок за день.</div>
+            </div>
+            <div class="cov-legend">
+              <span class="cov-legend-item"><span class="cov-legend-sw cov-legend-sw--ok">1</span>Все источники</span>
+              <span class="cov-legend-item"><span class="cov-legend-sw cov-legend-sw--partial">1</span>Частично</span>
+              <span class="cov-legend-item"><span class="cov-legend-sw cov-legend-sw--err">!</span>Ошибка</span>
+              <span class="cov-legend-item"><span class="cov-legend-sw cov-legend-sw--empty">—</span>Нет загрузок</span>
+            </div>
+          </div>
+        </div>
+
+        <span class="demo-label">Matrix · 30 дней · 4 типа ресурсов · day 27 = today · горизонтальная прокрутка</span>
+        <div class="demo" style="padding:0; background:transparent">
+          <div class="coverage" style="width:100%;">
+            <div class="coverage-scroll">
+              <div class="coverage-grid" style="--cov-days:30; --cov-label-w:260px;">
+                <!-- Header -->
+                <div class="cov-corner">Тип ресурса</div>
+                <div class="cov-day">01</div>
+                <div class="cov-day">02</div>
+                <div class="cov-day">03</div>
+                <div class="cov-day">04</div>
+                <div class="cov-day">05</div>
+                <div class="cov-day cov-day--weekend">06</div>
+                <div class="cov-day cov-day--weekend">07</div>
+                <div class="cov-day">08</div>
+                <div class="cov-day">09</div>
+                <div class="cov-day">10</div>
+                <div class="cov-day">11</div>
+                <div class="cov-day">12</div>
+                <div class="cov-day cov-day--weekend">13</div>
+                <div class="cov-day cov-day--weekend">14</div>
+                <div class="cov-day">15</div>
+                <div class="cov-day">16</div>
+                <div class="cov-day">17</div>
+                <div class="cov-day">18</div>
+                <div class="cov-day">19</div>
+                <div class="cov-day cov-day--weekend">20</div>
+                <div class="cov-day cov-day--weekend">21</div>
+                <div class="cov-day">22</div>
+                <div class="cov-day">23</div>
+                <div class="cov-day">24</div>
+                <div class="cov-day">25</div>
+                <div class="cov-day">26</div>
+                <div class="cov-day cov-day--today">27</div>
+                <div class="cov-day cov-day--weekend">28</div>
+                <div class="cov-day">29</div>
+                <div class="cov-day">30</div>
+
+                <!-- Row 1: Ozon by day -->
+                <div class="cov-label">
+                  <div class="mp-mark mp-mark--md mp-mark--ozon">Oz</div>
+                  <div class="cov-label-text">
+                    <div class="cov-label-title">Озон · Начисления по дням</div>
+                    <div class="cov-label-tech">ozon_finance_accrual_by_day</div>
+                  </div>
+                </div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--future">·</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--future">·</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--future">·</div></div>
+
+                <!-- Row 2: Ozon types — mostly empty -->
+                <div class="cov-label">
+                  <div class="mp-mark mp-mark--md mp-mark--ozon">Oz</div>
+                  <div class="cov-label-text">
+                    <div class="cov-label-title">Озон · Справочник типов начислений</div>
+                    <div class="cov-label-tech">ozon_finance_accrual_types</div>
+                  </div>
+                  <div class="cov-label-counts">
+                    <span class="cov-count cov-count--warn">1</span>
+                  </div>
+                </div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--partial">1<span class="cov-cell-dot cov-cell-dot--warn"></span></div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--empty">—</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--future">·</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--future">·</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--future">·</div></div>
+
+                <!-- Row 3: WB sales — has err + partial -->
+                <div class="cov-label">
+                  <div class="mp-mark mp-mark--md mp-mark--wb">WB</div>
+                  <div class="cov-label-text">
+                    <div class="cov-label-title">Wildberries · Детальный отчёт о продажах</div>
+                    <div class="cov-label-tech">wildberries_finance_sales_report_detailed</div>
+                  </div>
+                  <div class="cov-label-counts">
+                    <span class="cov-count cov-count--err">1</span>
+                    <span class="cov-count cov-count--warn">1</span>
+                  </div>
+                </div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">2</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">3</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">2</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">2</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">3</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">2</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">2</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">3</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">4</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">3</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">2</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">2</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">2</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">3</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">2</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">2</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">4</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--err">!<span class="cov-cell-dot cov-cell-dot--err"></span></div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">2</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">2</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">3</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">2</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">2</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">3</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">2</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">2</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--partial">1<span class="cov-cell-dot cov-cell-dot--warn"></span></div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--future">·</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--future">·</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--future">·</div></div>
+
+                <!-- Row 4: Megamarket -->
+                <div class="cov-label">
+                  <div class="mp-mark mp-mark--md mp-mark--megamarket">ММ</div>
+                  <div class="cov-label-text">
+                    <div class="cov-label-title">Мегамаркет · Отчёт по комиссиям</div>
+                    <div class="cov-label-tech">megamarket_commissions_report</div>
+                  </div>
+                </div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--ok">1</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--future">·</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--future">·</div></div>
+                <div class="cov-cellwrap"><div class="cov-cell cov-cell--future">·</div></div>
+
+                <!-- Subtotal row -->
+                <div class="cov-total-label">
+                  <div class="mp-mark mp-mark--md" style="background:var(--bg-page); color:var(--text-secondary); border:1px solid var(--border-soft);">Σ</div>
+                  <div class="u-flex-1">
+                    <div style="font-size:12.5px; font-weight:700; color:var(--text-strong);">Всего загрузок за день</div>
+                    <div style="font-size:10.5px; color:var(--text-muted);">сумма по всем типам ресурсов</div>
+                  </div>
+                </div>
+                <div class="cov-total-cell">4</div>
+                <div class="cov-total-cell">5</div>
+                <div class="cov-total-cell">4</div>
+                <div class="cov-total-cell">4</div>
+                <div class="cov-total-cell">5</div>
+                <div class="cov-total-cell">4</div>
+                <div class="cov-total-cell">4</div>
+                <div class="cov-total-cell">5</div>
+                <div class="cov-total-cell">6</div>
+                <div class="cov-total-cell">5</div>
+                <div class="cov-total-cell">4</div>
+                <div class="cov-total-cell">4</div>
+                <div class="cov-total-cell">4</div>
+                <div class="cov-total-cell">5</div>
+                <div class="cov-total-cell">4</div>
+                <div class="cov-total-cell">4</div>
+                <div class="cov-total-cell">6</div>
+                <div class="cov-total-cell">2</div>
+                <div class="cov-total-cell">4</div>
+                <div class="cov-total-cell">4</div>
+                <div class="cov-total-cell">5</div>
+                <div class="cov-total-cell">4</div>
+                <div class="cov-total-cell">4</div>
+                <div class="cov-total-cell">6</div>
+                <div class="cov-total-cell">5</div>
+                <div class="cov-total-cell">4</div>
+                <div class="cov-total-cell">3</div>
+                <div class="cov-total-cell cov-total-cell--empty">·</div>
+                <div class="cov-total-cell cov-total-cell--empty">·</div>
+                <div class="cov-total-cell cov-total-cell--empty">·</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <span class="demo-label">Cell variants</span>
+        <div class="demo demo--center" style="gap:18px; flex-wrap:wrap;">
+          <span style="display:inline-flex; align-items:center; gap:8px; font-size:11.5px; color:var(--text-secondary);"><span class="cov-cell cov-cell--ok u-w-32">1</span><code class="code-inline">--ok</code></span>
+          <span style="display:inline-flex; align-items:center; gap:8px; font-size:11.5px; color:var(--text-secondary);"><span class="cov-cell cov-cell--partial u-w-32">1<span class="cov-cell-dot cov-cell-dot--warn"></span></span><code class="code-inline">--partial</code></span>
+          <span style="display:inline-flex; align-items:center; gap:8px; font-size:11.5px; color:var(--text-secondary);"><span class="cov-cell cov-cell--err u-w-32">!<span class="cov-cell-dot cov-cell-dot--err"></span></span><code class="code-inline">--err</code></span>
+          <span style="display:inline-flex; align-items:center; gap:8px; font-size:11.5px; color:var(--text-secondary);"><span class="cov-cell cov-cell--empty u-w-32">—</span><code class="code-inline">--empty</code></span>
+          <span style="display:inline-flex; align-items:center; gap:8px; font-size:11.5px; color:var(--text-secondary);"><span class="cov-cell cov-cell--future u-w-32">·</span><code class="code-inline">--future</code></span>
+        </div>
+
+        <span class="demo-label">Do / Don't</span>
+        <div class="demo demo--column" style="gap:6px;">
+          <div class="cb-note">Число в ячейке = количество найденных загрузок/документов за день. Больше 99 — показывай <code class="code-inline">99+</code>.</div>
+          <div class="cb-note">В колонке «Тип ресурса» используй <code class="code-inline">.mp-mark</code> / <code class="code-inline">.bank-mark</code> + человекочитаемое название + технический id моноширинным.</div>
+          <div class="cb-note">Не подменяй матрицей обычную таблицу — её роль строго «дни × ресурс», не «строки данных».</div>
+          <div class="cb-note">Не показывай число в <code class="code-inline">--err</code> (только «!») или в <code class="code-inline">--future</code> (только «·») — статус важнее числа.</div>
+        </div>

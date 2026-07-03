@@ -1,4 +1,4 @@
-/* ============ REPORT (period grid) ============ */
+/* ============ REPORT ============ */
 /* Scrollable, sticky-left label column. Each row is its own grid:
    var(--r-label-w, 300px) · repeat(var(--r-periods, 4), 1fr) · var(--r-total-w, 150px) */
 .report {
@@ -42,7 +42,7 @@
 .r-row--balance .r-label,
 .r-row--net .r-label,
 .r-row--grand .r-label,
-.r-row--closing .r-label   { padding-top: 12px; padding-bottom: 12px; border-right-color: var(--border); }
+.r-row--closing .r-label   { padding-top: var(--s-3); padding-bottom: var(--s-3); border-right-color: var(--border); }
 .r-row--section .r-label,
 .r-row--net .r-label       { border-left: 3px solid var(--r-accent, var(--color-primary)); padding-left: 14px; }
 .r-row--closing .r-label   { border-right-color: var(--border-dark); padding: 14px 18px; }
@@ -91,7 +91,7 @@
 .r-row--net .r-cell,
 .r-row--balance .r-cell,
 .r-row--grand .r-cell    { padding: 10px 12px; border-right-color: var(--border); }
-.r-row--closing .r-cell  { padding: 12px; border-right-color: var(--border-dark); }
+.r-row--closing .r-cell  { padding: var(--s-3); border-right-color: var(--border-dark); }
 .r-cell-val { font-size: 12.5px; font-weight: 500; color: var(--text-strong); font-variant-numeric: tabular-nums; }
 .r-cell-val--group,
 .r-row--section .r-cell-val,

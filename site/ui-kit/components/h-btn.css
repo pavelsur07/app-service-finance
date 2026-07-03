@@ -1,0 +1,23 @@
+/* ============ HEADER-BUTTON ============ */
+.h-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 34px; padding: 0 var(--s-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
+  background: var(--bg-card);
+  color: var(--text-strong);
+  font-family: inherit; font-size: var(--font-12_5); font-weight: 600;
+  cursor: pointer;
+}
+.h-btn:hover { background: var(--bg-page); border-color: var(--border-hover); }
+.h-btn svg { color: var(--text-secondary); flex-shrink: 0; }
+.h-btn--icon {
+  width: 34px; padding: 0; justify-content: center;
+  color: var(--text-secondary); position: relative;
+}
+.h-btn--icon:hover { color: var(--text-strong); }
+.h-btn--icon .dot {
+  position: absolute; top: -3px; right: -3px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--danger-dot); border: 2px solid var(--bg-card);
+}

@@ -1,0 +1,14 @@
+/* ============ CHECKBOX ============ */
+.checkbox {
+  width: 14px; height: 14px; margin: 0;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.checkbox:disabled { cursor: not-allowed; opacity: 0.55; }
+.checkbox-label {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: var(--font-13); color: var(--text-strong);
+  cursor: pointer; user-select: none;
+}
+.checkbox-label:has(.checkbox:disabled) { cursor: not-allowed; color: var(--text-muted); }

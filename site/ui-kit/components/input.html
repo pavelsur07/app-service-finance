@@ -1,42 +1,79 @@
 <!-- @react Input -->
-<!-- @uiKit v1.4 -->
+<!-- @uiKit v2.1 -->
 <!-- @docs ui-kit/components/input.css -->
 
-<div class="row-2col">
-  <div class="field">
-    <label class="field-label">Default</label>
-    <input class="input" placeholder="Поиск контрагента…">
-  </div>
-  <div class="field">
-    <label class="field-label">Focus</label>
-    <input class="input" value="Тинькофф Бизнес" style="border-color:var(--color-primary); box-shadow:0 0 0 3px rgba(26,86,219,0.12)">
-  </div>
-  <div class="field">
-    <label class="field-label">Error <span class="req">*</span></label>
-    <input class="input input-error" value="abc">
-    <span class="field-helper error">ИНН должен содержать 10 или 12 цифр</span>
-  </div>
-  <div class="field">
-    <label class="field-label">Disabled</label>
-    <input class="input input-disabled" value="Заблокировано" disabled>
-  </div>
-  <div class="field">
-    <label class="field-label">С prefix</label>
-    <div class="input-wrap">
-      <span class="prefix">₽</span>
-      <input class="input input--prefix" value="245 000">
-    </div>
-  </div>
-  <div class="field">
-    <label class="field-label">С suffix · helper</label>
-    <div class="input-wrap">
-      <input class="input input--suffix" value="1.99">
-      <span class="suffix">%</span>
-    </div>
-    <span class="field-helper">Комиссия за платёжный сервис</span>
-  </div>
-  <div class="field" style="grid-column:1/-1">
-    <label class="field-label">Textarea</label>
-    <textarea class="input" rows="3" placeholder="Комментарий, виден только команде…"></textarea>
-  </div>
-</div>
+        <div class="row-2col">
+          <div class="field">
+            <label class="field-label">Default</label>
+            <input class="input" placeholder="Поиск контрагента…">
+          </div>
+          <div class="field">
+            <label class="field-label">Focus</label>
+            <input class="input is-focus" value="Тинькофф Бизнес">
+          </div>
+          <div class="field">
+            <label class="field-label" for="demo-inn-err">Error <span class="req">*</span></label>
+            <input id="demo-inn-err" class="input input-error" value="abc" aria-invalid="true" aria-describedby="demo-inn-err-msg">
+            <span id="demo-inn-err-msg" class="field-helper error">ИНН должен содержать 10 или 12 цифр</span>
+          </div>
+          <div class="field">
+            <label class="field-label">Disabled</label>
+            <input class="input input-disabled" value="Заблокировано" disabled>
+          </div>
+          <div class="field">
+            <label class="field-label">С prefix</label>
+            <div class="input-wrap">
+              <span class="prefix">₽</span>
+              <input class="input input--prefix" value="245 000">
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label">С suffix · helper</label>
+            <div class="input-wrap">
+              <input class="input input--suffix" value="1.99">
+              <span class="suffix">%</span>
+            </div>
+            <span class="field-helper">Комиссия за платёжный сервис</span>
+          </div>
+          <div class="field" style="grid-column:1/-1">
+            <label class="field-label">Textarea</label>
+            <textarea class="input" rows="3" placeholder="Комментарий, виден только команде…"></textarea>
+          </div>
+        </div>
+
+        <span class="demo-label">Native checkbox · <code class="code-inline">.checkbox</code></span>
+        <div class="demo" style="gap:22px; flex-wrap:wrap;">
+          <label class="checkbox-label"><input type="checkbox" class="checkbox"><span>Не отмечен</span></label>
+          <label class="checkbox-label"><input type="checkbox" class="checkbox" checked><span>Отмечен</span></label>
+          <label class="checkbox-label"><input type="checkbox" class="checkbox" disabled><span>Заблокирован</span></label>
+          <label class="checkbox-label"><input type="checkbox" class="checkbox" checked disabled><span>Отмечен · disabled</span></label>
+        </div>
+
+        <span class="demo-label">Native select · <code class="code-inline">.select</code> / <code class="code-inline">.select--sm</code></span>
+        <div class="form-grid" style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:14px;">
+          <div class="field">
+            <label class="field-label">Default (38)</label>
+            <select class="select">
+              <option>Все транспорты</option>
+              <option>banks_import</option>
+              <option>marketplaces</option>
+              <option>categorize</option>
+              <option>reports</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label">Sm (30) · фильтр в таблице</label>
+            <select class="select select--sm">
+              <option>Все периоды</option>
+              <option>Сегодня</option>
+              <option>Неделя</option>
+              <option>Месяц</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label">Disabled</label>
+            <select class="select" disabled>
+              <option>Заблокировано</option>
+            </select>
+          </div>
+        </div>

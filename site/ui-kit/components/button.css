@@ -1,4 +1,4 @@
-/* ============ BUTTONS ============ */
+/* ============ BUTTON ============ */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   font-family: inherit; cursor: pointer;
@@ -8,18 +8,19 @@
   text-decoration: none;
   transition: background .12s, border-color .12s, color .12s;
 }
-.btn-sm { height: 30px; padding: 0 12px; font-size: var(--font-12_5); border-radius: var(--r-2); }
+.btn-sm { height: 30px; padding: 0 var(--s-3); font-size: var(--font-12_5); border-radius: var(--r-2); }
 .btn-md { height: 36px; padding: 0 14px; font-size: var(--font-13); border-radius: var(--r-3); }
 .btn-lg { height: 44px; padding: 0 18px; font-size: var(--font-14); border-radius: var(--r-3); }
 
-.btn-primary { background: var(--color-primary); color: #fff; border-color: var(--color-primary); box-shadow: var(--shadow-primary); }
-.btn-primary:hover { background: var(--color-primary-hover); border-color: var(--color-primary-hover); }
+.btn-primary { background: var(--button-primary-bg); color: var(--button-primary-text); border-color: var(--button-primary-bg); box-shadow: var(--shadow-primary); }
+.btn-primary:hover { background: var(--button-primary-bg-hover); border-color: var(--button-primary-bg-hover); }
+.btn-primary.is-active { background: var(--button-primary-bg-active); border-color: var(--button-primary-bg-active); }
 
-.btn-secondary { background: var(--bg-card); color: var(--text-strong); border-color: var(--border); }
-.btn-secondary:hover { background: var(--bg-page); border-color: var(--border-hover); }
+.btn-secondary { background: var(--button-secondary-bg); color: var(--button-secondary-text); border-color: var(--button-secondary-border); }
+.btn-secondary:hover { background: var(--button-secondary-bg-hover); border-color: var(--button-secondary-border-hover); }
 
-.btn-ghost { background: transparent; color: var(--text-secondary); }
-.btn-ghost:hover { background: var(--bg-page); color: var(--text-strong); }
+.btn-ghost { background: var(--button-ghost-bg); color: var(--button-ghost-text); }
+.btn-ghost:hover { background: var(--button-ghost-bg-hover); color: var(--text-strong); }
 
 .btn-danger { background: var(--bg-card); color: var(--danger-text); border-color: var(--danger-border); }
 .btn-danger:hover { background: var(--danger-bg); }
@@ -36,9 +37,66 @@
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* state-faked classes for showcase */
-.is-hover.btn-primary { background: var(--color-primary-hover); }
-.is-hover.btn-secondary { background: var(--bg-page); }
-.is-hover.btn-ghost { background: var(--bg-page); }
-.is-active.btn-primary { background: var(--color-primary-active); }
+/* Solid danger / warning · destructive confirm CTAs (kept here as button variants) */
+.btn-danger-solid {
+  background: var(--danger-text); border-color: var(--danger-text);
+  color: var(--text-inverse);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.15) inset, 0 4px 10px var(--shadow-danger-glow);
+}
+.btn-danger-solid:hover { background: var(--danger-text-hover); border-color: var(--danger-text-hover); }
+.btn-warning-solid {
+  background: var(--warning-text); border-color: var(--warning-text);
+  color: var(--text-inverse);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.15) inset, 0 4px 10px var(--shadow-warning-glow);
+}
+.btn-warning-solid:hover { background: var(--warning-text-hover); border-color: var(--warning-text-hover); }
+
+/* Storybook shell · state-faked classes for showcase.
+   .is-focus is a documentation mock — production uses :focus-visible on the
+   real element. Component-specific .is-focus rules render the same visuals
+   the browser would paint when the user tabs to the field. */
+.is-hover.btn-primary { background: var(--button-primary-bg-hover); }
+.is-hover.btn-secondary { background: var(--button-secondary-bg-hover); }
+.is-hover.btn-ghost { background: var(--button-ghost-bg-hover); }
+.is-active.btn-primary { background: var(--button-primary-bg-active); }
 .is-focus { outline: 3px solid var(--focus-ring-primary); outline-offset: 0; }
+.input.is-focus,
+.textarea.is-focus,
+.select.is-focus { border-color: var(--input-border-focus); box-shadow: 0 0 0 3px var(--input-focus-ring); outline: none; }
+
+/* Storybook shell · component-adjacent documentation helpers */
+.chip__count { color: var(--text-disabled); font-weight: 600; margin-left: 2px; }
+
+/* Report-row accent modifiers — set --r-accent from semantic tokens
+   so demos don't leak raw hex through inline styles. */
+.r-row--income   { --r-accent: var(--success-dot); }
+.r-row--expenses { --r-accent: var(--danger-dot); }
+.r-row--projects { --r-accent: var(--color-primary); }
+
+/* Money-card dark variant — used by the "Hero balance (dark)" tile in the
+   Money reference. Inverts label/meta/spec colors against --bg-dark. */
+.money-card.money-card--dark { background: var(--bg-dark); color: var(--text-inverse); }
+.money-card.money-card--dark .mc-label,
+.money-card.money-card--dark .mc-meta,
+.money-card.money-card--dark .mc-spec { color: var(--text-disabled); }
+.money-card.money-card--dark .mc-meta b { color: var(--text-inverse); }
+.money-card.money-card--dark .mc-spec { border-top-color: rgba(255,255,255,0.10); }
+
+/* Storybook shell · layout utilities.
+   Bail-out classes for tiny one-off adjustments in demos and drawer/modal
+   heads — flex-grow spacer, right-align on a th. Prefer proper flex/grid
+   layout in production; utilities exist to keep storybook HTML clean of
+   `class="u-flex-1"` / `style="text-align:right"` inline noise. */
+.u-flex-1     { flex: 1 !important; min-width: 0; }
+.u-text-right { text-align: right !important; }
+.u-w-28       { width: 28px !important; }
+.u-w-32       { width: 32px !important; }
+.u-p-0        { padding: 0 !important; }
+.u-pl-4       { padding-left: var(--s-4); }
+.u-min-w-200  { min-width: 200px; }
+.u-min-w-220  { min-width: 220px; }
+
+/* Storybook shell · inline documentation notes (Do/Don't, Best practice,
+   architecture summaries). Kept out of production components. */
+.cb-note { font-size: var(--font-12_5); color: var(--text-secondary); line-height: 1.5; max-width: 680px; }
+.cb-note--warn { color: var(--text-strong); }

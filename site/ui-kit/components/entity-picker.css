@@ -1,7 +1,7 @@
-/* ============ EntityPicker / TreePicker shared ============ */
+/* ============ ENTITY-PICKER ============ */
 .picker { display: flex; flex-direction: column; max-height: 560px; }
 .picker-search {
-  padding: 0 20px 12px;
+  padding: 0 var(--s-5) var(--s-3);
   border-bottom: 1px solid var(--border-soft);
   position: relative;
 }
@@ -17,7 +17,7 @@
   border-radius: var(--r-3);
   font-family: inherit; font-size: 13px; color: var(--text-strong); outline: none;
 }
-.picker-search input:focus { background: var(--bg-card); border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--focus-ring-input); }
+.picker-search input:focus-visible { background: var(--bg-card); border-color: var(--input-border-focus); box-shadow: 0 0 0 3px var(--input-focus-ring); outline: none; }
 
 .picker-tabs { padding: 10px 20px 0; display: flex; gap: 14px; border-bottom: 1px solid var(--border-soft); }
 .picker-tab {
@@ -35,7 +35,7 @@
   font-size: 10.5px; font-weight: 700;
   color: var(--text-disabled);
   letter-spacing: 0.06em; text-transform: uppercase;
-  padding: 12px 12px 4px;
+  padding: var(--s-3) var(--s-3) var(--s-1);
 }
 .picker-item {
   display: flex; align-items: center; gap: 10px;
@@ -66,17 +66,17 @@
 }
 .picker-item.is-selected .check {
   background: var(--color-primary); border-color: var(--color-primary);
-  display: flex; align-items: center; justify-content: center; color: #fff;
+  display: flex; align-items: center; justify-content: center; color: var(--text-inverse);
 }
 
 .picker-foot {
-  padding: 12px 20px; border-top: 1px solid var(--border);
+  padding: var(--s-3) var(--s-5); border-top: 1px solid var(--border);
   display: flex; align-items: center; gap: 8px;
 }
 .picker-foot .add { color: var(--color-primary); font-weight: 600; }
 
 .picker-breadcrumb {
-  padding: 8px 20px;
+  padding: var(--s-2) var(--s-5);
   background: var(--bg-subtle);
   border-top: 1px solid var(--border-soft);
   font-size: 11.5px; color: var(--text-tertiary);
@@ -84,49 +84,3 @@
 }
 .picker-breadcrumb b { color: var(--text-strong); font-weight: 700; }
 .picker-breadcrumb .sep { color: var(--text-faint); }
-
-/* Tree node */
-.tree-node {
-  display: flex; align-items: center; gap: 8px;
-  padding: 7px 10px;
-  border-radius: var(--r-2);
-  cursor: pointer; border: 0; background: transparent;
-  font-family: inherit; text-align: left; width: 100%;
-  margin-bottom: 1px;
-  position: relative;
-}
-.tree-node:hover { background: var(--bg-page); }
-.tree-node.is-selected { background: var(--bg-row-selected); }
-.tree-node.is-disabled { cursor: not-allowed; }
-.tree-node.is-disabled .tn-name { color: var(--text-tertiary); font-weight: 600; }
-.tree-node .chev {
-  width: 14px; height: 14px;
-  display: inline-flex; align-items: center; justify-content: center;
-  color: var(--text-muted); flex-shrink: 0;
-  transition: transform .15s;
-}
-.tree-node.is-collapsed .chev { transform: rotate(-90deg); }
-.tree-node .chev-spacer { width: 14px; flex-shrink: 0; }
-.tree-node .tn-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.tree-node .tn-name {
-  flex: 1; min-width: 0; font-size: 13px; color: var(--text-strong); font-weight: 500;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.tree-node .tn-name mark { background: var(--warning-bg); color: var(--warning-text); border-radius: 2px; padding: 0 2px; font-weight: 700; }
-.tree-node.is-selected .tn-name { font-weight: 700; color: var(--color-primary-hover); }
-.tree-node .tn-count {
-  font-size: 10.5px; color: var(--text-muted); font-weight: 600;
-  background: var(--bg-page); padding: 1px 7px; border-radius: var(--r-1);
-  font-variant-numeric: tabular-nums;
-}
-.tree-node .tn-amount {
-  font-size: 12px; font-variant-numeric: tabular-nums;
-  color: var(--text-strong); font-weight: 700; letter-spacing: -0.01em;
-}
-.tree-node .tn-check {
-  width: 18px; height: 18px; border-radius: 50%;
-  border: 1.5px solid var(--border);
-  display: flex; align-items: center; justify-content: center;
-  color: transparent;
-}
-.tree-node.is-selected .tn-check { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }

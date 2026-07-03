@@ -1,23 +1,25 @@
-/* ============ INPUTS ============ */
+/* ============ INPUT ============ */
 .input {
   width: 100%; height: 38px;
-  padding: 0 12px;
-  border: 1px solid var(--border); border-radius: var(--r-3);
-  background: var(--bg-card);
+  padding: 0 var(--s-3);
+  border: 1px solid var(--input-border); border-radius: var(--r-3);
+  background: var(--input-bg);
   font-family: inherit; font-size: var(--font-13);
-  color: var(--text-strong);
+  color: var(--input-text);
   outline: none;
 }
-.input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--focus-ring-input); }
-.input::placeholder { color: var(--text-muted); }
-.input-error { border-color: var(--danger-dot); box-shadow: 0 0 0 3px var(--focus-ring-danger); }
+.input:focus-visible { border-color: var(--input-border-focus); box-shadow: 0 0 0 3px var(--input-focus-ring); outline: none; }
+.input::placeholder { color: var(--input-placeholder); }
+.input.is-error,
+.input-error,
+.select.is-error { border-color: var(--input-border-error); box-shadow: 0 0 0 3px var(--input-error-ring); }
 .input-disabled { background: var(--bg-page); color: var(--text-muted); cursor: not-allowed; }
 
 .field { display: flex; flex-direction: column; gap: 5px; }
-.field-label { font-size: var(--font-11_5); color: var(--text-tertiary); font-weight: 600; }
-.field-label .req { color: var(--danger-dot); margin-left: 2px; }
-.field-helper { font-size: var(--font-11); color: var(--text-muted); }
-.field-helper.error { color: var(--danger-text); }
+.field-label { font-size: var(--font-11_5); color: var(--form-label-text); font-weight: 600; }
+.field-label .req { color: var(--form-required-mark); margin-left: 2px; }
+.field-helper { font-size: var(--font-11); color: var(--form-helper-text); }
+.field-helper.error { color: var(--form-error-text); }
 
 .input-wrap { position: relative; }
 .input-wrap .prefix, .input-wrap .suffix {
@@ -27,7 +29,7 @@
 }
 .input-wrap .prefix { left: 12px; }
 .input-wrap .suffix { right: 12px; }
-.input-wrap .input--prefix { padding-left: 32px; }
+.input-wrap .input--prefix { padding-left: var(--s-7); }
 .input-wrap .input--suffix { padding-right: 36px; }
 
 textarea.input { height: auto; min-height: 64px; padding-top: 10px; padding-bottom: 10px; resize: vertical; line-height: 1.5; }

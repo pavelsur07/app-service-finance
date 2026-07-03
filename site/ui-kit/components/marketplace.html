@@ -1,0 +1,39 @@
+<!-- @react MarketplaceBadge -->
+<!-- @uiKit v2.1 -->
+<!-- @docs ui-kit/components/marketplace.css -->
+
+        <span class="demo-label">Mark · размеры (sm 24 · md 28 · lg 32 · circle)</span>
+        <div class="demo demo--center">
+          <div class="mp-mark mp-mark--sm mp-mark--ozon">Oz</div>
+          <div class="mp-mark mp-mark--md mp-mark--ozon">Oz</div>
+          <div class="mp-mark mp-mark--lg mp-mark--ozon">Oz</div>
+          <div class="mp-mark mp-mark--md mp-mark--circle mp-mark--ozon">Oz</div>
+        </div>
+        <span class="demo-label">Все маркетплейсы · md (default)</span>
+        <div class="demo demo--center">
+          <div class="mp-mark mp-mark--md mp-mark--ozon">Oz</div>
+          <div class="mp-mark mp-mark--md mp-mark--wb">WB</div>
+          <div class="mp-mark mp-mark--md mp-mark--yamarket">ЯМ</div>
+          <div class="mp-mark mp-mark--md mp-mark--megamarket">ММ</div>
+        </div>
+        <span class="demo-label">Full badge (mark + название + токен)</span>
+        <div class="demo">
+          <div class="mp-badge"><div class="mp-mark mp-mark--lg mp-mark--ozon">Oz</div><div><div class="mp-name">Озон</div><div class="mp-token">--mp-ozon</div></div></div>
+          <div class="mp-badge"><div class="mp-mark mp-mark--lg mp-mark--wb">WB</div><div><div class="mp-name">Wildberries</div><div class="mp-token">--mp-wb</div></div></div>
+          <div class="mp-badge"><div class="mp-mark mp-mark--lg mp-mark--yamarket">ЯМ</div><div><div class="mp-name">Яндекс Маркет</div><div class="mp-token">--mp-yamarket</div></div></div>
+          <div class="mp-badge"><div class="mp-mark mp-mark--lg mp-mark--megamarket">ММ</div><div><div class="mp-name">Мегамаркет</div><div class="mp-token">--mp-megamarket</div></div></div>
+        </div>
+        <span class="demo-label">Inline chip (mark 16 + название) — для строк операций рядом с суммой</span>
+        <div class="demo">
+          <span class="mp-chip"><span class="mp-mark mp-mark--ozon">Oz</span>Озон</span>
+          <span class="mp-chip"><span class="mp-mark mp-mark--wb">WB</span>Wildberries</span>
+          <span class="mp-chip"><span class="mp-mark mp-mark--yamarket">ЯМ</span>Яндекс Маркет</span>
+          <span class="mp-chip"><span class="mp-mark mp-mark--megamarket">ММ</span>Мегамаркет</span>
+        </div>
+        <span class="demo-label">Do / Don't</span>
+        <div class="demo demo--column" style="gap:6px;">
+          <div class="cb-note">Инициалы — 1–2 буквы (Oz, WB, ЯМ, ММ). Без эмодзи и без SVG-логотипов внутри mark.</div>
+          <div class="cb-note">Новый маркетплейс — пара токенов <code class="code-inline">--mp-&lt;id&gt;</code> + <code class="code-inline">--mp-&lt;id&gt;-fg</code> в <code class="code-inline">:root</code>.</div>
+          <div class="cb-note">Не подменяй фирменным цветом семантику ошибок/успеха — это роль <code class="code-inline">.status</code>.</div>
+          <div class="cb-note">Не выводи mark без подписи в основном UI — только в плотных таблицах с контекстом в той же строке.</div>
+        </div>

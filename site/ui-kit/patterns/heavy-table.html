@@ -1,0 +1,173 @@
+<!-- @react HeavyTable -->
+<!-- @uiKit v2.1 -->
+<!-- @docs ui-kit/patterns/heavy-table.css -->
+
+        <!-- Architecture summary -->
+        <div style="background:var(--bg-page); border-radius:var(--r-3); padding:16px 20px; margin-bottom:14px; font-size:12.5px; color:var(--text-secondary); line-height:1.75;">
+          <div style="font-size:13px; font-weight:700; color:var(--text-strong); margin-bottom:6px;">Архитектура (снаружи внутрь)</div>
+          <div><b style="color:var(--text-strong);">1.</b> <code class="code-inline">.app-header</code> + sticky thead под ней (<code class="code-inline">top: var(--app-header-height)</code>)</div>
+          <div><b style="color:var(--text-strong);">2.</b> Двухярусная sticky-шапка: верхний tier — группы колонок (<code class="code-inline">.t-tier1</code>), нижний — сами колонки</div>
+          <div><b style="color:var(--text-strong);">3.</b> Sticky-left колонка (SKU) + sticky-right колонка (Прибыль) + горизонтально скроллящая середина</div>
+          <div><b style="color:var(--text-strong);">4.</b> Sync'нутый горизонтальный скроллбар сверху (<code class="code-inline">.t-scrollbar--top</code>) + sticky-viewport снизу (<code class="code-inline">.t-scrollbar--bottom</code>)</div>
+          <div><b style="color:var(--text-strong);">5.</b> <code class="code-inline">.t-row--totals</code> в конце (Decision 21)</div>
+          <div><b style="color:var(--text-strong);">6.</b> <code class="code-inline">.t-pagination</code> под таблицей</div>
+          <div style="margin-top:10px;"><b style="color:var(--text-strong);">Контролы:</b> <code class="code-inline">.cols-popover</code> (видимость колонок + пресеты), <code class="code-inline">.tabs</code> (фильтрация по ABC-классу), <code class="code-inline">.t-sort-th</code> на сортируемых колонках</div>
+          <div><b style="color:var(--text-strong);">Внутри ячеек:</b> <code class="code-inline">.mp-mark--sm</code>, <code class="code-inline">.abc-pill</code>, <code class="code-inline">.t-expand-btn</code>, <code class="code-inline">.t-profit-bar</code>, <code class="code-inline">.money</code></div>
+          <div><b style="color:var(--text-strong);">Развёрнутая строка:</b> <code class="code-inline">.t-breakdown</code> — sub-таблица внутри строки с группированными подсуммами</div>
+        </div>
+
+        <!-- 2.1 — Two-tier sticky header -->
+        <span class="demo-label">2.1 — Two-tier sticky header (группы + колонки)</span>
+        <div class="demo" style="padding:0; display:block;">
+          <div style="background:var(--bg-row-hover); border:1px solid var(--border); border-radius:var(--r-3); overflow:hidden;">
+            <div class="t-tier1">
+              <div class="t-tier1-group" style="width:130px;">Идентификатор</div>
+              <div class="t-tier1-group" style="width:160px;">Товар</div>
+              <div class="t-tier1-group" style="width:130px;">Продажи</div>
+              <div class="t-tier1-group" style="width:180px;">Себестоимость</div>
+              <div class="t-tier1-group" style="width:180px;">Маркетинг</div>
+              <div class="t-tier1-group t-tier1-group--accent" style="flex:1; text-align:right;">Итог</div>
+            </div>
+            <div style="display:flex;">
+              <div style="width:130px; padding:10px 12px; font-size:10.5px; font-weight:700; color:var(--text-muted); letter-spacing:0.06em; text-transform:uppercase;">SKU</div>
+              <div style="width:160px; padding:10px 12px; font-size:10.5px; font-weight:700; color:var(--text-muted); letter-spacing:0.06em; text-transform:uppercase;">Наименование</div>
+              <div class="t-sort-th is-active" style="width:130px; padding:10px 12px; font-size:10.5px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; text-align:right; cursor:pointer;">Выручка</div>
+              <div style="width:180px; padding:10px 12px; font-size:10.5px; font-weight:700; color:var(--text-muted); letter-spacing:0.06em; text-transform:uppercase; text-align:right;">Себест + Логистика</div>
+              <div style="width:180px; padding:10px 12px; font-size:10.5px; font-weight:700; color:var(--text-muted); letter-spacing:0.06em; text-transform:uppercase; text-align:right;">Комиссия + РР</div>
+              <div style="flex:1; padding:10px 20px 10px 12px; font-size:10.5px; font-weight:700; color:var(--color-primary-hover); letter-spacing:0.06em; text-transform:uppercase; text-align:right; background:var(--color-primary-tint);">Прибыль</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2.2 — In-cell expand button -->
+        <span class="demo-label">2.2 — In-cell expand button (.t-expand-btn)</span>
+        <div class="demo demo--center">
+          <span class="cb-note" style="display:inline;">closed:</span>
+          <button class="t-expand-btn">186&thinsp;240&nbsp;₽
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <span class="cb-note" style="display:inline; margin-left:14px;">open:</span>
+          <button class="t-expand-btn is-open">186&thinsp;240&nbsp;₽
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 15 12 9 18 15"></polyline></svg>
+          </button>
+        </div>
+
+        <!-- 2.3 — In-cell profit bar -->
+        <span class="demo-label">2.3 — In-cell profit bar (.t-profit-bar)</span>
+        <div class="demo">
+          <div style="display:flex; flex-direction:column; align-items:flex-end;">
+            <span class="money money--14 money--strong">288&thinsp;160&nbsp;₽</span>
+            <span class="t-profit-bar"><span class="t-profit-bar-fill t-profit-bar-fill--up" style="width:80%;"></span></span>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:flex-end;">
+            <span class="money money--14 money--strong">102&thinsp;855&nbsp;₽</span>
+            <span class="t-profit-bar"><span class="t-profit-bar-fill t-profit-bar-fill--mid" style="width:35%;"></span></span>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:flex-end;">
+            <span class="money money--14 money--out">−24&thinsp;320&nbsp;₽</span>
+            <span class="t-profit-bar"><span class="t-profit-bar-fill t-profit-bar-fill--down" style="width:12%;"></span></span>
+          </div>
+        </div>
+
+        <!-- 2.4 — In-row breakdown panel -->
+        <span class="demo-label">2.4 — In-row breakdown panel (.t-breakdown)</span>
+        <div class="demo" style="padding:0; display:block; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r-4); overflow:hidden;">
+          <div class="t-breakdown">
+            <div class="t-breakdown-title">Прочие затраты (без комиссии и логистики)</div>
+            <div class="t-breakdown-head">
+              <span class="label">Группа / категория</span>
+              <span>Начислено</span>
+            </div>
+            <div class="t-breakdown-group">
+              <button class="t-breakdown-group-row">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                <span class="label">Услуги партнёров</span>
+                <span class="total">134&thinsp;093&nbsp;₽</span>
+              </button>
+              <div class="t-breakdown-item"><span class="label">Last mile Ozon</span><span class="value">36&thinsp;070&nbsp;₽</span></div>
+              <div class="t-breakdown-item"><span class="label">Эквайринг Ozon</span><span class="value">94&thinsp;803&nbsp;₽</span></div>
+              <div class="t-breakdown-item"><span class="label">Перевыставление возврата ПВЗ</span><span class="value">2&thinsp;280&nbsp;₽</span></div>
+            </div>
+            <div class="t-breakdown-group">
+              <button class="t-breakdown-group-row">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg>
+                <span class="label">Услуги FBO</span>
+                <span class="total">33&thinsp;523&nbsp;₽</span>
+              </button>
+            </div>
+            <div class="t-breakdown-group" style="border-bottom:0;">
+              <button class="t-breakdown-group-row">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg>
+                <span class="label">Другие услуги и штрафы</span>
+                <span class="total">18&thinsp;624&nbsp;₽</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2.5 — Columns popover -->
+        <span class="demo-label">2.5 — Columns popover (.cols-popover) — пресеты + видимость</span>
+        <div class="demo">
+          <div class="cols-popover">
+            <div class="cols-popover-section">Готовые пресеты</div>
+            <button class="cols-popover-row is-active">
+              <span class="radio"></span>
+              <span class="label">Все колонки</span>
+              <span class="count">21</span>
+            </button>
+            <button class="cols-popover-row">
+              <span class="radio"></span>
+              <span class="label">Только маржа и ROI</span>
+              <span class="count">9</span>
+            </button>
+            <button class="cols-popover-row">
+              <span class="radio"></span>
+              <span class="label">Только продажи</span>
+              <span class="count">7</span>
+            </button>
+            <div class="cols-popover-section" style="margin-top:6px; border-top:1px solid var(--border-soft); padding-top:10px;">Колонки → Себестоимость</div>
+            <button class="cols-popover-row is-checked">
+              <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+              <span class="label">Себестоимость</span>
+            </button>
+            <button class="cols-popover-row is-checked">
+              <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+              <span class="label">Себест. ед.</span>
+            </button>
+            <button class="cols-popover-row">
+              <span class="check"></span>
+              <span class="label">Кап. р.</span>
+            </button>
+            <button class="cols-popover-row" style="padding-bottom:10px;">
+              <span class="check"></span>
+              <span class="label">Ост. шт.</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2.6 — ABC filter tabs -->
+        <span class="demo-label">2.6 — ABC filter tabs — переиспользует .tabs</span>
+        <div class="demo">
+          <div class="tabs">
+            <button class="tab is-active">Все <span class="count">79</span></button>
+            <button class="tab">Звёзды <span class="count">12</span></button>
+            <button class="tab">Внимание <span class="count">8</span></button>
+            <button class="tab">Хвост <span class="count">3</span></button>
+          </div>
+        </div>
+
+        <!-- 2.7 — Dual scrollbar -->
+        <span class="demo-label">2.7 — Dual scrollbar — .t-scrollbar--top + .t-scrollbar--bottom</span>
+        <div class="demo" style="padding:0; display:block;">
+          <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r-3); overflow:hidden;">
+            <div style="padding:12px 16px; font-size:12px; color:var(--text-tertiary);">↑ Top scrollbar — прямо под sticky-шапкой таблицы. ↓ Bottom scrollbar — sticky bottom:0, виден пока таблица в кадре. Оба синхронизированы по scrollLeft в JS.</div>
+            <div class="t-scrollbar t-scrollbar--top"><div style="width:200%; height:1px;"></div></div>
+            <div style="height:80px; display:flex; align-items:center; justify-content:center; background:var(--bg-row-hover); color:var(--text-disabled); font-size:12px;">… таблица скроллит горизонтально …</div>
+            <div class="t-scrollbar t-scrollbar--bottom"><div style="width:200%; height:1px;"></div></div>
+          </div>
+        </div>
+
+        <!-- Canonical implementation reference -->
+        <div style="background:var(--color-primary-tint); border:1px solid var(--color-primary-border); border-radius:var(--r-3); padding:12px 16px; margin-top:14px; font-size:12.5px; color:var(--color-primary-hover); line-height:1.5;">
+          <b>Канонический живой пример —</b> <code class="code-inline">UnitEconomics.dc.html</code>. Не пересобирайте паттерн с нуля — копируйте структуру оттуда и адаптируйте под свои данные. Логика sync скроллбаров, раскрывание строк, ColumnsPopover и ABC-фильтр собраны в <code class="code-inline">class Component extends DCLogic</code>.
+        </div>

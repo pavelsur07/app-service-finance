@@ -1,0 +1,21 @@
+/* ============ APP-HEADER ============ */
+.app-header {
+  display: flex; align-items: stretch;
+  background: var(--app-header-bg);
+  border-bottom: 1px solid var(--app-header-border);
+  height: var(--app-header-height);
+  position: sticky; top: 0; z-index: 30; flex-shrink: 0;
+}
+.app-header-brand {
+  width: 264px; flex-shrink: 0;
+  padding: 0 18px;
+  border-right: 1px solid var(--app-header-border);
+  display: flex; align-items: center;
+}
+.app-header-brand img { display: block; height: 30px; width: auto; max-width: 100%; }
+.app-header-body {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center;
+  padding: 0 28px; gap: 14px;
+}
+.app-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }

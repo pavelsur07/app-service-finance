@@ -1,0 +1,152 @@
+<!-- @react TreePicker -->
+<!-- @uiKit v2.1 -->
+<!-- @docs ui-kit/components/tree-picker.css -->
+
+        <span class="demo-label">Инстанс 1 — Категория ДДС (с агрегатами)</span>
+        <div class="demo demo--hero" style="justify-content:center;">
+          <div class="mdl">
+            <div class="mdl-head">
+              <div class="u-flex-1">
+                <h3>Выбор категории ДДС</h3>
+                <div class="sub">Серые разделы — для группировки; выбираются цветные конечные статьи</div>
+              </div>
+              <button class="btn btn-sm btn-ghost u-w-28 u-p-0" aria-label="Закрыть"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+            </div>
+            <div class="picker">
+              <div class="picker-search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input value="услу" placeholder="Найти статью…">
+              </div>
+              <div class="picker-list" style="max-height:300px;">
+                <button class="tree-node is-disabled">
+                  <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"/></svg></span>
+                  <span class="tn-name">Доходы</span>
+                  <span class="tn-amount" style="color:var(--success-text);">+5&thinsp;670&thinsp;000 ₽</span>
+                </button>
+                <div class="u-pl-4">
+                  <button class="tree-node is-disabled">
+                    <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"/></svg></span>
+                    <span class="tn-name">От клиентов</span>
+                    <span class="tn-amount" style="color:var(--success-text);">+4&thinsp;820&thinsp;450 ₽</span>
+                  </button>
+                  <div class="u-pl-4">
+                    <button class="tree-node is-selected">
+                      <span class="chev-spacer"></span>
+                      <span class="tn-dot" style="background:var(--cat-revenue);"></span>
+                      <span class="tn-name">Оплата за <mark>услу</mark>ги</span>
+                      <span class="tn-amount" style="color:var(--success-text);">+3&thinsp;240&thinsp;000 ₽</span>
+                      <span class="tn-check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>
+                    </button>
+                    <button class="tree-node">
+                      <span class="chev-spacer"></span>
+                      <span class="tn-dot" style="background:var(--cat-revenue);"></span>
+                      <span class="tn-name">Оплата за товары</span>
+                      <span class="tn-amount" style="color:var(--success-text);">+1&thinsp;580&thinsp;450 ₽</span>
+                      <span class="tn-check"></span>
+                    </button>
+                  </div>
+                  <button class="tree-node is-collapsed is-disabled">
+                    <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"/></svg></span>
+                    <span class="tn-name">От партнёров</span>
+                    <span class="tn-amount" style="color:var(--success-text);">+849&thinsp;550 ₽</span>
+                  </button>
+                </div>
+                <button class="tree-node is-collapsed is-disabled">
+                  <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"/></svg></span>
+                  <span class="tn-name">Расходы</span>
+                  <span class="tn-amount" style="color:var(--danger-text);">−2&thinsp;968&thinsp;720 ₽</span>
+                </button>
+              </div>
+              <div class="picker-breadcrumb">
+                <span>Выбрано:</span>
+                <b>Доходы</b><span class="sep">›</span>
+                <b>От клиентов</b><span class="sep">›</span>
+                <b style="color:var(--color-primary-hover);">Оплата за услуги</b>
+              </div>
+            </div>
+            <div class="mdl-foot">
+              <button class="btn btn-md btn-secondary">Отмена</button>
+              <button class="btn btn-md btn-primary">Выбрать</button>
+            </div>
+          </div>
+        </div>
+
+        <span class="demo-label">Инстанс 2 — Статья ОПиУ (multi-level, без агрегатов)</span>
+        <div class="demo demo--hero" style="justify-content:center;">
+          <div class="mdl">
+            <div class="mdl-head">
+              <div class="u-flex-1">
+                <h3>Выбор статьи ОПиУ</h3>
+                <div class="sub">Куда отнести в отчёте о прибыли и убытках</div>
+              </div>
+              <button class="btn btn-sm btn-ghost u-w-28 u-p-0" aria-label="Закрыть"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+            </div>
+            <div class="picker">
+              <div class="picker-search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input placeholder="Найти статью…">
+              </div>
+              <div class="picker-list" style="max-height:340px;">
+                <button class="tree-node is-disabled">
+                  <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"/></svg></span>
+                  <span class="tn-name">Выручка</span>
+                  <span class="tn-count">3</span>
+                </button>
+                <div class="u-pl-4">
+                  <button class="tree-node">
+                    <span class="chev-spacer"></span>
+                    <span class="tn-dot" style="background:var(--cat-revenue);"></span>
+                    <span class="tn-name">Выручка от основной деятельности</span>
+                    <span class="tn-check"></span>
+                  </button>
+                  <button class="tree-node">
+                    <span class="chev-spacer"></span>
+                    <span class="tn-dot" style="background:var(--cat-revenue);"></span>
+                    <span class="tn-name">Выручка от прочих услуг</span>
+                    <span class="tn-check"></span>
+                  </button>
+                </div>
+                <button class="tree-node is-disabled">
+                  <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"/></svg></span>
+                  <span class="tn-name">Себестоимость</span>
+                  <span class="tn-count">4</span>
+                </button>
+                <div class="u-pl-4">
+                  <button class="tree-node is-disabled">
+                    <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"/></svg></span>
+                    <span class="tn-name">Прямые расходы</span>
+                  </button>
+                  <div class="u-pl-4">
+                    <button class="tree-node is-selected">
+                      <span class="chev-spacer"></span>
+                      <span class="tn-dot" style="background:var(--cat-services);"></span>
+                      <span class="tn-name">Материалы и сырьё</span>
+                      <span class="tn-check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>
+                    </button>
+                    <button class="tree-node">
+                      <span class="chev-spacer"></span>
+                      <span class="tn-dot" style="background:var(--cat-services);"></span>
+                      <span class="tn-name">Сдельная зарплата</span>
+                      <span class="tn-check"></span>
+                    </button>
+                  </div>
+                  <button class="tree-node is-collapsed is-disabled">
+                    <span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"/></svg></span>
+                    <span class="tn-name">Косвенные расходы</span>
+                    <span class="tn-count">5</span>
+                  </button>
+                </div>
+              </div>
+              <div class="picker-breadcrumb">
+                <span>Выбрано:</span>
+                <b>Себестоимость</b><span class="sep">›</span>
+                <b>Прямые расходы</b><span class="sep">›</span>
+                <b style="color:var(--color-primary-hover);">Материалы и сырьё</b>
+              </div>
+            </div>
+            <div class="mdl-foot">
+              <button class="btn btn-md btn-secondary">Отмена</button>
+              <button class="btn btn-md btn-primary">Выбрать</button>
+            </div>
+          </div>
+        </div>

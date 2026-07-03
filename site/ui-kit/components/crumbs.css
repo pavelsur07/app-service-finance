@@ -1,0 +1,10 @@
+/* ============ BREADCRUMBS ============ */
+.crumbs {
+  display: flex; align-items: center; gap: 6px;
+  font-size: var(--font-14); min-width: 0;
+  flex-wrap: wrap;
+}
+.crumbs a { color: var(--text-tertiary); text-decoration: none; font-weight: 500; }
+.crumbs a:hover { color: var(--color-primary); }
+.crumbs .crumb-current { color: var(--text-strong); font-weight: 700; letter-spacing: -0.005em; }
+.crumbs .crumb-sep { color: var(--text-faint); display: inline-flex; align-items: center; }

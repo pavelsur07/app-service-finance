@@ -1,4 +1,4 @@
-/* ============ DIRECTION (canonical: colored dot) ============ */
+/* ============ DIRECTION ============ */
 .direction {
   display: inline-flex; align-items: center; gap: 7px;
   font-size: 12px; font-weight: 600;
