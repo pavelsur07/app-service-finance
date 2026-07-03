@@ -81,6 +81,10 @@ final class StoredOzonAccrualTypeNameResolver
                 'exceptionClass' => $exception::class,
                 'errorMessage' => $exception->getMessage(),
             ]);
+
+            unset($this->cache[$companyId]);
+
+            return [];
         }
 
         ksort($dictionary);

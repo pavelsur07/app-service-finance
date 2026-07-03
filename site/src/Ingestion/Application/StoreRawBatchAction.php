@@ -90,7 +90,7 @@ final readonly class StoreRawBatchAction
         try {
             $this->entityManager->flush();
         } catch (UniqueConstraintViolationException $exception) {
-            return [$this->recoverConcurrentDuplicate($batch, $hash, $exception)];
+            return [$this->recoverConcurrentDuplicate($batch, $hash, $ndjson, $exception)];
         }
 
         return [$record];
@@ -113,6 +113,7 @@ final readonly class StoreRawBatchAction
     private function recoverConcurrentDuplicate(
         RawBatch $batch,
         string $hash,
+        string $ndjson,
         UniqueConstraintViolationException $exception,
     ): IngestRawRecord {
         $entityManager = $this->entityManager;
@@ -147,7 +148,7 @@ final readonly class StoreRawBatchAction
             throw $exception;
         }
 
-        $this->repairMissingObject($existingRecord, $this->ndjsonCodec->encodeRows($batch->rows));
+        $this->repairMissingObject($existingRecord, $ndjson);
         $entityManager->flush();
 
         return $existingRecord;

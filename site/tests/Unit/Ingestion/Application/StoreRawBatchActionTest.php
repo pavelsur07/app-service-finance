@@ -37,7 +37,9 @@ final class StoreRawBatchActionTest extends TestCase
             externalId: $externalId,
             syncJobId: 'sync-job-1',
             fetchedAt: new \DateTimeImmutable('2026-06-15 10:20:30'),
-            rows: $rows,
+            rows: (static function () use ($rows): \Generator {
+                yield from $rows;
+            })(),
         );
         $codec = new RawNdjsonCodec();
         $hash = hash('sha256', $codec->encodeRows($rows));
