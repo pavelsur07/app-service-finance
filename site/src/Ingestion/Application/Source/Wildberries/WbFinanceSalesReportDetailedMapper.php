@@ -5,14 +5,17 @@ declare(strict_types=1);
 namespace App\Ingestion\Application\Source\Wildberries;
 
 use App\Ingestion\Application\DTO\MappedControlSum;
+use App\Ingestion\Application\DTO\MappedPreviewIssue;
 use App\Ingestion\Application\DTO\MappedTransaction;
+use App\Ingestion\Domain\Contract\PreviewIssueAwareMapperInterface;
 use App\Ingestion\Domain\Contract\RawRecordAwareControlSumMapperInterface;
 use App\Ingestion\Domain\Contract\SourceMapperInterface;
 use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Enum\IngestSource;
+use App\Ingestion\Enum\NormalizationIssueKind;
 use App\Shared\Domain\ValueObject\Money;
 
-final readonly class WbFinanceSalesReportDetailedMapper implements SourceMapperInterface, RawRecordAwareControlSumMapperInterface
+final readonly class WbFinanceSalesReportDetailedMapper implements SourceMapperInterface, RawRecordAwareControlSumMapperInterface, PreviewIssueAwareMapperInterface
 {
     public function __construct(private WbFinanceSalesReportDetailedPreviewMapper $previewMapper)
     {
@@ -39,7 +42,6 @@ final readonly class WbFinanceSalesReportDetailedMapper implements SourceMapperI
     public function map(IngestRawRecord $rawRecord, iterable $rows): array
     {
         $preview = $this->previewMapper->preview($rawRecord->getCompanyId(), $rows);
-        $this->assertPreviewIsWritable($preview);
 
         $transactions = [];
         foreach ($preview->transactions as $transaction) {
@@ -80,7 +82,6 @@ final readonly class WbFinanceSalesReportDetailedMapper implements SourceMapperI
     public function controlSumForRawRecord(IngestRawRecord $rawRecord, iterable $rows): array
     {
         $preview = $this->previewMapper->preview($rawRecord->getCompanyId(), $rows);
-        $this->assertPreviewIsWritable($preview);
 
         $amountsByGroup = [];
         foreach ($preview->transactions as $transaction) {
@@ -103,27 +104,66 @@ final readonly class WbFinanceSalesReportDetailedMapper implements SourceMapperI
         return $controlSums;
     }
 
-    private function assertPreviewIsWritable(WbFinancePreviewResult $preview): void
+    /**
+     * @param iterable<array<string, mixed>> $rows
+     *
+     * @return list<MappedPreviewIssue>
+     */
+    public function previewIssues(IngestRawRecord $rawRecord, iterable $rows): array
     {
-        $mismatches = array_values(array_filter(
-            $preview->rowChecks,
-            static fn (WbFinancePreviewRowCheck $check): bool => 0 !== $check->deltaMinor,
-        ));
-        if ([] !== $mismatches) {
-            $first = $mismatches[0];
+        $preview = $this->previewMapper->preview($rawRecord->getCompanyId(), $rows);
 
-            throw new \RuntimeException(sprintf('WB finance payout check mismatch for row "%s": expected %d, actual %d.', $first->rowKey, $first->expectedNetMinor, $first->actualNetMinor));
+        $issues = [];
+        foreach ($preview->rowChecks as $check) {
+            if (0 === $check->deltaMinor) {
+                continue;
+            }
+
+            $issues[] = new MappedPreviewIssue(
+                operationGroupId: $check->operationGroupId,
+                kind: NormalizationIssueKind::SUM_MISMATCH,
+                details: [
+                    'message' => sprintf(
+                        'WB finance payout check mismatch for row "%s": expected %d, actual %d.',
+                        $check->rowKey,
+                        $check->expectedNetMinor,
+                        $check->actualNetMinor,
+                    ),
+                    'check' => 'wb_payout_check',
+                    'rowKey' => $check->rowKey,
+                    'expectedAmountMinor' => $check->expectedNetMinor,
+                    'actualAmountMinor' => $check->actualNetMinor,
+                    'deltaMinor' => $check->deltaMinor,
+                    'currency' => $check->currency,
+                    'operationGroupId' => $check->operationGroupId,
+                ],
+            );
         }
 
-        $unknownRowsWithAmounts = array_values(array_filter(
-            $preview->unknownRows,
-            static fn (WbFinancePreviewUnknownRow $row): bool => [] !== $row->nonZeroFields,
-        ));
-        if ([] !== $unknownRowsWithAmounts) {
-            $first = $unknownRowsWithAmounts[0];
+        foreach ($preview->unknownRows as $unknownRow) {
+            if ([] === $unknownRow->nonZeroFields) {
+                continue;
+            }
 
-            throw new \RuntimeException(sprintf('WB finance row "%s" has unmapped non-zero fields: %s.', $first->rowKey, implode(', ', $first->nonZeroFields)));
+            $issues[] = new MappedPreviewIssue(
+                operationGroupId: null,
+                kind: NormalizationIssueKind::UNKNOWN_FIELD,
+                details: [
+                    'message' => sprintf(
+                        'WB finance row "%s" has unmapped non-zero fields: %s.',
+                        $unknownRow->rowKey,
+                        implode(', ', $unknownRow->nonZeroFields),
+                    ),
+                    'check' => 'wb_unknown_row',
+                    'rowKey' => $unknownRow->rowKey,
+                    'sellerOperName' => $unknownRow->sellerOperName,
+                    'docTypeName' => $unknownRow->docTypeName,
+                    'nonZeroFields' => $unknownRow->nonZeroFields,
+                ],
+            );
         }
+
+        return $issues;
     }
 
     private function nonEmptyString(mixed $value): ?string

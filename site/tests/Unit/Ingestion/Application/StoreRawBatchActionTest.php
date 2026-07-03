@@ -37,7 +37,9 @@ final class StoreRawBatchActionTest extends TestCase
             externalId: $externalId,
             syncJobId: 'sync-job-1',
             fetchedAt: new \DateTimeImmutable('2026-06-15 10:20:30'),
-            rows: $rows,
+            rows: (static function () use ($rows): \Generator {
+                yield from $rows;
+            })(),
         );
         $codec = new RawNdjsonCodec();
         $hash = hash('sha256', $codec->encodeRows($rows));
@@ -93,6 +95,10 @@ final class StoreRawBatchActionTest extends TestCase
             );
 
         $objectStorage = $this->createMock(ObjectStorageInterface::class);
+        $objectStorage->expects(self::once())
+            ->method('exists')
+            ->with('existing-path.ndjson.gz')
+            ->willReturn(true);
         $objectStorage->expects(self::once())
             ->method('write')
             ->with(
@@ -155,5 +161,79 @@ final class StoreRawBatchActionTest extends TestCase
 
         self::assertSame([$existingRecord], $records);
         self::assertGreaterThan($originalLastSeenAt, $existingRecord->getLastSeenAt());
+    }
+
+    public function testSameHashLatestRecordRepairsMissingStorageObject(): void
+    {
+        $companyId = '11111111-1111-7111-8111-111111111111';
+        $resourceType = 'ozon_finance_accrual_types';
+        $externalId = 'accrual-types';
+        $rows = [['type_id' => 12, 'name' => 'Cross-docking']];
+        $batch = new RawBatch(
+            companyId: $companyId,
+            connectionRef: 'connection-1',
+            shopRef: 'shop-main',
+            source: IngestSource::OZON,
+            resourceType: $resourceType,
+            externalId: $externalId,
+            syncJobId: 'sync-job-1',
+            fetchedAt: new \DateTimeImmutable('2026-07-03 10:20:30'),
+            rows: $rows,
+        );
+        $codec = new RawNdjsonCodec();
+        $existingRecord = new IngestRawRecord(
+            companyId: $companyId,
+            connectionRef: 'connection-1',
+            shopRef: 'shop-main',
+            source: IngestSource::OZON,
+            resourceType: $resourceType,
+            externalId: $externalId,
+            storagePath: 'missing-types.ndjson.gz',
+            hash: hash('sha256', $codec->encodeRows($rows)),
+            byteSize: 42,
+            fetchedAt: new \DateTimeImmutable('2026-06-25 10:20:30'),
+            syncJobId: 'sync-job-previous',
+        );
+
+        $repository = $this->createMock(IngestRawRecordRepository::class);
+        $repository->expects(self::once())
+            ->method('findLatestByCompanySourceExternalId')
+            ->with($companyId, IngestSource::OZON, $resourceType, $externalId)
+            ->willReturn($existingRecord);
+        $repository->expects(self::never())->method('findOneByCompanySourceExternalIdAndHash');
+
+        $objectStorage = $this->createMock(ObjectStorageInterface::class);
+        $objectStorage->expects(self::once())
+            ->method('exists')
+            ->with('missing-types.ndjson.gz')
+            ->willReturn(false);
+        $objectStorage->expects(self::once())
+            ->method('write')
+            ->with(
+                'missing-types.ndjson.gz',
+                self::callback(static fn (string $payload): bool => $rows == array_map(
+                    static fn (string $line): array => json_decode($line, true, 512, JSON_THROW_ON_ERROR),
+                    array_filter(explode("\n", trim((string) gzdecode($payload)))),
+                )),
+            )
+            ->willReturnCallback(static fn (string $path, string $payload): StoredObject => new StoredObject($path, strlen($payload)));
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::never())->method('persist');
+        $entityManager->expects(self::once())->method('flush');
+
+        $managerRegistry = $this->createMock(ManagerRegistry::class);
+        $managerRegistry->expects(self::never())->method('resetManager');
+
+        $action = new StoreRawBatchAction(
+            $repository,
+            $objectStorage,
+            $codec,
+            new RawStoragePathBuilder(new PathSegmentNormalizer()),
+            $entityManager,
+            $managerRegistry,
+        );
+
+        self::assertSame([$existingRecord], $action($batch));
     }
 }

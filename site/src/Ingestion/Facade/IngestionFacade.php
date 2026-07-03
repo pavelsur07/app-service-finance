@@ -192,7 +192,27 @@ final readonly class IngestionFacade
             createdAt: (new \DateTimeImmutable((string) $row['created_at']))
                 ->setTimezone(new \DateTimeZone('UTC'))
                 ->format('Y-m-d\TH:i:s\Z'),
+            detailsMessage: $this->optionalString($details['message'] ?? null),
+            exceptionClass: $this->optionalString($details['exceptionClass'] ?? null),
+            resourceType: $this->optionalString($row['resource_type'] ?? null),
+            externalId: $this->optionalString($row['external_id'] ?? null),
+            fetchedAt: null === ($row['fetched_at'] ?? null)
+                ? null
+                : (new \DateTimeImmutable((string) $row['fetched_at']))
+                    ->setTimezone(new \DateTimeZone('UTC'))
+                    ->format('Y-m-d\TH:i:s\Z'),
         );
+    }
+
+    private function optionalString(mixed $value): ?string
+    {
+        if (!is_scalar($value) && null !== $value) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        return '' !== $value ? $value : null;
     }
 
     /**

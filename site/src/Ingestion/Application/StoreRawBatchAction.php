@@ -43,7 +43,7 @@ final readonly class StoreRawBatchAction
         );
 
         if (null !== $latestRecord && $latestRecord->getHash() === $hash) {
-            $latestRecord->markSeen();
+            $this->repairMissingObject($latestRecord, $ndjson);
             $this->entityManager->flush();
 
             return [$latestRecord];
@@ -58,7 +58,7 @@ final readonly class StoreRawBatchAction
         );
 
         if (null !== $existingRecord) {
-            $existingRecord->markSeen();
+            $this->repairMissingObject($existingRecord, $ndjson);
             $this->entityManager->flush();
 
             return [$existingRecord];
@@ -90,15 +90,30 @@ final readonly class StoreRawBatchAction
         try {
             $this->entityManager->flush();
         } catch (UniqueConstraintViolationException $exception) {
-            return [$this->recoverConcurrentDuplicate($batch, $hash, $exception)];
+            return [$this->recoverConcurrentDuplicate($batch, $hash, $ndjson, $exception)];
         }
 
         return [$record];
     }
 
+    private function repairMissingObject(IngestRawRecord $record, string $ndjson): void
+    {
+        if (!$this->objectStorage->exists($record->getStoragePath())) {
+            $compressed = gzencode($ndjson, 6);
+            if (false === $compressed) {
+                throw new RawStorageException('Failed to gzip raw payload.');
+            }
+
+            $this->objectStorage->write($record->getStoragePath(), $compressed);
+        }
+
+        $record->markSeen();
+    }
+
     private function recoverConcurrentDuplicate(
         RawBatch $batch,
         string $hash,
+        string $ndjson,
         UniqueConstraintViolationException $exception,
     ): IngestRawRecord {
         $entityManager = $this->entityManager;
@@ -133,7 +148,7 @@ final readonly class StoreRawBatchAction
             throw $exception;
         }
 
-        $existingRecord->markSeen();
+        $this->repairMissingObject($existingRecord, $ndjson);
         $entityManager->flush();
 
         return $existingRecord;

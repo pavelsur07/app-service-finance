@@ -647,6 +647,12 @@ export interface operations {
                             human_description?: string;
                             /** @example 2026-06-15T10:00:00Z */
                             created_at?: string;
+                            details_message?: string | null;
+                            exception_class?: string | null;
+                            resource_type?: string | null;
+                            external_id?: string | null;
+                            /** @example 2026-06-15T10:00:00Z */
+                            fetched_at?: string | null;
                         }[];
                         meta?: {
                             /** @example 1 */

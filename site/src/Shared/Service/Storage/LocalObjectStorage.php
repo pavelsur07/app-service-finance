@@ -19,7 +19,7 @@ final readonly class LocalObjectStorage implements ObjectStorageInterface
 
     public function read(string $path): string
     {
-        $contents = file_get_contents($this->storageService->getAbsolutePath($path));
+        $contents = @file_get_contents($this->storageService->getAbsolutePath($path));
         if (false === $contents) {
             throw new ObjectStorageException(sprintf('Failed to read object "%s".', $path));
         }

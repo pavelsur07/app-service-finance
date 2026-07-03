@@ -25,6 +25,14 @@ abstract readonly class AbstractDailyCursorIncrementalStrategy implements Increm
     private function normalizedCursorDate(string $cursorValue): ?string
     {
         try {
+            $payload = json_decode($cursorValue, true, 512, \JSON_THROW_ON_ERROR);
+            if (is_array($payload) && is_string($payload['date'] ?? null)) {
+                $cursorValue = $payload['date'];
+            }
+        } catch (\JsonException) {
+        }
+
+        try {
             return (new \DateTimeImmutable($cursorValue))->format('Y-m-d');
         } catch (\Throwable) {
             return null;

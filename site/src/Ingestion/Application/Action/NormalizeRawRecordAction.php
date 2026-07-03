@@ -8,8 +8,10 @@ use App\Ingestion\Application\Command\NormalizeRawRecordCommand;
 use App\Ingestion\Application\Command\RecordNormalizationIssueCommand;
 use App\Ingestion\Application\Command\UpsertFinancialTransactionCommand;
 use App\Ingestion\Application\DTO\MappedControlSum;
+use App\Ingestion\Application\DTO\MappedPreviewIssue;
 use App\Ingestion\Application\Service\ListingResolverRegistry;
 use App\Ingestion\Application\Service\SystemCounterpartyResolver;
+use App\Ingestion\Domain\Contract\PreviewIssueAwareMapperInterface;
 use App\Ingestion\Domain\Contract\RawRecordAwareControlSumMapperInterface;
 use App\Ingestion\Domain\Event\AffectedPeriod;
 use App\Ingestion\Domain\Event\NormalizationCompletedEvent;
@@ -20,6 +22,7 @@ use App\Ingestion\Exception\RawRecordNotFoundException;
 use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Repository\FinancialTransactionRepository;
 use App\Ingestion\Repository\IngestRawRecordRepository;
+use App\Ingestion\Repository\NormalizationIssueRepository;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -35,6 +38,7 @@ final readonly class NormalizeRawRecordAction
         private SystemCounterpartyResolver $systemCounterpartyResolver,
         private ListingResolverRegistry $listingResolverRegistry,
         private FinancialTransactionRepository $financialTransactionRepository,
+        private NormalizationIssueRepository $normalizationIssueRepository,
         private UpsertFinancialTransactionAction $upsertFinancialTransactionAction,
         private RecordNormalizationIssueAction $recordNormalizationIssueAction,
         private EntityManagerInterface $entityManager,
@@ -70,6 +74,9 @@ final readonly class NormalizeRawRecordAction
                 $controlSums = $mapper instanceof RawRecordAwareControlSumMapperInterface
                     ? $mapper->controlSumForRawRecord($rawRecord, $rows)
                     : $mapper->controlSum($rows);
+                $previewIssues = $mapper instanceof PreviewIssueAwareMapperInterface
+                    ? $mapper->previewIssues($rawRecord, $rows)
+                    : [];
             } catch (\Throwable $exception) {
                 ($this->recordNormalizationIssueAction)(new RecordNormalizationIssueCommand(
                     companyId: $command->companyId,
@@ -141,7 +148,7 @@ final readonly class NormalizeRawRecordAction
                     listingSku: $listingResolution?->listingSku,
                 ));
 
-                if (null !== $result) {
+                if (null !== $result && $result->affectsFinancialReport) {
                     $affectedPeriods[] = new AffectedPeriod(
                         shopRef: $rawRecord->getShopRef(),
                         oldOccurredAt: $result->oldOccurredAt,
@@ -155,7 +162,9 @@ final readonly class NormalizeRawRecordAction
             // diagnostic, so a failure there must not leave the record eligible for a
             // full re-normalization on retry.
             $rawRecord->markNormalizationDone();
+            $this->resolveOpenIssues($command->companyId, $rawRecord->getId());
             $this->recordControlSumIssues($command->companyId, $rawRecord->getId(), $controlSums);
+            $this->recordPreviewIssues($command->companyId, $rawRecord->getId(), $previewIssues);
             $this->entityManager->flush();
             $connection->commit();
 
@@ -195,6 +204,29 @@ final readonly class NormalizeRawRecordAction
 
         if (null !== $event) {
             $this->eventDispatcher->dispatch($event);
+        }
+    }
+
+    /**
+     * @param list<MappedPreviewIssue> $previewIssues
+     */
+    private function recordPreviewIssues(string $companyId, string $rawRecordId, array $previewIssues): void
+    {
+        foreach ($previewIssues as $previewIssue) {
+            ($this->recordNormalizationIssueAction)(new RecordNormalizationIssueCommand(
+                companyId: $companyId,
+                rawRecordId: $rawRecordId,
+                operationGroupId: $previewIssue->operationGroupId,
+                kind: $previewIssue->kind,
+                details: $previewIssue->details,
+            ));
+        }
+    }
+
+    private function resolveOpenIssues(string $companyId, string $rawRecordId): void
+    {
+        foreach ($this->normalizationIssueRepository->findOpenByRawRecord($companyId, $rawRecordId) as $issue) {
+            $issue->markResolved();
         }
     }
 

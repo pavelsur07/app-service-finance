@@ -58,6 +58,7 @@ const IssuesListView: React.FC<IssuesListViewProps> = ({
                             <th>Дата</th>
                             <th>Тип</th>
                             <th>Описание</th>
+                            <th>Детали</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -70,6 +71,16 @@ const IssuesListView: React.FC<IssuesListViewProps> = ({
                                     <StatusBadge status="warning" label={issueLabel(item.kind)} />
                                 </td>
                                 <td>{item.human_description ?? 'Описание недоступно'}</td>
+                                <td>
+                                    <div>{item.details_message ?? '—'}</div>
+                                    {(item.exception_class || item.resource_type || item.external_id || item.fetched_at) && (
+                                        <div className="text-muted small">
+                                            {[item.exception_class, item.resource_type, item.external_id, item.fetched_at ? formatDateTime(item.fetched_at) : null]
+                                                .filter(Boolean)
+                                                .join(' · ')}
+                                        </div>
+                                    )}
+                                </td>
                             </tr>
                         ))}
                     </tbody>

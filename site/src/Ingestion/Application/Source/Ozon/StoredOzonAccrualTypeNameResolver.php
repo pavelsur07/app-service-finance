@@ -7,6 +7,8 @@ namespace App\Ingestion\Application\Source\Ozon;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Repository\IngestRawRecordRepository;
+use App\Shared\Service\Storage\ObjectStorageException;
+use Psr\Log\LoggerInterface;
 
 final class StoredOzonAccrualTypeNameResolver
 {
@@ -18,6 +20,7 @@ final class StoredOzonAccrualTypeNameResolver
     public function __construct(
         private readonly IngestRawRecordRepository $rawRecordRepository,
         private readonly RawStorageFacade $rawStorageFacade,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -56,18 +59,32 @@ final class StoredOzonAccrualTypeNameResolver
         }
 
         $dictionary = [];
-        foreach ($this->rawStorageFacade->read($rawRecord->getId(), $companyId) as $row) {
-            if (!is_array($row) || ($row['_ingestion_empty'] ?? false) === true) {
-                continue;
-            }
+        try {
+            foreach ($this->rawStorageFacade->read($rawRecord->getId(), $companyId) as $row) {
+                if (!is_array($row) || ($row['_ingestion_empty'] ?? false) === true) {
+                    continue;
+                }
 
-            $typeId = $this->stringValue($row['type_id'] ?? $row['typeId'] ?? $row['id'] ?? null);
-            $name = $this->stringValue($row['name'] ?? $row['title'] ?? $row['type_name'] ?? $row['typeName'] ?? null);
-            if (null === $typeId || null === $name) {
-                continue;
-            }
+                $typeId = $this->stringValue($row['type_id'] ?? $row['typeId'] ?? $row['id'] ?? null);
+                $name = $this->stringValue($row['name'] ?? $row['title'] ?? $row['type_name'] ?? $row['typeName'] ?? null);
+                if (null === $typeId || null === $name) {
+                    continue;
+                }
 
-            $dictionary[$typeId] = $name;
+                $dictionary[$typeId] = $name;
+            }
+        } catch (ObjectStorageException $exception) {
+            $this->logger->warning('Ozon accrual types dictionary object is missing or unreadable; continuing without type names.', [
+                'companyId' => $companyId,
+                'rawRecordId' => $rawRecord->getId(),
+                'storagePath' => $rawRecord->getStoragePath(),
+                'exceptionClass' => $exception::class,
+                'errorMessage' => $exception->getMessage(),
+            ]);
+
+            unset($this->cache[$companyId]);
+
+            return [];
         }
 
         ksort($dictionary);

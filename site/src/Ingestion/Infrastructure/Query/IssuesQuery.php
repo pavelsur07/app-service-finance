@@ -25,6 +25,9 @@ final class IssuesQuery
                 'i.kind',
                 'i.details',
                 'i.created_at',
+                'r.resource_type',
+                'r.external_id',
+                'r.fetched_at',
             )
             ->from('ingest_normalization_issues', 'i')
             ->innerJoin(
