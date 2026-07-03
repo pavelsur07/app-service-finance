@@ -14,6 +14,8 @@ use Doctrine\DBAL\Connection;
 
 final readonly class OzonAccrualStaleProjectionPruner
 {
+    private const BUSINESS_TIMEZONE = 'Europe/Moscow';
+
     public function __construct(
         private Connection $connection,
         private FinancialTransactionRepository $transactionRepository,
@@ -93,8 +95,9 @@ final readonly class OzonAccrualStaleProjectionPruner
             return null;
         }
 
-        $from = \DateTimeImmutable::createFromFormat('!Y-m-d', $matches[1]);
-        $to = \DateTimeImmutable::createFromFormat('!Y-m-d', $matches[2]);
+        $timezone = new \DateTimeZone(self::BUSINESS_TIMEZONE);
+        $from = \DateTimeImmutable::createFromFormat('!Y-m-d', $matches[1], $timezone);
+        $to = \DateTimeImmutable::createFromFormat('!Y-m-d', $matches[2], $timezone);
         if (!$from instanceof \DateTimeImmutable || !$to instanceof \DateTimeImmutable || $from > $to) {
             return null;
         }
@@ -140,8 +143,8 @@ final readonly class OzonAccrualStaleProjectionPruner
                 'shopRef' => $rawRecord->getShopRef(),
                 'source' => IngestSource::OZON->value,
                 'rawRecordId' => $rawRecord->getId(),
-                'fromAt' => $from->format('Y-m-d 00:00:00'),
-                'toExclusive' => $to->modify('+1 day')->format('Y-m-d 00:00:00'),
+                'fromAt' => $from->format('Y-m-d H:i:sP'),
+                'toExclusive' => $to->modify('+1 day')->format('Y-m-d H:i:sP'),
                 'resourceType' => OzonResourceType::ACCRUAL_BY_DAY,
                 'fetchedAt' => $rawRecord->getFetchedAt()->format('Y-m-d H:i:s.u'),
                 'externalIdPrefix' => 'ozon:accrual-by-day:%',

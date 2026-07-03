@@ -327,7 +327,7 @@ final class OzonAccrualPruneStaleProjectionCommand extends Command
             return null;
         }
 
-        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value, new \DateTimeZone(self::BUSINESS_TIMEZONE));
         if (!$date instanceof \DateTimeImmutable || $date->format('Y-m-d') !== $value) {
             throw new \InvalidArgumentException(sprintf('--%s must be a valid YYYY-MM-DD date.', $name));
         }
