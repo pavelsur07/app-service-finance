@@ -1,11 +1,38 @@
 <!-- @react Tabs -->
-<!-- @uiKit v1.4 -->
+<!-- @uiKit v2.1 -->
 <!-- @docs ui-kit/components/tabs.css -->
 
-<div class="demo demo--center">
-  <div class="tabs">
-    <button class="tab is-active">Все <span class="count">248</span></button>
-    <button class="tab">Поступления <span class="count">94</span></button>
-    <button class="tab">Списания <span class="count">154</span></button>
-  </div>
-</div>
+        <span class="demo-label">Default (count plain)</span>
+        <div class="demo demo--center">
+          <div class="tabs">
+            <button class="tab is-active">Все <span class="count">248</span></button>
+            <button class="tab">Поступления <span class="count">94</span></button>
+            <button class="tab">Списания <span class="count">154</span></button>
+          </div>
+        </div>
+
+        <span class="demo-label">Count с inner-dot (статусные счётчики · danger / warning / success)</span>
+        <div class="demo demo--center">
+          <div class="tabs">
+            <button class="tab is-active">Очереди</button>
+            <button class="tab">Сбои <span class="count count--dot count--danger">3</span></button>
+            <button class="tab">Heartbeat <span class="count count--dot count--warning">1</span></button>
+            <button class="tab">Здоровье <span class="count count--dot count--success">OK</span></button>
+          </div>
+        </div>
+
+        <span class="demo-label">Tabs row + .tabs-meta справа (data-freshness)</span>
+        <div class="demo" style="padding:18px; background:var(--bg-page);">
+          <div class="tabs-row" style="width:100%;">
+            <div class="tabs">
+              <button class="tab is-active">Все</button>
+              <button class="tab">Очереди</button>
+              <button class="tab">Сбои <span class="count count--dot count--danger">3</span></button>
+            </div>
+            <div class="u-flex-1"></div>
+            <span class="tabs-meta">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Данные с момента старта окружения — <b>14&nbsp;д&nbsp;06:12</b>
+            </span>
+          </div>
+        </div>

@@ -1,8 +1,8 @@
-/* Modal (in-place demo) */
+/* ============ MODAL ============ */
 .mdl {
   width: 100%; max-width: var(--modal-width-standard);
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: var(--r-4);
   box-shadow: var(--shadow-modal);
 }
@@ -10,5 +10,19 @@
 .mdl-head { padding: 18px 20px 12px; display: flex; align-items: flex-start; gap: 12px; }
 .mdl-head h3 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.015em; }
 .mdl-head .sub { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
-.mdl-body { padding: 0 20px 12px; min-height: 60px; }
-.mdl-foot { border-top: 1px solid var(--border); padding: 12px 20px; display: flex; gap: 8px; justify-content: flex-end; }
+.mdl-body { padding: 0 var(--s-5) var(--s-3); min-height: 60px; }
+.mdl-foot { border-top: 1px solid var(--border); padding: var(--s-3) var(--s-5); display: flex; gap: 8px; justify-content: flex-end; }
+
+/* Interactive modal dialogs (live demos in UIKit) */
+.dlg {
+  padding: 0; border: 0;
+  background: transparent;
+  max-width: none; max-height: none;
+  overflow: visible;
+}
+.dlg::backdrop {
+  background: rgba(11, 18, 32, var(--backdrop-opacity));
+  backdrop-filter: blur(var(--backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--backdrop-blur));
+}
+.dlg .mdl { box-shadow: var(--shadow-modal); }

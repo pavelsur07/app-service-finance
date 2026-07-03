@@ -1,0 +1,28 @@
+/* ============ SEARCH-INPUT ============ */
+/* Wraps .input + leading magnifier icon + trailing clear button.
+   Add .has-value on the wrapper to reveal the clear button. */
+.search-field {
+  position: relative;
+}
+.search-field .input {
+  padding-left: 36px;
+  padding-right: var(--s-7);
+}
+.search-field .search-icon {
+  position: absolute;
+  left: 10px; top: 50%; transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.search-field .search-clear {
+  position: absolute;
+  right: 6px; top: 50%; transform: translateY(-50%);
+  width: 22px; height: 22px;
+  display: none;
+  border: 0; background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--r-1);
+}
+.search-field.has-value .search-clear { display: inline-flex; align-items: center; justify-content: center; }
+.search-field .search-clear:hover { color: var(--text-secondary); background: var(--bg-page); }

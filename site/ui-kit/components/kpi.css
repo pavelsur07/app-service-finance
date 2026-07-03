@@ -3,7 +3,7 @@
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--r-4);
-  padding: 16px 20px;
+  padding: var(--s-4) var(--s-5);
   display: flex; flex-direction: column; gap: 6px;
 }
 .kpi-label {
@@ -14,10 +14,58 @@
 .kpi-value { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: var(--text-strong); font-variant-numeric: tabular-nums; }
 .kpi-value--hero { font-size: 28px; }
 .kpi-meta { font-size: 11px; color: var(--text-muted); display: flex; gap: 6px; align-items: center; }
-.kpi--dark { background: var(--bg-dark); color: #fff; border-color: var(--bg-dark); }
+.kpi--dark { background: var(--bg-dark); color: var(--text-inverse); border-color: var(--bg-dark); }
 .kpi--dark .kpi-label { color: var(--text-disabled); }
-.kpi--dark .kpi-value { color: #fff; }
+.kpi--dark .kpi-value { color: var(--text-inverse); }
 .kpi--dark .kpi-meta { color: var(--text-disabled); }
+
+/* Accent variant — left rule keyed to feedback semantics; pairs with .kpi-units.
+   Use for direction-laden metrics (success = income/profit, danger = outflow/loss,
+   warning = attention/pending, primary = neutral total/count). */
+.kpi--accent-success,
+.kpi--accent-danger,
+.kpi--accent-warning,
+.kpi--accent-primary {
+  border-left-width: 3px;
+  padding-left: 18px;
+}
+.kpi--accent-success { border-left-color: var(--success-dot); }
+.kpi--accent-danger  { border-left-color: var(--danger-dot); }
+.kpi--accent-warning { border-left-color: var(--warning-dot); }
+.kpi--accent-primary { border-left-color: var(--color-primary); }
+
+/* Units / count sub-value (e.g. «500 ед.») — sits between .kpi-value and .kpi-meta.
+   Bold number + muted unit. tabular-nums for digit alignment in card rows. */
+.kpi-units {
+  font-size: var(--font-12_5);
+  font-weight: 600;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.005em;
+}
+.kpi-units b {
+  color: var(--text-strong);
+  font-weight: 700;
+  margin-right: 2px;
+}
+
+/* Header row — label left, StatusPill right. Use INSIDE .kpi when the card
+   needs a status badge (closed period, draft, blocked, on-review).
+   The card's flex gap (6px) handles vertical rhythm — no extra margin here. */
+.kpi-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.kpi-head .kpi-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kpi-head .status { flex-shrink: 0; }
 
 /* Delta chip */
 .delta {

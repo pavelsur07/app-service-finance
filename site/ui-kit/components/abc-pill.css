@@ -1,0 +1,14 @@
+/* ============ ABC-PILL ============ */
+.abc-pill {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 34px; padding: 3px 8px;
+  border-radius: var(--r-1);
+  font-family: var(--font-mono);
+  font-size: 11.5px; font-weight: 800; letter-spacing: 0.04em;
+  cursor: help;
+}
+.abc-pill--star      { background: var(--abc-star-bg);      color: var(--abc-star-text); }
+.abc-pill--attention { background: var(--abc-attention-bg); color: var(--abc-attention-text); }
+.abc-pill--mid       { background: var(--abc-mid-bg);       color: var(--abc-mid-text); }
+.abc-pill--weak      { background: var(--abc-weak-bg);      color: var(--abc-weak-text); }
+.abc-pill--tail      { background: var(--abc-tail-bg);      color: var(--abc-tail-text); }

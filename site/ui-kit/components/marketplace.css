@@ -1,0 +1,34 @@
+/* ============ MARKETPLACE-BADGE ============ */
+/* Same pattern as .bank-badge / .bank-mark, but for marketplace integrations. */
+.mp-badge {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 6px 10px 6px 6px;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--r-3);
+}
+.mp-mark {
+  width: 28px; height: 28px; border-radius: var(--r-2);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 10.5px; letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+.mp-mark--sm     { width: 24px; height: 24px; border-radius: 5px;       font-size: 9.5px; }
+.mp-mark--md     { width: 28px; height: 28px; border-radius: var(--r-3); font-size: 10.5px; }
+.mp-mark--lg     { width: 32px; height: 32px; border-radius: var(--r-3); font-size: 12px; }
+.mp-mark--circle { border-radius: 50%; }
+.mp-mark--ozon       { background: var(--mp-ozon);       color: var(--mp-ozon-fg); }
+.mp-mark--wb         { background: var(--mp-wb);         color: var(--mp-wb-fg); }
+.mp-mark--yamarket   { background: var(--mp-yamarket);   color: var(--mp-yamarket-fg); }
+.mp-mark--megamarket { background: var(--mp-megamarket); color: var(--mp-megamarket-fg); }
+.mp-name  { font-size: 12.5px; font-weight: 700; line-height: 1.2; }
+.mp-token { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+/* Inline chip variant: tiny mark (16) + name inside a neutral chip. */
+.mp-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 9px 3px 4px;
+  border-radius: var(--r-1);
+  background: var(--bg-card); border: 1px solid var(--border);
+  font-size: 11.5px; font-weight: 600; color: var(--text-strong);
+  white-space: nowrap; line-height: 1.4;
+}
+.mp-chip .mp-mark { width: 16px; height: 16px; border-radius: 3px; font-size: 8px; }

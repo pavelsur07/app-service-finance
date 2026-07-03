@@ -1,4 +1,4 @@
-/* ============ CONFIRMATION DIALOG ============ */
+/* ============ CONFIRMATION-DIALOG ============ */
 .confirm-body { padding: 14px 20px 4px; }
 .confirm-title { font-size: 15px; font-weight: 700; color: var(--text-strong); letter-spacing: -0.015em; }
 .confirm-text  { font-size: 13px; color: var(--text-tertiary); margin-top: 6px; line-height: 1.55; }
@@ -9,15 +9,20 @@
   display: flex; justify-content: flex-end; gap: 8px;
   margin-top: 14px;
 }
-.btn-danger-solid {
-  background: var(--danger-text); border-color: var(--danger-text);
-  color: #fff;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.15) inset, 0 4px 10px var(--shadow-danger-glow);
+
+/* Confirm · tinted key-value grid (for command/scope preview) */
+.confirm-kv {
+  margin-top: 14px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
+  padding: 12px 14px;
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 8px 14px;
+  align-items: baseline;
 }
-.btn-danger-solid:hover { background: var(--danger-text-hover); border-color: var(--danger-text-hover); }
-.btn-warning-solid {
-  background: var(--warning-text); border-color: var(--warning-text);
-  color: #fff;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.15) inset, 0 4px 10px var(--shadow-warning-glow);
-}
-.btn-warning-solid:hover { background: var(--warning-text-hover); border-color: var(--warning-text-hover); }
+.confirm-kv .kv-key { font-size: var(--font-11); color: var(--text-muted); }
+.confirm-kv .kv-val { font-size: 12.5px; color: var(--text-strong); }
+.confirm-kv .kv-val--mono { font-family: var(--font-mono); word-break: break-all; }
+.confirm-kv .kv-val--mono.is-strong { font-weight: 600; }

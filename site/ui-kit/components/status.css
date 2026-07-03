@@ -1,4 +1,4 @@
-/* ============ STATUS PILL (canonical) ============ */
+/* ============ STATUS-PILL ============ */
 .status {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 3px 10px 3px 8px;
@@ -6,8 +6,8 @@
   font-size: 11.5px; font-weight: 600; line-height: 1; white-space: nowrap;
 }
 .status .dot { width: 6px; height: 6px; border-radius: 50%; }
-.status--success { background: var(--success-bg); color: var(--success-text); } .status--success .dot { background: var(--success-dot); }
-.status--danger  { background: var(--danger-bg);  color: var(--danger-text); }  .status--danger .dot  { background: var(--danger-dot); }
-.status--warning { background: var(--warning-bg); color: var(--warning-text); } .status--warning .dot { background: var(--warning-dot); }
-.status--neutral { background: var(--neutral-tint-bg); color: var(--neutral-tint-text); } .status--neutral .dot { background: var(--text-disabled); }
-.status--pending { background: var(--warning-bg); color: var(--warning-text); } .status--pending .dot { background: var(--warning-dot); }
+.status--success { background: var(--status-success-bg); color: var(--status-success-text); } .status--success .dot { background: var(--status-success-dot); }
+.status--danger  { background: var(--status-danger-bg);  color: var(--status-danger-text); }  .status--danger .dot  { background: var(--status-danger-dot); }
+.status--warning { background: var(--status-warning-bg); color: var(--status-warning-text); } .status--warning .dot { background: var(--status-warning-dot); }
+.status--neutral { background: var(--status-neutral-bg); color: var(--status-neutral-text); } .status--neutral .dot { background: var(--status-neutral-dot); }
+.status--pending { background: var(--status-warning-bg); color: var(--status-warning-text); } .status--pending .dot { background: var(--status-warning-dot); }

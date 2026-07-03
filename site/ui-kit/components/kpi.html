@@ -1,34 +1,110 @@
 <!-- @react KpiCard -->
-<!-- @uiKit v1.4 -->
+<!-- @uiKit v2.1 -->
 <!-- @docs ui-kit/components/kpi.css -->
 
-<!-- Compact (22px) -->
-<div class="demo">
-  <div class="kpi" style="flex:1; min-width:200px">
-    <div class="kpi-label">Активных счетов</div>
-    <div class="kpi-value">10 <span style="font-size:13px; color:var(--text-disabled); font-weight:500">/ 11</span></div>
-    <div class="kpi-meta">в 5 банках + 2 кассы</div>
-  </div>
-  <div class="kpi" style="flex:1; min-width:200px">
-    <div class="kpi-label">Поступления</div>
-    <div class="kpi-value money--strong">+3&thinsp;820&thinsp;450 ₽</div>
-    <div class="kpi-meta"><span class="delta delta--up">+12,4%</span> к прошлому месяцу</div>
-  </div>
-  <div class="kpi" style="flex:1; min-width:200px">
-    <div class="kpi-label">Списания</div>
-    <div class="kpi-value money--strong">−2&thinsp;968&thinsp;720 ₽</div>
-    <div class="kpi-meta"><span class="delta delta--down">+4,1%</span> к прошлому месяцу</div>
-  </div>
-</div>
+        <span class="demo-label">Compact (22px)</span>
+        <div class="demo">
+          <div class="kpi u-flex-1 u-min-w-200">
+            <div class="kpi-label">Активных счетов</div>
+            <div class="kpi-value">10 <span style="font-size:13px; color:var(--text-disabled); font-weight:500">/ 11</span></div>
+            <div class="kpi-meta">в 5 банках + 2 кассы</div>
+          </div>
+          <div class="kpi u-flex-1 u-min-w-200">
+            <div class="kpi-label">Поступления</div>
+            <div class="kpi-value money--strong">+3&thinsp;820&thinsp;450 ₽</div>
+            <div class="kpi-meta"><span class="delta delta--up">+12,4%</span> к прошлому месяцу</div>
+          </div>
+          <div class="kpi u-flex-1 u-min-w-200">
+            <div class="kpi-label">Списания</div>
+            <div class="kpi-value money--strong">−2&thinsp;968&thinsp;720 ₽</div>
+            <div class="kpi-meta"><span class="delta delta--down">+4,1%</span> к прошлому месяцу</div>
+          </div>
+        </div>
+        <span class="demo-label">Hero (28px, тёмный)</span>
+        <div class="demo">
+          <div class="kpi kpi--dark u-flex-1">
+            <div class="kpi-label"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/></svg> Общий баланс</div>
+            <div class="kpi-value kpi-value--hero">3&thinsp;829&thinsp;930 ₽</div>
+            <div class="kpi-meta"><span class="delta delta--up">+12,4% за месяц</span> · в валюте: $8&thinsp;450</div>
+          </div>
+        </div>
 
-<!-- Hero (28px, тёмный) -->
-<div class="demo">
-  <div class="kpi kpi--dark" style="flex:1">
-    <div class="kpi-label">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/></svg>
-      Общий баланс
-    </div>
-    <div class="kpi-value kpi-value--hero">3&thinsp;829&thinsp;930 ₽</div>
-    <div class="kpi-meta"><span class="delta delta--up">+12,4% за месяц</span> · в валюте: $8&thinsp;450</div>
-  </div>
-</div>
+        <span class="demo-label">С акцентной полосой · <code class="code-inline">.kpi--accent-*</code> + <code class="code-inline">.kpi-units</code></span>
+        <div class="demo">
+          <div class="kpi kpi--accent-success u-flex-1 u-min-w-200">
+            <div class="kpi-label">Поступления</div>
+            <div class="kpi-value money--strong">+3&thinsp;850&thinsp;600 ₽</div>
+            <div class="kpi-units"><b>500</b> ед.</div>
+            <div class="kpi-meta"><span class="delta delta--up">+12,4%</span> к прошлому месяцу</div>
+          </div>
+          <div class="kpi kpi--accent-danger u-flex-1 u-min-w-200">
+            <div class="kpi-label">Списания</div>
+            <div class="kpi-value money--strong">−2&thinsp;968&thinsp;720 ₽</div>
+            <div class="kpi-units"><b>312</b> ед.</div>
+            <div class="kpi-meta"><span class="delta delta--down">+4,1%</span> к прошлому месяцу</div>
+          </div>
+          <div class="kpi kpi--accent-warning u-flex-1 u-min-w-200">
+            <div class="kpi-label">На согласовании</div>
+            <div class="kpi-value money--strong">218&thinsp;400 ₽</div>
+            <div class="kpi-units"><b>14</b> ед.</div>
+            <div class="kpi-meta">ждут действия финдира</div>
+          </div>
+          <div class="kpi kpi--accent-primary u-flex-1 u-min-w-200">
+            <div class="kpi-label">Активные операции</div>
+            <div class="kpi-value money--strong">12&thinsp;850&thinsp;400 ₽</div>
+            <div class="kpi-units"><b>248</b> ед.</div>
+            <div class="kpi-meta">за период · все статусы</div>
+          </div>
+        </div>
+
+        <span class="demo-label">С StatusPill · <code class="code-inline">.kpi-head</code> + <code class="code-inline">.status</code></span>
+        <div class="demo">
+          <div class="kpi kpi--accent-success u-flex-1 u-min-w-220">
+            <div class="kpi-head">
+              <div class="kpi-label">Поступления</div>
+              <span class="status status--success"><span class="dot"></span>Период закрыт</span>
+            </div>
+            <div class="kpi-value money--strong">+3&thinsp;850&thinsp;600 ₽</div>
+            <div class="kpi-units"><b>500</b> ед.</div>
+            <div class="kpi-meta"><span class="delta delta--up">+12,4%</span> к прошлому месяцу</div>
+          </div>
+          <div class="kpi kpi--accent-warning u-flex-1 u-min-w-220">
+            <div class="kpi-head">
+              <div class="kpi-label">На согласовании</div>
+              <span class="status status--pending"><span class="dot"></span>В ожидании</span>
+            </div>
+            <div class="kpi-value money--strong">218&thinsp;400 ₽</div>
+            <div class="kpi-units"><b>14</b> ед.</div>
+            <div class="kpi-meta">ждут действия финдира</div>
+          </div>
+          <div class="kpi kpi--accent-danger u-flex-1 u-min-w-220">
+            <div class="kpi-head">
+              <div class="kpi-label">Списания</div>
+              <span class="status status--danger"><span class="dot"></span>Превышен лимит</span>
+            </div>
+            <div class="kpi-value money--strong">−2&thinsp;968&thinsp;720 ₽</div>
+            <div class="kpi-units"><b>312</b> ед.</div>
+            <div class="kpi-meta"><span class="delta delta--down">+4,1%</span> к прошлому месяцу</div>
+          </div>
+          <div class="kpi kpi--accent-primary u-flex-1 u-min-w-220">
+            <div class="kpi-head">
+              <div class="kpi-label">Активные операции</div>
+              <span class="status status--neutral"><span class="dot"></span>Черновик</span>
+            </div>
+            <div class="kpi-value money--strong">12&thinsp;850&thinsp;400 ₽</div>
+            <div class="kpi-units"><b>248</b> ед.</div>
+            <div class="kpi-meta">за период · все статусы</div>
+          </div>
+        </div>
+
+        <span class="demo-label">Best practice</span>
+        <div class="demo demo--column" style="gap:6px;">
+          <div class="cb-note">Акцент — для метрик с явным направлением: <code class="code-inline">success</code> = поступления / прибыль, <code class="code-inline">danger</code> = списания / убытки, <code class="code-inline">warning</code> = требует внимания / на согласовании, <code class="code-inline">primary</code> = нейтральный итог / общий счётчик.</div>
+          <div class="cb-note"><code class="code-inline">.kpi-units</code> идёт сразу после <code class="code-inline">.kpi-value</code> — крупная сумма + количество операций, которые её сформировали. Число — <code class="code-inline">&lt;b&gt;</code> (strong), единица измерения приглушённая.</div>
+          <div class="cb-note">Не комбинируй <code class="code-inline">.kpi--accent-*</code> с <code class="code-inline">.kpi--dark</code> — hero-карточка ведёт визуально сама.</div>
+          <div class="cb-note">Не дублируй акцентом то, что уже передаёт <code class="code-inline">.delta--up/--down</code> — это разные слои информации.</div>
+          <div class="cb-note">Цвет — только из токенов <code class="code-inline">--success-dot</code>, <code class="code-inline">--danger-dot</code>, <code class="code-inline">--warning-dot</code>, <code class="code-inline">--color-primary</code>. Никаких новых hex.</div>
+          <div class="cb-note"><code class="code-inline">.kpi-head</code> — обёртка над <code class="code-inline">.kpi-label</code>, когда карточке нужен <code class="code-inline">.status</code>. Метка слева, пилюля справа, прижаты к верхнему краю карточки.</div>
+          <div class="cb-note">Семантика акцентной полосы и пилюли должна совпадать (<code class="code-inline">--accent-success</code> + <code class="code-inline">.status--success</code>), либо пилюля — нейтральная (<code class="code-inline">.status--neutral</code>) когда нужен только тэг состояния, не направление.</div>
+          <div class="cb-note">Не ставь больше одной пилюли в <code class="code-inline">.kpi-head</code> — для нескольких атрибутов используй обычный ряд статусов под значением.</div>
+        </div>

@@ -1,0 +1,45 @@
+/* ============ TREE-PICKER ============ */
+.tree-node {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px;
+  border-radius: var(--r-2);
+  cursor: pointer; border: 0; background: transparent;
+  font-family: inherit; text-align: left; width: 100%;
+  margin-bottom: 1px;
+  position: relative;
+}
+.tree-node:hover { background: var(--bg-page); }
+.tree-node.is-selected { background: var(--bg-row-selected); }
+.tree-node.is-disabled { cursor: not-allowed; }
+.tree-node.is-disabled .tn-name { color: var(--text-tertiary); font-weight: 600; }
+.tree-node .chev {
+  width: 14px; height: 14px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-muted); flex-shrink: 0;
+  transition: transform .15s;
+}
+.tree-node.is-collapsed .chev { transform: rotate(-90deg); }
+.tree-node .chev-spacer { width: 14px; flex-shrink: 0; }
+.tree-node .tn-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.tree-node .tn-name {
+  flex: 1; min-width: 0; font-size: 13px; color: var(--text-strong); font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tree-node .tn-name mark { background: var(--warning-bg); color: var(--warning-text); border-radius: 2px; padding: 0 2px; font-weight: 700; }
+.tree-node.is-selected .tn-name { font-weight: 700; color: var(--color-primary-hover); }
+.tree-node .tn-count {
+  font-size: 10.5px; color: var(--text-muted); font-weight: 600;
+  background: var(--bg-page); padding: 1px 7px; border-radius: var(--r-1);
+  font-variant-numeric: tabular-nums;
+}
+.tree-node .tn-amount {
+  font-size: 12px; font-variant-numeric: tabular-nums;
+  color: var(--text-strong); font-weight: 700; letter-spacing: -0.01em;
+}
+.tree-node .tn-check {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 1.5px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  color: transparent;
+}
+.tree-node.is-selected .tn-check { background: var(--color-primary); border-color: var(--color-primary); color: var(--text-inverse); }

@@ -1,0 +1,130 @@
+/* ============ COVERAGE-MATRIX ============ */
+/* Wide horizontal grid: rows = resource types, cols = days of period.
+   Sticky-left label column. Day cells encode coverage state via .cov-cell--*. */
+.coverage {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
+  overflow: hidden;
+}
+.coverage-scroll { overflow-x: auto; }
+.coverage-grid {
+  display: grid;
+  grid-template-columns: var(--cov-label-w, 280px) repeat(var(--cov-days, 30), minmax(28px, 1fr));
+  gap: 6px;
+  align-items: stretch;
+  padding-right: var(--s-4);
+  min-width: fit-content;
+}
+
+/* Sticky left column — shared for corner / row label / totals label */
+.cov-corner, .cov-label, .cov-total-label {
+  position: sticky; left: 0; z-index: 2;
+  background: var(--bg-card);
+  box-shadow: 6px 0 8px -6px rgba(15,23,42,0.10);
+}
+.cov-corner {
+  z-index: 3;
+  padding: 14px 12px 8px 16px;
+  font-size: 10.5px; font-weight: 700; color: var(--text-muted);
+  letter-spacing: 0.06em; text-transform: uppercase;
+}
+
+/* Day header */
+.cov-day {
+  padding: 14px 0 8px; text-align: center;
+  font-size: 10.5px; font-weight: 600; color: var(--text-muted);
+  font-variant-numeric: tabular-nums; letter-spacing: 0.02em;
+  position: relative;
+}
+.cov-day--weekend { color: var(--text-disabled); }
+.cov-day--today { color: var(--color-primary); font-weight: 700; }
+.cov-day--today::before {
+  content: ""; position: absolute; top: 4px; left: 50%;
+  transform: translateX(-50%);
+  width: 4px; height: 4px; border-radius: 50%; background: var(--color-primary);
+}
+
+/* Resource label cell */
+.cov-label {
+  padding: 10px 14px 10px 16px;
+  display: flex; align-items: center; gap: 10px;
+  border-top: 1px solid var(--border-soft);
+}
+.cov-label-text { min-width: 0; flex: 1; }
+.cov-label-title {
+  font-size: 12.5px; font-weight: 600; color: var(--text-strong);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cov-label-tech {
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;
+}
+.cov-label-counts { display: flex; gap: 4px; flex-shrink: 0; }
+.cov-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 16px; height: 16px; padding: 0 var(--s-1); border-radius: var(--r-1);
+  font-size: 10px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.cov-count--err  { background: var(--danger-bg);  color: var(--danger-text); }
+.cov-count--warn { background: var(--warning-bg); color: var(--warning-text); }
+
+/* Day status cell wrapper */
+.cov-cellwrap {
+  border-top: 1px solid var(--border-soft);
+  padding: 10px 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.cov-cell {
+  width: 100%; max-width: 32px; height: 22px;
+  border-radius: var(--r-2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer; position: relative;
+  border: 1px solid transparent;
+  transition: box-shadow 120ms;
+}
+.cov-cell:hover { box-shadow: 0 0 0 3px var(--focus-ring-primary); }
+.cov-cell--ok      { background: var(--success-bg); border-color: var(--success-border); color: var(--success-text); }
+.cov-cell--partial { background: var(--warning-bg); border-color: var(--warning-border); color: var(--warning-text); }
+.cov-cell--err     { background: var(--danger-bg);  border-color: var(--danger-border);  color: var(--danger-text); font-weight: 800; }
+.cov-cell--empty   { background: var(--bg-page);    border-color: var(--border-soft);    color: var(--text-disabled); font-weight: 600; cursor: default; }
+.cov-cell--future  { background: transparent;       border-color: transparent;           color: var(--text-disabled); font-weight: 500; cursor: default; }
+.cov-cell--future:hover { box-shadow: none; }
+.cov-cell-dot {
+  position: absolute; top: -2px; right: -2px;
+  width: 7px; height: 7px; border-radius: 50%;
+  border: 1.5px solid var(--bg-card);
+}
+.cov-cell-dot--warn { background: var(--warning-dot); }
+.cov-cell-dot--err  { background: var(--danger-dot); }
+
+/* Subtotal row */
+.cov-total-label {
+  padding: 12px 14px 12px 16px;
+  display: flex; align-items: center; gap: 10px;
+  border-top: 1px solid var(--border);
+}
+.cov-total-cell {
+  border-top: 1px solid var(--border);
+  padding: var(--s-3) 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+.cov-total-cell--empty { color: var(--text-disabled); font-weight: 500; }
+
+/* Legend swatches */
+.cov-legend { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: var(--text-secondary); }
+.cov-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.cov-legend-sw {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 18px; border-radius: var(--r-1);
+  font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums;
+  border: 1px solid transparent;
+}
+.cov-legend-sw--ok      { background: var(--success-bg); border-color: var(--success-border); color: var(--success-text); }
+.cov-legend-sw--partial { background: var(--warning-bg); border-color: var(--warning-border); color: var(--warning-text); }
+.cov-legend-sw--err     { background: var(--danger-bg);  border-color: var(--danger-border);  color: var(--danger-text); }
+.cov-legend-sw--empty   { background: var(--bg-page);    border-color: var(--border-soft);    color: var(--text-disabled); font-weight: 600; }

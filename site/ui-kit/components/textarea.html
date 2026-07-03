@@ -1,0 +1,23 @@
+<!-- @react Textarea -->
+<!-- @uiKit v2.1 -->
+<!-- @docs ui-kit/components/textarea.css -->
+
+        <div class="row-2col">
+          <div class="field">
+            <label class="field-label">Default</label>
+            <textarea class="textarea" placeholder="Комментарий, виден только команде…"></textarea>
+          </div>
+          <div class="field">
+            <label class="field-label">Focused (имитация)</label>
+            <textarea class="textarea is-focus">Курсор активен</textarea>
+          </div>
+          <div class="field">
+            <label class="field-label" for="demo-ta-err">Error <span class="req">*</span></label>
+            <textarea id="demo-ta-err" class="textarea is-error" aria-invalid="true" aria-describedby="demo-ta-err-msg">Не пройдена валидация</textarea>
+            <span id="demo-ta-err-msg" class="field-helper error">Минимум 10 символов</span>
+          </div>
+          <div class="field">
+            <label class="field-label">Disabled</label>
+            <textarea class="textarea" disabled>Заблокировано</textarea>
+          </div>
+        </div>

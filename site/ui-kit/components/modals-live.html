@@ -1,0 +1,92 @@
+<!-- @uiKit v2.1 -->
+
+        <div class="demo" style="gap:10px; flex-wrap:wrap;">
+          <button class="btn btn-md btn-primary" data-open="dlg-modal-standard">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>
+            Открыть Modal (compact 440)
+          </button>
+          <button class="btn btn-md btn-secondary" data-open="dlg-confirm-destructive">Confirm — destructive</button>
+          <button class="btn btn-md btn-secondary" data-open="dlg-confirm-warning">Confirm — warning</button>
+          <button class="btn btn-md btn-secondary" data-open="dlg-confirm-kv">Confirm — команда (key-value)</button>
+        </div>
+
+        <!-- DIALOG: standard compact modal -->
+        <dialog id="dlg-modal-standard" class="dlg">
+          <div class="mdl mdl--compact">
+            <div class="mdl-head">
+              <div class="u-flex-1">
+                <h3>Выбор компании</h3>
+                <div class="sub">Переключение между организациями</div>
+              </div>
+              <button class="btn btn-sm btn-ghost u-w-28 u-p-0" data-close aria-label="Закрыть"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+            </div>
+            <div class="mdl-body" style="padding:8px 20px 4px;">
+              <div class="field">
+                <label class="field-label">Найти компанию</label>
+                <input class="input" placeholder="Название или ИНН…">
+              </div>
+              <div style="margin-top:10px; display:flex; flex-direction:column; gap:6px;">
+                <label class="checkbox-label"><input type="checkbox" class="checkbox" checked><span>ООО «Ромашка-Бэст»</span></label>
+                <label class="checkbox-label"><input type="checkbox" class="checkbox"><span>ИП Петров Л.&nbsp;А.</span></label>
+                <label class="checkbox-label"><input type="checkbox" class="checkbox"><span>ООО «Северная заря»</span></label>
+              </div>
+            </div>
+            <div class="mdl-foot">
+              <button class="btn btn-md btn-secondary" data-close>Отмена</button>
+              <button class="btn btn-md btn-primary" data-close>Выбрать</button>
+            </div>
+          </div>
+        </dialog>
+
+        <!-- DIALOG: confirm destructive -->
+        <dialog id="dlg-confirm-destructive" class="dlg">
+          <div class="mdl mdl--compact">
+            <div class="confirm-body">
+              <div class="confirm-title">Удалить контрагента «ФНС России»?</div>
+              <div class="confirm-text">Это действие нельзя отменить. У контрагента <b>8 связанных операций</b> — они останутся, но потеряют связь с контрагентом.</div>
+            </div>
+            <div class="confirm-foot">
+              <button class="btn btn-md btn-secondary" data-close>Отмена</button>
+              <button class="btn btn-md btn-danger-solid" data-close>Удалить</button>
+            </div>
+          </div>
+        </dialog>
+
+        <!-- DIALOG: confirm warning -->
+        <dialog id="dlg-confirm-warning" class="dlg">
+          <div class="mdl mdl--compact">
+            <div class="confirm-body">
+              <div class="confirm-title">Отменить операцию?</div>
+              <div class="confirm-text">Операция «Оплата по счёту № 245» будет отменена. Действие можно откатить в течение 24 часов.</div>
+            </div>
+            <div class="confirm-foot">
+              <button class="btn btn-md btn-secondary" data-close>Не отменять</button>
+              <button class="btn btn-md btn-warning-solid" data-close>Отменить операцию</button>
+            </div>
+          </div>
+        </dialog>
+
+        <!-- DIALOG: confirm with key-value grid -->
+        <dialog id="dlg-confirm-kv" class="dlg">
+          <div class="mdl mdl--compact">
+            <div class="confirm-body">
+              <div class="confirm-title">Запустить операцию?</div>
+              <div class="confirm-text">Запустить «<b>Пересчёт ОДДС</b>» для <b>ООО «Ромашка-Бэст»</b>? Фоновая команда будет отправлена в очередь.</div>
+              <div class="confirm-kv">
+                <div class="kv-key">Команда</div>
+                <div class="kv-val kv-val--mono">app:recalc-oddc</div>
+                <div class="kv-key">Очередь</div>
+                <div class="kv-val kv-val--mono is-strong">reports</div>
+                <div class="kv-key">Объём</div>
+                <div class="kv-val">ООО «Ромашка-Бэст» · ИНН&nbsp;7723812931</div>
+              </div>
+            </div>
+            <div class="confirm-foot">
+              <button class="btn btn-md btn-secondary" data-close>Отмена</button>
+              <button class="btn btn-md btn-primary" data-close>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Запустить
+              </button>
+            </div>
+          </div>
+        </dialog>

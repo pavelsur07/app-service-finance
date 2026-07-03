@@ -1,39 +1,70 @@
 <!-- @react ConfirmDialog -->
-<!-- @uiKit v1.4 -->
+<!-- @uiKit v2.1 -->
 <!-- @docs ui-kit/components/confirm.css -->
 
-<!-- Destructive (Удалить) -->
-<div class="mdl mdl--compact">
-  <div class="confirm-body">
-    <div class="confirm-title">Удалить контрагента «ФНС России»?</div>
-    <div class="confirm-text">Это действие нельзя отменить. У контрагента <b>8 связанных операций</b> — они останутся, но потеряют связь с контрагентом.</div>
-  </div>
-  <div class="confirm-foot">
-    <button class="btn btn-md btn-secondary">Отмена</button>
-    <button class="btn btn-md btn-danger-solid">Удалить</button>
-  </div>
-</div>
+        <span class="demo-label">Destructive (Удалить)</span>
+        <div class="demo demo--hero" style="justify-content:center;">
+          <div class="mdl mdl--compact">
+            <div class="confirm-body">
+              <div class="confirm-title">Удалить контрагента «ФНС России»?</div>
+              <div class="confirm-text">Это действие нельзя отменить. У контрагента <b>8 связанных операций</b> — они останутся, но потеряют связь с контрагентом.</div>
+            </div>
+            <div class="confirm-foot">
+              <button class="btn btn-md btn-secondary">Отмена</button>
+              <button class="btn btn-md btn-danger-solid">Удалить</button>
+            </div>
+          </div>
+        </div>
 
-<!-- Warning (Прервать операцию) -->
-<div class="mdl mdl--compact">
-  <div class="confirm-body">
-    <div class="confirm-title">Отменить операцию?</div>
-    <div class="confirm-text">Операция «Оплата по счёту № 245» будет отменена. Действие можно откатить в течение 24 часов.</div>
-  </div>
-  <div class="confirm-foot">
-    <button class="btn btn-md btn-secondary">Не отменять</button>
-    <button class="btn btn-md btn-warning-solid">Отменить операцию</button>
-  </div>
-</div>
+        <span class="demo-label">Warning (Прервать операцию)</span>
+        <div class="demo demo--hero" style="justify-content:center;">
+          <div class="mdl mdl--compact">
+            <div class="confirm-body">
+              <div class="confirm-title">Отменить операцию?</div>
+              <div class="confirm-text">Операция «Оплата по счёту № 245» будет отменена. Действие можно откатить в течение 24 часов.</div>
+            </div>
+            <div class="confirm-foot">
+              <button class="btn btn-md btn-secondary">Не отменять</button>
+              <button class="btn btn-md btn-warning-solid">Отменить операцию</button>
+            </div>
+          </div>
+        </div>
 
-<!-- Neutral (Закрыть без сохранения) -->
-<div class="mdl mdl--compact">
-  <div class="confirm-body">
-    <div class="confirm-title">Закрыть без сохранения?</div>
-    <div class="confirm-text">Введённые данные будут потеряны. Чтобы сохранить, нажмите «Отмена» и нажмите «Сохранить» в форме.</div>
-  </div>
-  <div class="confirm-foot">
-    <button class="btn btn-md btn-secondary">Отмена</button>
-    <button class="btn btn-md btn-primary">Закрыть</button>
-  </div>
-</div>
+        <span class="demo-label">Neutral (Закрыть без сохранения)</span>
+        <div class="demo demo--hero" style="justify-content:center;">
+          <div class="mdl mdl--compact">
+            <div class="confirm-body">
+              <div class="confirm-title">Закрыть без сохранения?</div>
+              <div class="confirm-text">Введённые данные будут потеряны. Чтобы сохранить, нажмите «Отмена» и нажмите «Сохранить» в форме.</div>
+            </div>
+            <div class="confirm-foot">
+              <button class="btn btn-md btn-secondary">Отмена</button>
+              <button class="btn btn-md btn-primary">Закрыть</button>
+            </div>
+          </div>
+        </div>
+
+        <span class="demo-label">С key-value grid · <code class="code-inline">.confirm-kv</code> (запуск фоновой команды)</span>
+        <div class="demo demo--hero" style="justify-content:center;">
+          <div class="mdl mdl--compact">
+            <div class="confirm-body">
+              <div class="confirm-title">Запустить операцию?</div>
+              <div class="confirm-text">Запустить «<b>Пересчёт ОДДС</b>» для <b>ООО «Ромашка-Бэст»</b>? Фоновая команда будет отправлена в очередь.</div>
+              <div class="confirm-kv">
+                <div class="kv-key">Команда</div>
+                <div class="kv-val kv-val--mono">app:recalc-oddc</div>
+                <div class="kv-key">Очередь</div>
+                <div class="kv-val kv-val--mono is-strong">reports</div>
+                <div class="kv-key">Объём</div>
+                <div class="kv-val">ООО «Ромашка-Бэст» · ИНН&nbsp;7723812931</div>
+              </div>
+            </div>
+            <div class="confirm-foot">
+              <button class="btn btn-md btn-secondary">Отмена</button>
+              <button class="btn btn-md btn-primary">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Запустить
+              </button>
+            </div>
+          </div>
+        </div>

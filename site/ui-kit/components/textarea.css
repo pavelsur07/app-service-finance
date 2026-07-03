@@ -1,0 +1,19 @@
+/* ============ TEXTAREA ============ */
+.textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: var(--r-3);
+  background: var(--bg-card);
+  font-family: inherit;
+  font-size: var(--font-13);
+  color: var(--text-strong);
+  resize: vertical;
+  outline: none;
+  transition: border-color .12s, box-shadow .12s;
+}
+.textarea::placeholder { color: var(--input-placeholder); }
+.textarea:hover { border-color: var(--border-hover); }
+.textarea:focus-visible { border-color: var(--input-border-focus); box-shadow: 0 0 0 3px var(--input-focus-ring); outline: none; }
+.textarea:disabled { background: var(--bg-page); color: var(--text-muted); cursor: not-allowed; }
+.textarea.is-error { border-color: var(--input-border-error); box-shadow: 0 0 0 3px var(--input-error-ring); }

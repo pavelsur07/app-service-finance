@@ -27,25 +27,6 @@
   --bg-row-selected: #F4F8FF;
   --bg-dark: #0B1220;
 
-  /* ===== Semantic ===== */
-  --success-bg: #ECFDF5;
-  --success-border: #D1FAE5;
-  --success-text: #047857;
-  --success-dot: #10B981;
-
-  --danger-bg: #FEF2F2;
-  --danger-border: #FECACA;
-  --danger-text: #B91C1C;
-  --danger-dot: #EF4444;
-
-  --warning-bg: #FFFBEB;
-  --warning-border: #FDE68A;
-  --warning-text: #92400E;
-  --warning-dot: #F59E0B;
-
-  --neutral-tint-bg: var(--bg-page); /* alias of --bg-page */
-  --neutral-tint-text: #475569;
-
   /* ===== State colors (audit v1.4) ===== */
   --color-primary-active: #1A3E9C;
   --border-hover:         #D8DEE8;
@@ -70,8 +51,6 @@
   --cat-payroll: #8B5CF6;
   --cat-tax: #EF4444;
   --cat-software: #0EA5E9;
-  --cat-returns: #94A3B8;
-  --cat-financial: #1A56DB;
 
   /* ===== Banks (brand colors) ===== */
   --bank-tinkoff: #FFDD2D;        --bank-tinkoff-fg: #0B1220;
@@ -81,10 +60,17 @@
   --bank-mts:     #EF4444;        --bank-mts-fg:     #FFFFFF;
   --bank-yookassa:#7B61FF;        --bank-yookassa-fg:#FFFFFF;
 
+  /* ===== Marketplaces (brand colors) ===== */
+  --mp-ozon:       #005BFF;       --mp-ozon-fg:       #FFFFFF;
+  --mp-wb:         #CB11AB;       --mp-wb-fg:         #FFFFFF;
+  --mp-yamarket:   #FFCC00;       --mp-yamarket-fg:   #0B1220;
+  --mp-megamarket: #21A038;       --mp-megamarket-fg: #FFFFFF;
+
   /* ===== Source badge tints ===== */
   --src-api-bg: #EEF3FE;          --src-api-text: #1E40AF;        --src-api-border: #DBE6FF;
   --src-manual-bg: #F4F6FA;       --src-manual-text: #475569;     --src-manual-border: #E2E8F0;
   --src-bot-bg: #F5F3FF;          --src-bot-text: #6D28D9;        --src-bot-border: #E9E5FF;
   --src-xls-bg: #ECFDF5;          --src-xls-text: #047857;        --src-xls-border: #D1FAE5;
   --src-1c-bg: #FFF7ED;           --src-1c-text: #C2410C;         --src-1c-border: #FFE4CC;
+
 }

@@ -1,7 +1,7 @@
 /* ============ AVATAR ============ */
 .avatar {
   display: inline-flex; align-items: center; justify-content: center;
-  font-weight: 700; color: #fff;
+  font-weight: 700; color: var(--text-inverse);
   border-radius: var(--r-circle);
   flex-shrink: 0;
 }

@@ -1,0 +1,208 @@
+<!-- @react EntityPicker -->
+<!-- @uiKit v2.1 -->
+<!-- @docs ui-kit/patterns/entity-picker.css -->
+
+        <span class="demo-label">Инстанс 1 — Контрагент (ИНН + source в meta)</span>
+        <div class="demo demo--hero" style="justify-content:center;">
+          <div class="mdl">
+            <div class="mdl-head">
+              <div class="u-flex-1">
+                <h3>Выбор контрагента</h3>
+                <div class="sub">42 контрагента · поиск по названию и ИНН</div>
+              </div>
+              <button class="btn btn-sm btn-ghost u-w-28 u-p-0" aria-label="Закрыть"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+            </div>
+            <div class="picker">
+              <div class="picker-search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input placeholder="Найти по названию или ИНН…">
+              </div>
+              <div class="picker-tabs">
+                <button class="picker-tab is-active">Недавние <span class="count">8</span></button>
+                <button class="picker-tab">Избранные <span class="count">3</span></button>
+                <button class="picker-tab">Все <span class="count">42</span></button>
+              </div>
+              <div class="picker-list">
+                <button class="picker-item is-selected">
+                  <span class="avatar avatar--md avatar--square avatar--tint-1" style="font-size:10px;">ТП</span>
+                  <div class="pi-body">
+                    <div class="pi-name">ООО «Технопарк»</div>
+                    <div class="pi-meta">ИНН <b>7704123456</b> · ООО · <span class="src src--api" style="padding:1px 5px;">API</span></div>
+                  </div>
+                  <div class="pi-right">
+                    <span class="star is-on"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15 9 22 9 17 14 19 22 12 18 5 22 7 14 2 9 9 9"/></svg></span>
+                  </div>
+                </button>
+                <button class="picker-item">
+                  <span class="avatar avatar--md avatar--square avatar--tint-3" style="font-size:10px;">ЯД</span>
+                  <div class="pi-body">
+                    <div class="pi-name">Яндекс.Директ</div>
+                    <div class="pi-meta">ИНН <b>7736207543</b> · ООО · <span class="src src--api" style="padding:1px 5px;">API</span></div>
+                  </div>
+                  <div class="pi-right">
+                    <span class="star is-on"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15 9 22 9 17 14 19 22 12 18 5 22 7 14 2 9 9 9"/></svg></span>
+                  </div>
+                </button>
+                <button class="picker-item">
+                  <span class="avatar avatar--md avatar--square avatar--tint-1" style="font-size:10px;">АС</span>
+                  <div class="pi-body">
+                    <div class="pi-name">ООО «Аренда-Сити»</div>
+                    <div class="pi-meta">ИНН <b>5012094556</b> · ООО · <span class="src src--xls" style="padding:1px 5px;">XLS</span></div>
+                  </div>
+                  <div class="pi-right">
+                    <span class="star"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15 9 22 9 17 14 19 22 12 18 5 22 7 14 2 9 9 9"/></svg></span>
+                  </div>
+                </button>
+                <button class="picker-item">
+                  <span class="avatar avatar--md avatar--square avatar--tint-4" style="font-size:10px;">ФНС</span>
+                  <div class="pi-body">
+                    <div class="pi-name">ФНС России</div>
+                    <div class="pi-meta">ИНН <b>7707329152</b> · Бюджетная организация</div>
+                  </div>
+                  <div class="pi-right">
+                    <span class="star"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15 9 22 9 17 14 19 22 12 18 5 22 7 14 2 9 9 9"/></svg></span>
+                  </div>
+                </button>
+              </div>
+            </div>
+            <div class="picker-foot">
+              <button class="btn btn-md btn-ghost add" style="color:var(--color-primary); margin-right:auto">+ Добавить контрагента</button>
+              <button class="btn btn-md btn-secondary">Отмена</button>
+              <button class="btn btn-md btn-primary">Выбрать</button>
+            </div>
+          </div>
+        </div>
+
+        <span class="demo-label">Инстанс 2 — Проект (цветной dot слева, прогресс в meta)</span>
+        <div class="demo demo--hero" style="justify-content:center;">
+          <div class="mdl">
+            <div class="mdl-head">
+              <div class="u-flex-1">
+                <h3>Выбор проекта</h3>
+                <div class="sub">Проект привяжется к выбранным операциям</div>
+              </div>
+              <button class="btn btn-sm btn-ghost u-w-28 u-p-0" aria-label="Закрыть"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+            </div>
+            <div class="picker">
+              <div class="picker-search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input placeholder="Найти проект…">
+              </div>
+              <div class="picker-list">
+                <button class="picker-item">
+                  <span style="width:24px; display:inline-flex; justify-content:center;"><span style="width:10px; height:10px; border-radius:50%; background:var(--cat-revenue);"></span></span>
+                  <div class="pi-body">
+                    <div class="pi-name">Оптовая торговля шарами</div>
+                    <div class="pi-meta">3 этапа · бюджет <b>4&thinsp;500&thinsp;000 ₽</b> · потрачено <b>72%</b></div>
+                  </div>
+                  <div class="pi-right">
+                    <div style="width:48px;">
+                      <div style="height:4px; background:var(--bg-page); border-radius:3px; overflow:hidden;">
+                        <div style="width:72%; height:100%; background:var(--cat-revenue);"></div>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+                <button class="picker-item is-selected">
+                  <span style="width:24px; display:inline-flex; justify-content:center;"><span style="width:10px; height:10px; border-radius:50%; background:var(--cat-marketing);"></span></span>
+                  <div class="pi-body">
+                    <div class="pi-name">Маркетинг Q3</div>
+                    <div class="pi-meta">бюджет <b>1&thinsp;200&thinsp;000 ₽</b> · потрачено <b>45%</b></div>
+                  </div>
+                  <div class="pi-right">
+                    <div style="width:48px;">
+                      <div style="height:4px; background:var(--bg-page); border-radius:3px; overflow:hidden;">
+                        <div style="width:45%; height:100%; background:var(--cat-marketing);"></div>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+                <button class="picker-item">
+                  <span style="width:24px; display:inline-flex; justify-content:center;"><span style="width:10px; height:10px; border-radius:50%; background:var(--cat-software);"></span></span>
+                  <div class="pi-body">
+                    <div class="pi-name">Разработка CRM</div>
+                    <div class="pi-meta">бюджет <b>2&thinsp;800&thinsp;000 ₽</b> · потрачено <b>98%</b></div>
+                  </div>
+                  <div class="pi-right">
+                    <div style="width:48px;">
+                      <div style="height:4px; background:var(--bg-page); border-radius:3px; overflow:hidden;">
+                        <div style="width:98%; height:100%; background:var(--danger-dot);"></div>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </div>
+            <div class="picker-foot">
+              <button class="btn btn-md btn-ghost add" style="color:var(--color-primary); margin-right:auto">+ Новый проект</button>
+              <button class="btn btn-md btn-secondary">Отмена</button>
+              <button class="btn btn-md btn-primary">Выбрать</button>
+            </div>
+          </div>
+        </div>
+
+        <span class="demo-label">Инстанс 3 — Компания / Workspace + Empty state</span>
+        <div class="demo demo--hero" style="justify-content:center; gap:16px; flex-wrap:wrap;">
+          <div class="mdl mdl--compact">
+            <div class="mdl-head">
+              <div class="u-flex-1">
+                <h3>Переключение компании</h3>
+                <div class="sub">3 организации в вашем аккаунте</div>
+              </div>
+              <button class="btn btn-sm btn-ghost u-w-28 u-p-0" aria-label="Закрыть"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+            </div>
+            <div class="picker">
+              <div class="picker-list" style="max-height:260px">
+                <button class="picker-item is-selected">
+                  <span class="avatar avatar--md avatar--square avatar--tint-1">РБ</span>
+                  <div class="pi-body">
+                    <div class="pi-name">ООО «Ромашка-Бэст»</div>
+                    <div class="pi-meta"><span class="role-chip">Главбух</span></div>
+                  </div>
+                  <div class="pi-right"><div class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+                </button>
+                <button class="picker-item">
+                  <span class="avatar avatar--md avatar--square avatar--tint-3">ПЛ</span>
+                  <div class="pi-body">
+                    <div class="pi-name">ИП Петров Л. А.</div>
+                    <div class="pi-meta"><span class="role-chip">Финдир</span></div>
+                  </div>
+                  <div class="pi-right"><div class="check"></div></div>
+                </button>
+                <button class="picker-item">
+                  <span class="avatar avatar--md avatar--square avatar--tint-4">ШК</span>
+                  <div class="pi-body">
+                    <div class="pi-name">ООО «ШарКомпани»</div>
+                    <div class="pi-meta"><span class="role-chip">Наблюдатель</span></div>
+                  </div>
+                  <div class="pi-right"><div class="check"></div></div>
+                </button>
+              </div>
+            </div>
+            <div class="picker-foot">
+              <button class="btn btn-md btn-ghost add" style="color:var(--color-primary); margin-right:auto">+ Подключить</button>
+            </div>
+          </div>
+
+          <div class="mdl">
+            <div class="mdl-head">
+              <div class="u-flex-1">
+                <h3>Выбор контрагента</h3>
+                <div class="sub">Поиск: <b>«xxxxx»</b></div>
+              </div>
+              <button class="btn btn-sm btn-ghost u-w-28 u-p-0" aria-label="Закрыть"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+            </div>
+            <div class="picker">
+              <div class="picker-search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input value="xxxxx">
+              </div>
+              <div class="empty" style="margin:8px; padding:32px 20px; border:0;">
+                <div class="empty-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+                <div class="empty-title">Ничего не нашлось</div>
+                <div class="empty-text">Попробуйте другой запрос или добавьте контрагента</div>
+                <button class="btn btn-md btn-secondary">+ Добавить «xxxxx»</button>
+              </div>
+            </div>
+          </div>
+        </div>

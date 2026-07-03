@@ -1,4 +1,4 @@
-/* Drawer header / footer (in-place demo) */
+/* ============ DRAWER ============ */
 .dw {
   background: var(--bg-page);
   border-radius: var(--r-4);
@@ -13,7 +13,7 @@
 }
 .dw-head h3 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
 .dw-head .sub { font-size: 12px; color: var(--text-tertiary); margin-top: 5px; }
-.dw-body { padding: 16px 24px; min-height: 60px; }
+.dw-body { padding: var(--s-4) var(--s-6); min-height: 60px; }
 .dw-foot {
   background: var(--bg-card);
   padding: 14px 24px;

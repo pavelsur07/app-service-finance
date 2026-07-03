@@ -1,0 +1,54 @@
+<!-- @react Select -->
+<!-- @uiKit v2.1 -->
+<!-- @docs ui-kit/components/select.css -->
+
+        <span class="demo-label">Триггер · закрытое состояние <code class="code-inline">.select</code> / <code class="code-inline">.select--sm</code></span>
+        <div class="form-grid" style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:14px;">
+          <div class="field">
+            <label class="field-label">Default (38) · кастомный триггер</label>
+            <button type="button" class="select" style="text-align:left;">Все транспорты</button>
+            <span class="field-helper">Список рендерится через <code class="code-inline">.select-popup</code> — см. ниже</span>
+          </div>
+          <div class="field">
+            <label class="field-label">Sm (30) · нативный фильтр</label>
+            <select class="select select--sm">
+              <option>Все периоды</option>
+              <option>Сегодня</option>
+              <option>Неделя</option>
+              <option>Месяц</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label">Disabled</label>
+            <select class="select" disabled>
+              <option>Заблокировано</option>
+            </select>
+          </div>
+        </div>
+        <div style="font-size:11.5px; color:var(--text-muted); margin: 6px 0 2px; max-width:680px; line-height:1.5;">
+          <b style="color:var(--text-secondary);">Когда <code class="code-inline">&lt;select&gt;</code>, а когда <code class="code-inline">.select-popup</code>:</b>
+          нативный <code class="code-inline">&lt;select&gt;</code> рендерит выпадающий список средствами ОС/браузера — это нельзя стилизовать (цвет выбранной строки, шрифт, отступы зависят от системной темы). Поэтому для основного UI используем <code class="code-inline">.select-popup</code> с триггером-кнопкой <code class="code-inline">.select</code>. Нативный <code class="code-inline">&lt;select&gt;</code> оставляем только для коротких фильтров и read-only/disabled случаев, где визуал списка не критичен — <code class="code-inline">color-scheme: light</code> + <code class="code-inline">accent-color</code> на <code class="code-inline">.select</code> приведут его к светлой теме и primary-подсветке выбранной строки.
+        </div>
+
+        <span class="demo-label">Открытое · <code class="code-inline">.select-popup</code> с группами и состояниями</span>
+        <div class="demo" style="align-items:flex-start;">
+          <div style="position:relative; width:280px;">
+            <button type="button" class="select" style="text-align:left; border-color:var(--color-primary); box-shadow:0 0 0 3px var(--focus-ring-input);">Marketplace · Ozon FBO</button>
+            <div class="select-popup" style="position:static; margin-top:6px; width:100%;">
+              <div class="select-optgroup-label">Маркетплейсы</div>
+              <button type="button" class="select-option"><span>Wildberries</span><svg class="select-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>
+              <button type="button" class="select-option is-selected"><span>Ozon FBO</span><svg class="select-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>
+              <button type="button" class="select-option"><span>Ozon FBS</span><svg class="select-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>
+              <button type="button" class="select-option"><span>Я.Маркет</span><svg class="select-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>
+              <div class="select-optgroup-label">Банки</div>
+              <button type="button" class="select-option"><span>Тинькофф</span><svg class="select-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>
+              <button type="button" class="select-option is-disabled"><span>Сбер · недоступно</span><svg class="select-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>
+              <button type="button" class="select-option"><span>Альфа</span><svg class="select-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>
+            </div>
+          </div>
+          <div class="cb-note" style="max-width:340px;">
+            Визуальный язык — общий с <code class="code-inline">.menu</code> и <code class="code-inline">.picker-item</code>: card-фон, <code class="code-inline">--shadow-menu</code>, 7px-радиус, опции — кнопки с <code class="code-inline">--r-2</code> и hover на <code class="code-inline">--bg-page</code>. Выбранная — <code class="code-inline">--bg-row-selected</code> + чек в <code class="code-inline">--color-primary</code>.
+            <br><br>
+            Используй когда нужны группы (<code class="code-inline">.select-optgroup-label</code>), длинные списки со скроллом, кастомный контент в опции (иконка маркетплейса, аватар, бэйдж). Для простых — нативный <code class="code-inline">&lt;select&gt;</code>.
+          </div>
+        </div>

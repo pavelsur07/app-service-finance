@@ -1,4 +1,4 @@
-/* ============ Tags input ============ */
+/* ============ TAGS ============ */
 .tags-input {
   width: 100%;
   min-height: 38px;
@@ -8,7 +8,7 @@
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
   cursor: text; position: relative;
 }
-.tags-input.is-focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--focus-ring-input); }
+.tags-input.is-focus { border-color: var(--input-border-focus); box-shadow: 0 0 0 3px var(--input-focus-ring); }
 .tags-input input {
   border: 0; outline: 0; padding: 0 6px;
   font-family: inherit; font-size: 13px; color: var(--text-strong);
