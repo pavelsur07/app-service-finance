@@ -123,6 +123,55 @@ final class OzonAccrualNormalizeStoredCommandTest extends IntegrationTestCase
         self::assertStringContainsString('Normalized 1 Ozon accrual raw records inline.', $tester->getDisplay());
     }
 
+    public function testExecuteInlinePrunesStaleTransactionsFromOlderOverlappingRaw(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+        $oldRecord = $this->storeRawRecord(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            externalId: 'accrual-by-day:2026-06-22:2026-06-28',
+            fetchedAt: new \DateTimeImmutable('2026-07-02 03:00:00+00:00'),
+            rows: [$this->postingRow('2026-06-25', 111111111)],
+        );
+        $oldRecord->markNormalizationDone();
+        $this->persistExistingTransaction(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            rawRecordId: $oldRecord->getId(),
+            operationGroupId: Uuid::uuid7()->toString(),
+            externalId: 'ozon:accrual-by-day:111111111:sale:product-0',
+            type: TransactionType::SALE,
+            direction: TransactionDirection::IN,
+            amountMinor: 240200,
+            occurredAt: new \DateTimeImmutable('2026-06-25 00:00:00+03:00'),
+        );
+
+        $newRecord = $this->storeRawRecord(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            externalId: 'accrual-by-day:2026-06-23:2026-06-29',
+            fetchedAt: new \DateTimeImmutable('2026-07-03 03:00:00+00:00'),
+            rows: [$this->postingRow('2026-06-25', 222222222)],
+        );
+        $newRecord->markNormalizationDone();
+        $this->em->flush();
+
+        $tester = $this->tester();
+        $exit = $tester->execute([
+            '--company-id' => $companyId,
+            '--from' => '2026-06-23',
+            '--to' => '2026-06-29',
+            '--shop-ref' => $connectionRef,
+            '--include-done' => true,
+            '--execute-inline' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exit, $tester->getDisplay());
+        self::assertSame(0, $this->transactionCountByExternalId($companyId, 'ozon:accrual-by-day:111111111:sale:product-0'));
+        self::assertSame(3, $this->transactionCount($companyId, $newRecord->getId()));
+    }
+
     private function tester(): CommandTester
     {
         $app = new Application(self::$kernel);
@@ -189,11 +238,11 @@ final class OzonAccrualNormalizeStoredCommandTest extends IntegrationTestCase
     /**
      * @return array<string, mixed>
      */
-    private function postingRow(): array
+    private function postingRow(string $date = '2026-06-01', int $accrualId = 53675409100): array
     {
         return [
-            'accrual_id' => 53675409100,
-            'date' => '2026-06-01',
+            'accrual_id' => $accrualId,
+            'date' => $date,
             'unit_number' => '41774559-0885-1',
             'accrued_category' => 'POSTING',
             'posting' => [
@@ -251,6 +300,14 @@ final class OzonAccrualNormalizeStoredCommandTest extends IntegrationTestCase
                  HAVING COUNT(*) > 1
              ) duplicate_keys',
             ['companyId' => $companyId, 'source' => IngestSource::OZON->value],
+        );
+    }
+
+    private function transactionCountByExternalId(string $companyId, string $externalId): int
+    {
+        return (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM ingest_financial_transactions WHERE company_id = :companyId AND external_id = :externalId',
+            ['companyId' => $companyId, 'externalId' => $externalId],
         );
     }
 

@@ -9,6 +9,7 @@ use App\Ingestion\Application\Command\RecordNormalizationIssueCommand;
 use App\Ingestion\Application\Command\UpsertFinancialTransactionCommand;
 use App\Ingestion\Application\DTO\MappedControlSum;
 use App\Ingestion\Application\DTO\MappedPreviewIssue;
+use App\Ingestion\Application\Service\OzonAccrualStaleProjectionPruner;
 use App\Ingestion\Application\Service\ListingResolverRegistry;
 use App\Ingestion\Application\Service\SystemCounterpartyResolver;
 use App\Ingestion\Domain\Contract\PreviewIssueAwareMapperInterface;
@@ -40,6 +41,7 @@ final readonly class NormalizeRawRecordAction
         private FinancialTransactionRepository $financialTransactionRepository,
         private NormalizationIssueRepository $normalizationIssueRepository,
         private UpsertFinancialTransactionAction $upsertFinancialTransactionAction,
+        private OzonAccrualStaleProjectionPruner $ozonAccrualStaleProjectionPruner,
         private RecordNormalizationIssueAction $recordNormalizationIssueAction,
         private EntityManagerInterface $entityManager,
         private EventDispatcherInterface $eventDispatcher,
@@ -157,6 +159,15 @@ final readonly class NormalizeRawRecordAction
                 }
             }
 
+            $pruneResult = $this->ozonAccrualStaleProjectionPruner->prune($rawRecord, $mappedTransactions, execute: true);
+            foreach ($pruneResult->affectedDates as $date) {
+                $affectedPeriods[] = new AffectedPeriod(
+                    shopRef: $rawRecord->getShopRef(),
+                    oldOccurredAt: null,
+                    newOccurredAt: $this->affectedDate($date),
+                );
+            }
+
             $this->entityManager->flush();
             // Mark the raw record DONE before recording control-sum issues: issues are
             // diagnostic, so a failure there must not leave the record eligible for a
@@ -205,6 +216,11 @@ final readonly class NormalizeRawRecordAction
         if (null !== $event) {
             $this->eventDispatcher->dispatch($event);
         }
+    }
+
+    private function affectedDate(string $date): \DateTimeImmutable
+    {
+        return new \DateTimeImmutable(sprintf('%s 00:00:00', $date), new \DateTimeZone('Europe/Moscow'));
     }
 
     /**
