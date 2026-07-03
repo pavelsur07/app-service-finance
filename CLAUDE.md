@@ -4,6 +4,19 @@
 > Паттерны с примерами кода → `PATTERNS.md`.
 > **Режим работы — автономный.** Claude выполняет задачу этапами, каждый этап завершает self-review + Stage Report. Высокорисковые этапы — обязательная остановка для ревью Владельцем.
 
+Stack
+PHP 8.3
+Symfony 7.3
+Doctrine ORM
+PostgreSQL
+Redis
+Symfony Messenger
+Twig
+React
+Vite / frontend tooling
+Docker Compose
+Makefile-based commands
+
 ## Карта файлов
 
 | Файл | Назначение | Когда читать |
