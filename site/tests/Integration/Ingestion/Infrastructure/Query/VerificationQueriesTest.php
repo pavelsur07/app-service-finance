@@ -226,6 +226,44 @@ final class VerificationQueriesTest extends IntegrationTestCase
         self::assertSame(0, $cells[0]->issueCount);
     }
 
+    public function testCoverageUsesLastSeenDateForOzonAccrualTypesSnapshots(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+        $raw = $this->rawRecord(
+            companyId: $companyId,
+            shopRef: $connectionRef,
+            resourceType: OzonResourceType::ACCRUAL_TYPES,
+            fetchedAt: new \DateTimeImmutable('2026-06-25 07:41:49+00:00'),
+            externalId: 'accrual-types',
+            source: IngestSource::OZON,
+            connectionRef: $connectionRef,
+        );
+        $raw->markSeen(new \DateTimeImmutable('2026-07-03 09:32:46+00:00'));
+        $raw->markNormalizationDone();
+
+        $this->em->persist($raw);
+        $this->em->flush();
+
+        /** @var CoverageQuery $query */
+        $query = self::getContainer()->get(CoverageQuery::class);
+        $cells = $query->heatmap(
+            $companyId,
+            $connectionRef,
+            new \DateTimeImmutable('2026-07-03'),
+            new \DateTimeImmutable('2026-07-03'),
+        );
+
+        self::assertCount(1, $cells);
+        self::assertSame('2026-07-03', $cells[0]->date);
+        self::assertSame($connectionRef, $cells[0]->shopRef);
+        self::assertSame(OzonResourceType::ACCRUAL_TYPES, $cells[0]->resourceType);
+        self::assertSame(1, $cells[0]->rawCount);
+        self::assertSame(0, $cells[0]->txCount);
+        self::assertSame(0, $cells[0]->issueCount);
+        self::assertSame('2026-07-03T06:32:46Z', $cells[0]->lastFetchedAt);
+    }
+
     public function testCoverageUsesWildberriesReportDateFromExternalIdWithoutJobWindow(): void
     {
         $companyId = Uuid::uuid7()->toString();
