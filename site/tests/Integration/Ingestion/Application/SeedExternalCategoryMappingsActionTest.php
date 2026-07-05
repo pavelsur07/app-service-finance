@@ -9,14 +9,17 @@ use App\Ingestion\Application\Action\UpdateExternalCategoryMappingAction;
 use App\Ingestion\Application\Source\Ozon\OzonAccrualCategoryTaxonomyResolver;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Entity\ExternalCategory;
+use App\Ingestion\Entity\ExternalCategoryCompanyMapping;
 use App\Ingestion\Entity\ExternalCategoryMapping;
 use App\Ingestion\Enum\ExternalCategoryMappingStatus;
 use App\Ingestion\Enum\ExternalCategoryStatus;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\TransactionType;
+use App\Ingestion\Repository\ExternalCategoryCompanyMappingRepository;
 use App\Ingestion\Repository\ExternalCategoryMappingRepository;
 use App\Ingestion\Repository\ExternalCategoryRepository;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Ramsey\Uuid\Uuid;
 
 final class SeedExternalCategoryMappingsActionTest extends IntegrationTestCase
 {
@@ -34,7 +37,7 @@ final class SeedExternalCategoryMappingsActionTest extends IntegrationTestCase
 
         /** @var ExternalCategoryMappingRepository $mappingRepository */
         $mappingRepository = self::getContainer()->get(ExternalCategoryMappingRepository::class);
-        $normalizedKey = OzonAccrualCategoryTaxonomyResolver::nameKey('Acquiring');
+        $normalizedKey = OzonAccrualCategoryTaxonomyResolver::codeKey('ozon_acquiring');
         self::assertNotNull($normalizedKey);
 
         $mapping = $mappingRepository->findActiveByIdentity(
@@ -81,9 +84,7 @@ final class SeedExternalCategoryMappingsActionTest extends IntegrationTestCase
         ];
 
         foreach ($expectedMappings as $providerCategory => [$code, $label, $group, $type]) {
-            $normalizedKey = OzonAccrualCategoryTaxonomyResolver::looksLikeExternalCode($providerCategory)
-                ? OzonAccrualCategoryTaxonomyResolver::codeKey($providerCategory)
-                : OzonAccrualCategoryTaxonomyResolver::nameKey($providerCategory);
+            $normalizedKey = OzonAccrualCategoryTaxonomyResolver::codeKey($providerCategory);
             self::assertNotNull($normalizedKey);
 
             $mapping = $mappingRepository->findActiveByIdentity(
@@ -150,7 +151,7 @@ final class SeedExternalCategoryMappingsActionTest extends IntegrationTestCase
         $seedAction = self::getContainer()->get(SeedExternalCategoryMappingsAction::class);
         $seedAction(IngestSource::OZON);
 
-        $normalizedKey = OzonAccrualCategoryTaxonomyResolver::nameKey('Acquiring');
+        $normalizedKey = OzonAccrualCategoryTaxonomyResolver::codeKey('ozon_acquiring');
         self::assertNotNull($normalizedKey);
 
         /** @var ExternalCategoryRepository $categoryRepository */
@@ -191,5 +192,74 @@ final class SeedExternalCategoryMappingsActionTest extends IntegrationTestCase
         self::assertSame('Услуги партнёров custom', $mapping->getCanonicalGroup());
         self::assertSame(TransactionType::FEE, $mapping->getTransactionType());
         self::assertSame(777, $mapping->getSortOrder());
+
+        $auditRows = $this->connection->fetchAllAssociative(
+            'SELECT scope, action, company_id, new_values FROM ingest_external_category_mapping_audit WHERE external_category_id = :categoryId',
+            ['categoryId' => $category->getId()],
+        );
+        self::assertCount(1, $auditRows);
+        self::assertSame('default', $auditRows[0]['scope']);
+        self::assertSame('update', $auditRows[0]['action']);
+        self::assertNull($auditRows[0]['company_id']);
+    }
+
+    public function testAdminCanCreateCompanyOverrideWithoutChangingDefaultMapping(): void
+    {
+        /** @var SeedExternalCategoryMappingsAction $seedAction */
+        $seedAction = self::getContainer()->get(SeedExternalCategoryMappingsAction::class);
+        $seedAction(IngestSource::OZON);
+
+        $normalizedKey = OzonAccrualCategoryTaxonomyResolver::codeKey('PayPerClick');
+        self::assertNotNull($normalizedKey);
+
+        /** @var ExternalCategoryRepository $categoryRepository */
+        $categoryRepository = self::getContainer()->get(ExternalCategoryRepository::class);
+        $category = $categoryRepository->findByIdentity(
+            IngestSource::OZON,
+            OzonResourceType::ACCRUAL_BY_DAY,
+            OzonAccrualCategoryTaxonomyResolver::SCOPE_ANY,
+            $normalizedKey,
+        );
+        self::assertNotNull($category);
+
+        $companyId = Uuid::uuid7()->toString();
+
+        /** @var UpdateExternalCategoryMappingAction $updateAction */
+        $updateAction = self::getContainer()->get(UpdateExternalCategoryMappingAction::class);
+        $updateAction(
+            categoryId: $category->getId(),
+            canonicalCode: 'ozon_company_cpc',
+            canonicalLabel: 'Оплата за клик company',
+            canonicalGroup: 'Company group',
+            transactionType: TransactionType::ADVERTISING,
+            sortOrder: 1234,
+            status: ExternalCategoryMappingStatus::ACTIVE,
+            known: true,
+            companyId: $companyId,
+        );
+
+        /** @var ExternalCategoryCompanyMappingRepository $companyMappingRepository */
+        $companyMappingRepository = self::getContainer()->get(ExternalCategoryCompanyMappingRepository::class);
+        $companyMapping = $companyMappingRepository->findByCategoryAndCompany($category, $companyId);
+
+        self::assertInstanceOf(ExternalCategoryCompanyMapping::class, $companyMapping);
+        self::assertSame('ozon_company_cpc', $companyMapping->getCanonicalCode());
+
+        /** @var ExternalCategoryMappingRepository $mappingRepository */
+        $mappingRepository = self::getContainer()->get(ExternalCategoryMappingRepository::class);
+        $defaultMapping = $mappingRepository->findByCategory($category);
+        self::assertInstanceOf(ExternalCategoryMapping::class, $defaultMapping);
+        self::assertSame('ozon_cpc', $defaultMapping->getCanonicalCode());
+        $this->em->refresh($category);
+        self::assertSame('Оплата за клик', $category->getDisplayLabel());
+
+        $auditRows = $this->connection->fetchAllAssociative(
+            'SELECT scope, action, company_id FROM ingest_external_category_mapping_audit WHERE external_category_id = :categoryId',
+            ['categoryId' => $category->getId()],
+        );
+        self::assertCount(1, $auditRows);
+        self::assertSame('company', $auditRows[0]['scope']);
+        self::assertSame('create', $auditRows[0]['action']);
+        self::assertSame($companyId, $auditRows[0]['company_id']);
     }
 }

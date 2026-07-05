@@ -76,6 +76,46 @@ final class DiscoverExternalCategoriesActionTest extends IntegrationTestCase
         self::assertSame('ozon_logistics', $mapping->getCanonicalCode());
     }
 
+    public function testNameOnlyCategoryIsDiscoveredWithoutAutoMapping(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $rawRecordId = Uuid::uuid7()->toString();
+
+        $this->em->persist($this->unknownOzonFeeTransaction(
+            companyId: $companyId,
+            rawRecordId: $rawRecordId,
+            externalId: 'ozon:accrual-by-day:3:non-item:type-777',
+            component: 'non_item_fee:type-777',
+            label: 'Неизвестная категория Ozon: Acquiring',
+            typeId: '777',
+        ));
+        $this->em->flush();
+
+        /** @var DiscoverExternalCategoriesAction $action */
+        $action = self::getContainer()->get(DiscoverExternalCategoriesAction::class);
+        $stats = $action(IngestSource::OZON, 10);
+
+        self::assertSame(1, $stats['scanned']);
+        self::assertSame(1, $stats['categoriesCreated']);
+        self::assertSame(0, $stats['autoMapped']);
+        self::assertSame(1, $stats['unmapped']);
+
+        /** @var ExternalCategoryRepository $categoryRepository */
+        $categoryRepository = self::getContainer()->get(ExternalCategoryRepository::class);
+        $category = $categoryRepository->findByIdentity(
+            IngestSource::OZON,
+            OzonResourceType::ACCRUAL_BY_DAY,
+            OzonAccrualCategoryTaxonomyResolver::SCOPE_NON_ITEM,
+            'name:acquiring',
+        );
+
+        self::assertInstanceOf(ExternalCategory::class, $category);
+
+        /** @var ExternalCategoryMappingRepository $mappingRepository */
+        $mappingRepository = self::getContainer()->get(ExternalCategoryMappingRepository::class);
+        self::assertNull($mappingRepository->findByCategory($category));
+    }
+
     private function unknownOzonFeeTransaction(
         string $companyId,
         string $rawRecordId,
@@ -83,6 +123,7 @@ final class DiscoverExternalCategoriesActionTest extends IntegrationTestCase
         string $component,
         string $label,
         ?string $externalCode = null,
+        string $typeId = '29',
     ): FinancialTransaction {
         return new FinancialTransaction(
             companyId: $companyId,
@@ -100,7 +141,7 @@ final class DiscoverExternalCategoriesActionTest extends IntegrationTestCase
             description: $label,
             sourceData: [
                 '_ingestion_resource' => OzonResourceType::ACCRUAL_BY_DAY,
-                '_ingestion_type_id' => '29',
+                '_ingestion_type_id' => $typeId,
                 '_ingestion_external_code' => $externalCode,
                 '_ingestion_component' => $component,
                 '_ozon_category_known' => false,

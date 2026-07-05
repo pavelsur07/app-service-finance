@@ -32,7 +32,7 @@ final readonly class OzonAccrualByDayPreviewMapper
         bool $includeSaleRefund = false,
         bool $recordUnknownCategories = false,
     ): array {
-        $this->categoryResolver?->resetPerPreviewState();
+        $this->categoryResolver?->resetPerPreviewState($companyId);
 
         $transactions = [];
 

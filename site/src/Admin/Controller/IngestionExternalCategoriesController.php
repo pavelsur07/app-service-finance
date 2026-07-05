@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Admin\Controller;
 
+use App\Company\Entity\User;
 use App\Ingestion\Application\Action\DiscoverExternalCategoriesAction;
 use App\Ingestion\Application\Action\RefreshOzonAccrualCategoryMetadataAction;
 use App\Ingestion\Application\Action\SeedExternalCategoryMappingsAction;
@@ -161,6 +162,8 @@ final class IngestionExternalCategoriesController extends AbstractController
                 status: ExternalCategoryMappingStatus::from((string) $request->request->get('mapping_status')),
                 known: '1' === (string) $request->request->get('known', '0'),
                 displayLabel: $this->optionalString($request->request->get('display_label')),
+                updatedBy: $this->actorUserId(),
+                companyId: $this->optionalString($request->request->get('company_id')),
             );
             $this->addFlash('success', 'Маппинг категории сохранен. Запустите refresh metadata для нужного периода.');
         } catch (\Throwable $exception) {
@@ -201,5 +204,12 @@ final class IngestionExternalCategoriesController extends AbstractController
         $value = trim((string) $value);
 
         return '' === $value ? null : $value;
+    }
+
+    private function actorUserId(): ?string
+    {
+        $user = $this->getUser();
+
+        return $user instanceof User ? $user->getId() : null;
     }
 }

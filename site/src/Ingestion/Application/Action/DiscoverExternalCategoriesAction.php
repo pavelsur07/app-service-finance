@@ -105,8 +105,7 @@ final readonly class DiscoverExternalCategoriesAction
             }
 
             $mappedCategory = (null !== $externalCode ? OzonAccrualCategory::findByCode(OzonAccrualCategoryTaxonomyResolver::normalizeExternalCode($externalCode) ?? '') : null)
-                ?? OzonAccrualCategory::findByOzonName($externalCode)
-                ?? OzonAccrualCategory::findByOzonName($typeName)
+                ?? (null !== $externalCode ? OzonAccrualCategory::findByOzonName($externalCode) : null)
                 ?? OzonAccrualCategory::findByTypeId($typeId);
             $categoryId = $externalCategory->getId();
             $mappingKnownByCategoryId[$categoryId] ??= $this->mappingRepository->findByCategory($externalCategory) instanceof ExternalCategoryMapping;
@@ -143,7 +142,7 @@ final readonly class DiscoverExternalCategoriesAction
     {
         return $this->connection->fetchAllAssociative(
             sprintf(
-                 "SELECT
+                "SELECT
                     ft.source_data->>'_ingestion_type_id' AS type_id,
                     ft.source_data->>'_ingestion_external_code' AS external_code,
                     ft.source_data->>'_ingestion_provider_label' AS provider_label,
