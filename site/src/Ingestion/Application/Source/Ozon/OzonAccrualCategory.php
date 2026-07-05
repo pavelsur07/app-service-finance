@@ -129,14 +129,11 @@ final readonly class OzonAccrualCategory
         TransactionType $fallbackType,
         ?string $externalCode = null,
         ?string $providerLabel = null,
-    ): self
-    {
+    ): self {
         $externalCode = null !== $externalCode ? strtolower(trim($externalCode)) : null;
 
         return (null !== $externalCode ? self::findByCode($externalCode) : null)
             ?? self::findByOzonName($externalCode)
-            ?? self::findByOzonName($providerLabel)
-            ?? self::findByOzonName($typeName)
             ?? self::findByTypeId($typeId)
             ?? self::unknown($typeId, $providerLabel ?? $externalCode ?? $typeName, $fallbackType);
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Ingestion\Application\Source\Ozon;
 
 use App\Ingestion\Application\Source\Ozon\OzonAccrualCategory;
+use App\Ingestion\Application\Source\Ozon\OzonAccrualCategoryTaxonomyResolver;
 use App\Ingestion\Enum\TransactionType;
 use PHPUnit\Framework\TestCase;
 
@@ -71,7 +72,7 @@ final class OzonAccrualCategoryTest extends TestCase
         self::assertSame(TransactionType::FEE, $stockInsurance->transactionType);
     }
 
-    public function testFindsObservedInternalOzonTypeNames(): void
+    public function testFindsObservedInternalOzonExternalCodes(): void
     {
         $expectedCodes = [
             'Acquiring' => 'ozon_acquiring',
@@ -110,12 +111,28 @@ final class OzonAccrualCategoryTest extends TestCase
             'TemporaryPlacementsAgent' => 'ozon_temporary_partner_storage',
         ];
 
-        foreach ($expectedCodes as $ozonTypeName => $expectedCode) {
-            $category = OzonAccrualCategory::forTypedFee(null, $ozonTypeName, TransactionType::FEE);
+        foreach ($expectedCodes as $ozonExternalCode => $expectedCode) {
+            $category = OzonAccrualCategory::forTypedFee(null, null, TransactionType::FEE, $ozonExternalCode);
 
-            self::assertTrue($category->known, sprintf('Ozon type name "%s" must not resolve as unknown.', $ozonTypeName));
-            self::assertSame($expectedCode, $category->code, sprintf('Unexpected category for Ozon type name "%s".', $ozonTypeName));
+            self::assertTrue($category->known, sprintf('Ozon external code "%s" must not resolve as unknown.', $ozonExternalCode));
+            self::assertSame($expectedCode, $category->code, sprintf('Unexpected category for Ozon external code "%s".', $ozonExternalCode));
         }
+    }
+
+    public function testNameOnlyTypedFeeStaysUnknown(): void
+    {
+        $category = OzonAccrualCategory::forTypedFee(null, 'Acquiring', TransactionType::FEE);
+
+        self::assertFalse($category->known);
+        self::assertSame('Требует классификации', $category->group);
+    }
+
+    public function testExternalCodeHeuristicRejectsDisplayAliases(): void
+    {
+        self::assertTrue(OzonAccrualCategoryTaxonomyResolver::looksLikeExternalCode('Acquiring'));
+        self::assertTrue(OzonAccrualCategoryTaxonomyResolver::looksLikeExternalCode('Drop-Off'));
+        self::assertFalse(OzonAccrualCategoryTaxonomyResolver::looksLikeExternalCode('Логистика Ozon'));
+        self::assertFalse(OzonAccrualCategoryTaxonomyResolver::looksLikeExternalCode('Упаковка товара партнерами'));
     }
 
     public function testFindsFieldCategoriesBySignedAmount(): void

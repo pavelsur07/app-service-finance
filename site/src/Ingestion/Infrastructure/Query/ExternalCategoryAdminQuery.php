@@ -64,6 +64,7 @@ final readonly class ExternalCategoryAdminQuery
                 'sort_order' => null !== $row['sort_order'] ? (int) $row['sort_order'] : null,
                 'known' => null !== $row['known'] ? (bool) $row['known'] : null,
                 'mapping_status' => null !== $row['mapping_status'] ? (string) $row['mapping_status'] : null,
+                'company_overrides' => (int) $row['company_overrides'],
             ],
             $this->connection->fetchAllAssociative(
                 sprintf(
@@ -86,7 +87,13 @@ final readonly class ExternalCategoryAdminQuery
                             m.transaction_type,
                             m.sort_order,
                             m.known,
-                            m.status AS mapping_status
+                            m.status AS mapping_status,
+                            (
+                                SELECT COUNT(*)
+                                FROM ingest_external_category_company_mappings cm
+                                WHERE cm.external_category_id = c.id
+                                  AND cm.status = \'active\'
+                            ) AS company_overrides
                      FROM ingest_external_categories c
                      LEFT JOIN ingest_external_category_mappings m ON m.external_category_id = c.id
                      ORDER BY CASE c.status

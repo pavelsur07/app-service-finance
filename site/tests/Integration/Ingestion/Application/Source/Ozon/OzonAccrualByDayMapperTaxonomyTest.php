@@ -9,8 +9,13 @@ use App\Ingestion\Application\Source\Ozon\OzonAccrualByDayMapper;
 use App\Ingestion\Application\Source\Ozon\OzonAccrualCategoryTaxonomyResolver;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Entity\ExternalCategory;
+use App\Ingestion\Entity\ExternalCategoryCompanyMapping;
+use App\Ingestion\Entity\ExternalCategoryMapping;
 use App\Ingestion\Entity\IngestRawRecord;
+use App\Ingestion\Enum\ExternalCategoryMappingStatus;
+use App\Ingestion\Enum\ExternalCategoryStatus;
 use App\Ingestion\Enum\IngestSource;
+use App\Ingestion\Enum\TransactionType;
 use App\Ingestion\Repository\ExternalCategoryRepository;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
@@ -100,6 +105,128 @@ final class OzonAccrualByDayMapperTaxonomyTest extends IntegrationTestCase
         self::assertTrue($transactions[0]->sourceData['_ozon_category_known']);
     }
 
+    public function testCompanyOverrideTakesPrecedenceOverDefaultMapping(): void
+    {
+        $normalizedKey = OzonAccrualCategoryTaxonomyResolver::codeKey('CustomOzonFee');
+        self::assertNotNull($normalizedKey);
+
+        $category = new ExternalCategory(
+            source: IngestSource::OZON,
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            scope: OzonAccrualCategoryTaxonomyResolver::SCOPE_NON_ITEM,
+            normalizedKey: $normalizedKey,
+            externalCode: 'CustomOzonFee',
+            externalName: 'CustomOzonFee',
+            providerLabel: 'Custom Ozon fee',
+            displayLabel: 'Custom Ozon fee',
+            status: ExternalCategoryStatus::MAPPED,
+        );
+        $companyId = Uuid::uuid7()->toString();
+        $otherCompanyId = Uuid::uuid7()->toString();
+
+        $this->em->persist($category);
+        $this->em->persist(new ExternalCategoryMapping(
+            externalCategory: $category,
+            canonicalCode: 'ozon_other_services',
+            canonicalLabel: 'Другие услуги',
+            canonicalGroup: 'Другие услуги и штрафы',
+            transactionType: TransactionType::FEE,
+            sortOrder: 1090,
+            status: ExternalCategoryMappingStatus::ACTIVE,
+        ));
+        $this->em->persist(new ExternalCategoryCompanyMapping(
+            externalCategory: $category,
+            companyId: $companyId,
+            canonicalCode: 'ozon_cpc',
+            canonicalLabel: 'Оплата за клик',
+            canonicalGroup: 'Продвижение и реклама',
+            transactionType: TransactionType::ADVERTISING,
+            sortOrder: 900,
+            status: ExternalCategoryMappingStatus::ACTIVE,
+        ));
+        $this->em->flush();
+
+        /** @var OzonAccrualByDayMapper $mapper */
+        $mapper = self::getContainer()->get(OzonAccrualByDayMapper::class);
+
+        $companyTransactions = $mapper->mapForCategoryMetadataRefresh($this->rawRecord($companyId), [$this->customFeeRow()], recordUnknownCategories: false);
+        $otherCompanyTransactions = $mapper->mapForCategoryMetadataRefresh($this->rawRecord($otherCompanyId), [$this->customFeeRow()], recordUnknownCategories: false);
+
+        self::assertCount(1, $companyTransactions);
+        self::assertCount(1, $otherCompanyTransactions);
+        self::assertSame('ozon_cpc', $companyTransactions[0]->sourceData['_ozon_category_code']);
+        self::assertSame('Продвижение и реклама', $companyTransactions[0]->sourceData['_ozon_category_group']);
+        self::assertSame('ozon_other_services', $otherCompanyTransactions[0]->sourceData['_ozon_category_code']);
+        self::assertSame('Другие услуги и штрафы', $otherCompanyTransactions[0]->sourceData['_ozon_category_group']);
+    }
+
+    public function testCompanyAnyOverrideTakesPrecedenceOverScopedDefaultMapping(): void
+    {
+        $normalizedKey = OzonAccrualCategoryTaxonomyResolver::codeKey('ScopedCustomOzonFee');
+        self::assertNotNull($normalizedKey);
+
+        $scopedCategory = new ExternalCategory(
+            source: IngestSource::OZON,
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            scope: OzonAccrualCategoryTaxonomyResolver::SCOPE_NON_ITEM,
+            normalizedKey: $normalizedKey,
+            externalCode: 'ScopedCustomOzonFee',
+            externalName: 'ScopedCustomOzonFee',
+            providerLabel: 'Scoped custom Ozon fee',
+            displayLabel: 'Scoped custom Ozon fee',
+            status: ExternalCategoryStatus::MAPPED,
+        );
+        $anyCategory = new ExternalCategory(
+            source: IngestSource::OZON,
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            scope: OzonAccrualCategoryTaxonomyResolver::SCOPE_ANY,
+            normalizedKey: $normalizedKey,
+            externalCode: 'ScopedCustomOzonFee',
+            externalName: 'ScopedCustomOzonFee',
+            providerLabel: 'Scoped custom Ozon fee',
+            displayLabel: 'Scoped custom Ozon fee',
+            status: ExternalCategoryStatus::MAPPED,
+        );
+        $companyId = Uuid::uuid7()->toString();
+        $otherCompanyId = Uuid::uuid7()->toString();
+
+        $this->em->persist($scopedCategory);
+        $this->em->persist($anyCategory);
+        $this->em->persist(new ExternalCategoryMapping(
+            externalCategory: $scopedCategory,
+            canonicalCode: 'ozon_other_services',
+            canonicalLabel: 'Другие услуги',
+            canonicalGroup: 'Другие услуги и штрафы',
+            transactionType: TransactionType::FEE,
+            sortOrder: 1090,
+            status: ExternalCategoryMappingStatus::ACTIVE,
+        ));
+        $this->em->persist(new ExternalCategoryCompanyMapping(
+            externalCategory: $anyCategory,
+            companyId: $companyId,
+            canonicalCode: 'ozon_cpc',
+            canonicalLabel: 'Оплата за клик',
+            canonicalGroup: 'Продвижение и реклама',
+            transactionType: TransactionType::ADVERTISING,
+            sortOrder: 900,
+            status: ExternalCategoryMappingStatus::ACTIVE,
+        ));
+        $this->em->flush();
+
+        /** @var OzonAccrualByDayMapper $mapper */
+        $mapper = self::getContainer()->get(OzonAccrualByDayMapper::class);
+
+        $companyTransactions = $mapper->mapForCategoryMetadataRefresh($this->rawRecord($companyId), [$this->customFeeRow('ScopedCustomOzonFee')], recordUnknownCategories: false);
+        $otherCompanyTransactions = $mapper->mapForCategoryMetadataRefresh($this->rawRecord($otherCompanyId), [$this->customFeeRow('ScopedCustomOzonFee')], recordUnknownCategories: false);
+
+        self::assertCount(1, $companyTransactions);
+        self::assertCount(1, $otherCompanyTransactions);
+        self::assertSame('ozon_cpc', $companyTransactions[0]->sourceData['_ozon_category_code']);
+        self::assertSame('Продвижение и реклама', $companyTransactions[0]->sourceData['_ozon_category_group']);
+        self::assertSame('ozon_other_services', $otherCompanyTransactions[0]->sourceData['_ozon_category_code']);
+        self::assertSame('Другие услуги и штрафы', $otherCompanyTransactions[0]->sourceData['_ozon_category_group']);
+    }
+
     public function testZeroAmountTypedFeeDoesNotRecordUnknownCategory(): void
     {
         $companyId = Uuid::uuid7()->toString();
@@ -156,5 +283,24 @@ final class OzonAccrualByDayMapperTaxonomyTest extends IntegrationTestCase
             fetchedAt: new \DateTimeImmutable('2026-06-20 20:35:35'),
             syncJobId: Uuid::uuid7()->toString(),
         );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function customFeeRow(string $code = 'CustomOzonFee'): array
+    {
+        return [
+            'accrual_id' => 777004,
+            'date' => '2026-06-15',
+            'unit_number' => 'unit-1',
+            'accrued_category' => 'NON_ITEM',
+            'non_item_fee' => [
+                'type_id' => 999001,
+                'code' => $code,
+                'name' => $code,
+                'accrued' => ['amount' => '-10.00', 'currency' => 'RUB'],
+            ],
+        ];
     }
 }

@@ -130,18 +130,19 @@ final readonly class SeedExternalCategoryMappingsAction
             }
         }
 
-        foreach (array_merge([$category->label], $category->aliases) as $alias) {
-            $externalCode = OzonAccrualCategoryTaxonomyResolver::looksLikeExternalCode($alias) ? $alias : null;
-            $normalizedKey = null !== $externalCode
-                ? OzonAccrualCategoryTaxonomyResolver::codeKey($externalCode)
-                : OzonAccrualCategoryTaxonomyResolver::nameKey($alias);
+        foreach ($category->aliases as $alias) {
+            if (!OzonAccrualCategoryTaxonomyResolver::looksLikeExternalCode($alias)) {
+                continue;
+            }
+
+            $normalizedKey = OzonAccrualCategoryTaxonomyResolver::codeKey($alias);
             if (null !== $normalizedKey) {
                 $identities[$normalizedKey] = [
                     'normalizedKey' => $normalizedKey,
                     'externalTypeId' => null,
-                    'externalCode' => $externalCode,
+                    'externalCode' => $alias,
                     'externalName' => (string) $alias,
-                    'providerLabel' => null === $externalCode ? (string) $alias : $category->label,
+                    'providerLabel' => $category->label,
                     'displayLabel' => $category->label,
                 ];
             }

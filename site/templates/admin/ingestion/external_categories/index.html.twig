@@ -200,6 +200,7 @@
                 <th>Provider label</th>
                 <th>type_id</th>
                 <th>Mapping</th>
+                <th>Company overrides</th>
                 <th>Seen</th>
                 <th>Last seen</th>
               </tr>
@@ -224,6 +225,9 @@
                       <div class="row g-2">
                         <div class="col-md-4">
                           <input class="form-control form-control-sm" name="display_label" value="{{ row.display_label ?? row.provider_label ?? row.external_name ?? '' }}" placeholder="display label">
+                        </div>
+                        <div class="col-md-4">
+                          <input class="form-control form-control-sm" name="company_id" value="" placeholder="company override UUID">
                         </div>
                         <div class="col-md-3">
                           <input class="form-control form-control-sm" name="canonical_code" value="{{ row.canonical_code ?? '' }}" placeholder="code" required>
@@ -263,6 +267,7 @@
                       </div>
                     </form>
                   </td>
+                  <td>{{ row.company_overrides }}</td>
                   <td>{{ row.seen_count }}</td>
                   <td>{{ row.last_seen_at }}</td>
                 </tr>

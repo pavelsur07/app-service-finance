@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace App\Ingestion\Application\Source\Ozon;
 
 use App\Ingestion\Entity\ExternalCategory;
+use App\Ingestion\Entity\ExternalCategoryCompanyMapping;
 use App\Ingestion\Entity\ExternalCategoryMapping;
 use App\Ingestion\Enum\ExternalCategoryStatus;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\TransactionType;
+use App\Ingestion\Repository\ExternalCategoryCompanyMappingRepository;
 use App\Ingestion\Repository\ExternalCategoryMappingRepository;
 use App\Ingestion\Repository\ExternalCategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 
 final class OzonAccrualCategoryTaxonomyResolver
 {
@@ -30,12 +33,21 @@ final class OzonAccrualCategoryTaxonomyResolver
     /**
      * @var array<string, ExternalCategoryMapping>|null
      */
-    private ?array $activeMappingsByIdentity = null;
+    private ?array $activeDefaultMappingsByIdentity = null;
+
+    /**
+     * @var array<string, ExternalCategoryCompanyMapping>|null
+     */
+    private ?array $activeCompanyMappingsByIdentity = null;
+
+    private ?string $activeMappingCompanyId = null;
 
     public function __construct(
         private readonly ExternalCategoryRepository $categoryRepository,
         private readonly ExternalCategoryMappingRepository $mappingRepository,
+        private readonly ExternalCategoryCompanyMappingRepository $companyMappingRepository,
         private readonly EntityManagerInterface $entityManager,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -49,9 +61,11 @@ final class OzonAccrualCategoryTaxonomyResolver
         return $this->categoryFromMapping($this->findMapping(self::SCOPE_FIELD, self::fieldKey($field))) ?? $static;
     }
 
-    public function resetPerPreviewState(): void
+    public function resetPerPreviewState(?string $companyId = null): void
     {
-        $this->activeMappingsByIdentity = null;
+        $this->activeDefaultMappingsByIdentity = null;
+        $this->activeCompanyMappingsByIdentity = null;
+        $this->activeMappingCompanyId = $companyId;
         $this->recordedUnknowns = [];
     }
 
@@ -65,12 +79,7 @@ final class OzonAccrualCategoryTaxonomyResolver
         bool $recordUnknown = false,
     ): OzonAccrualCategory {
         foreach ($this->candidateKeys($externalCode, $providerLabel ?? $typeName, $typeId) as $normalizedKey) {
-            $mapped = $this->categoryFromMapping($this->findMapping($scope, $normalizedKey));
-            if (null !== $mapped) {
-                return $mapped;
-            }
-
-            $mapped = $this->categoryFromMapping($this->findMapping(self::SCOPE_ANY, $normalizedKey));
+            $mapped = $this->categoryFromMapping($this->findTypedFeeMapping($scope, $normalizedKey));
             if (null !== $mapped) {
                 return $mapped;
             }
@@ -145,15 +154,7 @@ final class OzonAccrualCategoryTaxonomyResolver
             return false;
         }
 
-        if (1 !== preg_match('/^[A-Za-z][A-Za-z0-9_.:-]*$/', $value)) {
-            return false;
-        }
-
-        return str_contains($value, '_')
-            || str_contains($value, '.')
-            || str_contains($value, ':')
-            || 1 === preg_match('/[a-z][A-Z]/', $value)
-            || str_starts_with(strtolower($value), 'ozon');
+        return 1 === preg_match('/^[A-Za-z][A-Za-z0-9_.:-]*$/', $value);
     }
 
     private static function normalizeTypeId(?string $typeId): ?string
@@ -198,31 +199,69 @@ final class OzonAccrualCategoryTaxonomyResolver
 
         return (null !== $externalCode ? OzonAccrualCategory::findByCode($externalCode) : null)
             ?? OzonAccrualCategory::findByOzonName($externalCode)
-            ?? OzonAccrualCategory::findByOzonName($providerLabel)
-            ?? OzonAccrualCategory::forTypedFee($typeId, $typeName, $fallbackType, $externalCode, $providerLabel);
+            ?? OzonAccrualCategory::findByTypeId($typeId)
+            ?? OzonAccrualCategory::unknown($typeId, $providerLabel ?? $externalCode ?? $typeName, $fallbackType);
     }
 
-    private function findMapping(string $scope, string $normalizedKey): ?ExternalCategoryMapping
+    private function findMapping(string $scope, string $normalizedKey): ExternalCategoryMapping|ExternalCategoryCompanyMapping|null
     {
-        return $this->activeMappingsByIdentity()[$this->mappingIdentityKey($scope, $normalizedKey)] ?? null;
+        return $this->findCompanyMapping($scope, $normalizedKey) ?? $this->findDefaultMapping($scope, $normalizedKey);
+    }
+
+    private function findTypedFeeMapping(string $scope, string $normalizedKey): ExternalCategoryMapping|ExternalCategoryCompanyMapping|null
+    {
+        return $this->findCompanyMapping($scope, $normalizedKey)
+            ?? $this->findCompanyMapping(self::SCOPE_ANY, $normalizedKey)
+            ?? $this->findDefaultMapping($scope, $normalizedKey)
+            ?? $this->findDefaultMapping(self::SCOPE_ANY, $normalizedKey);
+    }
+
+    private function findDefaultMapping(string $scope, string $normalizedKey): ?ExternalCategoryMapping
+    {
+        return $this->activeDefaultMappingsByIdentity()[$this->mappingIdentityKey($scope, $normalizedKey)] ?? null;
+    }
+
+    private function findCompanyMapping(string $scope, string $normalizedKey): ?ExternalCategoryCompanyMapping
+    {
+        return $this->activeCompanyMappingsByIdentity()[$this->mappingIdentityKey($scope, $normalizedKey)] ?? null;
     }
 
     /**
      * @return array<string, ExternalCategoryMapping>
      */
-    private function activeMappingsByIdentity(): array
+    private function activeDefaultMappingsByIdentity(): array
     {
-        if (null !== $this->activeMappingsByIdentity) {
-            return $this->activeMappingsByIdentity;
+        if (null !== $this->activeDefaultMappingsByIdentity) {
+            return $this->activeDefaultMappingsByIdentity;
         }
 
-        $this->activeMappingsByIdentity = [];
+        $this->activeDefaultMappingsByIdentity = [];
         foreach ($this->mappingRepository->findActiveBySourceAndResource(IngestSource::OZON, OzonResourceType::ACCRUAL_BY_DAY) as $mapping) {
             $category = $mapping->getExternalCategory();
-            $this->activeMappingsByIdentity[$this->mappingIdentityKey($category->getScope(), $category->getNormalizedKey())] = $mapping;
+            $this->activeDefaultMappingsByIdentity[$this->mappingIdentityKey($category->getScope(), $category->getNormalizedKey())] = $mapping;
         }
 
-        return $this->activeMappingsByIdentity;
+        return $this->activeDefaultMappingsByIdentity;
+    }
+
+    /**
+     * @return array<string, ExternalCategoryCompanyMapping>
+     */
+    private function activeCompanyMappingsByIdentity(): array
+    {
+        if (null !== $this->activeCompanyMappingsByIdentity) {
+            return $this->activeCompanyMappingsByIdentity;
+        }
+
+        $this->activeCompanyMappingsByIdentity = [];
+        if (null !== $this->activeMappingCompanyId) {
+            foreach ($this->companyMappingRepository->findActiveBySourceResourceAndCompany(IngestSource::OZON, OzonResourceType::ACCRUAL_BY_DAY, $this->activeMappingCompanyId) as $mapping) {
+                $category = $mapping->getExternalCategory();
+                $this->activeCompanyMappingsByIdentity[$this->mappingIdentityKey($category->getScope(), $category->getNormalizedKey())] = $mapping;
+            }
+        }
+
+        return $this->activeCompanyMappingsByIdentity;
     }
 
     private function mappingIdentityKey(string $scope, string $normalizedKey): string
@@ -230,7 +269,7 @@ final class OzonAccrualCategoryTaxonomyResolver
         return sprintf('%s:%s', $scope, $normalizedKey);
     }
 
-    private function categoryFromMapping(?ExternalCategoryMapping $mapping): ?OzonAccrualCategory
+    private function categoryFromMapping(ExternalCategoryMapping|ExternalCategoryCompanyMapping|null $mapping): ?OzonAccrualCategory
     {
         if (null === $mapping) {
             return null;
@@ -255,8 +294,7 @@ final class OzonAccrualCategoryTaxonomyResolver
         ?string $typeName,
         ?string $externalCode,
         ?string $providerLabel,
-    ): void
-    {
+    ): void {
         $normalizedKey = self::codeKey($externalCode)
             ?? self::nameKey($providerLabel ?? $typeName)
             ?? self::typeKey($typeId);
@@ -300,5 +338,14 @@ final class OzonAccrualCategoryTaxonomyResolver
 
         $this->entityManager->persist($category);
         $this->recordedUnknowns[$cacheKey] = $category;
+        $this->logger->warning('Ozon accrual category requires classification.', [
+            'source' => IngestSource::OZON->value,
+            'resourceType' => OzonResourceType::ACCRUAL_BY_DAY,
+            'scope' => $scope,
+            'normalizedKey' => $normalizedKey,
+            'externalTypeId' => $typeId,
+            'externalCode' => $externalCode,
+            'providerLabel' => $providerLabel,
+        ]);
     }
 }
