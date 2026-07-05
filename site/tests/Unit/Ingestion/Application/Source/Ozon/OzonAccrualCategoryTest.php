@@ -64,6 +64,11 @@ final class OzonAccrualCategoryTest extends TestCase
         $warehouseExport = OzonAccrualCategory::forTypedFee('77', null, TransactionType::FEE, 'ozon_warehouse_export');
         self::assertTrue($warehouseExport->known);
         self::assertSame('ozon_warehouse_export', $warehouseExport->code);
+
+        $stockInsurance = OzonAccrualCategory::findByTypeId('76');
+        self::assertNotNull($stockInsurance);
+        self::assertSame('ozon_stock_insurance', $stockInsurance->code);
+        self::assertSame(TransactionType::FEE, $stockInsurance->transactionType);
     }
 
     public function testFindsObservedInternalOzonTypeNames(): void
@@ -100,6 +105,7 @@ final class OzonAccrualCategoryTest extends TestCase
             'RfbsServiceFee' => 'ozon_other_services',
             'SellerReturns' => 'ozon_partner_return_processing',
             'StarsMembership' => 'ozon_stars_membership',
+            'StockInsurance' => 'ozon_stock_insurance',
             'TemporaryPlacement' => 'ozon_temporary_partner_storage',
             'TemporaryPlacementsAgent' => 'ozon_temporary_partner_storage',
         ];
