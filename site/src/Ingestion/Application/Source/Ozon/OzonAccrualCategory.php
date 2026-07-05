@@ -89,6 +89,7 @@ final readonly class OzonAccrualCategory
             new self('ozon_packaging_materials', 'Обеспечение материалами для упаковки товара', 'Другие услуги и штрафы', TransactionType::FEE, 1020, aliases: ['PackageCost']),
             new self('ozon_premium_subscription', 'Premium-подписка', 'Другие услуги и штрафы', TransactionType::FEE, 1030, aliases: ['PremiumSubscription']),
             new self('ozon_original_labeling', 'Маркировка оригинальности', 'Другие услуги и штрафы', TransactionType::FEE, 1040, aliases: ['LabelOriginal']),
+            new self('ozon_stock_insurance', 'Страхование остатков', 'Другие услуги и штрафы', TransactionType::FEE, 1045, typeIds: ['76'], aliases: ['StockInsurance']),
             new self('ozon_defect_fine_complaint', 'Штраф за жалобу', 'Другие услуги и штрафы', TransactionType::PENALTY, 1050, aliases: ['DefectFineComplaint']),
             new self('ozon_defect_fine_shipment_delay', 'Штраф за задержку отгрузки', 'Другие услуги и штрафы', TransactionType::PENALTY, 1060, aliases: ['DefectFineShipmentDelayRate']),
             new self('ozon_other_services', 'Другие услуги', 'Другие услуги и штрафы', TransactionType::FEE, 1090, aliases: ['DefectFineErrors', 'PremiumCashbackIndividualPoints', 'PremiumMailingCommission', 'RfbsServiceFee']),
