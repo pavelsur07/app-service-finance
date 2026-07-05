@@ -7,15 +7,14 @@ namespace App\Ingestion\Application\Action;
 use App\Ingestion\Entity\ExternalCategory;
 use App\Ingestion\Entity\ExternalCategoryCompanyMapping;
 use App\Ingestion\Entity\ExternalCategoryMapping;
+use App\Ingestion\Entity\ExternalCategoryMappingAudit;
 use App\Ingestion\Enum\ExternalCategoryMappingStatus;
 use App\Ingestion\Enum\TransactionDirection;
 use App\Ingestion\Enum\TransactionType;
 use App\Ingestion\Repository\ExternalCategoryCompanyMappingRepository;
 use App\Ingestion\Repository\ExternalCategoryMappingRepository;
 use App\Ingestion\Repository\ExternalCategoryRepository;
-use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
-use Ramsey\Uuid\Uuid;
 use Webmozart\Assert\Assert;
 
 final readonly class UpdateExternalCategoryMappingAction
@@ -25,7 +24,6 @@ final readonly class UpdateExternalCategoryMappingAction
         private ExternalCategoryMappingRepository $mappingRepository,
         private ExternalCategoryCompanyMappingRepository $companyMappingRepository,
         private EntityManagerInterface $entityManager,
-        private Connection $connection,
     ) {
     }
 
@@ -53,7 +51,7 @@ final readonly class UpdateExternalCategoryMappingAction
             Assert::uuid($companyId);
         }
 
-        $this->connection->transactional(function () use (
+        $this->entityManager->wrapInTransaction(function () use (
             $category,
             $canonicalCode,
             $canonicalLabel,
@@ -100,7 +98,6 @@ final readonly class UpdateExternalCategoryMappingAction
                     $this->entityManager->persist($mapping);
                 }
 
-                $this->entityManager->flush();
                 $this->audit($category, 'company', null === $oldValues ? 'create' : 'update', $oldValues, $this->snapshot($mapping), $updatedBy, $companyId);
 
                 return;
@@ -144,7 +141,6 @@ final readonly class UpdateExternalCategoryMappingAction
             }
             $category->updateDisplayLabel($displayLabel);
 
-            $this->entityManager->flush();
             $this->audit($category, 'default', null === $oldValues ? 'create' : 'update', $oldValues, $this->snapshot($mapping), $updatedBy);
         });
     }
@@ -183,17 +179,15 @@ final readonly class UpdateExternalCategoryMappingAction
         ?string $updatedBy,
         ?string $companyId = null,
     ): void {
-        $this->connection->insert('ingest_external_category_mapping_audit', [
-            'id' => Uuid::uuid7()->toString(),
-            'external_category_id' => $category->getId(),
-            'company_id' => $companyId,
-            'scope' => $scope,
-            'action' => $action,
-            'old_values' => null === $oldValues ? null : json_encode($oldValues, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES),
-            'new_values' => json_encode($newValues, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES),
-            'updated_by' => $updatedBy,
-            'created_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s.u'),
-        ]);
+        $this->entityManager->persist(new ExternalCategoryMappingAudit(
+            externalCategory: $category,
+            scope: $scope,
+            action: $action,
+            oldValues: $oldValues,
+            newValues: $newValues,
+            companyId: $companyId,
+            updatedBy: $updatedBy,
+        ));
     }
 
     private function optionalString(?string $value): ?string
