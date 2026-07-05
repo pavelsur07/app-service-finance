@@ -182,6 +182,52 @@ force-push в shared-ветки                               — никогда
 
 ---
 
+## PROD-доступ Codex
+
+Использовать только когда Владелец явно просит проверить или выполнить операцию на PROD.
+
+Ожидаемый SSH alias: `vf-prod-codex`.
+
+Правила:
+- Не использовать root SSH для работы Codex на PROD.
+- Не добавлять PROD-пользователя Codex в `docker` group.
+- Не запускать произвольный `sudo docker`, произвольный `docker exec` или произвольные privileged shell-команды.
+- Не печатать и не коммитить production IP, private keys, passwords, tokens, env values.
+
+Разрешённые wrappers:
+- `sudo /usr/local/bin/codex-docker-ps`
+- `sudo /usr/local/bin/codex-psql-ro`
+- `sudo /usr/local/bin/codex-console <allowed-symfony-command> ...`
+
+Read-only проверки можно выполнять после запроса Владельца на PROD-проверку:
+- Docker process/status через `codex-docker-ps`.
+- Messenger stats через `codex-console messenger:stats`.
+- Marketplace category status через `codex-console app:ingestion:marketplace-categories:status`.
+- Ozon preview/verification через `codex-console`.
+- Read-only SQL через `codex-psql-ro` и роль БД `codex_ro`.
+
+Перед выполнением команд, которые меняют данные, обрабатывают очереди, вызывают внешние API или меняют состояние приложения, нужно явное подтверждение Владельца непосредственно перед запуском:
+- `messenger:consume`.
+- Любая команда с `--execute`.
+- Repair, prune, backfill, rebuild, refresh, maintenance.
+- SQL write (`INSERT`, `UPDATE`, `DELETE`, DDL, migrations).
+- Изменения production Docker, workers, scheduler, queues, secrets, config, deploy.
+
+### Добавление PROD-разрешений
+
+Если нужной команды нет в wrapper:
+1. Описать точную production operation и зачем она нужна.
+2. Классифицировать: read-only, mutating/processing, dangerous/general.
+3. Добавить только точное имя Symfony console command в `/usr/local/bin/codex-console`.
+4. Не расширять sudoers и не выдавать прямой Docker-доступ.
+5. Проверить wrapper: `bash -n /usr/local/bin/codex-console`.
+6. Проверить от restricted user: `sudo -u codex-prod sudo /usr/local/bin/codex-console <command> --help` или другой безопасный read-only вызов.
+7. Durable policy changes фиксировать в `AGENTS.md` и `CLAUDE.md`; временные one-off разрешения не документировать как постоянные.
+
+Запрещено добавлять dangerous/general permissions: arbitrary shell, arbitrary `docker exec`, unrestricted `docker`, write-capable `psql`, file editing on production, package installation. Для one-off production writes предпочтителен временный narrowly scoped wrapper, который Владелец удаляет после использования.
+
+---
+
 ## Фронтенд-задача?
 
 Если задача касается React / TypeScript / Vite / Tabler — пользователь укажет:

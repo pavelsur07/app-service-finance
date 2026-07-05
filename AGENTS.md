@@ -336,6 +336,17 @@ Any SQL write operation (`INSERT`, `UPDATE`, `DELETE`, DDL, or migrations).
 Any change to production Docker, workers, scheduler, queues, secrets, config, or deployment state.
 
 If a required production command is not available through the existing wrappers, stop and ask the owner to add a narrowly scoped wrapper or to run the command manually. Do not work around the restriction with broader Docker or sudo access.
+
+Adding production command permissions:
+1. State the exact production operation and why it is needed.
+2. Classify it as read-only, mutating/processing, or dangerous/general.
+3. Add only the exact Symfony console command name to `/usr/local/bin/codex-console`.
+4. Do not broaden sudoers and do not add direct Docker access.
+5. Verify the wrapper with `bash -n /usr/local/bin/codex-console`.
+6. Verify as the restricted user with `sudo -u codex-prod sudo /usr/local/bin/codex-console <command> --help` or another safe read-only invocation.
+7. Document durable policy changes in this file; do not document temporary one-off permissions unless they should remain available.
+
+Do not add dangerous/general permissions such as arbitrary shell, arbitrary `docker exec`, unrestricted `docker`, write-capable `psql`, file editing on production, or package installation. For one-off production writes, prefer a temporary narrowly scoped wrapper that the owner removes after use.
 ---
 Command execution
 The project is Docker Compose based.
