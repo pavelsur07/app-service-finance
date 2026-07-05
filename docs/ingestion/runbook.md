@@ -361,7 +361,110 @@ WHERE company_id = 'UUID'
 
 ---
 
-## 10. Мониторинг воркеров
+## 10. Ozon accrual: canonical расходится с latest raw (rolling refresh / prune)
+
+### Симптом
+
+- `verify-rolling-refresh` завершился с FAIL: `amountMismatches` / `countMismatches` / `unknownCategoryRows` / `failedTargets` > 0;
+- в UI / P&L суммы по Ozon завышены относительно кабинета Ozon.
+
+### Причина
+
+Ozon меняет финансовые начисления задним числом. Rolling refresh каждую ночь
+пере-fetch'ит последние 45 дней и сохраняет новые raw snapshots. Строки нового
+snapshot upsert-ятся, а строки, исчезнувшие из нового snapshot, остаются
+в `ingest_financial_transactions` от старых overlapping raw — их убирает prune.
+
+**Автоматика:** при каждой успешной нормализации нового accrual-by-day raw
+prune выполняется автоматически (`NormalizeRawRecordAction` →
+`OzonAccrualStaleProjectionPruner`). Ручной prune нужен только для repair:
+исторические расхождения или случаи, когда нормализация нового raw не прошла.
+
+### Ночная цепочка (cron, `docker/cron/app.cron`)
+
+| Время MSK | Команда |
+|---|---|
+| 02:30 | `ozon-accrual:rolling-refresh --days-back=45 --execute` (fetch, нормализация async → auto-prune) |
+| 05:15 | `ozon-accrual:daily-maintenance --days-back=45 --execute` |
+| 05:45 / 06:30 | `ozon-accrual:reconcile-financial-projection --days-back=30 --execute` |
+| 06:45 | `ozon-accrual:verify-rolling-refresh --days-back=45` (read-only контроль) |
+
+FAIL verify виден в логах scheduler: `docker logs scheduler 2>&1 | grep verify-rolling-refresh`.
+
+### Процедура repair (безопасный порядок)
+
+**Шаг 1 — verify (read-only), локализовать shop:**
+
+```bash
+php -d memory_limit=1G bin/console app:ingestion:ozon-accrual:verify-rolling-refresh \
+  --days-back=45 --company-id=UUID
+```
+
+В таблице результата найти строки со статусом `fail` — запомнить `shopRef`.
+
+**Шаг 2 — dry-run prune (ничего не удаляет):**
+
+```bash
+php -d memory_limit=1G bin/console app:ingestion:ozon-accrual:prune-stale-projection \
+  --days-back=45 --company-id=UUID --shop-ref=SHOP_REF --dry-run
+```
+
+Печатает stale строки, сгруппированные по дате / типу / направлению, с суммами.
+Сверить глазами: удаляться должны только строки из **старых** raw (`staleRaw`,
+`staleFetchedAt` старше latest snapshot).
+
+**Шаг 3 — execute:**
+
+```bash
+php -d memory_limit=1G bin/console app:ingestion:ozon-accrual:prune-stale-projection \
+  --days-back=45 --company-id=UUID --shop-ref=SHOP_REF --execute
+```
+
+Удаляет только строки, отсутствующие в latest mapped raw. Перед DELETE повторно
+проверяет, что строка всё ещё принадлежит старому raw (защита от гонки с
+параллельной нормализацией). После удаления диспатчит `NormalizationCompletedEvent`
+→ затронутые периоды P&L помечаются грязными и пересчитываются. Команда
+идемпотентна — повторный запуск безопасен.
+
+**Шаг 4 — verify повторно (как шаг 1):** все метрики должны стать 0, статус `ok`.
+
+### Fallback: OOM / большие shops
+
+Полный прогон упирался в память из-за больших raw payload. Порядок действий:
+
+1. Всегда `php -d memory_limit=1G` (при необходимости `2G`).
+2. Сузить scope: `--company-id` + `--shop-ref` (по одному shop за раз).
+3. Маленькие окна вместо `--days-back=45` — идти по 7 дней:
+
+```bash
+php -d memory_limit=1G bin/console app:ingestion:ozon-accrual:prune-stale-projection \
+  --from=2026-06-01 --to=2026-06-07 --company-id=UUID --shop-ref=SHOP_REF --execute
+# затем --from=2026-06-08 --to=2026-06-14 и т.д.
+```
+
+4. У verify есть `--raw-limit` (raw записей на shop) и `--raw-row-limit`
+   (строк на raw payload) — снизить при OOM на verify.
+
+### Контрольная SQL-проверка (опционально)
+
+```sql
+-- stale транзакции: canonical строки, чей raw перекрыт более свежим snapshot
+SELECT DATE(ft.occurred_at) AS date, ft.type, ft.direction,
+       count(*), sum(ft.amount_minor)/100 AS total_rub,
+       old_raw.external_id AS stale_raw, old_raw.fetched_at
+FROM ingest_financial_transactions ft
+JOIN ingest_raw_records old_raw ON old_raw.id = ft.raw_record_id
+WHERE ft.company_id = 'UUID'
+  AND ft.shop_ref = 'SHOP_REF'
+  AND ft.source = 'ozon'
+  AND old_raw.resource_type = 'ozon_finance_accrual_by_day'
+GROUP BY 1, 2, 3, 6, 7
+ORDER BY 1, 7;
+```
+
+---
+
+## 11. Мониторинг воркеров
 
 ```bash
 # Статус всех воркеров
@@ -390,7 +493,7 @@ LIMIT 20;
 
 ---
 
-## 11. Часто встречающиеся ошибки
+## 12. Часто встречающиеся ошибки
 
 | Ошибка | Причина | Решение |
 |---|---|---|
@@ -401,10 +504,11 @@ LIMIT 20;
 | `BLOCKED_BY_CLOSE` | Данные за закрытый период | Согласовать с клиентом вариант А или Б |
 | `PENDING_LISTING` в enrichmentStatus | Листинг не найден в каталоге | Дождаться синхронизации каталога |
 | `PENDING_COGS` в enrichmentStatus | Нет закупочной цены | Попросить клиента внести себестоимость |
+| `verify-rolling-refresh` FAIL (`amountMismatches` > 0) | Ozon изменил начисления задним числом, stale строки от старых raw | п.10: dry-run → execute prune → verify |
 
 ---
 
-## 12. Контакты
+## 13. Контакты
 
 - Баг в маппинге (новый `operation_type`) → задача разработчику с SQL-результатом.
 - Проблема с AWS/S3 → DevOps.
