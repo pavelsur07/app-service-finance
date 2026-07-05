@@ -304,6 +304,39 @@ bank API credentials
 production database credentials
 If a task requires environment variables, reference only variable names, not values.
 ---
+Production access
+Use the restricted production access path only when the owner explicitly asks for a production check or operation.
+
+Expected SSH alias:
+`vf-prod-codex`
+
+Access rules:
+Do not use root SSH for Codex production work.
+Do not add the Codex production user to the `docker` group.
+Do not run arbitrary `sudo docker`, arbitrary `docker exec`, or arbitrary privileged shell commands.
+Do not print or commit production IP addresses, private keys, passwords, tokens, or environment values.
+
+Allowed production wrappers:
+`sudo /usr/local/bin/codex-docker-ps`
+`sudo /usr/local/bin/codex-psql-ro`
+`sudo /usr/local/bin/codex-console <allowed-symfony-command> ...`
+
+Read-only production checks may be run after the owner asks for a production check:
+Docker process/status checks through `codex-docker-ps`.
+Messenger queue stats through `codex-console messenger:stats`.
+Marketplace category status through `codex-console app:ingestion:marketplace-categories:status`.
+Read-only Ozon preview/verification commands through `codex-console`.
+Read-only SQL through `codex-psql-ro`, which uses the read-only `codex_ro` database role.
+
+Production commands that mutate data, process queues, call external APIs, or can change application state require explicit owner approval immediately before execution:
+`messenger:consume`.
+Any command with `--execute`.
+Any repair, prune, backfill, rebuild, refresh, or maintenance operation.
+Any SQL write operation (`INSERT`, `UPDATE`, `DELETE`, DDL, or migrations).
+Any change to production Docker, workers, scheduler, queues, secrets, config, or deployment state.
+
+If a required production command is not available through the existing wrappers, stop and ask the owner to add a narrowly scoped wrapper or to run the command manually. Do not work around the restriction with broader Docker or sudo access.
+---
 Command execution
 The project is Docker Compose based.
 Prefer existing Makefile commands when available.
