@@ -131,6 +131,10 @@ final readonly class SeedExternalCategoryMappingsAction
         }
 
         foreach ($category->aliases as $alias) {
+            if (!OzonAccrualCategoryTaxonomyResolver::looksLikeExternalCode($alias)) {
+                continue;
+            }
+
             $normalizedKey = OzonAccrualCategoryTaxonomyResolver::codeKey($alias);
             if (null !== $normalizedKey) {
                 $identities[$normalizedKey] = [

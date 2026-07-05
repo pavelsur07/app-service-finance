@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Ingestion\Application\Source\Ozon;
 
 use App\Ingestion\Application\Source\Ozon\OzonAccrualCategory;
+use App\Ingestion\Application\Source\Ozon\OzonAccrualCategoryTaxonomyResolver;
 use App\Ingestion\Enum\TransactionType;
 use PHPUnit\Framework\TestCase;
 
@@ -124,6 +125,14 @@ final class OzonAccrualCategoryTest extends TestCase
 
         self::assertFalse($category->known);
         self::assertSame('Требует классификации', $category->group);
+    }
+
+    public function testExternalCodeHeuristicRejectsDisplayAliases(): void
+    {
+        self::assertTrue(OzonAccrualCategoryTaxonomyResolver::looksLikeExternalCode('Acquiring'));
+        self::assertTrue(OzonAccrualCategoryTaxonomyResolver::looksLikeExternalCode('Drop-Off'));
+        self::assertFalse(OzonAccrualCategoryTaxonomyResolver::looksLikeExternalCode('Логистика Ozon'));
+        self::assertFalse(OzonAccrualCategoryTaxonomyResolver::looksLikeExternalCode('Упаковка товара партнерами'));
     }
 
     public function testFindsFieldCategoriesBySignedAmount(): void

@@ -163,7 +163,7 @@ final class IngestionExternalCategoriesController extends AbstractController
                 known: '1' === (string) $request->request->get('known', '0'),
                 displayLabel: $this->optionalString($request->request->get('display_label')),
                 updatedBy: $this->actorUserId(),
-                companyId: $this->optionalString($request->request->get('company_id')),
+                companyId: (string) $request->request->get('company_id', ''),
             );
             $this->addFlash('success', 'Маппинг категории сохранен. Запустите refresh metadata для нужного периода.');
         } catch (\Throwable $exception) {

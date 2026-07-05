@@ -153,15 +153,7 @@ final class OzonAccrualCategoryTaxonomyResolver
             return false;
         }
 
-        if (1 !== preg_match('/^[A-Za-z][A-Za-z0-9_.:-]*$/', $value)) {
-            return false;
-        }
-
-        return str_contains($value, '_')
-            || str_contains($value, '.')
-            || str_contains($value, ':')
-            || 1 === preg_match('/[a-z][A-Z]/', $value)
-            || str_starts_with(strtolower($value), 'ozon');
+        return 1 === preg_match('/^[A-Za-z][A-Za-z0-9_.:-]*$/', $value);
     }
 
     private static function normalizeTypeId(?string $typeId): ?string

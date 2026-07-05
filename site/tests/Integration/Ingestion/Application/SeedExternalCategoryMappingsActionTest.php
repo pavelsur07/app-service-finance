@@ -51,6 +51,27 @@ final class SeedExternalCategoryMappingsActionTest extends IntegrationTestCase
         self::assertSame('ozon_acquiring', $mapping->getCanonicalCode());
         self::assertSame('Эквайринг', $mapping->getCanonicalLabel());
         self::assertSame('Услуги партнёров', $mapping->getCanonicalGroup());
+
+        /** @var ExternalCategoryRepository $categoryRepository */
+        $categoryRepository = self::getContainer()->get(ExternalCategoryRepository::class);
+
+        $apiAliasKey = OzonAccrualCategoryTaxonomyResolver::codeKey('Logistic');
+        self::assertNotNull($apiAliasKey);
+        self::assertNotNull($categoryRepository->findByIdentity(
+            IngestSource::OZON,
+            OzonResourceType::ACCRUAL_BY_DAY,
+            OzonAccrualCategoryTaxonomyResolver::SCOPE_ANY,
+            $apiAliasKey,
+        ));
+
+        $displayAliasKey = OzonAccrualCategoryTaxonomyResolver::codeKey('Логистика Ozon');
+        self::assertNotNull($displayAliasKey);
+        self::assertNull($categoryRepository->findByIdentity(
+            IngestSource::OZON,
+            OzonResourceType::ACCRUAL_BY_DAY,
+            OzonAccrualCategoryTaxonomyResolver::SCOPE_ANY,
+            $displayAliasKey,
+        ));
     }
 
     public function testSeedsObservedOzonProviderCategories(): void
