@@ -45,10 +45,16 @@ final class DispatchBulkProcessingAction
 
         foreach ($documents as $doc) {
             foreach (PipelineStep::cases() as $step) {
+                // Кнопка «Обработать месяц» — это переобработка: без forceRefresh
+                // дедупликация по srid молча пропускает уже импортированные
+                // продажи/возвраты, и повторный запуск ничего не меняет.
+                // Force-замена удаляет только открытые строки (document_id IS NULL),
+                // закрытые месяцы не затрагиваются.
                 $this->bus->dispatch(new ProcessRawDocumentStepMessage(
                     rawDocumentId: (string) $doc->getId(),
                     step: $step->value,
                     companyId: $cmd->companyId,
+                    forceRefresh: true,
                 ));
             }
         }

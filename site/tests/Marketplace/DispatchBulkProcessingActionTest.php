@@ -14,7 +14,7 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceRawDocumentBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
-use Symfony\Component\Messenger\Transport\InMemoryTransport;
+use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 final class DispatchBulkProcessingActionTest extends IntegrationTestCase
 {
@@ -25,8 +25,8 @@ final class DispatchBulkProcessingActionTest extends IntegrationTestCase
     {
         parent::setUp();
 
-        $this->action    = self::getContainer()->get(DispatchBulkProcessingAction::class);
-        $this->transport = self::getContainer()->get('messenger.transport.async');
+        $this->action = self::getContainer()->get(DispatchBulkProcessingAction::class);
+        $this->transport = self::getContainer()->get('messenger.transport.async_pipeline');
         $this->transport->reset();
     }
 
@@ -36,9 +36,9 @@ final class DispatchBulkProcessingActionTest extends IntegrationTestCase
      */
     public function testDispatchesThreeStepMessagesForSalesReportDocument(): void
     {
-        $user    = UserBuilder::aUser()->withIndex(1)->build();
+        $user = UserBuilder::aUser()->withIndex(1)->build();
         $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
-        $doc     = MarketplaceRawDocumentBuilder::aDocument()
+        $doc = MarketplaceRawDocumentBuilder::aDocument()
             ->forCompany($company)
             ->withMarketplace(MarketplaceType::OZON)
             ->withDocumentType('sales_report')
@@ -51,13 +51,13 @@ final class DispatchBulkProcessingActionTest extends IntegrationTestCase
         $this->em->flush();
 
         $companyId = $company->getId();
-        $docId     = $doc->getId();
+        $docId = $doc->getId();
 
         $count = ($this->action)(new BulkProcessMonthCommand(
-            companyId:   $companyId,
+            companyId: $companyId,
             marketplace: MarketplaceType::OZON,
-            year:        2026,
-            month:       1,
+            year: 2026,
+            month: 1,
         ));
 
         // Действие вернуло 1 документ
@@ -68,12 +68,15 @@ final class DispatchBulkProcessingActionTest extends IntegrationTestCase
         self::assertCount(3, $envelopes);
 
         // Каждое сообщение — ProcessRawDocumentStepMessage с правильными ID
+        // и forceRefresh: кнопка «Обработать месяц» должна заменять уже
+        // импортированные строки, а не пропускать их по srid-дедупликации.
         $steps = [];
         foreach ($envelopes as $envelope) {
             $message = $envelope->getMessage();
             self::assertInstanceOf(ProcessRawDocumentStepMessage::class, $message);
             self::assertSame($docId, $message->rawDocumentId);
             self::assertSame($companyId, $message->companyId);
+            self::assertTrue($message->shouldForceRefresh());
             $steps[] = $message->step;
         }
 
@@ -93,9 +96,9 @@ final class DispatchBulkProcessingActionTest extends IntegrationTestCase
      */
     public function testReturnsZeroWhenMarketplaceDoesNotMatch(): void
     {
-        $user    = UserBuilder::aUser()->withIndex(2)->build();
+        $user = UserBuilder::aUser()->withIndex(2)->build();
         $company = CompanyBuilder::aCompany()->withIndex(2)->withOwner($user)->build();
-        $doc     = MarketplaceRawDocumentBuilder::aDocument()
+        $doc = MarketplaceRawDocumentBuilder::aDocument()
             ->forCompany($company)
             ->withMarketplace(MarketplaceType::WILDBERRIES)
             ->withDocumentType('sales_report')
@@ -108,10 +111,10 @@ final class DispatchBulkProcessingActionTest extends IntegrationTestCase
         $this->em->flush();
 
         $count = ($this->action)(new BulkProcessMonthCommand(
-            companyId:   $company->getId(),
+            companyId: $company->getId(),
             marketplace: MarketplaceType::OZON,
-            year:        2026,
-            month:       1,
+            year: 2026,
+            month: 1,
         ));
 
         self::assertSame(0, $count);
