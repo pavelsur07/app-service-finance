@@ -4,20 +4,19 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Marketplace\Application\Processor;
 
-use App\Marketplace\Application\ProcessWbCostsAction;
 use App\Marketplace\Application\Processor\WbCostsRawProcessor;
+use App\Marketplace\Application\ProcessWbCostsAction;
 use App\Marketplace\Application\Service\MarketplaceBarcodeCatalogService;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Application\Service\WbListingResolverService;
 use App\Marketplace\Entity\MarketplaceCost;
-use App\Marketplace\Entity\MarketplaceCostCategory;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
+use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
 use App\Marketplace\Infrastructure\Query\WbBarcodeUpsertQuery;
-use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
 use App\Marketplace\Repository\MarketplaceBarcodeCatalogRepository;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
 use App\Marketplace\Repository\MarketplaceListingBarcodeRepository;
@@ -26,8 +25,8 @@ use App\Marketplace\Service\CostCalculator\CostCalculatorInterface;
 use App\Marketplace\Service\CostCalculator\WbAcquiringCalculator;
 use App\Marketplace\Service\CostCalculator\WbCommissionCalculator;
 use App\Marketplace\Service\CostCalculator\WbDeductionCalculator;
-use App\Marketplace\Service\CostCalculator\WbLogisticsDeliveryCalculator;
 use App\Marketplace\Service\CostCalculator\WbLogisticsCorrectionCalculator;
+use App\Marketplace\Service\CostCalculator\WbLogisticsDeliveryCalculator;
 use App\Marketplace\Service\CostCalculator\WbLogisticsReturnCalculator;
 use App\Marketplace\Service\CostCalculator\WbLoyaltyDiscountCalculator;
 use App\Marketplace\Service\CostCalculator\WbPenaltyCalculator;
@@ -106,15 +105,11 @@ final class WbCostsRawProcessorTest extends TestCase
 
     #[DataProvider('commissionScenarios')]
     public function testWbCommissionCalculatorEmitsPositiveAmount(
-        float $ppvzVw,
-        float $ppvzVwNds,
+        array $overrides,
         float $expectedAbs,
     ): void {
         $entries = (new WbCommissionCalculator())->calculate(
-            $this->saleItem([
-                'ppvz_vw' => $ppvzVw,
-                'ppvz_vw_nds' => $ppvzVwNds,
-            ]),
+            $this->saleItem($overrides),
             null,
         );
 
@@ -124,11 +119,34 @@ final class WbCostsRawProcessorTest extends TestCase
         self::assertEqualsWithDelta($expectedAbs, (float) $entries[0]['amount'], 0.01);
     }
 
-    /** @return iterable<string, array{0:float,1:float,2:float}> */
+    /**
+     * Комиссия МП = цена с согласованной скидкой × кол-во − |к перечислению| − |эквайринг|.
+     *
+     * @return iterable<string, array{0:array<string,mixed>,1:float}>
+     */
     public static function commissionScenarios(): iterable
     {
-        yield 'commission with vat' => [700.0, 147.62, 847.62];
-        yield 'negative commission fields' => [-100.0, -20.0, 120.0];
+        yield 'обычная продажа' => [
+            ['retail_price_withdisc_rub' => 3000.00, 'ppvz_for_pay' => 1581.10, 'acquiring_fee' => 64.28],
+            1354.62,
+        ];
+        yield 'отрицательные значения полей WB' => [
+            ['retail_price_withdisc_rub' => 1000.00, 'ppvz_for_pay' => -800.00, 'acquiring_fee' => -20.00],
+            180.00,
+        ];
+        // Регрессия: реальная строка finance API (июнь 2026, СПП 44.85%) — vw отрицательный
+        // из-за СПП-компенсации и в формуле комиссии не участвует. Комиссия = кВВ 29% × 660.
+        yield 'finance API camelCase со СПП' => [
+            [
+                'retailPriceWithDisc' => '660',
+                'retailAmount' => '364',
+                'forPay' => '454.04',
+                'acquiringFee' => '14.56',
+                'vw' => '-94.5680327868852459',
+                'vwNds' => '-20.8',
+            ],
+            191.40,
+        ];
     }
 
     public function testWbAcquiringCalculatorEmitsPositiveAmountFromNegativeFee(): void
@@ -144,7 +162,6 @@ final class WbCostsRawProcessorTest extends TestCase
         self::assertEqualsWithDelta(55.50, (float) $entries[0]['amount'], 0.001);
     }
 
-
     public function testWbCommissionCalculatorSaleFormulaAndOperationTypeCharge(): void
     {
         $entries = (new WbCommissionCalculator())->calculate(
@@ -159,7 +176,8 @@ final class WbCostsRawProcessorTest extends TestCase
         );
 
         self::assertCount(1, $entries);
-        self::assertEqualsWithDelta(847.62, (float) $entries[0]['amount'], 0.001);
+        // 3000 − 1581.10 − 64.28; поля ppvz_vw/ppvz_vw_nds в формуле не участвуют.
+        self::assertEqualsWithDelta(1354.62, (float) $entries[0]['amount'], 0.001);
         self::assertSame(MarketplaceCostOperationType::CHARGE, $entries[0]['operation_type']);
     }
 
@@ -178,6 +196,7 @@ final class WbCostsRawProcessorTest extends TestCase
         );
 
         self::assertCount(1, $entries);
+        // Возврат комиссии по той же формуле: 1125 − 680.99 − 27.76 = 416.25 → сторно.
         self::assertEqualsWithDelta(416.25, (float) $entries[0]['amount'], 0.001);
         self::assertSame(MarketplaceCostOperationType::STORNO, $entries[0]['operation_type']);
     }
@@ -424,16 +443,19 @@ final class WbCostsRawProcessorTest extends TestCase
     {
         $calculator = new WbCommissionCalculator();
         $snakeEntries = $calculator->calculate($this->saleItem([
-            'ppvz_vw' => 700.00,
-            'ppvz_vw_nds' => 147.62,
+            'retail_price_withdisc_rub' => 3000.00,
+            'ppvz_for_pay' => 1581.10,
+            'acquiring_fee' => 64.28,
         ]), null);
         $camelEntries = $calculator->calculate([
             'docTypeName' => 'Продажа',
             'srid' => 'SRID-1',
             'saleDt' => '2026-01-15 10:00:00',
             'rrdId' => '1001',
-            'ppvzVw' => 700.00,
-            'ppvzVwNds' => 147.62,
+            'quantity' => 1,
+            'retailPriceWithDisc' => 3000.00,
+            'forPay' => 1581.10,
+            'acquiringFee' => 64.28,
         ], null);
 
         self::assertCount(1, $snakeEntries);
@@ -520,8 +542,8 @@ final class WbCostsRawProcessorTest extends TestCase
     {
         $entries = (new WbDeductionCalculator(new SlugifyService()))->calculate(
             $this->supplierOpItem('Удержание', [
-                'deduction'        => -77.00,
-                'bonus_type_name'  => 'Списание за отзыв',
+                'deduction' => -77.00,
+                'bonus_type_name' => 'Списание за отзыв',
             ]),
             null,
         );
@@ -597,7 +619,7 @@ final class WbCostsRawProcessorTest extends TestCase
             '$cost->setOperationType($costData[\'operation_type\'] ?? MarketplaceCostOperationType::CHARGE)',
             $source,
             'WbCostsRawProcessor::processBatch() должен брать operation_type из результата калькулятора '
-            . 'и использовать CHARGE как fallback для legacy-калькуляторов.',
+            .'и использовать CHARGE как fallback для legacy-калькуляторов.',
         );
     }
 
@@ -611,7 +633,7 @@ final class WbCostsRawProcessorTest extends TestCase
             '$costData[\'operation_type\'] ?? MarketplaceCostOperationType::CHARGE',
             $source,
             'WbCostsRawProcessor::processBatch() должен уметь сохранить STORNO, '
-            . 'если calculator вернул operation_type=STORNO.',
+            .'если calculator вернул operation_type=STORNO.',
         );
     }
 
@@ -665,7 +687,7 @@ final class WbCostsRawProcessorTest extends TestCase
             '$cost->setOperationType($costData[\'operation_type\'] ?? MarketplaceCostOperationType::CHARGE)',
             $source,
             'ProcessWbCostsAction::__invoke() должен брать operation_type из calculator-result '
-            . 'и использовать CHARGE как fallback для legacy-калькуляторов.',
+            .'и использовать CHARGE как fallback для legacy-калькуляторов.',
         );
     }
 
@@ -742,10 +764,10 @@ final class WbCostsRawProcessorTest extends TestCase
         $em = $this->createMock(EntityManagerInterface::class);
         $em->method('find')->willReturnCallback(
             static function (string $class, string $id) use ($companyId, $rawDocId, $company, $rawDoc): mixed {
-                if ($class === \App\Company\Entity\Company::class && $id === $companyId) {
+                if (\App\Company\Entity\Company::class === $class && $id === $companyId) {
                     return $company;
                 }
-                if ($class === \App\Marketplace\Entity\MarketplaceRawDocument::class && $id === $rawDocId) {
+                if (\App\Marketplace\Entity\MarketplaceRawDocument::class === $class && $id === $rawDocId) {
                     return $rawDoc;
                 }
 
@@ -836,54 +858,58 @@ final class WbCostsRawProcessorTest extends TestCase
 
     /**
      * @param array<string, mixed> $overrides
+     *
      * @return array<string, mixed>
      */
     private function saleItem(array $overrides = []): array
     {
         return array_merge([
             'doc_type_name' => 'Продажа',
-            'srid'          => 'SRID-1',
-            'sale_dt'       => '2026-01-15 10:00:00',
-            'retail_price'  => 1000.00,
+            'srid' => 'SRID-1',
+            'sale_dt' => '2026-01-15 10:00:00',
+            'retail_price' => 1000.00,
+            'quantity' => 1,
             'acquiring_fee' => 20.00,
-            'ppvz_for_pay'  => 800.00,
-            'nm_id'         => '',
-            'ts_name'       => '',
-            'rrd_id'        => '1001',
+            'ppvz_for_pay' => 800.00,
+            'nm_id' => '',
+            'ts_name' => '',
+            'rrd_id' => '1001',
         ], $overrides);
     }
 
     /**
      * @param array<string, mixed> $overrides
+     *
      * @return array<string, mixed>
      */
     private function logisticsItem(int $deliveryAmount, int $returnAmount, float $deliveryRub, array $overrides = []): array
     {
         return array_merge([
-            'doc_type_name'      => 'Услуги',
+            'doc_type_name' => 'Услуги',
             'supplier_oper_name' => 'Логистика',
-            'srid'               => 'SRID-LOG-1',
-            'sale_dt'            => '2026-01-15 10:00:00',
-            'rrd_id'             => '3001',
-            'delivery_amount'    => $deliveryAmount,
-            'return_amount'      => $returnAmount,
-            'delivery_rub'       => $deliveryRub,
-            'rrd_id'             => '2001',
+            'srid' => 'SRID-LOG-1',
+            'sale_dt' => '2026-01-15 10:00:00',
+            'rrd_id' => '3001',
+            'delivery_amount' => $deliveryAmount,
+            'return_amount' => $returnAmount,
+            'delivery_rub' => $deliveryRub,
+            'rrd_id' => '2001',
         ], $overrides);
     }
 
     /**
      * @param array<string, mixed> $overrides
+     *
      * @return array<string, mixed>
      */
     private function supplierOpItem(string $supplierOperName, array $overrides = []): array
     {
         return array_merge([
-            'doc_type_name'      => 'Услуги',
+            'doc_type_name' => 'Услуги',
             'supplier_oper_name' => $supplierOperName,
-            'srid'               => 'SRID-OP-1',
-            'sale_dt'            => '2026-01-15 10:00:00',
-            'rrd_id'             => '3001',
+            'srid' => 'SRID-OP-1',
+            'sale_dt' => '2026-01-15 10:00:00',
+            'rrd_id' => '3001',
         ], $overrides);
     }
 
@@ -894,10 +920,10 @@ final class WbCostsRawProcessorTest extends TestCase
     {
         $file = (string) $method->getFileName();
         $start = (int) $method->getStartLine();
-        $end   = (int) $method->getEndLine();
+        $end = (int) $method->getEndLine();
 
         $lines = file($file);
-        if ($lines === false) {
+        if (false === $lines) {
             self::fail("Не удалось прочитать файл {$file}");
         }
 
@@ -914,6 +940,7 @@ final class WbCostsRawProcessorTest extends TestCase
 
     /**
      * @param iterable<CostCalculatorInterface> $calculators
+     *
      * @return array{0: WbCostsRawProcessor, 1: array<int, MarketplaceCost>}
      */
     private function makeProcessorForBehavioralTest(iterable $calculators): array
@@ -1061,10 +1088,10 @@ final class WbCostsRawProcessorTest extends TestCase
         $em = $this->createMock(EntityManagerInterface::class);
         $em->method('find')->willReturnCallback(
             static function (string $class, string $id) use ($companyId, $rawDocId, $company, $rawDoc): mixed {
-                if ($class === \App\Company\Entity\Company::class && $id === $companyId) {
+                if (\App\Company\Entity\Company::class === $class && $id === $companyId) {
                     return $company;
                 }
-                if ($class === \App\Marketplace\Entity\MarketplaceRawDocument::class && $id === $rawDocId) {
+                if (\App\Marketplace\Entity\MarketplaceRawDocument::class === $class && $id === $rawDocId) {
                     return $rawDoc;
                 }
 
@@ -1102,8 +1129,16 @@ final class WbCostsRawProcessorTest extends TestCase
         );
 
         $calculator = new class implements CostCalculatorInterface {
-            public function supports(array $item): bool { return true; }
-            public function requiresListing(): bool { return true; }
+            public function supports(array $item): bool
+            {
+                return true;
+            }
+
+            public function requiresListing(): bool
+            {
+                return true;
+            }
+
             public function calculate(array $item, ?MarketplaceListing $listing = null): array
             {
                 return [[
@@ -1155,10 +1190,10 @@ final class WbCostsRawProcessorTest extends TestCase
         $em = $this->createMock(EntityManagerInterface::class);
         $em->method('find')->willReturnCallback(
             static function (string $class, string $id) use ($companyId, $rawDocId, $company, $rawDoc): mixed {
-                if ($class === \App\Company\Entity\Company::class && $id === $companyId) {
+                if (\App\Company\Entity\Company::class === $class && $id === $companyId) {
                     return $company;
                 }
-                if ($class === \App\Marketplace\Entity\MarketplaceRawDocument::class && $id === $rawDocId) {
+                if (\App\Marketplace\Entity\MarketplaceRawDocument::class === $class && $id === $rawDocId) {
                     return $rawDoc;
                 }
 
@@ -1238,10 +1273,10 @@ final class WbCostsRawProcessorTest extends TestCase
         $em = $this->createMock(EntityManagerInterface::class);
         $em->method('find')->willReturnCallback(
             static function (string $class, string $id) use ($companyId, $rawDocId, $company, $rawDoc): mixed {
-                if ($class === \App\Company\Entity\Company::class && $id === $companyId) {
+                if (\App\Company\Entity\Company::class === $class && $id === $companyId) {
                     return $company;
                 }
-                if ($class === \App\Marketplace\Entity\MarketplaceRawDocument::class && $id === $rawDocId) {
+                if (\App\Marketplace\Entity\MarketplaceRawDocument::class === $class && $id === $rawDocId) {
                     return $rawDoc;
                 }
 

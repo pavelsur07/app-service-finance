@@ -42,10 +42,21 @@ POST /api/finance/v1/sales-reports/detailed
 - `ppvz_vw_nds` / `vwNds` — **НДС вознаграждения WB**. ⚠ Finance API отдаёт ключ `vwNds`.
 - `commission_percent` — **процент комиссии**, не сумма.
 
-### Полная денежная комиссия WB
+### Комиссия МП (утверждена Владельцем 2026-07-06)
 ```text
-full_commission = abs(vw) + abs(vwNds)
+commission = retailPriceWithDisc × abs(quantity) − abs(forPay) − abs(acquiringFee)
 ```
+Основана на официальной формуле WB: «К перечислению» = «Цена с согласованной
+скидкой» − кВВ% − эквайринг. Проверено на PROD: тождество выполняется на 100%
+строк (июнь 2026: 2423/2423). Комиссия = «Размер кВВ, %» × цена.
+
+⚠ СПП-скидка и вознаграждение ПВЗ (ppvzReward) уже внутри этой суммы —
+не добавлять их к комиссии отдельно (двойной счёт).
+
+⚠ Поля `vw`/`vwNds` для комиссии НЕ использовать: это вознаграждение за вычетом
+СПП-компенсаций WB, при большом СПП оно отрицательное (WB доплачивает продавцу).
+`abs(vw) + abs(vwNds)` — старая неверная формула (занижала комиссию вдвое и
+переворачивала знак компенсации).
 
 ### Выручка без СПП
 ```text
@@ -78,7 +89,7 @@ pricePerUnit: gross_without_spp / abs(quantity)     // = retailPriceWithDisc (ц
 ### MarketplaceCost (Затраты)
 ```php
 wb_commission_percent: commission_percent
-wb_commission_amount: abs(ppvz_vw) + abs(ppvz_vw_nds)
+wb_commission_amount: retailPriceWithDisc × abs(quantity) − abs(forPay) − abs(acquiringFee)
 wb_acquiring: acquiring_fee
 wb_logistics: delivery_rub
 wb_return_logistics: return_amount
