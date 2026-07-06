@@ -101,7 +101,7 @@ final class OzonRealizationSyncCommand extends Command
         foreach ($connections as $connection) {
             $this->messageBus->dispatch(new SyncOzonRealizationMessage(
                 companyId:    $connection['company_id'],
-                connectionId: $connection['connection_id'],
+                connectionId: $connection['id'],
                 year:         $year,
                 month:        $month,
             ));
@@ -109,7 +109,7 @@ final class OzonRealizationSyncCommand extends Command
             $io->text(sprintf(
                 '  → Dispatched for company %s (connection %s)',
                 $connection['company_id'],
-                $connection['connection_id'],
+                $connection['id'],
             ));
 
             $dispatched++;
