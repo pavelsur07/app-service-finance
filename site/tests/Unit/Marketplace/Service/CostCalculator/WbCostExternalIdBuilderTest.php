@@ -48,6 +48,7 @@ final class WbCostExternalIdBuilderTest extends TestCase
             'srid' => 'SRID-1',
             'rrd_id' => '1001',
             'sale_dt' => '2026-01-15 10:00:00',
+            'quantity' => 1,
             'retail_price_withdisc_rub' => 1000.00,
             'acquiring_fee' => 20.00,
             'ppvz_for_pay' => 800.00,
@@ -63,7 +64,7 @@ final class CollectingLogger extends AbstractLogger
 
     public function log($level, $message, array $context = []): void
     {
-        if ($level === 'warning') {
+        if ('warning' === $level) {
             $this->warnings[] = ['message' => (string) $message, 'context' => $context];
         }
     }

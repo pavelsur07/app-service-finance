@@ -161,7 +161,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
             $barcode = isset($item['barcode']) ? (string) $item['barcode'] : null;
 
             $isReturn = $this->normalizer->isReturn($item);
-            $commissionAmount = $this->normalizer->fullMarketplaceCommission($item);
+            $commissionAmount = $this->normalizer->commissionAmount($item);
             if (!$isReturn && $commissionAmount > 0) {
                 // Legacy CostData does not support operation_type/STORNO.
                 // Return commission/acquiring is handled by WB raw cost processors only.

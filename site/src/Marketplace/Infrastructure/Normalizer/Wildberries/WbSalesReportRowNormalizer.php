@@ -198,6 +198,21 @@ final readonly class WbSalesReportRowNormalizer
         return abs($this->ppvzVw($row)) + abs($this->ppvzVwNds($row));
     }
 
+    /**
+     * Комиссия МП по официальной формуле WB (утверждена Владельцем 2026-07-06):
+     * «К перечислению» = «Цена с согласованной скидкой» − кВВ% − эквайринг, откуда
+     * комиссия = цена с согласованной скидкой × кол-во − |к перечислению| − |эквайринг|.
+     * СПП-скидка и вознаграждение ПВЗ уже внутри этой суммы — отдельно их к комиссии
+     * не добавлять (двойной счёт). Поля vw/vwNds для комиссии НЕ использовать:
+     * они отражают вознаграждение за вычетом СПП-компенсаций WB и бывают отрицательными.
+     */
+    public function commissionAmount(array $row): float
+    {
+        return $this->grossWithoutSpp($row)
+            - abs($this->forPay($row))
+            - abs($this->acquiringFee($row));
+    }
+
     private function raw(array $row, string ...$keys): mixed
     {
         foreach ($keys as $key) {

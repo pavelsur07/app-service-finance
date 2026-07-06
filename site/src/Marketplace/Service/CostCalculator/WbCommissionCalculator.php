@@ -33,15 +33,17 @@ class WbCommissionCalculator implements CostCalculatorInterface
 
     public function calculate(array $item, ?MarketplaceListing $listing): array
     {
-        $commission = $this->normalizer->fullMarketplaceCommission($item);
+        $commission = $this->normalizer->commissionAmount($item);
 
-        // Пропускаем нулевые комиссии
-        if (abs($commission) < 0.01) {
+        // Пропускаем строки без цены (formула неприменима) и нулевые/отрицательные
+        // комиссии. ponytail: отрицательная комиссия (кВВ% < 0) не встречается в данных
+        // (0 из 5618 строк на PROD); появится — добавить обратную операцию.
+        if ($this->normalizer->grossWithoutSpp($item) < 0.01 || $commission < 0.01) {
             return [];
         }
 
         $externalId = $this->externalIdBuilder->build($item, 'commission');
-        if ($externalId === null) {
+        if (null === $externalId) {
             return [];
         }
 
@@ -53,7 +55,7 @@ class WbCommissionCalculator implements CostCalculatorInterface
         return [
             [
                 'category_code' => 'commission',
-                'amount' => (string)abs($commission),
+                'amount' => (string) abs($commission),
                 'external_id' => $externalId,
                 'cost_date' => $saleDate,
                 'description' => 'Комиссия маркетплейса',
