@@ -114,7 +114,9 @@ returnLogisticsCost: return_amount
 ## УСТАРЕВШИЕ/ЗАПРЕЩЁННЫЕ ИНТЕРПРЕТАЦИИ
 - ❌ `retail_amount = quantity × retail_price`.
 - ❌ `commission_percent` как денежная комиссия.
-- ❌ `retail_price_withdisc_rub - ppvz_for_pay - acquiring_fee` как денежная комиссия.
+- ❌ `abs(vw) + abs(vwNds)` как «Комиссия МП» — vw это вознаграждение за вычетом
+  СПП-компенсаций WB (бывает отрицательным); актуальная формула — раздел
+  «Комиссия МП» выше.
 - ❌ `refundAmount = abs(retail_amount)` как универсальная формула возврата.
 - ❌ `realizationreport_id` как уникальный ID строки.
 
