@@ -38,19 +38,23 @@ POST /api/finance/v1/sales-reports/detailed
 - `retail_amount` / `retailAmount` — **сумма, оплаченная покупателем с учётом СПП**.
 - `ppvz_for_pay` / `forPay` — **к перечислению продавцу** (продажа) / **к удержанию** (возврат).
 - `acquiring_fee` / `acquiringFee` — **эквайринг**.
-- `ppvz_vw` / `ppvzVw` — **вознаграждение WB без НДС**.
-- `ppvz_vw_nds` / `ppvzVwNds` — **НДС вознаграждения WB**.
+- `ppvz_vw` / `vw` — **вознаграждение WB без НДС**. ⚠ Finance API отдаёт ключ `vw`, не `ppvzVw`.
+- `ppvz_vw_nds` / `vwNds` — **НДС вознаграждения WB**. ⚠ Finance API отдаёт ключ `vwNds`.
 - `commission_percent` — **процент комиссии**, не сумма.
 
 ### Полная денежная комиссия WB
 ```text
-full_commission = abs(ppvzVw) + abs(ppvzVwNds)
+full_commission = abs(vw) + abs(vwNds)
 ```
 
 ### Выручка без СПП
 ```text
-gross_without_spp = abs(forPay) + full_commission + abs(acquiringFee)
+gross_without_spp = retailPriceWithDisc × abs(quantity)
 ```
+
+⚠ Реконструкция `abs(forPay) + full_commission + abs(acquiringFee)` **неверна**:
+в finance API `forPay` считается с учётом СПП-компенсаций WB и сумма не сходится
+с ценой продавца (проверено на PROD: 0 совпадений из 2423 строк за июнь 2026).
 
 ## ПРАВИЛА ЗНАКОВ ДЛЯ УЧЁТА
 - Продажа: комиссия и эквайринг учитываются как расход (`CHARGE`).
@@ -65,8 +69,8 @@ externalOrderId: rrd_id
 saleDate: rr_dt
 marketplaceSku: sa_name
 quantity: abs(quantity)
-totalRevenue: retailAmount
-pricePerUnit: gross_without_spp / abs(quantity)
+totalRevenue: retailAmount                          // с СПП (что заплатил покупатель)
+pricePerUnit: gross_without_spp / abs(quantity)     // = retailPriceWithDisc (цена продавца, без СПП)
 ```
 
 **Фильтр:** `doc_type_name === "Продажа"`

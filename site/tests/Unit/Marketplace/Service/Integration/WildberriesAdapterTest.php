@@ -106,7 +106,7 @@ final class WildberriesAdapterTest extends TestCase
         $sales = $adapter->fetchSales($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-31'));
         self::assertCount(1, $sales);
         self::assertSame('9999.00', $sales[0]->totalRevenue);
-        self::assertSame('500.00', $sales[0]->pricePerUnit);
+        self::assertSame('1125.00', $sales[0]->pricePerUnit);
     }
 
     public function testLegacyFetchReturnsUsesRetailPriceWithDiscInsteadOfRetailAmount(): void

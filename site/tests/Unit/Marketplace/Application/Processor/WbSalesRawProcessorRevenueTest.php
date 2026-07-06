@@ -47,14 +47,15 @@ final class WbSalesRawProcessorRevenueTest extends TestCase
         self::assertCount(1, $result['sales']);
         self::assertSame([['123']], $result['nmIdsCalls']);
         self::assertSame('1607.00', $result['sales'][0]->getTotalRevenue());
-        self::assertSame('2493.00', $result['sales'][0]->getPricePerUnit());
-        self::assertNotSame('3000', $result['sales'][0]->getPricePerUnit());
+        self::assertSame('3000.00', $result['sales'][0]->getPricePerUnit());
+        // Регрессия: реконструкция forPay+комиссия+эквайринг давала 2493.00 вместо цены продавца.
+        self::assertNotSame('2493.00', $result['sales'][0]->getPricePerUnit());
         self::assertSame('2026-01-10', $result['sales'][0]->getSaleDate()->format('Y-m-d'));
     }
 
     /**
-     * M1: цена за единицу считается через bcmath с точностью 2 знака —
-     * неделящаяся сумма не должна давать длинный float-хвост.
+     * M1: цена за единицу считается через bcmath с фиксированной точностью 2 знака —
+     * в decimal-поле не должно попадать значение с float-хвостом.
      */
     public function testPricePerUnitUsesTwoDecimalBcmathForNonDivisibleQuantity(): void
     {
@@ -75,7 +76,7 @@ final class WbSalesRawProcessorRevenueTest extends TestCase
 
         self::assertCount(1, $result['sales']);
         self::assertSame('777.00', $result['sales'][0]->getTotalRevenue());
-        self::assertSame('333.33', $result['sales'][0]->getPricePerUnit());
+        self::assertSame('1000.00', $result['sales'][0]->getPricePerUnit());
     }
 
     public function testCamelCaseSaleCreatesSaleAndListingWithNormalizedMetadata(): void
@@ -105,8 +106,9 @@ final class WbSalesRawProcessorRevenueTest extends TestCase
         self::assertCount(1, $result['sales']);
         self::assertSame('test-sale-srid-1', $result['sales'][0]->getExternalOrderId());
         self::assertSame('1584.00', $result['sales'][0]->getTotalRevenue());
-        self::assertSame('2022.00', $result['sales'][0]->getPricePerUnit());
-        self::assertNotSame('2099', $result['sales'][0]->getPricePerUnit());
+        self::assertSame('2099.00', $result['sales'][0]->getPricePerUnit());
+        // Регрессия: реконструкция forPay+комиссия+эквайринг давала 2022.00 вместо цены продавца.
+        self::assertNotSame('2022.00', $result['sales'][0]->getPricePerUnit());
 
         self::assertCount(1, $result['createdListings']);
         $listing = $result['createdListings'][0];

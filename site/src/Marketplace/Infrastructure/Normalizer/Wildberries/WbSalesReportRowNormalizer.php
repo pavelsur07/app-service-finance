@@ -93,19 +93,24 @@ final readonly class WbSalesReportRowNormalizer
 
     public function ppvzVw(array $row): float
     {
-        return $this->float($row, 'ppvzVw', 'ppvz_vw');
+        // Finance API (/api/finance/v1/sales-reports/detailed) отдаёт ключ `vw`.
+        return $this->float($row, 'ppvzVw', 'vw', 'ppvz_vw');
     }
 
     public function ppvzVwNds(array $row): float
     {
-        return $this->float($row, 'ppvzVwNds', 'ppvz_vw_nds');
+        // Finance API отдаёт ключ `vwNds`.
+        return $this->float($row, 'ppvzVwNds', 'vwNds', 'ppvz_vw_nds');
     }
 
+    /**
+     * Выручка без СПП = цена продавца (retail_price_withdisc_rub) × количество.
+     * Реконструкция из forPay + комиссия + эквайринг не сходится с ценой продавца
+     * в finance API: forPay там считается с учётом СПП-компенсаций WB.
+     */
     public function grossWithoutSpp(array $row): float
     {
-        return abs($this->forPay($row))
-            + $this->fullMarketplaceCommission($row)
-            + abs($this->acquiringFee($row));
+        return abs($this->retailPriceWithDisc($row)) * abs($this->quantity($row));
     }
 
     public function deliveryAmount(array $row): float
@@ -156,7 +161,7 @@ final readonly class WbSalesReportRowNormalizer
     public function reportDate(array $row): \DateTimeImmutable
     {
         $date = $this->nullableString($row, 'rrDate', 'rr_dt');
-        if ($date === null) {
+        if (null === $date) {
             throw new \InvalidArgumentException('WB report row must contain rrDate or rr_dt.');
         }
 
@@ -166,7 +171,7 @@ final readonly class WbSalesReportRowNormalizer
     public function operationDate(array $row): \DateTimeImmutable
     {
         $date = $this->nullableString($row, 'saleDt', 'sale_dt', 'rrDate', 'rr_dt');
-        if ($date === null) {
+        if (null === $date) {
             throw new \InvalidArgumentException('WB report row must contain saleDt/sale_dt or rrDate/rr_dt.');
         }
 
@@ -175,12 +180,12 @@ final readonly class WbSalesReportRowNormalizer
 
     public function isSale(array $row): bool
     {
-        return $this->normalizeDocTypeName($this->docTypeName($row)) === 'sale';
+        return 'sale' === $this->normalizeDocTypeName($this->docTypeName($row));
     }
 
     public function isReturn(array $row): bool
     {
-        return $this->normalizeDocTypeName($this->docTypeName($row)) === 'return';
+        return 'return' === $this->normalizeDocTypeName($this->docTypeName($row));
     }
 
     public function isSaleOrReturn(array $row): bool
@@ -201,11 +206,11 @@ final readonly class WbSalesReportRowNormalizer
             }
 
             $value = $row[$key];
-            if ($value === null) {
+            if (null === $value) {
                 continue;
             }
 
-            if (is_string($value) && trim($value) === '') {
+            if (is_string($value) && '' === trim($value)) {
                 continue;
             }
 
@@ -219,14 +224,14 @@ final readonly class WbSalesReportRowNormalizer
     {
         $value = $this->raw($row, ...$keys);
 
-        return $value === null ? '' : trim((string) $value);
+        return null === $value ? '' : trim((string) $value);
     }
 
     private function nullableString(array $row, string ...$keys): ?string
     {
         $value = $this->string($row, ...$keys);
 
-        return $value === '' ? null : $value;
+        return '' === $value ? null : $value;
     }
 
     private function float(array $row, string ...$keys): float
@@ -237,11 +242,11 @@ final readonly class WbSalesReportRowNormalizer
             }
 
             $value = $row[$key];
-            if ($value === null) {
+            if (null === $value) {
                 continue;
             }
 
-            if (is_string($value) && trim($value) === '') {
+            if (is_string($value) && '' === trim($value)) {
                 continue;
             }
 
