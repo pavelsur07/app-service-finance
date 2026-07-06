@@ -103,6 +103,36 @@ final class WbSalesReportRowNormalizerTest extends TestCase
         );
     }
 
+    /**
+     * Регрессия (issue: REV_NOT_SPP == REV_SPP_SALES при закрытии месяца WB).
+     *
+     * Реальная строка finance API (/api/finance/v1/sales-reports/detailed):
+     * комиссия приходит в ключах `vw`/`vwNds` (не `ppvzVw`), а выручка без СПП —
+     * это цена продавца retailPriceWithDisc × qty, а не forPay + комиссия + эквайринг
+     * (реконструкция не сходится: forPay учитывает СПП-компенсации WB).
+     */
+    public function testFinanceApiRowGrossWithoutSppIsSellerPriceAndVwKeysAreRead(): void
+    {
+        $normalizer = new WbSalesReportRowNormalizer();
+
+        $row = [
+            'docTypeName' => 'Продажа',
+            'quantity' => 1,
+            'retailPrice' => '660',
+            'retailPriceWithDisc' => '660',
+            'retailAmount' => '364',
+            'forPay' => '454.04',
+            'vw' => '-94.5680327868852459',
+            'vwNds' => '-20.8',
+            'acquiringFee' => '14.56',
+            'spp' => '44.85',
+        ];
+
+        self::assertEqualsWithDelta(115.37, $normalizer->fullMarketplaceCommission($row), 0.01);
+        self::assertSame(660.0, $normalizer->grossWithoutSpp($row));
+        self::assertSame(364.0, $normalizer->retailAmount($row));
+    }
+
     public function testStringFallbackSkipsEmptyCamelCaseAndUsesSnakeCase(): void
     {
         $normalizer = new WbSalesReportRowNormalizer();

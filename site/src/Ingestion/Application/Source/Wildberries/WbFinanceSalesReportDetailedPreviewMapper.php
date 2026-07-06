@@ -88,7 +88,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
 
     /**
      * @param list<WbFinancePreviewTransaction> $transactions
-     * @param array<string, mixed> $row
+     * @param array<string, mixed>              $row
      */
     private function collectSaleRefundComponents(
         array &$transactions,
@@ -132,7 +132,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
             return;
         }
 
-        $commissionMinor = abs($this->minor($row, 'ppvzVw', 'ppvz_vw')) + abs($this->minor($row, 'ppvzVwNds', 'ppvz_vw_nds'));
+        $commissionMinor = abs($this->minor($row, 'ppvzVw', 'vw', 'ppvz_vw')) + abs($this->minor($row, 'ppvzVwNds', 'vwNds', 'ppvz_vw_nds'));
         $isReturn = $this->isReturn($docTypeName);
 
         if (0 !== $retailMinor) {
@@ -192,7 +192,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
 
     /**
      * @param list<WbFinancePreviewTransaction> $transactions
-     * @param array<string, mixed> $row
+     * @param array<string, mixed>              $row
      */
     private function collectCostComponents(
         array &$transactions,
@@ -285,7 +285,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
 
     /**
      * @param list<WbFinancePreviewTransaction> $transactions
-     * @param array<string, mixed> $row
+     * @param array<string, mixed>              $row
      */
     private function addCostField(
         array &$transactions,
@@ -329,7 +329,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
 
     /**
      * @param list<WbFinancePreviewTransaction> $transactions
-     * @param array<string, mixed> $row
+     * @param array<string, mixed>              $row
      */
     private function addCost(
         array &$transactions,
@@ -374,7 +374,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
 
     /**
      * @param list<WbFinancePreviewTransaction> $transactions
-     * @param array<string, mixed> $row
+     * @param array<string, mixed>              $row
      */
     private function add(
         array &$transactions,
@@ -425,8 +425,8 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
                 'retailAmount' => $this->raw($row, 'retailAmount', 'retail_amount'),
                 'forPay' => $this->raw($row, 'forPay', 'ppvz_for_pay'),
                 'acquiringFee' => $this->raw($row, 'acquiringFee', 'acquiring_fee'),
-                'ppvzVw' => $this->raw($row, 'ppvzVw', 'ppvz_vw'),
-                'ppvzVwNds' => $this->raw($row, 'ppvzVwNds', 'ppvz_vw_nds'),
+                'ppvzVw' => $this->raw($row, 'ppvzVw', 'vw', 'ppvz_vw'),
+                'ppvzVwNds' => $this->raw($row, 'ppvzVwNds', 'vwNds', 'ppvz_vw_nds'),
                 'ppvzReward' => $this->raw($row, 'ppvzReward', 'ppvz_reward'),
                 'cashbackDiscount' => $this->raw($row, 'cashbackDiscount', 'cashback_discount'),
             ],
@@ -445,8 +445,8 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
             ['retailAmount', 'retail_amount'],
             ['forPay', 'ppvz_for_pay'],
             ['acquiringFee', 'acquiring_fee'],
-            ['ppvzVw', 'ppvz_vw'],
-            ['ppvzVwNds', 'ppvz_vw_nds'],
+            ['ppvzVw', 'vw', 'ppvz_vw'],
+            ['ppvzVwNds', 'vwNds', 'ppvz_vw_nds'],
             ['deliveryService', 'delivery_rub'],
             ['paidStorage', 'storage_fee'],
             ['paidAcceptance', 'acceptance'],
@@ -526,8 +526,8 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
             || 0 !== $this->minor($row, 'retailAmount', 'retail_amount')
             || 0 !== $this->minor($row, 'forPay', 'ppvz_for_pay')
             || 0 !== $this->minor($row, 'acquiringFee', 'acquiring_fee')
-            || 0 !== $this->minor($row, 'ppvzVw', 'ppvz_vw')
-            || 0 !== $this->minor($row, 'ppvzVwNds', 'ppvz_vw_nds');
+            || 0 !== $this->minor($row, 'ppvzVw', 'vw', 'ppvz_vw')
+            || 0 !== $this->minor($row, 'ppvzVwNds', 'vwNds', 'ppvz_vw_nds');
     }
 
     private function isSale(string $docTypeName): bool

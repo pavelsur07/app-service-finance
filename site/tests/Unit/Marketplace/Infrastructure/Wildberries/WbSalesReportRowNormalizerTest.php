@@ -31,7 +31,7 @@ final class WbSalesReportRowNormalizerTest extends TestCase
         self::assertSame(2, $this->normalizer->quantity($row));
         self::assertSame(1300.0, $this->normalizer->retailPriceWithDisc($row));
         self::assertSame(80.0, $this->normalizer->fullMarketplaceCommission($row));
-        self::assertSame(1300.0, $this->normalizer->grossWithoutSpp($row));
+        self::assertSame(2600.0, $this->normalizer->grossWithoutSpp($row));
         self::assertTrue($this->normalizer->isSale($row));
         self::assertFalse($this->normalizer->isReturn($row));
     }
@@ -61,7 +61,7 @@ final class WbSalesReportRowNormalizerTest extends TestCase
         self::assertSame(1200.0, $this->normalizer->forPay($row));
         self::assertSame(20.0, $this->normalizer->acquiringFee($row));
         self::assertSame(80.0, $this->normalizer->fullMarketplaceCommission($row));
-        self::assertSame(1300.0, $this->normalizer->grossWithoutSpp($row));
+        self::assertSame(2600.0, $this->normalizer->grossWithoutSpp($row));
         self::assertTrue($this->normalizer->isSale($row));
     }
 
@@ -73,7 +73,6 @@ final class WbSalesReportRowNormalizerTest extends TestCase
         self::assertFalse($this->normalizer->isSale($row));
         self::assertTrue($this->normalizer->isSaleOrReturn($row));
     }
-
 
     public function testPvzCompensationWithReturnWordIsStillSaleByDocTypeOnly(): void
     {

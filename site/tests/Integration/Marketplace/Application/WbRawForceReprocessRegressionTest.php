@@ -7,8 +7,8 @@ namespace App\Tests\Integration\Marketplace\Application;
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
 use App\Marketplace\Application\ReprocessMarketplacePeriodAction;
-use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Entity\MarketplaceRawDocument;
+use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingBuilder;
@@ -55,6 +55,7 @@ final class WbRawForceReprocessRegressionTest extends IntegrationTestCase
             ->build();
         $rawDoc->setRawData([$this->makeWbSaleRowWithAmounts(
             srid: 'SRID-SALE-REPROCESS-1',
+            retailPriceWithDisc: 2099.00,
             retailAmount: 1584.00,
             forPay: 1308.04,
             acquiringFee: 77.30,
@@ -153,6 +154,7 @@ final class WbRawForceReprocessRegressionTest extends IntegrationTestCase
 
     private function makeWbSaleRowWithAmounts(
         string $srid,
+        float $retailPriceWithDisc,
         float $retailAmount,
         float $forPay,
         float $acquiringFee,
@@ -168,7 +170,7 @@ final class WbRawForceReprocessRegressionTest extends IntegrationTestCase
             'sa_name' => 'ART-1',
             'barcode' => '1234567890123',
             'quantity' => 1,
-            'retail_price_withdisc_rub' => $retailAmount,
+            'retail_price_withdisc_rub' => $retailPriceWithDisc,
             'retail_amount' => $retailAmount,
             'ppvz_for_pay' => $forPay,
             'acquiring_fee' => $acquiringFee,
