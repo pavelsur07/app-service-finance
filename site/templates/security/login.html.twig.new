@@ -1,0 +1,142 @@
+{% extends 'security/base.html.twig' %}
+
+{% block title %}Вход · Ваш Финдир{% endblock %}
+
+{# TODO(symfony): base.html.twig оборачивает {% block body %} в Tabler-навбар + .container.
+   Login — full-bleed сплит-экран и должен рендериться в «голом» layout без .container.
+   Нужен отдельный bare-layout (например security/base_bare.html.twig) — ручная доводка. #}
+
+{% block stylesheets %}
+    {{ parent() }}
+    {{ vite_entry_link_tags('login') }}
+{% endblock %}
+
+{% block body %}
+<div class="login-layout">
+
+  {# LEFT — BRAND (статичный контент) #}
+  <aside class="login-brand">
+    <div class="login-brand-head">
+      <div class="login-brand-mark">ВФ</div>
+      <div>
+        <div class="login-brand-name">Ваш Финдир</div>
+        <div class="login-brand-tag">Финансы для бизнеса · с 2024</div>
+      </div>
+    </div>
+
+    <div class="login-brand-body">
+      <h1 class="login-brand-h">С возвращением.<br>Ваши цифры готовы.</h1>
+      <p class="login-brand-sub">Свежие остатки, кассовые разрывы и P&amp;L обновились автоматически, пока вас не было.</p>
+
+      <div class="login-brand-stat">
+        <div class="login-brand-stat-label">
+          Обновлено 5 минут назад
+        </div>
+        <div class="login-brand-stat-value">₽ 12 480 300</div>
+        <div class="login-brand-stat-meta">
+          <span class="login-delta-up">+4,2% за неделю</span>
+          <span>остатки по 7 счетам</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="login-brand-foot">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+      <span>Защищённое соединение · TLS 1.3 · 2FA</span>
+    </div>
+  </aside>
+
+  {# RIGHT — FORM #}
+  <main class="login-form-pane">
+    <div class="login-form-top">
+      Нет аккаунта?
+      {# TODO(symfony): path('app_register') #}
+      <a href="#">Зарегистрироваться →</a>
+    </div>
+
+    {# TODO(symfony): action="{{ path('app_login') }}" method="post" #}
+    <form class="login-form-card" action="#" method="post" autocomplete="on" novalidate>
+      <h1 class="login-form-h">Вход в аккаунт</h1>
+      <p class="login-form-sub">Введите e-mail и пароль, чтобы продолжить работу.</p>
+
+      <div class="login-fields">
+
+      {# TODO(symfony): {% if error %} + error.messageKey|trans(error.messageData, 'security') #}
+      {#
+        <div class="alert alert--danger" role="alert">
+          <span class="a-ico">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+          </span>
+          <div class="a-body">
+            <div class="a-title">Не удалось войти</div>
+            <div class="a-text">Неверный e-mail или пароль. Проверьте раскладку клавиатуры и Caps Lock.</div>
+          </div>
+        </div>
+      #}
+
+      {# EMAIL #}
+      <div class="form-field">
+        <label class="form-label" for="f-email">E-mail <span class="req">*</span></label>
+        <div class="input-wrap">
+          <span class="prefix">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          </span>
+          {# TODO(symfony): value="{{ last_username }}", добавить class input-error при error #}
+          <input id="f-email" class="input input--prefix" type="email" name="_username" autocomplete="email" placeholder="you@company.ru" value="" required autofocus>
+        </div>
+      </div>
+
+      {# PASSWORD #}
+      <div class="form-field">
+        <div class="login-label-row">
+          <label class="form-label" for="f-password">Пароль <span class="req">*</span></label>
+          {# TODO(symfony): path('app_forgot_password') или соответствующий роут #}
+          <a href="#" class="right">Забыли пароль?</a>
+        </div>
+        {# TODO(stimulus): password-toggle — переключение type password/text по кнопке-глазу #}
+        <div class="password-field">
+          <input id="f-password" class="input" type="password" name="_password" autocomplete="current-password" placeholder="Введите пароль" required>
+          <button type="button" class="password-toggle" aria-label="Показать пароль" title="Показать пароль">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      </div>
+
+      {# REMEMBER — требует remember_me в firewall (см. security.yaml) #}
+      <label class="checkbox-label">
+        <input class="checkbox" type="checkbox" name="_remember_me">
+        <span>Запомнить меня на этом устройстве</span>
+      </label>
+
+      </div>
+
+      {# TODO(symfony): csrf_token('authenticate') #}
+      <input type="hidden" name="_csrf_token" data-controller="csrf-protection" value="">
+
+      <button type="submit" class="btn btn-lg btn-primary login-submit">
+        Войти
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+      </button>
+
+      <div class="login-signup">
+        {# TODO(symfony): path('app_register') #}
+        Нет аккаунта? <a href="#">Создать аккаунт</a>
+      </div>
+    </form>
+
+    <div class="login-foot">
+      <span>© 2024–2026 ООО «Ваш Финдир»</span>
+      {# TODO(symfony): реальные роуты help/security/contacts #}
+      <a href="#">Помощь</a>
+      <a href="#">Безопасность</a>
+      <a href="#">Контакты</a>
+      {# TODO(stimulus): переключатель языка #}
+      <span class="lang">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+        RU
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </span>
+    </div>
+  </main>
+</div>
+{% endblock %}
