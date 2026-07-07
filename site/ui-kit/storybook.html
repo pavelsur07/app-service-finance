@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>UI Kit · Ваш Финдир v2.1</title>
+<title>UI Kit · Ваш Финдир v2.3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
@@ -234,7 +234,7 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
       <div class="nav-logo">ВФ</div>
       <div>
         <div class="nav-title">UI Kit</div>
-        <div class="nav-version">v2.1 · 03.07.2026</div>
+        <div class="nav-version">v2.3 · 05.07.2026</div>
       </div>
     </div>
 
@@ -251,7 +251,9 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
     <div class="nav-section">03 Components</div>
 
     <div class="nav-subsection">Forms</div>
+    <a href="#form-field">Form field <span class="num">new</span></a>
     <a href="#input">Input</a>
+    <a href="#input-wrap">Input wrap <span class="num">new</span></a>
     <a href="#textarea">Textarea <span class="num">new</span></a>
     <a href="#select">Select <span class="num">new</span></a>
     <a href="#search-input">Search input <span class="num">new</span></a>
@@ -316,7 +318,7 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
       Канонический источник истины для всех экранов финансового SaaS-продукта.
       Зафиксированы дизайн-токены, разрешены расхождения из аудита, собраны компоненты со всеми состояниями.
     </p>
-    <div class="page-meta">v2.1 · 3 июля 2026 · Светлая тема</div>
+    <div class="page-meta">v2.3 · 5 июля 2026 · Светлая тема</div>
 
     <!-- ===================== 01. DECISIONS ===================== -->
     <section id="decisions">
@@ -498,6 +500,22 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
             <div class="decision-title">Именование новых компонентов — BEM</div>
             <div class="decision-value">Новые компоненты: <code class="code-inline">.component</code>, <code class="code-inline">.component--modifier</code>, <code class="code-inline">.component__element</code>. Старые Tabler-style (<code class="code-inline">.btn-primary</code>, <code class="code-inline">.kpi-label</code>) — не переименовываем.</div>
             <div class="decision-why">Файл содержит две конвенции: Tabler-style (до v1.5) и BEM (v1.5+). Переименование старого — breaking-change для legacy-шаблонов. Новые компоненты пишем в BEM для консистентности с v1.5+. Со временем legacy естественно уйдёт при миграции модулей.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">23</div>
+          <div class="decision-body">
+            <div class="decision-title">INPUT-WRAP — базовый паттерн input с prefix/suffix</div>
+            <div class="decision-value"><code class="code-inline">.input-wrap</code> + <code class="code-inline">.prefix</code> / <code class="code-inline">.suffix</code> — канонический примитив для любых фиксированных префиксов/суффиксов (₽, %, .ru, ИНН). <code class="code-inline">.password-field</code> и <code class="code-inline">.search-field</code> — специализации того же паттерна с фиксированной иконкой вместо API prefix/suffix.</div>
+            <div class="decision-why">Фактически классы были в CSS с v1.x, но не были задокументированы: без demo, без nav-ссылки — формально «не в UI Kit». Команда переизобретала то же самое локально. v2.3 выводит примитив в публичный канон.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">24</div>
+          <div class="decision-body">
+            <div class="decision-title">DEPRECATION: <code class="code-inline">.field</code> / <code class="code-inline">.field-label</code> → <code class="code-inline">.form-field</code> / <code class="code-inline">.form-label</code></div>
+            <div class="decision-value"><code class="code-inline">.field</code> и <code class="code-inline">.field-label</code> помечены @deprecated в v2.3 и будут удалены в v3.0. Новые компоненты используют <code class="code-inline">.form-field</code> / <code class="code-inline">.form-label</code>.</div>
+            <div class="decision-why">Два одинаковых по назначению layout-примитива (v1.x <code class="code-inline">.field</code> и v2.2 <code class="code-inline">.form-field</code>) — путаница «что выбрать». Оставляем старые рабочими, чтобы legacy-шаблоны не сломались — но все demo переведены на новый примитив как единственный образец.</div>
           </div>
         </div>
       </div>
@@ -713,6 +731,34 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
         </div>
       </div>
 
+      <h3 class="sub-h" id="form-field">Form field</h3>
+      <div class="section-sub">Вертикальная обёртка: подпись сверху, поле снизу, промежуток 5px.</div>
+
+      <div class="cb">
+        <div class="cb-head">
+          <div class="cb-name">FormField</div>
+          <div class="cb-tag">Layout</div>
+          <div class="cb-when">Каждое поле формы: Login, Register, диалоги, фильтры</div>
+        </div>
+        <div class="cb-body">
+          <div class="demo demo--column">
+            <div class="form-field">
+              <label class="form-label" for="ex-ff-1">E-mail</label>
+              <input id="ex-ff-1" class="input" type="email" placeholder="you@example.com">
+            </div>
+            <div class="form-field">
+              <label class="form-label" for="ex-ff-2">Пароль <span class="req">*</span></label>
+              <div class="password-field">
+                <input id="ex-ff-2" class="input" type="password" value="qwerty12345">
+                <button type="button" class="password-toggle" aria-label="Показать пароль">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- INPUT -->
       <div class="cb" id="input">
         <div class="cb-head">
@@ -721,40 +767,40 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
           <span class="cb-when">Текстовые поля форм. Высота 38px. Focus — синяя обводка с тенью.</span>
         </div>
         <div class="row-2col">
-          <div class="field">
-            <label class="field-label">Default</label>
+          <div class="form-field">
+            <label class="form-label">Default</label>
             <input class="input" placeholder="Поиск контрагента…">
           </div>
-          <div class="field">
-            <label class="field-label">Focus</label>
+          <div class="form-field">
+            <label class="form-label">Focus</label>
             <input class="input is-focus" value="Тинькофф Бизнес">
           </div>
-          <div class="field">
-            <label class="field-label" for="demo-inn-err">Error <span class="req">*</span></label>
+          <div class="form-field">
+            <label class="form-label" for="demo-inn-err">Error <span class="req">*</span></label>
             <input id="demo-inn-err" class="input input-error" value="abc" aria-invalid="true" aria-describedby="demo-inn-err-msg">
             <span id="demo-inn-err-msg" class="field-helper error">ИНН должен содержать 10 или 12 цифр</span>
           </div>
-          <div class="field">
-            <label class="field-label">Disabled</label>
+          <div class="form-field">
+            <label class="form-label">Disabled</label>
             <input class="input input-disabled" value="Заблокировано" disabled>
           </div>
-          <div class="field">
-            <label class="field-label">С prefix</label>
+          <div class="form-field">
+            <label class="form-label">С prefix</label>
             <div class="input-wrap">
               <span class="prefix">₽</span>
               <input class="input input--prefix" value="245 000">
             </div>
           </div>
-          <div class="field">
-            <label class="field-label">С suffix · helper</label>
+          <div class="form-field">
+            <label class="form-label">С suffix · helper</label>
             <div class="input-wrap">
               <input class="input input--suffix" value="1.99">
               <span class="suffix">%</span>
             </div>
             <span class="field-helper">Комиссия за платёжный сервис</span>
           </div>
-          <div class="field" style="grid-column:1/-1">
-            <label class="field-label">Textarea</label>
+          <div class="form-field" style="grid-column:1/-1">
+            <label class="form-label">Textarea</label>
             <textarea class="input" rows="3" placeholder="Комментарий, виден только команде…"></textarea>
           </div>
         </div>
@@ -769,8 +815,8 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
 
         <span class="demo-label">Native select · <code class="code-inline">.select</code> / <code class="code-inline">.select--sm</code></span>
         <div class="form-grid" style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:14px;">
-          <div class="field">
-            <label class="field-label">Default (38)</label>
+          <div class="form-field">
+            <label class="form-label">Default (38)</label>
             <select class="select">
               <option>Все транспорты</option>
               <option>banks_import</option>
@@ -779,8 +825,8 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
               <option>reports</option>
             </select>
           </div>
-          <div class="field">
-            <label class="field-label">Sm (30) · фильтр в таблице</label>
+          <div class="form-field">
+            <label class="form-label">Sm (30) · фильтр в таблице</label>
             <select class="select select--sm">
               <option>Все периоды</option>
               <option>Сегодня</option>
@@ -788,12 +834,53 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
               <option>Месяц</option>
             </select>
           </div>
-          <div class="field">
-            <label class="field-label">Disabled</label>
+          <div class="form-field">
+            <label class="form-label">Disabled</label>
             <select class="select" disabled>
               <option>Заблокировано</option>
             </select>
           </div>
+        </div>
+      </div>
+
+      <!-- INPUT-WRAP -->
+      <div class="cb" id="input-wrap">
+        <div class="cb-head">
+          <span class="cb-name">Input wrap</span>
+          <span class="cb-tag">.input-wrap · .prefix / .suffix</span>
+          <span class="cb-when">Поля с фиксированным префиксом/суффиксом: ₽, %, .ru, ИНН, единицы измерения.</span>
+        </div>
+        <div class="demo demo--column">
+
+          <div class="form-field">
+            <label class="form-label" for="ex-iw-1">Сумма</label>
+            <div class="input-wrap">
+              <span class="prefix">₽</span>
+              <input id="ex-iw-1" class="input input--prefix" placeholder="0">
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label class="form-label" for="ex-iw-2">Ставка</label>
+            <div class="input-wrap">
+              <input id="ex-iw-2" class="input input--suffix" value="12.5">
+              <span class="suffix">%</span>
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label class="form-label" for="ex-iw-3">Домен</label>
+            <div class="input-wrap">
+              <input id="ex-iw-3" class="input input--suffix" placeholder="mysite">
+              <span class="suffix">.ru</span>
+            </div>
+          </div>
+
+        </div>
+        <div class="cb-note">
+          <b>Связь с другими компонентами.</b>
+          <code class="code-inline">.password-field</code> и <code class="code-inline">.search-field</code> — специализации <code class="code-inline">.input-wrap</code> с фиксированной иконкой и без API prefix/suffix.
+          Для произвольных префиксов используйте <code class="code-inline">.input-wrap</code>.
         </div>
       </div>
 
@@ -805,21 +892,21 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
           <span class="cb-when">Многострочный ввод. Min-height 80px, vertical resize. Состояния: default · focus · error · disabled.</span>
         </div>
         <div class="row-2col">
-          <div class="field">
-            <label class="field-label">Default</label>
+          <div class="form-field">
+            <label class="form-label">Default</label>
             <textarea class="textarea" placeholder="Комментарий, виден только команде…"></textarea>
           </div>
-          <div class="field">
-            <label class="field-label">Focused (имитация)</label>
+          <div class="form-field">
+            <label class="form-label">Focused (имитация)</label>
             <textarea class="textarea is-focus">Курсор активен</textarea>
           </div>
-          <div class="field">
-            <label class="field-label" for="demo-ta-err">Error <span class="req">*</span></label>
+          <div class="form-field">
+            <label class="form-label" for="demo-ta-err">Error <span class="req">*</span></label>
             <textarea id="demo-ta-err" class="textarea is-error" aria-invalid="true" aria-describedby="demo-ta-err-msg">Не пройдена валидация</textarea>
             <span id="demo-ta-err-msg" class="field-helper error">Минимум 10 символов</span>
           </div>
-          <div class="field">
-            <label class="field-label">Disabled</label>
+          <div class="form-field">
+            <label class="form-label">Disabled</label>
             <textarea class="textarea" disabled>Заблокировано</textarea>
           </div>
         </div>
@@ -834,13 +921,13 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
         </div>
         <span class="demo-label">Триггер · закрытое состояние <code class="code-inline">.select</code> / <code class="code-inline">.select--sm</code></span>
         <div class="form-grid" style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:14px;">
-          <div class="field">
-            <label class="field-label">Default (38) · кастомный триггер</label>
+          <div class="form-field">
+            <label class="form-label">Default (38) · кастомный триггер</label>
             <button type="button" class="select" style="text-align:left;">Все транспорты</button>
             <span class="field-helper">Список рендерится через <code class="code-inline">.select-popup</code> — см. ниже</span>
           </div>
-          <div class="field">
-            <label class="field-label">Sm (30) · нативный фильтр</label>
+          <div class="form-field">
+            <label class="form-label">Sm (30) · нативный фильтр</label>
             <select class="select select--sm">
               <option>Все периоды</option>
               <option>Сегодня</option>
@@ -848,8 +935,8 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
               <option>Месяц</option>
             </select>
           </div>
-          <div class="field">
-            <label class="field-label">Disabled</label>
+          <div class="form-field">
+            <label class="form-label">Disabled</label>
             <select class="select" disabled>
               <option>Заблокировано</option>
             </select>
@@ -892,8 +979,8 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
           <span class="cb-when">Поиск с иконкой лупы слева. Кнопка очистки — справа, показывается классом <code class="code-inline">.has-value</code> на обёртке.</span>
         </div>
         <div class="row-3col">
-          <div class="field">
-            <label class="field-label">Empty</label>
+          <div class="form-field">
+            <label class="form-label">Empty</label>
             <div class="search-field">
               <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
               <input class="input" placeholder="Поиск по операциям…">
@@ -902,8 +989,8 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
               </button>
             </div>
           </div>
-          <div class="field">
-            <label class="field-label">С введённым значением</label>
+          <div class="form-field">
+            <label class="form-label">С введённым значением</label>
             <div class="search-field has-value">
               <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
               <input class="input" value="Озон FBO">
@@ -912,8 +999,8 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
               </button>
             </div>
           </div>
-          <div class="field">
-            <label class="field-label">Focused (имитация)</label>
+          <div class="form-field">
+            <label class="form-label">Focused (имитация)</label>
             <div class="search-field has-value">
               <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
               <input class="input is-focus" value="Озон FBO">
@@ -933,8 +1020,8 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
           <span class="cb-when">Поле пароля с кнопкой показать/скрыть. Реальный type-swap делает JS — здесь только разметка и стили.</span>
         </div>
         <div class="row-2col">
-          <div class="field">
-            <label class="field-label">Hidden (по умолчанию)</label>
+          <div class="form-field">
+            <label class="form-label">Hidden (по умолчанию)</label>
             <div class="password-field">
               <input class="input" type="password" value="qwerty12345">
               <button class="password-toggle" type="button" aria-label="Показать пароль">
@@ -942,8 +1029,8 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
               </button>
             </div>
           </div>
-          <div class="field">
-            <label class="field-label">Visible · показан</label>
+          <div class="form-field">
+            <label class="form-label">Visible · показан</label>
             <div class="password-field">
               <input class="input" type="text" value="qwerty12345">
               <button class="password-toggle" type="button" aria-label="Скрыть пароль" style="color: var(--text-secondary);">
@@ -978,8 +1065,8 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
           <span class="cb-when">Группа взаимоисключающих опций. Колоночная и строчная компоновка через <code class="code-inline">.radio-group</code> / <code class="code-inline">.radio-group--inline</code>.</span>
         </div>
         <div class="row-2col">
-          <div class="field">
-            <label class="field-label">Группа (column)</label>
+          <div class="form-field">
+            <label class="form-label">Группа (column)</label>
             <div class="radio-group">
               <label class="radio-label"><input type="radio" class="radio" name="rg1"><span>День</span></label>
               <label class="radio-label"><input type="radio" class="radio" name="rg1" checked><span>Неделя</span></label>
@@ -987,8 +1074,8 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
               <label class="radio-label"><input type="radio" class="radio" name="rg1" disabled><span>Год · недоступно</span></label>
             </div>
           </div>
-          <div class="field">
-            <label class="field-label">Группа (inline)</label>
+          <div class="form-field">
+            <label class="form-label">Группа (inline)</label>
             <div class="radio-group radio-group--inline">
               <label class="radio-label"><input type="radio" class="radio" name="rg2" checked><span>FBO</span></label>
               <label class="radio-label"><input type="radio" class="radio" name="rg2"><span>FBS</span></label>
@@ -1957,15 +2044,15 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
             <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r-4); padding:16px 20px;">
               <div style="font-size:11px; font-weight:700; color:var(--text-tertiary); letter-spacing:0.05em; text-transform:uppercase; margin-bottom:12px;">Сумма и направление</div>
               <div class="row-2col">
-                <div class="field">
-                  <label class="field-label">Сумма <span class="req">*</span></label>
+                <div class="form-field">
+                  <label class="form-label">Сумма <span class="req">*</span></label>
                   <div class="input-wrap">
                     <input class="input" value="156 200" style="text-align:right; font-weight:700; padding-right:32px; font-variant-numeric:tabular-nums;">
                     <span class="suffix">₽</span>
                   </div>
                 </div>
-                <div class="field">
-                  <label class="field-label">Направление</label>
+                <div class="form-field">
+                  <label class="form-label">Направление</label>
                   <div style="display:flex; gap:6px;">
                     <button class="chip chip--filter" style="flex:1; justify-content:center; padding:8px;"><span class="direction direction--in" style="font-weight:600;"><span class="ddot"></span>Поступление</span></button>
                     <button class="chip chip--filter is-active" style="flex:1; justify-content:center; padding:8px;"><span class="direction direction--out" style="font-weight:600;"><span class="ddot"></span>Списание</span></button>
@@ -1977,28 +2064,28 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
             <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r-4); padding:16px 20px;">
               <div style="font-size:11px; font-weight:700; color:var(--text-tertiary); letter-spacing:0.05em; text-transform:uppercase; margin-bottom:12px;">Контрагент и категория</div>
               <div class="row-2col">
-                <div class="field">
-                  <label class="field-label">Контрагент <span class="req">*</span></label>
+                <div class="form-field">
+                  <label class="form-label">Контрагент <span class="req">*</span></label>
                   <button class="input" style="display:flex; align-items:center; gap:8px; cursor:pointer; text-align:left; padding:0 10px;">
                     <span class="avatar avatar--sm avatar--square avatar--tint-1" style="width:22px; height:22px; font-size:9px;">ФНС</span>
                     <span class="u-flex-1">ФНС России</span>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-muted);"><polyline points="6 9 12 15 18 9"/></svg>
                   </button>
                 </div>
-                <div class="field">
-                  <label class="field-label">Категория ДДС <span class="req">*</span></label>
+                <div class="form-field">
+                  <label class="form-label">Категория ДДС <span class="req">*</span></label>
                   <button class="input" style="display:flex; align-items:center; gap:8px; cursor:pointer; text-align:left; padding:0 10px;">
                     <span style="width:8px; height:8px; border-radius:50%; background:var(--cat-tax);"></span>
                     <span class="u-flex-1">Налоги и сборы</span>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-muted);"><polyline points="6 9 12 15 18 9"/></svg>
                   </button>
                 </div>
-                <div class="field" style="grid-column:1/-1;">
-                  <label class="field-label">Назначение платежа</label>
+                <div class="form-field" style="grid-column:1/-1;">
+                  <label class="form-label">Назначение платежа</label>
                   <input class="input" value="НДС за 2 кв. 2026, договор № 245">
                 </div>
-                <div class="field" style="grid-column:1/-1;">
-                  <label class="field-label">Теги</label>
+                <div class="form-field" style="grid-column:1/-1;">
+                  <label class="form-label">Теги</label>
                   <div class="tags-input">
                     <span class="tag-chip">2026-Q2 <button class="x">×</button></span>
                     <span class="tag-chip">обязательный <button class="x">×</button></span>
@@ -2630,8 +2717,8 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
 
         <span class="demo-label">Пустое поле</span>
         <div class="demo demo--column">
-          <div class="field" style="width:100%; max-width:480px;">
-            <label class="field-label">Теги</label>
+          <div class="form-field" style="width:100%; max-width:480px;">
+            <label class="form-label">Теги</label>
             <div class="tags-input">
               <input placeholder="Добавьте тег…">
             </div>
@@ -2641,8 +2728,8 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
 
         <span class="demo-label">С тегами</span>
         <div class="demo demo--column">
-          <div class="field" style="width:100%; max-width:480px;">
-            <label class="field-label">Теги</label>
+          <div class="form-field" style="width:100%; max-width:480px;">
+            <label class="form-label">Теги</label>
             <div class="tags-input is-focus">
               <span class="tag-chip">2026-Q2<button class="x"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span>
               <span class="tag-chip">обязательный<button class="x"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span>
@@ -2655,8 +2742,8 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
 
         <span class="demo-label">С автосаджестом</span>
         <div class="demo demo--column" style="padding-bottom:160px;">
-          <div class="field" style="width:100%; max-width:480px;">
-            <label class="field-label">Теги</label>
+          <div class="form-field" style="width:100%; max-width:480px;">
+            <label class="form-label">Теги</label>
             <div class="tags-input is-focus">
               <span class="tag-chip">2026-Q2<button class="x"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span>
               <input value="подо" autofocus>
@@ -2916,8 +3003,8 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
               <button class="btn btn-sm btn-ghost u-w-28 u-p-0" data-close aria-label="Закрыть"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
             </div>
             <div class="mdl-body" style="padding:8px 20px 4px;">
-              <div class="field">
-                <label class="field-label">Найти компанию</label>
+              <div class="form-field">
+                <label class="form-label">Найти компанию</label>
                 <input class="input" placeholder="Название или ИНН…">
               </div>
               <div style="margin-top:10px; display:flex; flex-direction:column; gap:6px;">
@@ -3398,13 +3485,13 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
           <span class="cb-when">Стандартное поле формы: label сверху, input, helper/error внизу.</span>
         </div>
         <div class="row-2col">
-          <div class="field">
-            <label class="field-label">ИНН <span class="req">*</span></label>
+          <div class="form-field">
+            <label class="form-label">ИНН <span class="req">*</span></label>
             <input class="input" value="7723812931">
             <span class="field-helper">10 цифр для ЮЛ, 12 для ИП и физлица</span>
           </div>
-          <div class="field">
-            <label class="field-label">Категория ДДС <span class="req">*</span></label>
+          <div class="form-field">
+            <label class="form-label">Категория ДДС <span class="req">*</span></label>
             <button class="input" style="display:flex; align-items:center; gap:8px; cursor:pointer; text-align:left; padding:0 10px">
               <span style="width:8px; height:8px; border-radius:50%; background:var(--cat-revenue)"></span>
               <span class="u-flex-1">Оплата от клиента</span>
@@ -3458,22 +3545,22 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
               <svg class="a-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
               <div class="a-body"><div class="a-text">Неверный e-mail или пароль</div></div>
             </div>
-            <div class="field"><label class="field-label">E-mail</label><input class="input" value="anna@company.ru"></div>
-            <div class="field" style="margin-top:10px;"><label class="field-label">Пароль</label><input class="input" type="password" value="●●●●●●"></div>
+            <div class="form-field"><label class="form-label">E-mail</label><input class="input" value="anna@company.ru"></div>
+            <div class="form-field" style="margin-top:10px;"><label class="form-label">Пароль</label><input class="input" type="password" value="●●●●●●"></div>
           </div>
           <div style="width:100%; max-width:380px; padding:20px; background:var(--bg-page); border-radius:var(--r-4);">
             <div class="alert alert--success" style="margin-bottom:14px;">
               <svg class="a-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              <div class="a-body"><div class="a-text">Код подтверждения отправлен на <b><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="e3828d8d82a3808c8e93828d9acd9196">[email&#160;protected]</a></b></div></div>
+              <div class="a-body"><div class="a-text">Код подтверждения отправлен на <b><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="bddcd3d3dcfdded2d0cddcd3c493cfc8">[email&#160;protected]</a></b></div></div>
             </div>
-            <div class="field"><label class="field-label">Код из письма</label><input class="input" value="" placeholder="6 цифр"></div>
+            <div class="form-field"><label class="form-label">Код из письма</label><input class="input" value="" placeholder="6 цифр"></div>
           </div>
           <div style="width:100%; max-width:380px; padding:20px; background:var(--bg-page); border-radius:var(--r-4);">
             <div class="alert alert--info" style="margin-bottom:14px;">
               <svg class="a-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
               <div class="a-body"><div class="a-text">Ссылка для входа отправлена. Проверьте почту — она действительна 15 минут.</div></div>
             </div>
-            <div class="field"><label class="field-label">E-mail</label><input class="input" value="anna@company.ru" disabled style="background:var(--bg-page); color:var(--text-muted);"></div>
+            <div class="form-field"><label class="form-label">E-mail</label><input class="input" value="anna@company.ru" disabled style="background:var(--bg-page); color:var(--text-muted);"></div>
           </div>
         </div>
       </div>
@@ -3663,6 +3750,28 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
     <!-- ===================== CHANGELOG ===================== -->
     <section id="changelog">
       <h2 class="section-h">Changelog</h2>
+
+      <div class="cb">
+        <div class="cl-version">v2.3 — 5 июля 2026</div>
+        <div class="cl-summary">➕ INPUT-WRAP задокументирован как публичный примитив. ⚠️ .field / .field-label deprecated.</div>
+        <ul class="cl-list">
+          <li>➕ <b>INPUT-WRAP</b> (<code class="code-inline">.input-wrap</code>, <code class="code-inline">.prefix</code>, <code class="code-inline">.suffix</code>, <code class="code-inline">.input--prefix</code>, <code class="code-inline">.input--suffix</code>) — задокументирован как публичный примитив: отдельный маркер в CSS, demo-секция, nav-ссылка.</li>
+          <li>⚠️ <code class="code-inline">.field</code> и <code class="code-inline">.field-label</code> помечены <code class="code-inline">@deprecated v2.3 → v3.0</code>. Все demo переведены на <code class="code-inline">.form-field</code> / <code class="code-inline">.form-label</code>.</li>
+          <li>📐 <b>Decision 23</b>: <code class="code-inline">.input-wrap</code> — базовый паттерн, <code class="code-inline">.password-field</code> и <code class="code-inline">.search-field</code> — его специализации.</li>
+          <li>📐 <b>Decision 24</b>: deprecation-политика для <code class="code-inline">.field</code>.</li>
+          <li>📐 Version bump v2.2 → v2.3 в <code class="code-inline">&lt;title&gt;</code>, <code class="code-inline">.nav-version</code>, <code class="code-inline">.page-meta</code>.</li>
+        </ul>
+      </div>
+
+      <div class="cb">
+        <div class="cl-version">v2.2 — 5 июля 2026</div>
+        <div class="cl-summary">➕ Form-field примитив: вертикальная обёртка «подпись + поле». Активированы semantic-токены form-label.</div>
+        <ul class="cl-list">
+          <li>➕ <b>FORM-FIELD</b> (<code class="code-inline">.form-field</code>, <code class="code-inline">.form-label</code>) — вертикальная обёртка «подпись + поле». Промежуток 5px внутри, <code class="code-inline">var(--s-3)</code> между соседними полями.</li>
+          <li>🧹 Semantic-токены <code class="code-inline">--form-label-text</code> и <code class="code-inline">--form-required-mark</code> активированы: были объявлены в <code class="code-inline">:root</code> с v2.0, но не использовались. Теперь оживают в <code class="code-inline">.form-label</code>.</li>
+          <li>📐 Version bump v2.1 → v2.2 в <code class="code-inline">&lt;title&gt;</code>, <code class="code-inline">.nav-version</code>, <code class="code-inline">.page-meta</code>.</li>
+        </ul>
+      </div>
 
       <div class="cb">
         <div class="cl-version">v2.1 — 3 июля 2026</div>

@@ -1,0 +1,19 @@
+/* ============ FORM-FIELD ============ */
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.form-field + .form-field {
+  margin-top: var(--s-3);
+}
+.form-label {
+  font-size: var(--font-11_5);
+  color: var(--form-label-text);
+  font-weight: 600;
+  line-height: 1.4;
+}
+.form-label .req {
+  color: var(--form-required-mark);
+  margin-left: 2px;
+}

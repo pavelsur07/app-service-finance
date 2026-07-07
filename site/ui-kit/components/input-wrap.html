@@ -1,0 +1,38 @@
+<!-- @react InputWrap -->
+<!-- @uiKit v2.3 -->
+<!-- @docs ui-kit/components/input-wrap.css -->
+
+<!--
+  InputWrap — поле с фиксированным prefix/suffix (₽, %, .ru, ИНН, единицы измерения).
+  .prefix слева / .suffix справа; input получает .input--prefix / .input--suffix для отступа.
+  .password-field и .search-field — специализации этого паттерна с фиксированной иконкой.
+  Variants: prefix / suffix / States: — / Sizes: —
+-->
+
+        <div class="demo demo--column">
+
+          <div class="form-field">
+            <label class="form-label" for="ex-iw-1">Сумма</label>
+            <div class="input-wrap">
+              <span class="prefix">₽</span>
+              <input id="ex-iw-1" class="input input--prefix" placeholder="0">
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label class="form-label" for="ex-iw-2">Ставка</label>
+            <div class="input-wrap">
+              <input id="ex-iw-2" class="input input--suffix" value="12.5">
+              <span class="suffix">%</span>
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label class="form-label" for="ex-iw-3">Домен</label>
+            <div class="input-wrap">
+              <input id="ex-iw-3" class="input input--suffix" placeholder="mysite">
+              <span class="suffix">.ru</span>
+            </div>
+          </div>
+
+        </div>
