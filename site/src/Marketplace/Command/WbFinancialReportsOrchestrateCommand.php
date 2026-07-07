@@ -32,7 +32,10 @@ final class WbFinancialReportsOrchestrateCommand extends Command
     private const GLOBAL_BUCKET = 'global';
     private const MODE_OPERATIONAL = 'operational';
     private const MODE_HISTORICAL_RECOVERY = 'historical-recovery';
-    private const EMPTY_REFRESH_MAX_ATTEMPTS = 5;
+    // Пустой день (WB отдал 204/нет данных) ретраим до 24 раз — сутки ежечасных
+    // попыток. WB нередко публикует отчёт дня с задержкой в несколько часов, и при
+    // старом лимите 5 день навсегда застревал в статусе empty (см. 30.06.2026).
+    private const EMPTY_REFRESH_MAX_ATTEMPTS = 24;
 
     public function __construct(
         private readonly ActiveWbConnectionsQuery $activeWbConnectionsQuery,
