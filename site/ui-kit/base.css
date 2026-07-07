@@ -1,0 +1,18 @@
+/*
+ * UI Kit — base layer.
+ * box-sizing глобально; body-baseline scoped под .uikit-base,
+ * чтобы не затрагивать легаси Tabler-страницы.
+ */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+.uikit-base {
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: var(--font-13);
+  line-height: 1.5;
+  background: var(--bg-page);
+  color: var(--text-strong);
+}
