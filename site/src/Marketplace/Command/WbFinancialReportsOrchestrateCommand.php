@@ -34,7 +34,8 @@ final class WbFinancialReportsOrchestrateCommand extends Command
     private const MODE_HISTORICAL_RECOVERY = 'historical-recovery';
     // Пустой день (WB отдал 204/нет данных) ретраим до 24 раз — сутки ежечасных
     // попыток. WB нередко публикует отчёт дня с задержкой в несколько часов, и при
-    // старом лимите 5 день навсегда застревал в статусе empty (см. 30.06.2026).
+    // старом лимите 5 день навсегда застревал в статусе empty, хотя данные позже
+    // появлялись, и требовался ручной перезалив с --force.
     private const EMPTY_REFRESH_MAX_ATTEMPTS = 24;
 
     public function __construct(
