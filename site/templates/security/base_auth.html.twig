@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Welcome!{% endblock %}</title>
     <link rel="icon" type="image/svg+xml" href="{{ asset('static/favicon.svg') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
     {% block stylesheets %}
         {# Подключаем CSS, который Vite собрал для точки входа 'app' #}
         {{ vite_entry_link_tags('design_tokens') }}
@@ -12,7 +15,7 @@
         {{ vite_entry_link_tags('app') }}
     {% endblock %}
 </head>
-<body>
+<body class="uikit-base">
 {% block body %}{% endblock %}
 {% block javascripts %}
     {{ vite_entry_script_tags('app') }}

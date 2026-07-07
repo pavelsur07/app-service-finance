@@ -1,4 +1,5 @@
 /* UI Kit */
+@import url('../../ui-kit/base.css');
 @import url('../../ui-kit/tokens/index.css');
 @import url('../../ui-kit/components/all.css');
 @import url('../../ui-kit/patterns/all.css');
