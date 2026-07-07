@@ -15,21 +15,12 @@
 .select.is-error { border-color: var(--input-border-error); box-shadow: 0 0 0 3px var(--input-error-ring); }
 .input-disabled { background: var(--bg-page); color: var(--text-muted); cursor: not-allowed; }
 
+/* @deprecated v2.3 → удалить в v3.0.
+   Использовать .form-field / .form-label вместо .field / .field-label. */
 .field { display: flex; flex-direction: column; gap: 5px; }
 .field-label { font-size: var(--font-11_5); color: var(--form-label-text); font-weight: 600; }
 .field-label .req { color: var(--form-required-mark); margin-left: 2px; }
 .field-helper { font-size: var(--font-11); color: var(--form-helper-text); }
 .field-helper.error { color: var(--form-error-text); }
-
-.input-wrap { position: relative; }
-.input-wrap .prefix, .input-wrap .suffix {
-  position: absolute; top: 50%; transform: translateY(-50%);
-  color: var(--text-muted); font-size: var(--font-13); font-weight: 600;
-  pointer-events: none;
-}
-.input-wrap .prefix { left: 12px; }
-.input-wrap .suffix { right: 12px; }
-.input-wrap .input--prefix { padding-left: var(--s-7); }
-.input-wrap .input--suffix { padding-right: 36px; }
 
 textarea.input { height: auto; min-height: 64px; padding-top: 10px; padding-bottom: 10px; resize: vertical; line-height: 1.5; }

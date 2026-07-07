@@ -1,0 +1,16 @@
+/* ============ INPUT-WRAP ============ */
+/* Базовый паттерн «input + фиксированный prefix/suffix» (₽, %, .ru, ИНН и т.п.).
+   .password-field и .search-field — специализации того же паттерна
+   с фиксированной иконкой и без .prefix/.suffix API. */
+.input-wrap { position: relative; display: flex; align-items: center; }
+.input-wrap .prefix,
+.input-wrap .suffix {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  color: var(--text-muted); font-size: var(--font-13); font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center;
+  pointer-events: none;
+}
+.input-wrap .prefix { left: 12px; }
+.input-wrap .suffix { right: 12px; }
+.input--prefix { padding-left: var(--s-7); }
+.input--suffix { padding-right: 36px; }
