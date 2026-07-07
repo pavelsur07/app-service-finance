@@ -1,7 +1,7 @@
 import { Controller } from '@hotwired/stimulus';
 
 export default class extends Controller {
-  static targets = ['input', 'iconShow', 'iconHide'];
+  static targets = ['input'];
 
   connect() {
     this.shown = false;
@@ -16,11 +16,8 @@ export default class extends Controller {
   update() {
     this.inputTarget.type = this.shown ? 'text' : 'password';
 
-    if (this.hasIconShowTarget && this.hasIconHideTarget) {
-      this.iconShowTarget.hidden = this.shown;
-      this.iconHideTarget.hidden = !this.shown;
-    }
-
+    // aria-pressed — источник состояния: по нему CSS показывает нужную иконку
+    // (login-pw-eye / login-pw-eye-off, см. pages/login.css).
     const btn = this.element.querySelector('.password-toggle');
     if (btn) {
       const label = this.shown ? 'Скрыть пароль' : 'Показать пароль';

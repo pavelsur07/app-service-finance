@@ -142,3 +142,9 @@ html, body { margin:0; padding:0; min-height:100vh; }
   .login-form-pane  { padding: var(--s-7) var(--s-6); }
   .login-form-top   { top: var(--s-7); right: var(--s-6); }
 }
+
+/* password-toggle: ровно одна иконка за раз, по состоянию кнопки (aria-pressed).
+   Не зависит от [hidden]/JS — контроллер только переключает aria-pressed. */
+.password-toggle .login-pw-eye-off { display: none; }
+.password-toggle[aria-pressed="true"] .login-pw-eye { display: none; }
+.password-toggle[aria-pressed="true"] .login-pw-eye-off { display: inline-flex; }
