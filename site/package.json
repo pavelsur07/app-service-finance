@@ -25,6 +25,7 @@
         "vite-plugin-symfony": "^8.2"
     },
     "dependencies": {
+        "@hotwired/stimulus": "^3",
         "@tabler/icons-webfont": "^3.37.1",
         "openapi-fetch": "^0.14.1",
         "react": "^18.3.1",

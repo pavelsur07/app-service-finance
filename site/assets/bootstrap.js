@@ -1,5 +1,14 @@
-import { startStimulusApp } from '@symfony/stimulus-bundle';
+import { startStimulusApp, registerControllers } from 'vite-plugin-symfony/stimulus/helpers';
 
+// startStimulusApp() регистрирует 3rd-party контроллеры из controllers.json.
 const app = startStimulusApp();
-// register any custom, 3rd party controllers here
-// app.register('some_controller_name', SomeImportedController);
+
+// Локальные контроллеры из assets/controllers/*_controller.js.
+// vite-plugin-symfony НЕ сканирует папку сам — регистрируем через glob.
+// Имя файла → identifier: password_toggle_controller → data-controller="password-toggle".
+registerControllers(
+  app,
+  import.meta.glob('./controllers/*_controller.js', { query: '?stimulus', eager: true }),
+);
+
+export { app };
