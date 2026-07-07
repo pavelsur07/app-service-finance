@@ -2,6 +2,13 @@
 framework:
     secret: '%env(APP_SECRET)%'
 
+    # За обратным прокси (traefik → nginx → php-fpm) TLS терминируется на traefik,
+    # а до PHP запрос доходит по http. Без доверия прокси Symfony не видит HTTPS:
+    # генерит http-редиректы и не ставит secure на сессионную куку → логин срабатывает
+    # только со второй попытки. Доверяем приватным сетям (docker) и X-Forwarded-*.
+    trusted_proxies: 'private_ranges'
+    trusted_headers: ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-forwarded-port', 'x-forwarded-prefix']
+
     # Уровни логирования для исключений.
     # По умолчанию Symfony логирует 4xx HttpException на уровне ERROR, из-за чего
     # клиентские ошибки (404/403/405/422/…) попадают в отдельный sentry-handler (level: error)
