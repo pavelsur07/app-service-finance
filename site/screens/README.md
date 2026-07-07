@@ -100,7 +100,7 @@ designer: <имя или ник>
 
 | Screen | UI Kit ver. | Analysis | Twig | React module | Vite entry | Status |
 |---|---|---|---|---|---|---|
-| `login.html` | 1.2 | — | `templates/security/login.html.twig` | — | — | TODO: analyse |
+| `Login.dc.html` | 2.3 | — | `templates/security/login.html.twig.new` (verstka; CSS `assets/styles/pages/login.css`) | — | `login` | in progress: верстка сгенерирована, ждёт Symfony (csrf, app_login, error, last_username, remember_me) + bare-layout |
 | `dashboard.html` | — | — | — | — | — | not received |
 | `reconciliation.html` | — | — | — | — | — | not received |
 | `marketplace-analytics.html` | — | — | — | — | — | not received |

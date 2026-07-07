@@ -1,0 +1,144 @@
+/*
+ * Page-specific styles: login
+ * Generated from screens/Login.dc.html by screen-intake.
+ * Only login-* classes + page-scoped tokens. UI Kit classes live in ui-kit/.
+ */
+
+/* === page-specific tokens (для dark brand-панели) === */
+:root {
+  --brand-overlay-primary: rgba(26, 86, 219, 0.35);   /* radial glow — primary */
+  --brand-overlay-success: rgba(16, 185, 129, 0.18);  /* radial glow — success */
+  --brand-surface:         rgba(255, 255, 255, 0.04); /* soft panel bg */
+  --brand-divider:         rgba(255, 255, 255, 0.08); /* dividers on dark */
+  --brand-mark-highlight:  rgba(255, 255, 255, 0.25); /* inner top highlight on marks */
+  --brand-delta-bg:        rgba(16, 185, 129, 0.16);  /* delta chip bg on dark */
+  --brand-delta-text:      #6EE7B7;                   /* delta chip text on dark */
+}
+
+html, body { margin:0; padding:0; min-height:100vh; }
+
+.login-layout {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(420px, 1fr);
+}
+@media (max-width: 760px) { .login-layout { grid-template-columns: 1fr; } }
+
+/* --- LEFT BRAND --- */
+.login-brand {
+  background: var(--bg-dark); color: var(--text-inverse);
+  padding: var(--s-8) var(--s-8);
+  display: flex; flex-direction: column;
+  position: relative; overflow: hidden;
+}
+.login-brand::before {
+  content: ''; position: absolute; top: -20%; right: -20%;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, var(--brand-overlay-primary) 0%, transparent 60%);
+  pointer-events: none;
+}
+.login-brand::after {
+  content: ''; position: absolute; bottom: -30%; left: -10%;
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, var(--brand-overlay-success) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.login-brand-head { display: flex; align-items: center; gap: var(--s-3); position: relative; z-index: 1; }
+.login-brand-mark {
+  width: 40px; height: 40px; border-radius: var(--r-3);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+  color: var(--text-inverse);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 15px; letter-spacing: 0.02em;
+  box-shadow: 0 1px 0 var(--brand-mark-highlight) inset;
+}
+.login-brand-name { font-size: 16px; font-weight: 800; letter-spacing: -0.015em; }
+.login-brand-tag  { font-size: var(--font-11_5); color: var(--text-disabled); margin-top: 2px; }
+
+.login-brand-body { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: var(--s-6) 0; position: relative; z-index: 1; }
+.login-brand-h { margin: 0; font-size: 32px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.2; max-width: 18ch; }
+.login-brand-sub { margin: 14px 0 0; font-size: var(--font-14); color: var(--text-disabled); line-height: 1.6; max-width: 38ch; }
+
+.login-brand-stat {
+  margin-top: 28px;
+  background: var(--brand-surface);
+  border: 1px solid var(--brand-divider);
+  border-radius: var(--r-4);
+  padding: var(--s-4) var(--s-5);
+  max-width: 360px;
+}
+.login-brand-stat-label {
+  font-size: var(--font-10_5); font-weight: 700; color: var(--text-disabled);
+  letter-spacing: 0.06em; text-transform: uppercase;
+  display: flex; align-items: center; gap: 6px;
+}
+.login-brand-stat-label::before {
+  content: '';
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--success-dot);
+  flex-shrink: 0;
+}
+.login-brand-stat-value { margin-top: 6px; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.login-brand-stat-meta { margin-top: 4px; font-size: var(--font-11_5); color: var(--text-disabled); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.login-delta-up {
+  display: inline-flex; align-items: center;
+  font-size: var(--font-10_5); font-weight: 700;
+  padding: 2px 7px; border-radius: var(--r-1);
+  background: var(--brand-delta-bg); color: var(--brand-delta-text);
+}
+.login-brand-foot {
+  position: relative; z-index: 1;
+  padding-top: var(--s-6);
+  border-top: 1px solid var(--brand-divider);
+  display: flex; align-items: center; gap: 10px;
+  font-size: var(--font-11_5); color: var(--text-disabled);
+}
+
+/* --- RIGHT FORM --- */
+.login-form-pane {
+  padding: var(--s-8) var(--s-8);
+  display: flex; flex-direction: column;
+  background: var(--bg-page);
+  position: relative;
+}
+
+.login-form-top {
+  position: absolute; top: var(--s-8); right: var(--s-8);
+  display: flex; align-items: center; gap: var(--s-2);
+  font-size: var(--font-12_5); color: var(--text-tertiary);
+}
+.login-form-top a { color: var(--color-primary); text-decoration: none; font-weight: 700; }
+.login-form-top a:hover { color: var(--color-primary-hover); }
+
+.login-form-card { max-width: 420px; width: 100%; margin: 56px auto auto; display: flex; flex-direction: column; }
+.login-form-h   { margin: 0 0 6px; font-size: 24px; font-weight: 700; letter-spacing: -0.025em; color: var(--text-strong); }
+.login-form-sub { margin: 0 0 var(--s-6); font-size: var(--font-13); color: var(--text-tertiary); line-height: 1.55; }
+
+/* Wrapper вокруг всего группы полей (alert + form-field + checkbox) —
+   чтобы отступы между элементами жили в CSS, а не в inline-style. */
+.login-fields { display: flex; flex-direction: column; }
+.login-fields > .alert:first-child { margin-bottom: var(--s-5); }
+.login-fields > .form-field + .form-field { margin-top: var(--s-3); }
+.login-fields > .checkbox-label { margin-top: var(--s-4); }
+
+/* Label row: label слева + «Забыли пароль?» справа. */
+.login-label-row { display: flex; align-items: baseline; gap: 4px; }
+.login-label-row .right { margin-left: auto; font-size: var(--font-11_5); font-weight: 700; color: var(--color-primary); text-decoration: none; }
+.login-label-row .right:hover { color: var(--color-primary-hover); }
+
+.login-submit { margin-top: var(--s-5); width: 100%; }
+.login-signup { margin-top: var(--s-6); text-align: center; font-size: var(--font-13); color: var(--text-tertiary); }
+.login-signup a { color: var(--color-primary); font-weight: 700; text-decoration: none; }
+.login-signup a:hover { color: var(--color-primary-hover); }
+
+.login-foot { margin-top: auto; padding-top: var(--s-7); display: flex; align-items: center; gap: var(--s-4); font-size: var(--font-11_5); color: var(--text-muted); flex-wrap: wrap; }
+.login-foot a { color: var(--text-tertiary); text-decoration: none; }
+.login-foot a:hover { color: var(--text-strong); }
+.login-foot .lang { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--text-tertiary); cursor: pointer; }
+
+@media (max-width: 760px) {
+  .login-brand      { padding: var(--s-7) var(--s-6); min-height: 220px; }
+  .login-form-pane  { padding: var(--s-7) var(--s-6); }
+  .login-form-top   { top: var(--s-7); right: var(--s-6); }
+}
