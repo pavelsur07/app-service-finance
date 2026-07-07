@@ -1,4 +1,5 @@
 import './styles/app.css';
+import './bootstrap.js';
 /*
 import './react/dashboard_started.js';
 */

@@ -9,7 +9,7 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 export default defineConfig({
     plugins: [
         react(),
-        symfonyPlugin(),
+        symfonyPlugin({ stimulus: true }),
     ],
     resolve: {
         alias: {
