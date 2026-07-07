@@ -61,7 +61,7 @@ v2.1 → v2.3 (minor — component-add: FORM-FIELD + INPUT-WRAP). Складыв
 
 ## Verification
 
-- [ ] Скриншоты — ручная проверка Владельцем при review PR (`_audit/update-2026-07-07/`)
+- [x] Скриншоты — визуальная проверка Владельцем пройдена: split идентичен монолиту, расхождений нет (2026-07-07)
 - [x] check-ui-kit-classes: 8989 → 8788 нарушений (−201: новые классы теперь распознаются), exit 0
 - [x] check-uikit-react-mapping: 42 → 44 ref-broken-react-ref (+2 = FormField, InputWrap — ожидаемый backlog)
 - [x] vite build: clean (собран в temp-outDir), app-*.css содержит `.form-field`/`.form-label`/`.input-wrap`/`.input--prefix`/`.input--suffix`
