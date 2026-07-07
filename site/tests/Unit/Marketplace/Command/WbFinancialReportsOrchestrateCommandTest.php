@@ -334,7 +334,7 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
             1,
             self::callback(static fn (\DateTimeImmutable $date): bool => '2026-05-01' === $date->format('Y-m-d')),
             self::callback(static fn (\DateTimeImmutable $date): bool => '2026-05-20' === $date->format('Y-m-d')),
-            5,
+            24,
         )->willReturn(1);
 
         self::assertSame(Command::SUCCESS, $this->execute($this->rateLimiter()));
@@ -402,10 +402,10 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
 
     /**
      * @param array<string, string|null> $dailyStatuses
-     * @param array<string, int> $dueRetryCounts keyed by company:connection or company:connection:from:to
-     * @param array<string, int> $futureQueuedCounts
-     * @param array<string, int> $knownDayCounts keyed by company:connection or company:connection:from:to
-     * @param array<string, int> $emptyCounts keyed by company:connection or company:connection:from:to
+     * @param array<string, int>         $dueRetryCounts     keyed by company:connection or company:connection:from:to
+     * @param array<string, int>         $futureQueuedCounts
+     * @param array<string, int>         $knownDayCounts     keyed by company:connection or company:connection:from:to
+     * @param array<string, int>         $emptyCounts        keyed by company:connection or company:connection:from:to
      */
     private function dbFetchOneCallback(array $dailyStatuses, array $dueRetryCounts = [], array $futureQueuedCounts = [], array $knownDayCounts = [], array $emptyCounts = []): \Closure
     {
