@@ -101,7 +101,7 @@ designer: <имя или ник>
 | Screen | UI Kit ver. | Analysis | Twig | React module | Vite entry | Status |
 |---|---|---|---|---|---|---|
 | `Login.dc.html` | 2.3 | — | `templates/security/login.html.twig.new` (verstka; CSS `assets/styles/pages/login.css`) | — | `login` | in progress: верстка сгенерирована, ждёт Symfony (csrf, app_login, error, last_username, remember_me) + bare-layout |
-| `AdminShell.dc.html` | 2.3 | — | `templates/admin/base.html.twig.new` (verstka; CSS `assets/styles/pages/admin-shell.css`) | — | `admin_shell` | in progress: верстка сгенерирована, ждёт Symfony (path() nav-роуты, is-active по _route, app.user) + Stimulus collapse для доменных групп; заменяет legacy Tabler base |
+| `AdminShell.dc.html` | 2.3 | — | `templates/admin/base.html.twig` (монолитный layout; CSS `assets/styles/pages/admin-shell.css`) | — | `admin_shell` | in progress: layout влит в base (заменил legacy Tabler + partials), nav-роуты + is-active подключены; осталось Stimulus collapse, breadcrumb, app.user; admin-дети ещё на Tabler-разметке |
 | `dashboard.html` | — | — | — | — | — | not received |
 | `reconciliation.html` | — | — | — | — | — | not received |
 | `marketplace-analytics.html` | — | — | — | — | — | not received |
