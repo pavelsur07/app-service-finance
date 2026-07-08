@@ -9,13 +9,13 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>{% block title %}Admin · {{ app.request.host }}{% endblock %}</title>
-
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>{% block title %}Admin · {{ app.request.host }}{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{{ asset('static/favicon.svg') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   {{ vite_entry_link_tags('design_tokens') }}
   {{ vite_entry_link_tags('vf_custom_classes') }}
@@ -30,7 +30,7 @@
   <header class="app-header">
     <div class="app-header-brand">
       <a href="{{ path('admin_dashboard') }}" style="display:block; text-decoration:none;">
-        <img src="{{ asset('uploads/logo-vf-001.png') }}" alt="Ваш Финдир — финансы для бизнеса" style="display:block; height:32px; width:auto; max-width:100%;">
+        <img src="{{ asset('static/logo-vf-001.png') }}" alt="Ваш Финдир — финансы для бизнеса" style="display:block; height:32px; width:auto; max-width:100%;">
       </a>
     </div>
     <div class="app-header-body">
