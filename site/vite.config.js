@@ -24,6 +24,7 @@ export default defineConfig({
                 app: "./assets/app.js",
                 design_tokens: "./assets/styles/design-tokens.css",
                 login: "./assets/styles/pages/login.css",
+                admin_shell: "./assets/styles/pages/admin-shell.css",
                 vf_custom_classes: "./assets/styles/vf-custom-classes.css",
                 dashboard: "./assets/react/_legacy/dashboard_started.tsx", // Точка ./ обязательна!
                 marketplace_analytics_kpi: "./assets/react/_legacy/marketplace_analytics_kpi.tsx",
