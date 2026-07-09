@@ -6,8 +6,73 @@ on:
     pull_request:
 
 jobs:
+    # 0. ЧТО ИЗМЕНИЛОСЬ: один источник правды для path-фильтров.
+    #    Остальные job'ы гейтятся по этим выходам, поэтому фронт-, бэк-
+    #    и landing-правки больше не тянут весь пайплайн.
+    changes:
+        name: 🔎 Detect changes
+        runs-on: ubuntu-latest
+        outputs:
+            backend: ${{ steps.f.outputs.backend }}
+            frontend: ${{ steps.f.outputs.frontend }}
+            landing: ${{ steps.f.outputs.landing }}
+            matrix: ${{ steps.matrix.outputs.matrix }}
+        steps:
+            - name: 📦 Checkout repository
+              uses: actions/checkout@v4
+
+            - name: 🔎 Path filter
+              uses: dorny/paths-filter@v3
+              id: f
+              with:
+                  filters: |
+                      backend:
+                        - 'site/src/**'
+                        - 'site/config/**'
+                        - 'site/migrations/**'
+                        - 'site/templates/**'
+                        - 'site/public/**'
+                        - 'site/bin/**'
+                        - 'site/tests/**'
+                        - 'site/composer.json'
+                        - 'site/composer.lock'
+                        - 'site/docker/**'
+                        - '.github/workflows/deploy.yml'
+                      frontend:
+                        - 'site/assets/**'
+                        - 'site/package.json'
+                        - 'site/yarn.lock'
+                      landing:
+                        - 'landing/**'
+
+            # Собираем матрицу образов ровно под то, что изменилось:
+            #   frontend        → пересобираем site-nginx (в нём собранные ассеты)
+            #   backend         → site-nginx + site-php-fpm + site-php-cli
+            #   landing         → land-nginx
+            - name: 🧩 Build image matrix
+              id: matrix
+              run: |
+                  be='${{ steps.f.outputs.backend }}'
+                  fe='${{ steps.f.outputs.frontend }}'
+                  la='${{ steps.f.outputs.landing }}'
+                  items=()
+                  if [ "$be" = "true" ] || [ "$fe" = "true" ]; then
+                    items+=('{"service":"site-nginx","context":"./site","file":"./site/docker/production/nginx/Dockerfile","image":"site-nginx"}')
+                  fi
+                  if [ "$be" = "true" ]; then
+                    items+=('{"service":"site-php-fpm","context":"./site","file":"./site/docker/production/php-fpm/Dockerfile","image":"site-php-fpm"}')
+                    items+=('{"service":"site-php-cli","context":"./site","file":"./site/docker/production/php-cli/Dockerfile","image":"site-php-cli"}')
+                  fi
+                  if [ "$la" = "true" ]; then
+                    items+=('{"service":"landing","context":"./landing","file":"./landing/docker/production/nginx/Dockerfile","image":"land-nginx"}')
+                  fi
+                  IFS=,
+                  echo "matrix={\"include\":[${items[*]}]}" >> "$GITHUB_OUTPUT"
+
     unit-tests:
         name: 🧪 Unit tests
+        needs: changes
+        if: ${{ needs.changes.outputs.backend == 'true' }}
         runs-on: ubuntu-latest
         steps:
             - name: 📦 Checkout repository
@@ -34,30 +99,16 @@ jobs:
                     -e DEFAULT_URI=http://localhost \
                     site-php-cli composer test:unit
 
-    # 1. ЭТАП СБОРКИ: Запускаем 4 сборки одновременно
+    # 1. ЭТАП СБОРКИ: собираем только затронутые образы (динамическая матрица).
     build-and-push:
-        needs: unit-tests
+        needs: [ changes, unit-tests ]
+        # !cancelled() — чтобы job стартовал даже когда unit-tests пропущены (frontend/landing-only).
+        # != 'failure'  — но НЕ собираем, если бэкенд-тесты упали.
+        if: ${{ !cancelled() && needs.unit-tests.result != 'failure' && needs.changes.outputs.matrix != '{"include":[]}' }}
         runs-on: ubuntu-latest
         strategy:
             fail-fast: false
-            matrix:
-                include:
-                    - service: landing
-                      context: ./landing
-                      file: ./landing/docker/production/nginx/Dockerfile
-                      image: land-nginx
-                    - service: site-nginx
-                      context: ./site
-                      file: ./site/docker/production/nginx/Dockerfile
-                      image: site-nginx
-                    - service: site-php-fpm
-                      context: ./site
-                      file: ./site/docker/production/php-fpm/Dockerfile
-                      image: site-php-fpm
-                    - service: site-php-cli
-                      context: ./site
-                      file: ./site/docker/production/php-cli/Dockerfile
-                      image: site-php-cli
+            matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
         permissions:
             contents: read
             packages: write
@@ -88,9 +139,10 @@ jobs:
                   cache-to: type=gha,scope=${{ matrix.service }},mode=max
 
     # 2. ЭТАП ДЕПЛОЯ (rolling update — минимальный даунтайм)
+    #    Идёт только если что-то реально собралось (build success).
     deploy:
         needs: build-and-push
-        if: github.event_name != 'pull_request'
+        if: ${{ github.event_name != 'pull_request' && needs.build-and-push.result == 'success' }}
         runs-on: ubuntu-latest
         steps:
             - name: 📦 Checkout repository
@@ -169,10 +221,10 @@ jobs:
                     echo "✅ Деплой завершён без даунтайма"
                   EOF
 
-    # 3. ЭТАП МИГРАЦИЙ
+    # 3. ЭТАП МИГРАЦИЙ — только когда менялся бэкенд и деплой прошёл.
     migrations:
-        needs: deploy
-        if: github.event_name != 'pull_request'
+        needs: [ changes, deploy ]
+        if: ${{ !cancelled() && needs.deploy.result == 'success' && needs.changes.outputs.backend == 'true' }}
         runs-on: ubuntu-latest
         steps:
             - name: 🔐 Setup SSH key
@@ -217,8 +269,10 @@ jobs:
                     echo "✅ Миграции применены"
                   EOF
 
-    # 4. ТЕСТЫ НА ПУСТОЙ БД
+    # 4. ТЕСТЫ НА ПУСТОЙ БД — только при изменении бэкенда.
     migrations-empty-db:
+        needs: changes
+        if: ${{ needs.changes.outputs.backend == 'true' }}
         runs-on: ubuntu-latest
         services:
             postgres:
@@ -285,9 +339,11 @@ jobs:
                   MESSENGER_TRANSPORT_DSN: "redis://127.0.0.1:6379/messages"
               run: php bin/console doctrine:migrations:migrate --no-interaction
 
-    # 5. ПРОВЕРКА СИНХРОНИЗАЦИИ API-ТИПОВ
+    # 5. ПРОВЕРКА СИНХРОНИЗАЦИИ API-ТИПОВ — при изменении бэкенда или фронта.
     api-types-check:
         name: 🔍 Check API types sync
+        needs: changes
+        if: ${{ needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true' }}
         runs-on: ubuntu-latest
         services:
             postgres:
