@@ -29,8 +29,8 @@
   {# ====================== APP HEADER ====================== #}
   <header class="app-header">
     <div class="app-header-brand">
-      <a href="{{ path('admin_dashboard') }}" style="display:block; text-decoration:none;">
-        <img src="{{ asset('static/logo-vf-001.png') }}" alt="Ваш Финдир — финансы для бизнеса" style="display:block; height:32px; width:auto; max-width:100%;">
+      <a href="{{ path('admin_dashboard') }}">
+        <img src="{{ asset('static/logo-vf-001.png') }}" alt="Ваш Финдир — финансы для бизнеса">
       </a>
     </div>
     <div class="app-header-body">
@@ -119,8 +119,8 @@
         <div class="sb-foot">
           {# TODO(symfony): инициалы/имя/роль из app.user #}
           <span class="avatar avatar--md avatar--tint-4">ДС</span>
-          <div style="flex:1; min-width:0; line-height:1.2;">
-            <div class="me-name" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ app.user ? app.user.email : 'Дмитрий Соколов' }}</div>
+          <div class="u-flex-1">
+            <div class="me-name">{{ app.user ? app.user.email : 'Дмитрий Соколов' }}</div>
             <div class="me-role">Super-admin</div>
           </div>
           <a class="settings" href="{{ path('app_logout') }}" title="Выйти">
