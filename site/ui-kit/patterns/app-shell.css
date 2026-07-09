@@ -30,3 +30,9 @@
   min-width: 0;
   padding: var(--s-6) var(--s-7);
 }
+
+/* Full-bleed каркас: workzone скроллится сам, html-gutter не нужен —
+   иначе .app-header обрывается на ширину скроллбара справа. */
+html:has(.app) {
+  scrollbar-gutter: auto;
+}
