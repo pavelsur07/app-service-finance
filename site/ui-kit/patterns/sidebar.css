@@ -81,7 +81,7 @@
   padding: 10px 12px;
   display: flex; align-items: center; gap: 10px;
 }
-.sb-foot .me-name { font-size: 13px; font-weight: 600; line-height: 1.2; }
+.sb-foot .me-name { font-size: 13px; font-weight: 600; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sb-foot .me-role { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 .sb-foot .settings {
   width: 28px; height: 28px; border-radius: var(--r-2);
