@@ -3,7 +3,8 @@
   Origin: screens/AdminShell.dc.html via screen-intake; replaced legacy Tabler base.
 
   Partials: admin/partials/_header.html.twig, admin/partials/_sidebar.html.twig.
-  Blocks for child templates: title, admin_styles, body, admin_scripts.
+  Blocks for child templates: title, admin_styles, body, admin_modals,
+  admin_portals, admin_scripts.
   Remaining TODO: Stimulus collapse for domain groups, breadcrumb, app.user identity.
   NB: admin child templates are still legacy Tabler markup — migrate per screens matrix.
 #}
@@ -25,6 +26,8 @@
   {% block admin_styles %}{% endblock %}
 </head>
 <body class="uikit-base">
+{% include 'admin/_toasts.html.twig' %}
+
 <div class="app">
 
   {% include 'admin/partials/_header.html.twig' %}
@@ -39,6 +42,27 @@
     </main>
   </div>
 </div>
+
+<div id="admin-modal-root"></div>
+<div id="admin-drawer-root"></div>
+<div id="admin-live-region" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+<dialog id="admin-confirm-dialog" class="dlg" aria-labelledby="admin-confirm-title" aria-describedby="admin-confirm-message">
+  <div class="mdl mdl--compact">
+    <div class="confirm-body">
+      <div id="admin-confirm-title" class="confirm-title">Подтвердить действие?</div>
+      <div id="admin-confirm-message" class="confirm-text">Действие будет выполнено после подтверждения.</div>
+    </div>
+    <div class="confirm-foot">
+      <button type="button" class="btn btn-md btn-secondary" data-admin-confirm-cancel>Отмена</button>
+      <button type="button" class="btn btn-md btn-danger-solid" data-admin-confirm-accept>Подтвердить</button>
+    </div>
+  </div>
+</dialog>
+
+{% block admin_modals %}{% endblock %}
+{% block admin_portals %}{% endblock %}
+{{ vite_entry_script_tags('admin_shell_runtime') }}
 {% block admin_scripts %}{% endblock %}
 </body>
 </html>

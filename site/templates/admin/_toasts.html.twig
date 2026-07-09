@@ -1,0 +1,43 @@
+{% set admin_toast_types = {
+  'success': 'success',
+  'error': 'danger',
+  'danger': 'danger',
+  'warning': 'warning',
+  'alert': 'warning',
+  'notice': 'info',
+  'info': 'info'
+} %}
+
+{% set admin_toast_titles = {
+  'success': 'Готово',
+  'danger': 'Ошибка',
+  'warning': 'Внимание',
+  'info': 'Информация'
+} %}
+
+<div id="admin-toast-stack" class="toast-stack" role="region" aria-label="Уведомления" data-admin-toast-stack>
+  {% for flash_label, toast_type in admin_toast_types %}
+    {% for message in app.flashes(flash_label) %}
+      <div class="toast toast--{{ toast_type }}" data-admin-toast data-admin-toast-type="{{ toast_type }}">
+        <span class="t-ico" aria-hidden="true">
+          {% if toast_type == 'success' %}
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          {% elseif toast_type == 'danger' %}
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>
+          {% elseif toast_type == 'warning' %}
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+          {% else %}
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+          {% endif %}
+        </span>
+        <div class="t-body">
+          <div class="t-title">{{ admin_toast_titles[toast_type] }}</div>
+          <div class="t-desc">{{ message|nl2br }}</div>
+        </div>
+        <button type="button" class="t-close" aria-label="Закрыть" data-admin-toast-close>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+        </button>
+      </div>
+    {% endfor %}
+  {% endfor %}
+</div>
