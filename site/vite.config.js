@@ -22,6 +22,7 @@ export default defineConfig({
         rollupOptions: {
             input: {
                 app: "./assets/app.js",
+                admin_shell_runtime: "./assets/admin_shell_runtime.js",
                 design_tokens: "./assets/styles/design-tokens.css",
                 login: "./assets/styles/pages/login.css",
                 admin_shell: "./assets/styles/pages/admin-shell.css",

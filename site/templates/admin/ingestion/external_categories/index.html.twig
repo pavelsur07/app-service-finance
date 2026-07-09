@@ -11,20 +11,6 @@
     </div>
   </div>
 
-  {% for message in app.flashes('success') %}
-    <div class="alert alert-success alert-dismissible mt-3" role="alert">
-      <div>{{ message|nl2br }}</div>
-      <a class="btn-close" data-bs-dismiss="alert" aria-label="Close"></a>
-    </div>
-  {% endfor %}
-
-  {% for message in app.flashes('error') %}
-    <div class="alert alert-danger alert-dismissible mt-3" role="alert">
-      <div>{{ message|nl2br }}</div>
-      <a class="btn-close" data-bs-dismiss="alert" aria-label="Close"></a>
-    </div>
-  {% endfor %}
-
   <div class="row row-cards mt-3">
     <div class="col-sm-6 col-lg-3">
       <div class="card">

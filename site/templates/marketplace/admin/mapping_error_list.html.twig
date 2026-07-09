@@ -27,13 +27,6 @@
         </div>
     </div>
 
-    {% for flash in app.flashes('success') %}
-        <div class="alert alert-success alert-dismissible">
-            {{ flash }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    {% endfor %}
-
     {% if errors is empty %}
         <div class="card">
             <div class="card-body text-center py-5 text-muted">
