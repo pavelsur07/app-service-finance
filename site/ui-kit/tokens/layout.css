@@ -16,6 +16,7 @@
   --app-header-height: 60px;
   --app-header-bg:     var(--bg-card);
   --app-header-border: var(--border);
+  --app-sidebar-width: 264px;         /* v2.4 — ширина sidebar в app-shell */
 
   /* ===== ABC × ABC classifier (analytics) — v1.5 ===== */
   /* Отдельный набор, чтобы не смешивать с success/danger feedback-семантикой (Decision 20).

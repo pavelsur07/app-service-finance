@@ -1,0 +1,32 @@
+/* ============ APP-SHELL ============ */
+/* Внешний каркас страницы: .app-header сверху, .sb (264px) слева, рабочая зона справа.
+   Компонует существующие .app-header + .sb; сам контент вкладывается в .app-workzone. */
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.app-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.app-sidebar {
+  width: var(--app-sidebar-width);
+  flex-shrink: 0;
+}
+.app-sidebar .sb {
+  height: 100%;
+  position: sticky;
+  top: var(--app-header-height);
+  max-height: calc(100vh - var(--app-header-height));
+  border-radius: 0;
+  border-top: 0;
+  border-bottom: 0;
+  border-left: 0;
+}
+.app-workzone {
+  flex: 1;
+  min-width: 0;
+  padding: var(--s-6) var(--s-7);
+}
