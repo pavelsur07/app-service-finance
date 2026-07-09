@@ -31,8 +31,10 @@
   padding: var(--s-6) var(--s-7);
 }
 
-/* Full-bleed каркас: workzone скроллится сам, html-gutter не нужен —
-   иначе .app-header обрывается на ширину скроллбара справа. */
+/* App-shell full-bleed: страница скроллится на body (у .app-workzone нет
+   собственного overflow — sidebar/header держатся на sticky). Глобальный
+   html{scrollbar-gutter:stable} резервирует ~16px справа и отрывает .app-header
+   от края — на app-shell-страницах отключаем резерв. */
 html:has(.app) {
   scrollbar-gutter: auto;
 }
