@@ -22,6 +22,7 @@
         warning: "btn-warning-solid",
         primary: "btn-primary",
     };
+    const SIDEBAR_STORAGE_KEY = "admin.sidebar.groups";
 
     let pendingConfirm = null;
 
@@ -262,6 +263,56 @@
         });
     }
 
+    function readSidebarState() {
+        try {
+            return JSON.parse(window.localStorage.getItem(SIDEBAR_STORAGE_KEY) || "{}") || {};
+        } catch {
+            return {};
+        }
+    }
+
+    function writeSidebarState(state) {
+        try {
+            window.localStorage.setItem(SIDEBAR_STORAGE_KEY, JSON.stringify(state));
+        } catch {
+            // Ignore private-mode or disabled storage.
+        }
+    }
+
+    function setSidebarGroupCollapsed(toggle, sub, collapsed) {
+        toggle.classList.toggle("is-collapsed", collapsed);
+        toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        sub.hidden = collapsed;
+    }
+
+    function initSidebarGroups() {
+        const state = readSidebarState();
+
+        document.querySelectorAll("[data-admin-sidebar-toggle]").forEach((toggle) => {
+            const sub = document.getElementById(toggle.getAttribute("aria-controls"));
+            const group = toggle.dataset.adminSidebarToggle;
+
+            if (!sub || !group) return;
+
+            setSidebarGroupCollapsed(toggle, sub, !sub.querySelector(".sb-item.is-active") && state[group] === true);
+
+            toggle.addEventListener("click", () => {
+                const collapsed = !toggle.classList.contains("is-collapsed");
+                setSidebarGroupCollapsed(toggle, sub, collapsed);
+                state[group] = collapsed;
+                writeSidebarState(state);
+            });
+        });
+    }
+
+    function onReady(callback) {
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", callback);
+        } else {
+            callback();
+        }
+    }
+
     document.addEventListener("click", async (event) => {
         const closeToastButton = event.target.closest("[data-admin-toast-close]");
         if (closeToastButton) {
@@ -387,7 +438,8 @@
         }
     });
 
-    document.addEventListener("DOMContentLoaded", initExistingToasts);
+    onReady(initExistingToasts);
+    onReady(initSidebarGroups);
 
     window.addEventListener("admin:toast", (event) => {
         createToast(event.detail || {});
