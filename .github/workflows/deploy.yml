@@ -46,7 +46,7 @@ jobs:
                         - 'landing/**'
 
             # Собираем матрицу образов ровно под то, что изменилось:
-            #   frontend        → пересобираем site-nginx (в нём собранные ассеты)
+            #   frontend        → site-nginx + site-php-fpm (оба пекут public/build)
             #   backend         → site-nginx + site-php-fpm + site-php-cli
             #   landing         → land-nginx
             - name: 🧩 Build image matrix
@@ -56,11 +56,15 @@ jobs:
                   fe='${{ steps.f.outputs.frontend }}'
                   la='${{ steps.f.outputs.landing }}'
                   items=()
+                  # site-nginx и site-php-fpm оба пекут public/build из одного yarn build
+                  # (nginx отдаёт файлы, fpm хранит manifest для Twig) — на фронт-правке
+                  # их нужно пересобирать вместе, иначе manifest разъедется с файлами.
                   if [ "$be" = "true" ] || [ "$fe" = "true" ]; then
                     items+=('{"service":"site-nginx","context":"./site","file":"./site/docker/production/nginx/Dockerfile","image":"site-nginx"}')
-                  fi
-                  if [ "$be" = "true" ]; then
                     items+=('{"service":"site-php-fpm","context":"./site","file":"./site/docker/production/php-fpm/Dockerfile","image":"site-php-fpm"}')
+                  fi
+                  # site-php-cli (воркеры/CLI) ассеты не пекут — только на бэкенд-правке.
+                  if [ "$be" = "true" ]; then
                     items+=('{"service":"site-php-cli","context":"./site","file":"./site/docker/production/php-cli/Dockerfile","image":"site-php-cli"}')
                   fi
                   if [ "$la" = "true" ]; then
