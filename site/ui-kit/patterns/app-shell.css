@@ -4,16 +4,20 @@
 .app {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
 }
 .app-body {
   display: flex;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 .app-sidebar {
   width: var(--app-sidebar-width);
   flex-shrink: 0;
+  min-height: 0;
 }
 .app-sidebar .sb {
   height: 100%;
@@ -28,11 +32,18 @@
 .app-workzone {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   padding: var(--s-6) var(--s-7);
+  overflow: auto;
 }
 
-/* Full-bleed каркас: workzone скроллится сам, html-gutter не нужен —
-   иначе .app-header обрывается на ширину скроллбара справа. */
-html:has(.app) {
+/* App-shell owns viewport scroll: root/body stay fixed, workzone scrolls. */
+html:has(> body > .app) {
+  height: 100%;
+  overflow: hidden;
   scrollbar-gutter: auto;
+}
+body:has(> .app) {
+  height: 100%;
+  overflow: hidden;
 }
