@@ -258,7 +258,10 @@
 
     function initExistingToasts() {
         document.querySelectorAll("[data-admin-toast]").forEach((toast) => {
+            if (toast.dataset.adminToastInitialized === "1") return;
+
             const type = normalizeToastType(toast.dataset.adminToastType);
+            toast.dataset.adminToastInitialized = "1";
             scheduleToast(toast, undefined, type);
         });
     }
@@ -294,15 +297,17 @@
 
             if (!sub || !group) return;
 
-            setSidebarGroupCollapsed(toggle, sub, !sub.querySelector(".sb-item.is-active") && state[group] === true);
+            const hasActive = toggle.classList.contains("is-active") || Boolean(sub.querySelector(".sb-item.is-active"));
+            const initiallyCollapsed = toggle.classList.contains("is-collapsed") || toggle.getAttribute("aria-expanded") === "false" || sub.hidden;
+            const collapsed = !hasActive && (state[group] ?? initiallyCollapsed);
 
-            toggle.addEventListener("click", () => {
-                const collapsed = !toggle.classList.contains("is-collapsed");
-                setSidebarGroupCollapsed(toggle, sub, collapsed);
-                state[group] = collapsed;
-                writeSidebarState(state);
-            });
+            setSidebarGroupCollapsed(toggle, sub, collapsed);
         });
+    }
+
+    function initAdminShellRuntime() {
+        initExistingToasts();
+        initSidebarGroups();
     }
 
     function onReady(callback) {
@@ -317,6 +322,29 @@
         const closeToastButton = event.target.closest("[data-admin-toast-close]");
         if (closeToastButton) {
             closeToast(closeToastButton.closest("[data-admin-toast]"));
+            return;
+        }
+
+        const sidebarToggle = event.target.closest("[data-admin-sidebar-toggle]");
+        if (sidebarToggle) {
+            event.preventDefault();
+
+            const sub = document.getElementById(sidebarToggle.getAttribute("aria-controls"));
+            const group = sidebarToggle.dataset.adminSidebarToggle;
+
+            if (!sub || !group) return;
+
+            const collapsed = !sidebarToggle.classList.contains("is-collapsed");
+            const hasActive = sidebarToggle.classList.contains("is-active") || Boolean(sub.querySelector(".sb-item.is-active"));
+
+            if (collapsed && hasActive) {
+                return;
+            }
+
+            const state = readSidebarState();
+            setSidebarGroupCollapsed(sidebarToggle, sub, collapsed);
+            state[group] = collapsed;
+            writeSidebarState(state);
             return;
         }
 
@@ -438,8 +466,8 @@
         }
     });
 
-    onReady(initExistingToasts);
-    onReady(initSidebarGroups);
+    onReady(initAdminShellRuntime);
+    document.addEventListener("turbo:load", initAdminShellRuntime);
 
     window.addEventListener("admin:toast", (event) => {
         createToast(event.detail || {});
