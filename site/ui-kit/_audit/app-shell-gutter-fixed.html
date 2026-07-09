@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>app-shell gutter fixed audit</title>
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" href="../tokens/index.css">
+<link rel="stylesheet" href="../components/all.css">
+<link rel="stylesheet" href="../patterns/all.css">
+<style>
+  /* Mirrors the global app.css rule that caused the 16px empty right gutter. */
+  html { scrollbar-gutter: stable; }
+
+  .audit-main {
+    max-width: 920px;
+  }
+  .audit-title {
+    margin: 0 0 var(--s-4);
+    font-size: var(--font-24);
+    line-height: 1.2;
+  }
+  .audit-copy {
+    margin: 0 0 var(--s-5);
+    color: var(--text-secondary);
+    font-size: var(--font-13);
+  }
+  .audit-box {
+    border: 1px dashed var(--border-hover);
+    border-radius: var(--r-3);
+    padding: var(--s-5);
+    background: var(--bg-card);
+  }
+  .audit-spacer {
+    height: 120vh;
+    margin-top: var(--s-5);
+    border: 1px dashed var(--border-hover);
+    border-radius: var(--r-3);
+    background: linear-gradient(180deg, var(--bg-card), var(--bg-page));
+  }
+  .audit-check {
+    position: fixed;
+    right: 12px;
+    bottom: 12px;
+    z-index: 100;
+    width: 360px;
+    max-width: calc(100vw - 24px);
+    border: 1px solid var(--border);
+    border-radius: var(--r-3);
+    padding: 10px 12px;
+    background: var(--bg-card);
+    box-shadow: var(--shadow-md);
+    color: var(--text-secondary);
+    font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    white-space: pre-wrap;
+  }
+  .audit-check strong { color: var(--text-strong); }
+  .audit-check.is-pass { border-color: var(--success-border); }
+  .audit-check.is-fail { border-color: var(--danger-border); }
+</style>
+</head>
+<body class="uikit-base">
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-brand">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div class="nav-logo" style="width:30px; height:30px;">ВФ</div>
+        <span style="font-weight:800; font-size:14px; letter-spacing:-0.01em;">Ваш Финдир</span>
+      </div>
+    </div>
+    <div class="app-header-body">
+      <nav class="crumbs">
+        <a href="#">Главная</a>
+        <span class="crumb-sep"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
+        <span class="crumb-current">App shell audit</span>
+      </nav>
+      <div class="u-flex-1"></div>
+      <div class="app-header-actions">
+        <button class="h-btn h-btn--icon" type="button" title="Уведомления">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          <span class="dot"></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="app-body">
+    <aside class="app-sidebar">
+      <div class="sb">
+        <div class="sb-nav">
+          <div class="sb-group-title">Главное</div>
+          <a class="sb-item is-active" href="#">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12L12 4l9 8"></path><path d="M5 10v10h14V10"></path></svg>
+            <span class="lbl">Дашборд</span>
+          </a>
+          <a class="sb-item" href="#">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="13" rx="2"></rect><path d="M3 10h18"></path></svg>
+            <span class="lbl">Движение ДС</span>
+            <span class="badge">248</span>
+          </a>
+          <a class="sb-item" href="#">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3v18h18"></path><path d="M7 14l4-4 3 3 5-6"></path></svg>
+            <span class="lbl">ОПиУ</span>
+          </a>
+          <div class="sb-group-title">Домены</div>
+          <button class="sb-item" type="button">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16"></path><path d="M4 12h16"></path><path d="M4 17h16"></path></svg>
+            <span class="lbl">Маркетплейсы</span>
+            <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <div class="sb-sub">
+            <a class="sb-item" href="#"><span class="ico-dot"></span><span class="lbl">Неизвестные затраты</span></a>
+            <a class="sb-item" href="#"><span class="ico-dot"></span><span class="lbl">Переобработка</span></a>
+          </div>
+        </div>
+        <div class="sb-foot">
+          <span class="avatar avatar--md avatar--tint-4">ДС</span>
+          <div class="u-flex-1">
+            <div class="me-name">Дмитрий Соколов</div>
+            <div class="me-role">Super-admin</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="app-workzone">
+      <section class="audit-main">
+        <h1 class="audit-title">Admin shell right edge audit</h1>
+        <p class="audit-copy">
+          The header and sidebar must stay pinned. Only the workzone should scroll.
+        </p>
+        <div class="audit-box">
+          Expected result: no root scroll, workzone has vertical scroll, right edge gap is 0px.
+        </div>
+        <div class="audit-spacer" aria-hidden="true"></div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div id="audit-check" class="audit-check">measuring...</div>
+
+<script>
+(() => {
+  const panel = document.getElementById('audit-check');
+
+  function measure() {
+    const root = document.documentElement;
+    const header = document.querySelector('.app-header');
+    const headerButton = document.querySelector('.h-btn--icon');
+    const sidebar = document.querySelector('.app-sidebar');
+    const workzone = document.querySelector('.app-workzone');
+    const rect = header.getBoundingClientRect();
+    const buttonRect = headerButton.getBoundingClientRect();
+    const sidebarRect = sidebar.getBoundingClientRect();
+    const sidebarTopBefore = sidebarRect.top;
+    const gapToViewport = window.innerWidth - rect.right;
+    const reservedGutter = window.innerWidth - root.clientWidth;
+    const hasRootVerticalScroll = root.scrollHeight > root.clientHeight + 1;
+    const hasRootHorizontalScroll = root.scrollWidth > root.clientWidth + 1;
+    const hasWorkzoneVerticalScroll = workzone.scrollHeight > workzone.clientHeight + 1;
+    const sidebarPinned = Math.abs(sidebarRect.top - rect.bottom) <= 1
+      && Math.abs(sidebarRect.bottom - window.innerHeight) <= 1;
+    workzone.scrollTop = 80;
+    const sidebarMoved = Math.abs(sidebar.getBoundingClientRect().top - sidebarTopBefore) > 1;
+    workzone.scrollTop = 0;
+    const headerButtonOk = Math.abs(buttonRect.width - 34) <= 1
+      && Math.abs(buttonRect.height - 34) <= 1
+      && buttonRect.right <= window.innerWidth;
+    const pass = Math.abs(gapToViewport) <= 1
+      && Math.abs(reservedGutter) <= 1
+      && !hasRootVerticalScroll
+      && !hasRootHorizontalScroll
+      && hasWorkzoneVerticalScroll
+      && sidebarPinned
+      && !sidebarMoved
+      && headerButtonOk;
+
+    panel.classList.toggle('is-pass', pass);
+    panel.classList.toggle('is-fail', !pass);
+    panel.innerHTML = [
+      '<strong>' + (pass ? 'PASS' : 'FAIL') + '</strong>',
+      'header.right    : ' + rect.right.toFixed(1),
+      'viewport width  : ' + window.innerWidth,
+      'gap to viewport : ' + gapToViewport.toFixed(1) + 'px',
+      'client width    : ' + root.clientWidth,
+      'reserved gutter : ' + reservedGutter.toFixed(1) + 'px',
+      'root v-scroll   : ' + (hasRootVerticalScroll ? 'yes' : 'no'),
+      'root h-scroll   : ' + (hasRootHorizontalScroll ? 'yes' : 'no'),
+      'workzone scroll : ' + (hasWorkzoneVerticalScroll ? 'yes' : 'no'),
+      'sidebar pinned  : ' + (sidebarPinned ? 'yes' : 'no'),
+      'sidebar moved   : ' + (sidebarMoved ? 'yes' : 'no'),
+      'h-btn size      : ' + buttonRect.width.toFixed(1) + 'x' + buttonRect.height.toFixed(1),
+      'h-btn layout    : ' + (headerButtonOk ? 'ok' : 'bad'),
+      'scrollbar-gutter: ' + getComputedStyle(root).scrollbarGutter
+    ].join('\n');
+  }
+
+  window.addEventListener('load', measure);
+  window.addEventListener('resize', measure);
+})();
+</script>
+</body>
+</html>
