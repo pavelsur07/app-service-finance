@@ -63,6 +63,7 @@
 }
 .sb-item .chev { color: var(--text-muted); transition: transform .15s; }
 .sb-item.is-collapsed .chev { transform: rotate(-90deg); }
+.sb-item.is-collapsed + .sb-sub { display: none; }
 .sb-item.is-active {
   background: var(--color-primary-tint);
   color: var(--color-primary-hover);

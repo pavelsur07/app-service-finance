@@ -22,6 +22,7 @@
         warning: "btn-warning-solid",
         primary: "btn-primary",
     };
+    const SIDEBAR_STORAGE_KEY = "admin.sidebar.groups";
 
     let pendingConfirm = null;
 
@@ -257,15 +258,93 @@
 
     function initExistingToasts() {
         document.querySelectorAll("[data-admin-toast]").forEach((toast) => {
+            if (toast.dataset.adminToastInitialized === "1") return;
+
             const type = normalizeToastType(toast.dataset.adminToastType);
+            toast.dataset.adminToastInitialized = "1";
             scheduleToast(toast, undefined, type);
         });
+    }
+
+    function readSidebarState() {
+        try {
+            return JSON.parse(window.localStorage.getItem(SIDEBAR_STORAGE_KEY) || "{}") || {};
+        } catch {
+            return {};
+        }
+    }
+
+    function writeSidebarState(state) {
+        try {
+            window.localStorage.setItem(SIDEBAR_STORAGE_KEY, JSON.stringify(state));
+        } catch {
+            // Ignore private-mode or disabled storage.
+        }
+    }
+
+    function setSidebarGroupCollapsed(toggle, sub, collapsed) {
+        toggle.classList.toggle("is-collapsed", collapsed);
+        toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        sub.hidden = collapsed;
+    }
+
+    function initSidebarGroups() {
+        const state = readSidebarState();
+
+        document.querySelectorAll("[data-admin-sidebar-toggle]").forEach((toggle) => {
+            const sub = document.getElementById(toggle.getAttribute("aria-controls"));
+            const group = toggle.dataset.adminSidebarToggle;
+
+            if (!sub || !group) return;
+
+            const hasActive = toggle.classList.contains("is-active") || Boolean(sub.querySelector(".sb-item.is-active"));
+            const initiallyCollapsed = toggle.classList.contains("is-collapsed") || toggle.getAttribute("aria-expanded") === "false" || sub.hidden;
+            const collapsed = !hasActive && (state[group] ?? initiallyCollapsed);
+
+            setSidebarGroupCollapsed(toggle, sub, collapsed);
+        });
+    }
+
+    function initAdminShellRuntime() {
+        initExistingToasts();
+        initSidebarGroups();
+    }
+
+    function onReady(callback) {
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", callback);
+        } else {
+            callback();
+        }
     }
 
     document.addEventListener("click", async (event) => {
         const closeToastButton = event.target.closest("[data-admin-toast-close]");
         if (closeToastButton) {
             closeToast(closeToastButton.closest("[data-admin-toast]"));
+            return;
+        }
+
+        const sidebarToggle = event.target.closest("[data-admin-sidebar-toggle]");
+        if (sidebarToggle) {
+            event.preventDefault();
+
+            const sub = document.getElementById(sidebarToggle.getAttribute("aria-controls"));
+            const group = sidebarToggle.dataset.adminSidebarToggle;
+
+            if (!sub || !group) return;
+
+            const collapsed = !sidebarToggle.classList.contains("is-collapsed");
+            const hasActive = sidebarToggle.classList.contains("is-active") || Boolean(sub.querySelector(".sb-item.is-active"));
+
+            if (collapsed && hasActive) {
+                return;
+            }
+
+            const state = readSidebarState();
+            setSidebarGroupCollapsed(sidebarToggle, sub, collapsed);
+            state[group] = collapsed;
+            writeSidebarState(state);
             return;
         }
 
@@ -387,7 +466,8 @@
         }
     });
 
-    document.addEventListener("DOMContentLoaded", initExistingToasts);
+    onReady(initAdminShellRuntime);
+    document.addEventListener("turbo:load", initAdminShellRuntime);
 
     window.addEventListener("admin:toast", (event) => {
         createToast(event.detail || {});
