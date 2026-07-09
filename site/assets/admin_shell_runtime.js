@@ -187,10 +187,17 @@
 
         if (!dialog) return;
 
-        if (typeof dialog.close === "function" && dialog.open) {
-            dialog.close(returnValue);
+        if (typeof dialog.close === "function") {
+            if (dialog.open) {
+                dialog.close(returnValue);
+            }
         } else {
-            dialog.removeAttribute("open");
+            dialog.returnValue = returnValue;
+
+            if (dialog.hasAttribute("open")) {
+                dialog.removeAttribute("open");
+                dialog.dispatchEvent(new Event("close"));
+            }
         }
     }
 
@@ -226,7 +233,12 @@
         accept.className = `btn btn-md ${CONFIRM_TONES[tone]}`;
 
         openDialog(dialog);
-        accept.focus();
+
+        if (tone === "danger") {
+            cancel.focus();
+        } else {
+            accept.focus();
+        }
 
         return new Promise((resolve) => {
             pendingConfirm = { resolve };
@@ -288,6 +300,14 @@
         const confirmTrigger = event.target.closest("[data-admin-confirm]");
         if (!confirmTrigger) return;
 
+        if (confirmTrigger.tagName === "FORM") {
+            return;
+        }
+
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+            return;
+        }
+
         const form = confirmTrigger.form;
         const isSubmitter = form && ["submit", "image"].includes(confirmTrigger.type || "");
 
@@ -343,12 +363,26 @@
     }, true);
 
     document.addEventListener("click", (event) => {
-        if (event.target?.matches("dialog.dlg")) {
-            if (event.target.id === "admin-confirm-dialog") {
-                closeDialog(event.target, "cancel");
+        const dialog = event.target;
+
+        if (dialog?.matches?.("dialog.dlg")) {
+            const rect = dialog.getBoundingClientRect();
+            const isClickInside = (
+                rect.top <= event.clientY &&
+                event.clientY <= rect.bottom &&
+                rect.left <= event.clientX &&
+                event.clientX <= rect.right
+            );
+
+            if (isClickInside) {
+                return;
+            }
+
+            if (dialog.id === "admin-confirm-dialog") {
+                closeDialog(dialog, "cancel");
                 resolveConfirm(false);
             } else {
-                closeDialog(event.target);
+                closeDialog(dialog);
             }
         }
     });
