@@ -1,0 +1,22 @@
+{# Admin app-header — brand + breadcrumbs + actions. Included by admin/base.html.twig. #}
+<header class="app-header">
+  <div class="app-header-brand">
+    <a href="{{ path('admin_dashboard') }}">
+      <img src="{{ asset('static/logo-vf-001.png') }}" alt="Ваш Финдир — финансы для бизнеса">
+    </a>
+  </div>
+  <div class="app-header-body">
+    <nav class="crumbs">
+      <a href="#">Админка</a>
+      <span class="crumb-sep"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
+      {# TODO(symfony): breadcrumb текущей страницы через block или переменную #}
+      <span class="crumb-current">Панель управления</span>
+    </nav>
+  </div>
+  <div class="app-header-actions">
+    <button class="h-btn h-btn--icon" type="button" title="Уведомления">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+      <span class="dot"></span>
+    </button>
+  </div>
+</header>
