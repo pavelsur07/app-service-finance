@@ -4,17 +4,17 @@ namespace App\Tests\Service;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Accounts\MoneyAccountDailyBalance;
+use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Service\Accounts\AccountBalanceProvider;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
-use App\Cash\Enum\Accounts\MoneyAccountType;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 class AccountBalanceProviderTest extends KernelTestCase
 {
-    public function testReturnsLatestClosingBalancePerAccountUpToDate(): void
+    public function testReturnsLatestClosingAndOpeningBalancesPerAccountUpToDate(): void
     {
         self::bootKernel();
         $container = static::getContainer();
@@ -22,10 +22,10 @@ class AccountBalanceProviderTest extends KernelTestCase
         $hasher = $container->get(UserPasswordHasherInterface::class);
         $provider = $container->get(AccountBalanceProvider::class);
 
-        $em->createQuery('DELETE FROM App\\Entity\\MoneyAccountDailyBalance b')->execute();
-        $em->createQuery('DELETE FROM App\\Entity\\MoneyAccount a')->execute();
-        $em->createQuery('DELETE FROM App\\Company\\Entity\\Company c')->execute();
-        $em->createQuery('DELETE FROM App\\Entity\\User u')->execute();
+        $em->createQuery('DELETE FROM '.MoneyAccountDailyBalance::class.' b')->execute();
+        $em->createQuery('DELETE FROM '.MoneyAccount::class.' a')->execute();
+        $em->createQuery('DELETE FROM '.Company::class.' c')->execute();
+        $em->createQuery('DELETE FROM '.User::class.' u')->execute();
 
         $user = new User(Uuid::uuid4()->toString());
         $user->setEmail('balance@example.com');
@@ -64,7 +64,7 @@ class AccountBalanceProviderTest extends KernelTestCase
             $company,
             $account,
             new \DateTimeImmutable('2024-01-10'),
-            '0',
+            '125.00',
             '0',
             '0',
             '150.00',
@@ -76,7 +76,7 @@ class AccountBalanceProviderTest extends KernelTestCase
             $company,
             $account,
             new \DateTimeImmutable('2024-01-05'),
-            '0',
+            '80.00',
             '0',
             '0',
             '100.00',
@@ -87,8 +87,8 @@ class AccountBalanceProviderTest extends KernelTestCase
             Uuid::uuid4()->toString(),
             $company,
             $anotherAccount,
-            new \DateTimeImmutable('2024-01-08'),
-            '0',
+            new \DateTimeImmutable('2024-01-04'),
+            '40.00',
             '0',
             '0',
             '50.00',
@@ -116,5 +116,14 @@ class AccountBalanceProviderTest extends KernelTestCase
 
         self::assertSame('150.00', $balancesAfterLast[$account->getId()] ?? null);
         self::assertSame('50.00', $balancesAfterLast[$anotherAccount->getId()] ?? null);
+
+        $openingOnSnapshotDate = $provider->getOpeningBalancesUpToDate(
+            $company,
+            new \DateTimeImmutable('2024-01-10'),
+            $accountIds
+        );
+
+        self::assertSame('125.00', $openingOnSnapshotDate[$account->getId()] ?? null);
+        self::assertSame('50.00', $openingOnSnapshotDate[$anotherAccount->getId()] ?? null);
     }
 }

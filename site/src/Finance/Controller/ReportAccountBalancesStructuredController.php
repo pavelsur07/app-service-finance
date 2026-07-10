@@ -59,7 +59,7 @@ class ReportAccountBalancesStructuredController extends AbstractController
         $closingByAccountId = [];
         $turnoversByAccountId = [];
         if (!empty($accountIds)) {
-            $openingByAccountId = $this->accountBalanceProvider->getClosingBalancesUpToDate($company, $from, $accountIds);
+            $openingByAccountId = $this->accountBalanceProvider->getOpeningBalancesUpToDate($company, $from, $accountIds);
             $closingByAccountId = $this->accountBalanceProvider->getClosingBalancesUpToDate($company, $to, $accountIds);
             $turnoversByAccountId = $this->cashTransactionRepository->sumByAccountAndPeriod($company, $accountIds, $from, $to);
         }

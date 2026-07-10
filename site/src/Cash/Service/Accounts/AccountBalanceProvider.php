@@ -48,4 +48,46 @@ class AccountBalanceProvider
 
         return $balances;
     }
+
+    /**
+     * @param array<int|string> $accountIds
+     *
+     * @return array<int|string,string> accountId => openingBalance
+     */
+    public function getOpeningBalancesUpToDate(Company $company, \DateTimeInterface $date, array $accountIds): array
+    {
+        if (empty($accountIds)) {
+            return [];
+        }
+
+        $date = \DateTimeImmutable::createFromInterface($date)->setTime(0, 0);
+
+        $qb = $this->dailyBalanceRepository->createQueryBuilder('b')
+            ->innerJoin('b.moneyAccount', 'a')
+            ->addSelect('a')
+            ->where('b.company = :company')
+            ->andWhere('b.date <= :date')
+            ->andWhere('b.date >= a.openingBalanceDate')
+            ->andWhere('a.id IN (:accountIds)')
+            ->setParameter('company', $company)
+            ->setParameter('date', $date)
+            ->setParameter('accountIds', $accountIds)
+            ->orderBy('a.id', 'ASC')
+            ->addOrderBy('b.date', 'DESC');
+
+        $rows = $qb->getQuery()->getResult();
+
+        $balances = [];
+        foreach ($rows as $row) {
+            /** @var \App\Cash\Entity\Accounts\MoneyAccountDailyBalance $row */
+            $accountId = $row->getMoneyAccount()->getId();
+            if (!isset($balances[$accountId])) {
+                $balances[$accountId] = $row->getDate()->format('Y-m-d') === $date->format('Y-m-d')
+                    ? $row->getOpeningBalance()
+                    : $row->getClosingBalance();
+            }
+        }
+
+        return $balances;
+    }
 }
