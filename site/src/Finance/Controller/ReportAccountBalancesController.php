@@ -77,7 +77,9 @@ class ReportAccountBalancesController extends AbstractController
                 /** @var \App\Cash\Entity\Accounts\MoneyAccountDailyBalance $row */
                 $accId = $row->getMoneyAccount()->getId();
                 if (!isset($balancesByAccountId[$accId])) {
-                    $balancesByAccountId[$accId] = $row->getClosingBalance();
+                    $balancesByAccountId[$accId] = $row->getDate()->format('Y-m-d') === $date->format('Y-m-d')
+                        ? $row->getOpeningBalance()
+                        : $row->getClosingBalance();
                 }
             }
         }
