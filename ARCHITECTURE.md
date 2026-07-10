@@ -606,10 +606,13 @@ createTransaction(CreateCashTransactionCommand $command): CreateCashTransactionR
 - `AccountBalanceService` — единственная реализация формулы `opening + inflow - outflow = closing`.
 - `DailyBalanceRecalculator` только выбирает счета компании и делегирует пересчёт каноническому сервису.
 - `MoneyAccount.openingBalanceDate` — начало расчётного учёта по счёту; более ранние операции остаются в реестре, но не входят в остатки.
+- Будущая `openingBalanceDate` запрещена формой счёта и сервисом пересчёта.
 - `openingBalance` является остатком на начало `openingBalanceDate`; далее `opening` каждого дня равен `closing` предыдущего дня.
 - Soft-deleted операции исключаются. `isTransfer` не влияет на остаток: направление определяется только `INFLOW`/`OUTFLOW`.
 - Денежная арифметика выполняется decimal-строками через BCMath; снапшоты создаются непрерывно по календарным дням.
-- `MoneyAccount.currentBalance` пока сохраняется как совместимое поле и обновляется последним `closing` не позже текущей даты; источником истины остаётся `MoneyAccountDailyBalance`.
+- Методы чтения не запускают пересчёт: снапшоты создаются после изменения счёта, операций, импорта или явной команды пересчёта.
+- Пересчёт одного счёта выполняется в DBAL-транзакции под PostgreSQL advisory lock, удаляет производные снапшоты до актуальной `openingBalanceDate` и сериализует конкурентные запуски.
+- `MoneyAccount.currentBalance` пока сохраняется как совместимое поле и обновляется DBAL-запросом до последнего `closing` не позже текущей даты; источником истины остаётся `MoneyAccountDailyBalance`.
 
 **Идемпотентность внешних источников:**
 - Для внешних источников нужно заполнять `importSource` и `externalId`.

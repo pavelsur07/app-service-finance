@@ -27,6 +27,7 @@ class AccountBalanceProvider
             ->addSelect('a')
             ->where('b.company = :company')
             ->andWhere('b.date <= :date')
+            ->andWhere('b.date >= a.openingBalanceDate')
             ->andWhere('a.id IN (:accountIds)')
             ->setParameter('company', $company)
             ->setParameter('date', \DateTimeImmutable::createFromInterface($date)->setTime(0, 0))

@@ -2,11 +2,11 @@
 
 namespace App\Finance\Controller;
 
+use App\Cash\Application\Service\DailyBalanceRecalculator;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
-use App\Cash\Application\Service\DailyBalanceRecalculator;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -64,6 +64,7 @@ class ReportAccountBalancesController extends AbstractController
                 ->addSelect('a')
                 ->where('b.company = :company')
                 ->andWhere('b.date <= :date')
+                ->andWhere('b.date >= a.openingBalanceDate')
                 ->andWhere('a.id IN (:accountIds)')
                 ->setParameter('company', $company)
                 ->setParameter('date', $date)

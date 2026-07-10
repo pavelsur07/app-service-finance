@@ -272,6 +272,7 @@ class ReportTransactionsStatementController extends AbstractController
             ->addSelect('a')
             ->where('b.company = :company')
             ->andWhere('b.date BETWEEN :from AND :to')
+            ->andWhere('b.date >= a.openingBalanceDate')
             ->setParameter('company', $company)
             ->setParameter('from', $from)
             ->setParameter('to', $to)

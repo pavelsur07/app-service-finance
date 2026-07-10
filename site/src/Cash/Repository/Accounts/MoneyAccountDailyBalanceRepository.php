@@ -23,9 +23,11 @@ class MoneyAccountDailyBalanceRepository extends ServiceEntityRepository
             ->where('b.company = :company')
             ->andWhere('b.moneyAccount = :account')
             ->andWhere('b.date < :date')
+            ->andWhere('b.date >= :openingDate')
             ->setParameter('company', $company)
             ->setParameter('account', $account)
             ->setParameter('date', $date->setTime(0, 0))
+            ->setParameter('openingDate', $account->getOpeningBalanceDate()->setTime(0, 0))
             ->orderBy('b.date', 'DESC')
             ->setMaxResults(1)
             ->getQuery()->getOneOrNullResult();
@@ -108,8 +110,10 @@ class MoneyAccountDailyBalanceRepository extends ServiceEntityRepository
                         ELSE b.closing_balance
                     END AS account_balance
                 FROM money_account_daily_balance b
+                INNER JOIN money_account a ON a.id = b.money_account_id
                 WHERE b.company_id = :company_id
                   AND b.date <= :date
+                  AND b.date >= a.opening_balance_date
                   {$accountWhere}
                 ORDER BY b.money_account_id, b.date DESC
             ) t
@@ -128,8 +132,10 @@ class MoneyAccountDailyBalanceRepository extends ServiceEntityRepository
         $rows = $this->createQueryBuilder('b')
             ->select('b.currency as currency')
             ->addSelect('COALESCE(SUM(b.closingBalance), 0) as totalClosing')
+            ->innerJoin('b.moneyAccount', 'a')
             ->where('b.company = :company')
             ->andWhere('b.date = :date')
+            ->andWhere('b.date >= a.openingBalanceDate')
             ->setParameter('company', $company)
             ->setParameter('date', \DateTimeImmutable::createFromInterface($date), Types::DATE_IMMUTABLE)
             ->groupBy('b.currency')
@@ -161,8 +167,10 @@ class MoneyAccountDailyBalanceRepository extends ServiceEntityRepository
                     b.currency,
                     b.closing_balance
                 FROM money_account_daily_balance b
+                INNER JOIN money_account a ON a.id = b.money_account_id
                 WHERE b.company_id = :company_id
                   AND b.date <= :date
+                  AND b.date >= a.opening_balance_date
                 ORDER BY b.money_account_id, b.date DESC
             ) t
             GROUP BY t.currency
@@ -185,6 +193,60 @@ class MoneyAccountDailyBalanceRepository extends ServiceEntityRepository
         }
 
         return $result;
+    }
+
+    public function acquireRecalculationLock(MoneyAccount $account): void
+    {
+        $connection = $this->getEntityManager()->getConnection();
+        if (!$connection->isTransactionActive()) {
+            throw new \LogicException('Daily balance recalculation lock requires an active transaction.');
+        }
+
+        $connection->executeStatement(
+            'SELECT pg_advisory_xact_lock(hashtext(:namespace), hashtext(:account_id))',
+            [
+                'namespace' => 'cash_daily_balance',
+                'account_id' => $account->getId(),
+            ],
+        );
+    }
+
+    public function deleteBeforeOpeningDate(
+        Company $company,
+        MoneyAccount $account,
+        \DateTimeImmutable $openingDate,
+    ): void {
+        $this->getEntityManager()->getConnection()->executeStatement(
+            <<<'SQL'
+                DELETE FROM money_account_daily_balance
+                WHERE company_id = :company_id
+                  AND money_account_id = :account_id
+                  AND date < :opening_date
+                SQL,
+            [
+                'company_id' => $company->getId(),
+                'account_id' => $account->getId(),
+                'opening_date' => $openingDate->setTime(0, 0),
+            ],
+            ['opening_date' => Types::DATE_IMMUTABLE],
+        );
+    }
+
+    public function updateCurrentBalance(Company $company, MoneyAccount $account, string $balance): void
+    {
+        $this->getEntityManager()->getConnection()->executeStatement(
+            <<<'SQL'
+                UPDATE money_account
+                SET current_balance = :balance
+                WHERE id = :account_id
+                  AND company_id = :company_id
+                SQL,
+            [
+                'balance' => $balance,
+                'account_id' => $account->getId(),
+                'company_id' => $company->getId(),
+            ],
+        );
     }
 
     /**

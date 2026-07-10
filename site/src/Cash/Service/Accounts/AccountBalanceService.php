@@ -1,21 +1,27 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Cash\Service\Accounts;
 
 use App\Cash\DTO\DailyBalancesDTO;
 use App\Cash\DTO\MoneyBalanceDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Entity\Accounts\MoneyAccountDailyBalance;
+use App\Cash\Exception\BalanceNotAvailableBeforeOpeningDateException;
+use App\Cash\Exception\BalanceSnapshotNotFoundException;
+use App\Cash\Exception\OpeningBalanceDateInFutureException;
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Company\Entity\Company;
-use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\DBAL\Connection;
 
-class AccountBalanceService
+final class AccountBalanceService
 {
     public function __construct(
-        private CashTransactionRepository $txRepo,
-        private MoneyAccountDailyBalanceRepository $balanceRepo,
-        private EntityManagerInterface $em,
+        private readonly CashTransactionRepository $txRepo,
+        private readonly MoneyAccountDailyBalanceRepository $balanceRepo,
+        private readonly Connection $connection,
     ) {
     }
 
@@ -23,7 +29,7 @@ class AccountBalanceService
     {
         $date = $date->setTime(0, 0);
         if ($date < $account->getOpeningBalanceDate()->setTime(0, 0)) {
-            throw new \DomainException('Balance is not available before the account opening balance date.');
+            throw new BalanceNotAvailableBeforeOpeningDateException();
         }
 
         $snapshot = $this->balanceRepo->findOneBy([
@@ -31,13 +37,8 @@ class AccountBalanceService
             'moneyAccount' => $account,
             'date' => $date,
         ]);
-        if (!$snapshot) {
-            $this->recalculateDailyRange($company, $account, $date, $date);
-            $snapshot = $this->balanceRepo->findOneBy([
-                'company' => $company,
-                'moneyAccount' => $account,
-                'date' => $date,
-            ]);
+        if (!$snapshot instanceof MoneyAccountDailyBalance) {
+            throw new BalanceSnapshotNotFoundException();
         }
 
         return new MoneyBalanceDTO($snapshot->getDate(), $snapshot->getOpeningBalance(), $snapshot->getInflow(), $snapshot->getOutflow(), $snapshot->getClosingBalance(), $account->getCurrency());
@@ -60,11 +61,13 @@ class AccountBalanceService
             $from = $openingDate;
         }
 
-        $this->recalculateDailyRange($company, $account, $from, $to);
         $snapshots = $this->balanceRepo->createQueryBuilder('b')
             ->where('b.company = :c')->andWhere('b.moneyAccount = :a')
             ->andWhere('b.date BETWEEN :f AND :t')
-            ->setParameters(['c' => $company, 'a' => $account, 'f' => $from, 't' => $to])
+            ->setParameter('c', $company)
+            ->setParameter('a', $account)
+            ->setParameter('f', $from)
+            ->setParameter('t', $to)
             ->orderBy('b.date', 'ASC')
             ->getQuery()->getResult();
         $balances = [];
@@ -84,8 +87,28 @@ class AccountBalanceService
         }
 
         $openingDate = $account->getOpeningBalanceDate()->setTime(0, 0);
-        $from = max($from, $openingDate);
         $today = (new \DateTimeImmutable('today'))->setTime(0, 0);
+        if ($openingDate > $today) {
+            throw new OpeningBalanceDateInFutureException();
+        }
+
+        $from = max($from, $openingDate);
+
+        $this->connection->transactional(function () use ($company, $account, $from, $to, $openingDate, $today): void {
+            $this->balanceRepo->acquireRecalculationLock($account);
+            $this->balanceRepo->deleteBeforeOpeningDate($company, $account, $openingDate);
+            $this->recalculateLocked($company, $account, $from, $to, $openingDate, $today);
+        });
+    }
+
+    private function recalculateLocked(
+        Company $company,
+        MoneyAccount $account,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+        \DateTimeImmutable $openingDate,
+        \DateTimeImmutable $today,
+    ): void {
         $latestTransactionDate = $this->txRepo->findLatestOccurredAtForAccountFrom($company, $account, $openingDate);
         $latestSnapshotDate = $this->balanceRepo->findLatestDateForAccountFrom($company, $account, $openingDate);
         $to = $this->latestDate($to, $today, $openingDate, $latestTransactionDate, $latestSnapshotDate);
@@ -146,8 +169,7 @@ class AccountBalanceService
             $openingDate,
         );
         if (null !== $currentBalance) {
-            $account->setCurrentBalance($this->decimal($currentBalance));
-            $this->em->flush();
+            $this->balanceRepo->updateCurrentBalance($company, $account, $this->decimal($currentBalance));
         }
     }
 
