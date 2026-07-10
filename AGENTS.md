@@ -330,6 +330,7 @@ Read-only SQL through `codex-psql-ro`, which uses the read-only `codex_ro` datab
 
 Production commands that mutate data, process queues, call external APIs, or can change application state require explicit owner approval immediately before execution:
 `messenger:consume`.
+`app:daily-balance:recalc` for owner-approved daily-balance backfill.
 Any command with `--execute`.
 Any repair, prune, backfill, rebuild, refresh, or maintenance operation.
 Any SQL write operation (`INSERT`, `UPDATE`, `DELETE`, DDL, or migrations).
