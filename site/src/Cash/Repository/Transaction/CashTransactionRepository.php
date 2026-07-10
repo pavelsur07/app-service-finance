@@ -44,8 +44,8 @@ class CashTransactionRepository extends ServiceEntityRepository
         $qb = $this->createQueryBuilder('t')
             ->select(
                 't.occurredAt as date',
-                "SUM(CASE WHEN t.direction = 'INFLOW' THEN t.amount ELSE 0 END) as inflow",
-                "SUM(CASE WHEN t.direction = 'OUTFLOW' THEN t.amount ELSE 0 END) as outflow"
+                "SUM(CASE WHEN t.direction = 'INFLOW' THEN ABS(t.amount) ELSE 0 END) as inflow",
+                "SUM(CASE WHEN t.direction = 'OUTFLOW' THEN ABS(t.amount) ELSE 0 END) as outflow"
             )
             ->where('t.company = :company')
             ->andWhere('t.moneyAccount = :account')
@@ -59,6 +59,32 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->orderBy('date', 'ASC');
 
         return $qb->getQuery()->getArrayResult();
+    }
+
+    public function findLatestOccurredAtForAccountFrom(
+        Company $company,
+        MoneyAccount $account,
+        \DateTimeImmutable $from,
+    ): ?\DateTimeImmutable {
+        $value = $this->createQueryBuilder('t')
+            ->select('MAX(t.occurredAt)')
+            ->where('t.company = :company')
+            ->andWhere('t.moneyAccount = :account')
+            ->andWhere('t.occurredAt >= :from')
+            ->andWhere('t.deletedAt IS NULL')
+            ->setParameter('company', $company)
+            ->setParameter('account', $account)
+            ->setParameter('from', $from->setTime(0, 0))
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        if ($value instanceof \DateTimeInterface) {
+            return \DateTimeImmutable::createFromInterface($value)->setTime(0, 0);
+        }
+
+        return \is_string($value) && '' !== $value
+            ? (new \DateTimeImmutable($value))->setTime(0, 0)
+            : null;
     }
 
     public function existsByCompanyAndDedupe(string $companyId, string $dedupeHash): bool
@@ -108,7 +134,6 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->getQuery()
             ->getOneOrNullResult();
     }
-
 
     public function findIdByCompanyImportSourceExternalIdDbal(string $companyId, string $importSource, string $externalId): ?string
     {
@@ -259,7 +284,7 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->setParameter('inflow', CashDirection::INFLOW)
             ->setParameter('outflow', CashDirection::OUTFLOW);
 
-        // TODO: exclude transfers (isTransfer = true) if the report should show only operational turnovers.
+        // isTransfer is metadata only; account turnover follows INFLOW/OUTFLOW for every transaction.
 
         $result = $qb->getQuery()->getArrayResult();
 

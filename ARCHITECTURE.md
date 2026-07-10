@@ -601,6 +601,16 @@ createTransaction(CreateCashTransactionCommand $command): CreateCashTransactionR
 - `DailyBalanceRecalculator`;
 - `SnapshotCacheInvalidator`.
 
+#### Регистр ежедневных остатков
+
+- `AccountBalanceService` — единственная реализация формулы `opening + inflow - outflow = closing`.
+- `DailyBalanceRecalculator` только выбирает счета компании и делегирует пересчёт каноническому сервису.
+- `MoneyAccount.openingBalanceDate` — начало расчётного учёта по счёту; более ранние операции остаются в реестре, но не входят в остатки.
+- `openingBalance` является остатком на начало `openingBalanceDate`; далее `opening` каждого дня равен `closing` предыдущего дня.
+- Soft-deleted операции исключаются. `isTransfer` не влияет на остаток: направление определяется только `INFLOW`/`OUTFLOW`.
+- Денежная арифметика выполняется decimal-строками через BCMath; снапшоты создаются непрерывно по календарным дням.
+- `MoneyAccount.currentBalance` пока сохраняется как совместимое поле и обновляется последним `closing` не позже текущей даты; источником истины остаётся `MoneyAccountDailyBalance`.
+
 **Идемпотентность внешних источников:**
 - Для внешних источников нужно заполнять `importSource` и `externalId`.
 - Идемпотентность обеспечивается unique constraint `uniq_cashflow_import(company_id, import_source, external_id)`.

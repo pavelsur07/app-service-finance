@@ -2,24 +2,30 @@
 
 namespace App\Cash\Service\Accounts;
 
+use App\Cash\DTO\DailyBalancesDTO;
+use App\Cash\DTO\MoneyBalanceDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Company\Entity\Company;
-use App\Cash\DTO\DailyBalancesDTO;
-use App\Cash\DTO\MoneyBalanceDTO;
+use Doctrine\ORM\EntityManagerInterface;
 
 class AccountBalanceService
 {
     public function __construct(
         private CashTransactionRepository $txRepo,
         private MoneyAccountDailyBalanceRepository $balanceRepo,
+        private EntityManagerInterface $em,
     ) {
     }
 
     public function getBalanceOnDate(Company $company, MoneyAccount $account, \DateTimeImmutable $date): MoneyBalanceDTO
     {
         $date = $date->setTime(0, 0);
+        if ($date < $account->getOpeningBalanceDate()->setTime(0, 0)) {
+            throw new \DomainException('Balance is not available before the account opening balance date.');
+        }
+
         $snapshot = $this->balanceRepo->findOneBy([
             'company' => $company,
             'moneyAccount' => $account,
@@ -41,6 +47,19 @@ class AccountBalanceService
     {
         $from = $from->setTime(0, 0);
         $to = $to->setTime(0, 0);
+        if ($from > $to) {
+            [$from, $to] = [$to, $from];
+        }
+
+        $openingDate = $account->getOpeningBalanceDate()->setTime(0, 0);
+        if ($to < $openingDate) {
+            return new DailyBalancesDTO([], $account->getCurrency());
+        }
+
+        if ($from < $openingDate) {
+            $from = $openingDate;
+        }
+
         $this->recalculateDailyRange($company, $account, $from, $to);
         $snapshots = $this->balanceRepo->createQueryBuilder('b')
             ->where('b.company = :c')->andWhere('b.moneyAccount = :a')
@@ -60,17 +79,35 @@ class AccountBalanceService
     {
         $from = $from->setTime(0, 0);
         $to = $to->setTime(0, 0);
-        $prev = $this->balanceRepo->findLastBefore($company, $account, $from);
-        $opening = $prev ? $prev->getClosingBalance() : $account->getOpeningBalance();
-        // Если пересчёт стартует ровно с даты ввода остатка — opening фиксируем как установленный остаток счёта
-        $accountOpeningDate = $account->getOpeningBalanceDate();
-        if (null !== $accountOpeningDate) {
-            $fromDateOnly = $from->format('Y-m-d');
-            $openingDateOnly = $accountOpeningDate->setTime(0, 0)->format('Y-m-d');
-            if ($fromDateOnly === $openingDateOnly) {
-                $opening = $account->getOpeningBalance();
+        if ($from > $to) {
+            [$from, $to] = [$to, $from];
+        }
+
+        $openingDate = $account->getOpeningBalanceDate()->setTime(0, 0);
+        $from = max($from, $openingDate);
+        $today = (new \DateTimeImmutable('today'))->setTime(0, 0);
+        $latestTransactionDate = $this->txRepo->findLatestOccurredAtForAccountFrom($company, $account, $openingDate);
+        $latestSnapshotDate = $this->balanceRepo->findLatestDateForAccountFrom($company, $account, $openingDate);
+        $to = $this->latestDate($to, $today, $openingDate, $latestTransactionDate, $latestSnapshotDate);
+
+        $prev = null;
+        if ($from > $openingDate) {
+            $prev = $this->balanceRepo->findLastBefore($company, $account, $from);
+            if (null === $prev || $prev->getDate() < $openingDate) {
+                $from = $openingDate;
+                $prev = null;
+            } else {
+                $dayAfterPrevious = $prev->getDate()->modify('+1 day')->setTime(0, 0);
+                if ($dayAfterPrevious < $from) {
+                    $from = $dayAfterPrevious;
+                }
             }
         }
+
+        $opening = $from == $openingDate
+            ? $this->decimal($account->getOpeningBalance())
+            : $this->decimal($prev?->getClosingBalance() ?? $account->getOpeningBalance());
+
         $rows = [];
         $txAgg = $this->txRepo->sumByDay($company, $account, $from, $to);
         $map = [];
@@ -81,8 +118,8 @@ class AccountBalanceService
         $current = clone $from;
         while ($current <= $to) {
             $key = $current->format('Y-m-d');
-            $in = $map[$key]['inflow'] ?? '0';
-            $out = $map[$key]['outflow'] ?? '0';
+            $in = $this->decimal((string) ($map[$key]['inflow'] ?? '0'));
+            $out = $this->decimal((string) ($map[$key]['outflow'] ?? '0'));
             $closing = \bcsub(\bcadd($opening, $in, 2), $out, 2);
             $rows[] = [
                 'company_id' => $company->getId(),
@@ -97,6 +134,32 @@ class AccountBalanceService
             $opening = $closing;
             $current = $current->modify('+1 day');
         }
-        $this->balanceRepo->upsertMany($rows);
+
+        foreach (array_chunk($rows, 500) as $chunk) {
+            $this->balanceRepo->upsertMany($chunk);
+        }
+
+        $currentBalance = $this->balanceRepo->findLatestClosingBalanceOnOrBefore(
+            $company,
+            $account,
+            $today,
+            $openingDate,
+        );
+        if (null !== $currentBalance) {
+            $account->setCurrentBalance($this->decimal($currentBalance));
+            $this->em->flush();
+        }
+    }
+
+    private function decimal(string $value): string
+    {
+        return \bcadd($value, '0', 2);
+    }
+
+    private function latestDate(\DateTimeImmutable $first, ?\DateTimeImmutable ...$dates): \DateTimeImmutable
+    {
+        return array_reduce($dates, static function (\DateTimeImmutable $latest, ?\DateTimeImmutable $date): \DateTimeImmutable {
+            return null !== $date && $date > $latest ? $date : $latest;
+        }, $first);
     }
 }

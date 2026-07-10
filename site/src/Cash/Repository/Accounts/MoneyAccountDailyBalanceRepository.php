@@ -31,6 +31,54 @@ class MoneyAccountDailyBalanceRepository extends ServiceEntityRepository
             ->getQuery()->getOneOrNullResult();
     }
 
+    public function findLatestDateForAccountFrom(
+        Company $company,
+        MoneyAccount $account,
+        \DateTimeImmutable $from,
+    ): ?\DateTimeImmutable {
+        $value = $this->createQueryBuilder('b')
+            ->select('MAX(b.date)')
+            ->where('b.company = :company')
+            ->andWhere('b.moneyAccount = :account')
+            ->andWhere('b.date >= :from')
+            ->setParameter('company', $company)
+            ->setParameter('account', $account)
+            ->setParameter('from', $from->setTime(0, 0))
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        if ($value instanceof \DateTimeInterface) {
+            return \DateTimeImmutable::createFromInterface($value)->setTime(0, 0);
+        }
+
+        return \is_string($value) && '' !== $value
+            ? (new \DateTimeImmutable($value))->setTime(0, 0)
+            : null;
+    }
+
+    public function findLatestClosingBalanceOnOrBefore(
+        Company $company,
+        MoneyAccount $account,
+        \DateTimeImmutable $date,
+        \DateTimeImmutable $notBefore,
+    ): ?string {
+        $row = $this->createQueryBuilder('b')
+            ->select('b.closingBalance AS closingBalance')
+            ->where('b.company = :company')
+            ->andWhere('b.moneyAccount = :account')
+            ->andWhere('b.date BETWEEN :notBefore AND :date')
+            ->setParameter('company', $company)
+            ->setParameter('account', $account)
+            ->setParameter('notBefore', $notBefore->setTime(0, 0))
+            ->setParameter('date', $date->setTime(0, 0))
+            ->orderBy('b.date', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return \is_array($row) ? (string) $row['closingBalance'] : null;
+    }
+
     public function getOpeningBalanceForDate(
         Company $company,
         \DateTimeInterface $date,
