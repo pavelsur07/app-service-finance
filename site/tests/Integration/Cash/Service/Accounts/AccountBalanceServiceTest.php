@@ -113,6 +113,28 @@ final class AccountBalanceServiceTest extends IntegrationTestCase
         self::assertSame('9999999999999999.99', $this->currentBalance($account));
     }
 
+    public function testUsesOpeningBalanceForSameCalendarDateInDifferentTimezones(): void
+    {
+        $openingDate = new \DateTimeImmutable('today', new \DateTimeZone('UTC'));
+        $sameCalendarDate = new \DateTimeImmutable(
+            $openingDate->format('Y-m-d'),
+            new \DateTimeZone('America/New_York'),
+        );
+        [$company, $account] = $this->createAccount('300.00', $openingDate);
+
+        $this->balanceService->recalculateDailyRange(
+            $company,
+            $account,
+            $sameCalendarDate,
+            $sameCalendarDate,
+        );
+
+        $rows = $this->rows($company, $account);
+        self::assertNotEmpty($rows);
+        self::assertSame($openingDate->format('Y-m-d'), $rows[0]->getDate()->format('Y-m-d'));
+        self::assertSame('300.00', $rows[0]->getOpeningBalance());
+    }
+
     public function testAggregatesMultipleTransactionsInBothDirectionsForOneDay(): void
     {
         $today = new \DateTimeImmutable('today');

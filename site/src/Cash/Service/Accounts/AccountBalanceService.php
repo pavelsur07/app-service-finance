@@ -88,7 +88,7 @@ final class AccountBalanceService
 
         $openingDate = $account->getOpeningBalanceDate()->setTime(0, 0);
         $today = (new \DateTimeImmutable('today'))->setTime(0, 0);
-        if ($openingDate > $today) {
+        if ($openingDate->format('Y-m-d') > $today->format('Y-m-d')) {
             throw new OpeningBalanceDateInFutureException();
         }
 
@@ -127,7 +127,7 @@ final class AccountBalanceService
             }
         }
 
-        $opening = $from == $openingDate
+        $opening = $from->format('Y-m-d') === $openingDate->format('Y-m-d')
             ? $this->decimal($account->getOpeningBalance())
             : $this->decimal($prev?->getClosingBalance() ?? $account->getOpeningBalance());
 
