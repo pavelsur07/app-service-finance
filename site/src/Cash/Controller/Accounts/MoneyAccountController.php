@@ -3,11 +3,11 @@
 namespace App\Cash\Controller\Accounts;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Form\Accounts\MoneyAccountType as MoneyAccountFormType;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Accounts\MoneyAccountService;
-use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Shared\Service\ActiveCompanyService;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -39,7 +39,7 @@ class MoneyAccountController extends AbstractController
     }
 
     #[Route('/new', name: 'money_account_new', methods: ['GET', 'POST'])]
-    public function new(Request $request): Response
+    public function new(Request $request, AccountBalanceService $balanceService): Response
     {
         $company = $this->activeCompanyService->getActiveCompany();
         $account = new MoneyAccount(
@@ -55,6 +55,12 @@ class MoneyAccountController extends AbstractController
 
         if ($form->isSubmitted() && $form->isValid()) {
             $this->moneyAccountService->create($account);
+            $balanceService->recalculateDailyRange(
+                $company,
+                $account,
+                $account->getOpeningBalanceDate(),
+                new \DateTimeImmutable('today'),
+            );
 
             return $this->redirectToRoute('money_account_index');
         }
@@ -172,13 +178,6 @@ class MoneyAccountController extends AbstractController
                 $account->getOpeningBalanceDate(),
                 new \DateTimeImmutable('today')
             );
-            $todayBalance = $balanceService->getBalanceOnDate(
-                $company,
-                $account,
-                new \DateTimeImmutable('today')
-            );
-            $account->setCurrentBalance($todayBalance->closing);
-            $this->moneyAccountService->update();
 
             return $this->redirectToRoute('money_account_index');
         }

@@ -12,6 +12,7 @@ use Symfony\Component\Form\Extension\Core\Type\MoneyType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use Symfony\Component\Validator\Constraints\LessThanOrEqual;
 
 class MoneyAccountType extends AbstractType
 {
@@ -38,7 +39,7 @@ class MoneyAccountType extends AbstractType
                 'required' => false,
                 'currency' => false,
             ])
-            #Коментарий: Поле неснижаемого остатка (ватерлинии) для счёта.
+            // Коментарий: Поле неснижаемого остатка (ватерлинии) для счёта.
             ->add('minimumSafeBalance', MoneyType::class, [
                 'label' => 'Неснижаемый остаток',
                 'required' => false,
@@ -47,6 +48,9 @@ class MoneyAccountType extends AbstractType
             ->add('openingBalanceDate', DateType::class, [
                 'label' => 'Дата ввода',
                 'widget' => 'single_text',
+                'constraints' => [
+                    new LessThanOrEqual('today', message: 'Дата ввода не может быть позже сегодняшнего дня.'),
+                ],
             ])
             ->add('isDefault', CheckboxType::class, [
                 'label' => 'По умолчанию',

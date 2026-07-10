@@ -25,6 +25,7 @@ DG\BypassFinals::allowPaths([
     '*/src/Shared/Service/Storage/StorageService.php',
     '*/src/Ingestion/Repository/IngestRawRecordRepository.php',
     '*/src/Ingestion/Repository/FinancialTransactionRepository.php',
+    '*/src/Cash/Service/Accounts/AccountBalanceService.php',
 ]);
 
 if (method_exists(Dotenv::class, 'bootEnv')) {
