@@ -18,7 +18,10 @@ use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface;
+use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 
 /**
  * Загружает сырые данные Ozon за конкретную дату и сохраняет MarketplaceRawDocument.
@@ -41,18 +44,18 @@ final class SyncOzonReportHandler
 
     public function __invoke(SyncOzonReportMessage $message): void
     {
-        $companyId    = $message->companyId;
+        $companyId = $message->companyId;
         $connectionId = $message->connectionId;
-        $dateKey      = $message->date ?? (new \DateTimeImmutable('yesterday', new \DateTimeZone('Europe/Moscow')))->format('Y-m-d');
+        $dateKey = $message->date ?? (new \DateTimeImmutable('yesterday', new \DateTimeZone('Europe/Moscow')))->format('Y-m-d');
 
         $lock = $this->lockFactory->createLock(
-            'marketplace_sync_' . $companyId . '_ozon_' . $dateKey,
+            'marketplace_sync_'.$companyId.'_ozon_'.$dateKey,
             self::LOCK_TTL_SECONDS,
         );
 
         if (!$lock->acquire()) {
             $this->logger->warning('Ozon sync already in progress, skipping', [
-                'company_id'    => $companyId,
+                'company_id' => $companyId,
                 'connection_id' => $connectionId,
             ]);
 
@@ -90,21 +93,21 @@ final class SyncOzonReportHandler
 
         $timezone = new \DateTimeZone('Europe/Moscow');
 
-        if ($date !== null) {
+        if (null !== $date) {
             $parsed = \DateTimeImmutable::createFromFormat('!Y-m-d', $date, $timezone);
-            if ($parsed === false || $parsed->format('Y-m-d') !== $date) {
+            if (false === $parsed || $parsed->format('Y-m-d') !== $date) {
                 // Невалидный вход → skip. Это не системный сбой → warning (не в GlitchTip).
                 $this->logger->warning('Invalid date in SyncOzonReportMessage, skipping', [
                     'company_id' => $companyId,
-                    'date'       => $date,
+                    'date' => $date,
                 ]);
 
                 return;
             }
             $fromDate = $parsed;
-            $toDate   = $parsed;
+            $toDate = $parsed;
         } else {
-            $toDate   = new \DateTimeImmutable('yesterday', $timezone);
+            $toDate = new \DateTimeImmutable('yesterday', $timezone);
             $fromDate = $toDate;
         }
 
@@ -135,15 +138,15 @@ final class SyncOzonReportHandler
         }
 
         if (
-            $existingDoc !== null
+            null !== $existingDoc
             && in_array($existingDoc->getProcessingStatus(), [PipelineStatus::PENDING, PipelineStatus::RUNNING], true)
         ) {
             $this->logger->info('Skipping Ozon refresh: pipeline is still in progress for this raw document', [
-                'company_id'      => $companyId,
-                'connection_id'   => $connectionId,
+                'company_id' => $companyId,
+                'connection_id' => $connectionId,
                 'raw_document_id' => $existingDoc->getId(),
-                'status'          => $existingDoc->getProcessingStatus()?->value,
-                'date'            => $fromDate->format('Y-m-d'),
+                'status' => $existingDoc->getProcessingStatus()?->value,
+                'date' => $fromDate->format('Y-m-d'),
             ]);
 
             return;
@@ -162,7 +165,7 @@ final class SyncOzonReportHandler
             if (empty($rawData)) {
                 $this->logger->info('Ozon API returned empty report', [
                     'company_id' => $companyId,
-                    'period'     => $fromDate->format('Y-m-d') . ' - ' . $toDate->format('Y-m-d'),
+                    'period' => $fromDate->format('Y-m-d').' - '.$toDate->format('Y-m-d'),
                 ]);
                 $connection->markSyncSuccess();
                 $this->em->flush();
@@ -170,7 +173,7 @@ final class SyncOzonReportHandler
                 return;
             }
 
-            if ($existingDoc !== null) {
+            if (null !== $existingDoc) {
                 $existingDoc->refreshRawData(
                     rawData: $rawData,
                     apiEndpoint: $adapter->getApiEndpointName(),
@@ -182,11 +185,11 @@ final class SyncOzonReportHandler
                 $rawDocId = $existingDoc->getId();
 
                 $this->logger->info('Ozon raw report refreshed', [
-                    'company_id'    => $companyId,
+                    'company_id' => $companyId,
                     'connection_id' => $connectionId,
-                    'raw_doc_id'    => $rawDocId,
+                    'raw_doc_id' => $rawDocId,
                     'records_count' => count($rawData),
-                    'period'        => $fromDate->format('Y-m-d') . ' - ' . $toDate->format('Y-m-d'),
+                    'period' => $fromDate->format('Y-m-d').' - '.$toDate->format('Y-m-d'),
                 ]);
             } else {
                 $rawDoc = new MarketplaceRawDocument(
@@ -207,11 +210,11 @@ final class SyncOzonReportHandler
                 $rawDocId = $rawDoc->getId();
 
                 $this->logger->info('Ozon raw report saved', [
-                    'company_id'    => $companyId,
+                    'company_id' => $companyId,
                     'connection_id' => $connectionId,
-                    'raw_doc_id'    => $rawDocId,
+                    'raw_doc_id' => $rawDocId,
                     'records_count' => count($rawData),
-                    'period'        => $fromDate->format('Y-m-d') . ' - ' . $toDate->format('Y-m-d'),
+                    'period' => $fromDate->format('Y-m-d').' - '.$toDate->format('Y-m-d'),
                 ]);
             }
 
@@ -219,15 +222,25 @@ final class SyncOzonReportHandler
             $connection->markSyncSuccess();
             $this->em->flush();
         } catch (\Throwable $e) {
-            $this->logger->error('Ozon daily sync failed', [
-                'company_id'    => $companyId,
+            $transient = $this->isTransient($e);
+            $context = [
+                'company_id' => $companyId,
                 'connection_id' => $connectionId,
-                'error'         => $e->getMessage(),
-            ]);
+                'error' => $e->getMessage(),
+            ];
+
+            if ($transient) {
+                // Ожидаемо и повторяемо (429/5xx/таймаут) → warning (не в GlitchTip) + retry Messenger.
+                $this->logger->warning('Ozon daily sync: temporary API failure, will retry', $context);
+            } else {
+                $this->logger->error('Ozon daily sync failed', $context);
+            }
 
             try {
                 $connection = $this->em->find(MarketplaceConnection::class, $connectionId);
                 if ($connection) {
+                    // ponytail: при transient статус мигнёт failed→success между ретраями (~минута);
+                    // отдельный "retrying"-статус — только если это начнёт мешать в UI.
                     $connection->markSyncFailed($e->getMessage());
                     $this->em->flush();
                 }
@@ -235,6 +248,11 @@ final class SyncOzonReportHandler
                 $this->logger->error('Failed to save Ozon sync error status', [
                     'error' => $inner->getMessage(),
                 ]);
+            }
+
+            if ($transient) {
+                // Retry по стратегии async_sync: 10с → 20с → 40с, дальше failed-транспорт.
+                throw new RecoverableMessageHandlingException($e->getMessage(), 0, $e);
             }
 
             return;
@@ -247,15 +265,31 @@ final class SyncOzonReportHandler
             ));
 
             $this->logger->info('Dispatched auto-processing for Ozon day report', [
-                'company_id'      => $companyId,
+                'company_id' => $companyId,
                 'raw_document_id' => $rawDocId,
             ]);
         } catch (\Throwable $e) {
             $this->logger->error('Failed to dispatch auto-processing for Ozon', [
-                'company_id'      => $companyId,
+                'company_id' => $companyId,
                 'raw_document_id' => $rawDocId,
-                'error'           => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * OzonAdapter бросает сырые исключения Symfony HttpClient (не типизированные
+     * Marketplace*Exception, как WB-клиент) — классифицируем по ним.
+     */
+    private function isTransient(\Throwable $e): bool
+    {
+        if ($e instanceof HttpExceptionInterface) {
+            $status = $e->getResponse()->getStatusCode();
+
+            return 429 === $status || $status >= 500;
+        }
+
+        // Сетевой сбой / таймаут — ответа нет вообще.
+        return $e instanceof TransportExceptionInterface;
     }
 }
