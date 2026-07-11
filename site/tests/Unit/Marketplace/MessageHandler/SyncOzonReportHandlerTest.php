@@ -22,10 +22,14 @@ use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use Symfony\Component\HttpClient\Exception\TransportException;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\SharedLockInterface;
 use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 
 final class SyncOzonReportHandlerTest extends TestCase
 {
@@ -117,8 +121,6 @@ final class SyncOzonReportHandlerTest extends TestCase
         self::assertInstanceOf(ProcessDayReportMessage::class, $dispatchedMessage);
         self::assertSame($existingId, $dispatchedMessage->rawDocumentId);
     }
-
-
 
     public function testRefreshesExistingRawDocumentWithNullStatusAndKeepsId(): void
     {
@@ -339,7 +341,7 @@ final class SyncOzonReportHandlerTest extends TestCase
                 self::identicalTo($company),
                 self::identicalTo(MarketplaceType::OZON),
                 self::identicalTo('sales_report'),
-                self::callback(static fn (\DateTimeImmutable $d): bool => $d->format('Y-m-d') === self::DATE),
+                self::callback(static fn (\DateTimeImmutable $d): bool => self::DATE === $d->format('Y-m-d')),
             )
             ->willReturn([]);
 
@@ -390,6 +392,109 @@ final class SyncOzonReportHandlerTest extends TestCase
         $handler(new SyncOzonReportMessage(self::COMPANY_ID, self::CONNECTION_ID, 'not-a-date'));
     }
 
+    public function testTransientNetworkErrorLogsWarningAndThrowsRecoverable(): void
+    {
+        // Регрессия: таймаут/сетевой сбой — не инцидент. Warning (не в GlitchTip)
+        // + RecoverableMessageHandlingException → штатный retry Messenger.
+        $company = CompanyBuilder::aCompany()->withId(self::COMPANY_ID)->build();
+        $connection = new MarketplaceConnection(self::CONNECTION_ID, $company, MarketplaceType::OZON);
+
+        $rawDocRepo = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $rawDocRepo->method('findActiveExactDayDocuments')->willReturn([]);
+
+        $em = $this->createEmMock($company, $connection);
+
+        $adapter = $this->createMock(MarketplaceAdapterInterface::class);
+        $adapter->method('getMarketplaceType')->willReturn(MarketplaceType::OZON->value);
+        $adapter->method('fetchRawReport')->willThrowException(new TransportException('Connection timed out'));
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::never())->method('error');
+        $logger->expects(self::once())
+            ->method('warning')
+            ->with(self::stringContains('temporary API failure'), self::arrayHasKey('connection_id'));
+
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $handler = $this->createHandler($em, $adapter, $messageBus, $rawDocRepo, $logger);
+
+        $this->expectException(RecoverableMessageHandlingException::class);
+
+        try {
+            $handler(new SyncOzonReportMessage(self::COMPANY_ID, self::CONNECTION_ID, self::DATE));
+        } finally {
+            self::assertSame('Connection timed out', $connection->getLastSyncError());
+        }
+    }
+
+    public function testHttp429LogsWarningAndThrowsRecoverable(): void
+    {
+        $company = CompanyBuilder::aCompany()->withId(self::COMPANY_ID)->build();
+        $connection = new MarketplaceConnection(self::CONNECTION_ID, $company, MarketplaceType::OZON);
+
+        $rawDocRepo = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $rawDocRepo->method('findActiveExactDayDocuments')->willReturn([]);
+
+        $em = $this->createEmMock($company, $connection);
+
+        $adapter = $this->createMock(MarketplaceAdapterInterface::class);
+        $adapter->method('getMarketplaceType')->willReturn(MarketplaceType::OZON->value);
+        $adapter->method('fetchRawReport')->willThrowException($this->createHttpException(429));
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::never())->method('error');
+        $logger->expects(self::once())->method('warning');
+
+        $handler = $this->createHandler($em, $adapter, $this->createMock(MessageBusInterface::class), $rawDocRepo, $logger);
+
+        $this->expectException(RecoverableMessageHandlingException::class);
+        $handler(new SyncOzonReportMessage(self::COMPANY_ID, self::CONNECTION_ID, self::DATE));
+    }
+
+    public function testHttp401LogsErrorAndDoesNotRetry(): void
+    {
+        // Неустранимая ошибка (протухший токен) — инцидент: error + без retry.
+        $company = CompanyBuilder::aCompany()->withId(self::COMPANY_ID)->build();
+        $connection = new MarketplaceConnection(self::CONNECTION_ID, $company, MarketplaceType::OZON);
+
+        $rawDocRepo = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $rawDocRepo->method('findActiveExactDayDocuments')->willReturn([]);
+
+        $em = $this->createEmMock($company, $connection);
+
+        $adapter = $this->createMock(MarketplaceAdapterInterface::class);
+        $adapter->method('getMarketplaceType')->willReturn(MarketplaceType::OZON->value);
+        $adapter->method('fetchRawReport')->willThrowException($this->createHttpException(401));
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::never())->method('warning');
+        $logger->expects(self::once())
+            ->method('error')
+            ->with(self::stringContains('Ozon daily sync failed'), self::arrayHasKey('connection_id'));
+
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $handler = $this->createHandler($em, $adapter, $messageBus, $rawDocRepo, $logger);
+
+        // Не бросает — сообщение подтверждается без retry.
+        $handler(new SyncOzonReportMessage(self::COMPANY_ID, self::CONNECTION_ID, self::DATE));
+
+        self::assertNotNull($connection->getLastSyncError());
+    }
+
+    private function createHttpException(int $statusCode): HttpExceptionInterface
+    {
+        $response = $this->createMock(ResponseInterface::class);
+        $response->method('getStatusCode')->willReturn($statusCode);
+
+        $exception = $this->createMock(HttpExceptionInterface::class);
+        $exception->method('getResponse')->willReturn($response);
+
+        return $exception;
+    }
+
     private function buildDocForDate(Company $company): MarketplaceRawDocument
     {
         $day = new \DateTimeImmutable(self::DATE);
@@ -404,10 +509,10 @@ final class SyncOzonReportHandlerTest extends TestCase
     {
         $em = $this->createMock(EntityManagerInterface::class);
         $em->method('find')->willReturnCallback(static function (string $class, string $id) use ($company, $connection) {
-            if ($class === Company::class && $id === self::COMPANY_ID) {
+            if (Company::class === $class && self::COMPANY_ID === $id) {
                 return $company;
             }
-            if ($class === MarketplaceConnection::class && $id === self::CONNECTION_ID) {
+            if (MarketplaceConnection::class === $class && self::CONNECTION_ID === $id) {
                 return $connection;
             }
 
