@@ -243,6 +243,7 @@ git checkout -b chore/uikit-update-<NEW_VERSION>
    <link rel="stylesheet" href="tokens/index.css">
    <link rel="stylesheet" href="components/all.css">
    <link rel="stylesheet" href="patterns/all.css">
+   <link rel="stylesheet" href="components/states.css"><!-- behavior layer, cascade-last (owner=code) -->
    ```
 
 2. В `<style>` оставить **только** storybook-shell:
@@ -296,6 +297,7 @@ git checkout -b chore/uikit-update-<NEW_VERSION>
 2. Сравнивает визуально с `_incoming/ui-kit-v<NEW>.html` (открытый как есть, монолит).
 3. Разные версии секций — ожидаемо в местах, где были правки. Идентичны в остальных.
 4. При расхождении в неизменённых секциях — комментарий в PR, разбор.
+5. **Behavior layer**: расхождения между storybook и монолитом, вызванные `components/states.css` (autofill, native pseudo-classes, focus), — **ОЖИДАЕМЫ**: в монолите дизайнера этого слоя нет и не будет. Не флагать как регрессию.
 
 Задача Claude Code только создаёт папки `_audit/update-<DATE>/{before,after}/` как маркер и коротко описывает в отчёте, где ожидаются изменения. Скриншоты не делает.
 
@@ -421,6 +423,7 @@ gh pr create --draft \
 - [ ] `npm run build` — green
 - [ ] Отчёт `docs/migration/uikit-update-<NEW_VERSION>.md` создан
 - [ ] Draft PR открыт
+- [ ] `components/states.css` существует, апдейтом не изменён, импортируется из `assets/styles/app.css` последним в блоке импортов (не из all.css)
 - [ ] Файлы в `_incoming/` не тронуты
 - [ ] Никакие файлы вне `ui-kit/` и `docs/migration/` не правились
 - [ ] `_legacy/`, `assets/react/`, `templates/`, `src/` не тронуты
@@ -440,6 +443,7 @@ Twig-шаблоны под новые классы                        — д
 менять semver-правила «как удобнее»                  — следовать таблице
 делать скриншоты вручную от имени задачи             — это ручной шаг Владельца
 коммитить /tmp/storybook-*.html                      — рабочие файлы
+регенерить или перезаписывать components/states.css  — code-owned behavior layer, апдейт его не трогает
 ```
 
 ---
