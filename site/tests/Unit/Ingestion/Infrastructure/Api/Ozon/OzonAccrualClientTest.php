@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Ingestion\Infrastructure\Api\Ozon;
 
 use App\Ingestion\Exception\ConnectorAuthException;
-use App\Ingestion\Exception\ConnectorTransientException;
+use App\Ingestion\Exception\ConnectorRateLimitedException;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonAccrualClient;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonCredentialProviderInterface;
 use PHPUnit\Framework\TestCase;
@@ -241,7 +241,29 @@ final class OzonAccrualClientTest extends TestCase
         }
     }
 
-    public function testRateLimitStatusBecomesTransientException(): void
+    public function testRateLimitStatusBecomesRateLimitedExceptionWithRetryAfterHeader(): void
+    {
+        $client = new OzonAccrualClient(
+            new MockHttpClient(new MockResponse('{"error":"rate"}', [
+                'http_code' => 429,
+                'response_headers' => ['retry-after' => '30'],
+            ])),
+            $this->credentialProvider(),
+            new NullLogger(),
+        );
+
+        try {
+            $client->fetchTypes(
+                '0192f0c2-0000-7000-8000-000000000001',
+                '0192f0c2-0000-7000-8000-000000000002',
+            );
+            self::fail('Rate limit must throw ConnectorRateLimitedException.');
+        } catch (ConnectorRateLimitedException $exception) {
+            self::assertSame(30, $exception->retryAfterSeconds());
+        }
+    }
+
+    public function testRateLimitStatusWithoutRetryAfterHeaderUsesDefault(): void
     {
         $client = new OzonAccrualClient(
             new MockHttpClient(new MockResponse('{"error":"rate"}', ['http_code' => 429])),
@@ -249,11 +271,15 @@ final class OzonAccrualClientTest extends TestCase
             new NullLogger(),
         );
 
-        $this->expectException(ConnectorTransientException::class);
-        $client->fetchTypes(
-            '0192f0c2-0000-7000-8000-000000000001',
-            '0192f0c2-0000-7000-8000-000000000002',
-        );
+        try {
+            $client->fetchTypes(
+                '0192f0c2-0000-7000-8000-000000000001',
+                '0192f0c2-0000-7000-8000-000000000002',
+            );
+            self::fail('Rate limit must throw ConnectorRateLimitedException.');
+        } catch (ConnectorRateLimitedException $exception) {
+            self::assertSame(120, $exception->retryAfterSeconds());
+        }
     }
 
     private function credentialProvider(): OzonCredentialProviderInterface
