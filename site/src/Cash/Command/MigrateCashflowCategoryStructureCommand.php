@@ -63,8 +63,14 @@ final class MigrateCashflowCategoryStructureCommand extends Command
             $conflictCount += $conflicts;
 
             if ($execute && 0 === $conflicts) {
-                $this->migrator->execute($plan);
-                ++$processedCount;
+                try {
+                    $this->migrator->execute($plan);
+                    ++$processedCount;
+                } catch (\Throwable $exception) {
+                    $io->error(sprintf('Ошибка при переносе компании %s: %s', $id, $exception->getMessage()));
+
+                    return Command::FAILURE;
+                }
             }
 
             $table[] = [

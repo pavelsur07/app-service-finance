@@ -45,14 +45,14 @@ final readonly class CashflowCategoryStructureMigrator
      *     companyId: string,
      *     conflicts: list<string>,
      *     categories: array<string, array{id: string, create: bool, name: string, flowKind: string, sort: int, parentId: ?string}>,
-     *     rootsToMove: list<string>
+     *     rootsToMove: list<array{id: string, flowKind: string}>
      * }
      */
     public function plan(string $companyId): array
     {
-        /** @var list<array{id: string, name: string, system_code: ?string, is_system: bool, parent_id: ?string}> $rows */
+        /** @var list<array{id: string, name: string, system_code: ?string, is_system: bool, parent_id: ?string, flow_kind: string}> $rows */
         $rows = $this->connection->fetchAllAssociative(
-            'SELECT id, name, system_code, is_system, parent_id FROM cashflow_categories WHERE company_id = :companyId ORDER BY id',
+            'SELECT id, name, system_code, is_system, parent_id, flow_kind FROM cashflow_categories WHERE company_id = :companyId ORDER BY id',
             ['companyId' => $companyId],
         );
 
@@ -158,7 +158,15 @@ final readonly class CashflowCategoryStructureMigrator
                 continue;
             }
 
-            $rootsToMove[] = $row['id'];
+            if (!in_array($row['flow_kind'], array_column(CashflowFlowKind::cases(), 'value'), true)) {
+                $conflicts[] = sprintf('Категория %s имеет неизвестный flow_kind %s.', $row['id'], $row['flow_kind']);
+                continue;
+            }
+
+            $rootsToMove[] = [
+                'id' => $row['id'],
+                'flowKind' => $row['flow_kind'],
+            ];
         }
 
         return [
@@ -190,7 +198,7 @@ final readonly class CashflowCategoryStructureMigrator
      *     companyId: string,
      *     conflicts: list<string>,
      *     categories: array<string, array{id: string, create: bool, name: string, flowKind: string, sort: int, parentId: ?string}>,
-     *     rootsToMove: list<string>
+     *     rootsToMove: list<array{id: string, flowKind: string}>
      * } $plan
      */
     public function execute(array $plan): void
@@ -246,29 +254,52 @@ final readonly class CashflowCategoryStructureMigrator
                 }
             }
 
-            $operatingId = $plan['categories'][CashflowCategory::CODE_OPERATING]['id'];
-            foreach ($plan['rootsToMove'] as $rootId) {
+            foreach ([
+                CashflowCategory::CODE_OPERATING,
+                CashflowCategory::CODE_FINANCING,
+                CashflowCategory::CODE_INVESTING,
+                CashflowCategory::CODE_TECHNICAL,
+            ] as $rootCode) {
+                $root = $plan['categories'][$rootCode];
+                $this->updateSubtreeFlowKind($root['id'], $plan['companyId'], $root['flowKind']);
+            }
+
+            foreach ($plan['rootsToMove'] as $root) {
+                $targetParentCode = match ($root['flowKind']) {
+                    CashflowFlowKind::FINANCING->value => CashflowCategory::CODE_FINANCING,
+                    CashflowFlowKind::INVESTING->value => CashflowCategory::CODE_INVESTING,
+                    CashflowFlowKind::TECHNICAL->value => CashflowCategory::CODE_TECHNICAL,
+                    CashflowFlowKind::OPERATING->value => CashflowCategory::CODE_OPERATING,
+                    default => throw new \LogicException(sprintf('Unknown flow kind %s.', $root['flowKind'])),
+                };
+                $parentId = $plan['categories'][$targetParentCode]['id'];
+
                 $this->connection->executeStatement(
-                    'UPDATE cashflow_categories SET parent_id = :operatingId WHERE id = :rootId AND company_id = :companyId',
-                    ['operatingId' => $operatingId, 'rootId' => $rootId, 'companyId' => $plan['companyId']],
+                    'UPDATE cashflow_categories SET parent_id = :parentId WHERE id = :rootId AND company_id = :companyId',
+                    ['parentId' => $parentId, 'rootId' => $root['id'], 'companyId' => $plan['companyId']],
                 );
-                $this->connection->executeStatement(<<<'SQL'
-                    WITH RECURSIVE subtree AS (
-                        SELECT id FROM cashflow_categories WHERE id = :rootId AND company_id = :companyId
-                        UNION ALL
-                        SELECT child.id
-                        FROM cashflow_categories child
-                        INNER JOIN subtree parent ON child.parent_id = parent.id
-                    )
-                    UPDATE cashflow_categories
-                    SET flow_kind = :flowKind
-                    WHERE id IN (SELECT id FROM subtree)
-                    SQL, [
-                    'rootId' => $rootId,
-                    'companyId' => $plan['companyId'],
-                    'flowKind' => CashflowFlowKind::OPERATING->value,
-                ]);
+                $this->updateSubtreeFlowKind($root['id'], $plan['companyId'], $root['flowKind']);
             }
         });
+    }
+
+    private function updateSubtreeFlowKind(string $rootId, string $companyId, string $flowKind): void
+    {
+        $this->connection->executeStatement(<<<'SQL'
+            WITH RECURSIVE subtree AS (
+                SELECT id FROM cashflow_categories WHERE id = :rootId AND company_id = :companyId
+                UNION ALL
+                SELECT child.id
+                FROM cashflow_categories child
+                INNER JOIN subtree parent ON child.parent_id = parent.id
+            )
+            UPDATE cashflow_categories
+            SET flow_kind = :flowKind
+            WHERE id IN (SELECT id FROM subtree)
+            SQL, [
+            'rootId' => $rootId,
+            'companyId' => $companyId,
+            'flowKind' => $flowKind,
+        ]);
     }
 }

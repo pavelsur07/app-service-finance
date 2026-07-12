@@ -12,7 +12,7 @@ final class Version20260712120000 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'Make cashflow category code unique within a company';
+        return 'Normalize the legacy technical root code and make cashflow category code unique within a company';
     }
 
     public function up(Schema $schema): void
@@ -23,22 +23,32 @@ final class Version20260712120000 extends AbstractMigration
             sprintf('Migration %s supports only PostgreSQL; got platform "%s".', self::class, $platform::class),
         );
 
-        $duplicateCount = (int) $this->connection->fetchOne(<<<'SQL'
+        $duplicateCountAfterNormalization = (int) $this->connection->fetchOne(<<<'SQL'
             SELECT COUNT(*)
             FROM (
-                SELECT company_id, system_code
+                SELECT
+                    company_id,
+                    CASE
+                        WHEN parent_id IS NULL
+                            AND name = 'Технические операции'
+                            AND is_system = TRUE
+                            AND system_code = 'INTERNAL_TRANSFER'
+                        THEN 'CF_TECH'
+                        ELSE system_code
+                    END AS normalized_code
                 FROM cashflow_categories
                 WHERE system_code IS NOT NULL
-                GROUP BY company_id, system_code
+                GROUP BY company_id, normalized_code
                 HAVING COUNT(*) > 1
             ) duplicates
             SQL);
 
         $this->abortIf(
-            $duplicateCount > 0,
-            sprintf('Found %d duplicate cashflow category code(s) within companies.', $duplicateCount),
+            $duplicateCountAfterNormalization > 0,
+            sprintf('Found %d duplicate cashflow category code(s) within companies after legacy normalization.', $duplicateCountAfterNormalization),
         );
 
+        $this->addSql("UPDATE cashflow_categories SET system_code = 'CF_TECH' WHERE parent_id IS NULL AND name = 'Технические операции' AND is_system = TRUE AND system_code = 'INTERNAL_TRANSFER'");
         $this->addSql('CREATE UNIQUE INDEX uniq_cashflow_category_company_code ON cashflow_categories (company_id, system_code)');
     }
 
