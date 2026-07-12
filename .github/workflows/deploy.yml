@@ -146,7 +146,10 @@ jobs:
     #    Идёт только если что-то реально собралось (build success).
     deploy:
         needs: build-and-push
-        if: ${{ github.event_name != 'pull_request' && needs.build-and-push.result == 'success' }}
+        # !cancelled() — иначе GitHub неявно требует success() всей цепочки needs,
+        # и на frontend-only пуше (unit-tests skipped) deploy молча скипается,
+        # хотя образы собраны. Тот же паттерн, что в build-and-push и migrations.
+        if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.build-and-push.result == 'success' }}
         runs-on: ubuntu-latest
         steps:
             - name: 📦 Checkout repository
