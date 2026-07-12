@@ -42,7 +42,7 @@ final class CreateAccountActionTest extends TestCase
         $persisted = [];
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager
-            ->expects(self::exactly(3))
+            ->expects(self::exactly(5))
             ->method('persist')
             ->willReturnCallback(static function (object $entity) use (&$persisted): void {
                 $persisted[] = $entity;

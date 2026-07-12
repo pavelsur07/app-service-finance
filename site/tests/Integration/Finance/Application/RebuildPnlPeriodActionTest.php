@@ -7,6 +7,7 @@ namespace App\Tests\Integration\Finance\Application;
 use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Entity\User;
+use App\Company\Repository\ProjectDirectionRepository;
 use App\Finance\Application\Action\RebuildPnlPeriodAction;
 use App\Finance\Application\Command\RebuildPnlPeriodCommand;
 use App\Ingestion\Entity\FinancialTransaction;
@@ -97,14 +98,24 @@ final class RebuildPnlPeriodActionTest extends IntegrationTestCase
         self::assertStringContainsString('source-linking', (string) $period?->getLastError());
     }
 
-    private function createCompanyWithDefaultProject(): Company
+    public function testLegacyDefaultProjectRemainsSupported(): void
+    {
+        $company = $this->createCompanyWithDefaultProject('Основной');
+
+        /** @var ProjectDirectionRepository $repository */
+        $repository = self::getContainer()->get(ProjectDirectionRepository::class);
+
+        self::assertSame('Основной', $repository->findDefaultForCompany($company)?->getName());
+    }
+
+    private function createCompanyWithDefaultProject(string $projectName = 'Общий'): Company
     {
         $user = new User(Uuid::uuid4()->toString());
         $user->setEmail('pnl-rebuild@example.com');
         $user->setPassword('password');
         $company = new Company(Uuid::uuid4()->toString(), $user);
         $company->setName('P&L rebuild company');
-        $project = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Основной');
+        $project = new ProjectDirection(Uuid::uuid4()->toString(), $company, $projectName);
 
         foreach ([$user, $company, $project] as $entity) {
             $this->em->persist($entity);

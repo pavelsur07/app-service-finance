@@ -34,7 +34,7 @@ final class CompanyOwnerAccountCreatorTest extends TestCase
         $persisted = [];
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager
-            ->expects(self::exactly(3))
+            ->expects(self::exactly(5))
             ->method('persist')
             ->willReturnCallback(static function (object $entity) use (&$persisted): void {
                 $persisted[] = $entity;
@@ -70,7 +70,7 @@ final class CompanyOwnerAccountCreatorTest extends TestCase
         self::assertSame('Acme LLC', $company->getName());
         self::assertSame($user, $company->getUser());
         self::assertTrue($user->getCompanies()->contains($company));
-        self::assertCount(3, $persisted);
+        self::assertCount(5, $persisted);
         self::assertSame($user, $persisted[0]);
         self::assertSame($company, $persisted[1]);
         self::assertInstanceOf(CompanyMember::class, $persisted[2]);
@@ -95,7 +95,7 @@ final class CompanyOwnerAccountCreatorTest extends TestCase
         $persisted = [];
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager
-            ->expects(self::exactly(3))
+            ->expects(self::exactly(5))
             ->method('persist')
             ->willReturnCallback(static function (object $entity) use (&$persisted): void {
                 $persisted[] = $entity;
@@ -139,7 +139,7 @@ final class CompanyOwnerAccountCreatorTest extends TestCase
 
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager
-            ->expects(self::exactly(3))
+            ->expects(self::exactly(5))
             ->method('persist');
         $entityManager
             ->expects(self::once())
