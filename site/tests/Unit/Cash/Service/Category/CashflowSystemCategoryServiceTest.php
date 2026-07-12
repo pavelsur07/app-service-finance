@@ -20,7 +20,8 @@ final class CashflowSystemCategoryServiceTest extends TestCase
             ->setName('Не распределено')
             ->setSort(1000000)
             ->setParent(null)
-            ->setSystemCode(CashflowCategory::SYSTEM_UNALLOCATED);
+            ->setSystemCode(CashflowCategory::SYSTEM_UNALLOCATED)
+            ->setIsSystem(true);
 
         $repository = $this->createMock(CashflowCategoryRepository::class);
         $repository
@@ -51,15 +52,75 @@ final class CashflowSystemCategoryServiceTest extends TestCase
 
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager->expects(self::once())->method('persist');
-        $entityManager->expects(self::once())->method('flush');
+        $entityManager->expects(self::never())->method('flush');
 
         $service = new CashflowSystemCategoryService($entityManager, $repository);
         $created = $service->getOrCreateUnallocated($company);
 
         self::assertSame('Не распределено', $created->getName());
         self::assertNull($created->getParent());
-        self::assertSame(1000000, $created->getSort());
-        self::assertSame(CashflowCategory::SYSTEM_UNALLOCATED, $created->getSystemCode());
+        self::assertSame(50, $created->getSort());
+        self::assertSame(CashflowCategory::CODE_UNALLOCATED, $created->getCode());
+        self::assertTrue($created->isSystem());
         self::assertSame($company, $created->getCompany());
+    }
+
+    public function testCreatesCompleteSystemStructureWithoutFlush(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+
+        $repository = $this->createMock(CashflowCategoryRepository::class);
+        $repository->method('findOneByCompanyAndCode')->willReturn(null);
+        $repository->method('findSystemUnallocatedByCompany')->willReturn(null);
+
+        $persisted = [];
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager
+            ->expects(self::exactly(7))
+            ->method('persist')
+            ->willReturnCallback(static function (CashflowCategory $category) use (&$persisted): void {
+                $persisted[] = $category;
+            });
+        $entityManager->expects(self::never())->method('flush');
+
+        $structure = (new CashflowSystemCategoryService($entityManager, $repository))->ensureStructure($company);
+
+        self::assertCount(7, $structure);
+        self::assertCount(7, $persisted);
+        self::assertSame(
+            $structure[CashflowCategory::CODE_TECHNICAL],
+            $structure[CashflowCategory::CODE_TECHNICAL_IN]->getParent(),
+        );
+        self::assertSame(
+            $structure[CashflowCategory::CODE_TECHNICAL],
+            $structure[CashflowCategory::CODE_TECHNICAL_OUT]->getParent(),
+        );
+
+        foreach ($structure as $code => $category) {
+            self::assertSame($code, $category->getCode());
+            self::assertTrue($category->isSystem());
+        }
+    }
+
+    public function testRejectsReservedCodeOwnedByRegularCategory(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $regular = (new CashflowCategory('22222222-2222-2222-2222-222222222222', $company))
+            ->setName('Обычная категория');
+
+        $repository = $this->createMock(CashflowCategoryRepository::class);
+        $repository
+            ->expects(self::once())
+            ->method('findOneByCompanyAndCode')
+            ->with($company, CashflowCategory::CODE_OPERATING)
+            ->willReturn($regular);
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::never())->method('persist');
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('занят обычной категорией');
+
+        (new CashflowSystemCategoryService($entityManager, $repository))->ensureStructure($company);
     }
 }

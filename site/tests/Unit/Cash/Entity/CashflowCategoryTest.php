@@ -11,6 +11,78 @@ use PHPUnit\Framework\TestCase;
 
 final class CashflowCategoryTest extends TestCase
 {
+    public function testCategoryCodeIsNormalized(): void
+    {
+        $category = new CashflowCategory(
+            '11111111-1111-4111-8111-111111111111',
+            CompanyBuilder::aCompany()->build(),
+        );
+
+        $category->setCode(' cf_custom_1 ');
+
+        self::assertSame('CF_CUSTOM_1', $category->getCode());
+        self::assertSame('CF_CUSTOM_1', $category->getSystemCode());
+    }
+
+    public function testSystemCategoryRejectsProtectedChanges(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $category = (new CashflowCategory('11111111-1111-4111-8111-111111111111', $company))
+            ->setName('Операционная деятельность')
+            ->setSort(10)
+            ->markAsSystem(CashflowCategory::CODE_OPERATING);
+        $newParent = (new CashflowCategory('22222222-2222-4222-8222-222222222222', $company))
+            ->setName('Другой корень');
+
+        foreach ([
+            static fn () => $category->setName('Новое имя'),
+            static fn () => $category->setCode('CF_OTHER'),
+            static fn () => $category->setParent($newParent),
+            static fn () => $category->setSort(20),
+            static fn () => $category->setIsSystem(false),
+            static fn () => $category->assertCanDelete(),
+        ] as $change) {
+            try {
+                $change();
+                self::fail('Изменение системной категории должно быть запрещено.');
+            } catch (\DomainException) {
+                self::addToAssertionCount(1);
+            }
+        }
+    }
+
+    public function testSystemCategoryAllowsSameProtectedValues(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $category = (new CashflowCategory('11111111-1111-4111-8111-111111111111', $company))
+            ->setName('Операционная деятельность')
+            ->setSort(10)
+            ->markAsSystem(CashflowCategory::CODE_OPERATING);
+
+        $category
+            ->setName('Операционная деятельность')
+            ->setCode(CashflowCategory::CODE_OPERATING)
+            ->setParent(null)
+            ->setSort(10)
+            ->setIsSystem(true)
+            ->setDescription('Разрешённое изменение');
+
+        self::assertSame('Разрешённое изменение', $category->getDescription());
+    }
+
+    public function testRegularCategoryCannotUseReservedSystemCode(): void
+    {
+        $category = (new CashflowCategory(
+            '11111111-1111-4111-8111-111111111111',
+            CompanyBuilder::aCompany()->build(),
+        ))->setName('Обычная категория');
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('зарезервирован');
+
+        $category->setCode(CashflowCategory::CODE_OPERATING);
+    }
+
     public function testTechnicalFlowKindHasLabel(): void
     {
         self::assertSame('Технические операции', CashflowFlowKind::TECHNICAL->label());

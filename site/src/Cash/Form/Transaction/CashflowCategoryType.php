@@ -21,10 +21,21 @@ class CashflowCategoryType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
+        if (!$options['protected_system_fields']) {
+            $builder
+                ->add('name', TextType::class, [
+                    'label' => 'Наименование',
+                ])
+                ->add('code', TextType::class, [
+                    'label' => 'Код',
+                    'required' => false,
+                    'help' => 'Уникальный код в пределах компании: латинские буквы, цифры и _',
+                ]);
+
+            $builder->get('code')->addModelTransformer(new CashflowCategoryCodeTransformer());
+        }
+
         $builder
-            ->add('name', TextType::class, [
-                'label' => 'Наименование',
-            ])
             ->add('description', TextareaType::class, [
                 'label' => 'Описание',
                 'required' => false,
@@ -47,40 +58,26 @@ class CashflowCategoryType extends AbstractType
             ]);
         }
 
+        if (!$options['protected_system_fields']) {
+            $builder
+                ->add('sort', IntegerType::class, [
+                    'label' => 'Сортировка',
+                ])
+                ->add('parent', EntityType::class, [
+                    'class' => CashflowCategory::class,
+                    'choices' => $options['parents'],
+                    'choice_label' => static function (CashflowCategory $item) {
+                        return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
+                    },
+                    'required' => false,
+                    'label' => 'Родитель',
+                ]);
+        }
+
         $builder
-            ->add('isSystem', CheckboxType::class, [
-                'label' => 'Системная категория',
-                'required' => false,
-            ])
-            ->add('systemCode', ChoiceType::class, [
-                'label' => 'Код (systemCode)',
-                'required' => false,
-                'choices' => [
-                    'UNALLOCATED' => 'UNALLOCATED',
-                    'INTERNAL_TRANSFER' => 'INTERNAL_TRANSFER',
-                    'REFUND_SUPPLIER' => 'REFUND_SUPPLIER',
-                    'REFUND_TAX' => 'REFUND_TAX',
-                    'REFUND_PAYROLL' => 'REFUND_PAYROLL',
-                    'CAPEX' => 'CAPEX',
-                ],
-                'placeholder' => '—',
-                'help' => 'Используется для дашборда',
-            ])
-            ->add('sort', IntegerType::class, [
-                'label' => 'Сортировка',
-            ])
             ->add('allowPlDocument', CheckboxType::class, [
                 'label' => 'Разрешено создавать документы ОПиУ из этой категории',
                 'required' => false,
-            ])
-            ->add('parent', EntityType::class, [
-                'class' => CashflowCategory::class,
-                'choices' => $options['parents'],
-                'choice_label' => static function (CashflowCategory $item) {
-                    return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
-                },
-                'required' => false,
-                'label' => 'Родитель',
             ])
             ->add('plCategory', EntityType::class, [
                 'class' => PLCategory::class,
@@ -101,6 +98,7 @@ class CashflowCategoryType extends AbstractType
             'parents' => [],
             'plCategories' => [],
             'allow_flow_kind_edit' => false,
+            'protected_system_fields' => false,
         ]);
     }
 }

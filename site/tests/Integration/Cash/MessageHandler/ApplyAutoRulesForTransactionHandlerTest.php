@@ -8,12 +8,12 @@ use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Message\ApplyAutoRulesForTransaction;
+use App\Cash\MessageHandler\ApplyAutoRulesForTransactionHandler;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Category\CashflowSystemCategoryService;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
 use App\Company\Entity\Company;
-use App\Cash\Message\ApplyAutoRulesForTransaction;
-use App\Cash\MessageHandler\ApplyAutoRulesForTransactionHandler;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -63,7 +63,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
         $firstReloaded = $transactionRepository->find($firstTransaction->getId());
         self::assertInstanceOf(CashTransaction::class, $firstReloaded);
         self::assertNotNull($firstReloaded->getCashflowCategory());
-        self::assertSame(CashflowCategory::SYSTEM_UNALLOCATED, $firstReloaded->getCashflowCategory()?->getSystemCode());
+        self::assertSame(CashflowCategory::CODE_UNALLOCATED, $firstReloaded->getCashflowCategory()?->getCode());
         self::assertSame('Не распределено', $firstReloaded->getCashflowCategory()?->getName());
 
         $reloadedCompany = $this->em->find(Company::class, $company->getId());
@@ -92,7 +92,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
 
         $categoryCount = (int) $this->em->getRepository(CashflowCategory::class)->count([
             'company' => $company,
-            'systemCode' => CashflowCategory::SYSTEM_UNALLOCATED,
+            'systemCode' => CashflowCategory::CODE_UNALLOCATED,
         ]);
         self::assertSame(1, $categoryCount);
     }

@@ -26,11 +26,16 @@
                     <span class="cashflow-category-toggle-placeholder me-2"></span>
                 {% endif %}
                 <a href="{{ path('cashflow_category_edit', {'id': item.id}) }}" class="cashflow-category-link text-reset text-decoration-none flex-grow-1">{{ item.name }}</a>
+                {% if item.code %}
+                    <span class="badge bg-secondary-lt me-2">{{ item.code }}</span>
+                {% endif %}
                 <span class="ms-auto d-inline-flex gap-1">
+                    {% if not item.system %}
                     <form method="post" action="{{ path('cashflow_category_delete', {'id': item.id}) }}" class="d-inline" onsubmit="return confirm('Вы уверены?');">
                         <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ item.id) }}">
                         <button class="btn btn-sm btn-danger">🗑</button>
                     </form>
+                    {% endif %}
                 </span>
             </div>
             {% if has_children %}

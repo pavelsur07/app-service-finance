@@ -18,6 +18,7 @@
                         {{ form_row(form.parent) }}
                     </div>
                 </div>
+                {{ form_row(form.code) }}
                 {{ form_row(form.description) }}
                 {{ form_row(form.status) }}
                 {{ form_row(form.sort) }}
@@ -31,12 +32,6 @@
                                 {{ form_row(form.flowKind, { help: 'только для категорий верхнего уровня' }) }}
                             </div>
                         {% endif %}
-                        <div class="col-md-4">
-                            {{ form_row(form.isSystem) }}
-                        </div>
-                        <div class="col-md-4">
-                            {{ form_row(form.systemCode, { help: 'для правил (возвраты/CapEx/переводы) и дашборда' }) }}
-                        </div>
                     </div>
                 </div>
                 {{ form_rest(form) }}

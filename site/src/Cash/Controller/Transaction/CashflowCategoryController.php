@@ -77,6 +77,7 @@ class CashflowCategoryController extends AbstractController
             'parents' => $parents,
             'plCategories' => $plCategories,
             'allow_flow_kind_edit' => $article->isRoot(),
+            'protected_system_fields' => false,
         ]);
         $form->handleRequest($request);
 
@@ -118,6 +119,7 @@ class CashflowCategoryController extends AbstractController
             'parents' => $parents,
             'plCategories' => $plCategories,
             'allow_flow_kind_edit' => $article->isRoot(),
+            'protected_system_fields' => $article->isSystem(),
         ]);
         $form->handleRequest($request);
 
@@ -151,6 +153,12 @@ class CashflowCategoryController extends AbstractController
         }
 
         if ($this->isCsrfTokenValid('delete'.$article->getId(), $request->request->get('_token'))) {
+            if ($article->isSystem()) {
+                $this->addFlash('danger', 'Системную категорию нельзя удалить.');
+
+                return $this->redirectToRoute('cashflow_category_index');
+            }
+
             $em->remove($article);
             $em->flush();
         }
@@ -171,6 +179,7 @@ class CashflowCategoryController extends AbstractController
             'allowPlDocument' => $category->isAllowPlDocument(),
             'plCategoryId' => $category->getPlCategory()?->getId(),
             'systemCode' => $category->getSystemCode(),
+            'code' => $category->getCode(),
             'flowKind' => $category->getFlowKind()->value,
             'isSystem' => $category->isSystem(),
             'children' => array_map(

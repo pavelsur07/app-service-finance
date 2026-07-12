@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Company\Controller;
 
 use App\Balance\Service\BalanceStructureSeeder;
+use App\Cash\Service\Category\CashflowSystemCategoryService;
 use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
@@ -62,6 +63,7 @@ class CompanyController extends AbstractController
         Request $request,
         EntityManagerInterface $em,
         BalanceStructureSeeder $balanceSeeder,
+        CashflowSystemCategoryService $cashflowSystemCategories,
         CompanyOwnerMembershipCreator $companyOwnerMembershipCreator,
     ): Response {
         $user = $this->getUser();
@@ -77,6 +79,7 @@ class CompanyController extends AbstractController
 
         if ($form->isSubmitted() && $form->isValid()) {
             $companyOwnerMembershipCreator->persistCompanyWithOwnerMembership($company, $user);
+            $cashflowSystemCategories->ensureStructure($company);
             $balanceSeeder->seedDefaultIfEmpty($company);
             $em->flush();
 

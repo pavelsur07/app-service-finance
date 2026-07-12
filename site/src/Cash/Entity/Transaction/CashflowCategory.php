@@ -11,13 +11,34 @@ use App\Finance\Entity\PLCategory;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: CashflowCategoryRepository::class)]
 #[ORM\Table(name: '`cashflow_categories`')]
+#[ORM\UniqueConstraint(name: 'uniq_cashflow_category_company_code', columns: ['company_id', 'system_code'])]
+#[ORM\HasLifecycleCallbacks]
+#[UniqueEntity(fields: ['company', 'systemCode'], message: 'Код уже используется в этой компании.')]
 class CashflowCategory
 {
     public const SYSTEM_UNALLOCATED = 'UNALLOCATED';
+    public const CODE_OPERATING = 'CF_OP';
+    public const CODE_FINANCING = 'CF_FIN';
+    public const CODE_INVESTING = 'CF_INV';
+    public const CODE_TECHNICAL = 'CF_TECH';
+    public const CODE_TECHNICAL_IN = 'CF_TECH_IN';
+    public const CODE_TECHNICAL_OUT = 'CF_TECH_OUT';
+    public const CODE_UNALLOCATED = 'CF_UNALLOC';
+
+    private const SYSTEM_CODES = [
+        self::CODE_OPERATING,
+        self::CODE_FINANCING,
+        self::CODE_INVESTING,
+        self::CODE_TECHNICAL,
+        self::CODE_TECHNICAL_IN,
+        self::CODE_TECHNICAL_OUT,
+        self::CODE_UNALLOCATED,
+    ];
 
     #[ORM\Id]
     #[ORM\Column(type: 'guid', unique: true)]
@@ -86,6 +107,10 @@ class CashflowCategory
 
     public function setName(string $name): self
     {
+        if ($this->isSystem && isset($this->name) && $this->name !== $name) {
+            throw new \DomainException('Системную категорию нельзя переименовать.');
+        }
+
         $this->name = $name;
 
         return $this;
@@ -122,6 +147,10 @@ class CashflowCategory
 
     public function setSort(int $sort): self
     {
+        if ($this->isSystem && $this->sort !== $sort) {
+            throw new \DomainException('Системную категорию нельзя перемещать.');
+        }
+
         $this->sort = $sort;
 
         return $this;
@@ -136,6 +165,10 @@ class CashflowCategory
     {
         if ($this->parent === $parent) {
             return $this;
+        }
+
+        if ($this->isSystem) {
+            throw new \DomainException('Системную категорию нельзя перемещать.');
         }
 
         $this->parent?->children->removeElement($this);
@@ -208,12 +241,65 @@ class CashflowCategory
 
     public function getSystemCode(): ?string
     {
-        return $this->systemCode;
+        return $this->getCode();
     }
 
     public function setSystemCode(?string $code): self
     {
+        return $this->setCode($code);
+    }
+
+    public function getCode(): ?string
+    {
+        return $this->systemCode;
+    }
+
+    public function setCode(?string $code): self
+    {
+        $code = self::normalizeCode($code);
+
+        if (!$this->isSystem && self::isSystemCode($code)) {
+            throw new \DomainException('Этот код зарезервирован для системной категории.');
+        }
+
+        if ($this->isSystem && $this->systemCode !== $code) {
+            throw new \DomainException('Код системной категории нельзя изменить.');
+        }
+
         $this->systemCode = $code;
+
+        return $this;
+    }
+
+    public static function normalizeCode(?string $code): ?string
+    {
+        $code = null === $code || '' === trim($code) ? null : strtoupper(trim($code));
+
+        if (null !== $code && (strlen($code) > 32 || 1 !== preg_match('/^[A-Z0-9_]+$/', $code))) {
+            throw new \DomainException('Код категории может содержать только латинские буквы, цифры и символ подчёркивания.');
+        }
+
+        return $code;
+    }
+
+    public static function isSystemCode(?string $code): bool
+    {
+        return null !== $code && in_array($code, self::SYSTEM_CODES, true);
+    }
+
+    public function markAsSystem(string $code): self
+    {
+        $code = self::normalizeCode($code);
+        if (!self::isSystemCode($code)) {
+            throw new \DomainException('Для системной категории указан неизвестный код.');
+        }
+
+        if ($this->isSystem && $this->systemCode !== $code) {
+            throw new \DomainException('Код системной категории нельзя изменить.');
+        }
+
+        $this->systemCode = $code;
+        $this->isSystem = true;
 
         return $this;
     }
@@ -262,9 +348,26 @@ class CashflowCategory
 
     public function setIsSystem(bool $v): self
     {
+        if ($this->isSystem && !$v) {
+            throw new \DomainException('Системную категорию нельзя сделать обычной.');
+        }
+
         $this->isSystem = $v;
 
         return $this;
+    }
+
+    public function assertCanDelete(): void
+    {
+        if ($this->isSystem) {
+            throw new \DomainException('Системную категорию нельзя удалить.');
+        }
+    }
+
+    #[ORM\PreRemove]
+    public function preventSystemCategoryRemoval(): void
+    {
+        $this->assertCanDelete();
     }
 
     public function getLevel(): int
