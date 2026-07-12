@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>UI Kit · Ваш Финдир v2.4.1</title>
+<title>UI Kit · Ваш Финдир v2.4.2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
@@ -235,7 +235,7 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
       <div class="nav-logo">ВФ</div>
       <div>
         <div class="nav-title">UI Kit</div>
-        <div class="nav-version">v2.4.1 · 09.07.2026</div>
+        <div class="nav-version">v2.4.2 · 12.07.2026</div>
       </div>
     </div>
 
@@ -320,7 +320,7 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
       Канонический источник истины для всех экранов финансового SaaS-продукта.
       Зафиксированы дизайн-токены, разрешены расхождения из аудита, собраны компоненты со всеми состояниями.
     </p>
-    <div class="page-meta">v2.4.1 · 9 июля 2026 · Светлая тема</div>
+    <div class="page-meta">v2.4.2 · 12 июля 2026 · Светлая тема</div>
 
     <!-- ===================== 01. DECISIONS ===================== -->
     <section id="decisions">
@@ -3827,6 +3827,16 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
     <!-- ===================== CHANGELOG ===================== -->
     <section id="changelog">
       <h2 class="section-h">Changelog</h2>
+
+      <div class="cb">
+        <div class="cl-version">v2.4.2 — 12 июля 2026</div>
+        <div class="cl-summary">🔧 Autofill-фикс для .input. 📐 Behavior layer — инженерный слой states.css.</div>
+        <ul class="cl-list">
+          <li>🔧 Браузерный autofill больше не красит <code class="code-inline">.input</code> жёлтым: inset-заливка <code class="code-inline">var(--input-bg)</code> + <code class="code-inline">-webkit-text-fill-color</code>; на фокусе кольцо <code class="code-inline">var(--input-focus-ring)</code> совмещено с заливкой в одном box-shadow.</li>
+          <li>📐 Введён <b>behavior layer</b> (<code class="code-inline">components/states.css</code>, владелец — код): поведение браузера/a11y, подключается последним в каскаде через <code class="code-inline">app.css</code> мимо <code class="code-inline">all.css</code>; uikit-update его не регенерит. См. decisions.md, Decision 16.</li>
+          <li>📐 Version bump v2.4.1 → v2.4.2 в <code class="code-inline">&lt;title&gt;</code>, <code class="code-inline">.nav-version</code>, <code class="code-inline">.page-meta</code>.</li>
+        </ul>
+      </div>
 
       <div class="cb">
         <div class="cl-version">v2.4.1 — 9 июля 2026</div>
