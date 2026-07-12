@@ -7,6 +7,18 @@
    существующие токены. Визуальные состояния (hover/active цвета) —
    в монолите дизайнера, не здесь. См. decisions.md §Decisions #16. */
 
+/* Chrome применяет autofill UA-стили не сразу при загрузке, а в момент,
+   зависящий от взаимодействия со страницей; без transition это выглядит
+   как «стиль внезапно меняется после клика». 9999999s transition
+   замораживает переход — box-shadow-хак ниже выигрывает сразу.
+   Селектор — сам .input (не :-webkit-autofill): transition должен стоять
+   на поле заранее, до применения autofill-псевдокласса. Только
+   background-color/color — border и box-shadow не тормозим.
+   !important — одним на декларацию (per-value в списке — невалидный CSS). */
+.input {
+  transition: background-color 9999999s ease-out, color 9999999s ease-out !important;
+}
+
 /* Autofill: браузер красит .input жёлтым поверх токенов DS.
    Inset-заливка 1000px перекрывает user-agent background. */
 .input:-webkit-autofill,
