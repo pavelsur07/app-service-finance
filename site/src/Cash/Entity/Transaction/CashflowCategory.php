@@ -30,6 +30,16 @@ class CashflowCategory
     public const CODE_TECHNICAL_OUT = 'CF_TECH_OUT';
     public const CODE_UNALLOCATED = 'CF_UNALLOC';
 
+    private const SYSTEM_CODES = [
+        self::CODE_OPERATING,
+        self::CODE_FINANCING,
+        self::CODE_INVESTING,
+        self::CODE_TECHNICAL,
+        self::CODE_TECHNICAL_IN,
+        self::CODE_TECHNICAL_OUT,
+        self::CODE_UNALLOCATED,
+    ];
+
     #[ORM\Id]
     #[ORM\Column(type: 'guid', unique: true)]
     private ?string $id = null;
@@ -246,10 +256,10 @@ class CashflowCategory
 
     public function setCode(?string $code): self
     {
-        $code = null === $code || '' === trim($code) ? null : strtoupper(trim($code));
+        $code = self::normalizeCode($code);
 
-        if (null !== $code && (strlen($code) > 32 || 1 !== preg_match('/^[A-Z0-9_]+$/', $code))) {
-            throw new \DomainException('Код категории может содержать только латинские буквы, цифры и символ подчёркивания.');
+        if (!$this->isSystem && self::isSystemCode($code)) {
+            throw new \DomainException('Этот код зарезервирован для системной категории.');
         }
 
         if ($this->isSystem && $this->systemCode !== $code) {
@@ -257,6 +267,39 @@ class CashflowCategory
         }
 
         $this->systemCode = $code;
+
+        return $this;
+    }
+
+    public static function normalizeCode(?string $code): ?string
+    {
+        $code = null === $code || '' === trim($code) ? null : strtoupper(trim($code));
+
+        if (null !== $code && (strlen($code) > 32 || 1 !== preg_match('/^[A-Z0-9_]+$/', $code))) {
+            throw new \DomainException('Код категории может содержать только латинские буквы, цифры и символ подчёркивания.');
+        }
+
+        return $code;
+    }
+
+    public static function isSystemCode(?string $code): bool
+    {
+        return null !== $code && in_array($code, self::SYSTEM_CODES, true);
+    }
+
+    public function markAsSystem(string $code): self
+    {
+        $code = self::normalizeCode($code);
+        if (!self::isSystemCode($code)) {
+            throw new \DomainException('Для системной категории указан неизвестный код.');
+        }
+
+        if ($this->isSystem && $this->systemCode !== $code) {
+            throw new \DomainException('Код системной категории нельзя изменить.');
+        }
+
+        $this->systemCode = $code;
+        $this->isSystem = true;
 
         return $this;
     }

@@ -20,7 +20,8 @@ final class CashflowSystemCategoryServiceTest extends TestCase
             ->setName('Не распределено')
             ->setSort(1000000)
             ->setParent(null)
-            ->setSystemCode(CashflowCategory::SYSTEM_UNALLOCATED);
+            ->setSystemCode(CashflowCategory::SYSTEM_UNALLOCATED)
+            ->setIsSystem(true);
 
         $repository = $this->createMock(CashflowCategoryRepository::class);
         $repository
@@ -99,5 +100,27 @@ final class CashflowSystemCategoryServiceTest extends TestCase
             self::assertSame($code, $category->getCode());
             self::assertTrue($category->isSystem());
         }
+    }
+
+    public function testRejectsReservedCodeOwnedByRegularCategory(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $regular = (new CashflowCategory('22222222-2222-2222-2222-222222222222', $company))
+            ->setName('Обычная категория');
+
+        $repository = $this->createMock(CashflowCategoryRepository::class);
+        $repository
+            ->expects(self::once())
+            ->method('findOneByCompanyAndCode')
+            ->with($company, CashflowCategory::CODE_OPERATING)
+            ->willReturn($regular);
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::never())->method('persist');
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('занят обычной категорией');
+
+        (new CashflowSystemCategoryService($entityManager, $repository))->ensureStructure($company);
     }
 }

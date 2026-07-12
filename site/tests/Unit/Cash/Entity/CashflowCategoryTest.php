@@ -29,9 +29,8 @@ final class CashflowCategoryTest extends TestCase
         $company = CompanyBuilder::aCompany()->build();
         $category = (new CashflowCategory('11111111-1111-4111-8111-111111111111', $company))
             ->setName('Операционная деятельность')
-            ->setCode(CashflowCategory::CODE_OPERATING)
             ->setSort(10)
-            ->setIsSystem(true);
+            ->markAsSystem(CashflowCategory::CODE_OPERATING);
         $newParent = (new CashflowCategory('22222222-2222-4222-8222-222222222222', $company))
             ->setName('Другой корень');
 
@@ -57,9 +56,8 @@ final class CashflowCategoryTest extends TestCase
         $company = CompanyBuilder::aCompany()->build();
         $category = (new CashflowCategory('11111111-1111-4111-8111-111111111111', $company))
             ->setName('Операционная деятельность')
-            ->setCode(CashflowCategory::CODE_OPERATING)
             ->setSort(10)
-            ->setIsSystem(true);
+            ->markAsSystem(CashflowCategory::CODE_OPERATING);
 
         $category
             ->setName('Операционная деятельность')
@@ -70,6 +68,19 @@ final class CashflowCategoryTest extends TestCase
             ->setDescription('Разрешённое изменение');
 
         self::assertSame('Разрешённое изменение', $category->getDescription());
+    }
+
+    public function testRegularCategoryCannotUseReservedSystemCode(): void
+    {
+        $category = (new CashflowCategory(
+            '11111111-1111-4111-8111-111111111111',
+            CompanyBuilder::aCompany()->build(),
+        ))->setName('Обычная категория');
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('зарезервирован');
+
+        $category->setCode(CashflowCategory::CODE_OPERATING);
     }
 
     public function testTechnicalFlowKindHasLabel(): void

@@ -31,6 +31,8 @@ class CashflowCategoryType extends AbstractType
                     'required' => false,
                     'help' => 'Уникальный код в пределах компании: латинские буквы, цифры и _',
                 ]);
+
+            $builder->get('code')->addModelTransformer(new CashflowCategoryCodeTransformer());
         }
 
         $builder

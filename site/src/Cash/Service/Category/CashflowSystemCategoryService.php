@@ -45,7 +45,7 @@ class CashflowSystemCategoryService
     {
         $existing = $this->cashflowCategoryRepository->findSystemUnallocatedByCompany($company);
         if (null !== $existing) {
-            return $existing;
+            return $this->assertSystemCategory($existing, CashflowCategory::CODE_UNALLOCATED);
         }
 
         return $this->createCategory(
@@ -65,8 +65,12 @@ class CashflowSystemCategoryService
         int $sort,
         ?CashflowCategory $parent = null,
     ): CashflowCategory {
-        return $this->cashflowCategoryRepository->findOneByCompanyAndCode($company, $code)
-            ?? $this->createCategory($company, $code, $name, $flowKind, $sort, $parent);
+        $existing = $this->cashflowCategoryRepository->findOneByCompanyAndCode($company, $code);
+        if (null !== $existing) {
+            return $this->assertSystemCategory($existing, $code);
+        }
+
+        return $this->createCategory($company, $code, $name, $flowKind, $sort, $parent);
     }
 
     private function createCategory(
@@ -79,13 +83,21 @@ class CashflowSystemCategoryService
     ): CashflowCategory {
         $category = new CashflowCategory(Uuid::uuid4()->toString(), $company);
         $category->setName($name);
-        $category->setCode($code);
         $category->setParent($parent);
         $category->setSort($sort);
         $category->setFlowKind($flowKind);
-        $category->setIsSystem(true);
+        $category->markAsSystem($code);
 
         $this->entityManager->persist($category);
+
+        return $category;
+    }
+
+    private function assertSystemCategory(CashflowCategory $category, string $code): CashflowCategory
+    {
+        if (!$category->isSystem()) {
+            throw new \DomainException(sprintf('Код %s занят обычной категорией.', $code));
+        }
 
         return $category;
     }
