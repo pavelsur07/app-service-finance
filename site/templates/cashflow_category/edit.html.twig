@@ -25,15 +25,17 @@
                         <dd class="col-sm-9">{{ article.sort }}</dd>
                     </dl>
                 {% else %}
-                <div class="row">
-                    <div class="col-8">
+                <div class="row g-3">
+                    <div class="col-md-5">
                         {{ form_row(form.name) }}
                     </div>
-                    <div class="col-4">
+                    <div class="col-md-4">
                         {{ form_row(form.parent) }}
                     </div>
+                    <div class="col-md-3">
+                        {{ form_row(form.code) }}
+                    </div>
                 </div>
-                {{ form_row(form.code) }}
                 {% endif %}
                 {{ form_row(form.description) }}
                 {{ form_row(form.status) }}
