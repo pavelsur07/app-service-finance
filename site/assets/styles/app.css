@@ -3,6 +3,7 @@
 @import url('../../ui-kit/tokens/index.css');
 @import url('../../ui-kit/components/all.css');
 @import url('../../ui-kit/patterns/all.css');
+@import url('../../ui-kit/components/states.css'); /* behavior layer, cascade-last (owner=code, мимо all.css) */
 
 /*:root {
     color-scheme: light;
