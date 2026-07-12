@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Company\Service;
 
+use App\Cash\Service\Category\CashflowSystemCategoryService;
 use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
@@ -19,6 +20,7 @@ final readonly class CompanyOwnerAccountCreator
         private EntityManagerInterface $entityManager,
         private MessageBusInterface $bus,
         private CompanyOwnerMembershipCreator $companyOwnerMembershipCreator,
+        private CashflowSystemCategoryService $cashflowSystemCategories,
     ) {
     }
 
@@ -33,6 +35,7 @@ final readonly class CompanyOwnerAccountCreator
 
         $this->entityManager->persist($user);
         $company = $this->companyOwnerMembershipCreator->createCompany($user, $companyName);
+        $this->cashflowSystemCategories->ensureStructure($company);
 
         $this->entityManager->flush();
 

@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Company;
 
+use App\Cash\Service\Category\CashflowSystemCategoryService;
 use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
 use App\Company\Entity\User;
-use App\Company\Service\CompanyOwnerAccountCreator;
 use App\Company\Message\SendRegistrationEmailMessage;
+use App\Company\Service\CompanyOwnerAccountCreator;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
@@ -58,6 +59,7 @@ final class CompanyOwnerAccountCreatorTest extends TestCase
             $entityManager,
             $bus,
             new CompanyOwnerMembershipCreator($entityManager),
+            $this->createSystemCategoryServiceMock(),
         );
 
         $company = $creator->create($user, 'plain-password', '  Acme LLC  ', true);
@@ -112,6 +114,7 @@ final class CompanyOwnerAccountCreatorTest extends TestCase
             $entityManager,
             $bus,
             new CompanyOwnerMembershipCreator($entityManager),
+            $this->createSystemCategoryServiceMock(),
         );
 
         $company = $creator->create($user, 'plain-password', 'Acme LLC', false);
@@ -152,10 +155,19 @@ final class CompanyOwnerAccountCreatorTest extends TestCase
             $entityManager,
             $bus,
             new CompanyOwnerMembershipCreator($entityManager),
+            $this->createSystemCategoryServiceMock(),
         );
 
         $company = $creator->create($user, 'plain-password', 'Acme LLC', false);
 
         self::assertInstanceOf(Company::class, $company);
+    }
+
+    private function createSystemCategoryServiceMock(): CashflowSystemCategoryService
+    {
+        $service = $this->createMock(CashflowSystemCategoryService::class);
+        $service->expects(self::once())->method('ensureStructure');
+
+        return $service;
     }
 }

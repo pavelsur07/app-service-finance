@@ -10,6 +10,7 @@ use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
+use App\Cash\Service\Category\CashflowSystemCategoryService;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\Company\Infrastructure\Repository\CompanyRepository;
@@ -23,6 +24,7 @@ final class AccountBootstrapper
         private readonly EntityManagerInterface $em,
         private readonly CompanyRepository $companies,
         private readonly CashflowCategoryRepository $cashflowCategories,
+        private readonly CashflowSystemCategoryService $cashflowSystemCategories,
         private readonly PLCategoryRepository $plCategories,
         private readonly MoneyAccountRepository $moneyAccounts,
         private readonly BalanceStructureSeeder $balanceSeeder,
@@ -40,7 +42,8 @@ final class AccountBootstrapper
         $company = $this->em->transactional(function (EntityManagerInterface $em) use ($user): Company {
             $company = $this->createCompanyFor($user, 'Новая компания');
 
-            $this->seedCashflow($company);
+            $structure = $this->cashflowSystemCategories->ensureStructure($company);
+            $this->seedCashflow($company, $structure[CashflowCategory::CODE_OPERATING]);
             $this->seedPL($company);
             $this->seedAccounts($company);
             $this->balanceSeeder->seedDefaultIfEmpty($company);
@@ -70,7 +73,7 @@ final class AccountBootstrapper
         return $this->companyOwnerMembershipCreator->createCompany($user, $name);
     }
 
-    private function seedCashflow(Company $company): void
+    private function seedCashflow(Company $company, CashflowCategory $operating): void
     {
         $roots = [
             'Поступления (операционные)' => [
@@ -89,7 +92,7 @@ final class AccountBootstrapper
 
         $rootSort = 10;
         foreach ($roots as $rootName => $children) {
-            $root = $this->ensureCashflow($company, $rootName, null, $rootSort);
+            $root = $this->ensureCashflow($company, $rootName, $operating, $rootSort);
             $rootSort += 10;
 
             $childSort = 10;

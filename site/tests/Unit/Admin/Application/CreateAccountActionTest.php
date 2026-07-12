@@ -5,14 +5,15 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Admin\Application;
 
 use App\Admin\Application\CreateAccountAction;
+use App\Cash\Service\Category\CashflowSystemCategoryService;
+use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
 use App\Company\Entity\User;
-use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Facade\CompanyFacade;
 use App\Company\Infrastructure\Repository\CompanyRepository;
-use App\Company\Service\CompanyOwnerAccountCreator;
 use App\Company\Message\SendRegistrationEmailMessage;
+use App\Company\Service\CompanyOwnerAccountCreator;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -62,6 +63,7 @@ final class CreateAccountActionTest extends TestCase
             $entityManager,
             $bus,
             new CompanyOwnerMembershipCreator($entityManager),
+            $this->createMock(CashflowSystemCategoryService::class),
         );
         $companyFacade = new CompanyFacade($this->createMock(CompanyRepository::class), $accountCreator);
         $action = new CreateAccountAction($companyFacade);
