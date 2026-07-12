@@ -37,3 +37,11 @@
     0 0 0 3px var(--input-focus-ring),
     inset 0 0 0 1000px var(--input-bg);
 }
+
+/* Known limitation (принято, не фиксить): до первого жеста Chromium
+   рендерит autofill-preview пароля своим шрифтом/размером — маска точек
+   крупнее/другого начертания, чем после клика. Это на уровне рендерера,
+   не CSS-каскада — transition/!important/specificity здесь не помогают.
+   Chromium issue 960918 (открыт с 2019), дубликаты 41471071/41457553.
+   Воркэраунд (zoom на :-webkit-autofill) масштабирует весь box поля и
+   ломает фикс. height: 38px — дороже самого бага. См. decisions.md #16. */
