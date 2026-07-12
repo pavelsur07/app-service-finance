@@ -40,6 +40,10 @@ jobs:
                         - '.github/workflows/deploy.yml'
                       frontend:
                         - 'site/assets/**'
+                        # ui-kit — исходники стилей: app.css тянет их через @import,
+                        # nginx-образ пекёт в бандл (COPY . . + yarn build).
+                        - 'site/ui-kit/**'
+                        - 'site/vite.config.js'
                         - 'site/package.json'
                         - 'site/yarn.lock'
                       landing:
@@ -146,7 +150,10 @@ jobs:
     #    Идёт только если что-то реально собралось (build success).
     deploy:
         needs: build-and-push
-        if: ${{ github.event_name != 'pull_request' && needs.build-and-push.result == 'success' }}
+        # !cancelled() — иначе GitHub неявно требует success() всей цепочки needs,
+        # и на frontend-only пуше (unit-tests skipped) deploy молча скипается,
+        # хотя образы собраны. Тот же паттерн, что в build-and-push и migrations.
+        if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.build-and-push.result == 'success' }}
         runs-on: ubuntu-latest
         steps:
             - name: 📦 Checkout repository
