@@ -40,6 +40,10 @@ jobs:
                         - '.github/workflows/deploy.yml'
                       frontend:
                         - 'site/assets/**'
+                        # ui-kit — исходники стилей: app.css тянет их через @import,
+                        # nginx-образ пекёт в бандл (COPY . . + yarn build).
+                        - 'site/ui-kit/**'
+                        - 'site/vite.config.js'
                         - 'site/package.json'
                         - 'site/yarn.lock'
                       landing:
