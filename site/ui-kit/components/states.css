@@ -1,0 +1,27 @@
+/* ============ STATES — engineering behavior layer ============
+   owner=code · НЕ трогается uikit-update · подключается из app.css
+   (и <link> в storybook.html) ПОСЛЕДНИМ в каскаде, мимо all.css.
+
+   Здесь живёт только поведение браузера / a11y: native pseudo-classes,
+   autofill, focus. Ноль новых классов, ноль хардкод-цветов — только
+   существующие токены. Визуальные состояния (hover/active цвета) —
+   в монолите дизайнера, не здесь. См. decisions.md §Decisions #16. */
+
+/* Autofill: браузер красит .input жёлтым поверх токенов DS.
+   Inset-заливка 1000px перекрывает user-agent background. */
+.input:-webkit-autofill,
+.input:-webkit-autofill:hover {
+  -webkit-box-shadow: inset 0 0 0 1000px var(--input-bg);
+  -webkit-text-fill-color: var(--input-text);
+  caret-color: var(--input-text);
+}
+
+/* На фокусе ring и inset-заливка обязаны жить в одном box-shadow —
+   иначе автозаполненный input теряет либо кольцо, либо фон. */
+.input:-webkit-autofill:focus,
+.input:-webkit-autofill:focus-visible {
+  border-color: var(--input-border-focus);
+  -webkit-box-shadow:
+    0 0 0 3px var(--input-focus-ring),
+    inset 0 0 0 1000px var(--input-bg);
+}
