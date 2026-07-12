@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Company\Application\Service;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
+use App\Company\Entity\ProjectDirection;
 use App\Company\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -36,6 +39,18 @@ final readonly class CompanyOwnerMembershipCreator
             company: $company,
             user: $owner,
             role: CompanyMember::ROLE_OWNER,
+        ));
+        $this->entityManager->persist(new ProjectDirection(
+            id: Uuid::uuid4()->toString(),
+            company: $company,
+            name: 'Общий',
+        ));
+        $this->entityManager->persist(new MoneyAccount(
+            id: Uuid::uuid4()->toString(),
+            company: $company,
+            type: MoneyAccountType::BANK,
+            name: 'Основной счет',
+            currency: 'RUB',
         ));
 
         return $company;

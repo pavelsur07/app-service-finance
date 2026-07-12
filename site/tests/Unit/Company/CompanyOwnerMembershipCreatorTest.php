@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Company;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
+use App\Company\Entity\ProjectDirection;
 use App\Tests\Builders\Company\UserBuilder;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
@@ -21,7 +24,7 @@ final class CompanyOwnerMembershipCreatorTest extends TestCase
 
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager
-            ->expects(self::exactly(2))
+            ->expects(self::exactly(4))
             ->method('persist')
             ->willReturnCallback(static function (object $entity) use (&$persisted): void {
                 $persisted[] = $entity;
@@ -37,7 +40,7 @@ final class CompanyOwnerMembershipCreatorTest extends TestCase
         self::assertSame('Acme LLC', $company->getName());
         self::assertSame($owner, $company->getUser());
         self::assertTrue($owner->getCompanies()->contains($company));
-        self::assertCount(2, $persisted);
+        self::assertCount(4, $persisted);
         self::assertSame($company, $persisted[0]);
         self::assertInstanceOf(CompanyMember::class, $persisted[1]);
         self::assertSame($company, $persisted[1]->getCompany());
@@ -46,6 +49,17 @@ final class CompanyOwnerMembershipCreatorTest extends TestCase
         self::assertSame(CompanyMember::STATUS_ACTIVE, $persisted[1]->getStatus());
         self::assertTrue(Uuid::isValid((string) $company->getId()));
         self::assertTrue(Uuid::isValid((string) $persisted[1]->getId()));
+        self::assertInstanceOf(ProjectDirection::class, $persisted[2]);
+        self::assertSame($company, $persisted[2]->getCompany());
+        self::assertSame('Общий', $persisted[2]->getName());
+        self::assertNull($persisted[2]->getParent());
+        self::assertInstanceOf(MoneyAccount::class, $persisted[3]);
+        self::assertSame($company, $persisted[3]->getCompany());
+        self::assertSame('Основной счет', $persisted[3]->getName());
+        self::assertSame(MoneyAccountType::BANK, $persisted[3]->getType());
+        self::assertSame('RUB', $persisted[3]->getCurrency());
+        self::assertTrue($persisted[3]->isActive());
+        self::assertFalse($persisted[3]->isDefault());
     }
 
     public function testPersistCompanyWithOwnerMembershipKeepsExistingCompanyFields(): void
@@ -58,7 +72,7 @@ final class CompanyOwnerMembershipCreatorTest extends TestCase
         $persisted = [];
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager
-            ->expects(self::exactly(2))
+            ->expects(self::exactly(4))
             ->method('persist')
             ->willReturnCallback(static function (object $entity) use (&$persisted): void {
                 $persisted[] = $entity;
@@ -76,5 +90,7 @@ final class CompanyOwnerMembershipCreatorTest extends TestCase
         self::assertSame('1234567890', $result->getInn());
         self::assertSame($company, $persisted[0]);
         self::assertInstanceOf(CompanyMember::class, $persisted[1]);
+        self::assertInstanceOf(ProjectDirection::class, $persisted[2]);
+        self::assertInstanceOf(MoneyAccount::class, $persisted[3]);
     }
 }

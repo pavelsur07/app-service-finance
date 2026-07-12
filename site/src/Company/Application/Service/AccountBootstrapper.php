@@ -186,7 +186,6 @@ final class AccountBootstrapper
 
     private function seedAccounts(Company $company): void
     {
-        $this->ensureAccount($company, 'Основной счет', MoneyAccountType::BANK);
         $this->ensureAccount($company, 'Основная касса', MoneyAccountType::CASH);
     }
 
