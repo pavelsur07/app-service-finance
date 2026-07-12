@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>UI Kit · Ваш Финдир v2.4.2</title>
+<title>UI Kit · Ваш Финдир v2.4.3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
@@ -235,7 +235,7 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
       <div class="nav-logo">ВФ</div>
       <div>
         <div class="nav-title">UI Kit</div>
-        <div class="nav-version">v2.4.2 · 12.07.2026</div>
+        <div class="nav-version">v2.4.3 · 12.07.2026</div>
       </div>
     </div>
 
@@ -320,7 +320,7 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
       Канонический источник истины для всех экранов финансового SaaS-продукта.
       Зафиксированы дизайн-токены, разрешены расхождения из аудита, собраны компоненты со всеми состояниями.
     </p>
-    <div class="page-meta">v2.4.2 · 12 июля 2026 · Светлая тема</div>
+    <div class="page-meta">v2.4.3 · 12 июля 2026 · Светлая тема</div>
 
     <!-- ===================== 01. DECISIONS ===================== -->
     <section id="decisions">
@@ -3827,6 +3827,15 @@ h4.mini-h { font-size: 12px; font-weight: 700; color: var(--text-tertiary); lett
     <!-- ===================== CHANGELOG ===================== -->
     <section id="changelog">
       <h2 class="section-h">Changelog</h2>
+
+      <div class="cb">
+        <div class="cl-version">v2.4.3 — 12 июля 2026</div>
+        <div class="cl-summary">🔧 Autofill preview: стили .input применяются сразу при загрузке, без ожидания клика.</div>
+        <ul class="cl-list">
+          <li>🔧 До первого жеста Chromium держит автозаполненный пароль в preview и красит поле UA-стилями (<code class="code-inline">:-webkit-autofill</code> ещё не матчится). Сверхдлинный <code class="code-inline">transition</code> на <code class="code-inline">.input</code> в states.css замораживает принудительную смену фона.</li>
+          <li>📐 Version bump v2.4.2 → v2.4.3 в <code class="code-inline">&lt;title&gt;</code>, <code class="code-inline">.nav-version</code>, <code class="code-inline">.page-meta</code>.</li>
+        </ul>
+      </div>
 
       <div class="cb">
         <div class="cl-version">v2.4.2 — 12 июля 2026</div>
