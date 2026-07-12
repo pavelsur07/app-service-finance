@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Ingestion\Infrastructure\Api\Ozon;
 
 use App\Ingestion\Exception\ConnectorAuthException;
+use App\Ingestion\Exception\ConnectorRateLimitedException;
 use App\Ingestion\Exception\ConnectorTransientException;
 use App\Ingestion\Exception\CredentialNotFoundException;
 use Psr\Log\LoggerInterface;
@@ -17,6 +18,7 @@ final readonly class OzonAccrualClient implements OzonAccrualClientInterface
     private const POSTINGS_ENDPOINT = '/v1/finance/accrual/postings';
     private const BY_DAY_ENDPOINT = '/v1/finance/accrual/by-day';
     private const TYPES_ENDPOINT = '/v1/finance/accrual/types';
+    private const DEFAULT_RETRY_AFTER_SECONDS = 120;
 
     public function __construct(
         private HttpClientInterface $httpClient,
@@ -143,7 +145,7 @@ final readonly class OzonAccrualClient implements OzonAccrualClientInterface
 
             $statusCode = $response->getStatusCode();
             $content = $response->getContent(false);
-            $this->classifyStatus($statusCode, $endpoint, $content);
+            $this->classifyStatus($statusCode, $endpoint, $content, $response->getHeaders(false));
         } catch (TransportExceptionInterface $exception) {
             throw new ConnectorTransientException(sprintf('Ozon accrual transport error for %s.', $endpoint), previous: $exception);
         } finally {
@@ -280,7 +282,10 @@ final readonly class OzonAccrualClient implements OzonAccrualClientInterface
         return ['api_key' => $apiKey, 'client_id' => $clientId];
     }
 
-    private function classifyStatus(int $statusCode, string $endpoint, string $content): void
+    /**
+     * @param array<string, list<string>> $headers
+     */
+    private function classifyStatus(int $statusCode, string $endpoint, string $content, array $headers): void
     {
         if (401 === $statusCode || 403 === $statusCode) {
             throw new ConnectorAuthException(sprintf('Ozon accrual API auth failed for %s.', $endpoint));
@@ -291,7 +296,7 @@ final readonly class OzonAccrualClient implements OzonAccrualClientInterface
         }
 
         if (429 === $statusCode) {
-            throw new ConnectorTransientException(sprintf('Ozon accrual API rate limit for %s.', $endpoint));
+            throw new ConnectorRateLimitedException(sprintf('Ozon accrual API rate limit for %s.', $endpoint), $this->retryAfterSeconds($headers));
         }
 
         if ($statusCode >= 500) {
@@ -301,6 +306,17 @@ final readonly class OzonAccrualClient implements OzonAccrualClientInterface
         if ($statusCode < 200 || $statusCode >= 300) {
             throw new \RuntimeException(sprintf('Ozon accrual API returned HTTP %d for %s.', $statusCode, $endpoint));
         }
+    }
+
+    /**
+     * @param array<string, list<string>> $headers
+     */
+    private function retryAfterSeconds(array $headers): int
+    {
+        // ponytail: Ozon sends Retry-After in seconds or not at all; no HTTP-date parsing.
+        $value = trim($headers['retry-after'][0] ?? '');
+
+        return ctype_digit($value) ? max(1, (int) $value) : self::DEFAULT_RETRY_AFTER_SECONDS;
     }
 
     private function isCredentialBadRequest(string $content): bool
