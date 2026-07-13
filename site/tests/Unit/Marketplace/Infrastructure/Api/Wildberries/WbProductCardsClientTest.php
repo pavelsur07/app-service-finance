@@ -30,11 +30,11 @@ final class WbProductCardsClientTest extends TestCase
                 ? new MockResponse(json_encode([
                     'cards' => $firstPageCards,
                     'cursor' => ['updatedAt' => '2026-07-13T10:00:00Z', 'nmID' => 123, 'total' => 100],
-                ], JSON_THROW_ON_ERROR))
+                ], \JSON_THROW_ON_ERROR))
                 : new MockResponse(json_encode([
                     'cards' => [['nmID' => 2]],
                     'cursor' => ['updatedAt' => '2026-07-13T10:01:00Z', 'nmID' => 124, 'total' => 1],
-                ], JSON_THROW_ON_ERROR));
+                ], \JSON_THROW_ON_ERROR));
         });
 
         $cards = $this->client($http)->fetchAll('token');
@@ -54,11 +54,38 @@ final class WbProductCardsClientTest extends TestCase
         $response = new MockResponse(json_encode([
             'cards' => array_fill(0, 100, ['nmID' => 1]),
             'cursor' => ['total' => 100],
-        ], JSON_THROW_ON_ERROR));
+        ], \JSON_THROW_ON_ERROR));
 
         $this->expectException(MarketplaceInvalidApiResponseException::class);
 
         $this->client(new MockHttpClient($response))->fetchAll('token');
+    }
+
+    public function testFetchAllRejectsCursorCycle(): void
+    {
+        $request = 0;
+        $cursors = [
+            ['updatedAt' => '2026-07-13T10:00:00Z', 'nmID' => 123],
+            ['updatedAt' => '2026-07-13T10:01:00Z', 'nmID' => 124],
+            ['updatedAt' => '2026-07-13T10:00:00Z', 'nmID' => 123],
+        ];
+        $http = new MockHttpClient(static function () use (&$request, $cursors): MockResponse {
+            self::assertArrayHasKey($request, $cursors, 'Cursor cycle must be rejected before another request.');
+
+            return new MockResponse(json_encode([
+                'cards' => array_fill(0, 100, ['nmID' => 1]),
+                'cursor' => $cursors[$request++],
+            ], \JSON_THROW_ON_ERROR));
+        });
+
+        try {
+            $this->client($http)->fetchAll('token');
+            self::fail('Expected invalid API response exception.');
+        } catch (MarketplaceInvalidApiResponseException $e) {
+            self::assertSame('WB Product Cards cursor must advance.', $e->getMessage());
+        }
+
+        self::assertSame(3, $request);
     }
 
     public function testAuthErrorsAreClassified(): void

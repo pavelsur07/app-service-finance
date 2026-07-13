@@ -29,7 +29,7 @@ final readonly class WbProductCardsClient
     {
         $cards = [];
         $cursor = ['limit' => self::PAGE_SIZE];
-        $previousCursor = null;
+        $seenCursors = [];
         $limiter = $this->rateLimiter->create(hash('sha256', $apiKey));
 
         while (true) {
@@ -42,11 +42,12 @@ final readonly class WbProductCardsClient
             }
 
             $nextCursor = $this->nextCursor($page['cursor']);
-            if ($nextCursor === $previousCursor) {
+            $cursorKey = $nextCursor['updatedAt'].':'.$nextCursor['nmID'];
+            if (isset($seenCursors[$cursorKey])) {
                 throw $this->invalidResponse('WB Product Cards cursor must advance.');
             }
 
-            $previousCursor = $nextCursor;
+            $seenCursors[$cursorKey] = true;
             $cursor = ['limit' => self::PAGE_SIZE, ...$nextCursor];
         }
 
@@ -97,7 +98,7 @@ final readonly class WbProductCardsClient
         }
 
         try {
-            $decoded = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+            $decoded = json_decode($body, true, 512, \JSON_THROW_ON_ERROR);
         } catch (\JsonException $e) {
             throw new MarketplaceInvalidApiResponseException('WB Product Cards returned invalid JSON.', $statusCode, $excerpt, '', '', $e);
         }
@@ -121,7 +122,7 @@ final readonly class WbProductCardsClient
     private function nextCursor(array $cursor): array
     {
         $updatedAt = trim((string) ($cursor['updatedAt'] ?? ''));
-        $nmId = filter_var($cursor['nmID'] ?? null, FILTER_VALIDATE_INT);
+        $nmId = filter_var($cursor['nmID'] ?? null, \FILTER_VALIDATE_INT);
 
         if ('' === $updatedAt || false === $nmId || $nmId <= 0) {
             throw $this->invalidResponse('WB Product Cards pagination cursor is invalid.');
