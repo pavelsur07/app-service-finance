@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Inventory\Application;
 
+use App\Inventory\Application\DTO\NormalizedStockRow;
+use App\Inventory\Entity\InventoryRawSnapshot;
+use App\Inventory\Entity\InventorySnapshotSession;
 use App\Inventory\Entity\Location;
 use App\Inventory\Entity\StockSnapshot;
 use App\Inventory\Enum\LocationType;
@@ -11,6 +14,7 @@ use App\Inventory\Enum\SnapshotSessionStatus;
 use App\Inventory\Enum\StockSnapshotMappingStatus;
 use App\Inventory\Enum\StockStatus;
 use App\Inventory\Infrastructure\Normalizer\OzonProductStocksRawNormalizer;
+use App\Inventory\Infrastructure\Normalizer\WbWarehouseStocksRawNormalizer;
 use App\Inventory\Repository\InventoryRawSnapshotRepository;
 use App\Inventory\Repository\InventorySnapshotSessionRepository;
 use App\Inventory\Repository\LocationRepository;
@@ -26,6 +30,7 @@ final readonly class NormalizeInventorySnapshotAction
         private InventorySnapshotSessionRepository $sessionRepository,
         private InventoryRawSnapshotRepository $rawSnapshotRepository,
         private OzonProductStocksRawNormalizer $ozonRawNormalizer,
+        private WbWarehouseStocksRawNormalizer $wbRawNormalizer,
         private MarketplaceFacade $marketplaceFacade,
         private LocationRepository $locationRepository,
         private StockSnapshotRepository $stockSnapshotRepository,
@@ -50,13 +55,19 @@ final readonly class NormalizeInventorySnapshotAction
             return;
         }
 
-        if ($source !== MarketplaceType::OZON) {
+        if (!in_array($source, [MarketplaceType::OZON, MarketplaceType::WILDBERRIES], true)) {
             $this->logger->warning('Normalization skipped: source is not supported.', ['source' => $source->value]);
             return;
         }
 
         $rawSnapshots = $this->rawSnapshotRepository->findBySessionAndCompanyOrdered($snapshotSessionId, $companyId);
         if ($rawSnapshots === []) {
+            return;
+        }
+
+        if (MarketplaceType::WILDBERRIES === $source) {
+            $this->normalizeWildberries($companyId, $snapshotSessionId, $session, $rawSnapshots);
+
             return;
         }
 
@@ -134,7 +145,125 @@ final readonly class NormalizeInventorySnapshotAction
     }
 
     /**
-     * @param array<string, list<\App\Inventory\Application\DTO\NormalizedStockRow>> $rowsByRaw
+     * @param list<InventoryRawSnapshot> $rawSnapshots
+     */
+    private function normalizeWildberries(string $companyId, string $snapshotSessionId, InventorySnapshotSession $session, array $rawSnapshots): void
+    {
+        $rows = $this->wbRawNormalizer->normalize($rawSnapshots);
+        if ([] === $rows) {
+            foreach ($rawSnapshots as $rawSnapshot) {
+                $rawSnapshot->markAsProcessed();
+            }
+            $this->entityManager->flush();
+
+            return;
+        }
+
+        $sourceSkus = array_values(array_unique(array_map(
+            static fn (NormalizedStockRow $row): string => $row->sourceSku,
+            $rows,
+        )));
+        $listingsBySku = [];
+        foreach (array_chunk($sourceSkus, 5000) as $sourceSkuChunk) {
+            $listingsBySku = array_replace(
+                $listingsBySku,
+                $this->marketplaceFacade->findListingsByMarketplaceSkus($companyId, MarketplaceType::WILDBERRIES->value, $sourceSkuChunk),
+            );
+        }
+
+        $mappedListingIds = [];
+        $mappingBySku = [];
+        foreach ($sourceSkus as $sku) {
+            $matches = $listingsBySku[$sku] ?? [];
+            if (1 === count($matches)) {
+                $mappingBySku[$sku] = ['status' => StockSnapshotMappingStatus::Mapped, 'listingId' => $matches[0]['id']];
+                $mappedListingIds[] = $matches[0]['id'];
+            } else {
+                $mappingBySku[$sku] = count($matches) > 1
+                    ? ['status' => StockSnapshotMappingStatus::Ambiguous, 'listingId' => null]
+                    : ['status' => StockSnapshotMappingStatus::Unmapped, 'listingId' => null];
+            }
+        }
+
+        $productsByListing = [];
+        foreach (array_chunk(array_values(array_unique($mappedListingIds)), 5000) as $listingIdChunk) {
+            $productsByListing = array_replace(
+                $productsByListing,
+                $this->marketplaceFacade->resolveListingsToProducts($companyId, $listingIdChunk),
+            );
+        }
+
+        $locationExternalIds = array_values(array_unique(array_map(
+            static fn (NormalizedStockRow $row): string => (string) $row->locationExternalId,
+            $rows,
+        )));
+        $locations = $this->locationRepository->findByCompanySourceAndExternalIds(
+            $companyId,
+            MarketplaceType::WILDBERRIES,
+            $locationExternalIds,
+        );
+
+        foreach ($rows as $row) {
+            $locationExternalId = (string) $row->locationExternalId;
+            if (!isset($locations[$locationExternalId])) {
+                $locations[$locationExternalId] = $this->findOrCreateWbLocation($companyId, $row);
+            } else {
+                $locations[$locationExternalId]
+                    ->setCode((string) $row->locationCode)
+                    ->setName((string) $row->locationName)
+                    ->setMetadata($row->locationMetadata)
+                    ->setIsActive(true);
+            }
+
+            $mapping = $mappingBySku[$row->sourceSku] ?? ['status' => StockSnapshotMappingStatus::Unmapped, 'listingId' => null];
+            $listingId = $mapping['listingId'];
+            $productId = null !== $listingId ? ($productsByListing[$listingId] ?? null) : null;
+
+            $this->stockSnapshotRepository->upsertDaySnapshot(new StockSnapshot(
+                companyId: $companyId,
+                snapshotSessionId: $snapshotSessionId,
+                snapshotDate: $session->getStartedAt(),
+                snapshotAt: $session->getStartedAt(),
+                locationId: $locations[$locationExternalId]->getId(),
+                status: $row->status,
+                quantity: $row->quantity,
+                reservedQuantity: $row->reservedQuantity,
+                source: MarketplaceType::WILDBERRIES,
+                rawSnapshotId: $row->rawSnapshotId,
+                listingId: $listingId,
+                productId: $productId,
+                sourceSku: $row->sourceSku,
+                sourceOfferId: $row->sourceOfferId,
+                fulfillmentType: $row->fulfillmentType,
+                mappingStatus: $mapping['status'],
+            ));
+        }
+
+        foreach ($rawSnapshots as $rawSnapshot) {
+            $rawSnapshot->markAsProcessed();
+        }
+        $this->entityManager->flush();
+    }
+
+    private function findOrCreateWbLocation(string $companyId, NormalizedStockRow $row): Location
+    {
+        $externalId = (string) $row->locationExternalId;
+        $location = new Location(
+            companyId: $companyId,
+            type: LocationType::MpWarehouse,
+            externalSystem: MarketplaceType::WILDBERRIES,
+            code: (string) $row->locationCode,
+            name: (string) $row->locationName,
+            externalId: $externalId,
+            metadata: $row->locationMetadata,
+        );
+        $this->entityManager->persist($location);
+
+        return $location;
+    }
+
+    /**
+     * @param array<string, list<NormalizedStockRow>> $rowsByRaw
      *
      * @return array<string, Location>
      */

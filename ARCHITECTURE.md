@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.48 / 2026-05-22
+> Версия: 1.50 / 2026-07-13
 
 ---
 
@@ -1323,6 +1323,7 @@ buildQueryBuilder(
 - обязательный IDOR-фильтр `company_id = :companyId`;
 - `source` фильтруется через `MarketplaceType`;
 - `mappingStatus` фильтруется через `StockSnapshotMappingStatus`;
+- `status` фильтруется через `StockStatus`;
 - поддерживает фильтры:
   - `snapshotSessionId`;
   - `snapshotAt`;
@@ -1331,6 +1332,7 @@ buildQueryBuilder(
   - `mappingStatus`;
 - pagination через Pagerfanta;
 - `available_for_sale = quantity - reserved_quantity`;
+- склад читается через company-scoped join с `inventory_locations`;
 - `SELECT *` не используется.
 
 **Потребители:**
@@ -1962,6 +1964,26 @@ GET /inventory/stocks
 - не покрывает возвраты от клиента;
 - эти потоки добавляются отдельными загрузками/normalizer-ами.
 
+## Inventory — Wildberries FBW stock normalization
+
+Нормализатор WB принимает raw-страницы ответа
+`POST /api/analytics/v1/stocks-report/wb-warehouses` и агрегирует размерные
+строки `chrtId` до `nmId + warehouseId`. Исходный размерный разрез остаётся в
+`InventoryRawSnapshot`, миграция схемы `StockSnapshot` не требуется.
+
+Семантика WB:
+- `nmId` → `StockSnapshot.sourceSku` и маппинг листинга через `MarketplaceFacade`;
+- `warehouseId` → `Location.externalId`, `warehouseName` → `Location.name`;
+- `quantity` → `StockStatus::Available`;
+- `inWayToClient` → `StockStatus::InTransitToCustomer`;
+- `inWayFromClient` → `StockStatus::InTransitFromCustomer`;
+- для всех трёх строк `fulfillmentType = fbw`, `reservedQuantity = 0`;
+- все страницы одной сессии используют единый `snapshotAt = session.startedAt`.
+
+`StockQtyByListingOnDateQuery` выбирает последнюю целую snapshot-сессию отдельно
+для каждого marketplace source и суммирует только `StockStatus::Available`.
+Товары в пути в количественный остаток `InventoryFacade` не входят.
+
 ## Messenger routing — Inventory
 
 - `App\Inventory\Message\SyncOzonInventorySnapshotMessage` → `async_sync`;
@@ -2215,6 +2237,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.50 | 2026-07-13 | Inventory: добавлена нормализация WB FBW raw-остатков по `nmId + warehouseId`, отдельные статусы движения и выбор последней полной сессии по каждому источнику в `StockQtyByListingOnDateQuery` |
 | 1.49 | 2026-06-12 | Company: добавлен публичный контракт `CompanyFacade::createOwnerAccount()` для создания owner-аккаунта через фасад из Admin |
 | 1.48 | 2026-05-22 | Marketplace: зафиксирован контракт WB financial sync (entities статуса/ошибок, enum mode/status, message `SyncWbFinancialReportDayMessage` на `async_sync`, команда `app:marketplace:wb-financial-reports:sync`, pipeline, TZ `Europe/Moscow`, правило empty day и rate limit 1 request/min) |
 | 1.47 | 2026-05-11 | Inventory: задокументирован первый этап Ozon stock normalization — raw `/v4/product/info/stocks` → `StockSnapshot`, `reservedQuantity`, `StockSnapshotMappingStatus`, async normalization и UI `/inventory/stocks` |

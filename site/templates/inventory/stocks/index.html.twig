@@ -46,6 +46,15 @@
                         {% endfor %}
                     </select>
                 </div>
+                <div class="col-md-2">
+                    <label class="form-label">Статус остатка</label>
+                    <select name="status" class="form-select">
+                        <option value="">Все</option>
+                        {% for status in stockStatuses %}
+                            <option value="{{ status.value }}" {{ filters.status == status.value ? 'selected' : '' }}>{{ status.value }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
                 <div class="col-12 d-flex gap-2">
                     <button class="btn btn-primary" type="submit">Применить</button>
                     <a class="btn btn-outline-secondary" href="{{ path('inventory_stocks_index') }}">Сбросить</a>
@@ -64,6 +73,8 @@
                     <th>SKU</th>
                     <th>Offer ID</th>
                     <th>fulfillmentType</th>
+                    <th>Склад</th>
+                    <th>Статус</th>
                     <th>Остаток</th>
                     <th>Зарезервировано</th>
                     <th>Доступно расчётно</th>
@@ -78,6 +89,8 @@
                         <td>{{ row.source_sku ?: '—' }}</td>
                         <td>{{ row.source_offer_id ?: '—' }}</td>
                         <td>{{ row.fulfillment_type ?: '—' }}</td>
+                        <td>{{ row.location_name ?: '—' }}</td>
+                        <td>{{ row.status }}</td>
                         <td>{{ row.quantity }}</td>
                         <td>{{ row.reserved_quantity }}</td>
                         <td>{{ row.available_for_sale }}</td>
@@ -92,7 +105,7 @@
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="9" class="text-center text-muted py-4">Нет нормализованных остатков по выбранным фильтрам.</td>
+                        <td colspan="11" class="text-center text-muted py-4">Нет нормализованных остатков по выбранным фильтрам.</td>
                     </tr>
                 {% endfor %}
                 </tbody>

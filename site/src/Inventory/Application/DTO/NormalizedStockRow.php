@@ -18,6 +18,11 @@ final readonly class NormalizedStockRow
         public string $quantity,
         public string $reservedQuantity,
         public string $rawSnapshotId,
+        public ?string $locationExternalId = null,
+        public ?string $locationCode = null,
+        public ?string $locationName = null,
+        /** @var array<string, mixed>|null */
+        public ?array $locationMetadata = null,
     ) {
     }
 }
