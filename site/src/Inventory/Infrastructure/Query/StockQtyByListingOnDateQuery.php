@@ -26,6 +26,7 @@ final readonly class StockQtyByListingOnDateQuery
                 FROM inventory_stock_snapshots candidate
                 WHERE candidate.company_id = :companyId
                   AND candidate.snapshot_date <= :reportDate
+                  AND candidate.listing_id IS NOT NULL
                 ORDER BY
                     candidate.source,
                     candidate.snapshot_date DESC,

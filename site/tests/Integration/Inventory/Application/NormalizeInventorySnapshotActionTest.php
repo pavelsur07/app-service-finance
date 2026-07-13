@@ -21,6 +21,8 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Inventory\InventoryRawSnapshotBuilder;
+use App\Tests\Builders\Inventory\LocationBuilder;
+use App\Tests\Builders\Inventory\StockSnapshotBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 
 final class NormalizeInventorySnapshotActionTest extends IntegrationTestCase
@@ -233,6 +235,65 @@ final class NormalizeInventorySnapshotActionTest extends IntegrationTestCase
         $this->em->refresh($secondRaw);
         self::assertTrue($firstRaw->isProcessed());
         self::assertTrue($secondRaw->isProcessed());
+    }
+
+    public function testStockQtyFallsBackWhenLatestSourceSessionHasNoMappedListings(): void
+    {
+        $company = $this->createCompany(905);
+        $location = LocationBuilder::aLocation()
+            ->withCompanyId($company->getId())
+            ->withExternalId('507')
+            ->withCode('WB-507')
+            ->withName('Коледино')
+            ->build();
+        $product = new Product('30000000-0000-4000-8000-000000000905', $company);
+        $product->setSku('PRD-905')->setName('P905');
+        $listing = new MarketplaceListing('50000000-0000-4000-8000-000000000906', $company, $product, MarketplaceType::WILDBERRIES);
+        $listing->setMarketplaceSku('100')->setPrice('100.00');
+        $olderSession = new InventorySnapshotSession($company->getId(), MarketplaceType::WILDBERRIES, SnapshotTriggerType::Manual);
+        $newerSession = new InventorySnapshotSession($company->getId(), MarketplaceType::WILDBERRIES, SnapshotTriggerType::Manual);
+        $olderSession->markCompleted();
+        $newerSession->markCompleted();
+
+        $this->em->persist($location);
+        $this->em->persist($product);
+        $this->em->persist($listing);
+        $this->em->persist($olderSession);
+        $this->em->persist($newerSession);
+        $this->em->persist(StockSnapshotBuilder::aStockSnapshot()
+            ->withCompanyId($company->getId())
+            ->withSnapshotSessionId($olderSession->getId())
+            ->withSnapshotDate(new \DateTimeImmutable('2026-06-01'))
+            ->withSnapshotAt(new \DateTimeImmutable('2026-06-01 10:00:00'))
+            ->withLocationId($location->getId())
+            ->withQuantity('12.000')
+            ->withListingId($listing->getId())
+            ->withProductId($product->getId())
+            ->withSourceSku('100')
+            ->withFulfillmentType('fbw')
+            ->withMappingStatus(StockSnapshotMappingStatus::Mapped)
+            ->build());
+        $this->em->persist(StockSnapshotBuilder::aStockSnapshot()
+            ->withCompanyId($company->getId())
+            ->withSnapshotSessionId($newerSession->getId())
+            ->withSnapshotDate(new \DateTimeImmutable('2026-06-02'))
+            ->withSnapshotAt(new \DateTimeImmutable('2026-06-02 10:00:00'))
+            ->withLocationId($location->getId())
+            ->withQuantity('7.000')
+            ->withListingId(null)
+            ->withProductId(null)
+            ->withSourceSku('200')
+            ->withFulfillmentType('fbw')
+            ->withMappingStatus(StockSnapshotMappingStatus::Unmapped)
+            ->build());
+        $this->em->flush();
+
+        $stockByListing = self::getContainer()->get(StockQtyByListingOnDateQuery::class)->execute(
+            $company->getId(),
+            new \DateTimeImmutable('2026-06-02'),
+        );
+
+        self::assertSame([$listing->getId() => 12.0], $stockByListing);
     }
 
     private function raw(string $companyId, string $sessionId, string $sku, int $present, int $reserved, string $type, string $offerId): InventoryRawSnapshot

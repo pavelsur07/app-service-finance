@@ -13,7 +13,6 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 final readonly class WbInventoryClient
 {
     public const DEFAULT_LIMIT = 50000;
-    public const MIN_REQUEST_INTERVAL_SECONDS = 20;
     public const ENDPOINT = '/api/analytics/v1/stocks-report/wb-warehouses';
 
     private const BASE_URL = 'https://seller-analytics-api.wildberries.ru';

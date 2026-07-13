@@ -1974,6 +1974,7 @@ GET /inventory/stocks
 Семантика WB:
 - `nmId` → `StockSnapshot.sourceSku` и маппинг листинга через `MarketplaceFacade`;
 - `warehouseId` → `Location.externalId`, `warehouseName` → `Location.name`;
+- WB является источником правды для своих складов: при нормализации обновляются `Location.code`, `name`, `metadata` и `isActive`;
 - `quantity` → `StockStatus::Available`;
 - `inWayToClient` → `StockStatus::InTransitToCustomer`;
 - `inWayFromClient` → `StockStatus::InTransitFromCustomer`;
@@ -1981,7 +1982,8 @@ GET /inventory/stocks
 - все страницы одной сессии используют единый `snapshotAt = session.startedAt`.
 
 `StockQtyByListingOnDateQuery` выбирает последнюю целую snapshot-сессию отдельно
-для каждого marketplace source и суммирует только `StockStatus::Available`.
+для каждого marketplace source, содержащую хотя бы один замапленный листинг,
+и суммирует только `StockStatus::Available`.
 Товары в пути в количественный остаток `InventoryFacade` не входят.
 
 ## Messenger routing — Inventory

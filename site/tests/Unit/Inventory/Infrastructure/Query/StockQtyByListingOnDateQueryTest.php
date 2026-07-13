@@ -25,7 +25,7 @@ final class StockQtyByListingOnDateQueryTest extends TestCase
                     && str_contains($sql, 'latest.snapshot_session_id = s.snapshot_session_id')
                     && str_contains($sql, 's.status = :status')
                     && !str_contains($sql, 'candidate.status')
-                    && !str_contains($sql, 'candidate.listing_id')
+                    && str_contains($sql, 'candidate.listing_id IS NOT NULL')
                 ),
                 self::callback(static fn (array $params): bool => self::COMPANY_ID === $params['companyId']
                     && '2026-04-30' === $params['reportDate']
