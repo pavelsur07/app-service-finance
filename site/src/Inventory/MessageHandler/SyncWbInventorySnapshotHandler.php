@@ -13,6 +13,7 @@ use App\Inventory\Exception\WbInventoryTemporaryApiException;
 use App\Inventory\Infrastructure\Api\Wildberries\WbInventoryClient;
 use App\Inventory\Message\NormalizeInventorySnapshotMessage;
 use App\Inventory\Message\SyncWbInventorySnapshotMessage;
+use App\Inventory\Repository\InventoryRawSnapshotRepository;
 use App\Inventory\Repository\InventorySnapshotSessionRepository;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
@@ -30,6 +31,7 @@ final readonly class SyncWbInventorySnapshotHandler
 {
     public function __construct(
         private InventorySnapshotSessionRepository $sessionRepository,
+        private InventoryRawSnapshotRepository $rawSnapshotRepository,
         private MarketplaceFacade $marketplaceFacade,
         private WbInventoryClient $inventoryClient,
         private EntityManagerInterface $entityManager,
@@ -50,7 +52,12 @@ final readonly class SyncWbInventorySnapshotHandler
 
             return;
         }
-        if (in_array($session->getStatus(), [SnapshotSessionStatus::Completed, SnapshotSessionStatus::Partial, SnapshotSessionStatus::Failed], true)) {
+        if (SnapshotSessionStatus::Completed === $session->getStatus()) {
+            $this->dispatchNormalization($message, $session);
+
+            return;
+        }
+        if (in_array($session->getStatus(), [SnapshotSessionStatus::Partial, SnapshotSessionStatus::Failed], true)) {
             return;
         }
 
@@ -67,57 +74,80 @@ final readonly class SyncWbInventorySnapshotHandler
             return;
         }
 
-        $session->markInProgress();
-        $this->entityManager->flush();
+        if (SnapshotSessionStatus::Pending === $session->getStatus()) {
+            $session->markInProgress();
+            $this->entityManager->flush();
+        }
 
         $savedPages = 0;
         $offset = 0;
         $page = 1;
         $seenPageHashes = [];
+        $lastPageSize = null;
 
         try {
-            $this->marketplaceFacade->refreshWbListingCatalog($message->companyId, $message->connectionId);
+            $rawSnapshots = $this->rawSnapshotRepository->findBySessionAndCompanyOrdered($session->getId(), $message->companyId);
+            $savedPages = count($rawSnapshots);
+            foreach ($rawSnapshots as $rawSnapshot) {
+                $items = $rawSnapshot->getResponseBody()['data']['items'] ?? null;
+                if (!is_array($items) || !array_is_list($items)) {
+                    throw new WbInventoryApiException('Persisted WB inventory page has an unexpected response structure.');
+                }
 
-            do {
-                $startedAt = microtime(true);
-                $response = $this->inventoryClient->fetchStocks($credentials['api_key'], $this->pageLimit, $offset);
-                $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
-
-                $pageHash = hash('sha256', json_encode($response->items, \JSON_THROW_ON_ERROR));
+                $pageHash = hash('sha256', json_encode($items, \JSON_THROW_ON_ERROR));
                 if (isset($seenPageHashes[$pageHash])) {
-                    throw new WbInventoryApiException('WB Inventory API repeated a pagination page.');
+                    throw new WbInventoryApiException('Persisted WB inventory pages contain a repeated pagination page.');
                 }
                 $seenPageHashes[$pageHash] = true;
+                $lastPageSize = count($items);
+                $offset += $lastPageSize;
+                $page = max($page, ($rawSnapshot->getPageNumber() ?? 0) + 1);
+            }
 
-                $rawSnapshot = new InventoryRawSnapshot(
-                    companyId: $message->companyId,
-                    snapshotSessionId: $session->getId(),
-                    source: MarketplaceType::WILDBERRIES,
-                    sourceEndpoint: WbInventoryClient::ENDPOINT,
-                    requestParams: [
-                        'connectionId' => $message->connectionId,
-                        'marketplace' => MarketplaceType::WILDBERRIES->value,
-                        'page' => $page,
-                        'offset' => $offset,
-                        'limit' => $this->pageLimit,
-                        'requestedAt' => $session->getStartedAt()->format(\DATE_ATOM),
-                        'correlationId' => $session->getCorrelationId(),
-                    ],
-                    responseStatus: 200,
-                    responseBody: $response->raw,
-                    fetchedAt: new \DateTimeImmutable(),
-                    fetchDurationMs: max(0, $durationMs),
-                    correlationId: $session->getCorrelationId(),
-                    pageNumber: $page,
-                );
-                $this->entityManager->persist($rawSnapshot);
-                ++$savedPages;
-                $session->incrementReceivedPages();
-                $this->entityManager->flush();
+            if (null === $lastPageSize || $this->pageLimit === $lastPageSize) {
+                $this->marketplaceFacade->refreshWbListingCatalog($message->companyId, $message->connectionId);
 
-                $offset += count($response->items);
-                ++$page;
-            } while ($response->hasNextPage);
+                do {
+                    $startedAt = microtime(true);
+                    $response = $this->inventoryClient->fetchStocks($credentials['api_key'], $this->pageLimit, $offset);
+                    $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+
+                    $pageHash = hash('sha256', json_encode($response->items, \JSON_THROW_ON_ERROR));
+                    if (isset($seenPageHashes[$pageHash])) {
+                        throw new WbInventoryApiException('WB Inventory API repeated a pagination page.');
+                    }
+                    $seenPageHashes[$pageHash] = true;
+
+                    $rawSnapshot = new InventoryRawSnapshot(
+                        companyId: $message->companyId,
+                        snapshotSessionId: $session->getId(),
+                        source: MarketplaceType::WILDBERRIES,
+                        sourceEndpoint: WbInventoryClient::ENDPOINT,
+                        requestParams: [
+                            'connectionId' => $message->connectionId,
+                            'marketplace' => MarketplaceType::WILDBERRIES->value,
+                            'page' => $page,
+                            'offset' => $offset,
+                            'limit' => $this->pageLimit,
+                            'requestedAt' => $session->getStartedAt()->format(\DATE_ATOM),
+                            'correlationId' => $session->getCorrelationId(),
+                        ],
+                        responseStatus: 200,
+                        responseBody: $response->raw,
+                        fetchedAt: new \DateTimeImmutable(),
+                        fetchDurationMs: max(0, $durationMs),
+                        correlationId: $session->getCorrelationId(),
+                        pageNumber: $page,
+                    );
+                    $this->entityManager->persist($rawSnapshot);
+                    ++$savedPages;
+                    $session->incrementReceivedPages();
+                    $this->entityManager->flush();
+
+                    $offset += count($response->items);
+                    ++$page;
+                } while ($response->hasNextPage);
+            }
 
             $session->markCompleted();
             $this->entityManager->flush();
@@ -154,6 +184,11 @@ final readonly class SyncWbInventorySnapshotHandler
             return;
         }
 
+        $this->dispatchNormalization($message, $session);
+    }
+
+    private function dispatchNormalization(SyncWbInventorySnapshotMessage $message, InventorySnapshotSession $session): void
+    {
         $this->messageBus->dispatch(new NormalizeInventorySnapshotMessage(
             companyId: $message->companyId,
             snapshotSessionId: $session->getId(),

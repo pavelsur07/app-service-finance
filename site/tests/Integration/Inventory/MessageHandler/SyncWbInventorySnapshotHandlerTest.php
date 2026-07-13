@@ -14,6 +14,7 @@ use App\Inventory\Message\NormalizeInventorySnapshotMessage;
 use App\Inventory\Message\SyncWbInventorySnapshotMessage;
 use App\Inventory\MessageHandler\NormalizeInventorySnapshotHandler;
 use App\Inventory\MessageHandler\SyncWbInventorySnapshotHandler;
+use App\Inventory\Repository\InventoryRawSnapshotRepository;
 use App\Inventory\Repository\InventorySnapshotSessionRepository;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceConnectionType;
@@ -172,14 +173,86 @@ final class SyncWbInventorySnapshotHandlerTest extends IntegrationTestCase
         self::assertCount(0, $this->rawSnapshots($session));
     }
 
-    private function handler(int $pageLimit = WbInventoryClient::DEFAULT_LIMIT): SyncWbInventorySnapshotHandler
+    public function testInProgressRedeliveryResumesAfterPersistedPage(): void
+    {
+        $company = $this->createCompany(708);
+        $connection = $this->createConnection($company, 708);
+        $session = $this->createSession($company);
+        $session->markInProgress();
+        $session->incrementReceivedPages();
+        $this->em->persist(new InventoryRawSnapshot(
+            companyId: $company->getId(),
+            snapshotSessionId: $session->getId(),
+            source: MarketplaceType::WILDBERRIES,
+            sourceEndpoint: WbInventoryClient::ENDPOINT,
+            requestParams: ['offset' => 0, 'limit' => 2],
+            responseStatus: 200,
+            responseBody: ['data' => ['items' => [
+                $this->stock(800, 8001, 1, 1),
+                $this->stock(800, 8002, 1, 2),
+            ]]],
+            fetchedAt: new \DateTimeImmutable(),
+            fetchDurationMs: 1,
+            correlationId: $session->getCorrelationId(),
+            pageNumber: 1,
+        ));
+        $this->em->flush();
+        $this->swapHttpClient([
+            $this->catalogResponse([$this->card(800, [[8001, 'S', 'barcode-708-s'], [8002, 'M', 'barcode-708-m'], [8003, 'L', 'barcode-708-l']])]),
+            $this->inventoryResponse([$this->stock(800, 8003, 1, 3)]),
+        ]);
+
+        ($this->handler(2))($this->message($company, $connection, $session));
+
+        $this->em->refresh($session);
+        self::assertSame(SnapshotSessionStatus::Completed, $session->getStatus());
+        self::assertSame(2, $session->getReceivedPages());
+        $raw = $this->rawSnapshots($session);
+        self::assertCount(2, $raw);
+        self::assertSame([0, 2], array_map(static fn (InventoryRawSnapshot $item): int => $item->getRequestParams()['offset'], $raw));
+        self::assertSame([1, 2], array_map(static fn (InventoryRawSnapshot $item): int => $item->getPageNumber(), $raw));
+        self::assertSame(1, $this->countNormalizeMessages($session, $company));
+    }
+
+    public function testCompletedRedeliveryRetriesFailedNormalizationDispatch(): void
+    {
+        $company = $this->createCompany(709);
+        $connection = $this->createConnection($company, 709);
+        $session = $this->createSession($company);
+        $this->swapHttpClient([
+            $this->catalogResponse([$this->card(900, [[9001, 'S', 'barcode-709']])]),
+            $this->inventoryResponse([$this->stock(900, 9001, 1, 1)]),
+        ]);
+        $failingBus = $this->createMock(MessageBusInterface::class);
+        $failingBus->expects(self::once())
+            ->method('dispatch')
+            ->willThrowException(new \RuntimeException('Transport unavailable.'));
+
+        try {
+            ($this->handler(messageBus: $failingBus))($this->message($company, $connection, $session));
+            self::fail('Normalization dispatch failure must be retried by Messenger.');
+        } catch (\RuntimeException $e) {
+            self::assertSame('Transport unavailable.', $e->getMessage());
+        }
+
+        $this->em->refresh($session);
+        self::assertSame(SnapshotSessionStatus::Completed, $session->getStatus());
+        self::assertCount(1, $this->rawSnapshots($session));
+
+        ($this->handler())($this->message($company, $connection, $session));
+
+        self::assertSame(1, $this->countNormalizeMessages($session, $company));
+    }
+
+    private function handler(int $pageLimit = WbInventoryClient::DEFAULT_LIMIT, ?MessageBusInterface $messageBus = null): SyncWbInventorySnapshotHandler
     {
         return new SyncWbInventorySnapshotHandler(
             self::getContainer()->get(InventorySnapshotSessionRepository::class),
+            self::getContainer()->get(InventoryRawSnapshotRepository::class),
             self::getContainer()->get(MarketplaceFacade::class),
             self::getContainer()->get(WbInventoryClient::class),
             $this->em,
-            self::getContainer()->get(MessageBusInterface::class),
+            $messageBus ?? self::getContainer()->get(MessageBusInterface::class),
             self::getContainer()->get(AppLogger::class),
             $pageLimit,
         );
