@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Inventory\Infrastructure\Query;
 
+use App\Inventory\Enum\StockStatus;
 use App\Inventory\Infrastructure\Query\StockQtyByListingOnDateQuery;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
@@ -18,22 +19,17 @@ final class StockQtyByListingOnDateQueryTest extends TestCase
         $connection = $this->createMock(Connection::class);
 
         $connection->expects(self::once())
-            ->method('fetchOne')
-            ->willReturn('2026-04-30');
-
-        $connection->expects(self::once())
-            ->method('fetchAssociative')
-            ->willReturn(['snapshot_at' => '2026-04-30 15:00:00']);
-
-        $connection->expects(self::once())
             ->method('fetchAllAssociative')
             ->with(
-                self::stringContains('s.snapshot_at = :snapshotAt'),
-                self::callback(static fn (array $params): bool =>
-                    $params['companyId'] === self::COMPANY_ID
-                    && $params['snapshotDate'] === '2026-04-30'
-                    && $params['snapshotAt'] instanceof \DateTimeImmutable
-                    && $params['snapshotAt']->format('Y-m-d H:i:s') === '2026-04-30 15:00:00'
+                self::callback(static fn (string $sql): bool => str_contains($sql, 'DISTINCT ON (candidate.source)')
+                    && str_contains($sql, 'latest.snapshot_session_id = s.snapshot_session_id')
+                    && str_contains($sql, 's.status = :status')
+                    && !str_contains($sql, 'candidate.status')
+                    && str_contains($sql, 'candidate.listing_id IS NOT NULL')
+                ),
+                self::callback(static fn (array $params): bool => self::COMPANY_ID === $params['companyId']
+                    && '2026-04-30' === $params['reportDate']
+                    && $params['status'] === StockStatus::Available->value
                 ),
             )
             ->willReturn([
@@ -52,28 +48,10 @@ final class StockQtyByListingOnDateQueryTest extends TestCase
         $connection = $this->createMock(Connection::class);
 
         $connection->expects(self::once())
-            ->method('fetchOne')
-            ->willReturn('2026-05-01');
-
-        $connection->expects(self::once())
-            ->method('fetchAssociative')
-            ->with(
-                self::stringContains('MAX(s.snapshot_at)'),
-                self::callback(static fn (array $params): bool =>
-                    $params['companyId'] === self::COMPANY_ID
-                    && $params['snapshotDate'] === '2026-05-01'
-                ),
-            )
-            ->willReturn(['snapshot_at' => '2026-05-01 23:59:59']);
-
-        $connection->expects(self::once())
             ->method('fetchAllAssociative')
             ->with(
                 self::anything(),
-                self::callback(static fn (array $params): bool =>
-                    $params['snapshotDate'] === '2026-05-01'
-                    && $params['snapshotAt'] instanceof \DateTimeImmutable
-                    && $params['snapshotAt']->format('Y-m-d H:i:s') === '2026-05-01 23:59:59'
+                self::callback(static fn (array $params): bool => '2026-05-02' === $params['reportDate']
                 ),
             )
             ->willReturn([
@@ -86,47 +64,28 @@ final class StockQtyByListingOnDateQueryTest extends TestCase
         self::assertSame(['l-2' => 7.0], $result);
     }
 
-
-
-    public function testUsesLatestSnapshotAtInsideSelectedDay(): void
+    public function testAggregatesRowsReturnedForLatestSessionPerSource(): void
     {
         $reportDate = new \DateTimeImmutable('2026-05-01');
         $connection = $this->createMock(Connection::class);
 
         $connection->expects(self::once())
-            ->method('fetchOne')
-            ->willReturn('2026-05-01');
-
-        $connection->expects(self::once())
-            ->method('fetchAssociative')
-            ->willReturn(['snapshot_at' => '2026-05-01 20:15:00']);
-
-        $connection->expects(self::once())
             ->method('fetchAllAssociative')
-            ->with(
-                self::stringContains('s.snapshot_at = :snapshotAt'),
-                self::callback(static fn (array $params): bool =>
-                    $params['snapshotDate'] === '2026-05-01'
-                    && $params['snapshotAt'] instanceof \DateTimeImmutable
-                    && $params['snapshotAt']->format('Y-m-d H:i:s') === '2026-05-01 20:15:00'
-                ),
-            )
             ->willReturn([
-                ['listing_id' => 'l-3', 'stock_qty' => '3.25'],
+                ['listing_id' => 'ozon-listing', 'stock_qty' => '3.25'],
+                ['listing_id' => 'wb-listing', 'stock_qty' => '7'],
             ]);
 
         $query = new StockQtyByListingOnDateQuery($connection);
         $result = $query->execute(self::COMPANY_ID, $reportDate);
 
-        self::assertSame(['l-3' => 3.25], $result);
+        self::assertSame(['ozon-listing' => 3.25, 'wb-listing' => 7.0], $result);
     }
 
     public function testReturnsEmptyWhenNoSnapshotDate(): void
     {
         $connection = $this->createMock(Connection::class);
-        $connection->expects(self::once())->method('fetchOne')->willReturn(false);
-        $connection->expects(self::never())->method('fetchAssociative');
-        $connection->expects(self::never())->method('fetchAllAssociative');
+        $connection->expects(self::once())->method('fetchAllAssociative')->willReturn([]);
 
         $query = new StockQtyByListingOnDateQuery($connection);
 

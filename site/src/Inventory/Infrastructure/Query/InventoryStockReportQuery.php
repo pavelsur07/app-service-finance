@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Inventory\Infrastructure\Query;
 
 use App\Inventory\Enum\StockSnapshotMappingStatus;
+use App\Inventory\Enum\StockStatus;
 use App\Marketplace\Enum\MarketplaceType;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Query\QueryBuilder;
@@ -50,6 +51,7 @@ final class InventoryStockReportQuery
         ?\DateTimeImmutable $snapshotAt,
         ?string $search,
         ?StockSnapshotMappingStatus $mappingStatus,
+        ?StockStatus $status,
     ): Pagerfanta {
         $qb = $this->buildQueryBuilder(
             companyId: $companyId,
@@ -58,6 +60,7 @@ final class InventoryStockReportQuery
             snapshotAt: $snapshotAt,
             search: $search,
             mappingStatus: $mappingStatus,
+            status: $status,
         );
 
         return Pagerfanta::createForCurrentPageWithMaxPerPage(
@@ -79,6 +82,7 @@ final class InventoryStockReportQuery
         ?\DateTimeImmutable $snapshotAt,
         ?string $search,
         ?StockSnapshotMappingStatus $mappingStatus,
+        ?StockStatus $status,
     ): QueryBuilder {
         Assert::uuid($companyId);
 
@@ -91,12 +95,15 @@ final class InventoryStockReportQuery
                 's.source_sku',
                 's.source_offer_id',
                 's.fulfillment_type',
+                's.status',
                 's.quantity',
                 's.reserved_quantity',
                 '(s.quantity - s.reserved_quantity) AS available_for_sale',
                 's.mapping_status',
+                'l.name AS location_name',
             )
             ->from('inventory_stock_snapshots', 's')
+            ->innerJoin('s', 'inventory_locations', 'l', 'l.id = s.location_id AND l.company_id = s.company_id')
             ->where('s.company_id = :companyId')
             ->andWhere('s.source = :source')
             ->setParameter('companyId', $companyId)
@@ -123,6 +130,11 @@ final class InventoryStockReportQuery
         if ($mappingStatus !== null) {
             $qb->andWhere('s.mapping_status = :mappingStatus')
                 ->setParameter('mappingStatus', $mappingStatus->value);
+        }
+
+        if (null !== $status) {
+            $qb->andWhere('s.status = :status')
+                ->setParameter('status', $status->value);
         }
 
         return $qb;

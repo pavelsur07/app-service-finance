@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Inventory\Infrastructure\Query;
 
+use App\Inventory\Enum\StockStatus;
 use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\Types\Types;
 
 final readonly class StockQtyByListingOnDateQuery
 {
@@ -18,56 +18,34 @@ final readonly class StockQtyByListingOnDateQuery
      */
     public function execute(string $companyId, \DateTimeImmutable $reportDate): array
     {
-        $snapshotDate = $this->connection->fetchOne(
-            'SELECT MAX(s.snapshot_date)
-             FROM inventory_stock_snapshots s
-             WHERE s.company_id = :companyId
-               AND s.snapshot_date <= :reportDate
-               AND s.listing_id IS NOT NULL',
-            [
-                'companyId' => $companyId,
-                'reportDate' => $reportDate->format('Y-m-d'),
-            ]
-        );
-
-        if (!is_string($snapshotDate) || $snapshotDate === '') {
-            return [];
-        }
-
-        $snapshotAtRow = $this->connection->fetchAssociative(
-            'SELECT MAX(s.snapshot_at) AS snapshot_at
-             FROM inventory_stock_snapshots s
-             WHERE s.company_id = :companyId
-               AND s.snapshot_date = :snapshotDate
-               AND s.listing_id IS NOT NULL',
-            [
-                'companyId' => $companyId,
-                'snapshotDate' => $snapshotDate,
-            ],
-        );
-
-        $snapshotAt = is_array($snapshotAtRow) ? ($snapshotAtRow['snapshot_at'] ?? null) : null;
-        if (!is_string($snapshotAt) || $snapshotAt === '') {
-            return [];
-        }
-
-        $snapshotAtDateTime = new \DateTimeImmutable($snapshotAt);
-
         $rows = $this->connection->fetchAllAssociative(
-            'SELECT s.listing_id, SUM(s.quantity) AS stock_qty
+            'WITH latest_sessions AS (
+                SELECT DISTINCT ON (candidate.source)
+                    candidate.source,
+                    candidate.snapshot_session_id
+                FROM inventory_stock_snapshots candidate
+                WHERE candidate.company_id = :companyId
+                  AND candidate.snapshot_date <= :reportDate
+                  AND candidate.listing_id IS NOT NULL
+                ORDER BY
+                    candidate.source,
+                    candidate.snapshot_date DESC,
+                    candidate.snapshot_at DESC,
+                    candidate.snapshot_session_id DESC
+             )
+             SELECT s.listing_id, SUM(s.quantity) AS stock_qty
              FROM inventory_stock_snapshots s
+             INNER JOIN latest_sessions latest
+                ON latest.source = s.source
+               AND latest.snapshot_session_id = s.snapshot_session_id
              WHERE s.company_id = :companyId
-               AND s.snapshot_date = :snapshotDate
-               AND s.snapshot_at = :snapshotAt
+               AND s.status = :status
                AND s.listing_id IS NOT NULL
              GROUP BY s.listing_id',
             [
                 'companyId' => $companyId,
-                'snapshotDate' => $snapshotDate,
-                'snapshotAt' => $snapshotAtDateTime,
-            ],
-            [
-                'snapshotAt' => Types::DATETIME_IMMUTABLE,
+                'reportDate' => $reportDate->format('Y-m-d'),
+                'status' => StockStatus::Available->value,
             ],
         );
 

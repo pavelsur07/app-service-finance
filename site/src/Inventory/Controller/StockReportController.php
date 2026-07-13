@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Inventory\Controller;
 
 use App\Inventory\Enum\StockSnapshotMappingStatus;
+use App\Inventory\Enum\StockStatus;
 use App\Inventory\Infrastructure\Query\InventoryStockReportQuery;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Shared\Service\ActiveCompanyService;
@@ -45,6 +46,8 @@ final class StockReportController extends AbstractController
 
         $mappingStatusValue = $request->query->getString('mappingStatus');
         $mappingStatus = '' !== $mappingStatusValue ? StockSnapshotMappingStatus::tryFrom($mappingStatusValue) : null;
+        $statusValue = $request->query->getString('status');
+        $status = '' !== $statusValue ? StockStatus::tryFrom($statusValue) : null;
 
         if ($snapshotSessionId === null && $snapshotAtDt === null) {
             $snapshotSessionId = $this->stockReportQuery->findLatestSnapshotSessionId($companyId, $source);
@@ -60,6 +63,7 @@ final class StockReportController extends AbstractController
             snapshotAt: $snapshotAtDt,
             search: $request->query->getString('search'),
             mappingStatus: $mappingStatus,
+            status: $status,
         );
 
         return $this->render('inventory/stocks/index.html.twig', [
@@ -67,11 +71,13 @@ final class StockReportController extends AbstractController
             'source' => $source,
             'sources' => MarketplaceType::cases(),
             'mappingStatuses' => StockSnapshotMappingStatus::cases(),
+            'stockStatuses' => StockStatus::cases(),
             'filters' => [
                 'snapshotSessionId' => $snapshotSessionId,
                 'snapshotAt' => $snapshotAt,
                 'search' => $request->query->getString('search'),
                 'mappingStatus' => $mappingStatus?->value,
+                'status' => $status?->value,
             ],
         ]);
     }
