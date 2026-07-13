@@ -2,11 +2,223 @@
 
 {% block title %}Редактирование категории P&L{% endblock %}
 
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .var-chip { cursor: pointer; }
+        .var-code { font-family: var(--tblr-font-monospace); font-size: .7rem; font-weight: 600; letter-spacing: .02em; }
+    </style>
+{% endblock %}
+
 {% block body %}
-    {% include 'pl_category/_form.html.twig' with {
-        form: form,
-        page_title: 'Редактирование: ' ~ item.name,
-        submit_label: 'Сохранить',
-        available_codes: available_codes|default([])
-    } only %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <div class="page-pretitle">Справочники · Категории ОПиУ</div>
+                    <h2 class="page-title">Редактирование «{{ item.name }}»</h2>
+                </div>
+                <div class="col-auto ms-auto">
+                    <div class="btn-list">
+                        <a href="{{ path('pl_category_index') }}" class="btn btn-ghost-secondary d-none d-sm-inline-flex"><i class="ti ti-arrow-left me-1"></i>К списку</a>
+                        <form method="post" action="{{ path('pl_category_delete', {'id': item.id}) }}" class="d-inline" onsubmit="return confirm('Удалить строку ОПиУ?');">
+                            <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ item.id) }}">
+                            <button type="submit" class="btn btn-ghost-danger"><i class="ti ti-trash me-1"></i>Удалить</button>
+                        </form>
+                        <button type="submit" form="pl-category-edit-form" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i>Сохранить</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-xl mt-3">
+        {{ form_start(form, {'attr': {'id': 'pl-category-edit-form'}}) }}
+        <div class="row row-cards">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Основные данные</h3>
+                        <div class="card-actions">
+                            {% if item.type.value == 'KPI' %}
+                                <span class="badge bg-purple-lt"><i class="ti ti-math-function me-1"></i>Показатель (KPI)</span>
+                            {% elseif item.type.value == 'SUBTOTAL' %}
+                                <span class="badge bg-blue-lt"><i class="ti ti-sum me-1"></i>Итог (subtotal)</span>
+                            {% else %}
+                                <span class="badge bg-secondary-lt"><i class="ti ti-forms me-1"></i>Лист (из фактов)</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-8">
+                                {{ form_row(form.name) }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form_label(form.code) }}
+                                <div class="input-group input-group-flat">
+                                    <span class="input-group-text"><i class="ti ti-hash"></i></span>
+                                    {{ form_widget(form.code, {'attr': {'class': 'form-control font-monospace'}}) }}
+                                    <button type="button" class="btn" data-copy-target="#{{ form.code.vars.id }}" data-copy-feedback="copy-code-feedback" title="Скопировать код"><i class="ti ti-copy"></i></button>
+                                </div>
+                                <div id="copy-code-feedback" class="text-success small mt-1 d-none">Код скопирован</div>
+                                {{ form_errors(form.code) }}
+                                <div class="form-hint">Уникален в компании, используется в формулах</div>
+                            </div>
+
+                            <div class="col-md-6">
+                                {{ form_row(form.parent) }}
+                            </div>
+                            <div class="col-md-3">
+                                {{ form_row(form.sortOrder) }}
+                            </div>
+                            <div class="col-md-3">
+                                {{ form_row(form.type) }}
+                            </div>
+
+                            <div class="col-md-6">
+                                {{ form_row(form.flow) }}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form_row(form.expenseType) }}
+                            </div>
+
+                            <div class="col-md-4">
+                                {{ form_row(form.format) }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form_row(form.weightInParent) }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form_row(form.calcOrder) }}
+                            </div>
+
+                            <div class="col-12">
+                                {{ form_label(form.isVisible, null, {'label_attr': {'class': 'd-block mb-2'}}) }}
+                                <label class="form-check form-switch">
+                                    {{ form_widget(form.isVisible, {'attr': {'class': 'form-check-input'}}) }}
+                                    <span class="form-check-label">Показывать</span>
+                                </label>
+                                {{ form_errors(form.isVisible) }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-body border-top">
+                        <div class="d-flex align-items-center mb-2">
+                            <label class="form-check form-switch mb-0 me-3">
+                                <input id="calc-section-toggle" class="form-check-input" type="checkbox">
+                                <span class="form-check-label">Расчёт (формула)</span>
+                            </label>
+                            <span class="badge bg-blue-lt">для KPI / особых итогов</span>
+                        </div>
+                        <div id="calc-section" class="d-none">
+                            {{ form_label(form.formula) }}
+                            {{ form_widget(form.formula, {'attr': {'class': 'form-control font-monospace', 'rows': 5}}) }}
+                            {{ form_errors(form.formula) }}
+                            <div class="form-hint">Пример: REV_TOTAL - VAR_COSTS_TOTAL. Доступные коды — в панели «Переменные» справа.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Переменные</h3>
+                        <div class="card-actions text-secondary small">Клик — вставить в формулу</div>
+                    </div>
+                    <div class="card-body">
+                        {% if available_codes is not empty %}
+                            <div class="d-flex flex-column gap-2">
+                                {% for code in available_codes %}
+                                    <button type="button" class="btn btn-outline-secondary var-chip justify-content-between" data-insert-code="{{ code }}" data-insert-target="#{{ form.formula.vars.id }}">
+                                        <span class="var-code">{{ code }}</span>
+                                    </button>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-secondary mb-0 small">Нет доступных кодов для этой компании.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {{ form_rest(form) }}
+        {{ form_end(form, {'render_rest': false}) }}
+    </div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script>
+        (function () {
+            const initCalcSectionToggle = function () {
+                const toggle = document.getElementById('calc-section-toggle');
+                const calcSection = document.getElementById('calc-section');
+
+                if (!toggle || !calcSection) {
+                    return;
+                }
+
+                const syncCalcSection = function () {
+                    calcSection.classList.toggle('d-none', !toggle.checked);
+                };
+
+                if (toggle.dataset.calcToggleBound !== '1') {
+                    toggle.addEventListener('change', syncCalcSection);
+                    toggle.dataset.calcToggleBound = '1';
+                }
+
+                syncCalcSection();
+            };
+
+            initCalcSectionToggle();
+            document.addEventListener('DOMContentLoaded', initCalcSectionToggle);
+            document.addEventListener('turbo:load', initCalcSectionToggle);
+        })();
+
+        document.addEventListener('click', async function (event) {
+            const copyButton = event.target.closest('[data-copy-target]');
+            if (copyButton) {
+                const input = document.querySelector(copyButton.dataset.copyTarget);
+                if (!input || !input.value) {
+                    return;
+                }
+
+                try {
+                    await navigator.clipboard.writeText(input.value);
+                    const feedbackId = copyButton.dataset.copyFeedback;
+                    const feedback = feedbackId ? document.getElementById(feedbackId) : null;
+                    if (feedback) {
+                        feedback.classList.remove('d-none');
+                        setTimeout(() => feedback.classList.add('d-none'), 1400);
+                    }
+                } catch (e) {
+                    console.error('Copy failed', e);
+                }
+
+                return;
+            }
+
+            const codeChip = event.target.closest('[data-insert-code]');
+            if (codeChip) {
+                const textarea = document.querySelector(codeChip.dataset.insertTarget);
+                if (!textarea) {
+                    return;
+                }
+
+                const value = codeChip.dataset.insertCode;
+                const start = typeof textarea.selectionStart === 'number' ? textarea.selectionStart : textarea.value.length;
+                const end = typeof textarea.selectionEnd === 'number' ? textarea.selectionEnd : textarea.value.length;
+
+                textarea.value = textarea.value.slice(0, start) + value + textarea.value.slice(end);
+                const cursor = start + value.length;
+                textarea.focus();
+                if (typeof textarea.setSelectionRange === 'function') {
+                    textarea.setSelectionRange(cursor, cursor);
+                }
+            }
+        });
+    </script>
 {% endblock %}
