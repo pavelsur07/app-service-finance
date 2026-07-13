@@ -25,7 +25,7 @@
         </div>
     </div>
 
-    <div class="page-body">
+    <div id="pl-category-edit-page" class="page-body">
         <div class="container-xl">
             <div class="row row-cards">
                 <div class="col-lg-8">
@@ -234,6 +234,7 @@
                     return;
                 }
 
+                const page = document.getElementById('pl-category-edit-page');
                 const type = document.getElementById('{{ form.type.vars.id }}');
                 const expenseType = document.getElementById('{{ form.expenseType.vars.id }}');
                 const formula = document.getElementById('{{ form.formula.vars.id }}');
@@ -291,21 +292,24 @@
                     }
                 });
 
-                document.querySelectorAll('[data-insert-code]').forEach(function (button) {
-                    button.addEventListener('click', function () {
-                        const textarea = document.querySelector(button.dataset.insertTarget);
-                        if (!textarea) {
-                            return;
-                        }
+                page.addEventListener('click', function (event) {
+                    const button = event.target.closest('[data-insert-code]');
+                    if (!button) {
+                        return;
+                    }
 
-                        const value = button.dataset.insertCode;
-                        const start = typeof textarea.selectionStart === 'number' ? textarea.selectionStart : textarea.value.length;
-                        const end = typeof textarea.selectionEnd === 'number' ? textarea.selectionEnd : textarea.value.length;
-                        textarea.value = textarea.value.slice(0, start) + value + textarea.value.slice(end);
-                        const cursor = start + value.length;
-                        textarea.focus();
-                        textarea.setSelectionRange(cursor, cursor);
-                    });
+                    const textarea = document.querySelector(button.dataset.insertTarget);
+                    if (!textarea) {
+                        return;
+                    }
+
+                    const value = button.dataset.insertCode;
+                    const start = typeof textarea.selectionStart === 'number' ? textarea.selectionStart : textarea.value.length;
+                    const end = typeof textarea.selectionEnd === 'number' ? textarea.selectionEnd : textarea.value.length;
+                    textarea.value = textarea.value.slice(0, start) + value + textarea.value.slice(end);
+                    const cursor = start + value.length;
+                    textarea.focus();
+                    textarea.setSelectionRange(cursor, cursor);
                 });
 
                 form.addEventListener('submit', function () {

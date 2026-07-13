@@ -67,6 +67,24 @@ final class PLCategoryTest extends TestCase
         self::assertNull($leaf->getParent());
     }
 
+    public function testIsDescendantOf(): void
+    {
+        $company = $this->company();
+        $root = new PLCategory(Uuid::uuid4()->toString(), $company);
+        $child = new PLCategory(Uuid::uuid4()->toString(), $company);
+        $grandchild = new PLCategory(Uuid::uuid4()->toString(), $company);
+        $sibling = new PLCategory(Uuid::uuid4()->toString(), $company);
+
+        $child->setParent($root);
+        $grandchild->setParent($child);
+        $sibling->setParent($root);
+
+        self::assertTrue($child->isDescendantOf($root));
+        self::assertTrue($grandchild->isDescendantOf($root));
+        self::assertFalse($root->isDescendantOf($root));
+        self::assertFalse($sibling->isDescendantOf($child));
+    }
+
     private function company(): Company
     {
         $user = new User(Uuid::uuid4()->toString());
