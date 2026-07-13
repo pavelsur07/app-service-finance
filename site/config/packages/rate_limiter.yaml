@@ -21,3 +21,12 @@ framework:
             limit: 1
             interval: '70 seconds'
             cache_pool: cache.rate_limiter
+
+        # WB Content API: burst 5, then stay below the official 600 ms interval.
+        wb_content:
+            policy: token_bucket
+            limit: 5
+            rate:
+                interval: '1 second'
+                amount: 1
+            cache_pool: cache.rate_limiter

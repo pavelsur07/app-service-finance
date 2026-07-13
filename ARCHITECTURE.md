@@ -770,6 +770,11 @@ getActiveOzonSellerConnections(?string $companyId = null): array
 // @param  array<string>             $listingIds
 // @return array<string, string|null> map listingId → productId|null
 resolveListingsToProducts(string $companyId, array $listingIds): array
+
+// Загружает WB Product Cards для SELLER-подключения и атомарно обновляет
+// MarketplaceListing.marketplaceVariantId (chrtId) и barcodes.
+// Токен должен иметь категорию Content или Promotion.
+refreshWbListingCatalog(string $companyId, string $connectionId): int
 ```
 
 **Inventory mapping-контракт через Facade:**
@@ -2221,6 +2226,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.51 | 2026-07-13 | Marketplace: добавлена атомарная синхронизация WB Product Cards → `MarketplaceListing.marketplaceVariantId` и barcodes |
 | 1.50 | 2026-07-13 | Marketplace: в `MarketplaceListing` добавлен generic `marketplaceVariantId` (`chrtId` для WB) и точный batch-контракт facade |
 | 1.49 | 2026-06-12 | Company: добавлен публичный контракт `CompanyFacade::createOwnerAccount()` для создания owner-аккаунта через фасад из Admin |
 | 1.48 | 2026-05-22 | Marketplace: зафиксирован контракт WB financial sync (entities статуса/ошибок, enum mode/status, message `SyncWbFinancialReportDayMessage` на `async_sync`, команда `app:marketplace:wb-financial-reports:sync`, pipeline, TZ `Europe/Moscow`, правило empty day и rate limit 1 request/min) |
