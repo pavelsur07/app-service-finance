@@ -47,6 +47,25 @@ final class WbListingResolverServiceTest extends TestCase
         $this->resolver($repository)->resolve($company, '123', '42', marketplaceVariantId: '9001');
     }
 
+    public function testCatalogVariantFoundOnlyByVariantRejectsMismatchedNaturalIdentity(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $byVariant = $this->listing($company, '456', '44');
+        $byVariant->setMarketplaceVariantId('9001');
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('WB chrtId=9001 belongs to another listing.');
+
+        $this->resolver($this->createMock(MarketplaceListingRepository::class))->resolveCatalogVariant(
+            company: $company,
+            nmId: '123',
+            size: '42',
+            marketplaceVariantId: '9001',
+            listingByNaturalKey: null,
+            listingByVariant: $byVariant,
+        );
+    }
+
     public function testLegacyResolveDoesNotClearKnownVariantId(): void
     {
         $company = CompanyBuilder::aCompany()->build();
@@ -73,7 +92,7 @@ final class WbListingResolverServiceTest extends TestCase
     private function listing(\App\Company\Entity\Company $company, string $nmId, string $size): MarketplaceListing
     {
         $listing = new MarketplaceListing(
-            '55555555-5555-4555-8555-'.str_pad($nmId, 12, '0', STR_PAD_LEFT),
+            '55555555-5555-4555-8555-'.str_pad($nmId, 12, '0', \STR_PAD_LEFT),
             $company,
             null,
             MarketplaceType::WILDBERRIES,
