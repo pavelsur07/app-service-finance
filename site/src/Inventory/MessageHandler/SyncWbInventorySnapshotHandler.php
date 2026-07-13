@@ -133,7 +133,7 @@ final readonly class SyncWbInventorySnapshotHandler
 
             return;
         } catch (MarketplaceApiException|WbInventoryApiException $e) {
-            $this->logger->error('WB inventory snapshot API failure.', null, [
+            $this->logger->error('WB inventory snapshot API failure.', $e, [
                 'companyId' => $message->companyId,
                 'snapshotSessionId' => $session->getId(),
                 'savedPages' => $savedPages,
