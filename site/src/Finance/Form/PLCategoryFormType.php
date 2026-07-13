@@ -35,7 +35,7 @@ class PLCategoryFormType extends AbstractType
             ->add('parent', EntityType::class, [
                 'class' => PLCategory::class,
                 'choices' => $options['parents'],
-                'choice_label' => function (PLCategory $item) {
+                'choice_label' => static function (PLCategory $item) {
                     return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
                 },
                 'required' => false,
@@ -57,6 +57,7 @@ class PLCategoryFormType extends AbstractType
             ])
             ->add('flow', ChoiceType::class, [
                 'label' => 'Движение',
+                'expanded' => $options['expanded_choices'],
                 'choices' => [
                     'Доход' => PLFlow::INCOME,
                     'Расход' => PLFlow::EXPENSE,
@@ -65,16 +66,20 @@ class PLCategoryFormType extends AbstractType
             ])
             ->add('expenseType', ChoiceType::class, [
                 'label' => 'Тип расхода',
-                'choices' => [
+                'choices' => $options['expanded_choices'] ? [
+                    'Переменные' => PLExpenseType::VARIABLE,
+                    'Операционные' => PLExpenseType::OPEX,
+                    'Прочие' => PLExpenseType::OTHER,
+                ] : [
                     'VARIABLE' => PLExpenseType::VARIABLE,
                     'OPEX' => PLExpenseType::OPEX,
                     'OTHER' => PLExpenseType::OTHER,
                 ],
-                'data' => PLExpenseType::OTHER,
                 'help' => 'variable — переменные, opex — операционные, other — прочее',
             ])
             ->add('format', ChoiceType::class, [
                 'label' => 'Формат',
+                'expanded' => $options['expanded_choices'],
                 'choices' => [
                     'Деньги' => PLValueFormat::MONEY,
                     '%' => PLValueFormat::PERCENT,
@@ -111,6 +116,8 @@ class PLCategoryFormType extends AbstractType
         $resolver->setDefaults([
             'data_class' => PLCategory::class,
             'parents' => [],
+            'expanded_choices' => false,
         ]);
+        $resolver->setAllowedTypes('expanded_choices', 'bool');
     }
 }

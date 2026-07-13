@@ -143,6 +143,20 @@ class PLCategory
         return $this->children;
     }
 
+    public function isDescendantOf(self $category): bool
+    {
+        $parent = $this->parent;
+        while (null !== $parent) {
+            if ($parent->getId() === $category->getId()) {
+                return true;
+            }
+
+            $parent = $parent->parent;
+        }
+
+        return false;
+    }
+
     public function getLevel(): int
     {
         return $this->level;
