@@ -312,6 +312,83 @@ final class MarketplaceFacadeTest extends IntegrationTestCase
         $this->facade->getActiveOzonSellerConnections('not-a-uuid');
     }
 
+    public function testFindListingsByMarketplaceVariantIdsReturnsExactCompanyAndMarketplaceMatches(): void
+    {
+        $companyA = $this->seedCompany(self::COMPANY_A_ID, 'variant-a@example.test');
+        $companyB = $this->seedCompany(
+            self::COMPANY_B_ID,
+            'variant-b@example.test',
+            '22222222-2222-2222-2222-000000000b04',
+        );
+
+        $first = $this->seedListing(
+            $companyA,
+            null,
+            '55555555-5555-4555-8555-000000000101',
+            '123456',
+            '42',
+            MarketplaceType::WILDBERRIES,
+            '987001',
+        );
+        $second = $this->seedListing(
+            $companyA,
+            null,
+            '55555555-5555-4555-8555-000000000102',
+            '123456',
+            '44',
+            MarketplaceType::WILDBERRIES,
+            '987002',
+        );
+        $this->seedListing(
+            $companyB,
+            null,
+            '55555555-5555-4555-8555-000000000103',
+            '654321',
+            '42',
+            MarketplaceType::WILDBERRIES,
+            '987001',
+        );
+        $this->seedListing(
+            $companyA,
+            null,
+            '55555555-5555-4555-8555-000000000104',
+            'ozon-offer',
+            'UNKNOWN',
+            MarketplaceType::OZON,
+            '987001',
+        );
+        $this->em->flush();
+
+        $result = $this->facade->findListingsByMarketplaceVariantIds(
+            self::COMPANY_A_ID,
+            MarketplaceType::WILDBERRIES->value,
+            ['987001', '987002', 'missing', '987001'],
+        );
+
+        self::assertCount(2, $result);
+        self::assertSame([
+            'id' => $first->getId(),
+            'parentSku' => '123456',
+            'variantId' => '987001',
+            'size' => '42',
+        ], $result['987001']);
+        self::assertSame([
+            'id' => $second->getId(),
+            'parentSku' => '123456',
+            'variantId' => '987002',
+            'size' => '44',
+        ], $result['987002']);
+    }
+
+    public function testFindListingsByMarketplaceVariantIdsReturnsEmptyForEmptyInput(): void
+    {
+        self::assertSame([], $this->facade->findListingsByMarketplaceVariantIds(
+            self::COMPANY_A_ID,
+            MarketplaceType::WILDBERRIES->value,
+            [],
+        ));
+    }
+
     private function seedCompany(
         string $companyId,
         string $ownerEmail,
@@ -356,9 +433,12 @@ final class MarketplaceFacadeTest extends IntegrationTestCase
         string $listingId,
         string $marketplaceSku,
         string $size,
+        MarketplaceType $marketplace = MarketplaceType::OZON,
+        ?string $marketplaceVariantId = null,
     ): MarketplaceListing {
-        $listing = new MarketplaceListing($listingId, $company, $product, MarketplaceType::OZON);
+        $listing = new MarketplaceListing($listingId, $company, $product, $marketplace);
         $listing->setMarketplaceSku($marketplaceSku);
+        $listing->setMarketplaceVariantId($marketplaceVariantId);
         $listing->setSize($size);
         $listing->setPrice('0.00');
 

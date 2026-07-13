@@ -733,6 +733,12 @@ findListingsByMarketplaceSkus(string $companyId, string $marketplace, array $mar
 // Inventory использует этот метод как первый шаг маппинга:
 // sourceSku → listings (0 => unmapped, 1 => mapped, >1 => ambiguous)
 
+// Точное пакетное сопоставление вариантов маркетплейса с листингами.
+// MarketplaceListing.marketplaceVariantId хранит chrtId для Wildberries.
+// @param list<string> $marketplaceVariantIds
+// @return array<string, array{id: string, parentSku: string, variantId: string, size: string}>
+findListingsByMarketplaceVariantIds(string $companyId, string $marketplace, array $marketplaceVariantIds): array
+
 // Bulk-запрос продаж для набора листингов за одну дату (GROUP BY listing_id)
 // Листинги без продаж отсутствуют в результате (caller сам подставляет 0)
 // @param  string[]           $listingIds
@@ -2215,6 +2221,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.50 | 2026-07-13 | Marketplace: в `MarketplaceListing` добавлен generic `marketplaceVariantId` (`chrtId` для WB) и точный batch-контракт facade |
 | 1.49 | 2026-06-12 | Company: добавлен публичный контракт `CompanyFacade::createOwnerAccount()` для создания owner-аккаунта через фасад из Admin |
 | 1.48 | 2026-05-22 | Marketplace: зафиксирован контракт WB financial sync (entities статуса/ошибок, enum mode/status, message `SyncWbFinancialReportDayMessage` на `async_sync`, команда `app:marketplace:wb-financial-reports:sync`, pipeline, TZ `Europe/Moscow`, правило empty day и rate limit 1 request/min) |
 | 1.47 | 2026-05-11 | Inventory: задокументирован первый этап Ozon stock normalization — raw `/v4/product/info/stocks` → `StockSnapshot`, `reservedQuantity`, `StockSnapshotMappingStatus`, async normalization и UI `/inventory/stocks` |

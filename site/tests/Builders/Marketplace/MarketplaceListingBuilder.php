@@ -17,6 +17,7 @@ final class MarketplaceListingBuilder
     private ?Product $product = null;
     private MarketplaceType $marketplace = MarketplaceType::WILDBERRIES;
     private string $marketplaceSku = 'sku-test-1';
+    private ?string $marketplaceVariantId = null;
     private string $price = '1000.00';
 
     private function __construct()
@@ -49,6 +50,14 @@ final class MarketplaceListingBuilder
     {
         $clone = clone $this;
         $clone->marketplaceSku = $marketplaceSku;
+
+        return $clone;
+    }
+
+    public function withMarketplaceVariantId(?string $marketplaceVariantId): self
+    {
+        $clone = clone $this;
+        $clone->marketplaceVariantId = $marketplaceVariantId;
 
         return $clone;
     }
@@ -90,6 +99,7 @@ final class MarketplaceListingBuilder
             $this->marketplace,
         );
         $listing->setMarketplaceSku($this->marketplaceSku);
+        $listing->setMarketplaceVariantId($this->marketplaceVariantId);
         $listing->setPrice($this->price);
 
         return $listing;

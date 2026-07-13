@@ -18,6 +18,11 @@ use Webmozart\Assert\Assert;
     name: 'uniq_company_marketplace_sku_size',
     columns: ['company_id', 'marketplace', 'marketplace_sku', 'size']
 )]
+#[ORM\UniqueConstraint(
+    name: 'uniq_marketplace_listing_company_variant',
+    columns: ['company_id', 'marketplace', 'marketplace_variant_id'],
+    options: ['where' => 'marketplace_variant_id IS NOT NULL'],
+)]
 #[ORM\HasLifecycleCallbacks]
 class MarketplaceListing
 {
@@ -38,6 +43,9 @@ class MarketplaceListing
 
     #[ORM\Column(length: 100)]
     private string $marketplaceSku; // nm_id от WB
+
+    #[ORM\Column(length: 100, nullable: true)]
+    private ?string $marketplaceVariantId = null; // chrtId от WB
 
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $supplierSku = null; // sa_name от WB (артикул производителя)
@@ -116,6 +124,28 @@ class MarketplaceListing
     public function setMarketplaceSku(string $marketplaceSku): self
     {
         $this->marketplaceSku = $marketplaceSku;
+
+        return $this;
+    }
+
+    public function getMarketplaceVariantId(): ?string
+    {
+        return $this->marketplaceVariantId;
+    }
+
+    public function setMarketplaceVariantId(?string $marketplaceVariantId): self
+    {
+        $marketplaceVariantId = null === $marketplaceVariantId ? null : trim($marketplaceVariantId);
+
+        if ('' === $marketplaceVariantId) {
+            $marketplaceVariantId = null;
+        }
+
+        if (null !== $marketplaceVariantId) {
+            Assert::maxLength($marketplaceVariantId, 100);
+        }
+
+        $this->marketplaceVariantId = $marketplaceVariantId;
 
         return $this;
     }
