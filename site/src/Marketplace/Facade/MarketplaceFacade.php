@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Facade;
 
+use App\Marketplace\Application\RefreshWbListingCatalogAction;
 use App\Marketplace\DTO\ActiveListingDTO;
 use App\Marketplace\DTO\AdvertisingCostDTO;
 use App\Marketplace\DTO\CostData;
@@ -44,6 +45,7 @@ final readonly class MarketplaceFacade
         private MarketplaceCredentialsQuery $credentialsQuery,
         private ActiveOzonConnectionsQuery $activeOzonConnectionsQuery,
         private ActiveOzonPerformanceConnectionsQuery $activeOzonPerformanceConnectionsQuery,
+        private RefreshWbListingCatalogAction $refreshWbListingCatalogAction,
     ) {}
 
     /**
@@ -574,5 +576,13 @@ final readonly class MarketplaceFacade
         Assert::allUuid($listingIds);
 
         return $this->listingRepository->findListingToProductMap($companyId, $listingIds);
+    }
+
+    public function refreshWbListingCatalog(string $companyId, string $connectionId): int
+    {
+        Assert::uuid($companyId);
+        Assert::uuid($connectionId);
+
+        return ($this->refreshWbListingCatalogAction)($companyId, $connectionId);
     }
 }

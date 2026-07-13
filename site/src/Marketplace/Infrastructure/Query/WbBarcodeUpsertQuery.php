@@ -38,4 +38,21 @@ final class WbBarcodeUpsertQuery
             ],
         );
     }
+
+    public function upsertForListing(string $companyId, string $listingId, string $barcode): void
+    {
+        $this->connection->executeStatement(
+            'INSERT INTO marketplace_listing_barcodes (id, listing_id, company_id, marketplace, barcode)
+             VALUES (:id, :listingId, :companyId, :marketplace, :barcode)
+             ON CONFLICT (company_id, marketplace, barcode)
+             DO UPDATE SET listing_id = EXCLUDED.listing_id',
+            [
+                'id' => Uuid::uuid7()->toString(),
+                'listingId' => $listingId,
+                'companyId' => $companyId,
+                'marketplace' => MarketplaceType::WILDBERRIES->value,
+                'barcode' => $barcode,
+            ],
+        );
+    }
 }
