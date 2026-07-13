@@ -13,15 +13,16 @@ use App\Marketplace\DTO\ReturnData;
 use App\Marketplace\DTO\SaleData;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Inventory\CostPriceResolverInterface;
-use App\Marketplace\Infrastructure\Query\CostCategoriesQuery;
+use App\Marketplace\Infrastructure\Query\ActiveOzonConnectionsQuery;
 use App\Marketplace\Infrastructure\Query\ActiveOzonPerformanceConnectionsQuery;
+use App\Marketplace\Infrastructure\Query\ActiveWbConnectionsQuery;
+use App\Marketplace\Infrastructure\Query\CostCategoriesQuery;
 use App\Marketplace\Infrastructure\Query\ListingCostAggregateQuery;
 use App\Marketplace\Infrastructure\Query\ListingMetaQuery;
 use App\Marketplace\Infrastructure\Query\ListingReturnAggregateQuery;
 use App\Marketplace\Infrastructure\Query\ListingSalesAggregateQuery;
-use App\Marketplace\Infrastructure\Query\ActiveOzonConnectionsQuery;
 use App\Marketplace\Infrastructure\Query\MarketplaceCredentialsQuery;
+use App\Marketplace\Inventory\CostPriceResolverInterface;
 use App\Marketplace\Repository\MarketplaceAdvertisingCostRepositoryInterface;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceOrderRepositoryInterface;
@@ -45,8 +46,10 @@ final readonly class MarketplaceFacade
         private MarketplaceCredentialsQuery $credentialsQuery,
         private ActiveOzonConnectionsQuery $activeOzonConnectionsQuery,
         private ActiveOzonPerformanceConnectionsQuery $activeOzonPerformanceConnectionsQuery,
+        private ActiveWbConnectionsQuery $activeWbConnectionsQuery,
         private RefreshWbListingCatalogAction $refreshWbListingCatalogAction,
-    ) {}
+    ) {
+    }
 
     /**
      * Публичный безопасный контракт для активных Ozon SELLER-подключений.
@@ -107,6 +110,31 @@ final readonly class MarketplaceFacade
                 'clientId' => $row['client_id'],
             ],
             $rows,
+        );
+    }
+
+    /**
+     * @return array<int, array{
+     *     connectionId: string,
+     *     companyId: string,
+     *     marketplace: string,
+     *     connectionType: string
+     * }>
+     */
+    public function getActiveWbSellerConnections(?string $companyId = null): array
+    {
+        if (null !== $companyId) {
+            Assert::uuid($companyId);
+        }
+
+        return array_map(
+            static fn (array $row): array => [
+                'connectionId' => $row['connection_id'],
+                'companyId' => $row['company_id'],
+                'marketplace' => MarketplaceType::WILDBERRIES->value,
+                'connectionType' => MarketplaceConnectionType::SELLER->value,
+            ],
+            $this->activeWbConnectionsQuery->execute($companyId),
         );
     }
 

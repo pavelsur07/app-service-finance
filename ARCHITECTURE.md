@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.52 / 2026-07-13
+> Версия: 1.53 / 2026-07-13
 
 ---
 
@@ -756,12 +756,16 @@ getCostCategoriesForCompany(string $companyId, string $marketplace): array
 // например из MarketplaceAds к Ozon Performance API). connectionType обязателен — caller
 // должен явно указать SELLER или PERFORMANCE.
 // @return array{api_key: string, client_id: ?string}|null
-getConnectionCredentials(string $companyId, MarketplaceType $marketplace, MarketplaceConnectionType $connectionType): ?array
+getConnectionCredentials(string $companyId, MarketplaceType $marketplace, MarketplaceConnectionType $connectionType, ?string $connectionRef = null): ?array
 
 // Безопасный публичный контракт активных Ozon SELLER-подключений
 // (без apiKey / clientSecret / settings / credentials)
 // @return list<array{connectionId: string, companyId: string, marketplace: string, connectionType: string, clientId: ?string}>
 getActiveOzonSellerConnections(?string $companyId = null): array
+
+// Безопасный публичный контракт активных Wildberries SELLER-подключений
+// @return list<array{connectionId: string, companyId: string, marketplace: string, connectionType: string}>
+getActiveWbSellerConnections(?string $companyId = null): array
 
 // Пакетный резолв listingId → productId|null. Используется Inventory модулем
 // для маппинга raw API ответов в StockSnapshot записи. IDOR-защита через
@@ -1925,7 +1929,8 @@ GET  /api/public/{resource}?token=...  — публичный API
 ### Inventory routes
 
 - `GET /inventory/snapshots` — список raw-загрузок;
-- `POST /inventory/snapshots/request` — ручной запуск raw-загрузки;
+- `POST /inventory/snapshots/request` — ручной запуск raw-загрузки Ozon;
+- `POST /inventory/snapshots/request/wildberries` — ручной запуск raw-загрузки Wildberries;
 - `GET /inventory/snapshots/{id}/json` — raw JSON по session;
 - `GET /inventory/stocks` — UI-отчёт по нормализованным остаткам.
 
@@ -1978,6 +1983,27 @@ GET /inventory/stocks
 
 ## Inventory — Wildberries FBW stock normalization
 
+Ручной orchestration:
+
+```text
+RequestWbInventorySnapshotAction
+↓ SyncWbInventorySnapshotMessage (async_sync)
+SyncWbInventorySnapshotHandler
+↓ обязательный refreshWbListingCatalog()
+WB Product Cards → MarketplaceListing.marketplaceVariantId
+↓ POST /api/analytics/v1/stocks-report/wb-warehouses, limit/offset
+InventoryRawSnapshot
+↓ completed session
+NormalizeInventorySnapshotMessage (async_pipeline)
+↓
+NormalizeInventorySnapshotAction → StockSnapshot
+```
+
+429, transport и 5xx до первой raw-страницы завершают сессию как `failed`,
+после сохранённых страниц — как `partial`; такие сессии не нормализуются.
+Повтор выполняется вручную новой сессией. Production cron для WB Inventory не включён.
+Подключение должно использовать токен с доступом к Content API и Analytics API.
+
 Нормализатор WB принимает raw-страницы ответа
 `POST /api/analytics/v1/stocks-report/wb-warehouses` и агрегирует строки по
 `chrtId + warehouseId`, не смешивая размеры одной карточки. Существующая схема
@@ -2002,10 +2028,12 @@ GET /inventory/stocks
 ## Messenger routing — Inventory
 
 - `App\Inventory\Message\SyncOzonInventorySnapshotMessage` → `async_sync`;
+- `App\Inventory\Message\SyncWbInventorySnapshotMessage` → `async_sync`;
 - `App\Inventory\Message\NormalizeInventorySnapshotMessage` → `async_pipeline`.
 
 Объяснение:
 - `SyncOzonInventorySnapshotMessage` выполняет внешний HTTP-запрос к Ozon;
+- `SyncWbInventorySnapshotMessage` обновляет WB Product Cards и загружает raw-остатки;
 - `NormalizeInventorySnapshotMessage` выполняет локальную DB-heavy обработку raw JSON.
 
 ## Messenger routing — Marketplace (WB financial report day)
@@ -2252,6 +2280,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.53 | 2026-07-13 | Inventory: добавлен ручной WB orchestration с обязательным Product Cards refresh, async raw-загрузкой, безопасной offset-пагинацией и отдельным POST endpoint |
 | 1.52 | 2026-07-13 | Inventory: добавлена нормализация WB FBW raw-остатков по `chrtId + warehouseId`, точный variant-маппинг, отдельные статусы движения и выбор последней полной сессии по каждому источнику |
 | 1.51 | 2026-07-13 | Marketplace: добавлена атомарная синхронизация WB Product Cards → `MarketplaceListing.marketplaceVariantId` и barcodes |
 | 1.50 | 2026-07-13 | Marketplace: в `MarketplaceListing` добавлен generic `marketplaceVariantId` (`chrtId` для WB) и точный batch-контракт facade |

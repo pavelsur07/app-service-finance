@@ -6,6 +6,7 @@ namespace App\Tests\Integration\Inventory\Controller;
 
 use App\Company\Entity\User;
 use App\Inventory\Entity\InventorySnapshotSession;
+use App\Inventory\Message\SyncWbInventorySnapshotMessage;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
@@ -20,6 +21,7 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
 {
     private const COMPANY_ID = '11111111-1111-1111-1111-a90000000001';
     private const OWNER_ID = '22222222-2222-2222-2222-a90000000001';
+    private const WB_CONNECTION_ID = '33333333-3333-4333-8333-a90000000001';
 
     public function testValidCsrfRequestsSnapshotAndRedirectsWithSuccessFlash(): void
     {
@@ -126,6 +128,60 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
         self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
     }
 
+    public function testWildberriesRequestDispatchesDedicatedMessage(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        [$owner, $company] = $this->seedOwnerAndCompany('inventory-wb-request-ok@example.test');
+        $this->persistActiveWbConnection($company);
+        $this->login($client, $owner, self::COMPANY_ID);
+
+        $client->request('POST', '/inventory/snapshots/request/wildberries', ['_token' => $this->fetchWbRequestToken($client)]);
+
+        self::assertResponseRedirects('/inventory/snapshots');
+        $sent = $this->getSyncTransport($client)->getSent();
+        self::assertCount(1, $sent);
+        self::assertInstanceOf(SyncWbInventorySnapshotMessage::class, $sent[0]->getMessage());
+
+        $client->followRedirect();
+        self::assertSelectorTextContains('.toast.text-bg-success', 'Задача синхронизации остатков Wildberries запущена.');
+    }
+
+    public function testWildberriesRequestRejectsInvalidCsrf(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        [$owner, $company] = $this->seedOwnerAndCompany('inventory-wb-request-csrf@example.test');
+        $this->persistActiveWbConnection($company);
+        $this->login($client, $owner, self::COMPANY_ID);
+
+        $client->request('POST', '/inventory/snapshots/request/wildberries', ['_token' => 'invalid-token']);
+
+        self::assertResponseRedirects('/inventory/snapshots');
+        self::assertCount(0, $this->getSyncTransport($client)->getSent());
+    }
+
+    public function testWildberriesRouteRequiresOwner(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $user = UserBuilder::aUser()
+            ->withId(self::OWNER_ID)
+            ->withEmail('inventory-wb-request-not-owner@example.test')
+            ->withRoles(['ROLE_COMPANY_USER'])
+            ->build();
+        $this->em()->persist($user);
+        $this->em()->flush();
+
+        $client->loginUser($user);
+        $client->request('POST', '/inventory/snapshots/request/wildberries', ['_token' => 'noop']);
+
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+    }
+
     private function seedOwnerAndCompany(string $email): array
     {
         $owner = UserBuilder::aUser()
@@ -159,6 +215,16 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
         return (string) $crawler->filter('input[name="_token"]')->attr('value');
     }
 
+    private function fetchWbRequestToken(KernelBrowser $client): string
+    {
+        $crawler = $client->request('GET', '/inventory/snapshots');
+        self::assertResponseIsSuccessful();
+
+        return (string) $crawler
+            ->filter('form[action="/inventory/snapshots/request/wildberries"] input[name="_token"]')
+            ->attr('value');
+    }
+
     private function persistActiveOzonConnection(string $connectionId, \App\Company\Entity\Company $company): void
     {
         $connection = new MarketplaceConnection(
@@ -170,6 +236,20 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
         $connection->setApiKey('test-api-key');
         $connection->setClientId('1000');
         $connection->setIsActive(true);
+
+        $this->em()->persist($connection);
+        $this->em()->flush();
+    }
+
+    private function persistActiveWbConnection(\App\Company\Entity\Company $company): void
+    {
+        $connection = new MarketplaceConnection(
+            id: self::WB_CONNECTION_ID,
+            company: $company,
+            marketplace: MarketplaceType::WILDBERRIES,
+            connectionType: MarketplaceConnectionType::SELLER,
+        );
+        $connection->setApiKey('test-api-key')->setIsActive(true);
 
         $this->em()->persist($connection);
         $this->em()->flush();

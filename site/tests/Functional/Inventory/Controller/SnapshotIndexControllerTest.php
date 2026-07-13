@@ -54,10 +54,13 @@ final class SnapshotIndexControllerTest extends WebTestCaseBase
         self::assertStringContainsString('История загрузок', (string) $client->getResponse()->getContent());
         self::assertStringContainsString('OZON', (string) $client->getResponse()->getContent());
         self::assertStringNotContainsString('WILDBERRIES', (string) $client->getResponse()->getContent());
-        self::assertStringContainsString('Получить остатки', (string) $client->getResponse()->getContent());
+        self::assertStringContainsString('Получить Ozon', (string) $client->getResponse()->getContent());
+        self::assertStringContainsString('Получить Wildberries', (string) $client->getResponse()->getContent());
         self::assertGreaterThan(0, $crawler->filter('form[action="/inventory/snapshots/request"][method="post"]')->count());
         self::assertGreaterThan(0, $crawler->filter('form[action="/inventory/snapshots/request"] input[type="hidden"][name="_token"]')->count());
-        self::assertSame('Получить остатки', trim((string) $crawler->filter('form[action="/inventory/snapshots/request"] button[type="submit"]')->text()));
+        self::assertSame('Получить Ozon', trim((string) $crawler->filter('form[action="/inventory/snapshots/request"] button[type="submit"]')->text()));
+        self::assertGreaterThan(0, $crawler->filter('form[action="/inventory/snapshots/request/wildberries"][method="post"]')->count());
+        self::assertGreaterThan(0, $crawler->filter('form[action="/inventory/snapshots/request/wildberries"] input[type="hidden"][name="_token"]')->count());
 
         $headers = $crawler->filter('table thead th')->each(static fn ($node) => trim((string) $node->text()));
         self::assertSame(['Дата', 'Маркетплейс', 'Статус', 'Страницы', 'JSON', 'Ошибка'], $headers);

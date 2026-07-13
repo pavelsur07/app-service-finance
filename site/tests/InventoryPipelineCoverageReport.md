@@ -8,6 +8,7 @@
 | MarketplaceFacade | не возвращает Ozon PERFORMANCE | Да | `site/tests/Integration/Marketplace/Facade/MarketplaceFacadeTest.php` | В этом же тесте есть Ozon PERFORMANCE, он отфильтрован. |
 | MarketplaceFacade | фильтрует по companyId | Частично | `site/tests/Integration/Marketplace/Facade/MarketplaceFacadeTest.php` | Проверка company-фильтра есть у `resolveListingsToProducts`, но для `getActiveOzonSellerConnections` отдельного теста с входным `companyId` нет (метод возвращает глобальный список). |
 | MarketplaceFacade | не возвращает apiKey/clientSecret/credentials/settings | Да | `site/tests/Integration/Marketplace/Facade/MarketplaceFacadeTest.php` | Проверяется whitelist ключей массива и отсутствие секретных полей. |
+| MarketplaceFacade | возвращает safe active WB SELLER connection | Да | `site/tests/Integration/Inventory/Application/RequestWbInventorySnapshotActionTest.php` | Action получает connectionId через новый facade-контракт и dispatch-ит его без credentials. |
 | InventorySnapshotSessionListQuery | фильтр по companyId | Да | `site/tests/Integration/Inventory/Infrastructure/Query/InventorySnapshotSessionListQueryTest.php` | `testReturnsOnlyRecordsForRequestedCompany`. |
 | InventorySnapshotSessionListQuery | чужая company не видна | Да | `site/tests/Integration/Inventory/Infrastructure/Query/InventorySnapshotSessionListQueryTest.php` | В том же тесте foreign запись не попадает в выборку. |
 | InventorySnapshotSessionListQuery | сортировка новые сверху | Да | `site/tests/Integration/Inventory/Infrastructure/Query/InventorySnapshotSessionListQueryTest.php` | `testSortsNewestFirst`. |
@@ -63,8 +64,8 @@
 | Inventory UI GET /inventory/snapshots | таблица содержит колонки Дата/Маркетплейс/Статус | Да | `site/tests/Functional/Inventory/Controller/SnapshotIndexControllerTest.php` | Явный assert массива заголовков. |
 | Inventory UI GET /inventory/snapshots | empty state | Да | `site/tests/Functional/Inventory/Controller/SnapshotIndexControllerTest.php` | `testEmptyStateIsShownWhenNoSessions`. |
 | Inventory UI GET /inventory/snapshots | пагинация по 30 | Да | `site/tests/Functional/Inventory/Controller/SnapshotIndexControllerTest.php` | `testPaginationWorksWithThirtyItemsPerPage`. |
-| Inventory UI GET /inventory/snapshots | есть POST-форма “Получить остатки” | Да | `site/tests/Functional/Inventory/Controller/SnapshotIndexControllerTest.php` | Проверяются form action/method и кнопка. |
-| Inventory UI GET /inventory/snapshots | есть CSRF token | Да | `site/tests/Functional/Inventory/Controller/SnapshotIndexControllerTest.php` | Проверяется hidden `_token`. |
+| Inventory UI GET /inventory/snapshots | есть отдельные POST-формы Ozon/Wildberries | Да | `site/tests/Functional/Inventory/Controller/SnapshotIndexControllerTest.php` | Проверяются оба form action/method и явные подписи кнопок. |
+| Inventory UI GET /inventory/snapshots | есть отдельные CSRF token | Да | `site/tests/Functional/Inventory/Controller/SnapshotIndexControllerTest.php` | Проверяются hidden `_token` обеих форм. |
 | Inventory UI POST /inventory/snapshots/request | valid CSRF → action запускается, session создаётся, message dispatch | Да | `site/tests/Integration/Inventory/Controller/SnapshotRequestControllerTest.php` | `testValidCsrfRequestsSnapshotAndRedirectsWithSuccessFlash`. |
 | Inventory UI POST /inventory/snapshots/request | invalid CSRF → redirect + flash danger, dispatch не происходит | Да | `site/tests/Integration/Inventory/Controller/SnapshotRequestControllerTest.php` | `testInvalidCsrfRedirectsWithDangerFlashAndDoesNotDispatch`. |
 | Inventory UI POST /inventory/snapshots/request | нет active Ozon connection → warning flash | Да | `site/tests/Integration/Inventory/Controller/SnapshotRequestControllerTest.php` | `testNoActiveConnectionShowsWarningFlash`. |
@@ -72,6 +73,9 @@
 | Inventory UI POST /inventory/snapshots/request | route требует авторизации | Да | `site/tests/Integration/Inventory/Controller/SnapshotRequestControllerTest.php` | `testRouteRequiresAuthenticatedOwnerWithActiveCompany` (редирект на login). |
 | Inventory UI POST /inventory/snapshots/request | route требует ROLE_COMPANY_OWNER | Да | `site/tests/Integration/Inventory/Controller/SnapshotRequestControllerTest.php` | В том же тесте `ROLE_COMPANY_USER` получает 403. |
 | Inventory UI POST /inventory/snapshots/request | controller не делает HTTP-запрос к Ozon | Частично | `site/tests/Integration/Inventory/Controller/SnapshotRequestControllerTest.php` | Косвенно подтверждено проверкой dispatch в transport; отдельного теста-стоппера HTTP нет. |
+| Inventory UI POST /inventory/snapshots/request/wildberries | valid CSRF → WB message dispatch | Да | `site/tests/Integration/Inventory/Controller/SnapshotRequestControllerTest.php` | Проверяется отдельный `SyncWbInventorySnapshotMessage` и success flash. |
+| Inventory UI POST /inventory/snapshots/request/wildberries | invalid CSRF не dispatch-ит message | Да | `site/tests/Integration/Inventory/Controller/SnapshotRequestControllerTest.php` | Проверяется пустой `async_sync`. |
+| Inventory UI POST /inventory/snapshots/request/wildberries | требует ROLE_COMPANY_OWNER | Да | `site/tests/Integration/Inventory/Controller/SnapshotRequestControllerTest.php` | `ROLE_COMPANY_USER` получает 403. |
 | Cron command app:inventory:ozon-daily-sync | no connections → SUCCESS | Да | `site/tests/Integration/Inventory/Command/OzonInventoryDailySyncCommandTest.php` | `testNoConnectionsReturnsSuccess`. |
 | Cron command app:inventory:ozon-daily-sync | active Ozon SELLER connection → создаётся ScheduledNight session | Да | `site/tests/Integration/Inventory/Command/OzonInventoryDailySyncCommandTest.php` | `testCreatesScheduledNightSessionForActiveSellerConnection`. |
 | Cron command app:inventory:ozon-daily-sync | command не зависит от OzonInventoryClient | Частично | `site/tests/Integration/Inventory/Command/OzonInventoryDailySyncCommandTest.php` | Косвенно покрыто (тест не подменяет HTTP), но прямой assertion на отсутствие зависимости отсутствует. |
@@ -82,6 +86,7 @@
 | Config | Inventory controllers подключены в routes.yaml | Да | `site/config/routes.yaml` | Есть секция `inventory_controllers`. |
 | Config | Inventory Twig namespace подключён в twig.yaml | Да | `site/config/packages/twig.yaml` | Есть namespace/path для `templates/inventory`. |
 | Config | SyncOzonInventorySnapshotMessage route стоит в async_sync | Да | `site/config/packages/messenger.yaml` | Роутинг сообщения указан в `async_sync`. |
+| Config | SyncWbInventorySnapshotMessage route стоит в async_sync | Да | `site/config/packages/messenger.yaml` | Внешние WB HTTP-запросы выполняются в sync-worker transport. |
 | Config | не используется async_pipeline для внешнего Ozon HTTP | Да | `site/config/packages/messenger.yaml` | Для `SyncOzonInventorySnapshotMessage` выбран `async_sync`, не `async_pipeline`. |
 
 ## Итог
