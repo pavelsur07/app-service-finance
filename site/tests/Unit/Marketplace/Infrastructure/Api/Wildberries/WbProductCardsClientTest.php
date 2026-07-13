@@ -61,6 +61,37 @@ final class WbProductCardsClientTest extends TestCase
         $this->client(new MockHttpClient($response))->fetchAll('token');
     }
 
+    public function testFetchAllTrashUsesTrashCursorPaginationWithoutPhotoFilter(): void
+    {
+        $payloads = [];
+        $page = 0;
+        $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$page, &$payloads): MockResponse {
+            self::assertSame('POST', $method);
+            self::assertSame('https://content-api.wildberries.ru/content/v2/get/cards/trash', $url);
+            $payloads[] = $options['json'] ?? json_decode((string) ($options['body'] ?? 'null'), true);
+
+            return 0 === $page++
+                ? new MockResponse(json_encode([
+                    'cards' => array_fill(0, 100, ['nmID' => 1]),
+                    'cursor' => ['trashedAt' => '2026-07-13T10:00:00Z', 'nmID' => 123, 'total' => 100],
+                ], \JSON_THROW_ON_ERROR))
+                : new MockResponse(json_encode([
+                    'cards' => [['nmID' => 2]],
+                    'cursor' => ['trashedAt' => '2026-07-13T10:01:00Z', 'nmID' => 124, 'total' => 1],
+                ], \JSON_THROW_ON_ERROR));
+        });
+
+        $cards = $this->client($http)->fetchAllTrash('token');
+
+        self::assertCount(101, $cards);
+        self::assertArrayNotHasKey('filter', $payloads[0]['settings']);
+        self::assertSame([
+            'limit' => 100,
+            'trashedAt' => '2026-07-13T10:00:00Z',
+            'nmID' => 123,
+        ], $payloads[1]['settings']['cursor']);
+    }
+
     public function testFetchAllRejectsCursorCycle(): void
     {
         $request = 0;
@@ -88,6 +119,28 @@ final class WbProductCardsClientTest extends TestCase
         self::assertSame(3, $request);
     }
 
+    public function testFetchAllTrashRejectsRegressingCursor(): void
+    {
+        $request = 0;
+        $cursors = [
+            ['trashedAt' => '2026-07-13T10:01:00Z', 'nmID' => 124],
+            ['trashedAt' => '2026-07-13T10:00:00Z', 'nmID' => 123],
+        ];
+        $http = new MockHttpClient(static function () use (&$request, $cursors): MockResponse {
+            self::assertArrayHasKey($request, $cursors, 'Regressing cursor must be rejected before another request.');
+
+            return new MockResponse(json_encode([
+                'cards' => array_fill(0, 100, ['nmID' => 1]),
+                'cursor' => $cursors[$request++],
+            ], \JSON_THROW_ON_ERROR));
+        });
+
+        $this->expectException(MarketplaceInvalidApiResponseException::class);
+        $this->expectExceptionMessage('WB Product Cards cursor must advance.');
+
+        $this->client($http)->fetchAllTrash('token');
+    }
+
     public function testAuthErrorsAreClassified(): void
     {
         $this->expectException(MarketplaceAuthException::class);
@@ -108,6 +161,13 @@ final class WbProductCardsClientTest extends TestCase
         } catch (MarketplaceRateLimitException $e) {
             self::assertSame(7, $e->getRetryAfter());
         }
+    }
+
+    public function testTrashAuthErrorsAreClassified(): void
+    {
+        $this->expectException(MarketplaceAuthException::class);
+
+        $this->client(new MockHttpClient(new MockResponse('{}', ['http_code' => 403])))->fetchAllTrash('token');
     }
 
     private function client(MockHttpClient $httpClient): WbProductCardsClient

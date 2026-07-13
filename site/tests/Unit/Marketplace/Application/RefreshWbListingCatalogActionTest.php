@@ -52,9 +52,9 @@ final class RefreshWbListingCatalogActionTest extends TestCase
         $listingRepository->expects(self::never())->method('findByMarketplaceVariantId');
 
         $db = $this->createMock(Connection::class);
-        $db->expects(self::exactly(2))->method('executeStatement')->with(
+        $db->expects(self::exactly(3))->method('executeStatement')->with(
             self::stringContains('DO UPDATE SET listing_id = EXCLUDED.listing_id'),
-            self::callback(static fn (array $params): bool => in_array($params['barcode'], ['460001', '460002'], true)),
+            self::callback(static fn (array $params): bool => in_array($params['barcode'], ['460001', '460002', '460003'], true)),
         );
         $barcodeQuery = new WbBarcodeUpsertQuery($db);
         $resolver = new WbListingResolverService(
@@ -67,18 +67,28 @@ final class RefreshWbListingCatalogActionTest extends TestCase
         $action = new RefreshWbListingCatalogAction(
             $em,
             $connectionRepository,
-            $this->client([[
-                'nmID' => 123,
-                'vendorCode' => 'supplier-123',
-                'brand' => 'Brand',
-                'subjectName' => 'Shoes',
-                'title' => 'Running shoes',
-                'sizes' => [[
-                    'chrtID' => 9001,
-                    'techSize' => '42',
-                    'skus' => ['460001', '460002', '460001'],
+            $this->client(
+                [[
+                    'nmID' => 123,
+                    'vendorCode' => 'supplier-123',
+                    'brand' => 'Brand',
+                    'subjectName' => 'Shoes',
+                    'title' => 'Running shoes',
+                    'sizes' => [[
+                        'chrtID' => 9001,
+                        'techSize' => '42',
+                        'skus' => ['460001', '460002', '460001'],
+                    ]],
                 ]],
-            ]]),
+                [[
+                    'nmID' => 123,
+                    'sizes' => [[
+                        'chrtID' => 9001,
+                        'techSize' => '42',
+                        'skus' => ['460003'],
+                    ]],
+                ]],
+            ),
             $resolver,
             $listingRepository,
             $barcodeQuery,
@@ -92,11 +102,15 @@ final class RefreshWbListingCatalogActionTest extends TestCase
         self::assertSame('42', $created->getSize());
         self::assertSame('supplier-123', $created->getSupplierSku());
         self::assertSame('Running shoes', $created->getName());
+        self::assertTrue($created->isActive());
     }
 
-    /** @param list<array<string, mixed>> $cards */
+    /**
+     * @param list<array<string, mixed>> $cards
+     * @param list<array<string, mixed>> $trashCards
+     */
     #[DataProvider('invalidCatalogs')]
-    public function testRefreshRejectsAmbiguousCatalogBeforeTransaction(array $cards): void
+    public function testRefreshRejectsAmbiguousCatalogBeforeTransaction(array $cards, array $trashCards): void
     {
         $company = CompanyBuilder::aCompany()->build();
         $connection = new MarketplaceConnection('77777777-7777-4777-8777-777777777777', $company, MarketplaceType::WILDBERRIES);
@@ -110,7 +124,7 @@ final class RefreshWbListingCatalogActionTest extends TestCase
         $action = new RefreshWbListingCatalogAction(
             $em,
             $connectionRepository,
-            $this->client($cards),
+            $this->client($cards, $trashCards),
             new WbListingResolverService(
                 $listingRepository = $this->createMock(MarketplaceListingRepository::class),
                 $this->createMock(MarketplaceListingBarcodeRepository::class),
@@ -127,7 +141,7 @@ final class RefreshWbListingCatalogActionTest extends TestCase
         $action($company->getId(), $connection->getId());
     }
 
-    /** @return iterable<string, array{list<array<string, mixed>>}> */
+    /** @return iterable<string, array{list<array<string, mixed>>, list<array<string, mixed>>}> */
     public static function invalidCatalogs(): iterable
     {
         yield 'same natural key has two variants' => [[[
@@ -136,7 +150,7 @@ final class RefreshWbListingCatalogActionTest extends TestCase
                 ['chrtID' => 9001, 'techSize' => '42', 'skus' => []],
                 ['chrtID' => 9002, 'techSize' => '42', 'skus' => []],
             ],
-        ]]];
+        ]], []];
 
         yield 'same barcode has two variants' => [[[
             'nmID' => 123,
@@ -144,15 +158,74 @@ final class RefreshWbListingCatalogActionTest extends TestCase
                 ['chrtID' => 9001, 'techSize' => '42', 'skus' => ['460001']],
                 ['chrtID' => 9002, 'techSize' => '44', 'skus' => ['460001']],
             ],
+        ]], []];
+
+        yield 'active and trash natural key conflict' => [[[
+            'nmID' => 123,
+            'sizes' => [['chrtID' => 9001, 'techSize' => '42', 'skus' => []]],
+        ]], [[
+            'nmID' => 123,
+            'sizes' => [['chrtID' => 9002, 'techSize' => '42', 'skus' => []]],
         ]]];
     }
 
-    /** @param list<array<string, mixed>> $cards */
-    private function client(array $cards): WbProductCardsClient
+    public function testTrashFailureStopsBeforeTransaction(): void
     {
-        return new WbProductCardsClient(
-            new MockHttpClient(new MockResponse(json_encode(['cards' => $cards, 'cursor' => ['total' => count($cards)]], JSON_THROW_ON_ERROR))),
+        $company = CompanyBuilder::aCompany()->build();
+        $connection = new MarketplaceConnection('77777777-7777-4777-8777-777777777777', $company, MarketplaceType::WILDBERRIES);
+        $connection->setApiKey('token');
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('find')->willReturn($company);
+        $em->expects(self::never())->method('wrapInTransaction');
+        $connectionRepository = $this->createMock(MarketplaceConnectionRepository::class);
+        $connectionRepository->method('findByIdAndCompany')->willReturn($connection);
+        $client = new WbProductCardsClient(
+            new MockHttpClient([
+                $this->catalogResponse([]),
+                new MockResponse('', ['http_code' => 503]),
+            ]),
             new RateLimiterFactory(['id' => 'test', 'policy' => 'no_limit'], new InMemoryStorage()),
         );
+        $listingRepository = $this->createMock(MarketplaceListingRepository::class);
+
+        $action = new RefreshWbListingCatalogAction(
+            $em,
+            $connectionRepository,
+            $client,
+            new WbListingResolverService(
+                $listingRepository,
+                $this->createMock(MarketplaceListingBarcodeRepository::class),
+                new WbBarcodeUpsertQuery($this->createMock(Connection::class)),
+                $em,
+            ),
+            $listingRepository,
+            new WbBarcodeUpsertQuery($this->createMock(Connection::class)),
+            new NullLogger(),
+        );
+
+        $this->expectException(\RuntimeException::class);
+
+        $action($company->getId(), $connection->getId());
+    }
+
+    /**
+     * @param list<array<string, mixed>> $cards
+     * @param list<array<string, mixed>> $trashCards
+     */
+    private function client(array $cards, array $trashCards = []): WbProductCardsClient
+    {
+        return new WbProductCardsClient(
+            new MockHttpClient([
+                $this->catalogResponse($cards),
+                $this->catalogResponse($trashCards),
+            ]),
+            new RateLimiterFactory(['id' => 'test', 'policy' => 'no_limit'], new InMemoryStorage()),
+        );
+    }
+
+    /** @param list<array<string, mixed>> $cards */
+    private function catalogResponse(array $cards): MockResponse
+    {
+        return new MockResponse(json_encode(['cards' => $cards, 'cursor' => ['total' => count($cards)]], JSON_THROW_ON_ERROR));
     }
 }

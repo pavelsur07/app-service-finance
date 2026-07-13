@@ -15,7 +15,8 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 final readonly class WbProductCardsClient
 {
-    private const ENDPOINT = 'https://content-api.wildberries.ru/content/v2/get/cards/list';
+    private const LIST_ENDPOINT = 'https://content-api.wildberries.ru/content/v2/get/cards/list';
+    private const TRASH_ENDPOINT = 'https://content-api.wildberries.ru/content/v2/get/cards/trash';
     private const PAGE_SIZE = 100;
 
     public function __construct(
@@ -27,27 +28,41 @@ final readonly class WbProductCardsClient
     /** @return list<array<string, mixed>> */
     public function fetchAll(string $apiKey): array
     {
+        return $this->fetchAllFrom($apiKey, self::LIST_ENDPOINT, 'updatedAt', true);
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function fetchAllTrash(string $apiKey): array
+    {
+        return $this->fetchAllFrom($apiKey, self::TRASH_ENDPOINT, 'trashedAt', false);
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function fetchAllFrom(string $apiKey, string $endpoint, string $cursorDateField, bool $withPhotoFilter): array
+    {
         $cards = [];
         $cursor = ['limit' => self::PAGE_SIZE];
         $seenCursors = [];
+        $lastCursor = null;
         $limiter = $this->rateLimiter->create(hash('sha256', $apiKey));
 
         while (true) {
             $limiter->reserve()->wait();
-            $page = $this->fetchPage($apiKey, $cursor);
+            $page = $this->fetchPage($apiKey, $endpoint, $cursor, $withPhotoFilter);
             $cards = [...$cards, ...$page['cards']];
 
             if (count($page['cards']) < self::PAGE_SIZE) {
                 break;
             }
 
-            $nextCursor = $this->nextCursor($page['cursor']);
-            $cursorKey = $nextCursor['updatedAt'].':'.$nextCursor['nmID'];
-            if (isset($seenCursors[$cursorKey])) {
+            $nextCursor = $this->nextCursor($page['cursor'], $cursorDateField);
+            $cursorKey = $nextCursor[$cursorDateField].':'.$nextCursor['nmID'];
+            if (isset($seenCursors[$cursorKey]) || !$this->cursorAdvances($lastCursor, $nextCursor, $cursorDateField)) {
                 throw $this->invalidResponse('WB Product Cards cursor must advance.');
             }
 
             $seenCursors[$cursorKey] = true;
+            $lastCursor = $nextCursor;
             $cursor = ['limit' => self::PAGE_SIZE, ...$nextCursor];
         }
 
@@ -55,22 +70,24 @@ final readonly class WbProductCardsClient
     }
 
     /**
-     * @param array{limit: int, updatedAt?: string, nmID?: int} $cursor
+     * @param array<string, int|string> $cursor
      *
      * @return array{cards: list<array<string, mixed>>, cursor: array<string, mixed>}
      */
-    private function fetchPage(string $apiKey, array $cursor): array
+    private function fetchPage(string $apiKey, string $endpoint, array $cursor, bool $withPhotoFilter): array
     {
+        $settings = [
+            'sort' => ['ascending' => true],
+            'cursor' => $cursor,
+        ];
+        if ($withPhotoFilter) {
+            $settings['filter'] = ['withPhoto' => -1];
+        }
+
         try {
-            $response = $this->httpClient->request('POST', self::ENDPOINT, [
+            $response = $this->httpClient->request('POST', $endpoint, [
                 'headers' => ['Authorization' => $apiKey],
-                'json' => [
-                    'settings' => [
-                        'sort' => ['ascending' => true],
-                        'cursor' => $cursor,
-                        'filter' => ['withPhoto' => -1],
-                    ],
-                ],
+                'json' => ['settings' => $settings],
                 'timeout' => 120,
             ]);
             $statusCode = $response->getStatusCode();
@@ -116,19 +133,36 @@ final readonly class WbProductCardsClient
         return ['cards' => $decoded['cards'], 'cursor' => $decoded['cursor']];
     }
 
-    /** @param array<string, mixed> $cursor
-     * @return array{updatedAt: string, nmID: int}
+    /**
+     * @param array<string, mixed> $cursor
+     *
+     * @return array<string, int|string>
      */
-    private function nextCursor(array $cursor): array
+    private function nextCursor(array $cursor, string $cursorDateField): array
     {
-        $updatedAt = trim((string) ($cursor['updatedAt'] ?? ''));
+        $cursorDate = trim((string) ($cursor[$cursorDateField] ?? ''));
         $nmId = filter_var($cursor['nmID'] ?? null, \FILTER_VALIDATE_INT);
 
-        if ('' === $updatedAt || false === $nmId || $nmId <= 0) {
+        if ('' === $cursorDate || false === $nmId || $nmId <= 0) {
             throw $this->invalidResponse('WB Product Cards pagination cursor is invalid.');
         }
 
-        return ['updatedAt' => $updatedAt, 'nmID' => $nmId];
+        return [$cursorDateField => $cursorDate, 'nmID' => $nmId];
+    }
+
+    /**
+     * @param array<string, int|string>|null $previous
+     * @param array<string, int|string>      $next
+     */
+    private function cursorAdvances(?array $previous, array $next, string $cursorDateField): bool
+    {
+        if (null === $previous) {
+            return true;
+        }
+
+        $dateComparison = strcmp((string) $next[$cursorDateField], (string) $previous[$cursorDateField]);
+
+        return $dateComparison > 0 || (0 === $dateComparison && $next['nmID'] > $previous['nmID']);
     }
 
     /** @param array<string, list<string>> $headers */
