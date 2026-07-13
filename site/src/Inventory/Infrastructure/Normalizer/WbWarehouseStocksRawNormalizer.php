@@ -23,7 +23,7 @@ final readonly class WbWarehouseStocksRawNormalizer
      */
     public function normalize(array $rawSnapshots): array
     {
-        /** @var array<string, array{nmId: string, warehouseId: string, warehouseName: string, regionName: string, quantity: float, toClient: float, fromClient: float, rawSnapshotId: string}> $groups */
+        /** @var array<string, array{nmId: string, chrtId: string, warehouseId: string, warehouseName: string, regionName: string, quantity: float, toClient: float, fromClient: float, rawSnapshotId: string}> $groups */
         $groups = [];
 
         foreach ($rawSnapshots as $rawSnapshot) {
@@ -38,19 +38,22 @@ final readonly class WbWarehouseStocksRawNormalizer
                 }
 
                 $nmId = trim((string) ($item['nmId'] ?? ''));
+                $chrtId = trim((string) ($item['chrtId'] ?? ''));
                 $warehouseId = trim((string) ($item['warehouseId'] ?? ''));
-                if ('' === $nmId || '' === $warehouseId) {
+                if ('' === $nmId || '' === $chrtId || '' === $warehouseId) {
                     $this->logger->warning('WB inventory row skipped: required identifiers are missing.', [
                         'rawSnapshotId' => $rawSnapshot->getId(),
                         'hasNmId' => '' !== $nmId,
+                        'hasChrtId' => '' !== $chrtId,
                         'hasWarehouseId' => '' !== $warehouseId,
                     ]);
                     continue;
                 }
 
-                $key = $nmId."\0".$warehouseId;
+                $key = $chrtId."\0".$warehouseId;
                 $groups[$key] ??= [
                     'nmId' => $nmId,
+                    'chrtId' => $chrtId,
                     'warehouseId' => $warehouseId,
                     'warehouseName' => trim((string) ($item['warehouseName'] ?? '')),
                     'regionName' => trim((string) ($item['regionName'] ?? '')),
@@ -86,8 +89,8 @@ final readonly class WbWarehouseStocksRawNormalizer
             ] as $status => $quantity) {
                 $rows[] = new NormalizedStockRow(
                     source: MarketplaceType::WILDBERRIES,
-                    sourceSku: $group['nmId'],
-                    sourceOfferId: null,
+                    sourceSku: $group['chrtId'],
+                    sourceOfferId: $group['nmId'],
                     fulfillmentType: 'fbw',
                     status: StockStatus::from($status),
                     quantity: number_format($quantity, 3, '.', ''),

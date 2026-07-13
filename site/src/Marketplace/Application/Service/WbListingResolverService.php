@@ -39,23 +39,36 @@ final class WbListingResolverService
         ?string $tsName,
         array $wbMeta = [],
         ?string $barcode = null,
+        ?string $marketplaceVariantId = null,
     ): MarketplaceListing {
         $companyId = (string) $company->getId();
         $size = $this->normalizeWbSize($tsName);
+        $marketplaceVariantId = null === $marketplaceVariantId ? null : trim($marketplaceVariantId);
+        $marketplaceVariantId = '' === $marketplaceVariantId ? null : $marketplaceVariantId;
 
-        // 1. Ищем по nmId + size
-        $listing = $this->listingRepository->findByNmIdAndSize(
+        $listingByNaturalKey = $this->listingRepository->findByNmIdAndSize(
             $company,
             MarketplaceType::WILDBERRIES,
             $nmId,
             $size,
         );
+        $listingByVariant = null === $marketplaceVariantId
+            ? null
+            : $this->listingRepository->findByMarketplaceVariantId($company, MarketplaceType::WILDBERRIES, $marketplaceVariantId);
 
-        if ($listing !== null) {
-            return $listing;
+        if (null !== $listingByNaturalKey || null !== $listingByVariant) {
+            return $this->resolveKnownCandidates(
+                $company,
+                $nmId,
+                $size,
+                $marketplaceVariantId,
+                $wbMeta,
+                $barcode,
+                $listingByNaturalKey,
+                $listingByVariant,
+            );
         }
 
-        // 2. Если size=UNKNOWN и есть barcode — ищем листинг через barcode + marketplace
         if ($size === 'UNKNOWN' && $barcode !== null && $barcode !== '') {
             $barcodeEntity = $this->barcodeRepository->findByBarcode(
                 $companyId,
@@ -63,11 +76,77 @@ final class WbListingResolverService
                 MarketplaceType::WILDBERRIES,
             );
             if ($barcodeEntity !== null) {
-                return $barcodeEntity->getListing();
+                $listing = $barcodeEntity->getListing();
+                $this->bindVariantIdentity($listing, $nmId, $size, $marketplaceVariantId);
+
+                return $listing;
             }
         }
 
-        // 3. Создаём новый листинг
+        return $this->createListing($company, $nmId, $size, $marketplaceVariantId, $wbMeta, $barcode);
+    }
+
+    /**
+     * Resolver entry point for catalog sync with bulk-preloaded candidates.
+     *
+     * @param array<string, mixed> $wbMeta
+     */
+    public function resolveCatalogVariant(
+        Company $company,
+        string $nmId,
+        string $size,
+        string $marketplaceVariantId,
+        ?MarketplaceListing $listingByNaturalKey,
+        ?MarketplaceListing $listingByVariant,
+        array $wbMeta = [],
+    ): MarketplaceListing {
+        return $this->resolveKnownCandidates(
+            $company,
+            $nmId,
+            $this->normalizeWbSize($size),
+            trim($marketplaceVariantId),
+            $wbMeta,
+            null,
+            $listingByNaturalKey,
+            $listingByVariant,
+        );
+    }
+
+    /** @param array<string, mixed> $wbMeta */
+    private function resolveKnownCandidates(
+        Company $company,
+        string $nmId,
+        string $size,
+        ?string $marketplaceVariantId,
+        array $wbMeta,
+        ?string $barcode,
+        ?MarketplaceListing $listingByNaturalKey,
+        ?MarketplaceListing $listingByVariant,
+    ): MarketplaceListing {
+        if (null !== $listingByNaturalKey && null !== $listingByVariant && $listingByNaturalKey->getId() !== $listingByVariant->getId()) {
+            throw new \DomainException(sprintf('WB listing identity conflict for nmId=%s, size=%s, chrtId=%s.', $nmId, $size, $marketplaceVariantId));
+        }
+
+        $listing = $listingByNaturalKey ?? $listingByVariant;
+        if (null !== $listing) {
+            $this->bindVariantIdentity($listing, $nmId, $size, $marketplaceVariantId);
+
+            return $listing;
+        }
+
+        return $this->createListing($company, $nmId, $size, $marketplaceVariantId, $wbMeta, $barcode);
+    }
+
+    /** @param array<string, mixed> $wbMeta */
+    private function createListing(
+        Company $company,
+        string $nmId,
+        string $size,
+        ?string $marketplaceVariantId,
+        array $wbMeta,
+        ?string $barcode,
+    ): MarketplaceListing {
+        $companyId = (string) $company->getId();
         $saName = (string) ($wbMeta['sa_name'] ?? '');
         $brandName = (string) ($wbMeta['brand_name'] ?? '');
         $subjectName = (string) ($wbMeta['subject_name'] ?? '');
@@ -88,6 +167,7 @@ final class WbListingResolverService
         );
 
         $listing->setMarketplaceSku($nmId);
+        $listing->setMarketplaceVariantId($marketplaceVariantId);
         $listing->setSize($size);
         $listing->setSupplierSku($saName !== '' ? $saName : null);
         $listing->setPrice($price !== '' ? $price : '0');
@@ -129,5 +209,27 @@ final class WbListingResolverService
         $normalized = trim((string) $tsName);
 
         return $normalized !== '' ? $normalized : 'UNKNOWN';
+    }
+
+    private function bindVariantIdentity(
+        MarketplaceListing $listing,
+        string $nmId,
+        string $size,
+        ?string $marketplaceVariantId,
+    ): void {
+        if (null === $marketplaceVariantId) {
+            return;
+        }
+
+        if ($listing->getMarketplaceSku() !== $nmId || $listing->getSize() !== $size) {
+            throw new \DomainException(sprintf('WB chrtId=%s belongs to another listing.', $marketplaceVariantId));
+        }
+
+        $existingVariantId = $listing->getMarketplaceVariantId();
+        if (null !== $existingVariantId && $existingVariantId !== $marketplaceVariantId) {
+            throw new \DomainException(sprintf('WB listing already has chrtId=%s, cannot assign chrtId=%s.', $existingVariantId, $marketplaceVariantId));
+        }
+
+        $listing->setMarketplaceVariantId($marketplaceVariantId);
     }
 }

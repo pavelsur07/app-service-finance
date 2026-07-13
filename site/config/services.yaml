@@ -87,6 +87,10 @@ services:
             $factory: '@limiter.wb_finance'
             $cooldownStorage: '@App\Marketplace\Application\Service\WbFinanceCooldownStorageInterface'
 
+    App\Marketplace\Infrastructure\Api\Wildberries\WbProductCardsClient:
+        arguments:
+            $rateLimiter: '@limiter.wb_content'
+
     App\Marketplace\MessageHandler\SyncWbFinancialReportDayHandler:
         arguments:
             $financeRetryDelaySeconds: '%wb_finance.rate_limit_interval_seconds%'

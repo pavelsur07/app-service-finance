@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Facade;
 
+use App\Marketplace\Application\RefreshWbListingCatalogAction;
 use App\Marketplace\DTO\ActiveListingDTO;
 use App\Marketplace\DTO\AdvertisingCostDTO;
 use App\Marketplace\DTO\CostData;
@@ -44,6 +45,7 @@ final readonly class MarketplaceFacade
         private MarketplaceCredentialsQuery $credentialsQuery,
         private ActiveOzonConnectionsQuery $activeOzonConnectionsQuery,
         private ActiveOzonPerformanceConnectionsQuery $activeOzonPerformanceConnectionsQuery,
+        private RefreshWbListingCatalogAction $refreshWbListingCatalogAction,
     ) {}
 
     /**
@@ -415,6 +417,54 @@ final readonly class MarketplaceFacade
     }
 
     /**
+     * Находит листинги по идентификатору варианта товара на маркетплейсе.
+     * Для Wildberries marketplaceVariantId содержит chrtId размера.
+     *
+     * @param list<string> $marketplaceVariantIds
+     *
+     * @return array<string, array{id: string, parentSku: string, variantId: string, size: string}>
+     */
+    public function findListingsByMarketplaceVariantIds(
+        string $companyId,
+        string $marketplace,
+        array $marketplaceVariantIds,
+    ): array {
+        if ([] === $marketplaceVariantIds) {
+            return [];
+        }
+
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT l.id,
+                    l.marketplace_sku AS parent_sku,
+                    l.marketplace_variant_id AS variant_id,
+                    l.size
+             FROM marketplace_listings l
+            WHERE l.company_id = :companyId
+               AND l.marketplace = :marketplace
+               AND l.marketplace_variant_id IN (:marketplaceVariantIds)',
+            [
+                'companyId' => $companyId,
+                'marketplace' => $marketplace,
+                'marketplaceVariantIds' => array_values(array_unique($marketplaceVariantIds)),
+            ],
+            ['marketplaceVariantIds' => ArrayParameterType::STRING],
+        );
+
+        $result = [];
+        foreach ($rows as $row) {
+            $variantId = (string) $row['variant_id'];
+            $result[$variantId] = [
+                'id' => (string) $row['id'],
+                'parentSku' => (string) $row['parent_sku'],
+                'variantId' => $variantId,
+                'size' => (string) $row['size'],
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
      * Bulk-запрос продаж для набора листингов за одну дату.
      * Листинги без продаж в результате отсутствуют (caller должен подставить 0 самостоятельно).
      *
@@ -526,5 +576,13 @@ final readonly class MarketplaceFacade
         Assert::allUuid($listingIds);
 
         return $this->listingRepository->findListingToProductMap($companyId, $listingIds);
+    }
+
+    public function refreshWbListingCatalog(string $companyId, string $connectionId): int
+    {
+        Assert::uuid($companyId);
+        Assert::uuid($connectionId);
+
+        return ($this->refreshWbListingCatalogAction)($companyId, $connectionId);
     }
 }

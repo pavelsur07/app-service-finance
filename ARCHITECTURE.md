@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.50 / 2026-07-13
+> Версия: 1.52 / 2026-07-13
 
 ---
 
@@ -733,6 +733,12 @@ findListingsByMarketplaceSkus(string $companyId, string $marketplace, array $mar
 // Inventory использует этот метод как первый шаг маппинга:
 // sourceSku → listings (0 => unmapped, 1 => mapped, >1 => ambiguous)
 
+// Точное пакетное сопоставление вариантов маркетплейса с листингами.
+// MarketplaceListing.marketplaceVariantId хранит chrtId для Wildberries.
+// @param list<string> $marketplaceVariantIds
+// @return array<string, array{id: string, parentSku: string, variantId: string, size: string}>
+findListingsByMarketplaceVariantIds(string $companyId, string $marketplace, array $marketplaceVariantIds): array
+
 // Bulk-запрос продаж для набора листингов за одну дату (GROUP BY listing_id)
 // Листинги без продаж отсутствуют в результате (caller сам подставляет 0)
 // @param  string[]           $listingIds
@@ -764,10 +770,16 @@ getActiveOzonSellerConnections(?string $companyId = null): array
 // @param  array<string>             $listingIds
 // @return array<string, string|null> map listingId → productId|null
 resolveListingsToProducts(string $companyId, array $listingIds): array
+
+// Загружает WB Product Cards для SELLER-подключения и атомарно обновляет
+// MarketplaceListing.marketplaceVariantId (chrtId) и barcodes.
+// Токен должен иметь категорию Content или Promotion.
+refreshWbListingCatalog(string $companyId, string $connectionId): int
 ```
 
 **Inventory mapping-контракт через Facade:**
-- `sourceSku` → `MarketplaceFacade::findListingsByMarketplaceSkus(companyId, marketplace, sourceSkus)`;
+- Ozon `sourceSku` → `MarketplaceFacade::findListingsByMarketplaceSkus(companyId, marketplace, sourceSkus)`;
+- Wildberries `sourceSku` содержит `chrtId` размера и маппится через `MarketplaceFacade::findListingsByMarketplaceVariantIds(companyId, marketplace, marketplaceVariantIds)`;
 - найденные `listingId` → `MarketplaceFacade::resolveListingsToProducts(companyId, listingIds)`;
 - Inventory не импортирует напрямую Marketplace repository/service;
 - связь с MarketplaceListing в `StockSnapshot` хранится как `listingId: ?string` (без ManyToOne).
@@ -1967,12 +1979,13 @@ GET /inventory/stocks
 ## Inventory — Wildberries FBW stock normalization
 
 Нормализатор WB принимает raw-страницы ответа
-`POST /api/analytics/v1/stocks-report/wb-warehouses` и агрегирует размерные
-строки `chrtId` до `nmId + warehouseId`. Исходный размерный разрез остаётся в
-`InventoryRawSnapshot`, миграция схемы `StockSnapshot` не требуется.
+`POST /api/analytics/v1/stocks-report/wb-warehouses` и агрегирует строки по
+`chrtId + warehouseId`, не смешивая размеры одной карточки. Существующая схема
+`StockSnapshot` используется без дополнительной миграции.
 
 Семантика WB:
-- `nmId` → `StockSnapshot.sourceSku` и маппинг листинга через `MarketplaceFacade`;
+- `chrtId` → `StockSnapshot.sourceSku` и точный маппинг листинга через `MarketplaceFacade::findListingsByMarketplaceVariantIds()`;
+- `nmId` → `StockSnapshot.sourceOfferId` для трассировки родительской карточки;
 - `warehouseId` → `Location.externalId`, `warehouseName` → `Location.name`;
 - WB является источником правды для своих складов: при нормализации обновляются `Location.code`, `name`, `metadata` и `isActive`;
 - `quantity` → `StockStatus::Available`;
@@ -2239,7 +2252,9 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
-| 1.50 | 2026-07-13 | Inventory: добавлена нормализация WB FBW raw-остатков по `nmId + warehouseId`, отдельные статусы движения и выбор последней полной сессии по каждому источнику в `StockQtyByListingOnDateQuery` |
+| 1.52 | 2026-07-13 | Inventory: добавлена нормализация WB FBW raw-остатков по `chrtId + warehouseId`, точный variant-маппинг, отдельные статусы движения и выбор последней полной сессии по каждому источнику |
+| 1.51 | 2026-07-13 | Marketplace: добавлена атомарная синхронизация WB Product Cards → `MarketplaceListing.marketplaceVariantId` и barcodes |
+| 1.50 | 2026-07-13 | Marketplace: в `MarketplaceListing` добавлен generic `marketplaceVariantId` (`chrtId` для WB) и точный batch-контракт facade |
 | 1.49 | 2026-06-12 | Company: добавлен публичный контракт `CompanyFacade::createOwnerAccount()` для создания owner-аккаунта через фасад из Admin |
 | 1.48 | 2026-05-22 | Marketplace: зафиксирован контракт WB financial sync (entities статуса/ошибок, enum mode/status, message `SyncWbFinancialReportDayMessage` на `async_sync`, команда `app:marketplace:wb-financial-reports:sync`, pipeline, TZ `Europe/Moscow`, правило empty day и rate limit 1 request/min) |
 | 1.47 | 2026-05-11 | Inventory: задокументирован первый этап Ozon stock normalization — raw `/v4/product/info/stocks` → `StockSnapshot`, `reservedQuantity`, `StockSnapshotMappingStatus`, async normalization и UI `/inventory/stocks` |

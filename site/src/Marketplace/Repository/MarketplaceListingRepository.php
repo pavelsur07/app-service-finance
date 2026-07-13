@@ -228,6 +228,55 @@ class MarketplaceListingRepository extends ServiceEntityRepository
         return 1 === count($matches) ? $matches[0] : null;
     }
 
+    public function findByMarketplaceVariantId(
+        Company|string $company,
+        MarketplaceType $marketplace,
+        string $marketplaceVariantId,
+    ): ?MarketplaceListing {
+        $qb = $this->createQueryBuilder('l')
+            ->andWhere('l.marketplace = :marketplace')
+            ->andWhere('l.marketplaceVariantId = :marketplaceVariantId')
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('marketplaceVariantId', $marketplaceVariantId);
+
+        if ($company instanceof Company) {
+            $qb->andWhere('l.company = :company');
+        } else {
+            $qb->andWhere('IDENTITY(l.company) = :company');
+        }
+
+        return $qb
+            ->setParameter('company', $company)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
+     * @param list<string> $marketplaceVariantIds
+     *
+     * @return MarketplaceListing[]
+     */
+    public function findAllByCompanyMarketplaceAndMarketplaceVariantIds(
+        string $companyId,
+        MarketplaceType $marketplace,
+        array $marketplaceVariantIds,
+    ): array {
+        if ([] === $marketplaceVariantIds) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('l')
+            ->where('IDENTITY(l.company) = :companyId')
+            ->andWhere('l.marketplace = :marketplace')
+            ->andWhere('l.marketplaceVariantId IN (:marketplaceVariantIds)')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('marketplaceVariantIds', array_values(array_unique($marketplaceVariantIds)))
+            ->orderBy('l.marketplaceVariantId', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
     public function findByNmIdAndSize(
         Company $company,
         MarketplaceType $marketplace,

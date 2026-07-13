@@ -14,7 +14,7 @@ use Psr\Log\NullLogger;
 
 final class WbWarehouseStocksRawNormalizerTest extends TestCase
 {
-    public function testAggregatesSizesAndPagesByArticleAndWarehouse(): void
+    public function testPreservesVariantsAndAggregatesPagesByChrtIdAndWarehouse(): void
     {
         $first = InventoryRawSnapshotBuilder::aRawSnapshot()
             ->withSource(MarketplaceType::WILDBERRIES)
@@ -35,22 +35,25 @@ final class WbWarehouseStocksRawNormalizerTest extends TestCase
 
         $rows = $this->normalizer()->normalize([$first, $second]);
 
-        self::assertCount(6, $rows);
-        $byWarehouseAndStatus = [];
+        self::assertCount(12, $rows);
+        $byVariantWarehouseAndStatus = [];
         foreach ($rows as $row) {
-            $byWarehouseAndStatus[$row->locationExternalId][$row->status->value] = $row;
+            $byVariantWarehouseAndStatus[$row->sourceSku][$row->locationExternalId][$row->status->value] = $row;
         }
 
-        $available = $byWarehouseAndStatus['507'][StockStatus::Available->value];
-        self::assertSame('100', $available->sourceSku);
-        self::assertSame('15.000', $available->quantity);
+        $available = $byVariantWarehouseAndStatus['1']['507'][StockStatus::Available->value];
+        self::assertSame('1', $available->sourceSku);
+        self::assertSame('100', $available->sourceOfferId);
+        self::assertSame('4.000', $available->quantity);
         self::assertSame('fbw', $available->fulfillmentType);
         self::assertSame('WB-507', $available->locationCode);
         self::assertSame('Коледино', $available->locationName);
         self::assertSame(['regionName' => 'Центральный'], $available->locationMetadata);
-        self::assertSame('5.000', $byWarehouseAndStatus['507'][StockStatus::InTransitToCustomer->value]->quantity);
-        self::assertSame('3.000', $byWarehouseAndStatus['507'][StockStatus::InTransitFromCustomer->value]->quantity);
-        self::assertSame('0.000', $byWarehouseAndStatus['117'][StockStatus::InTransitToCustomer->value]->quantity);
+        self::assertSame('6.000', $byVariantWarehouseAndStatus['2']['507'][StockStatus::Available->value]->quantity);
+        self::assertSame('5.000', $byVariantWarehouseAndStatus['3']['507'][StockStatus::Available->value]->quantity);
+        self::assertSame('2.000', $byVariantWarehouseAndStatus['1']['507'][StockStatus::InTransitToCustomer->value]->quantity);
+        self::assertSame('2.000', $byVariantWarehouseAndStatus['3']['507'][StockStatus::InTransitFromCustomer->value]->quantity);
+        self::assertSame('7.000', $byVariantWarehouseAndStatus['3']['117'][StockStatus::Available->value]->quantity);
     }
 
     public function testSkipsRowsWithoutRequiredIdentifiers(): void
@@ -58,7 +61,8 @@ final class WbWarehouseStocksRawNormalizerTest extends TestCase
         $raw = InventoryRawSnapshotBuilder::aRawSnapshot()
             ->withResponseBody(['data' => ['items' => [
                 ['nmId' => 100, 'quantity' => 3],
-                ['warehouseId' => 507, 'quantity' => 4],
+                ['chrtId' => 1, 'warehouseId' => 507, 'quantity' => 4],
+                ['nmId' => 100, 'chrtId' => 1, 'quantity' => 5],
             ]]])
             ->build();
 

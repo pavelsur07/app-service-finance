@@ -149,12 +149,18 @@ final class NormalizeInventorySnapshotActionTest extends IntegrationTestCase
         $session->markCompleted();
         $this->em->persist($session);
 
-        $product = new Product('30000000-0000-4000-8000-000000000904', $company);
-        $product->setSku('PRD-904')->setName('P904');
-        $listing = new MarketplaceListing('50000000-0000-4000-8000-000000000905', $company, $product, MarketplaceType::WILDBERRIES);
-        $listing->setMarketplaceSku('100')->setPrice('100.00');
-        $this->em->persist($product);
-        $this->em->persist($listing);
+        $product42 = new Product('30000000-0000-4000-8000-000000000904', $company);
+        $product42->setSku('PRD-904-42')->setName('P904 42');
+        $product44 = new Product('30000000-0000-4000-8000-000000000907', $company);
+        $product44->setSku('PRD-904-44')->setName('P904 44');
+        $listing42 = new MarketplaceListing('50000000-0000-4000-8000-000000000905', $company, $product42, MarketplaceType::WILDBERRIES);
+        $listing42->setMarketplaceSku('100')->setMarketplaceVariantId('1')->setSize('42')->setPrice('100.00');
+        $listing44 = new MarketplaceListing('50000000-0000-4000-8000-000000000907', $company, $product44, MarketplaceType::WILDBERRIES);
+        $listing44->setMarketplaceSku('100')->setMarketplaceVariantId('2')->setSize('44')->setPrice('100.00');
+        $this->em->persist($product42);
+        $this->em->persist($product44);
+        $this->em->persist($listing42);
+        $this->em->persist($listing44);
 
         $firstRaw = InventoryRawSnapshotBuilder::aRawSnapshot()
             ->withCompanyId($company->getId())
@@ -188,23 +194,29 @@ final class NormalizeInventorySnapshotActionTest extends IntegrationTestCase
             ['companyId' => $company->getId(), 'source' => MarketplaceType::WILDBERRIES],
             ['status' => 'ASC'],
         );
-        self::assertCount(3, $rows);
+        self::assertCount(6, $rows);
 
-        $byStatus = [];
+        $byVariantAndStatus = [];
         foreach ($rows as $row) {
-            $byStatus[$row->getStatus()->value] = $row;
+            $byVariantAndStatus[$row->getSourceSku()][$row->getStatus()->value] = $row;
             self::assertSame($session->getStartedAt()->format('Y-m-d H:i:s'), $row->getSnapshotAt()->format('Y-m-d H:i:s'));
             self::assertSame(StockSnapshotMappingStatus::Mapped, $row->getMappingStatus());
-            self::assertSame($listing->getId(), $row->getListingId());
-            self::assertSame($product->getId(), $row->getProductId());
+            self::assertSame('100', $row->getSourceOfferId());
+            self::assertSame('1' === $row->getSourceSku() ? $listing42->getId() : $listing44->getId(), $row->getListingId());
+            self::assertSame('1' === $row->getSourceSku() ? $product42->getId() : $product44->getId(), $row->getProductId());
         }
 
-        self::assertSame('10.000', $byStatus[StockStatus::Available->value]->getQuantity());
-        self::assertSame('5.000', $byStatus[StockStatus::InTransitToCustomer->value]->getQuantity());
-        self::assertSame('3.000', $byStatus[StockStatus::InTransitFromCustomer->value]->getQuantity());
+        self::assertSame('4.000', $byVariantAndStatus['1'][StockStatus::Available->value]->getQuantity());
+        self::assertSame('2.000', $byVariantAndStatus['1'][StockStatus::InTransitToCustomer->value]->getQuantity());
+        self::assertSame('1.000', $byVariantAndStatus['1'][StockStatus::InTransitFromCustomer->value]->getQuantity());
+        self::assertSame('6.000', $byVariantAndStatus['2'][StockStatus::Available->value]->getQuantity());
+        self::assertSame('3.000', $byVariantAndStatus['2'][StockStatus::InTransitToCustomer->value]->getQuantity());
+        self::assertSame('2.000', $byVariantAndStatus['2'][StockStatus::InTransitFromCustomer->value]->getQuantity());
 
         $stockByListing = self::getContainer()->get(StockQtyByListingOnDateQuery::class)->execute($company->getId(), new \DateTimeImmutable());
-        self::assertSame([$listing->getId() => 10.0], $stockByListing);
+        self::assertCount(2, $stockByListing);
+        self::assertSame(4.0, $stockByListing[$listing42->getId()]);
+        self::assertSame(6.0, $stockByListing[$listing44->getId()]);
 
         $reportPager = self::getContainer()->get(InventoryStockReportQuery::class)->getPage(
             companyId: $company->getId(),
@@ -218,7 +230,7 @@ final class NormalizeInventorySnapshotActionTest extends IntegrationTestCase
             status: StockStatus::Available,
         );
         $reportRows = iterator_to_array($reportPager->getCurrentPageResults());
-        self::assertCount(1, $reportRows);
+        self::assertCount(2, $reportRows);
         self::assertSame('Коледино', $reportRows[0]['location_name']);
         self::assertSame(StockStatus::Available->value, $reportRows[0]['status']);
 
