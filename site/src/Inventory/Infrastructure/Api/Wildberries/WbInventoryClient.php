@@ -52,7 +52,6 @@ final readonly class WbInventoryClient
 
             $statusCode = $response->getStatusCode();
             $headers = $response->getHeaders(false);
-            $payload = $response->getContent(false);
         } catch (TransportExceptionInterface $e) {
             throw new WbInventoryTemporaryApiException('WB Inventory API transport error.', previous: $e);
         }
@@ -70,6 +69,12 @@ final readonly class WbInventoryClient
         }
         if (200 !== $statusCode) {
             throw new WbInventoryApiException($message);
+        }
+
+        try {
+            $payload = $response->getContent(false);
+        } catch (TransportExceptionInterface $e) {
+            throw new WbInventoryTemporaryApiException('WB Inventory API transport error.', previous: $e);
         }
 
         try {

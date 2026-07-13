@@ -11,6 +11,8 @@ use App\Inventory\Infrastructure\Api\Wildberries\WbInventoryClient;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 
 final class WbInventoryClientTest extends TestCase
 {
@@ -78,6 +80,22 @@ final class WbInventoryClientTest extends TestCase
             self::assertSame(27, $e->retryAfterSeconds);
             self::assertStringNotContainsString('must-not-leak', $e->getMessage());
         }
+    }
+
+    public function testRateLimitDoesNotReadResponseBody(): void
+    {
+        $response = $this->createMock(ResponseInterface::class);
+        $response->expects(self::once())->method('getStatusCode')->willReturn(429);
+        $response->expects(self::once())->method('getHeaders')->with(false)->willReturn(['retry-after' => ['27']]);
+        $response->expects(self::never())->method('getContent');
+
+        $httpClient = $this->createMock(HttpClientInterface::class);
+        $httpClient->expects(self::once())->method('request')->willReturn($response);
+
+        $client = new WbInventoryClient($httpClient);
+
+        $this->expectException(WbInventoryRateLimitException::class);
+        $client->fetchStocks('test-token');
     }
 
     public function testServerErrorIsTemporary(): void
