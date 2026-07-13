@@ -20,10 +20,16 @@
                 <div class="fw-medium">Получение актуальных остатков из маркетплейса</div>
                 <div class="text-muted small">Запускает асинхронную загрузку и обновляет историю ниже.</div>
             </div>
-            <form method="post" action="{{ path('inventory_snapshots_request') }}" class="mb-0">
-                <input type="hidden" name="_token" value="{{ csrf_token('inventory_snapshots_request') }}">
-                <button type="submit" class="btn btn-primary">Получить остатки</button>
-            </form>
+            <div class="d-flex gap-2 flex-wrap">
+                <form method="post" action="{{ path('inventory_snapshots_request') }}" class="mb-0">
+                    <input type="hidden" name="_token" value="{{ csrf_token('inventory_snapshots_request') }}">
+                    <button type="submit" class="btn btn-primary">Получить Ozon</button>
+                </form>
+                <form method="post" action="{{ path('inventory_wb_snapshots_request') }}" class="mb-0">
+                    <input type="hidden" name="_token" value="{{ csrf_token('inventory_wb_snapshots_request') }}">
+                    <button type="submit" class="btn btn-primary">Получить Wildberries</button>
+                </form>
+            </div>
         </div>
     </div>
 
