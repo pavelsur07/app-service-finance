@@ -88,7 +88,10 @@ class PLCategoryController extends AbstractController
         }
 
         $parents = $repo->findTreeByCompany($company);
-        $form = $this->createForm(PLCategoryFormType::class, $category, ['parents' => $parents]);
+        $form = $this->createForm(PLCategoryFormType::class, $category, [
+            'parents' => $parents,
+            'expanded_choices' => true,
+        ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -104,7 +107,7 @@ class PLCategoryController extends AbstractController
         return $this->render('pl_category/edit.html.twig', [
             'form' => $form->createView(),
             'item' => $category,
-            'available_codes' => $repo->findCodesByCompany($company),
+            'available_categories' => $parents,
         ]);
     }
 
