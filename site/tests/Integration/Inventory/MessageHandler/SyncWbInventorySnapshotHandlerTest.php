@@ -40,6 +40,7 @@ final class SyncWbInventorySnapshotHandlerTest extends IntegrationTestCase
             $this->catalogResponse([
                 $this->card(100, [[1001, 'S', 'barcode-s'], [1002, 'M', 'barcode-m']]),
             ]),
+            $this->catalogResponse([]),
             $this->inventoryResponse([
                 $this->stock(100, 1001, 507, 4),
                 $this->stock(100, 1002, 507, 7),
@@ -64,6 +65,35 @@ final class SyncWbInventorySnapshotHandlerTest extends IntegrationTestCase
         self::assertNotNull($rows[1]['listing_id']);
     }
 
+    public function testTrashCardSizesAreMappedToDistinctInactiveListings(): void
+    {
+        $company = $this->createCompany(710);
+        $connection = $this->createConnection($company, 710);
+        $session = $this->createSession($company);
+        $this->swapHttpClient([
+            $this->catalogResponse([]),
+            $this->catalogResponse([
+                $this->card(110, [[1101, 'S', 'trash-barcode-s'], [1102, 'M', 'trash-barcode-m']]),
+            ]),
+            $this->inventoryResponse([
+                $this->stock(110, 1101, 507, 5),
+                $this->stock(110, 1102, 507, 8),
+            ]),
+        ]);
+
+        ($this->handler())($this->message($company, $connection, $session));
+        self::getContainer()->get(NormalizeInventorySnapshotHandler::class)($this->normalizeMessage($session, $company));
+
+        $rows = $this->connection->fetchAllAssociative(
+            "SELECT stock.source_sku, stock.listing_id, listing.is_active FROM inventory_stock_snapshots stock JOIN marketplace_listings listing ON listing.id = stock.listing_id WHERE stock.snapshot_session_id = :session AND stock.status = 'available' ORDER BY stock.source_sku",
+            ['session' => $session->getId()],
+        );
+        self::assertSame(['1101', '1102'], array_column($rows, 'source_sku'));
+        self::assertNotSame($rows[0]['listing_id'], $rows[1]['listing_id']);
+        self::assertFalse($rows[0]['is_active']);
+        self::assertFalse($rows[1]['is_active']);
+    }
+
     public function testSeveralPagesUseIncreasingOffsets(): void
     {
         $company = $this->createCompany(702);
@@ -71,6 +101,7 @@ final class SyncWbInventorySnapshotHandlerTest extends IntegrationTestCase
         $session = $this->createSession($company);
         $this->swapHttpClient([
             $this->catalogResponse([$this->card(200, [[2001, 'S', 'barcode-702']])]),
+            $this->catalogResponse([]),
             $this->inventoryResponse([$this->stock(200, 2001, 1, 1), $this->stock(200, 2001, 2, 2)]),
             $this->inventoryResponse([$this->stock(200, 2001, 3, 3)]),
         ]);
@@ -91,6 +122,7 @@ final class SyncWbInventorySnapshotHandlerTest extends IntegrationTestCase
         $firstPage = [$this->stock(300, 3001, 1, 1)];
         $this->swapHttpClient([
             $this->catalogResponse([$this->card(300, [[3001, 'S', 'barcode-703']])]),
+            $this->catalogResponse([]),
             $this->inventoryResponse($firstPage),
             $this->inventoryResponse([$this->stock(300, 3001, 2, 2)]),
             $this->inventoryResponse($firstPage),
@@ -111,6 +143,7 @@ final class SyncWbInventorySnapshotHandlerTest extends IntegrationTestCase
         $session = $this->createSession($company);
         $this->swapHttpClient([
             $this->catalogResponse([$this->card(400, [[4001, 'S', 'barcode-704']])]),
+            $this->catalogResponse([]),
             new MockResponse('', ['http_code' => 429, 'response_headers' => ['retry-after: 10']]),
         ]);
 
@@ -129,6 +162,7 @@ final class SyncWbInventorySnapshotHandlerTest extends IntegrationTestCase
         $session = $this->createSession($company);
         $this->swapHttpClient([
             $this->catalogResponse([$this->card(600, [[6001, 'S', 'barcode-706']])]),
+            $this->catalogResponse([]),
             $this->inventoryResponse([$this->stock(600, 6001, 1, 1)]),
             new MockResponse('', ['http_code' => 429]),
         ]);
@@ -199,6 +233,7 @@ final class SyncWbInventorySnapshotHandlerTest extends IntegrationTestCase
         $this->em->flush();
         $this->swapHttpClient([
             $this->catalogResponse([$this->card(800, [[8001, 'S', 'barcode-708-s'], [8002, 'M', 'barcode-708-m'], [8003, 'L', 'barcode-708-l']])]),
+            $this->catalogResponse([]),
             $this->inventoryResponse([$this->stock(800, 8003, 1, 3)]),
         ]);
 
@@ -221,6 +256,7 @@ final class SyncWbInventorySnapshotHandlerTest extends IntegrationTestCase
         $session = $this->createSession($company);
         $this->swapHttpClient([
             $this->catalogResponse([$this->card(900, [[9001, 'S', 'barcode-709']])]),
+            $this->catalogResponse([]),
             $this->inventoryResponse([$this->stock(900, 9001, 1, 1)]),
         ]);
         $failingBus = $this->createMock(MessageBusInterface::class);

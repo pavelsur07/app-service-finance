@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.53 / 2026-07-13
+> Версия: 1.54 / 2026-07-13
 
 ---
 
@@ -775,8 +775,8 @@ getActiveWbSellerConnections(?string $companyId = null): array
 // @return array<string, string|null> map listingId → productId|null
 resolveListingsToProducts(string $companyId, array $listingIds): array
 
-// Загружает WB Product Cards для SELLER-подключения и атомарно обновляет
-// MarketplaceListing.marketplaceVariantId (chrtId) и barcodes.
+// Загружает активные и находящиеся в корзине WB Product Cards для SELLER-подключения
+// и атомарно обновляет MarketplaceListing.marketplaceVariantId (chrtId), isActive и barcodes.
 // Токен должен иметь категорию Content или Promotion.
 refreshWbListingCatalog(string $companyId, string $connectionId): int
 ```
@@ -1990,7 +1990,7 @@ RequestWbInventorySnapshotAction
 ↓ SyncWbInventorySnapshotMessage (async_sync)
 SyncWbInventorySnapshotHandler
 ↓ обязательный refreshWbListingCatalog()
-WB Product Cards → MarketplaceListing.marketplaceVariantId
+WB Product Cards list + trash → MarketplaceListing.marketplaceVariantId/isActive
 ↓ POST /api/analytics/v1/stocks-report/wb-warehouses, limit/offset
 InventoryRawSnapshot
 ↓ completed session
@@ -2003,6 +2003,10 @@ NormalizeInventorySnapshotAction → StockSnapshot
 после сохранённых страниц — как `partial`; такие сессии не нормализуются.
 Повтор выполняется вручную новой сессией. Production cron для WB Inventory не включён.
 Подключение должно использовать токен с доступом к Content API и Analytics API.
+Активные Product Cards сохраняются с `MarketplaceListing.isActive = true`, карточки
+из `/content/v2/get/cards/trash` — с `isActive = false`. Оба набора участвуют в
+точном маппинге остатков по `chrtId`; отсутствие карточки в обоих ответах само по
+себе не деактивирует существующий листинг.
 
 Нормализатор WB принимает raw-страницы ответа
 `POST /api/analytics/v1/stocks-report/wb-warehouses` и агрегирует строки по
@@ -2280,6 +2284,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.54 | 2026-07-13 | Marketplace/Inventory: WB Product Cards refresh дополнен карточками из корзины, которые сохраняются неактивными и участвуют в точном маппинге остатков по `chrtId` |
 | 1.53 | 2026-07-13 | Inventory: добавлен ручной WB orchestration с обязательным Product Cards refresh, async raw-загрузкой, безопасной offset-пагинацией и отдельным POST endpoint |
 | 1.52 | 2026-07-13 | Inventory: добавлена нормализация WB FBW raw-остатков по `chrtId + warehouseId`, точный variant-маппинг, отдельные статусы движения и выбор последней полной сессии по каждому источнику |
 | 1.51 | 2026-07-13 | Marketplace: добавлена атомарная синхронизация WB Product Cards → `MarketplaceListing.marketplaceVariantId` и barcodes |

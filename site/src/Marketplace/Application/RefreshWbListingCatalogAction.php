@@ -39,7 +39,9 @@ final readonly class RefreshWbListingCatalogAction
         $connection = $this->connectionRepository->findByIdAndCompany($connectionId, $company);
         $this->assertUsableConnection($connection);
 
-        $variants = $this->normalizeVariants($this->client->fetchAll($connection->getApiKey()));
+        $activeCards = $this->client->fetchAll($connection->getApiKey());
+        $trashCards = $this->client->fetchAllTrash($connection->getApiKey());
+        $variants = $this->normalizeVariants($activeCards, $trashCards);
 
         $synced = $this->em->wrapInTransaction(function () use ($company, $variants): int {
             $resolved = [];
@@ -81,7 +83,7 @@ final readonly class RefreshWbListingCatalogAction
                 if ('' !== $variant['title']) {
                     $listing->setName($variant['title']);
                 }
-                $listing->setIsActive(true);
+                $listing->setIsActive($variant['isActive']);
                 $resolved[] = [$listing, $variant['barcodes']];
             }
 
@@ -99,6 +101,8 @@ final readonly class RefreshWbListingCatalogAction
             'company_id' => $companyId,
             'connection_id' => $connectionId,
             'variants_synced' => $synced,
+            'active_variants_synced' => count(array_filter($variants, static fn (array $variant): bool => $variant['isActive'])),
+            'trash_variants_synced' => count(array_filter($variants, static fn (array $variant): bool => !$variant['isActive'])),
         ]);
 
         return $synced;
@@ -117,62 +121,67 @@ final readonly class RefreshWbListingCatalogAction
     }
 
     /**
-     * @param list<array<string, mixed>> $cards
+     * @param list<array<string, mixed>> $activeCards
+     * @param list<array<string, mixed>> $trashCards
      *
-     * @return list<array{nmId: string, chrtId: string, size: string, vendorCode: string, brand: string, subjectName: string, title: string, barcodes: list<string>}>
+     * @return list<array{nmId: string, chrtId: string, size: string, vendorCode: string, brand: string, subjectName: string, title: string, barcodes: list<string>, isActive: bool}>
      */
-    private function normalizeVariants(array $cards): array
+    private function normalizeVariants(array $activeCards, array $trashCards): array
     {
         $variants = [];
         $naturalKeys = [];
         $barcodeOwners = [];
 
-        foreach ($cards as $card) {
-            $nmId = $this->positiveId($card['nmID'] ?? null, 'nmID');
-            $sizes = $card['sizes'] ?? null;
-            if (!is_array($sizes) || !array_is_list($sizes)) {
-                throw new \UnexpectedValueException(sprintf('WB card nmID=%s has invalid sizes.', $nmId));
-            }
-
-            foreach ($sizes as $sizeData) {
-                if (!is_array($sizeData)) {
-                    throw new \UnexpectedValueException(sprintf('WB card nmID=%s contains invalid size.', $nmId));
+        foreach ([[true, $activeCards], [false, $trashCards]] as [$isActive, $cards]) {
+            foreach ($cards as $card) {
+                $nmId = $this->positiveId($card['nmID'] ?? null, 'nmID');
+                $sizes = $card['sizes'] ?? null;
+                if (!is_array($sizes) || !array_is_list($sizes)) {
+                    throw new \UnexpectedValueException(sprintf('WB card nmID=%s has invalid sizes.', $nmId));
                 }
 
-                $chrtId = $this->positiveId($sizeData['chrtID'] ?? null, 'chrtID');
-                $size = trim((string) ($sizeData['techSize'] ?? '')) ?: 'UNKNOWN';
-                $naturalKey = $nmId."\0".$size;
-
-                if (isset($naturalKeys[$naturalKey]) && $naturalKeys[$naturalKey] !== $chrtId) {
-                    throw new \DomainException(sprintf('WB nmID=%s size=%s has multiple chrtId values.', $nmId, $size));
-                }
-                if (isset($variants[$chrtId]) && ($variants[$chrtId]['nmId'] !== $nmId || $variants[$chrtId]['size'] !== $size)) {
-                    throw new \DomainException(sprintf('WB chrtId=%s belongs to multiple card variants.', $chrtId));
-                }
-
-                $naturalKeys[$naturalKey] = $chrtId;
-                $barcodes = $this->barcodes($sizeData['skus'] ?? []);
-                foreach ($barcodes as $barcode) {
-                    if (isset($barcodeOwners[$barcode]) && $barcodeOwners[$barcode] !== $chrtId) {
-                        throw new \DomainException(sprintf('WB barcode=%s belongs to multiple chrtId values.', $barcode));
+                foreach ($sizes as $sizeData) {
+                    if (!is_array($sizeData)) {
+                        throw new \UnexpectedValueException(sprintf('WB card nmID=%s contains invalid size.', $nmId));
                     }
-                    $barcodeOwners[$barcode] = $chrtId;
-                }
-                if (isset($variants[$chrtId])) {
-                    $variants[$chrtId]['barcodes'] = array_values(array_unique([...$variants[$chrtId]['barcodes'], ...$barcodes]));
-                    continue;
-                }
 
-                $variants[$chrtId] = [
-                    'nmId' => $nmId,
-                    'chrtId' => $chrtId,
-                    'size' => $size,
-                    'vendorCode' => trim((string) ($card['vendorCode'] ?? '')),
-                    'brand' => trim((string) ($card['brand'] ?? '')),
-                    'subjectName' => trim((string) ($card['subjectName'] ?? '')),
-                    'title' => trim((string) ($card['title'] ?? '')),
-                    'barcodes' => $barcodes,
-                ];
+                    $chrtId = $this->positiveId($sizeData['chrtID'] ?? null, 'chrtID');
+                    $size = trim((string) ($sizeData['techSize'] ?? '')) ?: 'UNKNOWN';
+                    $naturalKey = $nmId."\0".$size;
+
+                    if (isset($naturalKeys[$naturalKey]) && $naturalKeys[$naturalKey] !== $chrtId) {
+                        throw new \DomainException(sprintf('WB nmID=%s size=%s has multiple chrtId values.', $nmId, $size));
+                    }
+                    if (isset($variants[$chrtId]) && ($variants[$chrtId]['nmId'] !== $nmId || $variants[$chrtId]['size'] !== $size)) {
+                        throw new \DomainException(sprintf('WB chrtId=%s belongs to multiple card variants.', $chrtId));
+                    }
+
+                    $naturalKeys[$naturalKey] = $chrtId;
+                    $barcodes = $this->barcodes($sizeData['skus'] ?? []);
+                    foreach ($barcodes as $barcode) {
+                        if (isset($barcodeOwners[$barcode]) && $barcodeOwners[$barcode] !== $chrtId) {
+                            throw new \DomainException(sprintf('WB barcode=%s belongs to multiple chrtId values.', $barcode));
+                        }
+                        $barcodeOwners[$barcode] = $chrtId;
+                    }
+                    if (isset($variants[$chrtId])) {
+                        $variants[$chrtId]['barcodes'] = array_values(array_unique([...$variants[$chrtId]['barcodes'], ...$barcodes]));
+                        $variants[$chrtId]['isActive'] = $variants[$chrtId]['isActive'] || $isActive;
+                        continue;
+                    }
+
+                    $variants[$chrtId] = [
+                        'nmId' => $nmId,
+                        'chrtId' => $chrtId,
+                        'size' => $size,
+                        'vendorCode' => trim((string) ($card['vendorCode'] ?? '')),
+                        'brand' => trim((string) ($card['brand'] ?? '')),
+                        'subjectName' => trim((string) ($card['subjectName'] ?? '')),
+                        'title' => trim((string) ($card['title'] ?? '')),
+                        'barcodes' => $barcodes,
+                        'isActive' => $isActive,
+                    ];
+                }
             }
         }
 

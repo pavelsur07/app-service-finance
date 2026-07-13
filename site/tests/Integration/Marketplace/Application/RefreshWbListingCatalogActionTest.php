@@ -76,6 +76,57 @@ final class RefreshWbListingCatalogActionTest extends IntegrationTestCase
         );
     }
 
+    public function testRefreshMarksTrashVariantInactive(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $connection = new MarketplaceConnection(Uuid::uuid4()->toString(), $company, MarketplaceType::WILDBERRIES);
+        $connection->setApiKey('token');
+        $listing = $this->listing($company, '321', '44', '9101');
+
+        $this->em->persist($company->getUser());
+        $this->em->persist($company);
+        $this->em->persist($connection);
+        $this->em->persist($listing);
+        $this->em->flush();
+
+        $listingRepository = $this->em->getRepository(MarketplaceListing::class);
+        $connectionRepository = $this->em->getRepository(MarketplaceConnection::class);
+        $barcodeRepository = $this->em->getRepository(MarketplaceListingBarcode::class);
+        self::assertInstanceOf(MarketplaceListingRepository::class, $listingRepository);
+        self::assertInstanceOf(MarketplaceConnectionRepository::class, $connectionRepository);
+        self::assertInstanceOf(MarketplaceListingBarcodeRepository::class, $barcodeRepository);
+
+        $barcodeQuery = new WbBarcodeUpsertQuery($this->connection);
+        $action = new RefreshWbListingCatalogAction(
+            $this->em,
+            $connectionRepository,
+            $this->client([], [[
+                'nmID' => 321,
+                'sizes' => [[
+                    'chrtID' => 9101,
+                    'techSize' => '44',
+                    'skus' => ['460003'],
+                ]],
+            ]]),
+            new WbListingResolverService($listingRepository, $barcodeRepository, $barcodeQuery, $this->em),
+            $listingRepository,
+            $barcodeQuery,
+            new NullLogger(),
+        );
+
+        self::assertSame(1, $action($company->getId(), $connection->getId()));
+
+        $this->em->clear();
+        $refreshed = $listingRepository->find($listing->getId());
+        self::assertInstanceOf(MarketplaceListing::class, $refreshed);
+        self::assertFalse($refreshed->isActive());
+        self::assertSame('9101', $refreshed->getMarketplaceVariantId());
+        self::assertSame(
+            $listing->getId(),
+            $barcodeRepository->findListingIdByBarcode($company->getId(), '460003', MarketplaceType::WILDBERRIES),
+        );
+    }
+
     private function listing(
         \App\Company\Entity\Company $company,
         string $nmId,
@@ -91,23 +142,36 @@ final class RefreshWbListingCatalogActionTest extends IntegrationTestCase
         return $listing;
     }
 
-    private function client(): WbProductCardsClient
+    /**
+     * @param list<array<string, mixed>>|null $activeCards
+     * @param list<array<string, mixed>>      $trashCards
+     */
+    private function client(?array $activeCards = null, array $trashCards = []): WbProductCardsClient
     {
-        $body = json_encode([
-            'cards' => [[
-                'nmID' => 123,
-                'sizes' => [[
-                    'chrtID' => 9001,
-                    'techSize' => '42',
-                    'skus' => ['460001'],
-                ]],
+        $activeCards ??= [[
+            'nmID' => 123,
+            'sizes' => [[
+                'chrtID' => 9001,
+                'techSize' => '42',
+                'skus' => ['460001'],
             ]],
-            'cursor' => ['total' => 1],
-        ], \JSON_THROW_ON_ERROR);
+        ]];
 
         return new WbProductCardsClient(
-            new MockHttpClient(new MockResponse($body)),
+            new MockHttpClient([
+                $this->catalogResponse($activeCards),
+                $this->catalogResponse($trashCards),
+            ]),
             new RateLimiterFactory(['id' => 'test', 'policy' => 'no_limit'], new InMemoryStorage()),
         );
+    }
+
+    /** @param list<array<string, mixed>> $cards */
+    private function catalogResponse(array $cards): MockResponse
+    {
+        return new MockResponse(json_encode([
+            'cards' => $cards,
+            'cursor' => ['total' => count($cards)],
+        ], \JSON_THROW_ON_ERROR));
     }
 }
