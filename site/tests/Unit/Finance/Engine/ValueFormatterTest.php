@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Finance\Engine;
+namespace App\Tests\Unit\Finance\Engine;
 
-use App\Finance\Enum\PLValueFormat;
 use App\Finance\Engine\ValueFormatter;
+use App\Finance\Enum\PLValueFormat;
 use PHPUnit\Framework\TestCase;
 
 final class ValueFormatterTest extends TestCase

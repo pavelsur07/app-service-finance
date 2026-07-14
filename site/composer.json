@@ -99,7 +99,7 @@
         "test:functional": "php bin/phpunit --testsuite functional",
         "test:int": "phpunit -c phpunit.xml --testsuite=integration",
         "test:all": "phpunit -c phpunit.xml",
-        "test:smoke": "phpunit -c phpunit.xml --testsuite=telegram && phpunit -c phpunit.xml --testsuite=unit",
+        "test:smoke": "php bin/phpunit tests/Unit/Telegram tests/Functional/Telegram",
         "test:no-legacy": "phpunit -c phpunit.xml --exclude-group legacy",
         "cs:check": "php-cs-fixer fix --dry-run --diff --cache-file=var/cache/.php-cs-fixer.cache",
         "cs:fix": "php-cs-fixer fix --cache-file=var/cache/.php-cs-fixer.cache",

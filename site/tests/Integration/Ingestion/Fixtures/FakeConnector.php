@@ -9,6 +9,7 @@ use App\Ingestion\Application\DTO\PullResult;
 use App\Ingestion\Application\DTO\PushRequest;
 use App\Ingestion\Application\DTO\PushResult;
 use App\Ingestion\Application\DTO\ShopDescriptor;
+use App\Ingestion\Application\Source\Wildberries\WbResourceType;
 use App\Ingestion\Domain\Contract\SourceConnectorInterface;
 use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Enum\Capability;
@@ -102,7 +103,7 @@ final class FakeConnector implements SourceConnectorInterface
      */
     public function resourceTypes(): array
     {
-        return [self::RESOURCE_TYPE];
+        return [self::RESOURCE_TYPE, WbResourceType::FINANCE_SALES_REPORT_DETAILED];
     }
 
     /**

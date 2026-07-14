@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Finance\Engine;
+namespace App\Tests\Unit\Finance\Engine;
 
 use App\Finance\Engine\Graph;
 use PHPUnit\Framework\TestCase;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Finance\Formula;
+namespace App\Tests\Unit\Finance\Formula;
 
 use App\Finance\Formula\BinaryNode;
 use App\Finance\Formula\FuncCallNode;

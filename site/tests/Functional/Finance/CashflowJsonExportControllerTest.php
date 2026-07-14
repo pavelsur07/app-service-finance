@@ -168,13 +168,13 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
     private function seedCashflowData(Company $company, string $amount, string $occurredAt): CashflowCategory
     {
         $category = new CashflowCategory(Uuid::uuid4()->toString(), $company);
-        $category->setName('Operating inflow');
+        $category->setName('Operating inflow '.$occurredAt);
 
         $account = new MoneyAccount(
             Uuid::uuid4()->toString(),
             $company,
             MoneyAccountType::BANK,
-            'Main account '.substr($company->getId(), -2),
+            'Main account '.substr($company->getId(), -2).' '.$occurredAt,
             'RUB',
         );
         $account->setOpeningBalance('0.00');
@@ -202,9 +202,7 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
     private function loginWithActiveCompany(KernelBrowser $client, User $user, Company $company): void
     {
         $client->loginUser($user);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', $company->getId());
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
     }
 
     /** @return array<string, mixed> */

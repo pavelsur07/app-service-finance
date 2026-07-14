@@ -8,6 +8,7 @@ use App\Inventory\Exception\WbInventoryApiException;
 use App\Inventory\Exception\WbInventoryRateLimitException;
 use App\Inventory\Exception\WbInventoryTemporaryApiException;
 use App\Inventory\Infrastructure\Api\Wildberries\WbInventoryClient;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
@@ -48,7 +49,7 @@ final class WbInventoryClientTest extends TestCase
         self::assertFalse($response->hasNextPage);
     }
 
-    /** @dataProvider permanentErrorProvider */
+    #[DataProvider('permanentErrorProvider')]
     public function testPermanentHttpErrors(int $status): void
     {
         $client = new WbInventoryClient(new MockHttpClient(new MockResponse('{"error":"hidden"}', ['http_code' => $status])));
@@ -106,7 +107,7 @@ final class WbInventoryClientTest extends TestCase
         $client->fetchStocks('test-token');
     }
 
-    /** @dataProvider invalidPayloadProvider */
+    #[DataProvider('invalidPayloadProvider')]
     public function testRejectsInvalidPayload(string $payload): void
     {
         $client = new WbInventoryClient(new MockHttpClient(new MockResponse($payload, ['http_code' => 200])));

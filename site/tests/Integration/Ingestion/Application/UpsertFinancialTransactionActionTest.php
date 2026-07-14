@@ -105,16 +105,17 @@ final class UpsertFinancialTransactionActionTest extends IntegrationTestCase
         $this->em->flush();
         $this->em->clear();
 
-        self::assertNull($repeat);
+        self::assertNotNull($repeat);
+        self::assertFalse($repeat->affectsFinancialReport);
 
         /** @var FinancialTransactionRepository $repository */
         $repository = self::getContainer()->get(FinancialTransactionRepository::class);
         $transaction = $repository->findByNaturalKey($companyId, IngestSource::OZON, 'external-tx-1', TransactionType::SALE);
 
         self::assertNotNull($transaction);
-        // Nothing moved: amount and externalUpdatedAt stay at the originally stored version.
+        // Financial content stays put, while raw attribution converges to the fresher observation.
         self::assertSame(10000, $transaction->getAmountMinor());
-        self::assertEquals(new \DateTimeImmutable('2026-06-18 10:00:00'), $transaction->getExternalUpdatedAt());
+        self::assertEquals(new \DateTimeImmutable('2026-06-18 12:00:00'), $transaction->getExternalUpdatedAt());
     }
 
     public function testUpdatesWhenSourceContentChanged(): void

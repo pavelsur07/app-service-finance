@@ -9,6 +9,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\BrowserKit\Cookie;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Базовый класс для web-тестов (builders-first);
@@ -45,5 +46,29 @@ abstract class WebTestCaseBase extends WebTestCase
         $session->save();
 
         $client->getCookieJar()->set(new Cookie($session->getName(), $session->getId()));
+    }
+
+    protected function csrfToken(KernelBrowser $client, string $tokenId): string
+    {
+        $session = $client->getContainer()->get('session.factory')->createSession();
+        $cookie = $client->getCookieJar()->get($session->getName());
+        if (null !== $cookie) {
+            $session->setId($cookie->getValue());
+        }
+
+        $request = Request::create('/');
+        $request->setSession($session);
+        $requestStack = $client->getContainer()->get('request_stack');
+        $requestStack->push($request);
+
+        try {
+            $token = $client->getContainer()->get('security.csrf.token_manager')->getToken($tokenId)->getValue();
+            $session->save();
+            $client->getCookieJar()->set(new Cookie($session->getName(), $session->getId()));
+
+            return $token;
+        } finally {
+            $requestStack->pop();
+        }
     }
 }

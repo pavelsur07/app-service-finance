@@ -166,6 +166,18 @@ class BotLink
         return $this->usedAt;
     }
 
+    public function isUsed(): bool
+    {
+        return null !== $this->usedAt;
+    }
+
+    public function isExpired(?\DateTimeImmutable $now = null, int $leewaySeconds = 0): bool
+    {
+        $now ??= new \DateTimeImmutable();
+
+        return $this->expiresAt <= $now->modify(sprintf('+%d seconds', max(0, $leewaySeconds)));
+    }
+
     // Возвращает дату создания
     public function getCreatedAt(): \DateTimeImmutable
     {

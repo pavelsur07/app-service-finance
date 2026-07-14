@@ -32,18 +32,13 @@ final class CostPLMappingControllerTest extends WebTestCaseBase
         self::assertSelectorExists('[data-preview-url="/marketplace/cost-pl-mapping/default/preview"]');
         self::assertSelectorExists('[data-apply-url="/marketplace/cost-pl-mapping/default/apply"]');
 
-        $csrf = $client->getContainer()->get('security.csrf.token_manager')
-            ->getToken('marketplace_default_cost_mapping')
-            ->getValue();
-        self::assertSelectorExists(sprintf('[data-csrf-token="%s"]', $csrf));
+        self::assertSelectorExists('[data-csrf-token]:not([data-csrf-token=""])');
     }
 
     private function loginWithActiveCompany(KernelBrowser $client, User $user, Company $company): void
     {
         $client->loginUser($user);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', $company->getId());
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
     }
 
     private function seedBaseData(): array

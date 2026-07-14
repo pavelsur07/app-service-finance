@@ -28,14 +28,12 @@ final class CompanyMemberInviteFlowTest extends WebTestCaseBase
         $em->flush();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', $companyId);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', $companyId);
 
-        $csrfManager = $client->getContainer()->get('security.csrf.token_manager');
-        $token = $csrfManager->getToken('company_invite_operator')->getValue();
+        $crawler = $client->request('GET', '/company/users');
+        $token = (string) $crawler->filter('input[name="company_invite_operator[_token]"]')->attr('value');
 
-        $client->request('POST', sprintf('/company/%s/users/invite', $companyId), [
+        $client->request('POST', '/company/users/invite', [
             'company_invite_operator' => [
                 'email' => 'operator@example.test',
                 '_token' => $token,
@@ -45,7 +43,7 @@ final class CompanyMemberInviteFlowTest extends WebTestCaseBase
         self::assertTrue($client->getResponse()->isRedirect());
 
         /** @var CompanyInviteRepository $inviteRepository */
-        $inviteRepository = $this->em()->getRepository(CompanyInvite::class);
+        $inviteRepository = self::getContainer()->get(CompanyInviteRepository::class);
         $invite = $inviteRepository->findPendingByCompanyAndEmail(
             $company,
             'operator@example.test',
@@ -75,14 +73,13 @@ final class CompanyMemberInviteFlowTest extends WebTestCaseBase
         $em->flush();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', $company->getId());
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
 
-        $csrfManager = $client->getContainer()->get('security.csrf.token_manager');
-        $token = $csrfManager->getToken('invite_revoke_'.$invite->getId())->getValue();
+        $crawler = $client->request('GET', '/company/users');
+        $formSelector = sprintf('form[action="/company/invites/%s/revoke"] input[name="_token"]', $invite->getId());
+        $token = (string) $crawler->filter($formSelector)->attr('value');
 
-        $client->request('POST', sprintf('/company/%s/invites/%s/revoke', $company->getId(), $invite->getId()), [
+        $client->request('POST', sprintf('/company/invites/%s/revoke', $invite->getId()), [
             '_token' => $token,
         ]);
 

@@ -133,8 +133,6 @@ final class UnitExtendedExportControllerTest extends WebTestCaseBase
     private function loginAsOwner(KernelBrowser $client, object $owner, string $companyId): void
     {
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', $companyId);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', $companyId);
     }
 }

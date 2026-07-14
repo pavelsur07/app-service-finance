@@ -31,7 +31,7 @@ final class CashTransactionsFixtures extends Fixture implements DependentFixture
         $monthCurrent = (new \DateTimeImmutable('first day of this month'))->setTime(10, 0);
 
         $categoryRepo = $manager->getRepository(CashflowCategory::class);
-        $catByName = fn (string $name): CashflowCategory => $categoryRepo->findOneBy(['company' => $company, 'name' => $name])
+        $catByName = static fn (string $name): CashflowCategory => $categoryRepo->findOneBy(['company' => $company, 'name' => $name])
             ?? throw new \RuntimeException(sprintf('Cashflow category "%s" not found', $name));
 
         $sales = $catByName('Продажи');
@@ -40,13 +40,14 @@ final class CashTransactionsFixtures extends Fixture implements DependentFixture
         $refundSupplier = $catByName('REFUND_SUPPLIER');
         $internalTransfer = $catByName('INTERNAL TRANSFER');
 
-        $make = function (
+        $make = static function (
             \DateTimeImmutable $date,
             string $amount,
             CashDirection $direction,
             MoneyAccount $account,
             CashflowCategory $category,
             string $description,
+            bool $isTransfer = false,
         ) use ($company, $project, $manager): void {
             $tx = new CashTransaction(
                 Uuid::uuid4()->toString(),
@@ -60,6 +61,7 @@ final class CashTransactionsFixtures extends Fixture implements DependentFixture
             $tx->setCashflowCategory($category);
             $tx->setProjectDirection($project);
             $tx->setDescription($description);
+            $tx->setIsTransfer($isTransfer);
 
             $manager->persist($tx);
         };
@@ -76,8 +78,8 @@ final class CashTransactionsFixtures extends Fixture implements DependentFixture
         $make($monthCurrent->modify('+2 day'), '10000.00', CashDirection::INFLOW, $accAlfa, $refundSupplier, 'Возврат от поставщика');
 
         $transferDate = $monthCurrent->modify('+3 day');
-        $make($transferDate, '50000.00', CashDirection::OUTFLOW, $accAlfa, $internalTransfer, 'Внутренний перевод Альфа → Сбер');
-        $make($transferDate, '50000.00', CashDirection::INFLOW, $accSber, $internalTransfer, 'Внутренний перевод Сбер ← Альфа');
+        $make($transferDate, '50000.00', CashDirection::OUTFLOW, $accAlfa, $internalTransfer, 'Внутренний перевод Альфа → Сбер', true);
+        $make($transferDate, '50000.00', CashDirection::INFLOW, $accSber, $internalTransfer, 'Внутренний перевод Сбер ← Альфа', true);
 
         $manager->flush();
     }

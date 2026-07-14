@@ -84,6 +84,7 @@ final class PLCategoryFixtures extends Fixture implements DependentFixtureInterf
         // 1. ВЫРУЧКА
         // =====================================================================
         $revenue = $make('Выручка', 'REVENUE', 100, null, PLFlow::NONE, PLExpenseType::OTHER, self::REF_ROOT_REVENUE);
+        $revenue->setType(PLCategoryType::SUBTOTAL);
 
         $make('Выкупы без СПП', 'MP_GROSS_REVENUE', 110, $revenue, PLFlow::INCOME, PLExpenseType::OTHER, self::REF_MP_GROSS_REVENUE);
         $make('Выручка с СПП', 'MP_NET_REVENUE', 120, $revenue, PLFlow::INCOME, PLExpenseType::OTHER, self::REF_MP_NET_REVENUE);
@@ -95,6 +96,7 @@ final class PLCategoryFixtures extends Fixture implements DependentFixtureInterf
         // 2. СЕБЕСТОИМОСТЬ
         // =====================================================================
         $cogs = $make('Себестоимость', 'COGS', 200, null, PLFlow::NONE, PLExpenseType::OTHER, self::REF_ROOT_COGS);
+        $cogs->setType(PLCategoryType::SUBTOTAL);
 
         $make('Материалы', 'COGS_MATERIALS', 210, $cogs, PLFlow::EXPENSE, PLExpenseType::VARIABLE, self::REF_COGS_MATERIALS);
         $make('Производство', 'COGS_PRODUCTION', 220, $cogs, PLFlow::EXPENSE, PLExpenseType::VARIABLE, self::REF_COGS_PRODUCTION);
@@ -103,6 +105,7 @@ final class PLCategoryFixtures extends Fixture implements DependentFixtureInterf
         // 3. РАСХОДЫ МАРКЕТПЛЕЙСА
         // =====================================================================
         $mpCosts = $make('Расходы маркетплейса', 'MP_COSTS', 300, null, PLFlow::NONE, PLExpenseType::OTHER, self::REF_ROOT_MP_COSTS);
+        $mpCosts->setType(PLCategoryType::SUBTOTAL);
 
         $make('Комиссия МП', 'MP_COMMISSION', 310, $mpCosts, PLFlow::EXPENSE, PLExpenseType::VARIABLE, self::REF_MP_COMMISSION);
         $make('Эквайринг', 'MP_ACQUIRING', 320, $mpCosts, PLFlow::EXPENSE, PLExpenseType::VARIABLE, self::REF_MP_ACQUIRING);
@@ -120,6 +123,7 @@ final class PLCategoryFixtures extends Fixture implements DependentFixtureInterf
         // 4. ОПЕРАЦИОННЫЕ РАСХОДЫ
         // =====================================================================
         $opex = $make('Операционные расходы', 'OPEX', 500, null, PLFlow::NONE, PLExpenseType::OTHER, self::REF_ROOT_OPEX);
+        $opex->setType(PLCategoryType::SUBTOTAL);
 
         $make('Маркетинг', 'OPEX_MARKETING', 510, $opex, PLFlow::EXPENSE, PLExpenseType::OPEX, self::REF_OPEX_MARKETING);
         $make('Аренда', 'OPEX_RENT', 520, $opex, PLFlow::EXPENSE, PLExpenseType::OPEX, self::REF_OPEX_RENT);

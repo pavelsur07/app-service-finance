@@ -201,8 +201,6 @@ final class SoftDeleteExclusionRegressionTest extends WebTestCaseBase
     private function loginWithActiveCompany(object $client, object $user, string $companyId): void
     {
         $client->loginUser($user);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', $companyId);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', $companyId);
     }
 }

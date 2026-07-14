@@ -30,9 +30,7 @@ final class DashboardSnapshotControllerTest extends WebTestCaseBase
         $em->flush();
 
         $client->loginUser($user);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', $companyId);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', $companyId);
 
         $client->request('GET', '/api/dashboard/v1/snapshot');
 

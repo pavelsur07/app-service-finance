@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Functional\Shared;
+namespace App\Tests\Functional\Company;
 
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -30,9 +30,7 @@ final class MoneyAccountCreateAccessTest extends WebTestCaseBase
         $em->clear();
 
         $client->loginUser($user);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', $companyId);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', $companyId);
 
         $client->request('GET', '/accounts/');
 

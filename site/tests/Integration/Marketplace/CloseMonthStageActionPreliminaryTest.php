@@ -27,6 +27,7 @@ use App\Marketplace\Repository\MarketplaceMonthCloseRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Ramsey\Uuid\Uuid;
 
 /**
@@ -237,9 +238,8 @@ final class CloseMonthStageActionPreliminaryTest extends IntegrationTestCase
     /**
      * Регрессия: даже если preflight не блокирует (warning-only),
      * этап не должен закрываться при пустом наборе PL-entries.
-     *
-     * @dataProvider emptyEntriesModesProvider
      */
+    #[DataProvider('emptyEntriesModesProvider')]
     public function testCloseCostsThrowsWhenEntriesAreEmptyEvenIfPreflightAllowsClose(bool $preliminary): void
     {
         /** @var CloseMonthStageAction $action */

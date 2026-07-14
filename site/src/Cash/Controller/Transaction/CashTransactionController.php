@@ -6,6 +6,7 @@ use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Form\Transaction\CashTransactionType;
+use App\Cash\Message\EnqueueAutoRulesForRange;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
@@ -13,7 +14,6 @@ use App\Cash\Service\Transaction\CashTransactionService;
 use App\Cash\Service\Transaction\CashTransactionToDocumentService;
 use App\Company\Repository\CounterpartyRepository;
 use App\Finance\Entity\Document;
-use App\Cash\Message\EnqueueAutoRulesForRange;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\CompanyContextService;
 use Doctrine\ORM\Exception\ORMException;
@@ -139,7 +139,7 @@ class CashTransactionController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}', name: 'cash_transaction_show', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    #[Route('/{id}', name: 'cash_transaction_show', requirements: ['id' => '[0-9a-fA-F-]{36}'], methods: ['GET'])]
     public function show(CashTransaction $tx): Response
     {
         $company = $this->companyService->getActiveCompany();

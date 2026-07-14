@@ -170,8 +170,6 @@ final class InventorySetCostRedirectTest extends WebTestCaseBase
     private function loginWithActiveCompany(KernelBrowser $client, User $owner, Company $company): void
     {
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', $company->getId());
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
     }
 }

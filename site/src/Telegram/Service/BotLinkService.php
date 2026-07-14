@@ -9,6 +9,7 @@ use App\Telegram\Entity\BotLink;
 use App\Telegram\Entity\TelegramBot;
 use App\Telegram\Repository\BotLinkRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Ramsey\Uuid\Uuid;
 use Symfony\Component\String\ByteString;
 
 final class BotLinkService
@@ -43,7 +44,7 @@ final class BotLinkService
             expiresAt: $expiresAt
         );
 
-        $link = new BotLink($company, $bot, $token, self::DEFAULT_SCOPE, $expiresAt);
+        $link = new BotLink(Uuid::uuid7()->toString(), $company, $bot, $token, self::DEFAULT_SCOPE, $expiresAt);
         $this->em->persist($link);
         $this->em->flush();
 
