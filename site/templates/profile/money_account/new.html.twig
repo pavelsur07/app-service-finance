@@ -1,7 +1,8 @@
 {% extends 'base.html.twig' %}
 {% form_theme form.type 'form_div_layout.html.twig' %}
+{% set is_edit = account is defined %}
 
-{% block title %}Новый счёт{% endblock %}
+{% block title %}{{ is_edit ? 'Редактирование счёта' : 'Новый счёт' }}{% endblock %}
 
 {% block stylesheets %}
     <style>
@@ -26,12 +27,12 @@
             <div class="row g-2 align-items-center">
                 <div class="col">
                     <div class="page-pretitle">Счета и кассы</div>
-                    <h2 class="page-title">Новый счёт</h2>
+                    <h2 class="page-title">{{ is_edit ? 'Редактирование счёта' : 'Новый счёт' }}</h2>
                 </div>
                 <div class="col-auto ms-auto d-print-none">
                     <div class="btn-list">
                         <a href="{{ path('money_account_index') }}" class="btn btn-ghost-secondary d-none d-sm-inline-flex"><i class="ti ti-arrow-left me-1"></i>К списку</a>
-                        <button type="submit" form="money-account-create-form" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i>Создать</button>
+                        <button type="submit" form="money-account-create-form" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i>{{ is_edit ? 'Сохранить' : 'Создать' }}</button>
                     </div>
                 </div>
             </div>
@@ -127,7 +128,7 @@
                         <div class="card-footer d-flex align-items-center">
                             <div class="btn-list ms-auto">
                                 <a href="{{ path('money_account_index') }}" class="btn">Отмена</a>
-                                <button type="submit" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i>Создать</button>
+                                <button type="submit" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i>{{ is_edit ? 'Сохранить' : 'Создать' }}</button>
                             </div>
                         </div>
                         {{ form_rest(form) }}

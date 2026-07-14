@@ -12,7 +12,7 @@ use App\Tests\Support\Kernel\WebTestCaseBase;
 
 final class MoneyAccountNewControllerTest extends WebTestCaseBase
 {
-    public function testNewFormUsesAccountDesignAndKeepsEditFormUnchanged(): void
+    public function testNewAndEditFormsUseAccountDesign(): void
     {
         $client = static::createClient();
         $this->resetDb();
@@ -106,12 +106,52 @@ final class MoneyAccountNewControllerTest extends WebTestCaseBase
         self::assertSame(0, bccomp('1250.50', $account->getOpeningBalance(), 2));
         self::assertFalse($account->isDefault());
 
+        $bankMeta = [
+            'provider' => 'demo',
+            'external_account_id' => 'external-1',
+            'number' => '40817810000000000001',
+            'auth' => ['token' => 'kept'],
+        ];
+        $account->setBankMeta($bankMeta);
+        $this->em()->flush();
+
         $editCrawler = $client->request('GET', '/accounts/'.$account->getId().'/edit');
 
         self::assertResponseIsSuccessful();
-        self::assertCount(1, $editCrawler->filter('select[id$="_type"]'));
-        self::assertCount(0, $editCrawler->filter('input[data-money-account-type]'));
-        self::assertCount(1, $editCrawler->filter('input[id$="_currency"]'));
-        self::assertCount(0, $editCrawler->filter('select[id$="_currency"]'));
+        self::assertSelectorTextContains('h2.page-title', 'Редактирование счёта');
+        self::assertCount(1, $editCrawler->filter('form#money-account-create-form.card'));
+        self::assertCount(0, $editCrawler->filter('select[id$="_type"]'));
+        self::assertCount(4, $editCrawler->filter('input[data-money-account-type] + .form-selectgroup-label'));
+        self::assertCount(1, $editCrawler->filter('input[data-money-account-type][value="bank"]:checked'));
+        self::assertCount(1, $editCrawler->filter('select[id$="_currency"]'));
+        self::assertCount(0, $editCrawler->filter('#tab-integration, [name="bank_provider"]'));
+        self::assertSelectorTextContains('button[type="submit"]', 'Сохранить');
+
+        foreach ([
+            'minimumSafeBalance',
+            'bankName',
+            'iban',
+            'bic',
+            'corrAccount',
+            'location',
+            'responsiblePerson',
+            'provider',
+            'walletId',
+        ] as $field) {
+            self::assertCount(0, $editCrawler->filter(sprintf('[id$="_%s"]', $field)));
+        }
+
+        $editForm = $editCrawler->filter('#money-account-create-form')->form();
+        $editForm[$nameField] = 'Основной банк — обновлён';
+        $client->submit($editForm);
+
+        self::assertResponseRedirects('/accounts/');
+
+        $this->em()->clear();
+        $updatedAccount = $this->em()->getRepository(MoneyAccount::class)->find($account->getId());
+
+        self::assertInstanceOf(MoneyAccount::class, $updatedAccount);
+        self::assertSame('Основной банк — обновлён', $updatedAccount->getName());
+        self::assertSame($bankMeta, $updatedAccount->getBankMeta());
     }
 }

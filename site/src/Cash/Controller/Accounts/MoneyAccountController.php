@@ -97,7 +97,23 @@ class MoneyAccountController extends AbstractController
             throw $this->createNotFoundException();
         }
 
-        $form = $this->createForm(MoneyAccountFormType::class, $account);
+        $form = $this->createForm(MoneyAccountFormType::class, $account, [
+            'expanded_type' => true,
+            'currency_choices' => true,
+        ]);
+        foreach ([
+            'minimumSafeBalance',
+            'bankName',
+            'iban',
+            'bic',
+            'corrAccount',
+            'location',
+            'responsiblePerson',
+            'provider',
+            'walletId',
+        ] as $field) {
+            $form->remove($field);
+        }
         $form->handleRequest($request);
 
         $bankIntegration = [
@@ -117,7 +133,9 @@ class MoneyAccountController extends AbstractController
         $authPayload = null;
         $authProvided = false;
 
-        if ($form->isSubmitted()) {
+        $bankIntegrationSubmitted = $form->isSubmitted() && $request->request->has('bank_provider');
+
+        if ($bankIntegrationSubmitted) {
             $bankIntegration['provider'] = trim((string) $request->request->get('bank_provider', ''));
             $bankIntegration['external_account_id'] = trim((string) $request->request->get('bank_external_account_id', ''));
             $bankIntegration['number'] = trim((string) $request->request->get('bank_number', ''));
@@ -151,38 +169,40 @@ class MoneyAccountController extends AbstractController
         }
 
         if ($form->isSubmitted() && $form->isValid()) {
-            if ($clearBankLinkRequested) {
-                $account->clearBankLink();
-                $account->setBankCursor(null);
-            } else {
-                $shouldLinkBank = '' !== $bankIntegration['provider'] && '' !== $bankIntegration['external_account_id'];
-
-                if ($shouldLinkBank) {
-                    $account->setBankLink(
-                        $bankIntegration['provider'],
-                        $bankIntegration['external_account_id'],
-                        '' !== $bankIntegration['number'] ? $bankIntegration['number'] : null
-                    );
-                }
-
-                $bankMeta = $account->getBankMeta() ?? [];
-
-                if ('' !== $bankIntegration['number']) {
-                    $bankMeta['number'] = $bankIntegration['number'];
+            if ($bankIntegrationSubmitted) {
+                if ($clearBankLinkRequested) {
+                    $account->clearBankLink();
+                    $account->setBankCursor(null);
                 } else {
-                    unset($bankMeta['number']);
-                }
+                    $shouldLinkBank = '' !== $bankIntegration['provider'] && '' !== $bankIntegration['external_account_id'];
 
-                if ($authProvided) {
-                    $bankMeta['auth'] = $authPayload;
-                } elseif (array_key_exists('auth', $bankMeta) && '' === trim($bankIntegration['auth'])) {
-                    unset($bankMeta['auth']);
-                }
+                    if ($shouldLinkBank) {
+                        $account->setBankLink(
+                            $bankIntegration['provider'],
+                            $bankIntegration['external_account_id'],
+                            '' !== $bankIntegration['number'] ? $bankIntegration['number'] : null
+                        );
+                    }
 
-                if (!empty($bankMeta)) {
-                    $account->setBankMeta($bankMeta);
-                } else {
-                    $account->setBankMeta(null);
+                    $bankMeta = $account->getBankMeta() ?? [];
+
+                    if ('' !== $bankIntegration['number']) {
+                        $bankMeta['number'] = $bankIntegration['number'];
+                    } else {
+                        unset($bankMeta['number']);
+                    }
+
+                    if ($authProvided) {
+                        $bankMeta['auth'] = $authPayload;
+                    } elseif (array_key_exists('auth', $bankMeta) && '' === trim($bankIntegration['auth'])) {
+                        unset($bankMeta['auth']);
+                    }
+
+                    if (!empty($bankMeta)) {
+                        $account->setBankMeta($bankMeta);
+                    } else {
+                        $account->setBankMeta(null);
+                    }
                 }
             }
 
