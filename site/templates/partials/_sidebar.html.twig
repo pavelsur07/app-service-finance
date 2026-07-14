@@ -42,7 +42,7 @@
                                 Операции ДДС
                                 <span class="badge badge-sm bg-green-lt text-uppercase ms-auto">New</span>
                             </a>
-                            <a class="dropdown-item" href="{{ path('finance_funds_index') }}">Фонды (конверты) </a>
+                            {#<a class="dropdown-item" href="{{ path('finance_funds_index') }}">Фонды (конверты) </a>#}
                             <a class="dropdown-item" href="{{ path('payment_calendar_index') }}">Платежный календарь </a>
                             <a class="dropdown-item" href="{{ path('report_account_balances_structured_index') }}">Остатки и счета </a>
                             {#<a class="dropdown-item" href="#">Движение денег </a>#}
@@ -62,6 +62,7 @@
             </li>
             <!-- ОПиУ -->
 
+            {#  <!-- Сделки -->
             {% set deals_path = app.request ? app.request.pathinfo : '' %}
             {% set deals_active = deals_path starts with '/deals' %}
             <li class="nav-item dropdown {{ deals_active ? 'show' : '' }}">
@@ -87,6 +88,7 @@
                     </div>
                 </div>
             </li>
+            #} <!-- Сделки -->
 
             {#{% set cash_transactions_active = current_route == 'cash_transaction_index' %}
             <li class="nav-item {{ cash_transactions_active ? 'active' : '' }}">
@@ -120,6 +122,8 @@
                 </a>
             </li>#}
 
+
+            {# <!-- Кредиты -->
             {% set loans_active = current_route starts with 'loan_' %}
             <li class="nav-item {{ loans_active ? 'active' : '' }}">
                 <a class="nav-link {{ loans_active ? 'active' : '' }}" href="{{ path('loan_index') }}" title="Кредиты">
@@ -127,6 +131,8 @@
                     <span class="nav-link-title hide-when-collapsed">Кредиты</span>
                 </a>
             </li>
+            <!-- Кредиты --> #}
+
 
             {% include "partials/_sidebar_marketplace.html.twig" %}
 
