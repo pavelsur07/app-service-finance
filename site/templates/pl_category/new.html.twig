@@ -1,12 +1,1 @@
-{% extends 'base.html.twig' %}
-
-{% block title %}Новая категория P&L{% endblock %}
-
-{% block body %}
-    {% include 'pl_category/_form.html.twig' with {
-        form: form,
-        page_title: 'Новая строка P&L',
-        submit_label: 'Сохранить',
-        available_codes: available_codes|default([])
-    } only %}
-{% endblock %}
+{% extends 'pl_category/edit.html.twig' %}

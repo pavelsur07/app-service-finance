@@ -51,13 +51,17 @@ class PLCategoryController extends AbstractController
         $company = $companyService->getActiveCompany();
         $category = new PLCategory(Uuid::uuid4()->toString(), $company);
 
-        $parents = $repo->findTreeByCompany($company);
+        $availableCategories = $repo->findTreeByCompany($company);
         $nextSortOrder = $repo->getNextSortOrder($company, $category->getParent());
         if (null === $category->getSortOrder()) {
             $category->setSortOrder($nextSortOrder);
         }
 
-        $form = $this->createForm(PLCategoryFormType::class, $category, ['parents' => $parents]);
+        $form = $this->createForm(PLCategoryFormType::class, $category, [
+            'parents' => $availableCategories,
+            'expanded_choices' => true,
+        ]);
+        $form->remove('isVisible');
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -75,7 +79,8 @@ class PLCategoryController extends AbstractController
 
         return $this->render('pl_category/new.html.twig', [
             'form' => $form->createView(),
-            'available_codes' => $repo->findCodesByCompany($company),
+            'available_categories' => $availableCategories,
+            'is_new' => true,
         ]);
     }
 
