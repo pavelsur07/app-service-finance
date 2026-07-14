@@ -74,6 +74,18 @@
                             {% endif %}
                         </div>
                     </div>
+                    {% if priceAtDate %}
+                        <hr>
+                        <div class="text-muted small mb-1">Цена на дату ({{ priceAtDate|date('d.m.Y') }})</div>
+                        {% if priceAtPurchasePrice %}
+                            <div class="h3 mb-0">
+                                {{ priceAtPurchasePrice.priceAmount|number_format(2, '.', ' ') }}
+                                <small class="text-muted">{{ priceAtPurchasePrice.priceCurrency }}</small>
+                            </div>
+                        {% else %}
+                            <div class="text-muted">Не задано</div>
+                        {% endif %}
+                    {% endif %}
                 </div>
             </div>
         </div>

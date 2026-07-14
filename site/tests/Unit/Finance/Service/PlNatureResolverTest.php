@@ -1,0 +1,121 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Unit\Finance\Service;
+
+use App\Company\Entity\Company;
+use App\Company\Entity\User;
+use App\Finance\Application\Service\PlNatureResolver;
+use App\Finance\Entity\Document;
+use App\Finance\Entity\DocumentOperation;
+use App\Finance\Entity\PLCategory;
+use App\Finance\Enum\PLFlow;
+use App\Finance\Enum\PlNature;
+use PHPUnit\Framework\TestCase;
+use Ramsey\Uuid\Uuid;
+
+final class PlNatureResolverTest extends TestCase
+{
+    public function testOperationCategoryDeterminesNature(): void
+    {
+        $resolver = new PlNatureResolver();
+
+        $company = $this->createCompany();
+        $document = new Document(Uuid::uuid4()->toString(), $company);
+
+        $revenueRoot = $this->createCategory($company, 'Revenue');
+        $revenueChild = $this->createCategory($company, 'Marketplace Sales', $revenueRoot);
+        $revenueChild->setFlow(PLFlow::INCOME);
+
+        $operation = new DocumentOperation();
+        $operation->setDocument($document);
+        $operation->setAmount('0');
+        $operation->setCategory($revenueChild);
+
+        self::assertSame(PlNature::INCOME, $resolver->forOperation($operation));
+    }
+
+    public function testReturnsNullWhenCategoryMissing(): void
+    {
+        $resolver = new PlNatureResolver();
+
+        $company = $this->createCompany();
+        $document = new Document(Uuid::uuid4()->toString(), $company);
+
+        $operation = new DocumentOperation();
+        $operation->setDocument($document);
+        $operation->setAmount('0');
+
+        self::assertNull($resolver->forOperation($operation));
+    }
+
+    public function testFallsBackToAmountSignWhenCategoryIsNeutral(): void
+    {
+        $resolver = new PlNatureResolver();
+
+        $company = $this->createCompany();
+        $document = new Document(Uuid::uuid4()->toString(), $company);
+
+        $neutralCategory = $this->createCategory($company, 'Neutral KPI helper');
+        $neutralCategory->setFlow(PLFlow::NONE);
+
+        $incomeOperation = new DocumentOperation();
+        $incomeOperation->setDocument($document);
+        $incomeOperation->setCategory($neutralCategory);
+        $incomeOperation->setAmount('1250.00');
+
+        $expenseOperation = new DocumentOperation();
+        $expenseOperation->setDocument($document);
+        $expenseOperation->setCategory($neutralCategory);
+        $expenseOperation->setAmount('-450.00');
+
+        self::assertSame(PlNature::INCOME, $resolver->forOperation($incomeOperation));
+        self::assertSame(PlNature::EXPENSE, $resolver->forOperation($expenseOperation));
+    }
+
+    public function testDocumentReturnsMixedWhenHasIncomeAndExpenseOperations(): void
+    {
+        $resolver = new PlNatureResolver();
+
+        $company = $this->createCompany();
+        $document = new Document(Uuid::uuid4()->toString(), $company);
+
+        $revenueRoot = $this->createCategory($company, 'Revenue');
+        $revenueChild = $this->createCategory($company, 'Marketplace Sales', $revenueRoot);
+        $revenueChild->setFlow(PLFlow::INCOME);
+        $expenseRoot = $this->createCategory($company, 'OPEX');
+        $expenseChild = $this->createCategory($company, 'Marketing', $expenseRoot);
+        $expenseChild->setFlow(PLFlow::EXPENSE);
+
+        $incomeOperation = new DocumentOperation();
+        $incomeOperation->setCategory($revenueChild);
+        $document->addOperation($incomeOperation);
+
+        $expenseOperation = new DocumentOperation();
+        $expenseOperation->setCategory($expenseChild);
+        $document->addOperation($expenseOperation);
+
+        self::assertSame('MIXED', $resolver->forDocument($document));
+    }
+
+    private function createCompany(): Company
+    {
+        $user = new User(Uuid::uuid4()->toString());
+        $user->setEmail('test@example.com');
+        $user->setPassword('secret');
+
+        return new Company(Uuid::uuid4()->toString(), $user);
+    }
+
+    private function createCategory(Company $company, string $name, ?PLCategory $parent = null): PLCategory
+    {
+        $category = new PLCategory(Uuid::uuid4()->toString(), $company);
+        $category->setName($name);
+        if ($parent) {
+            $category->setParent($parent);
+        }
+
+        return $category;
+    }
+}

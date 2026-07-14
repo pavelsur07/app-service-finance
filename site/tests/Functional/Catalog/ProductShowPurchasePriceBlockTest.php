@@ -31,15 +31,14 @@ final class ProductShowPurchasePriceBlockTest extends WebTestCaseBase
 
         $product = (new Product('32222222-2222-2222-2222-222222222222', $company))
             ->setName('Товар с ценой')
-            ->setSku('SKU-PRICE-SHOW')
-            ->setPurchasePrice('0.00');
+            ->setSku('SKU-PRICE-SHOW');
 
         $purchasePrice = new ProductPurchasePrice(
             id: '43333333-3333-3333-3333-333333333333',
-            company: $company,
+            companyId: $company->getId(),
             product: $product,
             effectiveFrom: new \DateTimeImmutable('2024-01-01'),
-            priceAmount: 199900,
+            priceAmount: '199900',
             priceCurrency: 'RUB',
         );
 
@@ -50,9 +49,7 @@ final class ProductShowPurchasePriceBlockTest extends WebTestCaseBase
         $em->flush();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', $company->getId());
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
 
         $client->request('GET', sprintf('/catalog/products/%s?price_at=2024-02-15', $product->getId()));
 
@@ -61,7 +58,6 @@ final class ProductShowPurchasePriceBlockTest extends WebTestCaseBase
         self::assertStringContainsString('Закупочная цена', $content);
         self::assertStringContainsString('На сегодня', $content);
         self::assertStringContainsString('Цена на дату (15.02.2024)', $content);
-        self::assertStringContainsString('199900 RUB', $content);
+        self::assertStringContainsString('199 900.00', $content);
     }
 }
-

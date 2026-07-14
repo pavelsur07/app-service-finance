@@ -44,7 +44,7 @@ site-cs-fix:
 # ===== TESTS =====
 
 site-test-telegram:
-	 $(DOCKER_COMPOSE) run --rm site-php-cli composer test -- --testsuite telegram
+	$(DOCKER_COMPOSE) run --rm site-php-cli composer test:smoke
 
 # Быстрые юнит-тесты (без БД)
 site-test-unit:
@@ -58,7 +58,7 @@ site-test-integration: site-test-wait-db
 
 # Все тесты
 site-test: site-test-prepare
-	$(DOCKER_COMPOSE) run --rm site-php-cli composer test
+	$(DOCKER_COMPOSE) run --rm -e COMPOSER_PROCESS_TIMEOUT=0 site-php-cli composer test
 
 # ---- подготовка окружения тестов (smoke) ----
 site-test-smoke-init: site-test-env site-test-wait-db site-test-db site-test-migrations
@@ -92,14 +92,14 @@ site-test-migrations:
 
 site-test-fixtures:
 	# Если для интеграционных нужны данные — загружаем минимальные фикстуры
-	$(DOCKER_COMPOSE) run --rm site-php-cli php bin/console doctrine:fixtures:load --no-interaction --env=test
+	$(DOCKER_COMPOSE) run --rm site-php-cli php bin/console doctrine:fixtures:load --no-interaction --env=test --purge-exclusions=test_money_holder
 
 # Полный пересоздатeль test-БД (на случай поломанных фикстур)
 site-test-db-rebuild: site-test-wait-db
 	$(DOCKER_COMPOSE) run --rm site-php-cli php bin/console doctrine:database:drop --force --env=test
 	$(DOCKER_COMPOSE) run --rm site-php-cli php bin/console doctrine:database:create --env=test
 	$(DOCKER_COMPOSE) run --rm site-php-cli php bin/console doctrine:migrations:migrate --no-interaction --env=test
-	$(DOCKER_COMPOSE) run --rm site-php-cli php bin/console doctrine:fixtures:load --no-interaction --env=test
+	$(DOCKER_COMPOSE) run --rm site-php-cli php bin/console doctrine:fixtures:load --no-interaction --env=test --purge-exclusions=test_money_holder
 
 # ===== CODEX TESTS =====
 

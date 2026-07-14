@@ -54,9 +54,7 @@ final class ProductIndexTest extends WebTestCaseBase
         $em->flush();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', $activeCompany->getId());
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', $activeCompany->getId());
 
         $crawler = $client->request('GET', '/catalog/products');
 
@@ -70,7 +68,6 @@ final class ProductIndexTest extends WebTestCaseBase
     {
         return (new Product($id, $company))
             ->setName($name)
-            ->setSku($sku)
-            ->setPurchasePrice('100.00');
+            ->setSku($sku);
     }
 }

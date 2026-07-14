@@ -109,6 +109,7 @@ final class VerificationApiControllerTest extends WebTestCaseBase
                 'backfill-raw-'.$date,
                 new \DateTimeImmutable('2026-06-20 10:00:00+00:00'),
             );
+            $raw->markSeen(new \DateTimeImmutable('2026-06-20 10:00:00+00:00'));
             $firstRaw ??= $raw;
 
             $em->persist($raw);

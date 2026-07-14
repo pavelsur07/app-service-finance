@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Inventory\Enum;
+namespace App\Tests\Unit\Inventory\Enum;
 
 use App\Inventory\Enum\LocationType;
 use App\Inventory\Enum\SnapshotSessionStatus;

@@ -87,12 +87,9 @@ final class DealAdjustmentFlowTest extends WebTestCaseBase
         self::assertCount(1, $dealFromDb->getAdjustments());
 
         $client->loginUser($user);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', $companyId);
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', $companyId);
 
-        $tokenManager = $client->getContainer()->get('security.csrf.token_manager');
-        $token = $tokenManager->getToken('deal_item_remove'.$itemId)->getValue();
+        $token = $this->csrfToken($client, 'deal_item_remove'.$itemId);
 
         $client->request('POST', sprintf('/deals/%s/items/%s/remove', $dealId, $itemId), [
             '_token' => $token,

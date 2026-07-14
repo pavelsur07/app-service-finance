@@ -30,8 +30,7 @@ final class ProductPurchasePriceCreateTest extends WebTestCaseBase
 
         $product = (new Product('32222222-2222-2222-2222-222222222223', $company))
             ->setName('Товар для добавления цены')
-            ->setSku('SKU-PRICE-CREATE')
-            ->setPurchasePrice('0.00');
+            ->setSku('SKU-PRICE-CREATE');
 
         $em->persist($owner);
         $em->persist($company);
@@ -39,9 +38,7 @@ final class ProductPurchasePriceCreateTest extends WebTestCaseBase
         $em->flush();
 
         $client->loginUser($owner);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', $company->getId());
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
 
         $crawler = $client->request('GET', sprintf('/catalog/products/%s', $product->getId()));
         self::assertResponseIsSuccessful();
@@ -66,6 +63,6 @@ final class ProductPurchasePriceCreateTest extends WebTestCaseBase
 
         $content = (string) $client->getResponse()->getContent();
         self::assertStringContainsString('Закупочная цена успешно добавлена.', $content);
-        self::assertStringContainsString('123456 RUB', $content);
+        self::assertStringContainsString('123 456.00', $content);
     }
 }

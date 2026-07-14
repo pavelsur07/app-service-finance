@@ -111,7 +111,7 @@ final class PaymentRecurrenceService
             $totalMonths = ($baseMonth - 1) + $offset;
             $targetYear = $baseYear + intdiv($totalMonths, 12);
             $targetMonth = ($totalMonths % 12) + 1;
-            $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $targetMonth, $targetYear);
+            $daysInMonth = (int) $start->setDate($targetYear, $targetMonth, 1)->format('t');
             $day = min($dayOfMonth, $daysInMonth);
 
             $candidate = $start->setDate($targetYear, $targetMonth, $day);

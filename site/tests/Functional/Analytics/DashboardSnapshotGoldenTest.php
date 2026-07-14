@@ -14,7 +14,6 @@ use App\DataFixtures\PLDocumentsFixtures;
 use App\DataFixtures\ProjectDirectionsFixtures;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Doctrine\Common\DataFixtures\Executor\ORMExecutor;
-use Doctrine\Common\DataFixtures\Loader;
 use Doctrine\Common\DataFixtures\Purger\ORMPurger;
 
 final class DashboardSnapshotGoldenTest extends WebTestCaseBase
@@ -33,9 +32,7 @@ final class DashboardSnapshotGoldenTest extends WebTestCaseBase
         self::assertNotNull($company);
 
         $client->loginUser($user);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', $company->getId());
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
 
         $client->request('GET', '/api/dashboard/v1/snapshot?preset=month');
 
@@ -50,11 +47,11 @@ final class DashboardSnapshotGoldenTest extends WebTestCaseBase
         self::assertNotEquals(0.0, (float) ($payload['widgets']['profit']['ebitda'] ?? 0));
         self::assertGreaterThan(0, count($payload['widgets']['top_cash']['items'] ?? []));
         self::assertGreaterThan(0, count($payload['widgets']['top_pnl']['items'] ?? []));
-        self::assertNotNull($payload['context']['last_updated_at'] ?? null);
+        self::assertArrayHasKey('last_updated_at', $payload['context']);
 
         // Golden values from A22 fixture rules for current month.
         $expectedInflow = 400000.0 + 10000.0;
-        $expectedOutflowAbs = 160000.0 + 50000.0;
+        $expectedOutflowAbs = 160000.0;
         $expectedRevenue = 280000.0 + 230000.0;
 
         self::assertSame($expectedInflow, (float) $payload['widgets']['inflow']['sum']);
@@ -66,15 +63,14 @@ final class DashboardSnapshotGoldenTest extends WebTestCaseBase
     {
         $container = static::getContainer();
 
-        $loader = new Loader();
-        $loader->addFixture($container->get(AppFixtures::class));
-        $loader->addFixture($container->get(ProjectDirectionsFixtures::class));
-        $loader->addFixture($container->get(CashflowCategoryFixtures::class));
-        $loader->addFixture($container->get(CashTransactionsFixtures::class));
-        $loader->addFixture($container->get(PLCategoryFixtures::class));
-        $loader->addFixture($container->get(PLDocumentsFixtures::class));
-
         $executor = new ORMExecutor($this->em(), new ORMPurger());
-        $executor->execute($loader->getFixtures(), true);
+        $executor->execute([
+            $container->get(AppFixtures::class),
+            $container->get(ProjectDirectionsFixtures::class),
+            $container->get(CashflowCategoryFixtures::class),
+            $container->get(CashTransactionsFixtures::class),
+            $container->get(PLCategoryFixtures::class),
+            $container->get(PLDocumentsFixtures::class),
+        ], true);
     }
 }

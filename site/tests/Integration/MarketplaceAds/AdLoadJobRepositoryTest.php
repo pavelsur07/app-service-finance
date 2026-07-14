@@ -12,6 +12,7 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\MarketplaceAds\AdLoadJobBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 final class AdLoadJobRepositoryTest extends IntegrationTestCase
 {
@@ -265,9 +266,7 @@ final class AdLoadJobRepositoryTest extends IntegrationTestCase
         self::assertSame(5, $reloaded->getLoadedDays(), 'Счётчик не должен измениться от чужого company_id');
     }
 
-    /**
-     * @dataProvider nonPositiveDeltaProvider
-     */
+    #[DataProvider('nonPositiveDeltaProvider')]
     public function testIncrementRejectsNonPositiveDelta(int $delta): void
     {
         $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');

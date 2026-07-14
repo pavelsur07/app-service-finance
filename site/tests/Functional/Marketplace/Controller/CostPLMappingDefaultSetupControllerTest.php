@@ -177,7 +177,7 @@ final class CostPLMappingDefaultSetupControllerTest extends WebTestCaseBase
 
     private function csrf(KernelBrowser $client): string
     {
-        return $client->getContainer()->get('security.csrf.token_manager')->getToken('marketplace_default_cost_mapping')->getValue();
+        return $this->csrfToken($client, 'marketplace_default_cost_mapping');
     }
 
     private function countMappings(): int
@@ -188,9 +188,7 @@ final class CostPLMappingDefaultSetupControllerTest extends WebTestCaseBase
     private function loginWithActiveCompany(KernelBrowser $client, User $user, Company $company): void
     {
         $client->loginUser($user);
-        $session = $client->getContainer()->get('session');
-        $session->set('active_company_id', $company->getId());
-        $session->save();
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
     }
 
     private function seedBaseData(bool $withAllPlCodes = true): array

@@ -27,19 +27,6 @@
         <testsuite name="functional">
             <directory>tests/Functional</directory>
         </testsuite>
-        <!-- По модулю, если хочется запускать точечно -->
-        <testsuite name="telegram">
-            <directory>tests/Telegram</directory>
-        </testsuite>
-        <testsuite name="marketplace">
-            <directory>tests/Marketplace</directory>
-        </testsuite>
-        <testsuite name="marketplace-analytics">
-            <directory>tests/MarketplaceAnalytics</directory>
-        </testsuite>
-        <testsuite name="cash">
-            <directory>tests/Cash</directory>
-        </testsuite>
     </testsuites>
 
     <source>

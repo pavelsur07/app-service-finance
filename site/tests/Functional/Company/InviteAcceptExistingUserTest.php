@@ -21,9 +21,9 @@ final class InviteAcceptExistingUserTest extends WebTestCaseBase
         $this->resetDb();
 
         $em = $this->em();
-        $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
+        $owner = UserBuilder::aUser()->withIndex(1)->withEmail('owner@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
-        $existingUser = UserBuilder::aUser()->withEmail('operator@example.test')->build();
+        $existingUser = UserBuilder::aUser()->withIndex(2)->withEmail('operator@example.test')->build();
         $tokenService = new InviteTokenService();
         $plainToken = 'existing-user-token';
         $tokenHash = $tokenService->hashToken($plainToken);
@@ -41,8 +41,7 @@ final class InviteAcceptExistingUserTest extends WebTestCaseBase
         $em->flush();
 
         $client->loginUser($existingUser);
-        $csrfManager = $client->getContainer()->get('security.csrf.token_manager');
-        $token = $csrfManager->getToken('invite_accept_'.$invite->getId())->getValue();
+        $token = $this->csrfToken($client, 'invite_accept_'.$invite->getId());
 
         $client->request('POST', sprintf('/invite/%s/accept', $plainToken), [
             '_token' => $token,
