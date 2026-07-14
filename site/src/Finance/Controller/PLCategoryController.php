@@ -97,6 +97,7 @@ class PLCategoryController extends AbstractController
             'parents' => $parents,
             'expanded_choices' => true,
         ]);
+        $form->remove('isVisible');
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {

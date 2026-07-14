@@ -13,7 +13,7 @@ use App\Tests\Support\Kernel\WebTestCaseBase;
 
 final class PLCategoryEditControllerTest extends WebTestCaseBase
 {
-    public function testEditPreservesStoredExpenseTypeWhenSubmittedUnchanged(): void
+    public function testEditPreservesFieldsExcludedFromSubmission(): void
     {
         $client = static::createClient();
         $this->resetDb();
@@ -24,7 +24,8 @@ final class PLCategoryEditControllerTest extends WebTestCaseBase
             ->forCompany($company)
             ->withName('Variable expense')
             ->build()
-            ->setExpenseType(PLExpenseType::VARIABLE);
+            ->setExpenseType(PLExpenseType::VARIABLE)
+            ->setIsVisible(false);
 
         $em = $this->em();
         $em->persist($user);
@@ -40,6 +41,9 @@ final class PLCategoryEditControllerTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         $expenseTypeField = $crawler->filter('select[id$="_expenseType"]');
         self::assertCount(1, $expenseTypeField);
+        self::assertCount(1, $crawler->filter('select[id$="_flow"]'));
+        self::assertCount(0, $crawler->filter('input[name$="[flow]"]'));
+        self::assertCount(0, $crawler->filter('input[id$="_isVisible"]'));
 
         $form = $crawler->filter('#pl-category-edit-form')->form();
         $client->submit($form);
@@ -51,5 +55,6 @@ final class PLCategoryEditControllerTest extends WebTestCaseBase
 
         self::assertInstanceOf(PLCategory::class, $updatedCategory);
         self::assertSame(PLExpenseType::VARIABLE, $updatedCategory->getExpenseType());
+        self::assertFalse($updatedCategory->isVisible());
     }
 }

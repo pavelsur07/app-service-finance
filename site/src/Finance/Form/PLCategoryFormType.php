@@ -57,7 +57,6 @@ class PLCategoryFormType extends AbstractType
             ])
             ->add('flow', ChoiceType::class, [
                 'label' => 'Движение',
-                'expanded' => $options['expanded_choices'],
                 'choices' => [
                     'Доход' => PLFlow::INCOME,
                     'Расход' => PLFlow::EXPENSE,
