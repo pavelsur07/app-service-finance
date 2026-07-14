@@ -69,24 +69,7 @@
                                 </div>
 
                                 <div class="col-md-6">
-                                    {{ form_label(form.flow) }}
-                                    <div class="form-selectgroup">
-                                        {% for choice in form.flow %}
-                                            <label class="form-selectgroup-item" for="{{ choice.vars.id }}">
-                                                {{ form_widget(choice, {'attr': {'class': 'form-selectgroup-input'}}) }}
-                                                <span class="form-selectgroup-label">
-                                                    {% if choice.vars.value == 'INCOME' %}
-                                                        <i class="ti ti-trending-up text-green me-1"></i>Доход
-                                                    {% elseif choice.vars.value == 'EXPENSE' %}
-                                                        <i class="ti ti-trending-down text-red me-1"></i>Расход
-                                                    {% else %}
-                                                        <i class="ti ti-minus text-secondary me-1"></i>Нейтральная
-                                                    {% endif %}
-                                                </span>
-                                            </label>
-                                        {% endfor %}
-                                    </div>
-                                    {{ form_errors(form.flow) }}
+                                    {{ form_row(form.flow) }}
                                     <small class="form-hint">Составная строка может быть нейтральной.</small>
                                 </div>
 
@@ -121,14 +104,6 @@
                                     <small class="form-hint">Очередь вычисления зависимых строк.</small>
                                 </div>
 
-                                <div class="col-12">
-                                    {{ form_label(form.isVisible, null, {'label_attr': {'class': 'd-block mb-2'}}) }}
-                                    <label class="form-check form-switch">
-                                        {{ form_widget(form.isVisible, {'attr': {'class': 'form-check-input'}}) }}
-                                        <span class="form-check-label">Показывать</span>
-                                    </label>
-                                    {{ form_errors(form.isVisible) }}
-                                </div>
                             </div>
                         </div>
 
@@ -240,7 +215,7 @@
                 const formula = document.getElementById('{{ form.formula.vars.id }}');
                 const formulaHint = document.getElementById('pl-category-formula-hint');
                 const typeBadge = document.getElementById('pl-category-type-badge');
-                const flowInputs = form.querySelectorAll('input[name="{{ form.flow.vars.full_name }}"]');
+                const flow = document.getElementById('{{ form.flow.vars.id }}');
 
                 const syncType = function () {
                     const isLeaf = type.value === 'LEAF_INPUT';
@@ -262,14 +237,11 @@
                 };
 
                 const syncFlow = function () {
-                    const selected = form.querySelector('input[name="{{ form.flow.vars.full_name }}"]:checked');
-                    expenseType.disabled = !selected || selected.value !== 'EXPENSE';
+                    expenseType.disabled = flow.value !== 'EXPENSE';
                 };
 
                 type.addEventListener('change', syncType);
-                flowInputs.forEach(function (input) {
-                    input.addEventListener('change', syncFlow);
-                });
+                flow.addEventListener('change', syncFlow);
 
                 form.addEventListener('click', async function (event) {
                     const copyButton = event.target.closest('[data-copy-target]');
