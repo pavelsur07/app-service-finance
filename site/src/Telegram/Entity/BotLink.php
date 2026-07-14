@@ -175,7 +175,7 @@ class BotLink
     {
         $now ??= new \DateTimeImmutable();
 
-        return $this->expiresAt <= $now->modify(sprintf('+%d seconds', max(0, $leewaySeconds)));
+        return $this->expiresAt < $now->modify(sprintf('-%d seconds', max(0, $leewaySeconds)));
     }
 
     // Возвращает дату создания

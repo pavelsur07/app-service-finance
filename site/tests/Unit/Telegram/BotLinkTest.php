@@ -31,13 +31,17 @@ final class BotLinkTest extends TestCase
         $bot = $this->createStub(TelegramBot::class);
 
         $now = new \DateTimeImmutable();
-        $expiresAt = $now->add(new \DateInterval('PT60S'));
-        $entity = new BotLink(Uuid::uuid7()->toString(), $company, $bot, 'token', 'finance', $expiresAt);
+        $entity = new BotLink(
+            Uuid::uuid7()->toString(),
+            $company,
+            $bot,
+            'token',
+            'finance',
+            $now->modify('-10 seconds'),
+        );
 
-        // Без ливея — не истёк
-        self::assertFalse($entity->isExpired($now));
-
-        // С ливеем 120с — считается истёкшим
-        self::assertTrue($entity->isExpired($now, 120));
+        self::assertTrue($entity->isExpired($now));
+        self::assertFalse($entity->isExpired($now, 20));
+        self::assertTrue($entity->isExpired($now->modify('+11 seconds'), 20));
     }
 }

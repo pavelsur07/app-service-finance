@@ -24,6 +24,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Routing\Requirement\Requirement;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_USER')]
@@ -139,7 +140,7 @@ class CashTransactionController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}', name: 'cash_transaction_show', requirements: ['id' => '[0-9a-fA-F-]{36}'], methods: ['GET'])]
+    #[Route('/{id}', name: 'cash_transaction_show', requirements: ['id' => Requirement::UUID], methods: ['GET'])]
     public function show(CashTransaction $tx): Response
     {
         $company = $this->companyService->getActiveCompany();
@@ -154,7 +155,7 @@ class CashTransactionController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/create-pnl-document', name: 'cash_transaction_create_pnl_document', methods: ['POST'])]
+    #[Route('/{id}/create-pnl-document', name: 'cash_transaction_create_pnl_document', requirements: ['id' => Requirement::UUID], methods: ['POST'])]
     public function createPnlDocument(
         Request $request,
         CashTransaction $tx,
@@ -258,7 +259,7 @@ class CashTransactionController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/edit', name: 'cash_transaction_edit', methods: ['GET', 'POST'])]
+    #[Route('/{id}/edit', name: 'cash_transaction_edit', requirements: ['id' => Requirement::UUID], methods: ['GET', 'POST'])]
     public function edit(
         Request $request,
         CashTransaction $tx,
@@ -312,7 +313,7 @@ class CashTransactionController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/restore', name: 'cash_transaction_restore', requirements: ['id' => '[0-9a-fA-F-]{36}'], methods: ['POST'])]
+    #[Route('/{id}/restore', name: 'cash_transaction_restore', requirements: ['id' => Requirement::UUID], methods: ['POST'])]
     public function restore(
         Request $request,
         string $id,
@@ -337,7 +338,7 @@ class CashTransactionController extends AbstractController
         return $this->redirectToRoute('cash_transaction_deleted_index');
     }
 
-    #[Route('/{id}/delete', name: 'cash_transaction_delete', methods: ['POST'])]
+    #[Route('/{id}/delete', name: 'cash_transaction_delete', requirements: ['id' => Requirement::UUID], methods: ['POST'])]
     public function delete(Request $request, CashTransaction $tx, CashTransactionService $service): Response
     {
         $company = $this->companyService->getActiveCompany();
