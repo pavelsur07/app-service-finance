@@ -36,6 +36,8 @@ final class MoneyAccountNewControllerTest extends WebTestCaseBase
         self::assertSelectorTextContains('.money-account-info', 'остаток средств на счёте');
         self::assertCount(1, $crawler->filter('form#money-account-create-form.card'));
         self::assertCount(0, $crawler->filter('select[id$="_type"]'));
+        self::assertCount(0, $crawler->filter('label[for$="_type"]'));
+        self::assertCount(4, $crawler->filter('input[data-money-account-type] + .form-selectgroup-label'));
         self::assertSame(
             ['bank', 'cash', 'ewallet', 'crypto_wallet'],
             $crawler->filter('input[data-money-account-type]')->each(static fn ($node) => $node->attr('value')),
