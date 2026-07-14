@@ -78,7 +78,6 @@ class PLCategoryFormType extends AbstractType
             ])
             ->add('format', ChoiceType::class, [
                 'label' => 'Формат',
-                'expanded' => $options['expanded_choices'],
                 'choices' => [
                     'Деньги' => PLValueFormat::MONEY,
                     '%' => PLValueFormat::PERCENT,

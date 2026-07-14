@@ -3,9 +3,9 @@
 {% block title %}Редактирование категории P&L{% endblock %}
 
 {% block body %}
-    {% set income_variables = available_categories|filter(category => category.code is not empty and category.type.value == 'LEAF_INPUT' and category.flow.value == 'INCOME') %}
-    {% set expense_variables = available_categories|filter(category => category.code is not empty and category.type.value == 'LEAF_INPUT' and category.flow.value == 'EXPENSE') %}
-    {% set calculated_variables = available_categories|filter(category => category.code is not empty and (category.type.value != 'LEAF_INPUT' or category.flow.value == 'NONE')) %}
+    {% set income_variables = available_categories|filter(category => category.code is not empty and category.flow.value == 'INCOME') %}
+    {% set expense_variables = available_categories|filter(category => category.code is not empty and category.flow.value == 'EXPENSE') %}
+    {% set calculated_variables = available_categories|filter(category => category.code is not empty and category.type.value == 'KPI') %}
 
     <div class="page-header d-print-none">
         <div class="container-xl">
@@ -78,18 +78,7 @@
                                 </div>
 
                                 <div class="col-md-4">
-                                    {{ form_label(form.format) }}
-                                    <div class="form-selectgroup">
-                                        {% for choice in form.format %}
-                                            <label class="form-selectgroup-item" for="{{ choice.vars.id }}">
-                                                {{ form_widget(choice, {'attr': {'class': 'form-selectgroup-input'}}) }}
-                                                <span class="form-selectgroup-label">
-                                                    {% if choice.vars.value == 'MONEY' %}₽{% elseif choice.vars.value == 'PERCENT' %}%{% elseif choice.vars.value == 'RATIO' %}Коэф.{% else %}Кол-во{% endif %}
-                                                </span>
-                                            </label>
-                                        {% endfor %}
-                                    </div>
-                                    {{ form_errors(form.format) }}
+                                    {{ form_row(form.format) }}
                                 </div>
                                 <div class="col-md-4">
                                     {{ form_label(form.weightInParent) }}
@@ -145,8 +134,8 @@
                                     {% if income_variables is not empty %}
                                         <div class="d-flex flex-column gap-2">
                                             {% for category in income_variables %}
-                                                <button type="button" class="btn btn-outline-green justify-content-between" data-insert-code="{{ category.code }}" data-insert-target="#{{ form.formula.vars.id }}">
-                                                    <span>{{ category.name }}</span><span class="badge bg-green-lt ms-2 font-monospace small fw-semibold">{{ category.code }}</span>
+                                                <button type="button" class="pl-category-variable btn btn-outline-green justify-content-between" data-insert-code="{{ category.code }}" data-insert-target="#{{ form.formula.vars.id }}">
+                                                    <span class="pl-category-variable-name text-truncate text-start" title="{{ category.name }}">{{ category.name }}</span><span class="pl-category-variable-code badge bg-green-lt ms-2 font-monospace small fw-semibold flex-shrink-0 text-nowrap">{{ category.code }}</span>
                                                 </button>
                                             {% endfor %}
                                         </div>
@@ -158,8 +147,8 @@
                                     {% if expense_variables is not empty %}
                                         <div class="d-flex flex-column gap-2">
                                             {% for category in expense_variables %}
-                                                <button type="button" class="btn btn-outline-red justify-content-between" data-insert-code="{{ category.code }}" data-insert-target="#{{ form.formula.vars.id }}">
-                                                    <span>{{ category.name }}</span><span class="badge bg-red-lt ms-2 font-monospace small fw-semibold">{{ category.code }}</span>
+                                                <button type="button" class="pl-category-variable btn btn-outline-red justify-content-between" data-insert-code="{{ category.code }}" data-insert-target="#{{ form.formula.vars.id }}">
+                                                    <span class="pl-category-variable-name text-truncate text-start" title="{{ category.name }}">{{ category.name }}</span><span class="pl-category-variable-code badge bg-red-lt ms-2 font-monospace small fw-semibold flex-shrink-0 text-nowrap">{{ category.code }}</span>
                                                 </button>
                                             {% endfor %}
                                         </div>
@@ -171,8 +160,8 @@
                                     {% if calculated_variables is not empty %}
                                         <div class="d-flex flex-column gap-2">
                                             {% for category in calculated_variables %}
-                                                <button type="button" class="btn btn-outline-primary justify-content-between" data-insert-code="{{ category.code }}" data-insert-target="#{{ form.formula.vars.id }}">
-                                                    <span>{{ category.name }}</span><span class="badge bg-blue-lt ms-2 font-monospace small fw-semibold">{{ category.code }}</span>
+                                                <button type="button" class="pl-category-variable btn btn-outline-primary justify-content-between" data-insert-code="{{ category.code }}" data-insert-target="#{{ form.formula.vars.id }}">
+                                                    <span class="pl-category-variable-name text-truncate text-start" title="{{ category.name }}">{{ category.name }}</span><span class="pl-category-variable-code badge bg-blue-lt ms-2 font-monospace small fw-semibold flex-shrink-0 text-nowrap">{{ category.code }}</span>
                                                 </button>
                                             {% endfor %}
                                         </div>
