@@ -70,6 +70,43 @@ PK вместо company-scoped данных), он покраснеет и бу�
 4. `$connection->close()` / `ensureKernelShutdown()` в `tearDown()` — низкий приоритет, косметика,
    можно взять отдельным LOW-этапом при желании.
 
+## Stage 2 — Postgres tuning для локального test-инстанса (🟡 MEDIUM)
+
+### Почему не paratest сразу
+
+Проверил окружение перед стартом: на этой машине 2 vCPU, ~1.2Gi свободного RAM (часть уже в swap).
+Стандартные GitHub Actions `ubuntu-latest` раннеры — тоже обычно 2 vCPU. При 2 ядрах paratest даёт
+реалистично ×1.5–2, а не линейный рост, плюс требует: новую dev-зависимость (`composer require`,
+обязательный STOP по CLAUDE.md), отдельные тестовые БД/схемы на воркер (сейчас все интеграционные
+тесты шарят одну `app_test` через DAMA static connection), правки Makefile/CI под провижининг.
+Владелец подтвердил (через AskUserQuestion) начать с более дешёвого и безопасного пункта —
+тюнинга Postgres, без новых зависимостей.
+
+### Что меняем
+
+`site-postgres` — один и тот же контейнер и для dev-БД (`app`), и для test-БД (`app_test`);
+отдельного test-only Postgres в `docker-compose.yml` нет. CI (`.github/workflows/deploy.yml`)
+поднимает Postgres как отдельный GitHub Actions service-контейнер напрямую из `postgres:15-alpine`,
+никак не связанный с этим `docker-compose.yml` — тюнинг здесь на CI не повлияет, это отдельная
+задача при желании.
+
+Добавляем в `docker-compose.yml` для `site-postgres` флаги, отключающие лишнюю fsync/WAL-дисциплину,
+допустимые для эфемерной локальной БД: `fsync=off`, `synchronous_commit=off`, `full_page_writes=off`.
+
+Классификация: 🟡 MEDIUM — не прод (правим только `docker-compose.yml`, не `docker-compose.prod.yml`),
+не миграция, не публичный API, но меняем поведение shared-инстанса Postgres, используемого и для
+dev, и для test → нужен явный прогон и явное указание риска в отчёте (durability trade-off для
+локальной dev-БД на случай грубого сбоя хоста).
+
+Риски / что смотреть ревьюеру:
+- `fsync=off` отключает гарантию сохранности данных при неожиданном отключении питания/сбое ОС —
+  приемлемо для эфемерной dev/test БД в docker-volume на локальной машине, неприемлемо для прода
+  (там `docker-compose.prod.yml`, не трогаем).
+- Изменение требует пересоздания контейнера `site-postgres` (`docker compose up -d site-postgres`)
+  для применения `command:` — кратковременный обрыв соединений для всего, что сейчас подключено
+  к этому Postgres (на момент запуска — только сам контейнер и site-redis, воркеров messenger не
+  поднято).
+
 ## STOP
 
 Согласно классификации Stage 1 — 🟢 LOW, но так как это единственный источник изоляции для 145
