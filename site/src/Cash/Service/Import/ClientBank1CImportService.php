@@ -9,8 +9,8 @@ use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Company\Entity\Company;
-use App\Company\Enum\CounterpartyType;
 use App\Company\Entity\Counterparty;
+use App\Company\Enum\CounterpartyType;
 use App\Company\Repository\CounterpartyRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
@@ -324,21 +324,6 @@ class ClientBank1CImportService
             $isNewTransaction = false;
 
             if (null === $transaction) {
-                if (!$isPreview && $this->cashTransactionRepository->existsByCompanyAndDedupe($companyId, $dedupeHash)) {
-                    ++$duplicates;
-                    if (null !== $importLog) {
-                        $this->importLogger->incSkippedDuplicate($importLog);
-                    }
-                    $this->logger->info('[1C Import] row.skip_dedupe', [
-                        'company' => $companyId,
-                        'dedupeHash' => $dedupeHash,
-                        'rowNo' => $currentRow,
-                        'occurredAt' => $occurredAtUtc->format(\DATE_ATOM),
-                        'amountMinor' => $amountMinor,
-                    ]);
-                    continue;
-                }
-
                 $transaction = new CashTransaction(
                     Uuid::uuid4()->toString(),
                     $company,

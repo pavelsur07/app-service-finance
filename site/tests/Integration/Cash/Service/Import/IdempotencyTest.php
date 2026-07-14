@@ -4,6 +4,39 @@ namespace App\Tests\Integration\Cash\Service\Import;
 
 class IdempotencyTest extends ClientBank1CImportServiceTestCase
 {
+    public function testDistinctDocumentsWithSamePaymentDetailsAreBothImported(): void
+    {
+        $firstRow = [
+            'docType' => 'Банковский ордер',
+            'docNumber' => '861307',
+            'docDate' => '2026-01-29',
+            'amount' => 1099,
+            'payerAccount' => '40702810900000000001',
+            'receiverAccount' => '40702810900000000002',
+            'dateDebit' => '2026-01-29',
+            'dateCredit' => null,
+            'purpose' => 'Покупка товара с одинаковыми реквизитами',
+            'direction' => 'outflow',
+        ];
+        $secondRow = $firstRow;
+        $secondRow['docNumber'] = '924374';
+        $rows = [$firstRow, $secondRow];
+
+        $firstSummary = $this->service->import($rows, $this->account, false);
+
+        self::assertSame(2, $firstSummary['created']);
+        self::assertSame(0, $firstSummary['duplicates']);
+        self::assertSame(0, $firstSummary['errors']);
+        self::assertCount(2, $this->transactionRepository->findAll());
+
+        $secondSummary = $this->service->import($rows, $this->account, false);
+
+        self::assertSame(0, $secondSummary['created']);
+        self::assertSame(2, $secondSummary['duplicates']);
+        self::assertSame(0, $secondSummary['errors']);
+        self::assertCount(2, $this->transactionRepository->findAll());
+    }
+
     public function testRepeatedImportCountsDuplicatesAndSupportsOverwrite(): void
     {
         $row = [
