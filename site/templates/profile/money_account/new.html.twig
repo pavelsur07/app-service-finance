@@ -1,4 +1,5 @@
 {% extends 'base.html.twig' %}
+{% form_theme form.type 'form_div_layout.html.twig' %}
 
 {% block title %}Новый счёт{% endblock %}
 
@@ -59,7 +60,6 @@
                                 </div>
 
                                 <div class="col-12">
-                                    {{ form_label(form.type) }}
                                     {% set type_config = {
                                         'bank': {'icon': 'ti-building-bank', 'title': 'Банк', 'description': 'Расчётный счёт'},
                                         'cash': {'icon': 'ti-cash', 'title': 'Касса', 'description': 'Наличные'},
