@@ -50,7 +50,23 @@ class MoneyAccountController extends AbstractController
             currency: 'RUB'
         );
 
-        $form = $this->createForm(MoneyAccountFormType::class, $account);
+        $form = $this->createForm(MoneyAccountFormType::class, $account, [
+            'expanded_type' => true,
+            'currency_choices' => true,
+        ]);
+        foreach ([
+            'minimumSafeBalance',
+            'bankName',
+            'iban',
+            'bic',
+            'corrAccount',
+            'location',
+            'responsiblePerson',
+            'provider',
+            'walletId',
+        ] as $field) {
+            $form->remove($field);
+        }
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {

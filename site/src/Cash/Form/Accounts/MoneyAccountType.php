@@ -27,13 +27,26 @@ class MoneyAccountType extends AbstractType
                     'Крипто-кошелёк' => MoneyAccountTypeEnum::CRYPTO_WALLET,
                 ],
                 'label' => 'Тип счёта',
+                'expanded' => $options['expanded_type'],
+                'choice_value' => $options['expanded_type']
+                    ? static fn (?MoneyAccountTypeEnum $type): string => $type?->value ?? ''
+                    : null,
             ])
             ->add('name', TextType::class, [
                 'label' => 'Название',
-            ])
-            ->add('currency', TextType::class, [
-                'label' => 'Валюта',
-            ])
+            ]);
+
+        $builder->add('currency', $options['currency_choices'] ? ChoiceType::class : TextType::class, [
+            'label' => 'Валюта',
+            ...($options['currency_choices'] ? [
+                'choices' => [
+                    '₽ RUB' => 'RUB',
+                    '$ USD' => 'USD',
+                    '€ EUR' => 'EUR',
+                    '₸ KZT' => 'KZT',
+                ],
+            ] : []),
+        ])
             ->add('openingBalance', MoneyType::class, [
                 'label' => 'Стартовый остаток',
                 'required' => false,
@@ -98,6 +111,10 @@ class MoneyAccountType extends AbstractType
     {
         $resolver->setDefaults([
             'data_class' => MoneyAccount::class,
+            'expanded_type' => false,
+            'currency_choices' => false,
         ]);
+        $resolver->setAllowedTypes('expanded_type', 'bool');
+        $resolver->setAllowedTypes('currency_choices', 'bool');
     }
 }
