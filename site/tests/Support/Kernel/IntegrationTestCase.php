@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Support\Kernel;
 
-use App\Tests\Support\Db\DbReset;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -34,8 +33,14 @@ abstract class IntegrationTestCase extends KernelTestCase
         self::ensureKernelShutdown();
     }
 
+    /**
+     * По умолчанию ничего не делает: изоляция между тестами уже обеспечена
+     * транзакцией DAMA\DoctrineTestBundle (rollback после каждого теста), поэтому
+     * TRUNCATE всех таблиц здесь был избыточен — выполнялся внутри той же
+     * транзакции и терялся при откате. Переопределяется в PostgresResetTestCase
+     * для тестов, где DAMA rollback осознанно отключён (#[SkipDatabaseRollback]).
+     */
     protected function resetDb(): void
     {
-        (new DbReset())->reset($this->em);
     }
 }
