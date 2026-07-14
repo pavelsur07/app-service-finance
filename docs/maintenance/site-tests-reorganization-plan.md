@@ -24,10 +24,10 @@
 |---|---|---|
 | `unit` | 1322 теста, green с warnings/deprecations | `OK (1427 tests, 8580 assertions)`, без warnings/deprecations |
 | `integration` | 760 тестов, 4 failures | `OK (694 tests, 3326 assertions)` |
-| `functional` | 86 тестов: 51 errors, 1 failure | `OK (215 tests, 1398 assertions)` |
+| `functional` | 86 тестов: 51 errors, 1 failure | `OK (216 tests, 1399 assertions)` после review-fix |
 | Telegram smoke | 27 тестов, 16 errors | `OK (31 tests, 106 assertions)` по путям новых suites |
 
-Изменение числа тестов внутри suites ожидаемо: ранее отдельные модульные и orphan-наборы включены в три стандартных suite, а 21 HTTP-тест перенесён из Integration в Functional. На уровне файлов сохранено 456 действующих `*Test.php`.
+Изменение числа тестов внутри suites ожидаемо: ранее отдельные модульные и orphan-наборы включены в три стандартных suite, а 21 HTTP-тест перенесён из Integration в Functional. После review добавлен regression-тест UUID requirement; на уровне файлов сохранено 457 действующих `*Test.php`.
 
 Одобренные владельцем HIGH-действия выполнены:
 
@@ -140,14 +140,14 @@ site/tests/
 
 `PATTERNS.md` требует integration-покрытие для Actions и functional-покрытие для Controllers. Это требование к минимальному уровню покрытия, а не основание механически переносить любой существующий mock-based `TestCase`: такой перенос не сделает его integration/functional тестом. Проверка отсутствующих boundary-сценариев должна быть отдельным coverage-аудитом. В этой задаче чистые дополнительные unit-тесты остаются в `Unit`, а доказанные web/kernel тесты раскладываются по фактическому типу.
 
-После согласованного удаления двух мёртвых legacy-тестов ожидается:
+После согласованного удаления двух мёртвых legacy-тестов и добавления regression-теста UUID requirement:
 
 | Suite | Ожидаемое количество файлов |
 |---|---:|
 | Unit | 228 |
 | Integration | 155 |
-| Functional | 73 |
-| **Всего** | **456** |
+| Functional | 74 |
+| **Всего** | **457** |
 
 Если `OzonOrderSyncServiceTest` должен быть сохранён, сначала требуется отдельная задача на восстановление отсутствующего production-модуля; это не входит в реорганизацию тестов.
 
@@ -259,7 +259,7 @@ docker compose run --rm site-php-cli php bin/phpunit --testsuite cash
 **Статус исполнения:** DONE
 **После phase:** STOP, final owner review required.
 
-1. Проверить, что все оставшиеся 456 `*Test.php` входят ровно в один из трёх suites.
+1. Проверить, что все оставшиеся 457 `*Test.php` входят ровно в один из трёх suites.
 2. Запустить каждый suite отдельно и полный набор.
 3. Запустить code style для изменённых PHP-файлов.
 4. Проверить `git diff --summary`, чтобы все удаления являлись ожидаемыми rename/delete из утверждённого списка.
@@ -329,7 +329,8 @@ git diff --summary
 - `make site-test-db-rebuild` — migrations выполняются; исходная fixture-ошибка после migrations исправлена и повторно проверена отдельным `make site-test-fixtures`.
 - 24 orphan-теста проанализированы отдельно: 23 действующих подключены к стандартным suites, один legacy-тест удалён после подтверждения владельца.
 - `make site-test-telegram` — `OK (31 tests, 106 assertions)`.
-- `php bin/phpunit --testsuite functional` — `OK (215 tests, 1398 assertions)`.
+- `php bin/phpunit --testsuite functional` — `OK (216 tests, 1399 assertions)` после review-fix.
+- `php bin/phpunit --testsuite unit` — `OK (1427 tests, 8581 assertions)` после review-fix.
 - `php bin/phpunit --testsuite integration` — `OK (694 tests, 3326 assertions)`.
 - `make site-test` — `OK (2336 tests, 13304 assertions)` после штатной подготовки test-БД.
 - Первый финальный `make site-test` обнаружил рассинхронизацию локальной `app_test`: колонка `bot_links.updated_at` существовала без отметки соответствующей миграции. `make site-test-db-rebuild` пересоздал только test-БД; повторная проверка migration history и полный прогон успешны.
