@@ -185,7 +185,20 @@ class CashTransactionAutoRuleController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $rule->recordUpdate($auditContextProvider->getActorUserId());
+            $unitOfWork = $em->getUnitOfWork();
+            $unitOfWork->computeChangeSets();
+            $hasChanges = [] !== $unitOfWork->getEntityChangeSet($rule)
+                || $rule->getConditions()->exists(
+                    static fn ($key, $condition): bool => [] !== $unitOfWork->getEntityChangeSet($condition),
+                );
+
+            foreach ($unitOfWork->getScheduledCollectionUpdates() as $collection) {
+                $hasChanges = $hasChanges || $collection->getOwner() === $rule;
+            }
+
+            if ($hasChanges) {
+                $rule->recordUpdate($auditContextProvider->getActorUserId());
+            }
             $em->flush();
 
             return $this->redirectToRoute('cash_transaction_auto_rule_index');
