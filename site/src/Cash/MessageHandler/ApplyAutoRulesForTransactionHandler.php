@@ -2,6 +2,7 @@
 
 namespace App\Cash\MessageHandler;
 
+use App\Cash\Application\Service\AutoRuleDispatchGuard;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Message\ApplyAutoRulesForTransaction;
@@ -20,13 +21,17 @@ final class ApplyAutoRulesForTransactionHandler
         private readonly CashTransactionRepository $transactionRepository,
         private readonly CashTransactionAutoRuleService $autoRuleService,
         private readonly CashflowSystemCategoryService $cashflowSystemCategoryService,
+        private readonly AutoRuleDispatchGuard $dispatchGuard,
         private readonly LoggerInterface $logger,
     ) {
     }
 
     public function __invoke(ApplyAutoRulesForTransaction $message): void
     {
-        $transaction = $this->transactionRepository->find($message->transactionId);
+        $transaction = $this->transactionRepository->findOneByIdAndCompanyId(
+            $message->transactionId,
+            $message->companyId,
+        );
 
         if (!$transaction instanceof CashTransaction) {
             $this->logger->warning('Cash auto rules: transaction not found', [
@@ -34,20 +39,6 @@ final class ApplyAutoRulesForTransactionHandler
                 'companyId' => $message->companyId,
                 'createdAt' => $message->createdAt->format(\DATE_ATOM),
             ]);
-
-            return;
-        }
-
-        $transactionCompanyId = $transaction->getCompany()->getId();
-        if (null === $transactionCompanyId || $transactionCompanyId !== $message->companyId) {
-            $this->logger->warning('Cash auto rules: company mismatch', [
-                'transactionId' => $message->transactionId,
-                'expectedCompanyId' => $message->companyId,
-                'actualCompanyId' => $transactionCompanyId,
-                'createdAt' => $message->createdAt->format(\DATE_ATOM),
-            ]);
-
-            $this->entityManager->clear(CashTransaction::class);
 
             return;
         }
@@ -84,7 +75,7 @@ final class ApplyAutoRulesForTransactionHandler
         }
 
         if (null !== $rule) {
-            $changed = $this->autoRuleService->applyRule($rule, $transaction);
+            $changed = $this->autoRuleService->applyRule($rule, $transaction, $match);
             $ruleId = $rule->getId();
             $ruleName = $rule->getName();
         }
@@ -92,8 +83,11 @@ final class ApplyAutoRulesForTransactionHandler
         if (null === $transaction->getCashflowCategory()) {
             $unallocatedCategory = $this->cashflowSystemCategoryService->getOrCreateUnallocated($transaction->getCompany());
             $transaction->setCashflowCategory($unallocatedCategory);
-            $this->entityManager->flush();
             $changed = true;
+        }
+
+        if ($changed) {
+            $this->dispatchGuard->suppress(fn () => $this->entityManager->flush());
         }
 
         $this->logger->info('Cash auto rules applied', [

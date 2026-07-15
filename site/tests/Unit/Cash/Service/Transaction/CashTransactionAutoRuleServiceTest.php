@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Service\Transaction;
 
-use App\Cash\Application\Service\AutoRuleDispatchGuard;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Entity\Transaction\CashTransactionAutoRuleCondition;
@@ -19,7 +18,6 @@ use App\Company\Entity\Company;
 use App\Tests\Builders\Cash\CashflowCategoryBuilder;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
-use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 
@@ -32,9 +30,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         $transaction->markDeleted(null);
         $rule = $this->createRule($company);
 
-        $entityManager = $this->createMock(EntityManagerInterface::class);
-        $entityManager->expects(self::never())->method('flush');
-        $service = $this->createService($entityManager);
+        $service = $this->createService();
 
         self::assertSame(CashTransactionAutoRuleSkipReason::DELETED, $service->getSkipReason($transaction));
         self::assertNull($service->findMatchingRule($transaction));
@@ -50,9 +46,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         $transaction->setOccurredAt(new \DateTimeImmutable('2024-01-14'));
         $rule = $this->createRule($company);
 
-        $entityManager = $this->createMock(EntityManagerInterface::class);
-        $entityManager->expects(self::never())->method('flush');
-        $service = $this->createService($entityManager);
+        $service = $this->createService();
 
         self::assertSame(CashTransactionAutoRuleSkipReason::LOCKED_PERIOD, $service->getSkipReason($transaction));
         self::assertNull($service->findMatchingRule($transaction));
@@ -68,9 +62,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         $transaction->setOccurredAt(new \DateTimeImmutable('2024-01-15'));
         $rule = $this->createRule($company);
 
-        $entityManager = $this->createMock(EntityManagerInterface::class);
-        $entityManager->expects(self::once())->method('flush');
-        $service = $this->createService($entityManager);
+        $service = $this->createService(rules: [$rule]);
 
         self::assertNull($service->getSkipReason($transaction));
         self::assertTrue($service->applyRule($rule, $transaction));
@@ -83,9 +75,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         $transaction = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
         $rule = $this->createRule($company)->setIsActive(false);
 
-        $entityManager = $this->createMock(EntityManagerInterface::class);
-        $entityManager->expects(self::never())->method('flush');
-        $service = $this->createService($entityManager);
+        $service = $this->createService();
 
         self::assertFalse($service->applyRule($rule, $transaction));
         self::assertNull($transaction->getCashflowCategory());
@@ -106,9 +96,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
             ->build();
         $rule = $this->createRule($company);
 
-        $entityManager = $this->createMock(EntityManagerInterface::class);
-        $entityManager->expects(self::once())->method('flush');
-        $service = $this->createService($entityManager);
+        $service = $this->createService(rules: [$rule]);
 
         self::assertTrue($service->applyRule($rule, $transaction));
         self::assertSame($rule->getCashflowCategory(), $transaction->getCashflowCategory());
@@ -127,9 +115,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
             ->build();
         $rule = $this->createRule($company);
 
-        $entityManager = $this->createMock(EntityManagerInterface::class);
-        $entityManager->expects(self::never())->method('flush');
-        $service = $this->createService($entityManager);
+        $service = $this->createService(rules: [$rule]);
 
         self::assertFalse($service->applyRule($rule, $transaction));
         self::assertSame($assignedCategory, $transaction->getCashflowCategory());
@@ -150,9 +136,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
             ->build();
         $rule = $this->createRule($company)->setCashflowCategory($unallocated);
 
-        $entityManager = $this->createMock(EntityManagerInterface::class);
-        $entityManager->expects(self::never())->method('flush');
-        $service = $this->createService($entityManager);
+        $service = $this->createService(rules: [$rule]);
 
         self::assertFalse($service->applyRule($rule, $transaction));
         self::assertSame($unallocated, $transaction->getCashflowCategory());
@@ -171,10 +155,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         $repository = $this->createMock(CashTransactionAutoRuleRepository::class);
         $repository->method('findActiveByCompany')->with($company)->willReturn([$firstRule, $secondRule]);
 
-        $result = $this->createService(
-            $this->createMock(EntityManagerInterface::class),
-            $repository,
-        )->match($transaction);
+        $result = $this->createService($repository)->match($transaction);
 
         self::assertTrue($result->hasConflict());
         self::assertNull($result->rule);
@@ -190,10 +171,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         $repository = $this->createMock(CashTransactionAutoRuleRepository::class);
         $repository->method('findActiveByCompany')->with($company)->willReturn([$firstRule, $secondRule]);
 
-        $result = $this->createService(
-            $this->createMock(EntityManagerInterface::class),
-            $repository,
-        )->match($transaction);
+        $result = $this->createService($repository)->match($transaction);
 
         self::assertFalse($result->hasConflict());
         self::assertSame($firstRule, $result->rule);
@@ -212,10 +190,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         $repository = $this->createMock(CashTransactionAutoRuleRepository::class);
         $repository->method('findActiveByCompany')->with($company)->willReturn([$winner, $lowerPriorityRule]);
 
-        $result = $this->createService(
-            $this->createMock(EntityManagerInterface::class),
-            $repository,
-        )->match($transaction);
+        $result = $this->createService($repository)->match($transaction);
 
         self::assertFalse($result->hasConflict());
         self::assertSame($winner, $result->rule);
@@ -237,7 +212,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         ));
         $repository = $this->createMock(CashTransactionAutoRuleRepository::class);
         $repository->method('findActiveByCompany')->with($company)->willReturn([$rule]);
-        $service = $this->createService($this->createMock(EntityManagerInterface::class), $repository);
+        $service = $this->createService($repository);
 
         $rows = $service->previewRule($rule, [$otherTransaction, $matchingTransaction], 10);
 
@@ -245,6 +220,8 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         self::assertSame($matchingTransaction, $rows[0]['transaction']);
         self::assertSame($rule, $rows[0]['match']->rule);
         self::assertSame($service->match($matchingTransaction)->rule, $rows[0]['match']->rule);
+        self::assertSame($rule, $rows[0]['plan']?->rule);
+        self::assertTrue($rows[0]['plan']?->hasChanges());
     }
 
     public function testMatchesLocalizedDecimalAmount(): void
@@ -265,10 +242,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         $repository = $this->createMock(CashTransactionAutoRuleRepository::class);
         $repository->method('findActiveByCompany')->with($company)->willReturn([$rule]);
 
-        $match = $this->createService(
-            $this->createMock(EntityManagerInterface::class),
-            $repository,
-        )->match($transaction);
+        $match = $this->createService($repository)->match($transaction);
 
         self::assertSame($rule, $match->rule);
     }
@@ -280,23 +254,72 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         $rule = $this->createRule($company)->setIsActive(false);
         $repository = $this->createMock(CashTransactionAutoRuleRepository::class);
         $repository->method('findActiveByCompany')->with($company)->willReturn([]);
-        $service = $this->createService($this->createMock(EntityManagerInterface::class), $repository);
+        $service = $this->createService($repository);
 
         $rows = $service->previewRule($rule, [$transaction], 10);
 
         self::assertCount(1, $rows);
         self::assertSame($transaction, $rows[0]['transaction']);
         self::assertNull($rows[0]['match']->rule);
+        self::assertNull($rows[0]['plan']);
+    }
+
+    public function testApplicationPlanDoesNotMutateTransactionAndRecordsChanges(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $transaction = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
+        $rule = $this->createRule($company);
+        $service = $this->createService(rules: [$rule]);
+
+        $plan = $service->createApplicationPlan($rule, $transaction);
+
+        self::assertNull($transaction->getCashflowCategory());
+        self::assertSame([
+            'cashflowCategory' => [
+                'before' => null,
+                'after' => $rule->getCashflowCategory()?->getId(),
+            ],
+        ], $plan->changes);
+    }
+
+    public function testDoesNotApplyRuleWithTargetFromAnotherCompany(): void
+    {
+        $company = CompanyBuilder::aCompany()->withIndex(1)->build();
+        $otherCompany = CompanyBuilder::aCompany()->withIndex(2)->build();
+        $transaction = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
+        $rule = $this->createRule(
+            $company,
+            CashflowCategoryBuilder::aCashflowCategory()->withCompany($otherCompany)->build(),
+        );
+        $service = $this->createService(rules: [$rule]);
+
+        self::assertFalse($service->applyRule($rule, $transaction));
+        self::assertNull($transaction->getCashflowCategory());
+    }
+
+    public function testDoesNotApplyRuleThatIsNotTheCurrentWinner(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $transaction = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
+        $winner = $this->createRule($company)->setPriority(200);
+        $lowerPriorityRule = $this->createRule($company)->setPriority(100);
+        $service = $this->createService(rules: [$winner, $lowerPriorityRule]);
+
+        self::assertFalse($service->applyRule($lowerPriorityRule, $transaction));
+        self::assertNull($transaction->getCashflowCategory());
     }
 
     private function createService(
-        EntityManagerInterface $entityManager,
         ?CashTransactionAutoRuleRepository $repository = null,
+        array $rules = [],
     ): CashTransactionAutoRuleService {
+        if (null === $repository) {
+            $repository = $this->createMock(CashTransactionAutoRuleRepository::class);
+            $repository->method('findActiveByCompany')->willReturn($rules);
+        }
+
         return new CashTransactionAutoRuleService(
-            $repository ?? $this->createMock(CashTransactionAutoRuleRepository::class),
-            $entityManager,
-            new AutoRuleDispatchGuard(),
+            $repository,
         );
     }
 

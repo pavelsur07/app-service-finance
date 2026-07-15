@@ -19,6 +19,17 @@ class CashTransactionRepository extends ServiceEntityRepository
         parent::__construct($registry, CashTransaction::class);
     }
 
+    public function findOneByIdAndCompanyId(string $id, string $companyId): ?CashTransaction
+    {
+        return $this->createQueryBuilder('t')
+            ->andWhere('t.id = :id')
+            ->andWhere('IDENTITY(t.company) = :companyId')
+            ->setParameter('id', $id)
+            ->setParameter('companyId', $companyId)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     public function maxUpdatedAtForCompany(Company $company): ?\DateTimeImmutable
     {
         $maxUpdatedAt = $this->createQueryBuilder('t')

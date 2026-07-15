@@ -10,8 +10,10 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
+use App\Company\Entity\ProjectDirection;
 use App\Tests\Builders\Cash\CashflowCategoryBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\CounterpartyBuilder;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Validator\ConstraintViolationInterface;
@@ -98,6 +100,66 @@ final class CashTransactionAutoRuleConditionValidationTest extends TestCase
         );
 
         self::assertContains('conditions', $this->paths($this->validator->validate($rule)));
+    }
+
+    public function testRuleRejectsTargetsFromAnotherCompany(): void
+    {
+        $company = CompanyBuilder::aCompany()->withIndex(1)->build();
+        $otherCompany = CompanyBuilder::aCompany()->withIndex(2)->build();
+        $rule = new CashTransactionAutoRule(
+            Uuid::uuid4()->toString(),
+            $company,
+            'Аренда',
+            CashTransactionAutoRuleAction::FILL,
+            CashTransactionAutoRuleOperationType::OUTFLOW,
+            CashflowCategoryBuilder::aCashflowCategory()->withCompany($otherCompany)->build(),
+            CounterpartyBuilder::aCounterparty()->withCompany($otherCompany)->build(),
+        );
+        $rule->setProjectDirection(new ProjectDirection(Uuid::uuid4()->toString(), $otherCompany, 'Чужой проект'));
+
+        $paths = $this->paths($this->validator->validate($rule));
+
+        self::assertContains('cashflowCategory', $paths);
+        self::assertContains('projectDirection', $paths);
+        self::assertContains('counterparty', $paths);
+    }
+
+    public function testConditionRejectsCounterpartyFromAnotherCompany(): void
+    {
+        $company = CompanyBuilder::aCompany()->withIndex(1)->build();
+        $otherCompany = CompanyBuilder::aCompany()->withIndex(2)->build();
+        $rule = new CashTransactionAutoRule(
+            Uuid::uuid4()->toString(),
+            $company,
+            'Аренда',
+            CashTransactionAutoRuleAction::FILL,
+            CashTransactionAutoRuleOperationType::OUTFLOW,
+            CashflowCategoryBuilder::aCashflowCategory()->withCompany($company)->build(),
+        );
+        $condition = new CashTransactionAutoRuleCondition(
+            autoRule: $rule,
+            field: CashTransactionAutoRuleConditionField::COUNTERPARTY,
+            operator: CashTransactionAutoRuleConditionOperator::EQUAL,
+            counterparty: CounterpartyBuilder::aCounterparty()->withCompany($otherCompany)->build(),
+        );
+
+        self::assertContains('counterparty', $this->paths($this->validator->validate($condition)));
+    }
+
+    public function testRuleCompanyCannotBeReassigned(): void
+    {
+        $company = CompanyBuilder::aCompany()->withIndex(1)->build();
+        $rule = new CashTransactionAutoRule(
+            Uuid::uuid4()->toString(),
+            $company,
+            'Аренда',
+            CashTransactionAutoRuleAction::FILL,
+            CashTransactionAutoRuleOperationType::OUTFLOW,
+            CashflowCategoryBuilder::aCashflowCategory()->withCompany($company)->build(),
+        );
+
+        $this->expectException(\InvalidArgumentException::class);
+        $rule->setCompany(CompanyBuilder::aCompany()->withIndex(2)->build());
     }
 
     /** @return list<string> */
