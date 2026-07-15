@@ -61,7 +61,9 @@
                                     <span class="badge bg-secondary-lt">Выключено</span>
                                 {% endif %}
                             </td>
-                            <td>{{ item.action.name }}</td>
+                            <td>
+                                Безопасное заполнение{% if item.action.value == 'UPDATE' %} (legacy UPDATE){% endif %}
+                            </td>
                             <td>{{ item.operationType.name }}</td>
                             <td>{{ item.projectDirection ? item.projectDirection.name : '' }}</td>
                             <td>

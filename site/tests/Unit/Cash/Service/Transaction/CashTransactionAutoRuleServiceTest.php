@@ -169,7 +169,8 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
             ->setProjectDirection(new ProjectDirection($projectId, $company, 'Rule project'))
             ->setCounterparty(CounterpartyBuilder::aCounterparty()->withId($counterpartyId)->withCompany($company)->build());
 
-        $plan = $this->createService()->createApplicationPlan($rule, $transaction);
+        $service = $this->createService(rules: [$rule]);
+        $plan = $service->createApplicationPlan($service->match($transaction), $transaction);
 
         self::assertSame([], $plan->changes);
     }
@@ -178,12 +179,12 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
     {
         $company = CompanyBuilder::aCompany()->build();
         $transaction = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
-        $firstRule = $this->createRule($company);
+        $firstRule = $this->createRule($company, id: '11111111-1111-1111-1111-111111111111');
         $secondCategory = CashflowCategoryBuilder::aCashflowCategory()
             ->withId(Uuid::uuid4()->toString())
             ->withCompany($company)
             ->build();
-        $secondRule = $this->createRule($company, $secondCategory);
+        $secondRule = $this->createRule($company, $secondCategory, '22222222-2222-2222-2222-222222222222');
         $repository = $this->createMock(CashTransactionAutoRuleRepository::class);
         $repository->method('findActiveByCompany')->with($company)->willReturn([$firstRule, $secondRule]);
 
@@ -198,8 +199,12 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
     {
         $company = CompanyBuilder::aCompany()->build();
         $transaction = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
-        $firstRule = $this->createRule($company);
-        $secondRule = $this->createRule($company, $firstRule->getCashflowCategory());
+        $firstRule = $this->createRule($company, id: '11111111-1111-1111-1111-111111111111');
+        $secondRule = $this->createRule(
+            $company,
+            $firstRule->getCashflowCategory(),
+            '22222222-2222-2222-2222-222222222222',
+        );
         $repository = $this->createMock(CashTransactionAutoRuleRepository::class);
         $repository->method('findActiveByCompany')->with($company)->willReturn([$firstRule, $secondRule]);
 
@@ -226,6 +231,122 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
 
         self::assertFalse($result->hasConflict());
         self::assertSame($winner, $result->rule);
+    }
+
+    public function testResolvesAndAppliesIndependentFieldWinners(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $transaction = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
+        $categoryRule = $this->createRule(
+            $company,
+            id: '11111111-1111-1111-1111-111111111111',
+        )->setPriority(300);
+        $project = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Project');
+        $projectRule = $this->createRule(
+            $company,
+            id: '22222222-2222-2222-2222-222222222222',
+        )->setPriority(200)->setProjectDirection($project);
+        $counterparty = CounterpartyBuilder::aCounterparty()->withCompany($company)->build();
+        $counterpartyRule = $this->createRule(
+            $company,
+            id: '33333333-3333-3333-3333-333333333333',
+        )->setPriority(100)->setCounterparty($counterparty);
+        $service = $this->createService(rules: [$counterpartyRule, $projectRule, $categoryRule]);
+
+        $match = $service->match($transaction);
+        $plan = $service->applyRule($categoryRule, $transaction, $match);
+
+        self::assertSame([$categoryRule, $projectRule, $counterpartyRule], $match->matchingRules);
+        self::assertSame($categoryRule, $match->winners['cashflowCategory']);
+        self::assertSame($projectRule, $match->winners['projectDirection']);
+        self::assertSame($counterpartyRule, $match->winners['counterparty']);
+        self::assertSame($categoryRule->getCashflowCategory(), $transaction->getCashflowCategory());
+        self::assertSame($project, $transaction->getProjectDirection());
+        self::assertSame($counterparty, $transaction->getCounterparty());
+        self::assertSame([
+            'cashflowCategory' => $categoryRule,
+            'projectDirection' => $projectRule,
+            'counterparty' => $counterpartyRule,
+        ], $plan?->rulesByField);
+    }
+
+    public function testSkipsOnlyConflictingField(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $transaction = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
+        $project = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Project');
+        $firstRule = $this->createRule(
+            $company,
+            id: '11111111-1111-1111-1111-111111111111',
+        )->setProjectDirection($project);
+        $secondRule = $this->createRule(
+            $company,
+            CashflowCategoryBuilder::aCashflowCategory()
+                ->withId(Uuid::uuid4()->toString())
+                ->withCompany($company)
+                ->build(),
+            '22222222-2222-2222-2222-222222222222',
+        )->setProjectDirection($project);
+        $service = $this->createService(rules: [$secondRule, $firstRule]);
+
+        $match = $service->match($transaction);
+        $plan = $service->applyMatch($transaction, $match);
+
+        self::assertSame(['cashflowCategory'], array_keys($match->conflicts));
+        self::assertSame($firstRule, $match->winners['projectDirection']);
+        self::assertNull($transaction->getCashflowCategory());
+        self::assertSame($project, $transaction->getProjectDirection());
+        self::assertSame(['projectDirection'], array_keys($plan?->changes ?? []));
+    }
+
+    public function testMoreSpecificRuleWinsAtEqualPriority(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $transaction = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
+        $transaction->setDescription('Оплата аренды');
+        $generalRule = $this->createRule(
+            $company,
+            id: '11111111-1111-1111-1111-111111111111',
+        );
+        $specificRule = $this->createRule(
+            $company,
+            CashflowCategoryBuilder::aCashflowCategory()->withCompany($company)->build(),
+            '22222222-2222-2222-2222-222222222222',
+        );
+        $specificRule->addCondition(new CashTransactionAutoRuleCondition(
+            autoRule: $specificRule,
+            field: CashTransactionAutoRuleConditionField::DESCRIPTION,
+            operator: CashTransactionAutoRuleConditionOperator::CONTAINS,
+            value: 'аренд',
+        ));
+
+        $match = $this->createService(rules: [$generalRule, $specificRule])->match($transaction);
+
+        self::assertSame($specificRule, $match->winners['cashflowCategory']);
+        self::assertFalse($match->hasConflict());
+    }
+
+    public function testUpdateRulePreservesManualValuesAndIgnoresNullTargets(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $manualCategory = CashflowCategoryBuilder::aCashflowCategory()->withCompany($company)->build();
+        $manualProject = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Manual project');
+        $manualCounterparty = CounterpartyBuilder::aCounterparty()->withCompany($company)->build();
+        $transaction = CashTransactionBuilder::aCashTransaction()
+            ->forCompany($company)
+            ->withCashflowCategory($manualCategory)
+            ->build()
+            ->setProjectDirection($manualProject)
+            ->setCounterparty($manualCounterparty);
+        $rule = $this->createRule($company)->setAction(CashTransactionAutoRuleAction::UPDATE);
+        $service = $this->createService(rules: [$rule]);
+
+        $plan = $service->applyRule($rule, $transaction);
+
+        self::assertFalse($plan?->hasChanges());
+        self::assertSame($manualCategory, $transaction->getCashflowCategory());
+        self::assertSame($manualProject, $transaction->getProjectDirection());
+        self::assertSame($manualCounterparty, $transaction->getCounterparty());
     }
 
     public function testPreviewUsesTheSameMatcherAsApplication(): void
@@ -303,7 +424,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         $rule = $this->createRule($company);
         $service = $this->createService(rules: [$rule]);
 
-        $plan = $service->createApplicationPlan($rule, $transaction);
+        $plan = $service->createApplicationPlan($service->match($transaction), $transaction);
 
         self::assertNull($transaction->getCashflowCategory());
         self::assertSame([
@@ -313,9 +434,11 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
             ],
         ], $plan->changes);
         self::assertSame([
-            'autoRule' => [
-                'id' => $rule->getId(),
-                'revision' => 1,
+            'autoRules' => [
+                'cashflowCategory' => [
+                    'id' => $rule->getId(),
+                    'revision' => 1,
+                ],
             ],
             'changes' => $plan->changes,
         ], $plan->auditDiff());
@@ -362,12 +485,15 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         );
     }
 
-    private function createRule(Company $company, ?CashflowCategory $category = null): CashTransactionAutoRule
-    {
+    private function createRule(
+        Company $company,
+        ?CashflowCategory $category = null,
+        ?string $id = null,
+    ): CashTransactionAutoRule {
         $category ??= CashflowCategoryBuilder::aCashflowCategory()->withCompany($company)->build();
 
         return new CashTransactionAutoRule(
-            Uuid::uuid4()->toString(),
+            $id ?? Uuid::uuid4()->toString(),
             $company,
             'Test rule',
             CashTransactionAutoRuleAction::FILL,

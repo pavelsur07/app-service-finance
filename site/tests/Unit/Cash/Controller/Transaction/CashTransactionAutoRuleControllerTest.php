@@ -50,7 +50,10 @@ final class CashTransactionAutoRuleControllerTest extends TestCase
             ->willReturn($transaction);
         $autoRuleService = $this->createMock(CashTransactionAutoRuleService::class);
         $autoRuleService->method('getSkipReason')->with($transaction)->willReturn(null);
-        $autoRuleService->method('match')->with($transaction)->willReturn(new CashTransactionAutoRuleMatchResult($winner));
+        $autoRuleService->method('match')->with($transaction)->willReturn(new CashTransactionAutoRuleMatchResult(
+            $winner,
+            winners: ['cashflowCategory' => $winner],
+        ));
         $autoRuleService->expects(self::never())->method('applyRule');
         $csrfTokenManager = $this->createMock(CsrfTokenManagerInterface::class);
         $csrfTokenManager->expects(self::once())
@@ -82,7 +85,7 @@ final class CashTransactionAutoRuleControllerTest extends TestCase
         ], json_decode((string) $response->getContent(), true, flags: \JSON_THROW_ON_ERROR));
     }
 
-    public function testManualApplyFlushesOnceWithDispatchSuppressed(): void
+    public function testManualApplyFlushesOnceWithPartialConflictAndDispatchSuppressed(): void
     {
         $company = CompanyBuilder::aCompany()->build();
         $transaction = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
@@ -103,7 +106,20 @@ final class CashTransactionAutoRuleControllerTest extends TestCase
             ->willReturn($transaction);
         $autoRuleService = $this->createMock(CashTransactionAutoRuleService::class);
         $autoRuleService->method('getSkipReason')->willReturn(null);
-        $match = new CashTransactionAutoRuleMatchResult($rule);
+        $conflictingRule = new CashTransactionAutoRule(
+            Uuid::uuid4()->toString(),
+            $company,
+            'Conflicting project rule',
+            CashTransactionAutoRuleAction::FILL,
+            CashTransactionAutoRuleOperationType::ANY,
+            $rule->getCashflowCategory(),
+        );
+        $match = new CashTransactionAutoRuleMatchResult(
+            $rule,
+            [$conflictingRule],
+            winners: ['cashflowCategory' => $rule],
+            conflicts: ['projectDirection' => [$conflictingRule]],
+        );
         $applicationPlan = new CashTransactionAutoRuleApplicationPlan(
             $rule,
             ['cashflowCategory' => ['before' => null, 'after' => $rule->getCashflowCategory()?->getId()]],

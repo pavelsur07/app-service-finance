@@ -8,9 +8,9 @@ use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Enum\Transaction\CashDirection;
-use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleSkipReason;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Company\Entity\Company;
@@ -24,8 +24,8 @@ class CashTransactionAutoRuleService
     }
 
     /**
-     * Найти правило-победитель для транзакции (в пределах компании транзакции).
-     * Возвращает null, если правило не найдено или обнаружен конфликт.
+     * Найти основное правило-победитель для транзакции (в пределах компании транзакции).
+     * Возвращает null, если ни у одного поля нет однозначного победителя.
      */
     public function findMatchingRule(CashTransaction $t): ?CashTransactionAutoRule
     {
@@ -75,8 +75,8 @@ class CashTransactionAutoRuleService
                 'transaction' => $transaction,
                 'skipReason' => $skipReason,
                 'match' => $match,
-                'plan' => null !== $match->rule
-                    ? $this->createApplicationPlan($match->rule, $transaction)
+                'plan' => $match->hasWinners()
+                    ? $this->createApplicationPlan($match, $transaction)
                     : null,
             ];
 
@@ -91,32 +91,65 @@ class CashTransactionAutoRuleService
     /** @param list<CashTransactionAutoRule> $rules */
     private function resolveMatch(CashTransaction $transaction, array $rules): CashTransactionAutoRuleMatchResult
     {
-        $matchingRules = [];
-        $matchingPriority = null;
-
-        foreach ($rules as $rule) {
-            if (null !== $matchingPriority && $rule->getPriority() < $matchingPriority) {
-                break;
-            }
-
-            if ($this->ruleMatchesTransaction($rule, $transaction)) {
-                $matchingPriority ??= $rule->getPriority();
-                $matchingRules[] = $rule;
-            }
-        }
+        $matchingRules = array_values(array_filter(
+            $rules,
+            fn (CashTransactionAutoRule $rule): bool => $this->ruleMatchesTransaction($rule, $transaction),
+        ));
 
         if ([] === $matchingRules) {
             return new CashTransactionAutoRuleMatchResult(null);
         }
 
-        $winner = $matchingRules[0];
-        foreach (array_slice($matchingRules, 1) as $rule) {
-            if ($this->getRuleEffectSignature($winner) !== $this->getRuleEffectSignature($rule)) {
-                return new CashTransactionAutoRuleMatchResult(null, $matchingRules);
+        usort($matchingRules, function (CashTransactionAutoRule $left, CashTransactionAutoRule $right): int {
+            return $right->getPriority() <=> $left->getPriority()
+                ?: $this->getSpecificity($right) <=> $this->getSpecificity($left)
+                ?: strcmp((string) $left->getId(), (string) $right->getId());
+        });
+
+        $winners = [];
+        $conflicts = [];
+        foreach (['cashflowCategory', 'projectDirection', 'counterparty'] as $field) {
+            $candidates = array_values(array_filter(
+                $matchingRules,
+                fn (CashTransactionAutoRule $rule): bool => null !== $this->getTargetId($rule, $field),
+            ));
+            if ([] === $candidates) {
+                continue;
+            }
+
+            $topRule = $candidates[0];
+            $topSpecificity = $this->getSpecificity($topRule);
+            $contenders = array_values(array_filter(
+                $candidates,
+                fn (CashTransactionAutoRule $rule): bool => $rule->getPriority() === $topRule->getPriority()
+                    && $this->getSpecificity($rule) === $topSpecificity,
+            ));
+            $targetIds = array_unique(array_map(
+                fn (CashTransactionAutoRule $rule): ?string => $this->getTargetId($rule, $field),
+                $contenders,
+            ));
+
+            if (count($targetIds) > 1) {
+                $conflicts[$field] = $contenders;
+            } else {
+                $winners[$field] = $topRule;
             }
         }
 
-        return new CashTransactionAutoRuleMatchResult($winner);
+        $conflictingRules = [];
+        foreach ($conflicts as $fieldConflicts) {
+            foreach ($fieldConflicts as $conflictingRule) {
+                $conflictingRules[(string) $conflictingRule->getId()] = $conflictingRule;
+            }
+        }
+
+        return new CashTransactionAutoRuleMatchResult(
+            $winners['cashflowCategory'] ?? $winners['projectDirection'] ?? $winners['counterparty'] ?? null,
+            array_values($conflictingRules),
+            $matchingRules,
+            $winners,
+            $conflicts,
+        );
     }
 
     private function ruleMatchesTransaction(CashTransactionAutoRule $rule, CashTransaction $transaction): bool
@@ -206,15 +239,19 @@ class CashTransactionAutoRuleService
         };
     }
 
-    /** @return array{string, ?string, ?string, ?string} */
-    private function getRuleEffectSignature(CashTransactionAutoRule $rule): array
+    private function getSpecificity(CashTransactionAutoRule $rule): int
     {
-        return [
-            $rule->getAction()->value,
-            $rule->getCashflowCategory()?->getId(),
-            $rule->getProjectDirection()?->getId(),
-            $rule->getCounterparty()?->getId(),
-        ];
+        return $rule->getConditions()->count()
+            + (CashTransactionAutoRuleOperationType::ANY === $rule->getOperationType() ? 0 : 1);
+    }
+
+    private function getTargetId(CashTransactionAutoRule $rule, string $field): ?string
+    {
+        return match ($field) {
+            'cashflowCategory' => $rule->getCashflowCategory()?->getId(),
+            'projectDirection' => $rule->getProjectDirection()?->getId(),
+            'counterparty' => $rule->getCounterparty()?->getId(),
+        };
     }
 
     /** Применить текущее правило-победитель к одной транзакции без сохранения. */
@@ -232,81 +269,86 @@ class CashTransactionAutoRuleService
         }
 
         $resolvedMatch ??= $this->match($t);
-        if ($resolvedMatch->rule !== $rule) {
+        if (!$resolvedMatch->isWinner($rule)) {
             return null;
         }
 
-        $plan = $this->createApplicationPlan($rule, $t);
-        $this->applyPlan($plan, $t);
+        return $this->applyMatch($t, $resolvedMatch);
+    }
+
+    public function applyMatch(
+        CashTransaction $transaction,
+        ?CashTransactionAutoRuleMatchResult $resolvedMatch = null,
+    ): ?CashTransactionAutoRuleApplicationPlan {
+        if (null !== $this->getSkipReason($transaction)) {
+            return null;
+        }
+
+        $resolvedMatch ??= $this->match($transaction);
+        if (!$resolvedMatch->hasWinners()) {
+            return null;
+        }
+
+        $plan = $this->createApplicationPlan($resolvedMatch, $transaction);
+        $this->applyPlan($plan, $transaction);
 
         return $plan;
     }
 
     public function createApplicationPlan(
-        CashTransactionAutoRule $rule,
+        CashTransactionAutoRuleMatchResult $match,
         CashTransaction $t,
     ): CashTransactionAutoRuleApplicationPlan {
         $changes = [];
-        $category = $rule->getCashflowCategory(); // в сущности правила поле not-null
-        $projectDirection = $rule->getProjectDirection();
-        $counterparty = $rule->getCounterparty();
-        $action = $rule->getAction();
+        $rulesByField = [];
+        $categoryRule = $match->winners['cashflowCategory'] ?? null;
+        $projectRule = $match->winners['projectDirection'] ?? null;
+        $counterpartyRule = $match->winners['counterparty'] ?? null;
+        $category = $categoryRule?->getCashflowCategory();
+        $projectDirection = $projectRule?->getProjectDirection();
+        $counterparty = $counterpartyRule?->getCounterparty();
 
-        // Семантика:
-        // FILL   — ставим категорию только если у транзакции она пуста или не распределена
-        // UPDATE — перезаписываем всегда
-        if (CashTransactionAutoRuleAction::FILL === $action) {
-            $currentCategory = $t->getCashflowCategory();
-            $isCategoryEmpty = null === $currentCategory || in_array(
-                $currentCategory->getCode(),
-                [CashflowCategory::CODE_UNALLOCATED, CashflowCategory::SYSTEM_UNALLOCATED],
-                true,
-            );
-            if (null !== $category && $currentCategory?->getId() !== $category->getId() && $isCategoryEmpty) {
-                $changes['cashflowCategory'] = [
-                    'before' => $currentCategory?->getId(),
-                    'after' => $category->getId(),
-                ];
-            }
-            if (null === $t->getProjectDirection() && null !== $projectDirection) {
-                $changes['projectDirection'] = [
-                    'before' => null,
-                    'after' => $projectDirection->getId(),
-                ];
-            }
-            if (null === $t->getCounterparty() && null !== $counterparty) {
-                $changes['counterparty'] = [
-                    'before' => null,
-                    'after' => $counterparty->getId(),
-                ];
-            }
-        } else { // UPDATE
-            if ($t->getCashflowCategory()?->getId() !== $category?->getId()) {
-                $changes['cashflowCategory'] = [
-                    'before' => $t->getCashflowCategory()?->getId(),
-                    'after' => $category?->getId(),
-                ];
-            }
-            if ($t->getProjectDirection()?->getId() !== $projectDirection?->getId()) {
-                $changes['projectDirection'] = [
-                    'before' => $t->getProjectDirection()?->getId(),
-                    'after' => $projectDirection?->getId(),
-                ];
-            }
-            if ($t->getCounterparty()?->getId() !== $counterparty?->getId()) {
-                $changes['counterparty'] = [
-                    'before' => $t->getCounterparty()?->getId(),
-                    'after' => $counterparty?->getId(),
-                ];
-            }
+        $currentCategory = $t->getCashflowCategory();
+        $isCategoryEmpty = null === $currentCategory || in_array(
+            $currentCategory->getCode(),
+            [CashflowCategory::CODE_UNALLOCATED, CashflowCategory::SYSTEM_UNALLOCATED],
+            true,
+        );
+        if (null !== $categoryRule && null !== $category
+            && $currentCategory?->getId() !== $category->getId() && $isCategoryEmpty) {
+            $changes['cashflowCategory'] = [
+                'before' => $currentCategory?->getId(),
+                'after' => $category->getId(),
+            ];
+            $rulesByField['cashflowCategory'] = $categoryRule;
+        }
+        if (null === $t->getProjectDirection() && null !== $projectRule && null !== $projectDirection) {
+            $changes['projectDirection'] = [
+                'before' => null,
+                'after' => $projectDirection->getId(),
+            ];
+            $rulesByField['projectDirection'] = $projectRule;
+        }
+        if (null === $t->getCounterparty() && null !== $counterpartyRule && null !== $counterparty) {
+            $changes['counterparty'] = [
+                'before' => null,
+                'after' => $counterparty->getId(),
+            ];
+            $rulesByField['counterparty'] = $counterpartyRule;
+        }
+
+        $primaryRule = $match->rule;
+        if (null === $primaryRule) {
+            throw new \LogicException('An application plan requires at least one winning auto rule.');
         }
 
         return new CashTransactionAutoRuleApplicationPlan(
-            $rule,
+            $primaryRule,
             $changes,
             $category,
             $projectDirection,
             $counterparty,
+            $rulesByField,
         );
     }
 
