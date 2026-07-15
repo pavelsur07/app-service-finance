@@ -22,6 +22,9 @@ sentry:
             - 'Symfony\Component\ErrorHandler\Error\FatalError'
             - 'Symfony\Component\Debug\Exception\FatalErrorException'
 
+    messenger:
+        capture_soft_fails: false
+
     # Отключаем стандартные перехватчики, ловим всё через Monolog
     register_error_listener: false
     register_error_handler: false
