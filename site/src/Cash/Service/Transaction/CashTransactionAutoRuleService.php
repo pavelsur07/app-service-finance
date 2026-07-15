@@ -262,7 +262,7 @@ class CashTransactionAutoRuleService
                 [CashflowCategory::CODE_UNALLOCATED, CashflowCategory::SYSTEM_UNALLOCATED],
                 true,
             );
-            if (null !== $category && $currentCategory !== $category && $isCategoryEmpty) {
+            if (null !== $category && $currentCategory?->getId() !== $category->getId() && $isCategoryEmpty) {
                 $changes['cashflowCategory'] = [
                     'before' => $currentCategory?->getId(),
                     'after' => $category->getId(),
@@ -281,19 +281,19 @@ class CashTransactionAutoRuleService
                 ];
             }
         } else { // UPDATE
-            if ($t->getCashflowCategory() !== $category) {
+            if ($t->getCashflowCategory()?->getId() !== $category?->getId()) {
                 $changes['cashflowCategory'] = [
                     'before' => $t->getCashflowCategory()?->getId(),
                     'after' => $category?->getId(),
                 ];
             }
-            if ($t->getProjectDirection() !== $projectDirection) {
+            if ($t->getProjectDirection()?->getId() !== $projectDirection?->getId()) {
                 $changes['projectDirection'] = [
                     'before' => $t->getProjectDirection()?->getId(),
                     'after' => $projectDirection?->getId(),
                 ];
             }
-            if ($t->getCounterparty() !== $counterparty) {
+            if ($t->getCounterparty()?->getId() !== $counterparty?->getId()) {
                 $changes['counterparty'] = [
                     'before' => $t->getCounterparty()?->getId(),
                     'after' => $counterparty?->getId(),

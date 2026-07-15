@@ -15,9 +15,11 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleSkipReason;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
 use App\Company\Entity\Company;
+use App\Company\Entity\ProjectDirection;
 use App\Tests\Builders\Cash\CashflowCategoryBuilder;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\CounterpartyBuilder;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 
@@ -124,8 +126,9 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
     public function testFillRuleDoesNotReportChangeWhenUnallocatedTargetIsAlreadySet(): void
     {
         $company = CompanyBuilder::aCompany()->build();
+        $categoryId = Uuid::uuid4()->toString();
         $unallocated = CashflowCategoryBuilder::aCashflowCategory()
-            ->withId(Uuid::uuid4()->toString())
+            ->withId($categoryId)
             ->withCompany($company)
             ->withName('Не распределено')
             ->build()
@@ -134,12 +137,41 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
             ->forCompany($company)
             ->withCashflowCategory($unallocated)
             ->build();
-        $rule = $this->createRule($company)->setCashflowCategory($unallocated);
+        $sameCategory = CashflowCategoryBuilder::aCashflowCategory()
+            ->withId($categoryId)
+            ->withCompany($company)
+            ->build();
+        $rule = $this->createRule($company)->setCashflowCategory($sameCategory);
 
         $service = $this->createService(rules: [$rule]);
 
         self::assertFalse($service->applyRule($rule, $transaction));
         self::assertSame($unallocated, $transaction->getCashflowCategory());
+    }
+
+    public function testUpdateRuleComparesTargetsById(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $categoryId = Uuid::uuid4()->toString();
+        $projectId = Uuid::uuid4()->toString();
+        $counterpartyId = Uuid::uuid4()->toString();
+        $transaction = CashTransactionBuilder::aCashTransaction()
+            ->forCompany($company)
+            ->withCashflowCategory(CashflowCategoryBuilder::aCashflowCategory()->withId($categoryId)->withCompany($company)->build())
+            ->build()
+            ->setProjectDirection(new ProjectDirection($projectId, $company, 'Current project'))
+            ->setCounterparty(CounterpartyBuilder::aCounterparty()->withId($counterpartyId)->withCompany($company)->build());
+        $rule = $this->createRule(
+            $company,
+            CashflowCategoryBuilder::aCashflowCategory()->withId($categoryId)->withCompany($company)->build(),
+        )
+            ->setAction(CashTransactionAutoRuleAction::UPDATE)
+            ->setProjectDirection(new ProjectDirection($projectId, $company, 'Rule project'))
+            ->setCounterparty(CounterpartyBuilder::aCounterparty()->withId($counterpartyId)->withCompany($company)->build());
+
+        $plan = $this->createService()->createApplicationPlan($rule, $transaction);
+
+        self::assertSame([], $plan->changes);
     }
 
     public function testDetectsConflictBetweenEqualPriorityRulesWithDifferentTargets(): void
