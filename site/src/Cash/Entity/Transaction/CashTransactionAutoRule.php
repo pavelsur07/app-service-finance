@@ -11,6 +11,7 @@ use App\Company\Entity\ProjectDirection;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as AssertConstraint;
 use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: CashTransactionAutoRuleRepository::class)]
@@ -30,6 +31,8 @@ class CashTransactionAutoRule
     private Company $company;
 
     #[ORM\Column(length: 255)]
+    #[AssertConstraint\NotBlank(message: 'Укажите название автоправила.')]
+    #[AssertConstraint\Length(max: 255, maxMessage: 'Название не должно быть длиннее {{ limit }} символов.')]
     private string $name;
 
     #[ORM\Column(enumType: CashTransactionAutoRuleAction::class)]
@@ -50,6 +53,7 @@ class CashTransactionAutoRule
 
     #[ORM\ManyToOne(targetEntity: CashflowCategory::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'RESTRICT')]
+    #[AssertConstraint\NotNull(message: 'Выберите статью ДДС.')]
     private ?CashflowCategory $cashflowCategory = null;
 
     #[ORM\ManyToOne(targetEntity: ProjectDirection::class)]
@@ -58,6 +62,8 @@ class CashTransactionAutoRule
 
     /** @var Collection<int, CashTransactionAutoRuleCondition> */
     #[ORM\OneToMany(mappedBy: 'autoRule', targetEntity: CashTransactionAutoRuleCondition::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[AssertConstraint\Count(min: 1, minMessage: 'Добавьте хотя бы одно условие.')]
+    #[AssertConstraint\Valid]
     private Collection $conditions;
 
     public function __construct(

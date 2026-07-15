@@ -20,9 +20,9 @@ class CashTransactionAutoRuleConditionType extends AbstractType
         $builder
             ->add('field', EnumType::class, [
                 'class' => CashTransactionAutoRuleConditionField::class,
-                'label' => 'Если у операции заполнено поле',
+                'label' => 'Поле операции',
                 'row_attr' => ['class' => 'condition-field-row'],
-                'choice_label' => function (CashTransactionAutoRuleConditionField $choice) {
+                'choice_label' => static function (CashTransactionAutoRuleConditionField $choice) {
                     return match ($choice) {
                         CashTransactionAutoRuleConditionField::COUNTERPARTY => 'Контрагент (точное совпадение)',
                         CashTransactionAutoRuleConditionField::COUNTERPARTY_NAME => 'Название контрагента содержит',
@@ -37,12 +37,12 @@ class CashTransactionAutoRuleConditionType extends AbstractType
                 'class' => CashTransactionAutoRuleConditionOperator::class,
                 'label' => 'Оператор',
                 'row_attr' => ['class' => 'condition-operator-row'],
-                'choice_label' => function (CashTransactionAutoRuleConditionOperator $choice) {
+                'choice_label' => static function (CashTransactionAutoRuleConditionOperator $choice) {
                     return match ($choice) {
-                        CashTransactionAutoRuleConditionOperator::EQUAL => '=',
-                        CashTransactionAutoRuleConditionOperator::GREATER_THAN => '>',
-                        CashTransactionAutoRuleConditionOperator::LESS_THAN => '<',
-                        CashTransactionAutoRuleConditionOperator::BETWEEN => 'Диапазон',
+                        CashTransactionAutoRuleConditionOperator::EQUAL => 'Равно',
+                        CashTransactionAutoRuleConditionOperator::GREATER_THAN => 'Больше',
+                        CashTransactionAutoRuleConditionOperator::LESS_THAN => 'Меньше',
+                        CashTransactionAutoRuleConditionOperator::BETWEEN => 'Между',
                         CashTransactionAutoRuleConditionOperator::CONTAINS => 'Содержит',
                     };
                 },
@@ -57,7 +57,7 @@ class CashTransactionAutoRuleConditionType extends AbstractType
             ])
             ->add('value', TextType::class, [
                 'required' => false,
-                'label' => 'Содержит',
+                'label' => 'Значение',
                 'row_attr' => ['class' => 'condition-value-row'],
             ])
             ->add('valueTo', TextType::class, [

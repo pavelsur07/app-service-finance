@@ -1,0 +1,84 @@
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <h2 class="page-title">{{ pageTitle }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="container-xl mt-3">
+    <div class="card">
+        <div class="card-body">
+            {{ form_start(form) }}
+            {{ form_errors(form) }}
+            {{ form_row(form.name) }}
+            <div class="row">
+                <div class="col-md-6">
+                    {{ form_row(form.priority) }}
+                </div>
+                <div class="col-md-6 d-flex align-items-center">
+                    {{ form_row(form.isActive) }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    {{ form_row(form.action) }}
+                </div>
+                <div class="col-md-6">
+                    {{ form_row(form.operationType) }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-4">
+                    {{ form_row(form.cashflowCategory) }}
+                </div>
+                <div class="col-md-4">
+                    {{ form_row(form.projectDirection) }}
+                </div>
+                <div class="col-md-4">
+                    {{ form_row(form.counterparty) }}
+                </div>
+            </div>
+            <fieldset
+                class="mb-3"
+                data-controller="auto-rule-conditions"
+                data-auto-rule-conditions-index-value="{{ form.conditions|length > 0 ? form.conditions|last.vars.name + 1 : 0 }}"
+                data-auto-rule-conditions-prototype-value="{{ form_widget(form.conditions.vars.prototype)|e('html_attr') }}"
+            >
+                <legend class="form-label">Условия</legend>
+                <p class="text-muted small">Операция должна одновременно соответствовать всем условиям.</p>
+                {{ form_errors(form.conditions) }}
+                <div data-auto-rule-conditions-target="collection">
+                    {% for condition in form.conditions %}
+                        <div class="card mb-2" data-auto-rule-condition>
+                            <div class="card-body">
+                                <h3 data-condition-title>Условие {{ loop.index }}</h3>
+                                {{ form_widget(condition) }}
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-danger"
+                                    data-action="auto-rule-conditions#remove"
+                                    data-remove-condition
+                                    aria-label="Удалить условие {{ loop.index }}"
+                                >Удалить</button>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+                <button
+                    type="button"
+                    class="btn btn-sm btn-secondary mt-2"
+                    data-action="auto-rule-conditions#add"
+                >+ Добавить условие</button>
+                <span class="sr-only" aria-live="polite" data-auto-rule-conditions-target="status"></span>
+            </fieldset>
+            {% do form.conditions.setRendered %}
+            <div class="btn-list mt-3">
+                <button class="btn btn-primary">Сохранить</button>
+                <a class="btn btn-secondary" href="{{ path('cash_transaction_auto_rule_index') }}">Отмена</a>
+            </div>
+            {{ form_end(form) }}
+        </div>
+    </div>
+</div>
