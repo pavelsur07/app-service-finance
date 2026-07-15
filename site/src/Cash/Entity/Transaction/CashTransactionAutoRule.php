@@ -48,6 +48,27 @@ class CashTransactionAutoRule
     #[ORM\Column(options: ['default' => true])]
     private bool $isActive = true;
 
+    #[ORM\Column(options: ['default' => 1])]
+    private int $revision = 1;
+
+    #[ORM\Column(type: 'datetime_immutable')]
+    private \DateTimeImmutable $createdAt;
+
+    #[ORM\Column(type: 'datetime_immutable')]
+    private \DateTimeImmutable $updatedAt;
+
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $disabledAt = null;
+
+    #[ORM\Column(type: 'guid', nullable: true)]
+    private ?string $createdByUserId = null;
+
+    #[ORM\Column(type: 'guid', nullable: true)]
+    private ?string $updatedByUserId = null;
+
+    #[ORM\Column(type: 'guid', nullable: true)]
+    private ?string $disabledByUserId = null;
+
     #[ORM\ManyToOne(targetEntity: Counterparty::class)]
     #[ORM\JoinColumn(onDelete: 'SET NULL')]
     private ?Counterparty $counterparty = null;
@@ -75,8 +96,14 @@ class CashTransactionAutoRule
         CashTransactionAutoRuleOperationType $operationType,
         ?CashflowCategory $cashflowCategory = null,
         ?Counterparty $counterparty = null,
+        ?string $createdByUserId = null,
     ) {
         Assert::uuid($id);
+        if (null !== $createdByUserId) {
+            Assert::uuid($createdByUserId);
+        }
+
+        $now = new \DateTimeImmutable();
         $this->id = $id;
         $this->company = $company;
         $this->name = $name;
@@ -88,6 +115,10 @@ class CashTransactionAutoRule
         if ($counterparty) {
             $this->counterparty = $counterparty;
         }
+        $this->createdAt = $now;
+        $this->updatedAt = $now;
+        $this->createdByUserId = $createdByUserId;
+        $this->updatedByUserId = $createdByUserId;
         $this->conditions = new ArrayCollection();
     }
 
@@ -163,9 +194,75 @@ class CashTransactionAutoRule
 
     public function setIsActive(bool $isActive): self
     {
-        $this->isActive = $isActive;
+        if ($isActive === $this->isActive) {
+            return $this;
+        }
+
+        Assert::false($isActive, 'Отключенное автоправило нельзя активировать повторно.');
+        $this->disable();
 
         return $this;
+    }
+
+    public function disable(?string $actorUserId = null): bool
+    {
+        if (!$this->isActive) {
+            return false;
+        }
+
+        $this->assertActorUserId($actorUserId);
+        $now = new \DateTimeImmutable();
+        $this->isActive = false;
+        $this->disabledAt = $now;
+        $this->disabledByUserId = $actorUserId;
+        $this->recordUpdate($actorUserId, $now);
+
+        return true;
+    }
+
+    public function recordUpdate(?string $actorUserId = null, ?\DateTimeImmutable $updatedAt = null): self
+    {
+        $this->assertActorUserId($actorUserId);
+        ++$this->revision;
+        $this->updatedAt = $updatedAt ?? new \DateTimeImmutable();
+        $this->updatedByUserId = $actorUserId;
+
+        return $this;
+    }
+
+    public function getRevision(): int
+    {
+        return $this->revision;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    public function getUpdatedAt(): \DateTimeImmutable
+    {
+        return $this->updatedAt;
+    }
+
+    public function getDisabledAt(): ?\DateTimeImmutable
+    {
+        return $this->disabledAt;
+    }
+
+    public function getCreatedByUserId(): ?string
+    {
+        return $this->createdByUserId;
+    }
+
+    public function getUpdatedByUserId(): ?string
+    {
+        return $this->updatedByUserId;
+    }
+
+    public function getDisabledByUserId(): ?string
+    {
+        return $this->disabledByUserId;
     }
 
     public function getCounterparty(): ?Counterparty
@@ -246,6 +343,13 @@ class CashTransactionAutoRule
                     ->atPath($path)
                     ->addViolation();
             }
+        }
+    }
+
+    private function assertActorUserId(?string $actorUserId): void
+    {
+        if (null !== $actorUserId) {
+            Assert::uuid($actorUserId);
         }
     }
 }

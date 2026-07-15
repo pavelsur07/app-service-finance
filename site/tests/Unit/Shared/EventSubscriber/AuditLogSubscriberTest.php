@@ -2,39 +2,29 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Unit\Cash\Application\Service;
+namespace App\Tests\Unit\Shared\EventSubscriber;
 
 use App\Cash\Application\DTO\CashTransactionAutoRuleApplicationPlan;
 use App\Cash\Application\Service\AutoRuleDispatchGuard;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
+use App\Shared\Audit\AuditContextProvider;
+use App\Shared\EventSubscriber\AuditLogSubscriber;
 use App\Tests\Builders\Cash\CashflowCategoryBuilder;
+use App\Tests\Builders\Cash\CashTransactionBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
+use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Event\PostUpdateEventArgs;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 
-final class AutoRuleDispatchGuardTest extends TestCase
+final class AuditLogSubscriberTest extends TestCase
 {
-    public function testRestoresStateAfterFailure(): void
-    {
-        $guard = new AutoRuleDispatchGuard();
-
-        try {
-            $guard->suppress(static function () use ($guard): void {
-                self::assertTrue($guard->isSuppressed());
-
-                throw new \RuntimeException('test');
-            });
-            self::fail('Exception was expected.');
-        } catch (\RuntimeException) {
-            self::assertFalse($guard->isSuppressed());
-        }
-    }
-
-    public function testExposesApplicationPlanOnlyInsideSuppressedOperation(): void
+    public function testDoesNotDuplicateExplicitAutoRuleApplicationAudit(): void
     {
         $company = CompanyBuilder::aCompany()->build();
+        $transaction = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
         $rule = new CashTransactionAutoRule(
             Uuid::uuid4()->toString(),
             $company,
@@ -50,12 +40,18 @@ final class AutoRuleDispatchGuardTest extends TestCase
             null,
             null,
         );
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::never())->method('persist');
         $guard = new AutoRuleDispatchGuard();
+        $subscriber = new AuditLogSubscriber(
+            $this->createMock(AuditContextProvider::class),
+            $entityManager,
+            $guard,
+        );
 
-        $guard->suppress(static function () use ($guard, $plan): void {
-            self::assertSame($plan, $guard->getApplicationPlan());
-        }, $plan);
-
-        self::assertNull($guard->getApplicationPlan());
+        $guard->suppress(
+            static fn () => $subscriber->postUpdate(new PostUpdateEventArgs($transaction, $entityManager)),
+            $plan,
+        );
     }
 }

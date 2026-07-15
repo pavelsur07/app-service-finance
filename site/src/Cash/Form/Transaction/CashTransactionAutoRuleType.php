@@ -11,7 +11,6 @@ use App\Company\Entity\ProjectDirection;
 use App\Shared\Form\Type\ProjectDirectionPickerType;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
-use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\CollectionType;
 use Symfony\Component\Form\Extension\Core\Type\EnumType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
@@ -30,10 +29,6 @@ class CashTransactionAutoRuleType extends AbstractType
             ->add('priority', IntegerType::class, [
                 'label' => 'Приоритет',
                 'help' => 'Чем больше число, тем выше приоритет.',
-            ])
-            ->add('isActive', CheckboxType::class, [
-                'label' => 'Правило активно',
-                'required' => false,
             ])
             ->add('action', EnumType::class, [
                 'class' => CashTransactionAutoRuleAction::class,

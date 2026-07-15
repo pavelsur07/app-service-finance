@@ -72,10 +72,12 @@
                             <td class="text-end">
                                 <a href="{{ path('cash_transaction_auto_rule_check', {id: item.id}) }}" class="btn btn-sm btn-secondary">пров.</a>
                                 <a href="{{ path('cash_transaction_auto_rule_edit', {id: item.id}) }}" class="btn btn-sm btn-warning">✏️</a>
-                                <form method="post" action="{{ path('cash_transaction_auto_rule_delete', {id: item.id}) }}" style="display:inline;" onsubmit="return confirm('Удалить?');">
-                                    <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ item.id) }}">
-                                    <button class="btn btn-sm btn-danger">🗑</button>
-                                </form>
+                                {% if item.active %}
+                                    <form method="post" action="{{ path('cash_transaction_auto_rule_delete', {id: item.id}) }}" style="display:inline;" onsubmit="return confirm('Отключить правило? Отменить это действие нельзя.');">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('disable' ~ item.id) }}">
+                                        <button class="btn btn-sm btn-danger">Отключить</button>
+                                    </form>
+                                {% endif %}
                             </td>
                         </tr>
                     {% else %}

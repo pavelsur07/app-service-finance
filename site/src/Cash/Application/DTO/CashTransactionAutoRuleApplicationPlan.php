@@ -27,4 +27,16 @@ final readonly class CashTransactionAutoRuleApplicationPlan
     {
         return [] !== $this->changes;
     }
+
+    /** @return array{autoRule: array{id: ?string, revision: int}, changes: array<string, array{before: ?string, after: ?string}>} */
+    public function auditDiff(): array
+    {
+        return [
+            'autoRule' => [
+                'id' => $this->rule->getId(),
+                'revision' => $this->rule->getRevision(),
+            ],
+            'changes' => $this->changes,
+        ];
+    }
 }

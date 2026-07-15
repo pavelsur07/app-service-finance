@@ -55,5 +55,9 @@ final class CashTransactionAutoRuleConditionTest extends IntegrationTestCase
         $this->assertSame('invoice', $saved->getConditions()->first()->getValue());
         $this->assertSame(100, $saved->getPriority());
         $this->assertTrue($saved->isActive());
+        $this->assertSame(1, $saved->getRevision());
+        $this->assertNotNull($saved->getCreatedAt());
+        $this->assertNotNull($saved->getUpdatedAt());
+        $this->assertNull($saved->getDisabledAt());
     }
 }

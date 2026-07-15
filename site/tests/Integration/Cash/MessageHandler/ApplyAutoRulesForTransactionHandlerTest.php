@@ -20,6 +20,7 @@ use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Category\CashflowSystemCategoryService;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
 use App\Company\Entity\Company;
+use App\Shared\Entity\AuditLog;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -224,6 +225,26 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
         $reloaded = $this->em->find(CashTransaction::class, $transaction->getId());
         self::assertInstanceOf(CashTransaction::class, $reloaded);
         self::assertSame($targetCategory->getId(), $reloaded->getCashflowCategory()?->getId());
+
+        $applicationAuditLogs = array_filter(
+            $this->em->getRepository(AuditLog::class)->findBy(['entityId' => $transaction->getId()]),
+            static fn (AuditLog $auditLog): bool => $rule->getId() === ($auditLog->getDiff()['autoRule']['id'] ?? null),
+        );
+        self::assertCount(1, $applicationAuditLogs);
+        $applicationAuditLog = reset($applicationAuditLogs);
+        self::assertInstanceOf(AuditLog::class, $applicationAuditLog);
+        self::assertSame([
+            'autoRule' => [
+                'id' => $rule->getId(),
+                'revision' => 1,
+            ],
+            'changes' => [
+                'cashflowCategory' => [
+                    'before' => $unallocated->getId(),
+                    'after' => $targetCategory->getId(),
+                ],
+            ],
+        ], $applicationAuditLog->getDiff());
     }
 
     public function testConflictLeavesTransactionUnallocated(): void
