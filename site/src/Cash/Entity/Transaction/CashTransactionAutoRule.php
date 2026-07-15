@@ -48,7 +48,8 @@ class CashTransactionAutoRule
     #[ORM\Column(options: ['default' => true])]
     private bool $isActive = true;
 
-    #[ORM\Column(options: ['default' => 1])]
+    #[ORM\Version]
+    #[ORM\Column(type: 'integer', options: ['default' => 1])]
     private int $revision = 1;
 
     #[ORM\Column(type: 'datetime_immutable')]
@@ -223,7 +224,6 @@ class CashTransactionAutoRule
     public function recordUpdate(?string $actorUserId = null, ?\DateTimeImmutable $updatedAt = null): self
     {
         $this->assertActorUserId($actorUserId);
-        ++$this->revision;
         $this->updatedAt = $updatedAt ?? new \DateTimeImmutable();
         $this->updatedByUserId = $actorUserId;
 

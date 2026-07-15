@@ -180,11 +180,11 @@ final class CashTransactionAutoRuleConditionValidationTest extends TestCase
         self::assertSame($actorUserId, $rule->getCreatedByUserId());
         self::assertTrue($rule->disable($actorUserId));
         self::assertFalse($rule->isActive());
-        self::assertSame(2, $rule->getRevision());
+        self::assertSame(1, $rule->getRevision());
         self::assertNotNull($rule->getDisabledAt());
         self::assertSame($actorUserId, $rule->getDisabledByUserId());
         self::assertFalse($rule->disable($actorUserId));
-        self::assertSame(2, $rule->getRevision());
+        self::assertSame(1, $rule->getRevision());
 
         $this->expectException(\InvalidArgumentException::class);
         $rule->setIsActive(true);
