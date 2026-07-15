@@ -3,6 +3,9 @@
 
 {% block body %}
 <div class="container-xl mt-3">
+  {% if filterError %}
+    <div class="alert alert-danger">{{ filterError }}</div>
+  {% endif %}
   {% if not rule.active %}
     <div class="alert alert-warning">Правило выключено. Доступен только предпросмотр.</div>
   {% endif %}
@@ -23,7 +26,7 @@
       </div>
       <div class="col-md-2">
         <label class="form-label">Лимит</label>
-        <input type="number" name="limit" value="{{ app.request.get('limit') ?? 200 }}" class="form-control" min="10" max="200">
+        <input type="number" name="limit" value="{{ limit }}" class="form-control" min="10" max="200">
       </div>
       <div class="col-md-2 align-self-end">
         <button class="btn btn-primary">Обновить</button>

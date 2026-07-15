@@ -2,6 +2,7 @@
 
 namespace App\Cash\Controller\Transaction;
 
+use App\Cash\Application\DTO\CashTransactionAutoRulePreviewFilter;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
@@ -22,6 +23,8 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Csrf\CsrfToken;
+use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_USER')]
@@ -201,6 +204,24 @@ class CashTransactionAutoRuleController extends AbstractController
             throw $this->createNotFoundException();
         }
 
+        $today = new \DateTimeImmutable('today');
+        $dateFrom = (string) $request->query->get('dateFrom', $today->modify('-6 months')->format('Y-m-d'));
+        $dateTo = (string) $request->query->get('dateTo', $today->format('Y-m-d'));
+        $limit = (string) $request->query->get('limit', '200');
+
+        try {
+            $filter = CashTransactionAutoRulePreviewFilter::fromStrings($dateFrom, $dateTo, $limit);
+        } catch (\InvalidArgumentException $exception) {
+            return $this->render('cash_transaction_auto_rule/check.html.twig', [
+                'rule' => $rule,
+                'previewRows' => [],
+                'limit' => 200,
+                'dateFrom' => $dateFrom,
+                'dateTo' => $dateTo,
+                'filterError' => $exception->getMessage(),
+            ], new Response(status: Response::HTTP_BAD_REQUEST));
+        }
+
         $qb = $txRepo->createQueryBuilder('t')
             ->andWhere('t.company = :company')
             ->setParameter('company', $company)
@@ -214,28 +235,25 @@ class CashTransactionAutoRuleController extends AbstractController
             ->addSelect('projectDirection')
             ->orderBy('t.occurredAt', 'DESC');
 
-        $today = new \DateTimeImmutable('today');
-        $dateFrom = (string) $request->query->get('dateFrom', $today->modify('-6 months')->format('Y-m-d'));
-        $dateTo = (string) $request->query->get('dateTo', $today->format('Y-m-d'));
         $qb
             ->andWhere('t.occurredAt >= :from')
-            ->setParameter('from', new \DateTimeImmutable($dateFrom.' 00:00:00'))
+            ->setParameter('from', $filter->dateFrom)
             ->andWhere('t.occurredAt <= :to')
-            ->setParameter('to', new \DateTimeImmutable($dateTo.' 23:59:59'));
+            ->setParameter('to', $filter->dateTo->setTime(23, 59, 59));
 
-        $limit = max(10, min((int) $request->query->get('limit', 200), 200));
         $previewRows = $autoRuleService->previewRule(
             $rule,
             $qb->getQuery()->toIterable(),
-            $limit,
+            $filter->limit,
         );
 
         return $this->render('cash_transaction_auto_rule/check.html.twig', [
             'rule' => $rule,
             'previewRows' => $previewRows,
-            'limit' => $limit,
-            'dateFrom' => $dateFrom,
-            'dateTo' => $dateTo,
+            'limit' => $filter->limit,
+            'dateFrom' => $filter->dateFrom->format('Y-m-d'),
+            'dateTo' => $filter->dateTo->format('Y-m-d'),
+            'filterError' => null,
         ]);
     }
 
@@ -272,7 +290,21 @@ class CashTransactionAutoRuleController extends AbstractController
         ActiveCompanyService $companyService,
         CashTransactionRepository $txRepo,
         CashTransactionAutoRuleService $autoRuleService,
+        CsrfTokenManagerInterface $csrfTokenManager,
     ): Response {
+        $csrfToken = new CsrfToken(
+            'apply-auto-rule'.$transactionId,
+            (string) $request->request->get('_token', ''),
+        );
+        if (!$csrfTokenManager->isTokenValid($csrfToken)) {
+            return new JsonResponse([
+                'ok' => false,
+                'changed' => false,
+                'reason' => 'invalid_csrf_token',
+                'message' => 'Недействительный CSRF-токен.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $company = $companyService->getActiveCompany();
 
         /** @var CashTransaction|null $t */
