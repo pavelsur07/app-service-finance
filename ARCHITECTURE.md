@@ -560,6 +560,13 @@ updatePLRegisterForDocument(string $documentId): void
 
 > **Остальные Facade** добавлять сюда по мере реализации модулей.
 
+### Cash transaction auto-rule governance
+
+- `CashTransactionAutoRule` is company-owned and has an immutable company, a Doctrine-managed optimistic-lock `revision`, lifecycle timestamps, and nullable user IDs for create/update/disable actors.
+- Rules are disable-only: an inactive rule cannot be re-enabled or physically deleted through the Cash auto-rule UI.
+- Each actual auto-rule mutation persists one `AuditLog` for the `CashTransaction` in the same flush. Its diff contains only rule ID/revision and changed field before/after IDs; descriptions, INNs, and bank payloads are excluded.
+- `AutoRuleDispatchGuard` carries the application plan during that flush so the generic transaction audit subscriber does not duplicate the explicit provenance record.
+
 ### `CashFacade` (`src/Cash/Facade/CashFacade.php`)
 ```php
 // Создать ДДС-транзакцию из внешнего модуля (идемпотентно для внешних источников)
