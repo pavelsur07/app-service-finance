@@ -68,8 +68,8 @@ class CashTransactionAutoRuleController extends AbstractController
             static fn (CashTransactionAutoRuleAction $action) => [
                 'value' => $action->value,
                 'label' => match ($action) {
-                    CashTransactionAutoRuleAction::FILL => 'Заполнить поля операции',
-                    CashTransactionAutoRuleAction::UPDATE => 'Изменить поля операции',
+                    CashTransactionAutoRuleAction::FILL => 'Безопасно заполнить пустые поля',
+                    CashTransactionAutoRuleAction::UPDATE => 'Безопасно заполнить пустые поля (legacy UPDATE)',
                 },
             ],
             CashTransactionAutoRuleAction::cases(),
@@ -300,6 +300,7 @@ class CashTransactionAutoRuleController extends AbstractController
             'transaction' => $t,
             'rule' => $match?->rule,
             'conflictingRules' => $match?->conflictingRules ?? [],
+            'conflicts' => $match?->conflicts ?? [],
             'skipReason' => $skipReason,
         ]);
     }
@@ -348,18 +349,18 @@ class CashTransactionAutoRuleController extends AbstractController
         }
 
         $match = $autoRuleService->match($t);
-        if ($match->hasConflict()) {
+        if (!$match->hasWinners() && $match->hasConflict()) {
             return new JsonResponse([
                 'ok' => false,
                 'changed' => false,
                 'reason' => 'conflict',
-                'message' => 'Обнаружен конфликт автоправил с одинаковым приоритетом',
+                'message' => 'Все найденные поля конфликтуют и не будут изменены',
             ], 200);
         }
 
         $requestedRuleId = (string) $request->request->get('ruleId', '');
         $rule = $match->rule;
-        if (!$rule || ('' !== $requestedRuleId && $requestedRuleId !== $rule->getId())) {
+        if (!$rule || ('' !== $requestedRuleId && !$match->hasWinnerId($requestedRuleId))) {
             return new JsonResponse(['ok' => false, 'message' => 'Подходящее правило не найдено'], 200);
         }
 

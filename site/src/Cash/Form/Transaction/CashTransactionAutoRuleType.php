@@ -35,8 +35,8 @@ class CashTransactionAutoRuleType extends AbstractType
                 'label' => 'Действие с операцией ДДС',
                 'choice_label' => static function (CashTransactionAutoRuleAction $choice) {
                     return match ($choice) {
-                        CashTransactionAutoRuleAction::FILL => 'Заполнить поля операции',
-                        CashTransactionAutoRuleAction::UPDATE => 'Изменить поля операции',
+                        CashTransactionAutoRuleAction::FILL => 'Безопасно заполнить пустые поля',
+                        CashTransactionAutoRuleAction::UPDATE => 'Безопасно заполнить пустые поля (legacy UPDATE)',
                     };
                 },
             ])

@@ -13,6 +13,7 @@ final readonly class CashTransactionAutoRuleApplicationPlan
 {
     /**
      * @param array<string, array{before: ?string, after: ?string}> $changes
+     * @param array<string, CashTransactionAutoRule> $rulesByField
      */
     public function __construct(
         public CashTransactionAutoRule $rule,
@@ -20,6 +21,7 @@ final readonly class CashTransactionAutoRuleApplicationPlan
         public ?CashflowCategory $cashflowCategory,
         public ?ProjectDirection $projectDirection,
         public ?Counterparty $counterparty,
+        public array $rulesByField = [],
     ) {
     }
 
@@ -28,14 +30,24 @@ final readonly class CashTransactionAutoRuleApplicationPlan
         return [] !== $this->changes;
     }
 
-    /** @return array{autoRule: array{id: ?string, revision: int}, changes: array<string, array{before: ?string, after: ?string}>} */
+    /** @return array{autoRules: array<string, array{id: ?string, revision: int}>, changes: array<string, array{before: ?string, after: ?string}>} */
     public function auditDiff(): array
     {
+        $rulesByField = $this->rulesByField;
+        if ([] === $rulesByField) {
+            foreach (array_keys($this->changes) as $field) {
+                $rulesByField[$field] = $this->rule;
+            }
+        }
+
         return [
-            'autoRule' => [
-                'id' => $this->rule->getId(),
-                'revision' => $this->rule->getRevision(),
-            ],
+            'autoRules' => array_map(
+                static fn (CashTransactionAutoRule $rule): array => [
+                    'id' => $rule->getId(),
+                    'revision' => $rule->getRevision(),
+                ],
+                $rulesByField,
+            ),
             'changes' => $this->changes,
         ];
     }

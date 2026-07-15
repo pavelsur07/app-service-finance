@@ -61,8 +61,8 @@ final class ApplyAutoRulesForTransactionHandler
 
         $match = $this->autoRuleService->match($transaction);
         $rule = $match->rule;
-        $changed = false;
-        $applicationPlan = null;
+        $applicationPlan = $this->autoRuleService->applyMatch($transaction, $match);
+        $changed = $applicationPlan?->hasChanges() ?? false;
         $ruleId = null;
         $ruleName = null;
 
@@ -74,12 +74,11 @@ final class ApplyAutoRulesForTransactionHandler
                     static fn (CashTransactionAutoRule $conflictingRule): string => (string) $conflictingRule->getId(),
                     $match->conflictingRules,
                 ),
+                'fields' => array_keys($match->conflicts),
             ]);
         }
 
         if (null !== $rule) {
-            $applicationPlan = $this->autoRuleService->applyRule($rule, $transaction, $match);
-            $changed = $applicationPlan?->hasChanges() ?? false;
             $ruleId = $rule->getId();
             $ruleName = $rule->getName();
         }

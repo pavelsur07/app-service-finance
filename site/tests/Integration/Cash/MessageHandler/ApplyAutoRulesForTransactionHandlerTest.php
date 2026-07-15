@@ -20,6 +20,7 @@ use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Category\CashflowSystemCategoryService;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
 use App\Company\Entity\Company;
+use App\Company\Entity\ProjectDirection;
 use App\Shared\Entity\AuditLog;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -82,7 +83,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             ->with($transaction)
             ->willReturn(CashTransactionAutoRuleSkipReason::DELETED);
         $autoRuleService->expects(self::never())->method('match');
-        $autoRuleService->expects(self::never())->method('applyRule');
+        $autoRuleService->expects(self::never())->method('applyMatch');
 
         $handler = new ApplyAutoRulesForTransactionHandler(
             $this->em,
@@ -123,7 +124,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
         $autoRuleService->expects(self::exactly(2))
             ->method('match')
             ->willReturn(new CashTransactionAutoRuleMatchResult(null));
-        $autoRuleService->expects(self::never())->method('applyRule');
+        $autoRuleService->expects(self::exactly(2))->method('applyMatch')->willReturn(null);
 
         $handler = new ApplyAutoRulesForTransactionHandler(
             $this->em,
@@ -228,15 +229,18 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
 
         $applicationAuditLogs = array_filter(
             $this->em->getRepository(AuditLog::class)->findBy(['entityId' => $transaction->getId()]),
-            static fn (AuditLog $auditLog): bool => $rule->getId() === ($auditLog->getDiff()['autoRule']['id'] ?? null),
+            static fn (AuditLog $auditLog): bool => $rule->getId()
+                === ($auditLog->getDiff()['autoRules']['cashflowCategory']['id'] ?? null),
         );
         self::assertCount(1, $applicationAuditLogs);
         $applicationAuditLog = reset($applicationAuditLogs);
         self::assertInstanceOf(AuditLog::class, $applicationAuditLog);
         self::assertSame([
-            'autoRule' => [
-                'id' => $rule->getId(),
-                'revision' => 1,
+            'autoRules' => [
+                'cashflowCategory' => [
+                    'id' => $rule->getId(),
+                    'revision' => 1,
+                ],
             ],
             'changes' => [
                 'cashflowCategory' => [
@@ -247,13 +251,14 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
         ], $applicationAuditLog->getDiff());
     }
 
-    public function testConflictLeavesTransactionUnallocated(): void
+    public function testConflictSkipsCategoryButAppliesProject(): void
     {
         $user = UserBuilder::aUser()->withIndex(1)->build();
         $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
         $account = MoneyAccountBuilder::aMoneyAccount()->forCompany($company)->build();
         $firstCategory = (new CashflowCategory(Uuid::uuid4()->toString(), $company))->setName('Аренда');
         $secondCategory = (new CashflowCategory(Uuid::uuid4()->toString(), $company))->setName('Комиссия');
+        $project = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Project');
         $firstRule = new CashTransactionAutoRule(
             Uuid::uuid4()->toString(),
             $company,
@@ -262,6 +267,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             CashTransactionAutoRuleOperationType::ANY,
             $firstCategory,
         );
+        $firstRule->setProjectDirection($project);
         $secondRule = new CashTransactionAutoRule(
             Uuid::uuid4()->toString(),
             $company,
@@ -270,9 +276,10 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             CashTransactionAutoRuleOperationType::ANY,
             $secondCategory,
         );
+        $secondRule->setProjectDirection($project);
         $transaction = $this->createTransaction($company, $account);
 
-        foreach ([$user, $company, $account, $firstCategory, $secondCategory, $firstRule, $secondRule, $transaction] as $entity) {
+        foreach ([$user, $company, $account, $firstCategory, $secondCategory, $project, $firstRule, $secondRule, $transaction] as $entity) {
             $this->em->persist($entity);
         }
         $this->em->flush();
@@ -295,6 +302,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
         $reloaded = $this->em->find(CashTransaction::class, $transaction->getId());
         self::assertInstanceOf(CashTransaction::class, $reloaded);
         self::assertSame(CashflowCategory::CODE_UNALLOCATED, $reloaded->getCashflowCategory()?->getCode());
+        self::assertSame($project->getId(), $reloaded->getProjectDirection()?->getId());
     }
 
     private function createTransaction(Company $company, MoneyAccount $account): CashTransaction

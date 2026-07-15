@@ -47,7 +47,8 @@
         {% for row in previewRows %}
           {% set t = row.transaction %}
           {% set winner = row.match.rule %}
-          {% set isWinner = winner and winner.id == rule.id %}
+          {% set isWinner = row.match.isWinner(rule) %}
+          {% set isConflicting = row.match.isConflictingRule(rule) %}
           <tr{% if row.skipReason or not isWinner %} class="text-muted"{% endif %}>
             <td>{{ t.occurredAt|date('d.m.Y') }}</td>
             <td>{{ t.moneyAccount.name }}</td>
@@ -59,13 +60,6 @@
             <td>
               {% if row.skipReason %}
                 <span class="badge bg-warning-lt">{{ row.skipReason.label }}</span>
-              {% elseif row.match.hasConflict() %}
-                <span class="badge bg-danger-lt">Конфликт</span>
-                <div class="small mt-1">
-                  {% for conflictingRule in row.match.conflictingRules %}
-                    <div>{{ conflictingRule.name }} ({{ conflictingRule.priority }})</div>
-                  {% endfor %}
-                </div>
               {% elseif not rule.active %}
                 <span class="badge bg-secondary-lt">Правило выключено</span>
                 {% if winner %}
@@ -73,6 +67,16 @@
                 {% endif %}
               {% elseif isWinner %}
                 <span class="badge bg-success-lt">Победитель</span>
+                {% if row.match.hasConflict() %}
+                  <div class="small mt-1 text-warning">Конфликтующие поля будут пропущены</div>
+                {% endif %}
+              {% elseif isConflicting %}
+                <span class="badge bg-danger-lt">Конфликт</span>
+                <div class="small mt-1">
+                  {% for conflictingRule in row.match.conflictingRules %}
+                    <div>{{ conflictingRule.name }} ({{ conflictingRule.priority }})</div>
+                  {% endfor %}
+                </div>
               {% elseif winner %}
                 <span class="badge bg-warning-lt">Не применяется</span>
                 <div class="small mt-1">Победитель: {{ winner.name }} ({{ winner.priority }})</div>
