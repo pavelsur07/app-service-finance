@@ -189,6 +189,8 @@ class CashTransactionAutoRuleService
         string $value,
         string $valueTo,
     ): bool {
+        $value = str_replace(',', '.', trim($value));
+        $valueTo = str_replace(',', '.', trim($valueTo));
         $comparedToValue = \bccomp($amount, $value, 2);
 
         return match ($operator) {

@@ -15,15 +15,15 @@
     <div class="row g-2">
       <div class="col-md-3">
         <label class="form-label">С даты</label>
-        <input type="date" name="dateFrom" value="{{ app.request.get('dateFrom') }}" class="form-control">
+        <input type="date" name="dateFrom" value="{{ dateFrom }}" class="form-control">
       </div>
       <div class="col-md-3">
         <label class="form-label">По дату</label>
-        <input type="date" name="dateTo" value="{{ app.request.get('dateTo') }}" class="form-control">
+        <input type="date" name="dateTo" value="{{ dateTo }}" class="form-control">
       </div>
       <div class="col-md-2">
         <label class="form-label">Лимит</label>
-        <input type="number" name="limit" value="{{ app.request.get('limit') ?? 200 }}" class="form-control" min="10" max="1000">
+        <input type="number" name="limit" value="{{ app.request.get('limit') ?? 200 }}" class="form-control" min="10" max="200">
       </div>
       <div class="col-md-2 align-self-end">
         <button class="btn btn-primary">Обновить</button>

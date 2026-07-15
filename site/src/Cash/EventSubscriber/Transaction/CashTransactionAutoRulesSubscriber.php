@@ -5,6 +5,7 @@ namespace App\Cash\EventSubscriber\Transaction;
 use App\Cash\Application\Service\AutoRuleDispatchGuard;
 use App\Cash\Application\Service\DebouncedRangeEnqueuer;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Message\ApplyAutoRulesForTransaction;
 use App\Cash\Message\EnqueueAutoRulesForRange;
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
 use Doctrine\Common\EventSubscriber;
@@ -88,10 +89,15 @@ final class CashTransactionAutoRulesSubscriber implements EventSubscriber
                 'moneyAccountIds' => $accountIds,
             ]);
         } else {
-            $this->logger?->debug('[AutoRules] skipped_duplicate', [
+            $this->bus->dispatch(
+                new ApplyAutoRulesForTransaction((string) $entity->getId(), $companyId, new \DateTimeImmutable()),
+                [new DelayStamp(10000)]
+            );
+            $this->logger?->debug('[AutoRules] enqueued_transaction_fallback', [
                 'companyId' => $companyId,
                 'day' => $dayStart->format('Y-m-d'),
                 'moneyAccountId' => $moneyAccountId,
+                'transactionId' => $entity->getId(),
             ]);
         }
     }

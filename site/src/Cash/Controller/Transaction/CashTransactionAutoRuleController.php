@@ -214,14 +214,16 @@ class CashTransactionAutoRuleController extends AbstractController
             ->addSelect('projectDirection')
             ->orderBy('t.occurredAt', 'DESC');
 
-        if ($dFrom = $request->query->get('dateFrom')) {
-            $qb->andWhere('t.occurredAt >= :from')->setParameter('from', new \DateTimeImmutable($dFrom.' 00:00:00'));
-        }
-        if ($dTo = $request->query->get('dateTo')) {
-            $qb->andWhere('t.occurredAt <= :to')->setParameter('to', new \DateTimeImmutable($dTo.' 23:59:59'));
-        }
+        $today = new \DateTimeImmutable('today');
+        $dateFrom = (string) $request->query->get('dateFrom', $today->modify('-6 months')->format('Y-m-d'));
+        $dateTo = (string) $request->query->get('dateTo', $today->format('Y-m-d'));
+        $qb
+            ->andWhere('t.occurredAt >= :from')
+            ->setParameter('from', new \DateTimeImmutable($dateFrom.' 00:00:00'))
+            ->andWhere('t.occurredAt <= :to')
+            ->setParameter('to', new \DateTimeImmutable($dateTo.' 23:59:59'));
 
-        $limit = max(10, min((int) $request->query->get('limit', 200), 1000));
+        $limit = max(10, min((int) $request->query->get('limit', 200), 200));
         $previewRows = $autoRuleService->previewRule(
             $rule,
             $qb->getQuery()->toIterable(),
@@ -232,6 +234,8 @@ class CashTransactionAutoRuleController extends AbstractController
             'rule' => $rule,
             'previewRows' => $previewRows,
             'limit' => $limit,
+            'dateFrom' => $dateFrom,
+            'dateTo' => $dateTo,
         ]);
     }
 

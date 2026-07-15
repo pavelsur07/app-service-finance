@@ -247,6 +247,32 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         self::assertSame($service->match($matchingTransaction)->rule, $rows[0]['match']->rule);
     }
 
+    public function testMatchesLocalizedDecimalAmount(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $transaction = CashTransactionBuilder::aCashTransaction()
+            ->forCompany($company)
+            ->withAmount('100.50')
+            ->build();
+        $rule = $this->createRule($company);
+        $rule->addCondition(new CashTransactionAutoRuleCondition(
+            autoRule: $rule,
+            field: CashTransactionAutoRuleConditionField::AMOUNT,
+            operator: CashTransactionAutoRuleConditionOperator::BETWEEN,
+            value: '100,00',
+            valueTo: '101,00',
+        ));
+        $repository = $this->createMock(CashTransactionAutoRuleRepository::class);
+        $repository->method('findActiveByCompany')->with($company)->willReturn([$rule]);
+
+        $match = $this->createService(
+            $this->createMock(EntityManagerInterface::class),
+            $repository,
+        )->match($transaction);
+
+        self::assertSame($rule, $match->rule);
+    }
+
     public function testPreviewIncludesInactiveRuleWithoutSelectingItAsWinner(): void
     {
         $company = CompanyBuilder::aCompany()->build();
