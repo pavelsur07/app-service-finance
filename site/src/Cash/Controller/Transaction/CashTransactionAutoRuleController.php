@@ -5,10 +5,7 @@ namespace App\Cash\Controller\Transaction;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
-use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
-use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
-use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Cash\Form\Transaction\CashTransactionAutoRuleType;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
@@ -18,7 +15,6 @@ use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Shared\Service\ActiveCompanyService;
-use App\Util\StringNormalizer;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -197,6 +193,7 @@ class CashTransactionAutoRuleController extends AbstractController
         ActiveCompanyService $companyService,
         CashTransactionAutoRuleRepository $ruleRepo,
         CashTransactionRepository $txRepo,
+        CashTransactionAutoRuleService $autoRuleService,
     ): Response {
         $company = $companyService->getActiveCompany();
         $rule = $ruleRepo->find($id);
@@ -206,19 +203,17 @@ class CashTransactionAutoRuleController extends AbstractController
 
         $qb = $txRepo->createQueryBuilder('t')
             ->andWhere('t.company = :company')
-            ->andWhere('t.deletedAt IS NULL')
             ->setParameter('company', $company)
+            ->innerJoin('t.moneyAccount', 'moneyAccount')
+            ->addSelect('moneyAccount')
+            ->leftJoin('t.counterparty', 'counterparty')
+            ->addSelect('counterparty')
+            ->leftJoin('t.cashflowCategory', 'cashflowCategory')
+            ->addSelect('cashflowCategory')
+            ->leftJoin('t.projectDirection', 'projectDirection')
+            ->addSelect('projectDirection')
             ->orderBy('t.occurredAt', 'DESC');
 
-        // 1) Фильтр по типу операции (если не ANY)
-        if (CashTransactionAutoRuleOperationType::ANY !== $rule->getOperationType()) {
-            $dir = CashTransactionAutoRuleOperationType::INFLOW === $rule->getOperationType()
-                ? CashDirection::INFLOW
-                : CashDirection::OUTFLOW;
-            $qb->andWhere('t.direction = :dir')->setParameter('dir', $dir);
-        }
-
-        // Опциональные границы периода предпросмотра (?dateFrom, ?dateTo)
         if ($dFrom = $request->query->get('dateFrom')) {
             $qb->andWhere('t.occurredAt >= :from')->setParameter('from', new \DateTimeImmutable($dFrom.' 00:00:00'));
         }
@@ -226,72 +221,16 @@ class CashTransactionAutoRuleController extends AbstractController
             $qb->andWhere('t.occurredAt <= :to')->setParameter('to', new \DateTimeImmutable($dTo.' 23:59:59'));
         }
 
-        // 2) Условия правила (AND)
-        $needJoinCp = false;
-        foreach ($rule->getConditions() as $idx => $cond) {
-            $p = 'p'.$idx; // параметр
-            switch ($cond->getField()) {
-                case CashTransactionAutoRuleConditionField::COUNTERPARTY:
-                    // operator = EQUAL; значение — entity
-                    $qb->andWhere('t.counterparty = :'.$p)->setParameter($p, $cond->getCounterparty());
-                    break;
-
-                case CashTransactionAutoRuleConditionField::COUNTERPARTY_NAME:
-                    $needJoinCp = true;
-                    $qb->andWhere("REPLACE(LOWER(COALESCE(cp.name, '')), 'ё', 'е') LIKE :$p")
-                       ->setParameter($p, '%'.StringNormalizer::normalize((string) $cond->getValue()).'%');
-                    break;
-
-                case CashTransactionAutoRuleConditionField::INN:
-                    $needJoinCp = true;
-                    $qb->andWhere('cp.inn = :'.$p)->setParameter($p, preg_replace('/\D+/', '', (string) $cond->getValue()));
-                    break;
-
-                case CashTransactionAutoRuleConditionField::DATE:
-                    if (CashTransactionAutoRuleConditionOperator::BETWEEN === $cond->getOperator()) {
-                        $qb->andWhere('t.occurredAt BETWEEN :'.$p.'From AND :'.$p.'To')
-                           ->setParameter($p.'From', new \DateTimeImmutable($cond->getValue().' 00:00:00'))
-                           ->setParameter($p.'To', new \DateTimeImmutable($cond->getValueTo().' 23:59:59'));
-                    } else {
-                        // трактуем EQUAL как «в пределах суток»
-                        $qb->andWhere('t.occurredAt BETWEEN :'.$p.'From AND :'.$p.'To')
-                           ->setParameter($p.'From', new \DateTimeImmutable($cond->getValue().' 00:00:00'))
-                           ->setParameter($p.'To', new \DateTimeImmutable($cond->getValue().' 23:59:59'));
-                    }
-                    break;
-
-                case CashTransactionAutoRuleConditionField::AMOUNT:
-                    $val = (float) str_replace(',', '.', (string) $cond->getValue());
-                    if (CashTransactionAutoRuleConditionOperator::BETWEEN === $cond->getOperator()) {
-                        $val2 = (float) str_replace(',', '.', (string) $cond->getValueTo());
-                        $qb->andWhere('t.amount BETWEEN :'.$p.'A AND :'.$p.'B')
-                           ->setParameter($p.'A', $val)->setParameter($p.'B', $val2);
-                    } elseif (CashTransactionAutoRuleConditionOperator::GREATER_THAN === $cond->getOperator()) {
-                        $qb->andWhere('t.amount > :'.$p)->setParameter($p, $val);
-                    } elseif (CashTransactionAutoRuleConditionOperator::LESS_THAN === $cond->getOperator()) {
-                        $qb->andWhere('t.amount < :'.$p)->setParameter($p, $val);
-                    } else { // EQUAL
-                        $qb->andWhere('t.amount = :'.$p)->setParameter($p, $val);
-                    }
-                    break;
-
-                case CashTransactionAutoRuleConditionField::DESCRIPTION:
-                    $qb->andWhere("REPLACE(LOWER(COALESCE(t.description, '')), 'ё', 'е') LIKE :$p")
-                       ->setParameter($p, '%'.StringNormalizer::normalize((string) $cond->getValue()).'%');
-                    break;
-            }
-        }
-        if ($needJoinCp) {
-            $qb->leftJoin('t.counterparty', 'cp');
-        }
-
-        // Ограничение предпросмотра
-        $limit = min((int) $request->query->get('limit', 200), 1000);
-        $transactions = $qb->setMaxResults($limit)->getQuery()->getResult();
+        $limit = max(10, min((int) $request->query->get('limit', 200), 1000));
+        $previewRows = $autoRuleService->previewRule(
+            $rule,
+            $qb->getQuery()->toIterable(),
+            $limit,
+        );
 
         return $this->render('cash_transaction_auto_rule/check.html.twig', [
             'rule' => $rule,
-            'transactions' => $transactions,
+            'previewRows' => $previewRows,
             'limit' => $limit,
         ]);
     }
@@ -311,11 +250,14 @@ class CashTransactionAutoRuleController extends AbstractController
             throw $this->createNotFoundException();
         }
 
-        $rule = $autoRuleService->findMatchingRule($t);
+        $skipReason = $autoRuleService->getSkipReason($t);
+        $match = null === $skipReason ? $autoRuleService->match($t) : null;
 
         return $this->render('cash_transaction_auto_rule/_auto_rule_modal_body.html.twig', [
             'transaction' => $t,
-            'rule' => $rule,
+            'rule' => $match?->rule,
+            'conflictingRules' => $match?->conflictingRules ?? [],
+            'skipReason' => $skipReason,
         ]);
     }
 
@@ -325,7 +267,6 @@ class CashTransactionAutoRuleController extends AbstractController
         Request $request,
         ActiveCompanyService $companyService,
         CashTransactionRepository $txRepo,
-        CashTransactionAutoRuleRepository $ruleRepo,
         CashTransactionAutoRuleService $autoRuleService,
     ): Response {
         $company = $companyService->getActiveCompany();
@@ -336,14 +277,29 @@ class CashTransactionAutoRuleController extends AbstractController
             throw $this->createNotFoundException();
         }
 
-        $ruleId = (string) $request->request->get('ruleId', '');
-        $rule = $ruleId ? $ruleRepo->find($ruleId) : null;
-
-        // safety: если id не пришёл — пересчитаем подбор прямо сейчас
-        if (!$rule) {
-            $rule = $autoRuleService->findMatchingRule($t);
+        $skipReason = $autoRuleService->getSkipReason($t);
+        if (null !== $skipReason) {
+            return new JsonResponse([
+                'ok' => false,
+                'changed' => false,
+                'reason' => $skipReason->value,
+                'message' => $skipReason->label(),
+            ], 200);
         }
-        if (!$rule || $rule->getCompany() !== $company) {
+
+        $match = $autoRuleService->match($t);
+        if ($match->hasConflict()) {
+            return new JsonResponse([
+                'ok' => false,
+                'changed' => false,
+                'reason' => 'conflict',
+                'message' => 'Обнаружен конфликт автоправил с одинаковым приоритетом',
+            ], 200);
+        }
+
+        $requestedRuleId = (string) $request->request->get('ruleId', '');
+        $rule = $match->rule;
+        if (!$rule || ('' !== $requestedRuleId && $requestedRuleId !== $rule->getId())) {
             return new JsonResponse(['ok' => false, 'message' => 'Подходящее правило не найдено'], 200);
         }
 

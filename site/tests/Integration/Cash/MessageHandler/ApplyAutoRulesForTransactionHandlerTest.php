@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\MessageHandler;
 
+use App\Cash\Application\DTO\CashTransactionAutoRuleMatchResult;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleSkipReason;
 use App\Cash\Message\ApplyAutoRulesForTransaction;
 use App\Cash\MessageHandler\ApplyAutoRulesForTransactionHandler;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
@@ -23,6 +28,45 @@ use Ramsey\Uuid\Uuid;
 
 final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
 {
+    public function testSkipsDeletedTransactionBeforeMatchingOrFallbackCategory(): void
+    {
+        $user = UserBuilder::aUser()->withIndex(1)->build();
+        $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+        $account = MoneyAccountBuilder::aMoneyAccount()->forCompany($company)->build();
+        $transaction = $this->createTransaction($company, $account);
+        $transaction->markDeleted(null);
+
+        $this->em->persist($user);
+        $this->em->persist($company);
+        $this->em->persist($account);
+        $this->em->persist($transaction);
+        $this->em->flush();
+
+        $autoRuleService = $this->createMock(CashTransactionAutoRuleService::class);
+        $autoRuleService->expects(self::once())
+            ->method('getSkipReason')
+            ->with($transaction)
+            ->willReturn(CashTransactionAutoRuleSkipReason::DELETED);
+        $autoRuleService->expects(self::never())->method('match');
+        $autoRuleService->expects(self::never())->method('applyRule');
+
+        $handler = new ApplyAutoRulesForTransactionHandler(
+            $this->em,
+            self::getContainer()->get(CashTransactionRepository::class),
+            $autoRuleService,
+            self::getContainer()->get(CashflowSystemCategoryService::class),
+            new NullLogger(),
+        );
+
+        $handler(new ApplyAutoRulesForTransaction(
+            (string) $transaction->getId(),
+            (string) $company->getId(),
+            new \DateTimeImmutable(),
+        ));
+
+        self::assertNull($transaction->getCashflowCategory());
+    }
+
     public function testAssignsUnallocatedAndReusesSingleSystemCategoryForCompany(): void
     {
         $user = UserBuilder::aUser()->withIndex(1)->build();
@@ -42,8 +86,8 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
 
         $autoRuleService = $this->createMock(CashTransactionAutoRuleService::class);
         $autoRuleService->expects(self::exactly(2))
-            ->method('findMatchingRule')
-            ->willReturn(null);
+            ->method('match')
+            ->willReturn(new CashTransactionAutoRuleMatchResult(null));
         $autoRuleService->expects(self::never())->method('applyRule');
 
         $handler = new ApplyAutoRulesForTransactionHandler(
@@ -95,6 +139,104 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             'systemCode' => CashflowCategory::CODE_UNALLOCATED,
         ]);
         self::assertSame(1, $categoryCount);
+    }
+
+    public function testReclassifiesUnallocatedTransactionWithFillRule(): void
+    {
+        $user = UserBuilder::aUser()->withIndex(1)->build();
+        $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+        $account = MoneyAccountBuilder::aMoneyAccount()->forCompany($company)->build();
+        $unallocated = (new CashflowCategory(Uuid::uuid4()->toString(), $company))
+            ->setName('Не распределено')
+            ->markAsSystem(CashflowCategory::CODE_UNALLOCATED);
+        $targetCategory = (new CashflowCategory(Uuid::uuid4()->toString(), $company))
+            ->setName('Аренда');
+        $rule = new CashTransactionAutoRule(
+            Uuid::uuid4()->toString(),
+            $company,
+            'Аренда',
+            CashTransactionAutoRuleAction::FILL,
+            CashTransactionAutoRuleOperationType::ANY,
+            $targetCategory,
+        );
+        $transaction = $this->createTransaction($company, $account)
+            ->setCashflowCategory($unallocated);
+
+        $this->em->persist($user);
+        $this->em->persist($company);
+        $this->em->persist($account);
+        $this->em->persist($unallocated);
+        $this->em->persist($targetCategory);
+        $this->em->persist($rule);
+        $this->em->persist($transaction);
+        $this->em->flush();
+
+        $handler = new ApplyAutoRulesForTransactionHandler(
+            $this->em,
+            self::getContainer()->get(CashTransactionRepository::class),
+            self::getContainer()->get(CashTransactionAutoRuleService::class),
+            self::getContainer()->get(CashflowSystemCategoryService::class),
+            new NullLogger(),
+        );
+
+        $handler(new ApplyAutoRulesForTransaction(
+            $transaction->getId() ?? '',
+            $company->getId() ?? '',
+            new \DateTimeImmutable('2024-01-01T00:00:00+00:00'),
+        ));
+
+        $reloaded = $this->em->find(CashTransaction::class, $transaction->getId());
+        self::assertInstanceOf(CashTransaction::class, $reloaded);
+        self::assertSame($targetCategory->getId(), $reloaded->getCashflowCategory()?->getId());
+    }
+
+    public function testConflictLeavesTransactionUnallocated(): void
+    {
+        $user = UserBuilder::aUser()->withIndex(1)->build();
+        $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+        $account = MoneyAccountBuilder::aMoneyAccount()->forCompany($company)->build();
+        $firstCategory = (new CashflowCategory(Uuid::uuid4()->toString(), $company))->setName('Аренда');
+        $secondCategory = (new CashflowCategory(Uuid::uuid4()->toString(), $company))->setName('Комиссия');
+        $firstRule = new CashTransactionAutoRule(
+            Uuid::uuid4()->toString(),
+            $company,
+            'Аренда',
+            CashTransactionAutoRuleAction::FILL,
+            CashTransactionAutoRuleOperationType::ANY,
+            $firstCategory,
+        );
+        $secondRule = new CashTransactionAutoRule(
+            Uuid::uuid4()->toString(),
+            $company,
+            'Комиссия',
+            CashTransactionAutoRuleAction::FILL,
+            CashTransactionAutoRuleOperationType::ANY,
+            $secondCategory,
+        );
+        $transaction = $this->createTransaction($company, $account);
+
+        foreach ([$user, $company, $account, $firstCategory, $secondCategory, $firstRule, $secondRule, $transaction] as $entity) {
+            $this->em->persist($entity);
+        }
+        $this->em->flush();
+
+        $handler = new ApplyAutoRulesForTransactionHandler(
+            $this->em,
+            self::getContainer()->get(CashTransactionRepository::class),
+            self::getContainer()->get(CashTransactionAutoRuleService::class),
+            self::getContainer()->get(CashflowSystemCategoryService::class),
+            new NullLogger(),
+        );
+
+        $handler(new ApplyAutoRulesForTransaction(
+            $transaction->getId() ?? '',
+            $company->getId() ?? '',
+            new \DateTimeImmutable('2024-01-01T00:00:00+00:00'),
+        ));
+
+        $reloaded = $this->em->find(CashTransaction::class, $transaction->getId());
+        self::assertInstanceOf(CashTransaction::class, $reloaded);
+        self::assertSame(CashflowCategory::CODE_UNALLOCATED, $reloaded->getCashflowCategory()?->getCode());
     }
 
     private function createTransaction(Company $company, MoneyAccount $account): CashTransaction

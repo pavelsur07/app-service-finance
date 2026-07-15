@@ -18,6 +18,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Index(name: 'idx_ctar_company', columns: ['company_id'])]
 #[ORM\Index(name: 'idx_ctar_category', columns: ['cashflow_category_id'])]
 #[ORM\Index(name: 'idx_ctar_counterparty', columns: ['counterparty_id'])]
+#[ORM\Index(name: 'idx_ctar_company_active_priority', columns: ['company_id', 'is_active', 'priority'])]
 class CashTransactionAutoRule
 {
     #[ORM\Id]
@@ -36,6 +37,12 @@ class CashTransactionAutoRule
 
     #[ORM\Column(enumType: CashTransactionAutoRuleOperationType::class)]
     private CashTransactionAutoRuleOperationType $operationType;
+
+    #[ORM\Column(options: ['default' => 100])]
+    private int $priority = 100;
+
+    #[ORM\Column(options: ['default' => true])]
+    private bool $isActive = true;
 
     #[ORM\ManyToOne(targetEntity: Counterparty::class)]
     #[ORM\JoinColumn(onDelete: 'SET NULL')]
@@ -126,6 +133,30 @@ class CashTransactionAutoRule
     public function setOperationType(CashTransactionAutoRuleOperationType $operationType): self
     {
         $this->operationType = $operationType;
+
+        return $this;
+    }
+
+    public function getPriority(): int
+    {
+        return $this->priority;
+    }
+
+    public function setPriority(int $priority): self
+    {
+        $this->priority = $priority;
+
+        return $this;
+    }
+
+    public function isActive(): bool
+    {
+        return $this->isActive;
+    }
+
+    public function setIsActive(bool $isActive): self
+    {
+        $this->isActive = $isActive;
 
         return $this;
     }

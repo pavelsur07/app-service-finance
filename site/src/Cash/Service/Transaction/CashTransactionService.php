@@ -11,7 +11,6 @@ use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Exception\CurrencyMismatchException;
 use App\Cash\Exception\FinancePeriodLockedException;
-use App\Cash\Message\ApplyAutoRulesForTransaction;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\PaymentPlan\PaymentPlanMatcher;
 use App\Cash\Service\Vat\VatCalculator;
@@ -22,7 +21,6 @@ use App\Company\Entity\ProjectDirection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Exception\ORMException;
 use Ramsey\Uuid\Uuid;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 class CashTransactionService
 {
@@ -30,7 +28,6 @@ class CashTransactionService
         private EntityManagerInterface $em,
         private DailyBalanceRecalculator $recalculator,   // ← как и было: после CRUD пересчитываем факты
         private CashTransactionRepository $txRepo,
-        private MessageBusInterface $messageBus,
         private PaymentPlanMatcher $paymentPlanMatcher,
         private VatPolicy $vatPolicy,
         private VatCalculator $vatCalculator,
@@ -139,12 +136,6 @@ class CashTransactionService
 
         $this->paymentPlanMatcher->matchForTransaction($tx);
 
-        $this->messageBus->dispatch(new ApplyAutoRulesForTransaction(
-            (string) $tx->getId(),
-            (string) $company->getId(),
-            new \DateTimeImmutable(),
-        ));
-
         // После фиксации транзакции обязательно пересчитываем факты и инвалидируем snapshot:
         // виджеты dashboard читают агрегированные данные, поэтому без инвалидации пользователь
         // может увидеть устаревший слепок в пределах TTL даже после успешного сохранения.
@@ -204,12 +195,6 @@ class CashTransactionService
 
         // Сохраняем изменения
         $this->em->flush(); // ← flush перед пересчётом обязателен
-
-        $this->messageBus->dispatch(new ApplyAutoRulesForTransaction(
-            (string) $tx->getId(),
-            (string) $company->getId(),
-            new \DateTimeImmutable(),
-        ));
 
         // Минимальный диапазон пересчёта: от min(старая дата, новая дата) до сегодня
         $from = min($dto->occurredAt, $oldDate)->setTime(0, 0);

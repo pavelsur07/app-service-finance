@@ -3,9 +3,12 @@
 
 {% block body %}
 <div class="container-xl mt-3">
+  {% if not rule.active %}
+    <div class="alert alert-warning">Правило выключено. Доступен только предпросмотр.</div>
+  {% endif %}
   <div class="d-flex align-items-center mb-2">
     <h2 class="page-title">Совпадения по правилу: {{ rule.name }}</h2>
-    <div class="ms-auto text-muted">Показано: {{ transactions|length }} (limit {{ limit }})</div>
+    <div class="ms-auto text-muted">Показано: {{ previewRows|length }} (limit {{ limit }})</div>
   </div>
 
   <form method="get" class="card card-body mb-3">
@@ -34,12 +37,15 @@
         <thead>
           <tr>
             <th>Дата</th><th>Счет</th><th class="text-end">Сумма</th>
-            <th>Статья</th><th>Проект</th><th>Контрагент</th><th>Описание</th><th></th>
+            <th>Статья</th><th>Проект</th><th>Контрагент</th><th>Описание</th><th>Статус</th><th></th>
           </tr>
         </thead>
         <tbody>
-        {% for t in transactions %}
-          <tr>
+        {% for row in previewRows %}
+          {% set t = row.transaction %}
+          {% set winner = row.match.rule %}
+          {% set isWinner = winner and winner.id == rule.id %}
+          <tr{% if row.skipReason or not isWinner %} class="text-muted"{% endif %}>
             <td>{{ t.occurredAt|date('d.m.Y') }}</td>
             <td>{{ t.moneyAccount.name }}</td>
             <td class="text-end">{{ t.amount|number_format(2, ',', ' ') }} {{ t.currency }}</td>
@@ -47,12 +53,36 @@
             <td>{{ t.projectDirection ? t.projectDirection.name : '' }}</td>
             <td>{{ t.counterparty ? t.counterparty.name : '' }}</td>
             <td>{{ t.description }}</td>
+            <td>
+              {% if row.skipReason %}
+                <span class="badge bg-warning-lt">{{ row.skipReason.label }}</span>
+              {% elseif row.match.hasConflict() %}
+                <span class="badge bg-danger-lt">Конфликт</span>
+                <div class="small mt-1">
+                  {% for conflictingRule in row.match.conflictingRules %}
+                    <div>{{ conflictingRule.name }} ({{ conflictingRule.priority }})</div>
+                  {% endfor %}
+                </div>
+              {% elseif not rule.active %}
+                <span class="badge bg-secondary-lt">Правило выключено</span>
+                {% if winner %}
+                  <div class="small mt-1">Победитель: {{ winner.name }}</div>
+                {% endif %}
+              {% elseif isWinner %}
+                <span class="badge bg-success-lt">Победитель</span>
+              {% elseif winner %}
+                <span class="badge bg-warning-lt">Не применяется</span>
+                <div class="small mt-1">Победитель: {{ winner.name }} ({{ winner.priority }})</div>
+              {% else %}
+                <span class="badge bg-secondary-lt">Не применяется</span>
+              {% endif %}
+            </td>
             <td class="text-nowrap">
               <a class="btn btn-sm btn-info" href="{{ path('cash_transaction_show', {id: t.id}) }}">Просмотр</a>
             </td>
           </tr>
         {% else %}
-          <tr><td colspan="8" class="text-center text-muted">Совпадений нет</td></tr>
+          <tr><td colspan="9" class="text-center text-muted">Совпадений нет</td></tr>
         {% endfor %}
         </tbody>
       </table>
@@ -60,4 +90,3 @@
   </div>
 </div>
 {% endblock %}
-

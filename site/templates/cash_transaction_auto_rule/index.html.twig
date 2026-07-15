@@ -30,6 +30,8 @@
                     <thead>
                         <tr>
                             <th>Название</th>
+                            <th>Приоритет</th>
+                            <th>Статус</th>
                             <th>Действие</th>
                             <th>Тип операции</th>
                             <th>Направление / проект</th>
@@ -46,8 +48,19 @@
                         {% if item.counterparty %}
                             {% set titleParts = titleParts|merge([item.counterparty.name]) %}
                         {% endif %}
-                        <tr>
-                            <td>{{ titleParts|join(' + ') }}</td>
+                        <tr{% if not item.active %} class="text-muted"{% endif %}>
+                            <td>
+                                <div>{{ item.name }}</div>
+                                <small class="text-muted">{{ titleParts|join(' + ') }}</small>
+                            </td>
+                            <td>{{ item.priority }}</td>
+                            <td>
+                                {% if item.active %}
+                                    <span class="badge bg-success-lt">Активно</span>
+                                {% else %}
+                                    <span class="badge bg-secondary-lt">Выключено</span>
+                                {% endif %}
+                            </td>
                             <td>{{ item.action.name }}</td>
                             <td>{{ item.operationType.name }}</td>
                             <td>{{ item.projectDirection ? item.projectDirection.name : '' }}</td>
@@ -66,7 +79,7 @@
                             </td>
                         </tr>
                     {% else %}
-                        <tr><td colspan="6" class="text-center">Нет данных</td></tr>
+                        <tr><td colspan="8" class="text-center">Нет данных</td></tr>
                     {% endfor %}
                     </tbody>
                 </table>

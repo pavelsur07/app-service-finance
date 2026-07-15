@@ -3,10 +3,10 @@
 namespace App\Cash\MessageHandler;
 
 use App\Cash\Entity\Transaction\CashTransaction;
-use App\Cash\Repository\Transaction\CashTransactionRepository;
-use App\Company\Entity\Company;
 use App\Cash\Message\ApplyAutoRulesForTransaction;
 use App\Cash\Message\EnqueueAutoRulesForRange;
+use App\Cash\Repository\Transaction\CashTransactionRepository;
+use App\Company\Entity\Company;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Query;
 use Psr\Log\LoggerInterface;
@@ -34,8 +34,16 @@ final class EnqueueAutoRulesForRangeHandler
 
         $qb = $this->transactionRepository->createQueryBuilder('t')
             ->where('t.company = :company')
+            ->andWhere('t.deletedAt IS NULL')
             ->setParameter('company', $company)
             ->orderBy('t.occurredAt', 'ASC');
+
+        $lockBefore = $company->getFinanceLockBefore();
+        if (null !== $lockBefore) {
+            $qb
+                ->andWhere('t.occurredAt >= :lockBefore')
+                ->setParameter('lockBefore', $lockBefore->setTime(0, 0));
+        }
 
         if ($message->from instanceof \DateTimeImmutable) {
             $qb

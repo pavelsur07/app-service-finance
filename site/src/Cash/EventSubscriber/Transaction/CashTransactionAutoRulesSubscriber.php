@@ -2,11 +2,13 @@
 
 namespace App\Cash\EventSubscriber\Transaction;
 
+use App\Cash\Application\Service\AutoRuleDispatchGuard;
+use App\Cash\Application\Service\DebouncedRangeEnqueuer;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Message\EnqueueAutoRulesForRange;
-use App\Cash\Application\Service\DebouncedRangeEnqueuer;
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
 use Doctrine\Common\EventSubscriber;
+use Doctrine\ORM\Event\PostUpdateEventArgs;
 use Doctrine\ORM\Events;
 use Doctrine\Persistence\Event\LifecycleEventArgs;
 use Psr\Log\LoggerInterface;
@@ -18,9 +20,19 @@ use Symfony\Component\Messenger\Stamp\DelayStamp;
 #[AsDoctrineListener(event: Events::postUpdate)]
 final class CashTransactionAutoRulesSubscriber implements EventSubscriber
 {
+    private const MATCH_INPUT_FIELDS = [
+        'moneyAccount',
+        'counterparty',
+        'direction',
+        'amount',
+        'occurredAt',
+        'description',
+    ];
+
     public function __construct(
         private readonly MessageBusInterface $bus,
         private readonly DebouncedRangeEnqueuer $debouncer,
+        private readonly AutoRuleDispatchGuard $dispatchGuard,
         #[Autowire(service: 'monolog.logger.autorules')]
         private readonly ?LoggerInterface $logger = null,
     ) {
@@ -28,42 +40,58 @@ final class CashTransactionAutoRulesSubscriber implements EventSubscriber
 
     public function getSubscribedEvents(): array
     {
-        return [Events::postPersist, Events::postUpdate]; // <--- И ЭТО
+        return [Events::postPersist, Events::postUpdate];
     }
 
-    // 2. Добавьте метод postUpdate (или сделайте алиас)
-    public function postUpdate(LifecycleEventArgs $args): void
+    public function postUpdate(PostUpdateEventArgs $args): void
     {
-        $this->postPersist($args);
+        $entity = $args->getObject();
+        if (!$entity instanceof CashTransaction || $this->dispatchGuard->isSuppressed()) {
+            return;
+        }
+
+        $changeSet = $args->getObjectManager()->getUnitOfWork()->getEntityChangeSet($entity);
+        if ([] === array_intersect(self::MATCH_INPUT_FIELDS, array_keys($changeSet))) {
+            return;
+        }
+
+        $this->enqueue($entity);
     }
 
     public function postPersist(LifecycleEventArgs $args): void
     {
         $entity = $args->getObject();
-        if (!$entity instanceof CashTransaction) {
+        if (!$entity instanceof CashTransaction || $this->dispatchGuard->isSuppressed()) {
             return;
         }
 
-        $companyId = $entity->getCompany()->getId();
+        $this->enqueue($entity);
+    }
+
+    private function enqueue(CashTransaction $entity): void
+    {
+        $companyId = (string) $entity->getCompany()->getId();
+        $moneyAccountId = (string) $entity->getMoneyAccount()->getId();
         $occurredAt = $entity->getOccurredAt();
         $dayStart = $occurredAt->setTime(0, 0, 0);
         $dayEnd = $occurredAt->setTime(23, 59, 59);
 
-        if ($this->debouncer->shouldEnqueueCompanyDay($companyId, $dayStart)) {
-            $filters = ['moneyAccountId' => $entity->getMoneyAccount()?->getId()];
+        if ($this->debouncer->shouldEnqueueCompanyDay($companyId, $dayStart, $moneyAccountId)) {
+            $accountIds = [$moneyAccountId];
             $this->bus->dispatch(
-                new EnqueueAutoRulesForRange($companyId, $dayStart, $dayEnd, $filters),
+                new EnqueueAutoRulesForRange($companyId, $dayStart, $dayEnd, $accountIds),
                 [new DelayStamp(10000)]
             );
             $this->logger?->info('[AutoRules] enqueued', [
                 'companyId' => $companyId,
                 'day' => $dayStart->format('Y-m-d'),
-                'filters' => $filters,
+                'moneyAccountIds' => $accountIds,
             ]);
         } else {
             $this->logger?->debug('[AutoRules] skipped_duplicate', [
                 'companyId' => $companyId,
                 'day' => $dayStart->format('Y-m-d'),
+                'moneyAccountId' => $moneyAccountId,
             ]);
         }
     }

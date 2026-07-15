@@ -32,7 +32,8 @@ class CashTransactionAutoRuleRepository extends ServiceEntityRepository
         $qb = $this->createQueryBuilder('r')
             ->andWhere('r.company = :company')
             ->setParameter('company', $company)
-            ->orderBy('r.name', 'ASC');
+            ->orderBy('r.priority', 'DESC')
+            ->addOrderBy('r.id', 'ASC');
 
         if ($action) {
             $qb->andWhere('r.action = :action')->setParameter('action', $action);
@@ -48,5 +49,22 @@ class CashTransactionAutoRuleRepository extends ServiceEntityRepository
         }
 
         return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * @return CashTransactionAutoRule[]
+     */
+    public function findActiveByCompany(Company $company): array
+    {
+        return $this->createQueryBuilder('r')
+            ->andWhere('r.company = :company')
+            ->andWhere('r.isActive = true')
+            ->setParameter('company', $company)
+            ->leftJoin('r.conditions', 'conditions')
+            ->addSelect('conditions')
+            ->orderBy('r.priority', 'DESC')
+            ->addOrderBy('r.id', 'ASC')
+            ->getQuery()
+            ->getResult();
     }
 }
