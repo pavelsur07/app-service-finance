@@ -42,6 +42,15 @@ final class CashTransactionAutoRuleConditionValidationTest extends TestCase
         self::assertCount(0, $this->validator->validate($condition));
     }
 
+    public function testRejectsConditionWithoutFieldAndOperator(): void
+    {
+        $violations = $this->validator->validate(new CashTransactionAutoRuleCondition());
+
+        self::assertCount(2, $violations);
+        self::assertContains('field', $this->paths($violations));
+        self::assertContains('operator', $this->paths($violations));
+    }
+
     public function testRejectsUnsupportedDateOperator(): void
     {
         $condition = new CashTransactionAutoRuleCondition(

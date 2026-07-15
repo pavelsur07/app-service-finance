@@ -144,6 +144,18 @@ class CashTransactionAutoRuleCondition
     #[AssertConstraint\Callback]
     public function validate(ExecutionContextInterface $context): void
     {
+        if (!isset($this->field)) {
+            $context->buildViolation('Выберите поле операции.')
+                ->atPath('field')
+                ->addViolation();
+        }
+
+        if (!isset($this->operator)) {
+            $context->buildViolation('Выберите оператор.')
+                ->atPath('operator')
+                ->addViolation();
+        }
+
         if (!isset($this->field, $this->operator)) {
             return;
         }
