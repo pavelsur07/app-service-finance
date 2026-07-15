@@ -20,6 +20,17 @@ class CashTransactionAutoRuleRepository extends ServiceEntityRepository
         parent::__construct($registry, CashTransactionAutoRule::class);
     }
 
+    public function findOneByIdAndCompanyId(string $id, string $companyId): ?CashTransactionAutoRule
+    {
+        return $this->createQueryBuilder('r')
+            ->andWhere('r.id = :id')
+            ->andWhere('IDENTITY(r.company) = :companyId')
+            ->setParameter('id', $id)
+            ->setParameter('companyId', $companyId)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     /**
      * @return CashTransactionAutoRule[]
      */
@@ -61,7 +72,11 @@ class CashTransactionAutoRuleRepository extends ServiceEntityRepository
             ->andWhere('r.isActive = true')
             ->setParameter('company', $company)
             ->leftJoin('r.conditions', 'conditions')
-            ->addSelect('conditions')
+            ->leftJoin('conditions.counterparty', 'conditionCounterparty')
+            ->leftJoin('r.cashflowCategory', 'cashflowCategory')
+            ->leftJoin('r.projectDirection', 'projectDirection')
+            ->leftJoin('r.counterparty', 'counterparty')
+            ->addSelect('conditions', 'conditionCounterparty', 'cashflowCategory', 'projectDirection', 'counterparty')
             ->orderBy('r.priority', 'DESC')
             ->addOrderBy('r.id', 'ASC')
             ->getQuery()

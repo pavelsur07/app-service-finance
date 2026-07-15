@@ -2,8 +2,8 @@
 
 namespace App\Cash\Service\Transaction;
 
+use App\Cash\Application\DTO\CashTransactionAutoRuleApplicationPlan;
 use App\Cash\Application\DTO\CashTransactionAutoRuleMatchResult;
-use App\Cash\Application\Service\AutoRuleDispatchGuard;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
@@ -13,15 +13,13 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleSkipReason;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
+use App\Company\Entity\Company;
 use App\Util\StringNormalizer;
-use Doctrine\ORM\EntityManagerInterface;
 
 class CashTransactionAutoRuleService
 {
     public function __construct(
         private CashTransactionAutoRuleRepository $ruleRepo,
-        private EntityManagerInterface $em,
-        private AutoRuleDispatchGuard $dispatchGuard,
     ) {
     }
 
@@ -52,7 +50,8 @@ class CashTransactionAutoRuleService
      * @return list<array{
      *     transaction: CashTransaction,
      *     skipReason: CashTransactionAutoRuleSkipReason|null,
-     *     match: CashTransactionAutoRuleMatchResult
+     *     match: CashTransactionAutoRuleMatchResult,
+     *     plan: CashTransactionAutoRuleApplicationPlan|null
      * }>
      */
     public function previewRule(
@@ -69,12 +68,16 @@ class CashTransactionAutoRuleService
             }
 
             $skipReason = $this->getSkipReason($transaction);
+            $match = null === $skipReason
+                ? $this->resolveMatch($transaction, $activeRules)
+                : new CashTransactionAutoRuleMatchResult(null);
             $rows[] = [
                 'transaction' => $transaction,
                 'skipReason' => $skipReason,
-                'match' => null === $skipReason
-                    ? $this->resolveMatch($transaction, $activeRules)
-                    : new CashTransactionAutoRuleMatchResult(null),
+                'match' => $match,
+                'plan' => null !== $match->rule
+                    ? $this->createApplicationPlan($match->rule, $transaction)
+                    : null,
             ];
 
             if (count($rows) >= $limit) {
@@ -118,7 +121,8 @@ class CashTransactionAutoRuleService
 
     private function ruleMatchesTransaction(CashTransactionAutoRule $rule, CashTransaction $transaction): bool
     {
-        if ($rule->getCompany() !== $transaction->getCompany()) {
+        if (!$this->belongsToSameCompany($rule->getCompany(), $transaction->getCompany())
+            || !$this->hasConsistentCompanyScope($rule)) {
             return false;
         }
 
@@ -213,28 +217,36 @@ class CashTransactionAutoRuleService
         ];
     }
 
-    /**
-     * Применить правило к одной транзакции.
-     * Возвращает true, если были изменения; false — если изменений не было.
-     * NB: в текущей модели правила меняют Категорию ДДС и Направление/Проект.
-     */
-    public function applyRule(CashTransactionAutoRule $rule, CashTransaction $t): bool
-    {
-        $changed = false;
-
+    /** Применить текущее правило-победитель к одной транзакции без сохранения. */
+    public function applyRule(
+        CashTransactionAutoRule $rule,
+        CashTransaction $t,
+        ?CashTransactionAutoRuleMatchResult $resolvedMatch = null,
+    ): bool {
         if (null !== $this->getSkipReason($t)) {
             return false;
         }
 
-        if (!$rule->isActive()) {
+        if (!$rule->isActive() || !$this->ruleMatchesTransaction($rule, $t)) {
             return false;
         }
 
-        // безопасность по компании
-        if ($rule->getCompany() !== $t->getCompany()) {
+        $resolvedMatch ??= $this->match($t);
+        if ($resolvedMatch->rule !== $rule) {
             return false;
         }
 
+        $plan = $this->createApplicationPlan($rule, $t);
+        $this->applyPlan($plan, $t);
+
+        return $plan->hasChanges();
+    }
+
+    public function createApplicationPlan(
+        CashTransactionAutoRule $rule,
+        CashTransaction $t,
+    ): CashTransactionAutoRuleApplicationPlan {
+        $changes = [];
         $category = $rule->getCashflowCategory(); // в сущности правила поле not-null
         $projectDirection = $rule->getProjectDirection();
         $counterparty = $rule->getCounterparty();
@@ -250,38 +262,101 @@ class CashTransactionAutoRuleService
                 [CashflowCategory::CODE_UNALLOCATED, CashflowCategory::SYSTEM_UNALLOCATED],
                 true,
             );
-            if (null !== $category && $currentCategory !== $category && $isCategoryEmpty) {
-                $t->setCashflowCategory($category);
-                $changed = true;
+            if (null !== $category && $currentCategory?->getId() !== $category->getId() && $isCategoryEmpty) {
+                $changes['cashflowCategory'] = [
+                    'before' => $currentCategory?->getId(),
+                    'after' => $category->getId(),
+                ];
             }
             if (null === $t->getProjectDirection() && null !== $projectDirection) {
-                $t->setProjectDirection($projectDirection);
-                $changed = true;
+                $changes['projectDirection'] = [
+                    'before' => null,
+                    'after' => $projectDirection->getId(),
+                ];
             }
             if (null === $t->getCounterparty() && null !== $counterparty) {
-                $t->setCounterparty($counterparty);
-                $changed = true;
+                $changes['counterparty'] = [
+                    'before' => null,
+                    'after' => $counterparty->getId(),
+                ];
             }
         } else { // UPDATE
-            if ($t->getCashflowCategory() !== $category) {
-                $t->setCashflowCategory($category);
-                $changed = true;
+            if ($t->getCashflowCategory()?->getId() !== $category?->getId()) {
+                $changes['cashflowCategory'] = [
+                    'before' => $t->getCashflowCategory()?->getId(),
+                    'after' => $category?->getId(),
+                ];
             }
-            if ($t->getProjectDirection() !== $projectDirection) {
-                $t->setProjectDirection($projectDirection);
-                $changed = true;
+            if ($t->getProjectDirection()?->getId() !== $projectDirection?->getId()) {
+                $changes['projectDirection'] = [
+                    'before' => $t->getProjectDirection()?->getId(),
+                    'after' => $projectDirection?->getId(),
+                ];
             }
-            if ($t->getCounterparty() !== $counterparty) {
-                $t->setCounterparty($counterparty);
-                $changed = true;
+            if ($t->getCounterparty()?->getId() !== $counterparty?->getId()) {
+                $changes['counterparty'] = [
+                    'before' => $t->getCounterparty()?->getId(),
+                    'after' => $counterparty?->getId(),
+                ];
             }
         }
 
-        if ($changed) {
-            $this->dispatchGuard->suppress(fn () => $this->em->flush());
+        return new CashTransactionAutoRuleApplicationPlan(
+            $rule,
+            $changes,
+            $category,
+            $projectDirection,
+            $counterparty,
+        );
+    }
+
+    private function applyPlan(CashTransactionAutoRuleApplicationPlan $plan, CashTransaction $transaction): void
+    {
+        if (array_key_exists('cashflowCategory', $plan->changes)) {
+            $transaction->setCashflowCategory($plan->cashflowCategory);
         }
 
-        return $changed;
+        if (array_key_exists('projectDirection', $plan->changes)) {
+            $transaction->setProjectDirection($plan->projectDirection);
+        }
+
+        if (array_key_exists('counterparty', $plan->changes)) {
+            $transaction->setCounterparty($plan->counterparty);
+        }
+    }
+
+    private function hasConsistentCompanyScope(CashTransactionAutoRule $rule): bool
+    {
+        $company = $rule->getCompany();
+
+        if (null !== $rule->getCashflowCategory()
+            && !$this->belongsToSameCompany($company, $rule->getCashflowCategory()->getCompany())) {
+            return false;
+        }
+
+        if (null !== $rule->getProjectDirection()
+            && !$this->belongsToSameCompany($company, $rule->getProjectDirection()->getCompany())) {
+            return false;
+        }
+
+        if (null !== $rule->getCounterparty()
+            && !$this->belongsToSameCompany($company, $rule->getCounterparty()->getCompany())) {
+            return false;
+        }
+
+        foreach ($rule->getConditions() as $condition) {
+            if (null !== $condition->getCounterparty()
+                && !$this->belongsToSameCompany($company, $condition->getCounterparty()->getCompany())) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function belongsToSameCompany(Company $left, Company $right): bool
+    {
+        return null !== $left->getId() && $left->getId() === $right->getId();
     }
 
     public function getSkipReason(CashTransaction $transaction): ?CashTransactionAutoRuleSkipReason

@@ -3,6 +3,7 @@
 namespace App\Cash\Controller\Transaction;
 
 use App\Cash\Application\DTO\CashTransactionAutoRulePreviewFilter;
+use App\Cash\Application\Service\AutoRuleDispatchGuard;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
@@ -162,8 +163,8 @@ class CashTransactionAutoRuleController extends AbstractController
         ProjectDirectionRepository $projectDirectionRepo,
     ): Response {
         $company = $companyService->getActiveCompany();
-        $rule = $repo->find($id);
-        if (!$rule || $rule->getCompany() !== $company) {
+        $rule = $repo->findOneByIdAndCompanyId($id, (string) $company->getId());
+        if (!$rule) {
             throw $this->createNotFoundException();
         }
 
@@ -199,8 +200,8 @@ class CashTransactionAutoRuleController extends AbstractController
         CashTransactionAutoRuleService $autoRuleService,
     ): Response {
         $company = $companyService->getActiveCompany();
-        $rule = $ruleRepo->find($id);
-        if (!$rule || $rule->getCompany() !== $company) {
+        $rule = $ruleRepo->findOneByIdAndCompanyId($id, (string) $company->getId());
+        if (!$rule) {
             throw $this->createNotFoundException();
         }
 
@@ -267,8 +268,8 @@ class CashTransactionAutoRuleController extends AbstractController
         $company = $companyService->getActiveCompany();
 
         /** @var CashTransaction|null $t */
-        $t = $txRepo->find($transactionId);
-        if (!$t || $t->getCompany() !== $company) {
+        $t = $txRepo->findOneByIdAndCompanyId($transactionId, (string) $company->getId());
+        if (!$t) {
             throw $this->createNotFoundException();
         }
 
@@ -291,6 +292,8 @@ class CashTransactionAutoRuleController extends AbstractController
         CashTransactionRepository $txRepo,
         CashTransactionAutoRuleService $autoRuleService,
         CsrfTokenManagerInterface $csrfTokenManager,
+        EntityManagerInterface $entityManager,
+        AutoRuleDispatchGuard $dispatchGuard,
     ): Response {
         $csrfToken = new CsrfToken(
             'apply-auto-rule'.$transactionId,
@@ -308,8 +311,8 @@ class CashTransactionAutoRuleController extends AbstractController
         $company = $companyService->getActiveCompany();
 
         /** @var CashTransaction|null $t */
-        $t = $txRepo->find($transactionId);
-        if (!$t || $t->getCompany() !== $company) {
+        $t = $txRepo->findOneByIdAndCompanyId($transactionId, (string) $company->getId());
+        if (!$t) {
             throw $this->createNotFoundException();
         }
 
@@ -339,7 +342,10 @@ class CashTransactionAutoRuleController extends AbstractController
             return new JsonResponse(['ok' => false, 'message' => 'Подходящее правило не найдено'], 200);
         }
 
-        $changed = $autoRuleService->applyRule($rule, $t);
+        $changed = $autoRuleService->applyRule($rule, $t, $match);
+        if ($changed) {
+            $dispatchGuard->suppress(static fn () => $entityManager->flush());
+        }
 
         return new JsonResponse([
             'ok' => true,
@@ -358,8 +364,8 @@ class CashTransactionAutoRuleController extends AbstractController
         ActiveCompanyService $companyService,
     ): Response {
         $company = $companyService->getActiveCompany();
-        $rule = $repo->find($id);
-        if (!$rule || $rule->getCompany() !== $company) {
+        $rule = $repo->findOneByIdAndCompanyId($id, (string) $company->getId());
+        if (!$rule) {
             throw $this->createNotFoundException();
         }
 

@@ -12,6 +12,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as AssertConstraint;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: CashTransactionAutoRuleRepository::class)]
@@ -102,7 +103,7 @@ class CashTransactionAutoRule
 
     public function setCompany(Company $company): self
     {
-        $this->company = $company;
+        Assert::same($company->getId(), $this->company->getId(), 'Компания автоправила не может быть изменена.');
 
         return $this;
     }
@@ -228,5 +229,23 @@ class CashTransactionAutoRule
         }
 
         return $this;
+    }
+
+    #[AssertConstraint\Callback]
+    public function validateCompanyScope(ExecutionContextInterface $context): void
+    {
+        $associations = [
+            'cashflowCategory' => $this->cashflowCategory,
+            'projectDirection' => $this->projectDirection,
+            'counterparty' => $this->counterparty,
+        ];
+
+        foreach ($associations as $path => $association) {
+            if (null !== $association && $association->getCompany()->getId() !== $this->company->getId()) {
+                $context->buildViolation('Выбранное значение должно принадлежать компании автоправила.')
+                    ->atPath($path)
+                    ->addViolation();
+            }
+        }
     }
 }
