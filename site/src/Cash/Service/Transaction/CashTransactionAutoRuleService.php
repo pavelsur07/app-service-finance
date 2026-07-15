@@ -4,6 +4,7 @@ namespace App\Cash\Service\Transaction;
 
 use App\Cash\Application\DTO\CashTransactionAutoRuleApplicationPlan;
 use App\Cash\Application\DTO\CashTransactionAutoRuleMatchResult;
+use App\Cash\Application\DTO\CashTransactionAutoRulePreviewResult;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
@@ -44,48 +45,150 @@ class CashTransactionAutoRuleService
         );
     }
 
-    /**
-     * @param iterable<CashTransaction> $transactions
-     *
-     * @return list<array{
-     *     transaction: CashTransaction,
-     *     skipReason: CashTransactionAutoRuleSkipReason|null,
-     *     match: CashTransactionAutoRuleMatchResult,
-     *     plan: CashTransactionAutoRuleApplicationPlan|null
-     * }>
-     */
+    /** @param iterable<CashTransaction> $transactions */
     public function previewRule(
         CashTransactionAutoRule $rule,
         iterable $transactions,
         int $limit,
-    ): array {
+    ): CashTransactionAutoRulePreviewResult {
         $rows = [];
+        $summary = [
+            'scanned' => 0,
+            'matched' => 0,
+            'wouldChange' => 0,
+            'noChange' => 0,
+            'skipped' => 0,
+            'conflicts' => 0,
+        ];
+        $changesByField = [
+            'cashflowCategory' => 0,
+            'projectDirection' => 0,
+            'counterparty' => 0,
+        ];
+        $byMonth = [];
+        $byCurrency = [];
+        $byCategory = [];
+        $byProject = [];
         $activeRules = $this->ruleRepo->findActiveByCompany($rule->getCompany());
 
         foreach ($transactions as $transaction) {
+            ++$summary['scanned'];
             if (!$this->ruleMatchesTransaction($rule, $transaction)) {
                 continue;
             }
 
+            ++$summary['matched'];
             $skipReason = $this->getSkipReason($transaction);
             $match = null === $skipReason
                 ? $this->resolveMatch($transaction, $activeRules)
                 : new CashTransactionAutoRuleMatchResult(null);
+            $plan = $match->hasWinners()
+                ? $this->createApplicationPlan($match, $transaction)
+                : null;
+            $wouldChange = null !== $plan && $plan->hasChanges();
+            $hasConflict = $match->hasConflict();
+            $skipped = null !== $skipReason;
+
+            ++$summary[$wouldChange ? 'wouldChange' : 'noChange'];
+            $summary['skipped'] += (int) $skipped;
+            $summary['conflicts'] += (int) $hasConflict;
+            foreach (array_keys($plan?->changes ?? []) as $field) {
+                if (array_key_exists($field, $changesByField)) {
+                    ++$changesByField[$field];
+                }
+            }
+
+            $resultCategory = null !== $plan && array_key_exists('cashflowCategory', $plan->changes)
+                ? $plan->cashflowCategory
+                : $transaction->getCashflowCategory();
+            $resultProject = null !== $plan && array_key_exists('projectDirection', $plan->changes)
+                ? $plan->projectDirection
+                : $transaction->getProjectDirection();
+
+            $this->incrementBreakdown(
+                $byMonth,
+                $transaction->getOccurredAt()->format('Y-m'),
+                $transaction->getOccurredAt()->format('m.Y'),
+                $wouldChange,
+                $hasConflict,
+                $skipped,
+            );
+            $this->incrementBreakdown(
+                $byCurrency,
+                $transaction->getCurrency(),
+                $transaction->getCurrency(),
+                $wouldChange,
+                $hasConflict,
+                $skipped,
+            );
+            $this->incrementBreakdown(
+                $byCategory,
+                (string) ($resultCategory?->getId() ?? '__none__'),
+                $resultCategory?->getName() ?? 'Не задано',
+                $wouldChange,
+                $hasConflict,
+                $skipped,
+            );
+            $this->incrementBreakdown(
+                $byProject,
+                (string) ($resultProject?->getId() ?? '__none__'),
+                $resultProject?->getName() ?? 'Не задано',
+                $wouldChange,
+                $hasConflict,
+                $skipped,
+            );
+
+            if (count($rows) >= $limit) {
+                continue;
+            }
+
             $rows[] = [
                 'transaction' => $transaction,
                 'skipReason' => $skipReason,
                 'match' => $match,
-                'plan' => $match->hasWinners()
-                    ? $this->createApplicationPlan($match, $transaction)
-                    : null,
+                'plan' => $plan,
             ];
-
-            if (count($rows) >= $limit) {
-                break;
-            }
         }
 
-        return $rows;
+        krsort($byMonth, \SORT_STRING);
+        ksort($byCurrency, \SORT_STRING);
+        uasort($byCategory, static fn (array $left, array $right): int => strnatcasecmp($left['label'], $right['label']));
+        uasort($byProject, static fn (array $left, array $right): int => strnatcasecmp($left['label'], $right['label']));
+
+        return new CashTransactionAutoRulePreviewResult(
+            $rows,
+            $summary,
+            $changesByField,
+            array_values($byMonth),
+            array_values($byCurrency),
+            array_values($byCategory),
+            array_values($byProject),
+        );
+    }
+
+    /**
+     * @param array<string, array{key: string, label: string, matched: int, wouldChange: int, conflicts: int, skipped: int}> $breakdown
+     */
+    private function incrementBreakdown(
+        array &$breakdown,
+        string $key,
+        string $label,
+        bool $wouldChange,
+        bool $hasConflict,
+        bool $skipped,
+    ): void {
+        $breakdown[$key] ??= [
+            'key' => $key,
+            'label' => $label,
+            'matched' => 0,
+            'wouldChange' => 0,
+            'conflicts' => 0,
+            'skipped' => 0,
+        ];
+        ++$breakdown[$key]['matched'];
+        $breakdown[$key]['wouldChange'] += (int) $wouldChange;
+        $breakdown[$key]['conflicts'] += (int) $hasConflict;
+        $breakdown[$key]['skipped'] += (int) $skipped;
     }
 
     /** @param list<CashTransactionAutoRule> $rules */

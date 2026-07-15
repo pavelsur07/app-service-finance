@@ -8,6 +8,7 @@ use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashflowFlowKind;
 use App\Company\Entity\Company;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\Query;
 use Doctrine\Persistence\ManagerRegistry;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
 use Pagerfanta\Pagerfanta;
@@ -28,6 +29,35 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->setParameter('companyId', $companyId)
             ->getQuery()
             ->getOneOrNullResult();
+    }
+
+    /** @return iterable<CashTransaction> */
+    public function iterateForAutoRulePreview(
+        Company $company,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+    ): iterable {
+        $query = $this->createQueryBuilder('t')
+            ->andWhere('t.company = :company')
+            ->andWhere('t.deletedAt IS NULL')
+            ->andWhere('t.occurredAt >= :from')
+            ->andWhere('t.occurredAt <= :to')
+            ->setParameter('company', $company)
+            ->setParameter('from', $from->setTime(0, 0, 0))
+            ->setParameter('to', $to->setTime(23, 59, 59))
+            ->innerJoin('t.moneyAccount', 'moneyAccount')
+            ->addSelect('moneyAccount')
+            ->leftJoin('t.counterparty', 'counterparty')
+            ->addSelect('counterparty')
+            ->leftJoin('t.cashflowCategory', 'cashflowCategory')
+            ->addSelect('cashflowCategory')
+            ->leftJoin('t.projectDirection', 'projectDirection')
+            ->addSelect('projectDirection')
+            ->orderBy('t.occurredAt', 'DESC')
+            ->getQuery();
+        $query->setHint(Query::HINT_READ_ONLY, true);
+
+        return $query->toIterable();
     }
 
     public function maxUpdatedAtForCompany(Company $company): ?\DateTimeImmutable

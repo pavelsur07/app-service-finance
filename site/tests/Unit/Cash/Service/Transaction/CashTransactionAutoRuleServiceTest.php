@@ -367,14 +367,14 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         $repository->method('findActiveByCompany')->with($company)->willReturn([$rule]);
         $service = $this->createService($repository);
 
-        $rows = $service->previewRule($rule, [$otherTransaction, $matchingTransaction], 10);
+        $preview = $service->previewRule($rule, [$otherTransaction, $matchingTransaction], 10);
 
-        self::assertCount(1, $rows);
-        self::assertSame($matchingTransaction, $rows[0]['transaction']);
-        self::assertSame($rule, $rows[0]['match']->rule);
-        self::assertSame($service->match($matchingTransaction)->rule, $rows[0]['match']->rule);
-        self::assertSame($rule, $rows[0]['plan']?->rule);
-        self::assertTrue($rows[0]['plan']?->hasChanges());
+        self::assertCount(1, $preview->rows);
+        self::assertSame($matchingTransaction, $preview->rows[0]['transaction']);
+        self::assertSame($rule, $preview->rows[0]['match']->rule);
+        self::assertSame($service->match($matchingTransaction)->rule, $preview->rows[0]['match']->rule);
+        self::assertSame($rule, $preview->rows[0]['plan']?->rule);
+        self::assertTrue($preview->rows[0]['plan']?->hasChanges());
     }
 
     public function testMatchesLocalizedDecimalAmount(): void
@@ -409,12 +409,116 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         $repository->method('findActiveByCompany')->with($company)->willReturn([]);
         $service = $this->createService($repository);
 
-        $rows = $service->previewRule($rule, [$transaction], 10);
+        $preview = $service->previewRule($rule, [$transaction], 10);
 
-        self::assertCount(1, $rows);
-        self::assertSame($transaction, $rows[0]['transaction']);
-        self::assertNull($rows[0]['match']->rule);
-        self::assertNull($rows[0]['plan']);
+        self::assertCount(1, $preview->rows);
+        self::assertSame($transaction, $preview->rows[0]['transaction']);
+        self::assertNull($preview->rows[0]['match']->rule);
+        self::assertNull($preview->rows[0]['plan']);
+    }
+
+    public function testPreviewStatisticsCoverAllMatchesBeyondTheRowLimitWithoutMutation(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $targetCategory = CashflowCategoryBuilder::aCashflowCategory()
+            ->withId('11111111-1111-1111-1111-111111111111')
+            ->withCompany($company)
+            ->withName('Target category')
+            ->build();
+        $assignedCategory = CashflowCategoryBuilder::aCashflowCategory()
+            ->withId('22222222-2222-2222-2222-222222222222')
+            ->withCompany($company)
+            ->withName('Assigned category')
+            ->build();
+        $rule = $this->createRule($company, $targetCategory);
+        $rule->addCondition(new CashTransactionAutoRuleCondition(
+            autoRule: $rule,
+            field: CashTransactionAutoRuleConditionField::DESCRIPTION,
+            operator: CashTransactionAutoRuleConditionOperator::CONTAINS,
+            value: 'match',
+        ));
+        $first = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
+        $first->setDescription('match one')->setOccurredAt(new \DateTimeImmutable('2024-01-15'));
+        $second = CashTransactionBuilder::aCashTransaction()
+            ->forCompany($company)
+            ->withCashflowCategory($assignedCategory)
+            ->build();
+        $second
+            ->setDescription('match two')
+            ->setOccurredAt(new \DateTimeImmutable('2024-02-15'))
+            ->setCurrency('USD');
+        $skipped = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
+        $skipped
+            ->setDescription('match deleted')
+            ->setOccurredAt(new \DateTimeImmutable('2024-03-15'))
+            ->setCurrency('EUR')
+            ->markDeleted(null);
+        $other = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
+        $other->setDescription('other')->setOccurredAt(new \DateTimeImmutable('2024-04-15'));
+
+        $preview = $this->createService(rules: [$rule])->previewRule(
+            $rule,
+            [$first, $second, $skipped, $other],
+            1,
+        );
+
+        self::assertCount(1, $preview->rows);
+        self::assertSame($first, $preview->rows[0]['transaction']);
+        self::assertSame([
+            'scanned' => 4,
+            'matched' => 3,
+            'wouldChange' => 1,
+            'noChange' => 2,
+            'skipped' => 1,
+            'conflicts' => 0,
+        ], $preview->summary);
+        self::assertSame([
+            'cashflowCategory' => 1,
+            'projectDirection' => 0,
+            'counterparty' => 0,
+        ], $preview->changesByField);
+        self::assertSame(['2024-03', '2024-02', '2024-01'], array_column($preview->byMonth, 'key'));
+        self::assertSame(['EUR', 'RUB', 'USD'], array_column($preview->byCurrency, 'key'));
+        self::assertSame(3, $preview->byProject[0]['matched']);
+        self::assertSame(1, $preview->byProject[0]['wouldChange']);
+        self::assertNull($first->getCashflowCategory());
+        self::assertSame($assignedCategory, $second->getCashflowCategory());
+    }
+
+    public function testPreviewReportsFieldConflictWithoutGuessingAChange(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $transaction = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
+        $firstRule = $this->createRule(
+            $company,
+            CashflowCategoryBuilder::aCashflowCategory()
+                ->withId('11111111-1111-1111-1111-111111111111')
+                ->withCompany($company)
+                ->build(),
+            '33333333-3333-3333-3333-333333333333',
+        );
+        $secondRule = $this->createRule(
+            $company,
+            CashflowCategoryBuilder::aCashflowCategory()
+                ->withId('22222222-2222-2222-2222-222222222222')
+                ->withCompany($company)
+                ->build(),
+            '44444444-4444-4444-4444-444444444444',
+        );
+
+        $preview = $this->createService(rules: [$firstRule, $secondRule])->previewRule(
+            $firstRule,
+            [$transaction],
+            10,
+        );
+
+        self::assertSame(1, $preview->summary['matched']);
+        self::assertSame(1, $preview->summary['conflicts']);
+        self::assertSame(0, $preview->summary['wouldChange']);
+        self::assertSame(1, $preview->summary['noChange']);
+        self::assertSame(['cashflowCategory'], array_keys($preview->rows[0]['match']->conflicts));
+        self::assertNull($preview->rows[0]['plan']);
+        self::assertNull($transaction->getCashflowCategory());
     }
 
     public function testApplicationPlanDoesNotMutateTransactionAndRecordsChanges(): void

@@ -565,6 +565,7 @@ updatePLRegisterForDocument(string $documentId): void
 - `CashTransactionAutoRule` is company-owned and has an immutable company, a Doctrine-managed optimistic-lock `revision`, lifecycle timestamps, and nullable user IDs for create/update/disable actors.
 - Rules are disable-only: an inactive rule cannot be re-enabled or physically deleted through the Cash auto-rule UI.
 - One matcher is shared by preview, manual apply, and the worker. It resolves category, project, and counterparty independently by priority, specificity (condition count plus a direction constraint), then immutable rule ID.
+- The authenticated company-scoped preview is read-only: it uses the same application plan as the worker, limits only displayed rows, and calculates full-period counts plus independent month, currency, resulting-category, and resulting-project breakdowns.
 - A conflict skips only its field. Existing manual values are preserved, `CF_UNALLOC` is empty for category filling, and null rule targets never clear transaction fields.
 - Each actual auto-rule mutation persists one `AuditLog` for the `CashTransaction` in the same flush. Its diff contains per-field rule ID/revision and changed field before/after IDs; descriptions, INNs, and bank payloads are excluded.
 - `AutoRuleDispatchGuard` carries the application plan during that flush so the generic transaction audit subscriber does not duplicate the explicit provenance record.
