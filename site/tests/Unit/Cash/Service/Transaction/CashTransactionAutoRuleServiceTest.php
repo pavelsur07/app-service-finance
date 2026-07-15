@@ -36,7 +36,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
 
         self::assertSame(CashTransactionAutoRuleSkipReason::DELETED, $service->getSkipReason($transaction));
         self::assertNull($service->findMatchingRule($transaction));
-        self::assertFalse($service->applyRule($rule, $transaction));
+        self::assertNull($service->applyRule($rule, $transaction));
         self::assertNull($transaction->getCashflowCategory());
     }
 
@@ -52,7 +52,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
 
         self::assertSame(CashTransactionAutoRuleSkipReason::LOCKED_PERIOD, $service->getSkipReason($transaction));
         self::assertNull($service->findMatchingRule($transaction));
-        self::assertFalse($service->applyRule($rule, $transaction));
+        self::assertNull($service->applyRule($rule, $transaction));
         self::assertNull($transaction->getCashflowCategory());
     }
 
@@ -67,7 +67,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         $service = $this->createService(rules: [$rule]);
 
         self::assertNull($service->getSkipReason($transaction));
-        self::assertTrue($service->applyRule($rule, $transaction));
+        self::assertTrue($service->applyRule($rule, $transaction)?->hasChanges());
         self::assertSame($rule->getCashflowCategory(), $transaction->getCashflowCategory());
     }
 
@@ -79,7 +79,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
 
         $service = $this->createService();
 
-        self::assertFalse($service->applyRule($rule, $transaction));
+        self::assertNull($service->applyRule($rule, $transaction));
         self::assertNull($transaction->getCashflowCategory());
     }
 
@@ -100,7 +100,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
 
         $service = $this->createService(rules: [$rule]);
 
-        self::assertTrue($service->applyRule($rule, $transaction));
+        self::assertTrue($service->applyRule($rule, $transaction)?->hasChanges());
         self::assertSame($rule->getCashflowCategory(), $transaction->getCashflowCategory());
     }
 
@@ -119,7 +119,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
 
         $service = $this->createService(rules: [$rule]);
 
-        self::assertFalse($service->applyRule($rule, $transaction));
+        self::assertFalse($service->applyRule($rule, $transaction)?->hasChanges());
         self::assertSame($assignedCategory, $transaction->getCashflowCategory());
     }
 
@@ -145,7 +145,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
 
         $service = $this->createService(rules: [$rule]);
 
-        self::assertFalse($service->applyRule($rule, $transaction));
+        self::assertFalse($service->applyRule($rule, $transaction)?->hasChanges());
         self::assertSame($unallocated, $transaction->getCashflowCategory());
     }
 
@@ -312,6 +312,13 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
                 'after' => $rule->getCashflowCategory()?->getId(),
             ],
         ], $plan->changes);
+        self::assertSame([
+            'autoRule' => [
+                'id' => $rule->getId(),
+                'revision' => 1,
+            ],
+            'changes' => $plan->changes,
+        ], $plan->auditDiff());
     }
 
     public function testDoesNotApplyRuleWithTargetFromAnotherCompany(): void
@@ -325,7 +332,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         );
         $service = $this->createService(rules: [$rule]);
 
-        self::assertFalse($service->applyRule($rule, $transaction));
+        self::assertNull($service->applyRule($rule, $transaction));
         self::assertNull($transaction->getCashflowCategory());
     }
 
@@ -337,7 +344,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         $lowerPriorityRule = $this->createRule($company)->setPriority(100);
         $service = $this->createService(rules: [$winner, $lowerPriorityRule]);
 
-        self::assertFalse($service->applyRule($lowerPriorityRule, $transaction));
+        self::assertNull($service->applyRule($lowerPriorityRule, $transaction));
         self::assertNull($transaction->getCashflowCategory());
     }
 

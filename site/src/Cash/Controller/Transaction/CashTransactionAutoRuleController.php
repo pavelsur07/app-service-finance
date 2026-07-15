@@ -16,6 +16,9 @@ use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Repository\ProjectDirectionRepository;
+use App\Shared\Audit\AuditContextProvider;
+use App\Shared\Entity\AuditLog;
+use App\Shared\Enum\AuditLogAction;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -118,6 +121,7 @@ class CashTransactionAutoRuleController extends AbstractController
         CashflowCategoryRepository $categoryRepo,
         CounterpartyRepository $counterpartyRepo,
         ProjectDirectionRepository $projectDirectionRepo,
+        AuditContextProvider $auditContextProvider,
     ): Response {
         $company = $companyService->getActiveCompany();
         $categories = $categoryRepo->findTreeByCompany($company);
@@ -129,7 +133,8 @@ class CashTransactionAutoRuleController extends AbstractController
             $company,
             '',
             CashTransactionAutoRuleAction::FILL,
-            CashTransactionAutoRuleOperationType::ANY
+            CashTransactionAutoRuleOperationType::ANY,
+            createdByUserId: $auditContextProvider->getActorUserId(),
         );
 
         $form = $this->createForm(CashTransactionAutoRuleType::class, $rule, [
@@ -161,6 +166,7 @@ class CashTransactionAutoRuleController extends AbstractController
         CashflowCategoryRepository $categoryRepo,
         CounterpartyRepository $counterpartyRepo,
         ProjectDirectionRepository $projectDirectionRepo,
+        AuditContextProvider $auditContextProvider,
     ): Response {
         $company = $companyService->getActiveCompany();
         $rule = $repo->findOneByIdAndCompanyId($id, (string) $company->getId());
@@ -179,6 +185,7 @@ class CashTransactionAutoRuleController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            $rule->recordUpdate($auditContextProvider->getActorUserId());
             $em->flush();
 
             return $this->redirectToRoute('cash_transaction_auto_rule_index');
@@ -294,6 +301,7 @@ class CashTransactionAutoRuleController extends AbstractController
         CsrfTokenManagerInterface $csrfTokenManager,
         EntityManagerInterface $entityManager,
         AutoRuleDispatchGuard $dispatchGuard,
+        AuditContextProvider $auditContextProvider,
     ): Response {
         $csrfToken = new CsrfToken(
             'apply-auto-rule'.$transactionId,
@@ -342,9 +350,21 @@ class CashTransactionAutoRuleController extends AbstractController
             return new JsonResponse(['ok' => false, 'message' => 'Подходящее правило не найдено'], 200);
         }
 
-        $changed = $autoRuleService->applyRule($rule, $t, $match);
+        $applicationPlan = $autoRuleService->applyRule($rule, $t, $match);
+        $changed = $applicationPlan?->hasChanges() ?? false;
         if ($changed) {
-            $dispatchGuard->suppress(static fn () => $entityManager->flush());
+            $entityManager->persist(new AuditLog(
+                (string) $t->getCompany()->getId(),
+                CashTransaction::class,
+                (string) $t->getId(),
+                AuditLogAction::UPDATE,
+                $applicationPlan->auditDiff(),
+                $auditContextProvider->getActorUserId(),
+            ));
+            $dispatchGuard->suppress(
+                static fn () => $entityManager->flush(),
+                $applicationPlan,
+            );
         }
 
         return new JsonResponse([
@@ -362,6 +382,7 @@ class CashTransactionAutoRuleController extends AbstractController
         CashTransactionAutoRuleRepository $repo,
         EntityManagerInterface $em,
         ActiveCompanyService $companyService,
+        AuditContextProvider $auditContextProvider,
     ): Response {
         $company = $companyService->getActiveCompany();
         $rule = $repo->findOneByIdAndCompanyId($id, (string) $company->getId());
@@ -369,8 +390,8 @@ class CashTransactionAutoRuleController extends AbstractController
             throw $this->createNotFoundException();
         }
 
-        if ($this->isCsrfTokenValid('delete'.$rule->getId(), $request->request->get('_token'))) {
-            $em->remove($rule);
+        if ($this->isCsrfTokenValid('disable'.$rule->getId(), $request->request->get('_token'))
+            && $rule->disable($auditContextProvider->getActorUserId())) {
             $em->flush();
         }
 

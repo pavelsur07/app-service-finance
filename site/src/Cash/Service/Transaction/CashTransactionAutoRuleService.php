@@ -222,24 +222,24 @@ class CashTransactionAutoRuleService
         CashTransactionAutoRule $rule,
         CashTransaction $t,
         ?CashTransactionAutoRuleMatchResult $resolvedMatch = null,
-    ): bool {
+    ): ?CashTransactionAutoRuleApplicationPlan {
         if (null !== $this->getSkipReason($t)) {
-            return false;
+            return null;
         }
 
         if (!$rule->isActive() || !$this->ruleMatchesTransaction($rule, $t)) {
-            return false;
+            return null;
         }
 
         $resolvedMatch ??= $this->match($t);
         if ($resolvedMatch->rule !== $rule) {
-            return false;
+            return null;
         }
 
         $plan = $this->createApplicationPlan($rule, $t);
         $this->applyPlan($plan, $t);
 
-        return $plan->hasChanges();
+        return $plan;
     }
 
     public function createApplicationPlan(
