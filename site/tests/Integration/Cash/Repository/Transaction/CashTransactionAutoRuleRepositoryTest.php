@@ -72,6 +72,14 @@ final class CashTransactionAutoRuleRepositoryTest extends IntegrationTestCase
             ['Inactive', 'High priority', 'Same priority', 'Low priority'],
             array_map(static fn (CashTransactionAutoRule $rule): string => $rule->getName(), $repository->findByCompany($company)),
         );
+        self::assertSame(
+            $highPriority->getId(),
+            $repository->findOneByIdAndCompanyId((string) $highPriority->getId(), (string) $company->getId())?->getId(),
+        );
+        self::assertNull($repository->findOneByIdAndCompanyId(
+            (string) $highPriority->getId(),
+            '11111111-1111-1111-1111-999999999999',
+        ));
     }
 
     private function createRule(

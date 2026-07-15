@@ -160,6 +160,15 @@ class CashTransactionAutoRuleCondition
             return;
         }
 
+        $counterpartyCompanyMismatch = null !== $this->counterparty
+            && null !== $this->autoRule
+            && $this->counterparty->getCompany()->getId() !== $this->autoRule->getCompany()->getId();
+        if ($counterpartyCompanyMismatch) {
+            $context->buildViolation('Контрагент должен принадлежать компании автоправила.')
+                ->atPath('counterparty')
+                ->addViolation();
+        }
+
         $allowedOperators = match ($this->field) {
             CashTransactionAutoRuleConditionField::COUNTERPARTY => [CashTransactionAutoRuleConditionOperator::EQUAL],
             CashTransactionAutoRuleConditionField::COUNTERPARTY_NAME,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Cash\MessageHandler;
 
 use App\Cash\Application\DTO\CashTransactionAutoRuleMatchResult;
+use App\Cash\Application\Service\AutoRuleDispatchGuard;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
@@ -28,6 +29,38 @@ use Ramsey\Uuid\Uuid;
 
 final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
 {
+    public function testDoesNotLoadTransactionOutsideMessageCompany(): void
+    {
+        $user = UserBuilder::aUser()->withIndex(1)->build();
+        $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+        $account = MoneyAccountBuilder::aMoneyAccount()->forCompany($company)->build();
+        $transaction = $this->createTransaction($company, $account);
+
+        foreach ([$user, $company, $account, $transaction] as $entity) {
+            $this->em->persist($entity);
+        }
+        $this->em->flush();
+
+        $autoRuleService = $this->createMock(CashTransactionAutoRuleService::class);
+        $autoRuleService->expects(self::never())->method('getSkipReason');
+        $handler = new ApplyAutoRulesForTransactionHandler(
+            $this->em,
+            self::getContainer()->get(CashTransactionRepository::class),
+            $autoRuleService,
+            self::getContainer()->get(CashflowSystemCategoryService::class),
+            self::getContainer()->get(AutoRuleDispatchGuard::class),
+            new NullLogger(),
+        );
+
+        $handler(new ApplyAutoRulesForTransaction(
+            (string) $transaction->getId(),
+            '11111111-1111-1111-1111-999999999999',
+            new \DateTimeImmutable(),
+        ));
+
+        self::assertNull($transaction->getCashflowCategory());
+    }
+
     public function testSkipsDeletedTransactionBeforeMatchingOrFallbackCategory(): void
     {
         $user = UserBuilder::aUser()->withIndex(1)->build();
@@ -55,6 +88,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             self::getContainer()->get(CashTransactionRepository::class),
             $autoRuleService,
             self::getContainer()->get(CashflowSystemCategoryService::class),
+            self::getContainer()->get(AutoRuleDispatchGuard::class),
             new NullLogger(),
         );
 
@@ -95,6 +129,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             $transactionRepository,
             $autoRuleService,
             $cashflowSystemCategoryService,
+            self::getContainer()->get(AutoRuleDispatchGuard::class),
             new NullLogger(),
         );
 
@@ -176,6 +211,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             self::getContainer()->get(CashTransactionRepository::class),
             self::getContainer()->get(CashTransactionAutoRuleService::class),
             self::getContainer()->get(CashflowSystemCategoryService::class),
+            self::getContainer()->get(AutoRuleDispatchGuard::class),
             new NullLogger(),
         );
 
@@ -225,6 +261,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             self::getContainer()->get(CashTransactionRepository::class),
             self::getContainer()->get(CashTransactionAutoRuleService::class),
             self::getContainer()->get(CashflowSystemCategoryService::class),
+            self::getContainer()->get(AutoRuleDispatchGuard::class),
             new NullLogger(),
         );
 
