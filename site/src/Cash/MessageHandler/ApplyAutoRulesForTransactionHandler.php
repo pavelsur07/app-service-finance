@@ -3,10 +3,11 @@
 namespace App\Cash\MessageHandler;
 
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Entity\Transaction\CashTransactionAutoRule;
+use App\Cash\Message\ApplyAutoRulesForTransaction;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Category\CashflowSystemCategoryService;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
-use App\Cash\Message\ApplyAutoRulesForTransaction;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -51,10 +52,36 @@ final class ApplyAutoRulesForTransactionHandler
             return;
         }
 
-        $rule = $this->autoRuleService->findMatchingRule($transaction);
+        $skipReason = $this->autoRuleService->getSkipReason($transaction);
+        if (null !== $skipReason) {
+            $this->logger->info('Cash auto rules skipped', [
+                'transactionId' => $transaction->getId(),
+                'companyId' => $message->companyId,
+                'messageCreatedAt' => $message->createdAt->format(\DATE_ATOM),
+                'reason' => $skipReason->value,
+            ]);
+
+            $this->entityManager->clear(CashTransaction::class);
+
+            return;
+        }
+
+        $match = $this->autoRuleService->match($transaction);
+        $rule = $match->rule;
         $changed = false;
         $ruleId = null;
         $ruleName = null;
+
+        if ($match->hasConflict()) {
+            $this->logger->warning('Cash auto rules: conflict detected', [
+                'transactionId' => $transaction->getId(),
+                'companyId' => $message->companyId,
+                'ruleIds' => array_map(
+                    static fn (CashTransactionAutoRule $conflictingRule): string => (string) $conflictingRule->getId(),
+                    $match->conflictingRules,
+                ),
+            ]);
+        }
 
         if (null !== $rule) {
             $changed = $this->autoRuleService->applyRule($rule, $transaction);
@@ -74,6 +101,7 @@ final class ApplyAutoRulesForTransactionHandler
             'companyId' => $message->companyId,
             'messageCreatedAt' => $message->createdAt->format(\DATE_ATOM),
             'changed' => $changed,
+            'conflict' => $match->hasConflict(),
             'ruleId' => $ruleId,
             'ruleName' => $ruleName,
         ]);

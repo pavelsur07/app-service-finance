@@ -2,12 +2,16 @@
 
 namespace App\Cash\Service\Transaction;
 
+use App\Cash\Application\DTO\CashTransactionAutoRuleMatchResult;
+use App\Cash\Application\Service\AutoRuleDispatchGuard;
+use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleSkipReason;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Util\StringNormalizer;
 use Doctrine\ORM\EntityManagerInterface;
@@ -17,121 +21,196 @@ class CashTransactionAutoRuleService
     public function __construct(
         private CashTransactionAutoRuleRepository $ruleRepo,
         private EntityManagerInterface $em,
+        private AutoRuleDispatchGuard $dispatchGuard,
     ) {
     }
 
     /**
-     * Найти ПЕРВОЕ подходящее правило для транзакции (в пределах компании транзакции).
-     * Возвращает null, если ни одно правило не подошло.
+     * Найти правило-победитель для транзакции (в пределах компании транзакции).
+     * Возвращает null, если правило не найдено или обнаружен конфликт.
      */
     public function findMatchingRule(CashTransaction $t): ?CashTransactionAutoRule
     {
-        $company = $t->getCompany();
-        $rules = $this->ruleRepo->findByCompany($company); // уже есть в репозитории
+        return $this->match($t)->rule;
+    }
 
-        foreach ($rules as $rule) {
-            // 1) Тип операции
-            $opType = $rule->getOperationType();
-            if ('ANY' !== $opType->value) {
-                if ('INFLOW' === $opType->value && CashDirection::INFLOW !== $t->getDirection()) {
-                    continue;
-                }
-                if ('OUTFLOW' === $opType->value && CashDirection::OUTFLOW !== $t->getDirection()) {
-                    continue;
-                }
+    public function match(CashTransaction $t): CashTransactionAutoRuleMatchResult
+    {
+        if (null !== $this->getSkipReason($t)) {
+            return new CashTransactionAutoRuleMatchResult(null);
+        }
+
+        return $this->resolveMatch(
+            $t,
+            $this->ruleRepo->findActiveByCompany($t->getCompany()),
+        );
+    }
+
+    /**
+     * @param iterable<CashTransaction> $transactions
+     *
+     * @return list<array{
+     *     transaction: CashTransaction,
+     *     skipReason: CashTransactionAutoRuleSkipReason|null,
+     *     match: CashTransactionAutoRuleMatchResult
+     * }>
+     */
+    public function previewRule(
+        CashTransactionAutoRule $rule,
+        iterable $transactions,
+        int $limit,
+    ): array {
+        $rows = [];
+        $activeRules = $this->ruleRepo->findActiveByCompany($rule->getCompany());
+
+        foreach ($transactions as $transaction) {
+            if (!$this->ruleMatchesTransaction($rule, $transaction)) {
+                continue;
             }
 
-            // 2) Все условия (AND)
-            $ok = true;
-            foreach ($rule->getConditions() as $cond) {
-                $field = $cond->getField();
-                $operator = $cond->getOperator();
-                $value = (string) ($cond->getValue() ?? '');
-                $valueTo = (string) ($cond->getValueTo() ?? '');
+            $skipReason = $this->getSkipReason($transaction);
+            $rows[] = [
+                'transaction' => $transaction,
+                'skipReason' => $skipReason,
+                'match' => null === $skipReason
+                    ? $this->resolveMatch($transaction, $activeRules)
+                    : new CashTransactionAutoRuleMatchResult(null),
+            ];
 
-                switch ($field) {
-                    case CashTransactionAutoRuleConditionField::COUNTERPARTY:
-                        // точное совпадение по выбранному контрагенту
-                        if ($t->getCounterparty() !== $cond->getCounterparty()) {
-                            $ok = false;
-                        }
-                        break;
-
-                    case CashTransactionAutoRuleConditionField::COUNTERPARTY_NAME:
-                        $name = $t->getCounterparty()?->getName() ?? '';
-                        if (!StringNormalizer::contains($name, $value)) {
-                            $ok = false;
-                        }
-                        break;
-
-                    case CashTransactionAutoRuleConditionField::INN:
-                        $inn = preg_replace('/\D+/', '', (string) ($t->getCounterparty()?->getInn() ?? ''));
-                        $val = preg_replace('/\D+/', '', $value);
-                        if ($inn !== $val) {
-                            $ok = false;
-                        }
-                        break;
-
-                    case CashTransactionAutoRuleConditionField::DATE:
-                        // EQUAL — в пределах суток; BETWEEN — включая границы
-                        $d = $t->getOccurredAt();
-                        if (CashTransactionAutoRuleConditionOperator::BETWEEN === $operator) {
-                            $from = new \DateTimeImmutable($value.' 00:00:00');
-                            $to = new \DateTimeImmutable($valueTo.' 23:59:59');
-                            if ($d < $from || $d > $to) {
-                                $ok = false;
-                            }
-                        } else { // EQUAL
-                            $from = new \DateTimeImmutable($value.' 00:00:00');
-                            $to = new \DateTimeImmutable($value.' 23:59:59');
-                            if ($d < $from || $d > $to) {
-                                $ok = false;
-                            }
-                        }
-                        break;
-
-                    case CashTransactionAutoRuleConditionField::AMOUNT:
-                        // amount хранится строкой; сравним через bccomp при масштабе 2
-                        $amt = $t->getAmount();
-                        $cmp = fn (string $a, string $b) => \bccomp($a, $b, 2);
-                        if (CashTransactionAutoRuleConditionOperator::BETWEEN === $operator) {
-                            if (!($cmp($amt, (string) $value) >= 0 && $cmp($amt, (string) $valueTo) <= 0)) {
-                                $ok = false;
-                            }
-                        } elseif (CashTransactionAutoRuleConditionOperator::GREATER_THAN === $operator) {
-                            if (!($cmp($amt, (string) $value) > 0)) {
-                                $ok = false;
-                            }
-                        } elseif (CashTransactionAutoRuleConditionOperator::LESS_THAN === $operator) {
-                            if (!($cmp($amt, (string) $value) < 0)) {
-                                $ok = false;
-                            }
-                        } else { // EQUAL
-                            if (!(0 === $cmp($amt, (string) $value))) {
-                                $ok = false;
-                            }
-                        }
-                        break;
-
-                    case CashTransactionAutoRuleConditionField::DESCRIPTION:
-                        $desc = $t->getDescription() ?? '';
-                        if (!StringNormalizer::contains($desc, $value)) {
-                            $ok = false;
-                        }
-                        break;
-                }
-
-                if (!$ok) {
-                    break;
-                }
-            }
-
-            if ($ok) {
-                return $rule;
+            if (count($rows) >= $limit) {
+                break;
             }
         }
 
-        return null;
+        return $rows;
+    }
+
+    /** @param list<CashTransactionAutoRule> $rules */
+    private function resolveMatch(CashTransaction $transaction, array $rules): CashTransactionAutoRuleMatchResult
+    {
+        $matchingRules = [];
+        $matchingPriority = null;
+
+        foreach ($rules as $rule) {
+            if (null !== $matchingPriority && $rule->getPriority() < $matchingPriority) {
+                break;
+            }
+
+            if ($this->ruleMatchesTransaction($rule, $transaction)) {
+                $matchingPriority ??= $rule->getPriority();
+                $matchingRules[] = $rule;
+            }
+        }
+
+        if ([] === $matchingRules) {
+            return new CashTransactionAutoRuleMatchResult(null);
+        }
+
+        $winner = $matchingRules[0];
+        foreach (array_slice($matchingRules, 1) as $rule) {
+            if ($this->getRuleEffectSignature($winner) !== $this->getRuleEffectSignature($rule)) {
+                return new CashTransactionAutoRuleMatchResult(null, $matchingRules);
+            }
+        }
+
+        return new CashTransactionAutoRuleMatchResult($winner);
+    }
+
+    private function ruleMatchesTransaction(CashTransactionAutoRule $rule, CashTransaction $transaction): bool
+    {
+        if ($rule->getCompany() !== $transaction->getCompany()) {
+            return false;
+        }
+
+        $operationType = $rule->getOperationType();
+        if ('INFLOW' === $operationType->value && CashDirection::INFLOW !== $transaction->getDirection()) {
+            return false;
+        }
+        if ('OUTFLOW' === $operationType->value && CashDirection::OUTFLOW !== $transaction->getDirection()) {
+            return false;
+        }
+
+        foreach ($rule->getConditions() as $condition) {
+            $operator = $condition->getOperator();
+            $value = (string) ($condition->getValue() ?? '');
+            $valueTo = (string) ($condition->getValueTo() ?? '');
+
+            $matches = match ($condition->getField()) {
+                CashTransactionAutoRuleConditionField::COUNTERPARTY => $transaction->getCounterparty() === $condition->getCounterparty(),
+                CashTransactionAutoRuleConditionField::COUNTERPARTY_NAME => StringNormalizer::contains(
+                    $transaction->getCounterparty()?->getName() ?? '',
+                    $value,
+                ),
+                CashTransactionAutoRuleConditionField::INN => preg_replace('/\D+/', '', (string) ($transaction->getCounterparty()?->getInn() ?? ''))
+                    === preg_replace('/\D+/', '', $value),
+                CashTransactionAutoRuleConditionField::DATE => $this->dateMatches(
+                    $transaction->getOccurredAt(),
+                    $operator,
+                    $value,
+                    $valueTo,
+                ),
+                CashTransactionAutoRuleConditionField::AMOUNT => $this->amountMatches(
+                    $transaction->getAmount(),
+                    $operator,
+                    $value,
+                    $valueTo,
+                ),
+                CashTransactionAutoRuleConditionField::DESCRIPTION => StringNormalizer::contains(
+                    $transaction->getDescription() ?? '',
+                    $value,
+                ),
+            };
+
+            if (!$matches) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function dateMatches(
+        \DateTimeImmutable $date,
+        CashTransactionAutoRuleConditionOperator $operator,
+        string $value,
+        string $valueTo,
+    ): bool {
+        $from = new \DateTimeImmutable($value.' 00:00:00');
+        $to = new \DateTimeImmutable(
+            (CashTransactionAutoRuleConditionOperator::BETWEEN === $operator ? $valueTo : $value).' 23:59:59',
+        );
+
+        return $date >= $from && $date <= $to;
+    }
+
+    private function amountMatches(
+        string $amount,
+        CashTransactionAutoRuleConditionOperator $operator,
+        string $value,
+        string $valueTo,
+    ): bool {
+        $value = str_replace(',', '.', trim($value));
+        $valueTo = str_replace(',', '.', trim($valueTo));
+        $comparedToValue = \bccomp($amount, $value, 2);
+
+        return match ($operator) {
+            CashTransactionAutoRuleConditionOperator::BETWEEN => $comparedToValue >= 0
+                && \bccomp($amount, $valueTo, 2) <= 0,
+            CashTransactionAutoRuleConditionOperator::GREATER_THAN => $comparedToValue > 0,
+            CashTransactionAutoRuleConditionOperator::LESS_THAN => $comparedToValue < 0,
+            default => 0 === $comparedToValue,
+        };
+    }
+
+    /** @return array{string, ?string, ?string, ?string} */
+    private function getRuleEffectSignature(CashTransactionAutoRule $rule): array
+    {
+        return [
+            $rule->getAction()->value,
+            $rule->getCashflowCategory()?->getId(),
+            $rule->getProjectDirection()?->getId(),
+            $rule->getCounterparty()?->getId(),
+        ];
     }
 
     /**
@@ -142,6 +221,14 @@ class CashTransactionAutoRuleService
     public function applyRule(CashTransactionAutoRule $rule, CashTransaction $t): bool
     {
         $changed = false;
+
+        if (null !== $this->getSkipReason($t)) {
+            return false;
+        }
+
+        if (!$rule->isActive()) {
+            return false;
+        }
 
         // безопасность по компании
         if ($rule->getCompany() !== $t->getCompany()) {
@@ -154,10 +241,16 @@ class CashTransactionAutoRuleService
         $action = $rule->getAction();
 
         // Семантика:
-        // FILL   — ставим категорию только если у транзакции она пуста
+        // FILL   — ставим категорию только если у транзакции она пуста или не распределена
         // UPDATE — перезаписываем всегда
         if (CashTransactionAutoRuleAction::FILL === $action) {
-            if (null === $t->getCashflowCategory() && null !== $category) {
+            $currentCategory = $t->getCashflowCategory();
+            $isCategoryEmpty = null === $currentCategory || in_array(
+                $currentCategory->getCode(),
+                [CashflowCategory::CODE_UNALLOCATED, CashflowCategory::SYSTEM_UNALLOCATED],
+                true,
+            );
+            if (null !== $category && $currentCategory !== $category && $isCategoryEmpty) {
                 $t->setCashflowCategory($category);
                 $changed = true;
             }
@@ -185,9 +278,23 @@ class CashTransactionAutoRuleService
         }
 
         if ($changed) {
-            $this->em->flush(); // одна транзакция — можно сразу
+            $this->dispatchGuard->suppress(fn () => $this->em->flush());
         }
 
         return $changed;
+    }
+
+    public function getSkipReason(CashTransaction $transaction): ?CashTransactionAutoRuleSkipReason
+    {
+        if ($transaction->isDeleted()) {
+            return CashTransactionAutoRuleSkipReason::DELETED;
+        }
+
+        $lockBefore = $transaction->getCompany()->getFinanceLockBefore();
+        if (null !== $lockBefore && $transaction->getOccurredAt()->setTime(0, 0) < $lockBefore->setTime(0, 0)) {
+            return CashTransactionAutoRuleSkipReason::LOCKED_PERIOD;
+        }
+
+        return null;
     }
 }
