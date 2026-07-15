@@ -9,6 +9,8 @@ use App\Cash\Message\ApplyAutoRulesForTransaction;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Category\CashflowSystemCategoryService;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
+use App\Shared\Entity\AuditLog;
+use App\Shared\Enum\AuditLogAction;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -60,6 +62,7 @@ final class ApplyAutoRulesForTransactionHandler
         $match = $this->autoRuleService->match($transaction);
         $rule = $match->rule;
         $changed = false;
+        $applicationPlan = null;
         $ruleId = null;
         $ruleName = null;
 
@@ -75,7 +78,8 @@ final class ApplyAutoRulesForTransactionHandler
         }
 
         if (null !== $rule) {
-            $changed = $this->autoRuleService->applyRule($rule, $transaction, $match);
+            $applicationPlan = $this->autoRuleService->applyRule($rule, $transaction, $match);
+            $changed = $applicationPlan?->hasChanges() ?? false;
             $ruleId = $rule->getId();
             $ruleName = $rule->getName();
         }
@@ -86,8 +90,21 @@ final class ApplyAutoRulesForTransactionHandler
             $changed = true;
         }
 
+        if (null !== $applicationPlan && $applicationPlan->hasChanges()) {
+            $this->entityManager->persist(new AuditLog(
+                (string) $transaction->getCompany()->getId(),
+                CashTransaction::class,
+                (string) $transaction->getId(),
+                AuditLogAction::UPDATE,
+                $applicationPlan->auditDiff(),
+            ));
+        }
+
         if ($changed) {
-            $this->dispatchGuard->suppress(fn () => $this->entityManager->flush());
+            $this->dispatchGuard->suppress(
+                fn () => $this->entityManager->flush(),
+                $applicationPlan,
+            );
         }
 
         $this->logger->info('Cash auto rules applied', [

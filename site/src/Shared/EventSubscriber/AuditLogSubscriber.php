@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\EventSubscriber;
 
+use App\Cash\Application\Service\AutoRuleDispatchGuard;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Shared\Audit\AuditContextProvider;
 use App\Shared\Entity\AuditLog;
@@ -22,6 +23,7 @@ final class AuditLogSubscriber implements EventSubscriber
     public function __construct(
         private readonly AuditContextProvider $auditContextProvider,
         private readonly EntityManagerInterface $entityManager,
+        private readonly AutoRuleDispatchGuard $autoRuleDispatchGuard,
     ) {
     }
 
@@ -74,6 +76,10 @@ final class AuditLogSubscriber implements EventSubscriber
         }
 
         if (!$entity instanceof CashTransaction) {
+            return;
+        }
+
+        if (null !== $this->autoRuleDispatchGuard->getApplicationPlan()) {
             return;
         }
 

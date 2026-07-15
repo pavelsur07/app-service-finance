@@ -162,6 +162,34 @@ final class CashTransactionAutoRuleConditionValidationTest extends TestCase
         $rule->setCompany(CompanyBuilder::aCompany()->withIndex(2)->build());
     }
 
+    public function testRuleCanOnlyBeDisabledOnceAndRecordsActor(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $actorUserId = Uuid::uuid4()->toString();
+        $rule = new CashTransactionAutoRule(
+            Uuid::uuid4()->toString(),
+            $company,
+            'Аренда',
+            CashTransactionAutoRuleAction::FILL,
+            CashTransactionAutoRuleOperationType::OUTFLOW,
+            CashflowCategoryBuilder::aCashflowCategory()->withCompany($company)->build(),
+            createdByUserId: $actorUserId,
+        );
+
+        self::assertSame(1, $rule->getRevision());
+        self::assertSame($actorUserId, $rule->getCreatedByUserId());
+        self::assertTrue($rule->disable($actorUserId));
+        self::assertFalse($rule->isActive());
+        self::assertSame(2, $rule->getRevision());
+        self::assertNotNull($rule->getDisabledAt());
+        self::assertSame($actorUserId, $rule->getDisabledByUserId());
+        self::assertFalse($rule->disable($actorUserId));
+        self::assertSame(2, $rule->getRevision());
+
+        $this->expectException(\InvalidArgumentException::class);
+        $rule->setIsActive(true);
+    }
+
     /** @return list<string> */
     private function paths(ConstraintViolationListInterface $violations): array
     {
