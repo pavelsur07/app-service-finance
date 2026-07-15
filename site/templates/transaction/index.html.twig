@@ -317,35 +317,53 @@
         if (f.id !== 'autoRuleApplyForm') return;
         ev.preventDefault();
 
-        const formData = new FormData(f);
-        const res = await fetch(f.action, { method: 'POST', body: formData, headers: {'X-Requested-With': 'XMLHttpRequest'}});
-        const data = await res.json();
+        try {
+          const formData = new FormData(f);
+          const res = await fetch(f.action, { method: 'POST', body: formData, headers: {'X-Requested-With': 'XMLHttpRequest'}});
+          const data = await res.json();
 
-        if (data.ok) {
+          if (data.ok) {
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-success mb-2';
+            alert.textContent = `Применено: ${data.changed ? 'да' : 'без изменений'}`;
+
+            const details = document.createElement('div');
+            details.append('Правило: ');
+            const ruleName = document.createElement('strong');
+            ruleName.textContent = data.ruleName ?? '';
+            details.append(ruleName, ` (${data.action ?? ''})`);
+
+            const actions = document.createElement('div');
+            actions.className = 'mt-3 text-end';
+            const closeButton = document.createElement('button');
+            closeButton.type = 'button';
+            closeButton.className = 'btn btn-primary';
+            closeButton.dataset.bsDismiss = 'modal';
+            closeButton.textContent = 'Закрыть';
+            actions.append(closeButton);
+
+            bodyEl.replaceChildren(alert, details, actions);
+            return;
+          }
+
           const alert = document.createElement('div');
-          alert.className = 'alert alert-success mb-2';
-          alert.textContent = `Применено: ${data.changed ? 'да' : 'без изменений'}`;
-
-          const details = document.createElement('div');
-          details.append('Правило: ');
-          const ruleName = document.createElement('strong');
-          ruleName.textContent = data.ruleName ?? '';
-          details.append(ruleName, ` (${data.action ?? ''})`);
+          alert.className = 'alert alert-warning mb-2';
+          alert.textContent = data.message ?? 'Не найдено';
 
           const actions = document.createElement('div');
           actions.className = 'mt-3 text-end';
           const closeButton = document.createElement('button');
           closeButton.type = 'button';
-          closeButton.className = 'btn btn-primary';
+          closeButton.className = 'btn btn-secondary';
           closeButton.dataset.bsDismiss = 'modal';
           closeButton.textContent = 'Закрыть';
           actions.append(closeButton);
 
-          bodyEl.replaceChildren(alert, details, actions);
-        } else {
+          bodyEl.replaceChildren(alert, actions);
+        } catch {
           const alert = document.createElement('div');
-          alert.className = 'alert alert-warning mb-2';
-          alert.textContent = data.message ?? 'Не найдено';
+          alert.className = 'alert alert-danger mb-2';
+          alert.textContent = 'Не удалось обработать запрос. Попробуйте ещё раз.';
 
           const actions = document.createElement('div');
           actions.className = 'mt-3 text-end';
