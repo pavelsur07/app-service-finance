@@ -26,7 +26,7 @@
   <form id="autoRuleApplyForm" method="post"
         action="{{ path('cash_transaction_auto_rule_apply_one', {transactionId: transaction.id}) }}">
     <input type="hidden" name="ruleId" value="{{ rule.id }}">
-    {# CSRF не обязателен для AJAX, но можно добавить, если в проекте принято #}
+    <input type="hidden" name="_token" value="{{ csrf_token('apply-auto-rule' ~ transaction.id) }}">
     <div class="d-flex gap-2 mt-3">
       <button type="submit" class="btn btn-primary">Применить</button>
       <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>

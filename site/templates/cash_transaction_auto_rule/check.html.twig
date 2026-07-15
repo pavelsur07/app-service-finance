@@ -3,6 +3,9 @@
 
 {% block body %}
 <div class="container-xl mt-3">
+  {% if filterError %}
+    <div class="alert alert-danger">{{ filterError }}</div>
+  {% endif %}
   {% if not rule.active %}
     <div class="alert alert-warning">Правило выключено. Доступен только предпросмотр.</div>
   {% endif %}
