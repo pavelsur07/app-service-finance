@@ -2,7 +2,7 @@
 
 ## Status
 
-- Phase: **Stage 6.1–6.2 deployed; owner-approved Stage 6.3 implemented and awaiting review**
+- Phase: **Stage 6 complete, deployed, and accepted read-only in production**
 - Overall risk: **HIGH** because Stage 6.3 adds one protected read-only page route
 - Production mutations: **out of scope**
 - Historical recalculation: **forbidden**
@@ -130,17 +130,21 @@ Completed work:
 
 **Risk:** HIGH (owner-approved protected page route)
 
-**Status:** DONE; awaiting owner review
+**Status:** DONE; deployed and accepted read-only in production
 
 **Result:** a bounded, read-only report proposes deterministic candidates for human review.
 
-**Next action:** **STOP for owner review before Stage 6.4 or deployment.**
+**Next action:** completed in Stage 6.4.
 
 The implementation uses one company-scoped DBAL read model and an authenticated GET page. It does not create rules, mutate transactions, dispatch messages, or expose transaction descriptions/INNs.
 
 ### Stage 6.4 — Final hardening and handoff
 
 **Risk:** MEDIUM locally; HIGH for production acceptance
+
+**Status:** DONE
+
+**Next action:** **STOP; final owner review required.**
 
 Work:
 

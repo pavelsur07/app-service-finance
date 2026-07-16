@@ -171,3 +171,59 @@ The query includes explicit company predicates for transactions, audits, account
 #### Open questions
 
 - none
+
+### Stage 6.4: Final hardening and production acceptance — DONE
+
+**Risk:** MEDIUM locally; HIGH for production acceptance
+**Next action:** STOP, final owner review required
+
+#### What was done
+
+- Reviewed the complete Stage 6 diff from the Stage 5 baseline through the merged Stage 6.3 change.
+- Re-ran the full unit suite and focused functional/integration regressions on merged `master`.
+- Verified that existing persisted condition fields remain supported; Stage 6 only adds enum values.
+- Confirmed the production rolling deployment, healthy application/workers, and the applied additive money-account migration.
+- Executed the candidate aggregation read-only against production data; it completed successfully and returned the valid empty state for the checked company.
+- Did not mutate transactions, create rules, dispatch messages, or enqueue historical ranges.
+
+#### Files changed
+
+- `docs/reviews/cash-auto-rules-stage-6-plan.md` — final Stage 6 status.
+- `docs/reviews/cash-auto-rules-stage-6-report.md` — final hardening and production acceptance report.
+
+#### Self-review
+
+- [x] Scope compliance
+- [x] Project patterns followed
+- [x] No forbidden actions
+- [x] Security/company access checked
+- [x] Tests/checks run
+- [x] Documentation updated
+
+The final Stage 6.4 change is documentation-only. Production checks used restricted read-only wrappers. No application code, schema, configuration, queue, rule, or transaction was changed during acceptance.
+
+#### Checks
+
+- GitHub production workflow for merge `42860450` — OK, including build, rolling deployment, and Doctrine migration job.
+- Production container status — OK; PHP application and workers healthy.
+- Production migration `DoctrineMigrations\\Version20260716092436` — present.
+- Production persisted auto-rule condition fields — compatible (`COUNTERPARTY` and `DESCRIPTION`); no invalid money-account references.
+- Production candidate aggregation — OK; valid empty result for the checked company.
+- `make site-test-unit` — OK, 1500 tests / 8819 assertions.
+- Focused functional/integration regression — OK, 5 tests / 48 assertions.
+- Symfony container lint — OK.
+- Doctrine mapping validation with `--skip-sync` — OK.
+- Twig lint for affected templates — OK.
+- Targeted PHP CS Fixer dry run — OK, 0 fixable files.
+- Frontend production build — OK; existing non-blocking UX Turbo package warning remains.
+- Complete Stage 6 `git diff --check` — OK.
+
+#### Risks / reviewer focus
+
+- Candidate output depends on field-level manual audit history; zero candidates is a valid result.
+- Existing rules are unchanged until a user explicitly edits or creates a rule using a new exact condition.
+- Historical recalculation remains explicitly out of scope.
+
+#### Open questions
+
+- none
