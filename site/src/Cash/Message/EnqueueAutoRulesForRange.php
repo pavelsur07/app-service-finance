@@ -16,10 +16,12 @@ final readonly class EnqueueAutoRulesForRange
     ) {
     }
 
-    public function __wakeup(): void
+    public function __unserialize(array $data): void
     {
-        if (!(new \ReflectionProperty($this, 'correlationId'))->isInitialized($this)) {
-            $this->correlationId = null;
-        }
+        $this->companyId = $data['companyId'];
+        $this->from = $data['from'] ?? null;
+        $this->to = $data['to'] ?? null;
+        $this->moneyAccountIds = $data['moneyAccountIds'] ?? null;
+        $this->correlationId = $data['correlationId'] ?? null;
     }
 }

@@ -13,7 +13,7 @@ final readonly class CashTransactionAutoRuleApplicationPlan
 {
     /**
      * @param array<string, array{before: ?string, after: ?string}> $changes
-     * @param array<string, CashTransactionAutoRule>                $rulesByField
+     * @param array<string, CashTransactionAutoRule> $rulesByField
      */
     public function __construct(
         public CashTransactionAutoRule $rule,
