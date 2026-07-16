@@ -12,10 +12,11 @@ final readonly class ApplyAutoRulesForTransaction
     ) {
     }
 
-    public function __wakeup(): void
+    public function __unserialize(array $data): void
     {
-        if (!(new \ReflectionProperty($this, 'correlationId'))->isInitialized($this)) {
-            $this->correlationId = null;
-        }
+        $this->transactionId = $data['transactionId'];
+        $this->companyId = $data['companyId'];
+        $this->createdAt = $data['createdAt'];
+        $this->correlationId = $data['correlationId'] ?? null;
     }
 }
