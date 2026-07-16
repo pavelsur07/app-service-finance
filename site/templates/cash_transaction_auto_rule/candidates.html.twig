@@ -1,0 +1,65 @@
+{% extends 'base.html.twig' %}
+{% block title %}Кандидаты автоправил ДДС{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <div class="page-pretitle">Автоправила ДДС</div>
+                    <h2 class="page-title mb-0">Кандидаты правил</h2>
+                </div>
+                <div class="col-auto ms-auto">
+                    <a href="{{ path('cash_transaction_auto_rule_index') }}" class="btn btn-outline-secondary">К списку правил</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-xl mt-3">
+        <div class="alert alert-info" role="status">
+            Отчёт только для чтения. Он не создаёт правила и не изменяет транзакции.
+            Показаны совпадения со статьёй, подтверждённой пользователем в
+            {{ minSamples }} и более операциях минимум за {{ minDistinctDates }} разные даты,
+            с согласованностью 100% за период {{ dateFrom|date('d.m.Y') }}–{{ dateTo|date('d.m.Y') }}.
+        </div>
+
+        <div class="card auto-rule-candidates" data-candidate-count="{{ candidates|length }}">
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter">
+                    <thead>
+                        <tr>
+                            <th>Условие</th>
+                            <th>Значение</th>
+                            <th>Тип операции</th>
+                            <th>Предлагаемая статья</th>
+                            <th>Подтверждения</th>
+                            <th>Уверенность</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for candidate in candidates %}
+                        <tr class="auto-rule-candidate">
+                            <td>{{ candidate.fieldLabel }}</td>
+                            <td>{{ candidate.valueLabel }}</td>
+                            <td>{{ candidate.operationTypeLabel }}</td>
+                            <td>{{ candidate.categoryName }}</td>
+                            <td>{{ candidate.sampleCount }} операций / {{ candidate.distinctDateCount }} дат</td>
+                            <td><span class="badge bg-success-lt">100%</span></td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">
+                                За выбранный период нет кандидатов, соответствующих безопасному порогу.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if candidates|length == maxCandidates %}
+                <div class="card-footer text-muted">Показаны первые {{ maxCandidates }} кандидатов.</div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}
