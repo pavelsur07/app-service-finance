@@ -124,6 +124,8 @@ Existing condition rows remain valid with `money_account_id = NULL`. The migrati
 - Added a protected, company-scoped candidate report linked from the Cash auto-rule list.
 - Added one DBAL read model over the approved 180-day window and 5-sample/3-date/100%-consistency contract.
 - Considered a category confirmed only when its latest category audit is a user action; a later auto-rule category audit excludes the sample.
+- Accepted both current root-level and nested manual category audit shapes when no `autoRules` provenance is present.
+- Excluded empty and whitespace-only import-source values without treating them as the `__MISSING__` null sentinel.
 - Proposed category-only candidates from one exact signal at a time and capped output at 100 rows.
 - Kept the request read-only: no rule creation, transaction mutation, messages, persisted report state, or historical recalculation.
 
@@ -150,8 +152,8 @@ The query includes explicit company predicates for transactions, audits, account
 
 #### Checks
 
-- Focused functional test — OK, 1 test / 23 assertions.
-- Cash auto-rule controller regression tests — OK, 3 tests / 44 assertions.
+- Focused functional test — OK, 1 test / 29 assertions.
+- Cash auto-rule controller regression tests — OK, 3 tests / 50 assertions.
 - `make site-test-unit` — OK, 1500 tests / 8819 assertions.
 - Targeted PHP CS Fixer dry run — OK, 0 fixable files.
 - `php bin/console lint:container` — OK.

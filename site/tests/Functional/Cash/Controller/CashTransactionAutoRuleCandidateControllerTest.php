@@ -46,6 +46,7 @@ final class CashTransactionAutoRuleCandidateControllerTest extends WebTestCaseBa
         $conflictingAccount = $this->account($company, 2, 'Счёт с конфликтом');
         $autoChangedAccount = $this->account($company, 3, 'Счёт после автоправила');
         $sameDayAccount = $this->account($company, 4, 'Счёт одного дня');
+        $nestedAuditAccount = $this->account($company, 6, 'Счёт вложенного аудита');
 
         $otherUser = UserBuilder::aUser()->withIndex(2)->asCompanyOwner()->build();
         $otherCompany = CompanyBuilder::aCompany()->withIndex(2)->withOwner($otherUser)->build();
@@ -65,6 +66,7 @@ final class CashTransactionAutoRuleCandidateControllerTest extends WebTestCaseBa
             $conflictingAccount,
             $autoChangedAccount,
             $sameDayAccount,
+            $nestedAuditAccount,
             $otherUser,
             $otherCompany,
             $otherCompanyCategory,
@@ -75,6 +77,7 @@ final class CashTransactionAutoRuleCandidateControllerTest extends WebTestCaseBa
 
         $today = new \DateTimeImmutable('today');
         $eligible = $this->transactions($company, $eligibleAccount, array_fill(0, 5, $category), 'eligible', $today);
+        $blankSource = $this->transactions($company, $eligibleAccount, array_fill(0, 5, $category), '   ', $today);
         $conflicting = $this->transactions(
             $company,
             $conflictingAccount,
@@ -91,6 +94,13 @@ final class CashTransactionAutoRuleCandidateControllerTest extends WebTestCaseBa
             $today,
             sameDay: true,
         );
+        $nestedAudit = $this->transactions(
+            $company,
+            $nestedAuditAccount,
+            array_fill(0, 5, $category),
+            'nested',
+            $today,
+        );
         $foreign = $this->transactions(
             $otherCompany,
             $otherCompanyAccount,
@@ -99,7 +109,7 @@ final class CashTransactionAutoRuleCandidateControllerTest extends WebTestCaseBa
             $today,
         );
 
-        foreach (array_merge($eligible, $conflicting, $autoChanged, $sameDay, $foreign) as $transaction) {
+        foreach (array_merge($eligible, $blankSource, $conflicting, $autoChanged, $sameDay, $nestedAudit, $foreign) as $transaction) {
             $this->em()->persist($transaction);
         }
         $this->em()->flush();
@@ -107,6 +117,7 @@ final class CashTransactionAutoRuleCandidateControllerTest extends WebTestCaseBa
         $manualAuditAt = new \DateTimeImmutable('-2 hours');
         foreach ([
             [$eligible, $user],
+            [$blankSource, $user],
             [$conflicting, $user],
             [$autoChanged, $user],
             [$sameDay, $user],
@@ -115,6 +126,9 @@ final class CashTransactionAutoRuleCandidateControllerTest extends WebTestCaseBa
             foreach ($transactions as $transaction) {
                 $this->em()->persist($this->manualCategoryAudit($transaction, $actor, $manualAuditAt));
             }
+        }
+        foreach ($nestedAudit as $transaction) {
+            $this->em()->persist($this->manualCategoryAudit($transaction, $user, $manualAuditAt, nested: true));
         }
         $this->em()->flush();
 
@@ -140,12 +154,15 @@ final class CashTransactionAutoRuleCandidateControllerTest extends WebTestCaseBa
         $client->request('GET', '/cash-transaction-auto-rules/candidates');
 
         self::assertResponseIsSuccessful();
-        self::assertSelectorExists('.auto-rule-candidates[data-candidate-count="2"]');
-        self::assertSelectorCount(2, '.auto-rule-candidate');
+        self::assertSelectorExists('.auto-rule-candidates[data-candidate-count="4"]');
+        self::assertSelectorCount(4, '.auto-rule-candidate');
         self::assertSelectorTextContains('body', 'Основной счёт');
         self::assertSelectorTextContains('body', 'eligible');
+        self::assertSelectorTextContains('body', 'Счёт вложенного аудита');
+        self::assertSelectorTextContains('body', 'nested');
         self::assertSelectorTextContains('body', 'Комиссия банку');
         self::assertSelectorTextContains('body', '5 операций / 5 дат');
+        self::assertSelectorTextContains('body', '10 операций / 5 дат');
         self::assertSelectorTextNotContains('body', 'Счёт с конфликтом');
         self::assertSelectorTextNotContains('body', 'Счёт после автоправила');
         self::assertSelectorTextNotContains('body', 'Счёт одного дня');
@@ -196,13 +213,16 @@ final class CashTransactionAutoRuleCandidateControllerTest extends WebTestCaseBa
         CashTransaction $transaction,
         User $actor,
         \DateTimeImmutable $createdAt,
+        bool $nested = false,
     ): AuditLog {
+        $change = [null, $transaction->getCashflowCategory()?->getId()];
+
         return new AuditLog(
             (string) $transaction->getCompany()->getId(),
             CashTransaction::class,
             (string) $transaction->getId(),
             AuditLogAction::UPDATE,
-            ['cashflowCategory' => [null, $transaction->getCashflowCategory()?->getId()]],
+            $nested ? ['changes' => ['cashflowCategory' => $change]] : ['cashflowCategory' => $change],
             $actor->getId(),
             $createdAt,
         );

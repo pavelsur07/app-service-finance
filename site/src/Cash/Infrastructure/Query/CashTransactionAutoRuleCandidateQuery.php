@@ -63,7 +63,10 @@ final readonly class CashTransactionAutoRuleCandidateQuery
                 INNER JOIN LATERAL (
                     SELECT BOOL_AND(
                         latest_audit.actor_user_id IS NOT NULL
-                        AND jsonb_exists(latest_audit.diff::jsonb, 'cashflowCategory')
+                        AND (
+                            jsonb_exists(latest_audit.diff::jsonb, 'cashflowCategory')
+                            OR latest_audit.diff::jsonb #> '{changes,cashflowCategory}' IS NOT NULL
+                        )
                         AND NOT jsonb_exists(latest_audit.diff::jsonb, 'autoRules')
                     ) AS manually_confirmed
                     FROM (
@@ -103,8 +106,16 @@ final readonly class CashTransactionAutoRuleCandidateQuery
                     ('MONEY_ACCOUNT', confirmed.money_account_id::text, confirmed.money_account_name),
                     (
                         'IMPORT_SOURCE',
-                        COALESCE(confirmed.import_source, '__MISSING__'),
-                        COALESCE(confirmed.import_source, 'Источник не указан')
+                        CASE
+                            WHEN confirmed.import_source IS NULL THEN '__MISSING__'
+                            WHEN NULLIF(TRIM(confirmed.import_source), '') IS NULL THEN NULL
+                            ELSE confirmed.import_source
+                        END,
+                        CASE
+                            WHEN confirmed.import_source IS NULL THEN 'Источник не указан'
+                            WHEN NULLIF(TRIM(confirmed.import_source), '') IS NULL THEN NULL
+                            ELSE confirmed.import_source
+                        END
                     ),
                     ('CURRENCY', confirmed.currency, confirmed.currency),
                     ('DOCUMENT_TYPE', LOWER(TRIM(confirmed.doc_type)), TRIM(confirmed.doc_type)),
