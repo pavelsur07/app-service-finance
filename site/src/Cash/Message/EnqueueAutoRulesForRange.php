@@ -18,7 +18,7 @@ final readonly class EnqueueAutoRulesForRange
 
     public function __wakeup(): void
     {
-        if (!isset($this->correlationId)) {
+        if (!(new \ReflectionProperty($this, 'correlationId'))->isInitialized($this)) {
             $this->correlationId = null;
         }
     }

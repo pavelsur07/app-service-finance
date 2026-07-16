@@ -32,6 +32,26 @@ final class AutoRuleMessageCompatibilityTest extends TestCase
         self::assertNull($message->correlationId);
     }
 
+    public function testNewRangePayloadWithNullCorrelationIdUnserializesSuccessfully(): void
+    {
+        $message = unserialize(serialize(new EnqueueAutoRulesForRange('company-id')));
+
+        self::assertInstanceOf(EnqueueAutoRulesForRange::class, $message);
+        self::assertNull($message->correlationId);
+    }
+
+    public function testNewTransactionPayloadWithNullCorrelationIdUnserializesSuccessfully(): void
+    {
+        $message = unserialize(serialize(new ApplyAutoRulesForTransaction(
+            'transaction-id',
+            'company-id',
+            new \DateTimeImmutable(),
+        )));
+
+        self::assertInstanceOf(ApplyAutoRulesForTransaction::class, $message);
+        self::assertNull($message->correlationId);
+    }
+
     private function withoutCorrelationId(object $message, int $propertyCount): string
     {
         $payload = preg_replace(
