@@ -2,10 +2,10 @@
 
 ## Status
 
-- Phase: **Stage 5.1 implemented**
+- Phase: **Stage 5.2 implemented**
 - Implementation: **awaiting owner review**
 - Overall risk: **HIGH**
-- Required gate: **STOP before Stage 5.2**
+- Required gate: **STOP before Stage 5.3/deployment**
 - Production mutations: **forbidden in this plan**
 
 ## Goal
@@ -286,4 +286,4 @@ Acceptance criteria:
 
 ## Phase 0 decision
 
-The owner approved Stage 5.1 implementation. The minimal no-migration path above is implemented and must be reviewed before Stage 5.2 starts.
+The owner approved Stage 5.2 implementation. The minimal no-migration correlation path above is implemented and must be reviewed before Stage 5.3 or deployment starts.

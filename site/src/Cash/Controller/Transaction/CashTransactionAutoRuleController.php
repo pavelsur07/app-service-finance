@@ -355,7 +355,7 @@ class CashTransactionAutoRuleController extends AbstractController
                 CashTransaction::class,
                 (string) $t->getId(),
                 AuditLogAction::UPDATE,
-                $applicationPlan->auditDiff(),
+                $applicationPlan->auditDiff(Uuid::uuid7()->toString()),
                 $auditContextProvider->getActorUserId(),
             ));
             $dispatchGuard->suppress(
