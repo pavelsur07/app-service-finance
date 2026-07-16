@@ -11,6 +11,7 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Tests\Builders\Cash\CashflowCategoryBuilder;
+use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
@@ -25,7 +26,17 @@ final class CashTransactionAutoRuleEditControllerTest extends WebTestCaseBase
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $company = CompanyBuilder::aCompany()->withOwner($user)->build();
+        $otherCompany = CompanyBuilder::aCompany()->withIndex(2)->withOwner($user)->build();
         $category = CashflowCategoryBuilder::aCashflowCategory()->withCompany($company)->build();
+        $ownAccount = MoneyAccountBuilder::aMoneyAccount()
+            ->withId(Uuid::uuid4()->toString())
+            ->forCompany($company)
+            ->build();
+        $foreignAccount = MoneyAccountBuilder::aMoneyAccount()
+            ->withId(Uuid::uuid4()->toString())
+            ->withIndex(2)
+            ->forCompany($otherCompany)
+            ->build();
         $rule = new CashTransactionAutoRule(
             Uuid::uuid4()->toString(),
             $company,
@@ -41,7 +52,7 @@ final class CashTransactionAutoRuleEditControllerTest extends WebTestCaseBase
             value: 'invoice',
         ));
 
-        foreach ([$user, $company, $category, $rule] as $entity) {
+        foreach ([$user, $company, $otherCompany, $category, $ownAccount, $foreignAccount, $rule] as $entity) {
             $this->em()->persist($entity);
         }
         $this->em()->flush();
@@ -52,6 +63,11 @@ final class CashTransactionAutoRuleEditControllerTest extends WebTestCaseBase
 
         $crawler = $client->request('GET', $editUrl);
         self::assertResponseIsSuccessful();
+        $accountOptionValues = $crawler
+            ->filter('select[name="cash_transaction_auto_rule[conditions][0][moneyAccount]"] option')
+            ->each(static fn ($option): string => (string) $option->attr('value'));
+        self::assertContains($ownAccount->getId(), $accountOptionValues);
+        self::assertNotContains($foreignAccount->getId(), $accountOptionValues);
         $client->submit($crawler->selectButton('Сохранить')->form());
         self::assertResponseRedirects('/cash-transaction-auto-rules/');
         self::assertSame(1, $this->reloadRule($rule)->getRevision());

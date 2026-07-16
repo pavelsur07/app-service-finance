@@ -7,6 +7,18 @@ const OPERATORS = {
   DATE: ['EQUAL', 'BETWEEN'],
   AMOUNT: ['EQUAL', 'GREATER_THAN', 'LESS_THAN', 'BETWEEN'],
   DESCRIPTION: ['CONTAINS'],
+  CURRENCY: ['EQUAL'],
+  IMPORT_SOURCE: ['EQUAL'],
+  IS_TRANSFER: ['EQUAL'],
+  DOCUMENT_TYPE: ['EQUAL'],
+  MONEY_ACCOUNT: ['EQUAL'],
+};
+
+const PLACEHOLDERS = {
+  CURRENCY: 'RUB',
+  IMPORT_SOURCE: 'telegram или __MISSING__',
+  IS_TRANSFER: 'true или false',
+  DOCUMENT_TYPE: 'Платёжное поручение',
 };
 
 export default class extends Controller {
@@ -69,6 +81,7 @@ export default class extends Controller {
     const operator = item.querySelector('[id$="_operator"]');
     const operatorRow = item.querySelector('.condition-operator-row');
     const counterpartyRow = item.querySelector('.condition-counterparty-row');
+    const moneyAccountRow = item.querySelector('.condition-money-account-row');
     const valueRow = item.querySelector('.condition-value-row');
     const valueToRow = item.querySelector('.condition-value-to-row');
     const valueInput = valueRow?.querySelector('input');
@@ -89,15 +102,18 @@ export default class extends Controller {
     }
 
     const isCounterparty = 'COUNTERPARTY' === field.value;
+    const isMoneyAccount = 'MONEY_ACCOUNT' === field.value;
     const usesRange = ['DATE', 'AMOUNT'].includes(field.value) && 'BETWEEN' === operator.value;
 
     operatorRow.hidden = 1 === allowed.length;
     this.toggleRow(counterpartyRow, isCounterparty, !isCounterparty);
-    this.toggleRow(valueRow, !isCounterparty, isCounterparty);
+    this.toggleRow(moneyAccountRow, isMoneyAccount, !isMoneyAccount);
+    this.toggleRow(valueRow, !isCounterparty && !isMoneyAccount, isCounterparty || isMoneyAccount);
     this.toggleRow(valueToRow, usesRange, !usesRange);
 
     if (valueInput) {
       valueInput.type = 'DATE' === field.value ? 'date' : 'text';
+      valueInput.placeholder = PLACEHOLDERS[field.value] ?? '';
       if ('INN' === field.value) {
         valueInput.inputMode = 'numeric';
       } else if ('AMOUNT' === field.value) {

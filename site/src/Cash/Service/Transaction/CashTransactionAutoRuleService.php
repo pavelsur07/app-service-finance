@@ -8,6 +8,7 @@ use App\Cash\Application\DTO\CashTransactionAutoRulePreviewResult;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
+use App\Cash\Entity\Transaction\CashTransactionAutoRuleCondition;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
@@ -274,6 +275,7 @@ class CashTransactionAutoRuleService
             $operator = $condition->getOperator();
             $value = (string) ($condition->getValue() ?? '');
             $valueTo = (string) ($condition->getValueTo() ?? '');
+            $exactValue = trim($value);
 
             $matches = match ($condition->getField()) {
                 CashTransactionAutoRuleConditionField::COUNTERPARTY => $transaction->getCounterparty() === $condition->getCounterparty(),
@@ -299,6 +301,15 @@ class CashTransactionAutoRuleService
                     $transaction->getDescription() ?? '',
                     $value,
                 ),
+                CashTransactionAutoRuleConditionField::CURRENCY => $transaction->getCurrency() === $exactValue,
+                CashTransactionAutoRuleConditionField::IMPORT_SOURCE => CashTransactionAutoRuleCondition::MISSING_IMPORT_SOURCE_VALUE === $exactValue
+                    ? null === $transaction->getImportSource()
+                    : $transaction->getImportSource() === $exactValue,
+                CashTransactionAutoRuleConditionField::IS_TRANSFER => $transaction->isTransfer() === ('true' === $exactValue),
+                CashTransactionAutoRuleConditionField::DOCUMENT_TYPE => $this->normalizedExactText($transaction->getDocType())
+                    === $this->normalizedExactText($value),
+                CashTransactionAutoRuleConditionField::MONEY_ACCOUNT => $transaction->getMoneyAccount()->getId()
+                    === $condition->getMoneyAccount()?->getId(),
             };
 
             if (!$matches) {
@@ -307,6 +318,11 @@ class CashTransactionAutoRuleService
         }
 
         return true;
+    }
+
+    private function normalizedExactText(?string $value): string
+    {
+        return mb_strtolower(trim((string) $value), 'UTF-8');
     }
 
     private function dateMatches(

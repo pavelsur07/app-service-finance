@@ -87,6 +87,7 @@ class CashTransactionAutoRuleType extends AbstractType
                 'entry_type' => CashTransactionAutoRuleConditionType::class,
                 'entry_options' => [
                     'counterparties' => $options['counterparties'],
+                    'moneyAccounts' => $options['moneyAccounts'],
                 ],
                 'allow_add' => true,
                 'allow_delete' => true,
@@ -101,6 +102,7 @@ class CashTransactionAutoRuleType extends AbstractType
             'data_class' => CashTransactionAutoRule::class,
             'categories' => [],
             'counterparties' => [],
+            'moneyAccounts' => [],
             'projectDirections' => [],
         ]);
     }
