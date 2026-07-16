@@ -2,8 +2,8 @@
 
 ## Status
 
-- Phase: **Phase 0, Stage 6.1, and owner-approved Stage 6.2 complete; Stage 6.3 business-definition gate reached**
-- Overall risk: **MEDIUM**, with explicit HIGH-risk and business-definition gates below
+- Phase: **Stage 6.1–6.2 deployed; owner-approved Stage 6.3 implemented and awaiting review**
+- Overall risk: **HIGH** because Stage 6.3 adds one protected read-only page route
 - Production mutations: **out of scope**
 - Historical recalculation: **forbidden**
 
@@ -69,14 +69,17 @@ Normalization is required when a new ingestion path is introduced, at that path'
 
 ### 5. Candidate generation remains read-only and approval-based
 
-The future candidate report may aggregate repeated stable signals and already assigned category/project/counterparty values, but it must never persist a rule or enqueue application work.
+The owner approved the Stage 6.3 contract:
 
-Implementation is blocked until the owner defines:
+- analyze the last 180 days;
+- require at least five manually confirmed transactions across at least three distinct operation dates;
+- treat a category as manually confirmed only when its latest field-level audit was performed by a user and no later auto-rule category change exists;
+- propose only the cashflow category in v1;
+- require 100% category consistency; ties produce no candidate;
+- evaluate one exact signal at a time, split by operation direction;
+- cap the output at 100 candidates and keep the report company-scoped and read-only.
 
-- minimum repetition/sample count and analysis period;
-- what proves a historical assignment is confirmed rather than automatic;
-- which target fields may become candidates;
-- acceptable consistency/confidence threshold and tie behavior.
+Stage 6.3 must never persist a rule, mutate a transaction, dispatch a message, or inspect descriptions, INNs, amounts, or date conditions.
 
 ## Staged implementation
 
@@ -125,13 +128,15 @@ Completed work:
 
 ### Stage 6.3 — Rule-candidate report
 
-**Risk:** MEDIUM after business contract approval
+**Risk:** HIGH (owner-approved protected page route)
+
+**Status:** DONE; awaiting owner review
 
 **Result:** a bounded, read-only report proposes deterministic candidates for human review.
 
-**Next action:** **STOP until the four business parameters in Design decision 5 are supplied.**
+**Next action:** **STOP for owner review before Stage 6.4 or deployment.**
 
-The report must not create rules, mutate transactions, dispatch messages, or expose transaction descriptions/INNs in logs.
+The implementation uses one company-scoped DBAL read model and an authenticated GET page. It does not create rules, mutate transactions, dispatch messages, or expose transaction descriptions/INNs.
 
 ### Stage 6.4 — Final hardening and handoff
 
@@ -165,8 +170,11 @@ Work:
 
 ### Stage 6.3 after business contract approval
 
-- one focused read model/query and presentation entry point, selected during that substage's inspection
-- focused aggregation, access-boundary, and no-write tests
+- `site/src/Cash/Application/DTO/CashTransactionAutoRuleCandidate.php`
+- `site/src/Cash/Infrastructure/Query/CashTransactionAutoRuleCandidateQuery.php`
+- `site/src/Cash/Controller/Transaction/CashTransactionAutoRuleCandidateController.php`
+- `site/templates/cash_transaction_auto_rule/candidates.html.twig`
+- rules-index link and focused access/aggregation/no-write test
 
 ## Required checks
 
@@ -202,7 +210,7 @@ Work:
 - current import-source values, unique constraints, or deduplication behavior;
 - current transaction classifications or historical data;
 - Messenger transports, routing, workers, cron, or production configuration;
-- public routes or APIs;
+- public routes or APIs other than the owner-approved protected Stage 6.3 GET page;
 - CFO model or target fields;
 - automatic rule creation;
 - negative text matching without an approved concrete case.

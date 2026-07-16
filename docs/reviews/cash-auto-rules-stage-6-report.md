@@ -112,4 +112,60 @@ Existing condition rows remain valid with `money_account_id = NULL`. The migrati
 
 #### Open questions
 
-- Stage 6.3 remains blocked on the rule-candidate report business contract defined in the Stage 6 plan.
+- none
+
+### Stage 6.3: Read-only rule-candidate report — DONE
+
+**Risk:** HIGH (owner-approved protected GET route)
+**Next action:** STOP, owner review required before Stage 6.4 or deployment
+
+#### What was done
+
+- Added a protected, company-scoped candidate report linked from the Cash auto-rule list.
+- Added one DBAL read model over the approved 180-day window and 5-sample/3-date/100%-consistency contract.
+- Considered a category confirmed only when its latest category audit is a user action; a later auto-rule category audit excludes the sample.
+- Proposed category-only candidates from one exact signal at a time and capped output at 100 rows.
+- Kept the request read-only: no rule creation, transaction mutation, messages, persisted report state, or historical recalculation.
+
+#### Files changed
+
+- `site/src/Cash/Application/DTO/CashTransactionAutoRuleCandidate.php` — scalar candidate read model.
+- `site/src/Cash/Infrastructure/Query/CashTransactionAutoRuleCandidateQuery.php` — company-scoped aggregation query.
+- `site/src/Cash/Controller/Transaction/CashTransactionAutoRuleCandidateController.php` — protected GET page.
+- `site/templates/cash_transaction_auto_rule/candidates.html.twig` — read-only report UI.
+- `site/templates/cash_transaction_auto_rule/index.html.twig` — report link.
+- `site/tests/Functional/Cash/Controller/CashTransactionAutoRuleCandidateControllerTest.php` — access, isolation, thresholds, provenance, and no-write coverage.
+- `ARCHITECTURE.md` and the Stage 6 plan — approved report contract.
+
+#### Self-review
+
+- [x] Scope compliance
+- [x] Project patterns followed
+- [x] No forbidden actions after explicit route approval
+- [x] Security/company access checked
+- [x] Tests/checks run
+- [x] Documentation updated
+
+The query includes explicit company predicates for transactions, audits, accounts, counterparties, and categories. Descriptions, INNs, raw bank data, amounts, and date-condition candidates are not selected or logged. The report has no write-capable dependency.
+
+#### Checks
+
+- Focused functional test — OK, 1 test / 23 assertions.
+- Cash auto-rule controller regression tests — OK, 3 tests / 44 assertions.
+- `make site-test-unit` — OK, 1500 tests / 8819 assertions.
+- Targeted PHP CS Fixer dry run — OK, 0 fixable files.
+- `php bin/console lint:container` — OK.
+- Twig lint for both affected templates — OK.
+- Symfony route inspection — OK, GET-only protected page path registered.
+- `git diff --check` — OK.
+
+#### Risks / reviewer focus
+
+- Manual confirmation intentionally excludes legacy/imported assignments without a field-level user audit.
+- A later auto-rule category audit excludes that transaction even when the resulting category ID is unchanged.
+- Candidates are suggestions only; broad signals such as currency still require human judgement before any rule is created.
+- The query uses existing transaction-period and audit-entity indexes and creates no schema objects.
+
+#### Open questions
+
+- none
