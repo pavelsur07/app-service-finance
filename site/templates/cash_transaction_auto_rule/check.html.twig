@@ -110,7 +110,7 @@
         <thead>
           <tr>
             <th>Дата</th><th>Счет</th><th class="text-end">Сумма</th>
-            <th>Статья</th><th>Проект</th><th>Контрагент</th><th>Описание</th><th>План</th><th>Статус</th><th></th>
+            <th>Статья</th><th>Проект</th><th>Контрагент</th><th>Описание</th><th>План</th><th>Статус и правила</th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -177,13 +177,13 @@
                 {% for field, label in fieldLabels %}
                   {% if row.match.conflicts[field] is defined %}
                     <div class="text-danger">
-                      {{ label }}: конфликт —
+                      {{ label }}: конфликт правил —
                       {% for competingRule in row.match.conflicts[field] %}
                         {{ competingRule.name }}{% if not loop.last %}, {% endif %}
                       {% endfor %}
                     </div>
                   {% elseif row.match.winners[field] is defined %}
-                    <div>{{ label }}: {{ row.match.winners[field].name }}</div>
+                    <div>{{ label }} — правило «{{ row.match.winners[field].name }}»</div>
                   {% endif %}
                 {% endfor %}
               </div>
