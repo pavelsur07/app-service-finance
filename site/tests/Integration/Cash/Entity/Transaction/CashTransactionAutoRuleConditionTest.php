@@ -2,9 +2,11 @@
 
 namespace App\Tests\Integration\Cash\Entity\Transaction;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Entity\Transaction\CashTransactionAutoRuleCondition;
+use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
@@ -93,5 +95,46 @@ final class CashTransactionAutoRuleConditionTest extends IntegrationTestCase
 
         $this->expectException(OptimisticLockException::class);
         $this->em->flush();
+    }
+
+    public function testPersistsExactMoneyAccountCondition(): void
+    {
+        $user = new User(Uuid::uuid4()->toString());
+        $user->setEmail('money-account-condition@example.com');
+        $user->setPassword('pass');
+        $company = new Company(Uuid::uuid4()->toString(), $user);
+        $company->setName('Money Account Rule Co');
+        $category = new CashflowCategory(Uuid::uuid4()->toString(), $company);
+        $category->setName('Sales');
+        $account = new MoneyAccount(
+            Uuid::uuid4()->toString(),
+            $company,
+            MoneyAccountType::BANK,
+            'Main account',
+            'RUB',
+        );
+        $rule = new CashTransactionAutoRule(
+            Uuid::uuid4()->toString(),
+            $company,
+            'Account rule',
+            CashTransactionAutoRuleAction::FILL,
+            CashTransactionAutoRuleOperationType::ANY,
+            $category,
+        );
+        $rule->addCondition(new CashTransactionAutoRuleCondition(
+            field: CashTransactionAutoRuleConditionField::MONEY_ACCOUNT,
+            operator: CashTransactionAutoRuleConditionOperator::EQUAL,
+            moneyAccount: $account,
+        ));
+
+        foreach ([$user, $company, $category, $account, $rule] as $entity) {
+            $this->em->persist($entity);
+        }
+        $this->em->flush();
+        $this->em->clear();
+
+        $savedRule = $this->em->find(CashTransactionAutoRule::class, $rule->getId());
+
+        self::assertSame($account->getId(), $savedRule?->getConditions()->first()->getMoneyAccount()?->getId());
     }
 }

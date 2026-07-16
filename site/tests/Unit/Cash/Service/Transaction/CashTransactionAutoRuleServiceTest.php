@@ -18,6 +18,7 @@ use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
 use App\Tests\Builders\Cash\CashflowCategoryBuilder;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
+use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\CounterpartyBuilder;
 use PHPUnit\Framework\TestCase;
@@ -398,6 +399,83 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         $match = $this->createService($repository)->match($transaction);
 
         self::assertSame($rule, $match->rule);
+    }
+
+    public function testMatchesAllNewExactScalarConditionsTogether(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $transaction = CashTransactionBuilder::aCashTransaction()
+            ->forCompany($company)
+            ->build()
+            ->setImportSource('telegram')
+            ->setIsTransfer(false)
+            ->setDocType('  ПЛАТЁЖНОЕ ПОРУЧЕНИЕ ');
+        $rule = $this->createRule($company);
+
+        foreach ([
+            [CashTransactionAutoRuleConditionField::CURRENCY, ' RUB '],
+            [CashTransactionAutoRuleConditionField::IMPORT_SOURCE, ' telegram '],
+            [CashTransactionAutoRuleConditionField::IS_TRANSFER, ' false '],
+            [CashTransactionAutoRuleConditionField::DOCUMENT_TYPE, 'платёжное поручение'],
+        ] as [$field, $value]) {
+            $rule->addCondition(new CashTransactionAutoRuleCondition(
+                autoRule: $rule,
+                field: $field,
+                operator: CashTransactionAutoRuleConditionOperator::EQUAL,
+                value: $value,
+            ));
+        }
+
+        self::assertSame($rule, $this->createService(rules: [$rule])->match($transaction)->rule);
+
+        $transaction->setIsTransfer(true);
+
+        self::assertNull($this->createService(rules: [$rule])->match($transaction)->rule);
+    }
+
+    public function testMatchesExplicitMissingImportSource(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $transaction = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
+        $rule = $this->createRule($company);
+        $rule->addCondition(new CashTransactionAutoRuleCondition(
+            autoRule: $rule,
+            field: CashTransactionAutoRuleConditionField::IMPORT_SOURCE,
+            operator: CashTransactionAutoRuleConditionOperator::EQUAL,
+            value: CashTransactionAutoRuleCondition::MISSING_IMPORT_SOURCE_VALUE,
+        ));
+        $service = $this->createService(rules: [$rule]);
+
+        self::assertSame($rule, $service->match($transaction)->rule);
+
+        $transaction->setImportSource('file');
+
+        self::assertNull($service->match($transaction)->rule);
+    }
+
+    public function testMatchesExactMoneyAccount(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $transaction = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
+        $rule = $this->createRule($company);
+        $rule->addCondition(new CashTransactionAutoRuleCondition(
+            autoRule: $rule,
+            field: CashTransactionAutoRuleConditionField::MONEY_ACCOUNT,
+            operator: CashTransactionAutoRuleConditionOperator::EQUAL,
+            moneyAccount: $transaction->getMoneyAccount(),
+        ));
+        $service = $this->createService(rules: [$rule]);
+
+        self::assertSame($rule, $service->match($transaction)->rule);
+
+        $transaction->setMoneyAccount(
+            MoneyAccountBuilder::aMoneyAccount()
+                ->withId(Uuid::uuid4()->toString())
+                ->forCompany($company)
+                ->build(),
+        );
+
+        self::assertNull($service->match($transaction)->rule);
     }
 
     public function testPreviewIncludesInactiveRuleWithoutSelectingItAsWinner(): void

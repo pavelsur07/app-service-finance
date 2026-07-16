@@ -2,6 +2,7 @@
 
 namespace App\Cash\Form\Transaction;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashTransactionAutoRuleCondition;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
@@ -30,6 +31,11 @@ class CashTransactionAutoRuleConditionType extends AbstractType
                         CashTransactionAutoRuleConditionField::DATE => 'Дата операции',
                         CashTransactionAutoRuleConditionField::AMOUNT => 'Сумма',
                         CashTransactionAutoRuleConditionField::DESCRIPTION => 'Описание содержит',
+                        CashTransactionAutoRuleConditionField::CURRENCY => 'Валюта (точное совпадение)',
+                        CashTransactionAutoRuleConditionField::IMPORT_SOURCE => 'Источник импорта (точное совпадение)',
+                        CashTransactionAutoRuleConditionField::IS_TRANSFER => 'Внутренний перевод',
+                        CashTransactionAutoRuleConditionField::DOCUMENT_TYPE => 'Тип документа (точное совпадение)',
+                        CashTransactionAutoRuleConditionField::MONEY_ACCOUNT => 'Денежный счёт (точное совпадение)',
                     };
                 },
             ])
@@ -55,6 +61,18 @@ class CashTransactionAutoRuleConditionType extends AbstractType
                 'label' => 'Контрагент',
                 'row_attr' => ['class' => 'condition-counterparty-row'],
             ])
+            ->add('moneyAccount', EntityType::class, [
+                'class' => MoneyAccount::class,
+                'choices' => $options['moneyAccounts'],
+                'choice_label' => static fn (MoneyAccount $account): string => sprintf(
+                    '%s (%s)',
+                    $account->getName(),
+                    $account->getCurrency(),
+                ),
+                'required' => false,
+                'label' => 'Денежный счёт',
+                'row_attr' => ['class' => 'condition-money-account-row'],
+            ])
             ->add('value', TextType::class, [
                 'required' => false,
                 'label' => 'Значение',
@@ -72,6 +90,7 @@ class CashTransactionAutoRuleConditionType extends AbstractType
         $resolver->setDefaults([
             'data_class' => CashTransactionAutoRuleCondition::class,
             'counterparties' => [],
+            'moneyAccounts' => [],
         ]);
     }
 }

@@ -12,8 +12,10 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Company\Entity\ProjectDirection;
 use App\Tests\Builders\Cash\CashflowCategoryBuilder;
+use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\CounterpartyBuilder;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Validator\ConstraintViolationInterface;
@@ -87,6 +89,88 @@ final class CashTransactionAutoRuleConditionValidationTest extends TestCase
         self::assertContains('value', $this->paths($this->validator->validate($condition)));
     }
 
+    #[DataProvider('validExactSignalProvider')]
+    public function testAcceptsNewExactSignal(
+        CashTransactionAutoRuleConditionField $field,
+        string $value,
+    ): void {
+        $condition = new CashTransactionAutoRuleCondition(
+            field: $field,
+            operator: CashTransactionAutoRuleConditionOperator::EQUAL,
+            value: $value,
+        );
+
+        self::assertCount(0, $this->validator->validate($condition));
+    }
+
+    /**
+     * @return iterable<string, array{CashTransactionAutoRuleConditionField, string}>
+     */
+    public static function validExactSignalProvider(): iterable
+    {
+        yield 'currency' => [CashTransactionAutoRuleConditionField::CURRENCY, 'RUB'];
+        yield 'import source' => [CashTransactionAutoRuleConditionField::IMPORT_SOURCE, 'telegram'];
+        yield 'missing import source' => [
+            CashTransactionAutoRuleConditionField::IMPORT_SOURCE,
+            CashTransactionAutoRuleCondition::MISSING_IMPORT_SOURCE_VALUE,
+        ];
+        yield 'transfer' => [CashTransactionAutoRuleConditionField::IS_TRANSFER, 'false'];
+        yield 'document type' => [CashTransactionAutoRuleConditionField::DOCUMENT_TYPE, 'Платёжное поручение'];
+    }
+
+    #[DataProvider('invalidExactSignalProvider')]
+    public function testRejectsInvalidNewExactSignal(
+        CashTransactionAutoRuleConditionField $field,
+        CashTransactionAutoRuleConditionOperator $operator,
+        string $value,
+        string $expectedPath,
+    ): void {
+        $condition = new CashTransactionAutoRuleCondition(
+            field: $field,
+            operator: $operator,
+            value: $value,
+        );
+
+        self::assertContains($expectedPath, $this->paths($this->validator->validate($condition)));
+    }
+
+    /**
+     * @return iterable<string, array{CashTransactionAutoRuleConditionField, CashTransactionAutoRuleConditionOperator, string, string}>
+     */
+    public static function invalidExactSignalProvider(): iterable
+    {
+        yield 'lowercase currency' => [
+            CashTransactionAutoRuleConditionField::CURRENCY,
+            CashTransactionAutoRuleConditionOperator::EQUAL,
+            'rub',
+            'value',
+        ];
+        yield 'source with spaces' => [
+            CashTransactionAutoRuleConditionField::IMPORT_SOURCE,
+            CashTransactionAutoRuleConditionOperator::EQUAL,
+            'bank source',
+            'value',
+        ];
+        yield 'non-canonical boolean' => [
+            CashTransactionAutoRuleConditionField::IS_TRANSFER,
+            CashTransactionAutoRuleConditionOperator::EQUAL,
+            '1',
+            'value',
+        ];
+        yield 'long document type' => [
+            CashTransactionAutoRuleConditionField::DOCUMENT_TYPE,
+            CashTransactionAutoRuleConditionOperator::EQUAL,
+            str_repeat('a', 65),
+            'value',
+        ];
+        yield 'unsupported operator' => [
+            CashTransactionAutoRuleConditionField::DOCUMENT_TYPE,
+            CashTransactionAutoRuleConditionOperator::CONTAINS,
+            'invoice',
+            'operator',
+        ];
+    }
+
     public function testRuleRequiresAtLeastOneCondition(): void
     {
         $company = CompanyBuilder::aCompany()->build();
@@ -144,6 +228,38 @@ final class CashTransactionAutoRuleConditionValidationTest extends TestCase
         );
 
         self::assertContains('counterparty', $this->paths($this->validator->validate($condition)));
+    }
+
+    public function testConditionRequiresMoneyAccount(): void
+    {
+        $condition = new CashTransactionAutoRuleCondition(
+            field: CashTransactionAutoRuleConditionField::MONEY_ACCOUNT,
+            operator: CashTransactionAutoRuleConditionOperator::EQUAL,
+        );
+
+        self::assertContains('moneyAccount', $this->paths($this->validator->validate($condition)));
+    }
+
+    public function testConditionRejectsMoneyAccountFromAnotherCompany(): void
+    {
+        $company = CompanyBuilder::aCompany()->withIndex(1)->build();
+        $otherCompany = CompanyBuilder::aCompany()->withIndex(2)->build();
+        $rule = new CashTransactionAutoRule(
+            Uuid::uuid4()->toString(),
+            $company,
+            'Аренда',
+            CashTransactionAutoRuleAction::FILL,
+            CashTransactionAutoRuleOperationType::OUTFLOW,
+            CashflowCategoryBuilder::aCashflowCategory()->withCompany($company)->build(),
+        );
+        $condition = new CashTransactionAutoRuleCondition(
+            autoRule: $rule,
+            field: CashTransactionAutoRuleConditionField::MONEY_ACCOUNT,
+            operator: CashTransactionAutoRuleConditionOperator::EQUAL,
+            moneyAccount: MoneyAccountBuilder::aMoneyAccount()->forCompany($otherCompany)->build(),
+        );
+
+        self::assertContains('moneyAccount', $this->paths($this->validator->validate($condition)));
     }
 
     public function testRuleCompanyCannotBeReassigned(): void
