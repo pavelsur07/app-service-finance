@@ -10,6 +10,7 @@ use App\Company\Entity\Company;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Query;
 use Psr\Log\LoggerInterface;
+use Ramsey\Uuid\Uuid;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
 
@@ -29,6 +30,7 @@ final class EnqueueAutoRulesForRangeHandler
     public function __invoke(EnqueueAutoRulesForRange $message): void
     {
         $startTime = microtime(true);
+        $correlationId = $message->correlationId ?? Uuid::uuid7()->toString();
 
         $company = $this->entityManager->getReference(Company::class, $message->companyId);
 
@@ -80,6 +82,7 @@ final class EnqueueAutoRulesForRangeHandler
                 (string) $transaction->getId(),
                 $message->companyId,
                 new \DateTimeImmutable(),
+                $correlationId,
             ));
 
             ++$enqueued;
@@ -91,6 +94,7 @@ final class EnqueueAutoRulesForRangeHandler
 
         $this->logger->info('Cash auto rules enqueue completed', [
             'companyId' => $message->companyId,
+            'correlationId' => $correlationId,
             'selected' => $selected,
             'enqueued' => $enqueued,
             'from' => $message->from?->format(\DATE_ATOM),

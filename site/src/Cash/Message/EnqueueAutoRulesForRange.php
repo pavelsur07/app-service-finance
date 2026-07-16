@@ -12,6 +12,14 @@ final readonly class EnqueueAutoRulesForRange
         public ?\DateTimeImmutable $from = null,
         public ?\DateTimeImmutable $to = null,
         public ?array $moneyAccountIds = null,
+        public ?string $correlationId = null,
     ) {
+    }
+
+    public function __wakeup(): void
+    {
+        if (!isset($this->correlationId)) {
+            $this->correlationId = null;
+        }
     }
 }

@@ -14,6 +14,7 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Psr\Log\NullLogger;
+use Ramsey\Uuid\Uuid;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 
@@ -38,6 +39,12 @@ final class EnqueueAutoRulesForRangeHandlerTest extends IntegrationTestCase
             ->build();
         $boundary->setOccurredAt(new \DateTimeImmutable('2024-01-15'));
 
+        $open = CashTransactionBuilder::aCashTransaction()
+            ->forCompany($company)
+            ->withMoneyAccount($account)
+            ->build();
+        $open->setOccurredAt(new \DateTimeImmutable('2024-01-16'));
+
         $deleted = CashTransactionBuilder::aCashTransaction()
             ->forCompany($company)
             ->withMoneyAccount($account)
@@ -50,6 +57,7 @@ final class EnqueueAutoRulesForRangeHandlerTest extends IntegrationTestCase
         $this->em->persist($account);
         $this->em->persist($locked);
         $this->em->persist($boundary);
+        $this->em->persist($open);
         $this->em->persist($deleted);
         $this->em->flush();
 
@@ -76,8 +84,13 @@ final class EnqueueAutoRulesForRangeHandlerTest extends IntegrationTestCase
             new \DateTimeImmutable('2024-01-31'),
         ));
 
-        self::assertCount(1, $dispatched);
+        self::assertCount(2, $dispatched);
         self::assertInstanceOf(ApplyAutoRulesForTransaction::class, $dispatched[0]);
         self::assertSame($boundary->getId(), $dispatched[0]->transactionId);
+        self::assertSame($open->getId(), $dispatched[1]->transactionId);
+        $correlationId = $dispatched[0]->correlationId;
+        self::assertIsString($correlationId);
+        self::assertTrue(Uuid::isValid($correlationId));
+        self::assertSame([$correlationId, $correlationId], array_column($dispatched, 'correlationId'));
     }
 }

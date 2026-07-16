@@ -13,7 +13,7 @@ final readonly class CashTransactionAutoRuleApplicationPlan
 {
     /**
      * @param array<string, array{before: ?string, after: ?string}> $changes
-     * @param array<string, CashTransactionAutoRule> $rulesByField
+     * @param array<string, CashTransactionAutoRule>                $rulesByField
      */
     public function __construct(
         public CashTransactionAutoRule $rule,
@@ -30,8 +30,8 @@ final readonly class CashTransactionAutoRuleApplicationPlan
         return [] !== $this->changes;
     }
 
-    /** @return array{autoRules: array<string, array{id: ?string, revision: int}>, changes: array<string, array{before: ?string, after: ?string}>} */
-    public function auditDiff(): array
+    /** @return array{correlationId: string, autoRules: array<string, array{id: ?string, revision: int}>, changes: array<string, array{before: ?string, after: ?string}>} */
+    public function auditDiff(string $correlationId): array
     {
         $rulesByField = $this->rulesByField;
         if ([] === $rulesByField) {
@@ -41,6 +41,7 @@ final readonly class CashTransactionAutoRuleApplicationPlan
         }
 
         return [
+            'correlationId' => $correlationId,
             'autoRules' => array_map(
                 static fn (CashTransactionAutoRule $rule): array => [
                     'id' => $rule->getId(),

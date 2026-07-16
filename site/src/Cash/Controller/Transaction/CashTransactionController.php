@@ -17,6 +17,7 @@ use App\Finance\Entity\Document;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\CompanyContextService;
 use Doctrine\ORM\Exception\ORMException;
+use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -111,6 +112,7 @@ class CashTransactionController extends AbstractController
             $from,
             $today,
             null,
+            Uuid::uuid7()->toString(),
         ));
 
         $this->addFlash('success', sprintf(

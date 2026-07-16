@@ -3,13 +3,37 @@
 namespace App\Tests\Unit\Command;
 
 use App\Cash\Command\CashAutoRulesEnqueueCommand;
+use App\Cash\Message\EnqueueAutoRulesForRange;
 use PHPUnit\Framework\TestCase;
+use Ramsey\Uuid\Uuid;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 final class CashAutoRulesEnqueueCommandTest extends TestCase
 {
+    public function testExecuteAddsCorrelationId(): void
+    {
+        $dispatched = null;
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->method('dispatch')->willReturnCallback(
+            static function (object $message) use (&$dispatched): Envelope {
+                $dispatched = $message;
+
+                return new Envelope($message);
+            },
+        );
+
+        $tester = new CommandTester(new CashAutoRulesEnqueueCommand($bus));
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'companyId' => Uuid::uuid7()->toString(),
+        ]));
+        self::assertInstanceOf(EnqueueAutoRulesForRange::class, $dispatched);
+        self::assertTrue(Uuid::isValid((string) $dispatched->correlationId));
+    }
+
     public function testExecuteFailsWhenAccountsContainNonUuid(): void
     {
         $bus = $this->createMock(MessageBusInterface::class);

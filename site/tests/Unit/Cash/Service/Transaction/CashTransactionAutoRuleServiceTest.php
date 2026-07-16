@@ -527,6 +527,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         $transaction = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
         $rule = $this->createRule($company);
         $service = $this->createService(rules: [$rule]);
+        $correlationId = Uuid::uuid7()->toString();
 
         $plan = $service->createApplicationPlan($service->match($transaction), $transaction);
 
@@ -538,6 +539,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
             ],
         ], $plan->changes);
         self::assertSame([
+            'correlationId' => $correlationId,
             'autoRules' => [
                 'cashflowCategory' => [
                     'id' => $rule->getId(),
@@ -545,7 +547,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
                 ],
             ],
             'changes' => $plan->changes,
-        ], $plan->auditDiff());
+        ], $plan->auditDiff($correlationId));
     }
 
     public function testDoesNotApplyRuleWithTargetFromAnotherCompany(): void
