@@ -79,6 +79,7 @@ final class CashAutoRulesEnqueueCommand extends Command
             $from,
             $to,
             $accountIds,
+            Uuid::uuid7()->toString(),
         ));
 
         $output->writeln('<info>Сообщение поставлено в очередь.</info>');

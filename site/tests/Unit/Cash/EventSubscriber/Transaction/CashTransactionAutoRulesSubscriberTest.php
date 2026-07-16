@@ -15,6 +15,7 @@ use Doctrine\ORM\Event\PostUpdateEventArgs;
 use Doctrine\ORM\UnitOfWork;
 use Doctrine\Persistence\Event\LifecycleEventArgs;
 use PHPUnit\Framework\TestCase;
+use Ramsey\Uuid\Uuid;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\SharedLockInterface;
 use Symfony\Component\Messenger\Envelope;
@@ -23,9 +24,10 @@ use Symfony\Component\Messenger\Stamp\DelayStamp;
 
 final class CashTransactionAutoRulesSubscriberTest extends TestCase
 {
-    public function testPostPersistEnqueuesDelayedRange(): void
+    public function testPostPersistEnqueuesDelayedRangesWithDistinctCorrelations(): void
     {
         $transaction = CashTransactionBuilder::aCashTransaction()->build();
+        $secondTransaction = CashTransactionBuilder::aCashTransaction()->build();
         $entityManager = $this->createMock(EntityManagerInterface::class);
 
         $lock = $this->createMock(SharedLockInterface::class);
@@ -45,11 +47,15 @@ final class CashTransactionAutoRulesSubscriberTest extends TestCase
         $subscriber = $this->createSubscriber($bus, $lockFactory);
 
         $subscriber->postPersist(new LifecycleEventArgs($transaction, $entityManager));
+        $subscriber->postPersist(new LifecycleEventArgs($secondTransaction, $entityManager));
 
-        self::assertCount(1, $dispatched);
+        self::assertCount(2, $dispatched);
         self::assertInstanceOf(EnqueueAutoRulesForRange::class, $dispatched[0][0]);
         self::assertInstanceOf(DelayStamp::class, $dispatched[0][1][0]);
         self::assertSame(10000, $dispatched[0][1][0]->getDelay());
+        self::assertTrue(Uuid::isValid((string) $dispatched[0][0]->correlationId));
+        self::assertTrue(Uuid::isValid((string) $dispatched[1][0]->correlationId));
+        self::assertNotSame($dispatched[0][0]->correlationId, $dispatched[1][0]->correlationId);
     }
 
     public function testPostUpdateIgnoresOutputOnlyChanges(): void
@@ -90,6 +96,7 @@ final class CashTransactionAutoRulesSubscriberTest extends TestCase
         self::assertCount(1, $dispatched);
         self::assertInstanceOf(ApplyAutoRulesForTransaction::class, $dispatched[0][0]);
         self::assertSame($transaction->getId(), $dispatched[0][0]->transactionId);
+        self::assertTrue(Uuid::isValid((string) $dispatched[0][0]->correlationId));
         self::assertInstanceOf(DelayStamp::class, $dispatched[0][1][0]);
         self::assertSame(10000, $dispatched[0][1][0]->getDelay());
     }

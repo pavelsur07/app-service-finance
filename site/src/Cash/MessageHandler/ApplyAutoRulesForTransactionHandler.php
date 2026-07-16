@@ -13,6 +13,7 @@ use App\Shared\Entity\AuditLog;
 use App\Shared\Enum\AuditLogAction;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Ramsey\Uuid\Uuid;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 #[AsMessageHandler]
@@ -30,6 +31,7 @@ final class ApplyAutoRulesForTransactionHandler
 
     public function __invoke(ApplyAutoRulesForTransaction $message): void
     {
+        $correlationId = $message->correlationId ?? Uuid::uuid7()->toString();
         $transaction = $this->transactionRepository->findOneByIdAndCompanyId(
             $message->transactionId,
             $message->companyId,
@@ -39,6 +41,7 @@ final class ApplyAutoRulesForTransactionHandler
             $this->logger->warning('Cash auto rules: transaction not found', [
                 'transactionId' => $message->transactionId,
                 'companyId' => $message->companyId,
+                'correlationId' => $correlationId,
                 'createdAt' => $message->createdAt->format(\DATE_ATOM),
             ]);
 
@@ -50,6 +53,7 @@ final class ApplyAutoRulesForTransactionHandler
             $this->logger->info('Cash auto rules skipped', [
                 'transactionId' => $transaction->getId(),
                 'companyId' => $message->companyId,
+                'correlationId' => $correlationId,
                 'messageCreatedAt' => $message->createdAt->format(\DATE_ATOM),
                 'reason' => $skipReason->value,
             ]);
@@ -70,6 +74,7 @@ final class ApplyAutoRulesForTransactionHandler
             $this->logger->warning('Cash auto rules: conflict detected', [
                 'transactionId' => $transaction->getId(),
                 'companyId' => $message->companyId,
+                'correlationId' => $correlationId,
                 'ruleIds' => array_map(
                     static fn (CashTransactionAutoRule $conflictingRule): string => (string) $conflictingRule->getId(),
                     $match->conflictingRules,
@@ -95,7 +100,7 @@ final class ApplyAutoRulesForTransactionHandler
                 CashTransaction::class,
                 (string) $transaction->getId(),
                 AuditLogAction::UPDATE,
-                $applicationPlan->auditDiff(),
+                $applicationPlan->auditDiff($correlationId),
             ));
         }
 
@@ -109,6 +114,7 @@ final class ApplyAutoRulesForTransactionHandler
         $this->logger->info('Cash auto rules applied', [
             'transactionId' => $transaction->getId(),
             'companyId' => $message->companyId,
+            'correlationId' => $correlationId,
             'messageCreatedAt' => $message->createdAt->format(\DATE_ATOM),
             'changed' => $changed,
             'conflict' => $match->hasConflict(),

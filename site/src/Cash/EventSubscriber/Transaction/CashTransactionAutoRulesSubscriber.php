@@ -13,6 +13,7 @@ use Doctrine\ORM\Event\PostUpdateEventArgs;
 use Doctrine\ORM\Events;
 use Doctrine\Persistence\Event\LifecycleEventArgs;
 use Psr\Log\LoggerInterface;
+use Ramsey\Uuid\Uuid;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\DelayStamp;
@@ -76,25 +77,28 @@ final class CashTransactionAutoRulesSubscriber implements EventSubscriber
         $occurredAt = $entity->getOccurredAt();
         $dayStart = $occurredAt->setTime(0, 0, 0);
         $dayEnd = $occurredAt->setTime(23, 59, 59);
+        $correlationId = Uuid::uuid7()->toString();
 
         if ($this->debouncer->shouldEnqueueCompanyDay($companyId, $dayStart, $moneyAccountId)) {
             $accountIds = [$moneyAccountId];
             $this->bus->dispatch(
-                new EnqueueAutoRulesForRange($companyId, $dayStart, $dayEnd, $accountIds),
+                new EnqueueAutoRulesForRange($companyId, $dayStart, $dayEnd, $accountIds, $correlationId),
                 [new DelayStamp(10000)]
             );
             $this->logger?->info('[AutoRules] enqueued', [
                 'companyId' => $companyId,
+                'correlationId' => $correlationId,
                 'day' => $dayStart->format('Y-m-d'),
                 'moneyAccountIds' => $accountIds,
             ]);
         } else {
             $this->bus->dispatch(
-                new ApplyAutoRulesForTransaction((string) $entity->getId(), $companyId, new \DateTimeImmutable()),
+                new ApplyAutoRulesForTransaction((string) $entity->getId(), $companyId, new \DateTimeImmutable(), $correlationId),
                 [new DelayStamp(10000)]
             );
             $this->logger?->debug('[AutoRules] enqueued_transaction_fallback', [
                 'companyId' => $companyId,
+                'correlationId' => $correlationId,
                 'day' => $dayStart->format('Y-m-d'),
                 'moneyAccountId' => $moneyAccountId,
                 'transactionId' => $entity->getId(),

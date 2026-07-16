@@ -26,6 +26,7 @@ use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
 
@@ -45,13 +46,21 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
 
         $autoRuleService = $this->createMock(CashTransactionAutoRuleService::class);
         $autoRuleService->expects(self::never())->method('getSkipReason');
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('warning')
+            ->with(
+                'Cash auto rules: transaction not found',
+                self::callback(static fn (array $context): bool => isset($context['correlationId'])
+                    && Uuid::isValid($context['correlationId'])),
+            );
         $handler = new ApplyAutoRulesForTransactionHandler(
             $this->em,
             self::getContainer()->get(CashTransactionRepository::class),
             $autoRuleService,
             self::getContainer()->get(CashflowSystemCategoryService::class),
             self::getContainer()->get(AutoRuleDispatchGuard::class),
-            new NullLogger(),
+            $logger,
         );
 
         $handler(new ApplyAutoRulesForTransaction(
@@ -208,20 +217,33 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
         $this->em->persist($transaction);
         $this->em->flush();
 
+        $loggedCorrelationIds = [];
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->method('info')->willReturnCallback(
+            static function (string $message, array $context) use (&$loggedCorrelationIds): void {
+                if ('Cash auto rules applied' === $message) {
+                    $loggedCorrelationIds[] = $context['correlationId'] ?? null;
+                }
+            },
+        );
         $handler = new ApplyAutoRulesForTransactionHandler(
             $this->em,
             self::getContainer()->get(CashTransactionRepository::class),
             self::getContainer()->get(CashTransactionAutoRuleService::class),
             self::getContainer()->get(CashflowSystemCategoryService::class),
             self::getContainer()->get(AutoRuleDispatchGuard::class),
-            new NullLogger(),
+            $logger,
         );
+        $correlationId = Uuid::uuid7()->toString();
 
-        $handler(new ApplyAutoRulesForTransaction(
+        $message = new ApplyAutoRulesForTransaction(
             $transaction->getId() ?? '',
             $company->getId() ?? '',
             new \DateTimeImmutable('2024-01-01T00:00:00+00:00'),
-        ));
+            $correlationId,
+        );
+        $handler($message);
+        $handler($message);
 
         $reloaded = $this->em->find(CashTransaction::class, $transaction->getId());
         self::assertInstanceOf(CashTransaction::class, $reloaded);
@@ -235,7 +257,9 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
         self::assertCount(1, $applicationAuditLogs);
         $applicationAuditLog = reset($applicationAuditLogs);
         self::assertInstanceOf(AuditLog::class, $applicationAuditLog);
+        self::assertSame([$correlationId, $correlationId], $loggedCorrelationIds);
         self::assertSame([
+            'correlationId' => $correlationId,
             'autoRules' => [
                 'cashflowCategory' => [
                     'id' => $rule->getId(),

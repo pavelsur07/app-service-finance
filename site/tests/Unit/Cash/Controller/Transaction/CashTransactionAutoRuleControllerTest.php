@@ -141,12 +141,22 @@ final class CashTransactionAutoRuleControllerTest extends TestCase
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager->expects(self::once())
             ->method('persist')
-            ->with(self::callback(static fn (object $entity): bool => $entity instanceof AuditLog
-                && $entity->getCompanyId() === $company->getId()
-                && CashTransaction::class === $entity->getEntityClass()
-                && $entity->getEntityId() === $transaction->getId()
-                && $entity->getDiff() === $applicationPlan->auditDiff()
-                && $entity->getActorUserId() === $actorUserId));
+            ->with(self::callback(static function (object $entity) use ($company, $transaction, $applicationPlan, $actorUserId): bool {
+                if (!$entity instanceof AuditLog) {
+                    return false;
+                }
+
+                $diff = $entity->getDiff();
+                $correlationId = $diff['correlationId'] ?? null;
+
+                return $entity->getCompanyId() === $company->getId()
+                    && CashTransaction::class === $entity->getEntityClass()
+                    && $entity->getEntityId() === $transaction->getId()
+                    && is_string($correlationId)
+                    && Uuid::isValid($correlationId)
+                    && $diff === $applicationPlan->auditDiff($correlationId)
+                    && $entity->getActorUserId() === $actorUserId;
+            }));
         $entityManager->expects(self::once())
             ->method('flush')
             ->willReturnCallback(static function () use ($dispatchGuard, $applicationPlan): void {

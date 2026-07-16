@@ -567,7 +567,8 @@ updatePLRegisterForDocument(string $documentId): void
 - One matcher is shared by preview, manual apply, and the worker. It resolves category, project, and counterparty independently by priority, specificity (condition count plus a direction constraint), then immutable rule ID.
 - The authenticated company-scoped preview is read-only: it uses the same application plan as the worker, limits only displayed rows, and calculates full-period counts plus independent month, currency, resulting-category, and resulting-project breakdowns.
 - A conflict skips only its field. Existing manual values are preserved, `CF_UNALLOC` is empty for category filling, and null rule targets never clear transaction fields.
-- Each actual auto-rule mutation persists one `AuditLog` for the `CashTransaction` in the same flush. Its diff contains per-field rule ID/revision and changed field before/after IDs; descriptions, INNs, and bank payloads are excluded.
+- Each actual auto-rule mutation persists one `AuditLog` for the `CashTransaction` in the same flush. Its diff contains a range/transaction correlation UUID, per-field rule ID/revision, and changed field before/after IDs; descriptions, INNs, and bank payloads are excluded.
+- Range messages propagate one correlation UUID to every child transaction message and safe structured log. Optional message fields plus native-serialization wakeup keep payloads queued before this contract backward-compatible.
 - `AutoRuleDispatchGuard` carries the application plan during that flush so the generic transaction audit subscriber does not duplicate the explicit provenance record.
 
 ### `CashFacade` (`src/Cash/Facade/CashFacade.php`)
