@@ -152,8 +152,8 @@ class CashTransactionAutoRuleService
 
         krsort($byMonth, \SORT_STRING);
         ksort($byCurrency, \SORT_STRING);
-        uasort($byCategory, static fn (array $left, array $right): int => strnatcasecmp($left['label'], $right['label']));
-        uasort($byProject, static fn (array $left, array $right): int => strnatcasecmp($left['label'], $right['label']));
+        uasort($byCategory, static fn (array $left, array $right): int => strnatcmp(mb_strtolower($left['label']), mb_strtolower($right['label'])));
+        uasort($byProject, static fn (array $left, array $right): int => strnatcmp(mb_strtolower($left['label']), mb_strtolower($right['label'])));
 
         return new CashTransactionAutoRulePreviewResult(
             $rows,

@@ -423,12 +423,12 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         $targetCategory = CashflowCategoryBuilder::aCashflowCategory()
             ->withId('11111111-1111-1111-1111-111111111111')
             ->withCompany($company)
-            ->withName('Target category')
+            ->withName('аренда')
             ->build();
         $assignedCategory = CashflowCategoryBuilder::aCashflowCategory()
             ->withId('22222222-2222-2222-2222-222222222222')
             ->withCompany($company)
-            ->withName('Assigned category')
+            ->withName('Банк')
             ->build();
         $rule = $this->createRule($company, $targetCategory);
         $rule->addCondition(new CashTransactionAutoRuleCondition(
@@ -479,6 +479,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         ], $preview->changesByField);
         self::assertSame(['2024-03', '2024-02', '2024-01'], array_column($preview->byMonth, 'key'));
         self::assertSame(['EUR', 'RUB', 'USD'], array_column($preview->byCurrency, 'key'));
+        self::assertSame(['аренда', 'Банк', 'Не задано'], array_column($preview->byCategory, 'label'));
         self::assertSame(3, $preview->byProject[0]['matched']);
         self::assertSame(1, $preview->byProject[0]['wouldChange']);
         self::assertNull($first->getCashflowCategory());
