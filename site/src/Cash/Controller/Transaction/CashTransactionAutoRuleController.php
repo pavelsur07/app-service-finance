@@ -240,37 +240,20 @@ class CashTransactionAutoRuleController extends AbstractController
                 'dateFrom' => $dateFrom,
                 'dateTo' => $dateTo,
                 'filterError' => $exception->getMessage(),
+                'preview' => null,
             ], new Response(status: Response::HTTP_BAD_REQUEST));
         }
 
-        $qb = $txRepo->createQueryBuilder('t')
-            ->andWhere('t.company = :company')
-            ->setParameter('company', $company)
-            ->innerJoin('t.moneyAccount', 'moneyAccount')
-            ->addSelect('moneyAccount')
-            ->leftJoin('t.counterparty', 'counterparty')
-            ->addSelect('counterparty')
-            ->leftJoin('t.cashflowCategory', 'cashflowCategory')
-            ->addSelect('cashflowCategory')
-            ->leftJoin('t.projectDirection', 'projectDirection')
-            ->addSelect('projectDirection')
-            ->orderBy('t.occurredAt', 'DESC');
-
-        $qb
-            ->andWhere('t.occurredAt >= :from')
-            ->setParameter('from', $filter->dateFrom)
-            ->andWhere('t.occurredAt <= :to')
-            ->setParameter('to', $filter->dateTo->setTime(23, 59, 59));
-
-        $previewRows = $autoRuleService->previewRule(
+        $preview = $autoRuleService->previewRule(
             $rule,
-            $qb->getQuery()->toIterable(),
+            $txRepo->iterateForAutoRulePreview($company, $filter->dateFrom, $filter->dateTo),
             $filter->limit,
         );
 
         return $this->render('cash_transaction_auto_rule/check.html.twig', [
             'rule' => $rule,
-            'previewRows' => $previewRows,
+            'previewRows' => $preview->rows,
+            'preview' => $preview,
             'limit' => $filter->limit,
             'dateFrom' => $filter->dateFrom->format('Y-m-d'),
             'dateTo' => $filter->dateTo->format('Y-m-d'),

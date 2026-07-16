@@ -34,13 +34,83 @@
     </div>
   </form>
 
+  {% if preview %}
+    <div class="row row-cards mb-3 auto-rule-preview-summary"
+         data-scanned="{{ preview.summary.scanned }}"
+         data-matched="{{ preview.summary.matched }}"
+         data-would-change="{{ preview.summary.wouldChange }}"
+         data-conflicts="{{ preview.summary.conflicts }}">
+      {% set summaryCards = [
+        {label: 'Проверено', value: preview.summary.scanned},
+        {label: 'Совпало с правилом', value: preview.summary.matched},
+        {label: 'Будут изменения', value: preview.summary.wouldChange},
+        {label: 'Без изменений', value: preview.summary.noChange},
+        {label: 'Пропущено', value: preview.summary.skipped},
+        {label: 'С конфликтами', value: preview.summary.conflicts}
+      ] %}
+      {% for item in summaryCards %}
+        <div class="col-sm-6 col-lg-2">
+          <div class="card card-sm">
+            <div class="card-body">
+              <div class="text-muted">{{ item.label }}</div>
+              <div class="h2 mb-0">{{ item.value }}</div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="card card-body mb-3">
+      <div class="fw-bold mb-2">Изменения по полям</div>
+      <div class="d-flex flex-wrap gap-3">
+        <span>Статья: <strong>{{ preview.changesByField.cashflowCategory }}</strong></span>
+        <span>Проект: <strong>{{ preview.changesByField.projectDirection }}</strong></span>
+        <span>Контрагент: <strong>{{ preview.changesByField.counterparty }}</strong></span>
+      </div>
+    </div>
+
+    {% set breakdowns = [
+      {title: 'По месяцам', rows: preview.byMonth},
+      {title: 'По валютам', rows: preview.byCurrency},
+      {title: 'По итоговой статье', rows: preview.byCategory},
+      {title: 'По итоговому проекту', rows: preview.byProject}
+    ] %}
+    <div class="row row-cards mb-3">
+      {% for breakdown in breakdowns %}
+        <div class="col-lg-6">
+          <div class="card h-100">
+            <div class="card-header"><h3 class="card-title">{{ breakdown.title }}</h3></div>
+            <div class="table-responsive">
+              <table class="table table-sm table-vcenter mb-0">
+                <thead><tr><th>Группа</th><th class="text-end">Совпало</th><th class="text-end">Изменится</th><th class="text-end">Конфликты</th><th class="text-end">Пропущено</th></tr></thead>
+                <tbody>
+                {% for item in breakdown.rows %}
+                  <tr>
+                    <td>{{ item.label }}</td>
+                    <td class="text-end">{{ item.matched }}</td>
+                    <td class="text-end">{{ item.wouldChange }}</td>
+                    <td class="text-end">{{ item.conflicts }}</td>
+                    <td class="text-end">{{ item.skipped }}</td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="5" class="text-center text-muted">Нет данных</td></tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
   <div class="card">
     <div class="table-responsive">
       <table class="table table-vcenter">
         <thead>
           <tr>
             <th>Дата</th><th>Счет</th><th class="text-end">Сумма</th>
-            <th>Статья</th><th>Проект</th><th>Контрагент</th><th>Описание</th><th>Статус</th><th></th>
+            <th>Статья</th><th>Проект</th><th>Контрагент</th><th>Описание</th><th>План</th><th>Статус</th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -57,6 +127,21 @@
             <td>{{ t.projectDirection ? t.projectDirection.name : '' }}</td>
             <td>{{ t.counterparty ? t.counterparty.name : '' }}</td>
             <td>{{ t.description }}</td>
+            <td class="auto-rule-preview-plan">
+              {% if row.plan and row.plan.changes %}
+                {% for field, change in row.plan.changes %}
+                  {% if field == 'cashflowCategory' %}
+                    <div><strong>Статья:</strong> {{ t.cashflowCategory ? t.cashflowCategory.name : 'Не задано' }} → {{ row.plan.cashflowCategory.name }}</div>
+                  {% elseif field == 'projectDirection' %}
+                    <div><strong>Проект:</strong> {{ t.projectDirection ? t.projectDirection.name : 'Не задано' }} → {{ row.plan.projectDirection.name }}</div>
+                  {% elseif field == 'counterparty' %}
+                    <div><strong>Контрагент:</strong> {{ t.counterparty ? t.counterparty.name : 'Не задано' }} → {{ row.plan.counterparty.name }}</div>
+                  {% endif %}
+                {% endfor %}
+              {% else %}
+                <span class="text-muted">Без изменений</span>
+              {% endif %}
+            </td>
             <td>
               {% if row.skipReason %}
                 <span class="badge bg-warning-lt">{{ row.skipReason.label }}</span>
@@ -83,13 +168,32 @@
               {% else %}
                 <span class="badge bg-secondary-lt">Не применяется</span>
               {% endif %}
+              {% set fieldLabels = {
+                cashflowCategory: 'Статья',
+                projectDirection: 'Проект',
+                counterparty: 'Контрагент'
+              } %}
+              <div class="small mt-2">
+                {% for field, label in fieldLabels %}
+                  {% if row.match.conflicts[field] is defined %}
+                    <div class="text-danger">
+                      {{ label }}: конфликт —
+                      {% for competingRule in row.match.conflicts[field] %}
+                        {{ competingRule.name }}{% if not loop.last %}, {% endif %}
+                      {% endfor %}
+                    </div>
+                  {% elseif row.match.winners[field] is defined %}
+                    <div>{{ label }}: {{ row.match.winners[field].name }}</div>
+                  {% endif %}
+                {% endfor %}
+              </div>
             </td>
             <td class="text-nowrap">
               <a class="btn btn-sm btn-info" href="{{ path('cash_transaction_show', {id: t.id}) }}">Просмотр</a>
             </td>
           </tr>
         {% else %}
-          <tr><td colspan="9" class="text-center text-muted">Совпадений нет</td></tr>
+          <tr><td colspan="10" class="text-center text-muted">Совпадений нет</td></tr>
         {% endfor %}
         </tbody>
       </table>
