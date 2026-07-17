@@ -2,9 +2,9 @@
 
 ## Status
 
-- Phase: **Phase 0 complete**
+- Phase: **Stage 7.5 implemented and verified locally**
 - Risk: **HIGH** — production schema migration across Cash and Finance facts
-- Next action: **STOP; owner review is required before creating the migration**
+- Next action: **STOP; owner review is required before PR/deployment work**
 - Production writes: **not performed**
 - Historical recalculation/backfill: **forbidden in Stage 7.5**
 
@@ -202,6 +202,8 @@ Before owner review of the migration:
 - [x] No application, schema, queue, or production mutation performed
 
 ## Owner decision gate
+
+Owner approved the schema contract, migration creation, and local `app_test` application on 2026-07-17. The migration and integration checks passed locally; production remains unchanged.
 
 Approval is required for all of the following before migration creation:
 

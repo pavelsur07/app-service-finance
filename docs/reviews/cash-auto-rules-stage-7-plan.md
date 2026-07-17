@@ -2,9 +2,9 @@
 
 ## Status
 
-- Phase: **Stage 7.4 accepted in production; Stage 7.5 Phase 0 complete**
+- Phase: **Stage 7.4 accepted in production; Stage 7.5 implemented and verified locally**
 - Overall risk: **HIGH** because the model adds company master data and new financial dimensions to Cash, documents, P&L aggregates, and auto rules
-- Next action: **STOP; owner approval required before creating the HIGH-risk Stage 7.5 migration**
+- Next action: **STOP; owner review required before Stage 7.5 PR/deployment work**
 - Further production mutations: **forbidden until a separately approved migration or backfill step**
 - Historical recalculation: **forbidden by default**
 
@@ -237,11 +237,11 @@ Production status: ACCEPTED; deployment, `Version20260716170000`, container heal
 
 This is an expand-only migration unit. It does not update existing facts, rebuild P&L, or change reports.
 
-Phase 0 status: DONE; detailed contract and read-only preflight are in `cash-auto-rules-stage-7-5-plan.md` and `cash-auto-rules-stage-7-5-preflight.sql`.
+Implementation status: DONE and verified on local `app_test`. `Version20260717120000` plus focused schema/writer tests passed without changing existing facts. The detailed contract, read-only preflight, and Stage Report are in `cash-auto-rules-stage-7-5-plan.md`, `cash-auto-rules-stage-7-5-preflight.sql`, and `cash-auto-rules-stage-7-5-report.md`.
 
 The current four-column P&L conflict target remains available. Stage 7.5 prepares a future five-column `NULLS NOT DISTINCT` key but does not enable multi-ЦФО writes. Because production deploys code before migrations, Stage 7.7 is split into a nullable-writer compatibility cutover and a later behavior activation.
 
-**Next action:** mandatory STOP before migration creation.
+**Next action:** mandatory STOP for owner review before PR/deployment work.
 
 ### Stage 7.6 — Cash transaction integration
 
