@@ -16,7 +16,8 @@ final readonly class CashFacade
     public function __construct(
         private CashTransactionService $cashTransactionService,
         private CashTransactionRepository $cashTransactionRepository,
-    ) {}
+    ) {
+    }
 
     public function createTransaction(CreateCashTransactionCommand $command): CreateCashTransactionResult
     {
@@ -35,6 +36,7 @@ final readonly class CashFacade
         $dto->externalId = $command->externalId;
         $dto->dedupeHash = $command->dedupeHash;
         $dto->rawData = $command->rawData;
+        $dto->responsibilityCenterId = $command->responsibilityCenterId;
 
         $existing = $this->findExistingByImport($command);
         if (null !== $existing) {
@@ -76,5 +78,4 @@ final readonly class CashFacade
             $command->externalId,
         );
     }
-
 }

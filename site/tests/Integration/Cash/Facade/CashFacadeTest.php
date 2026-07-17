@@ -11,6 +11,9 @@ use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Facade\CashFacade;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Company\Entity\Counterparty;
+use App\Company\Entity\FinancialResponsibilityCenter;
+use App\Company\Entity\FinancialResponsibilityCenterProject;
+use App\Company\Entity\ProjectDirection;
 use App\Company\Enum\CounterpartyType;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -40,6 +43,7 @@ final class CashFacadeTest extends IntegrationTestCase
         $account->setOpeningBalanceDate(new \DateTimeImmutable('2024-01-01'));
 
         $counterparty = new Counterparty(Uuid::uuid4()->toString(), $company, 'Client', CounterpartyType::LEGAL_ENTITY);
+        $systemPair = $this->persistSystemPair($company);
 
         $this->em->persist($user);
         $this->em->persist($company);
@@ -65,6 +69,8 @@ final class CashFacadeTest extends IntegrationTestCase
         self::assertNotNull($saved);
         self::assertSame('Facade tx', $saved->getDescription());
         self::assertSame($counterparty->getId(), $saved->getCounterparty()?->getId());
+        self::assertSame($systemPair['project']->getId(), $saved->getProjectDirection()?->getId());
+        self::assertSame($systemPair['center']->getId(), $saved->getResponsibilityCenterId());
     }
 
     public function testCreateTransactionPersistsImportAndTelegramDedupFields(): void
@@ -75,6 +81,7 @@ final class CashFacadeTest extends IntegrationTestCase
         $account = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Main', 'USD');
         $account->setOpeningBalance('0');
         $account->setOpeningBalanceDate(new \DateTimeImmutable('2024-01-01'));
+        $this->persistSystemPair($company);
 
         $this->em->persist($user);
         $this->em->persist($company);
@@ -124,6 +131,7 @@ final class CashFacadeTest extends IntegrationTestCase
         $account = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Main', 'USD');
         $account->setOpeningBalance('0');
         $account->setOpeningBalanceDate(new \DateTimeImmutable('2024-01-01'));
+        $systemPair = $this->persistSystemPair($company);
 
         $this->em->persist($user);
         $this->em->persist($company);
@@ -149,6 +157,8 @@ final class CashFacadeTest extends IntegrationTestCase
         self::assertNull($saved->getExternalId());
         self::assertNull($saved->getDedupeHash());
         self::assertSame([], $saved->getRawData());
+        self::assertSame($systemPair['project']->getId(), $saved->getProjectDirection()?->getId());
+        self::assertSame($systemPair['center']->getId(), $saved->getResponsibilityCenterId());
     }
 
     public function testCreateTransactionReturnsDuplicateForSameImportSourceAndExternalId(): void
@@ -159,6 +169,7 @@ final class CashFacadeTest extends IntegrationTestCase
         $account = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Main', 'USD');
         $account->setOpeningBalance('0');
         $account->setOpeningBalanceDate(new \DateTimeImmutable('2024-01-01'));
+        $systemPair = $this->persistSystemPair($company);
 
         $this->em->persist($user);
         $this->em->persist($company);
@@ -187,6 +198,7 @@ final class CashFacadeTest extends IntegrationTestCase
             description: 'Telegram tx duplicate delivery',
             importSource: 'telegram',
             externalId: 'telegram:dedupe',
+            projectDirectionId: Uuid::uuid4()->toString(),
         ));
 
         self::assertTrue($first->created);
@@ -194,6 +206,10 @@ final class CashFacadeTest extends IntegrationTestCase
         self::assertFalse($second->created);
         self::assertTrue($second->duplicate);
         self::assertSame($first->transactionId, $second->transactionId);
+        $stored = $this->cashTransactionRepository->find($first->transactionId);
+        self::assertNotNull($stored);
+        self::assertSame($systemPair['project']->getId(), $stored->getProjectDirection()?->getId());
+        self::assertSame($systemPair['center']->getId(), $stored->getResponsibilityCenterId());
 
         $rows = $this->cashTransactionRepository->findBy([
             'company' => $company,
@@ -212,6 +228,7 @@ final class CashFacadeTest extends IntegrationTestCase
         $account = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Main', 'USD');
         $account->setOpeningBalance('0');
         $account->setOpeningBalanceDate(new \DateTimeImmutable('2024-01-01'));
+        $this->persistSystemPair($company);
 
         $this->em->persist($user);
         $this->em->persist($company);
@@ -257,6 +274,7 @@ final class CashFacadeTest extends IntegrationTestCase
         $account = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Main', 'USD');
         $account->setOpeningBalance('0');
         $account->setOpeningBalanceDate(new \DateTimeImmutable('2024-01-01'));
+        $this->persistSystemPair($company);
 
         $this->em->persist($user);
         $this->em->persist($company);
@@ -303,5 +321,29 @@ final class CashFacadeTest extends IntegrationTestCase
         ]);
 
         self::assertCount(1, $rows);
+    }
+
+    /**
+     * @return array{project: ProjectDirection, center: FinancialResponsibilityCenter}
+     */
+    private function persistSystemPair(\App\Company\Entity\Company $company): array
+    {
+        $project = new ProjectDirection(
+            Uuid::uuid4()->toString(),
+            $company,
+            'Общий',
+            ProjectDirection::CODE_GENERAL,
+        );
+        $center = new FinancialResponsibilityCenter(
+            $company->getId(),
+            FinancialResponsibilityCenter::CODE_GENERAL,
+            FinancialResponsibilityCenter::NAME_GENERAL,
+        );
+
+        $this->em->persist($project);
+        $this->em->persist($center);
+        $this->em->persist(new FinancialResponsibilityCenterProject($company->getId(), $project, $center));
+
+        return ['project' => $project, 'center' => $center];
     }
 }

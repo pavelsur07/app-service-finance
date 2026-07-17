@@ -1,7 +1,7 @@
 ### Stage 7.9.3: Shared project × ЦФО planner, preview, and apply — DONE
 
 **Risk:** HIGH
-**Next action:** STOP, owner review required; production deployment also requires the Stage 7.9.2 zero-unpaired-rule gate
+**Next action:** DONE; move to Stage 7.9.4 transition / Stage 7.6.2 planning
 
 #### What was done
 
@@ -14,6 +14,7 @@
 - Fixed review P2: execution path now returns `null` for no-op pair plans so fallback category changes are not suppressed by an empty auto-rule application plan.
 - Fixed review P3: category-only preview now loads active ЦФО labels instead of showing raw UUIDs for already assigned transaction ЦФО values.
 - Kept writers/import defaults, history, routes, auth, queues, migrations, documents, P&L, and existing transactions unchanged.
+- Production acceptance was closed as preview-only after deployment: rule `Перевод на карту` preview showed 20 July 2026 rows changing only `ЦФО: Не задано → Общий`, zero conflicts, and no category/project/counterparty changes. No historical range or one-row transaction mutation was executed by Codex.
 
 #### Files changed
 
@@ -52,10 +53,10 @@
 - Confirm that any project/ЦФО conflict blocks both pair fields while category/counterparty changes continue.
 - Confirm exact system-pair replacement, custom-pair preservation, partial fill, and unavailable-pair fail-closed behavior.
 - Confirm preview loads one active-pair snapshot rather than querying per transaction.
-- Production deployment is forbidden until the Stage 7.9.2 dry-run/execute/zero gate is separately approved and completed.
-- Stage 7.9.4 is not included and cannot start before review plus controlled Stage 7.9.3 production acceptance.
+- Stage 7.9.2 production gate is complete: command dry-run found 74 assignable rules, execute updated 74, follow-up dry-run found 0 candidates, and read-only SQL found 0 active `PROJECT_GENERAL` rules without ЦФО.
+- Stage 7.9.4 remains a transition back to Stage 7.6 writer/import work; writer defaults are still not included in this stage report.
 - The user-owned untracked `reports/` directory remains untouched.
 
 #### Open questions
 
-- none for implementation; owner review and production gates remain mandatory.
+- none for Stage 7.9.3.

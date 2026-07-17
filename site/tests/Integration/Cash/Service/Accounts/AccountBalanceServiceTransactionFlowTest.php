@@ -12,6 +12,9 @@ use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Transaction\CashTransactionService;
 use App\Company\Entity\Company;
+use App\Company\Entity\FinancialResponsibilityCenter;
+use App\Company\Entity\FinancialResponsibilityCenterProject;
+use App\Company\Entity\ProjectDirection;
 use App\Company\Entity\User;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
@@ -44,6 +47,15 @@ final class AccountBalanceServiceTransactionFlowTest extends IntegrationTestCase
         $this->em->persist($user);
         $this->em->persist($company);
         $this->em->persist($account);
+        $project = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Общий', ProjectDirection::CODE_GENERAL);
+        $center = new FinancialResponsibilityCenter(
+            $company->getId(),
+            FinancialResponsibilityCenter::CODE_GENERAL,
+            FinancialResponsibilityCenter::NAME_GENERAL,
+        );
+        $this->em->persist($project);
+        $this->em->persist($center);
+        $this->em->persist(new FinancialResponsibilityCenterProject($company->getId(), $project, $center));
         $this->em->flush();
 
         $dto1 = new CashTransactionDTO();

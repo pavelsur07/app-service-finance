@@ -277,6 +277,7 @@ class CashTransactionController extends AbstractController
         $dto->amount = $tx->getAmount();
         $dto->direction = $tx->getDirection();
         $dto->description = $tx->getDescription();
+        $dto->responsibilityCenterId = $tx->getResponsibilityCenterId();
 
         $form = $this->createForm(CashTransactionType::class, $dto, ['company' => $company]);
 
