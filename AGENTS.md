@@ -95,6 +95,34 @@ STOP and ask the owner only when missing information materially affects:
 
 Do not guess missing business rules. Do not expand the scope autonomously.
 
+Baseline before implementation
+Before changing code, run the smallest relevant baseline check when practical.
+
+Record:
+- the command,
+- the result,
+- any pre-existing failures,
+- whether the environment was sufficient to run the check.
+
+After implementation, compare the final result with the baseline.
+Do not attribute a pre-existing failure to the current stage.
+Do not block a safe task only because an unrelated pre-existing check is red; document the evidence and continue with the checks relevant to the current scope.
+
+Stage Definition of Done
+Before implementing each stage, define explicit completion criteria.
+
+The Definition of Done must state:
+- expected observable behavior,
+- acceptance checks,
+- required tests,
+- required documentation changes,
+- operational or observability requirements when relevant,
+- compatibility requirements,
+- work explicitly excluded from the stage.
+
+Do not start implementation of a large stage until its Definition of Done is clear enough to verify objectively.
+For small tasks, the Definition of Done may be a short internal checklist.
+
 Small tasks
 For small, isolated, low-risk tasks:
 - inspect the relevant files,
@@ -123,14 +151,18 @@ Use staged execution for large, risky, or module-sized tasks, including:
 Large task flow:
 ```text
 Phase 0 — Plan
+    -> Baseline
+    -> Stage Definition of Done
     -> Stage 1..N — Implement
-        -> Checks
+        -> Targeted checks
+        -> Module checks
+        -> Full relevant stage checks
         -> Independent automatic review
         -> Review findings
         -> Fix findings
         -> Re-run checks
         -> Repeat review until green or STOP condition
-    -> Stage Report
+    -> Stage Report + Checkpoint
     -> Next stage or Phase Final — Handoff
 ```
 
@@ -158,7 +190,8 @@ During Phase 0:
 - identify existing project patterns,
 - prepare a staged implementation plan,
 - classify each stage by risk,
-- list required tests/checks,
+- define the Definition of Done for each stage,
+- list baseline and final tests/checks,
 - list files or areas expected to change,
 - list what must not be changed.
 
@@ -287,16 +320,127 @@ Do not stop after the first fix attempt when additional safe fixes remain inside
 After 3 iterations, STOP only if unresolved BLOCKER or IMPORTANT findings remain. Report the exact remaining issue, attempted fixes, evidence, and recommended options.
 Do not hide unresolved review findings.
 
+Verification strategy
+Use a progressive verification cascade.
+
+During implementation:
+1. Run the narrowest relevant test or check for the changed behavior.
+2. Run the relevant module or bounded-context test set.
+3. Run static analysis, linting, or build checks relevant to changed files.
+
+At stage completion:
+4. Run the full relevant stage check set.
+
+At final handoff:
+5. Run the full project check set when practical and supported by the environment.
+
+A targeted green test is not enough to declare a stage complete when broader relevant checks are available.
+Prefer fast feedback during implementation and broader confidence before handoff.
+
+Regression tests for bug fixes
+For every bug fix, add a regression test when technically practical.
+
+The regression test must:
+- fail against the previous incorrect behavior,
+- pass after the fix,
+- verify observable behavior rather than private implementation details.
+
+If an automated regression test is not practical, document why and provide the strongest available alternative verification.
+A bug fix without a regression test or documented alternative verification is not complete.
+
+Failed command handling
+Do not repeat the same failed command without changing code, configuration, environment, or the diagnostic hypothesis.
+
+After an identical repeated failure:
+- stop blind retries,
+- inspect the root cause,
+- collect evidence,
+- run a narrower diagnostic command,
+- then fix the cause or STOP with a concrete report.
+
+Do not use repeated command execution as a substitute for diagnosis.
+
+Backward-compatible database evolution
+Prefer expand/contract for database and persistent contract changes:
+
+```text
+1. Expand   — add compatible schema or fields without removing old behavior.
+2. Migrate  — backfill or transform data in a separate controlled step.
+3. Switch   — enable the new code path after compatibility is verified.
+4. Contract — remove old schema or behavior in a later reviewed task.
+```
+
+Do not combine schema expansion, full backfill, production switch, and removal of the old schema in one stage unless explicitly required and reviewed.
+
+For every migration-related stage, review:
+- generated SQL,
+- indexes and constraints,
+- nullable/default behavior,
+- lock and table-scan risk,
+- compatibility between old and new application versions,
+- data volume and backfill strategy,
+- rollback or forward-fix strategy.
+
+Checkpoint and resume
+For every large task, maintain a resumable checkpoint.
+
+If a task id exists, save it to:
+```text
+docs/tasks/<id>/checkpoint.md
+```
+
+The checkpoint must include:
+```md
+## Current checkpoint
+
+**Phase:** <phase or stage>
+**Status:** <planned | implementing | checking | reviewing | fixing | stopped | done>
+
+### Completed
+- ...
+
+### Current diff / affected files
+- ...
+
+### Checks and baseline
+- ...
+
+### Review status
+- iteration: ...
+- unresolved findings: ...
+
+### Exact next action
+- ...
+
+### Files to inspect first on resume
+- ...
+```
+
+Update the checkpoint:
+- after completing a stage,
+- before every mandatory STOP,
+- after an environment failure that prevents continuation,
+- before ending an unfinished work session when possible.
+
+When resuming:
+1. Read the checkpoint first.
+2. Verify it against the current branch, `git status`, and actual files.
+3. Do not trust stale checkpoint content over repository state.
+4. Continue from the exact next action instead of repeating completed analysis.
+
 Stage completion
 A stage is complete only when:
+- its Definition of Done is satisfied,
 - implementation is finished,
-- relevant checks were run,
+- baseline and final results were compared,
+- the relevant verification cascade was completed,
 - automatic review was performed,
 - review fixes were applied,
 - repeat checks were run,
 - no unresolved BLOCKER or IMPORTANT findings remain,
 - acceptance criteria for the stage are met,
-- and the Stage Report is prepared.
+- the Stage Report is prepared,
+- and the checkpoint is updated.
 
 Backend and frontend separation
 For large product work, split backend and frontend into separate stages or PRs.
@@ -339,8 +483,16 @@ Stage Report format:
 #### Files changed
 - `path/to/file` — new/modified
 
+#### Definition of Done
+- [x] ...
+
+#### Baseline
+- `command` — result / pre-existing failure
+
 #### Checks
-- `command` — result
+- targeted: `command` — result
+- module: `command` — result
+- full relevant stage: `command` — result
 
 #### Automatic review
 - Iterations: 1..3
@@ -354,6 +506,10 @@ Stage Report format:
 
 #### Risks / reviewer focus
 - ...
+
+#### Checkpoint
+- `docs/tasks/<id>/checkpoint.md` updated, or N/A
+- exact next action: ...
 
 #### Open questions
 - none
@@ -439,7 +595,10 @@ expand scope without owner approval
 invent missing business or financial rules
 skip Phase 0 for a large task
 skip automatic review because the change looks obvious
+skip baseline or Definition of Done for a large stage without documenting why
 declare a stage complete with unresolved BLOCKER or IMPORTANT findings
+repeat the same failed command without a new diagnostic hypothesis or change
+combine expand, backfill, switch, and contract in one database stage without explicit review
 hide failed checks or review findings
 rewrite unrelated modules while passing through them
 replace working code without an explicit task
