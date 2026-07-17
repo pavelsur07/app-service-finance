@@ -231,7 +231,7 @@ Production status: ACCEPTED; deployment, `Version20260716170000`, container heal
 
 ### Stage 7.5 — Expand Cash and Finance schema
 
-**Risk:** HIGH (additive nullable fact columns, restrictive FKs, and compatibility-safe P&L aggregation-index preparation)
+**Risk:** HIGH (additive nullable fact columns and restrictive FKs)
 
 **Result:** nullable ЦФО columns and foreign keys are deployed before application code reads them.
 
@@ -239,7 +239,7 @@ This is an expand-only migration unit. It does not update existing facts, rebuil
 
 Implementation status: DONE and verified on local `app_test`. `Version20260717120000` plus focused schema/writer tests passed without changing existing facts. The detailed contract, read-only preflight, and Stage Report are in `cash-auto-rules-stage-7-5-plan.md`, `cash-auto-rules-stage-7-5-preflight.sql`, and `cash-auto-rules-stage-7-5-report.md`.
 
-The current four-column P&L conflict target remains available. Stage 7.5 prepares a future five-column `NULLS NOT DISTINCT` key but does not enable multi-ЦФО writes. Because production deploys code before migrations, Stage 7.7 is split into a nullable-writer compatibility cutover and a later behavior activation.
+Stage 7.5 leaves the current four-column P&L uniqueness and conflict target byte-for-byte unchanged. A review found that `NULLS NOT DISTINCT` would break the existing category-deletion path (`ON DELETE SET NULL`), so the future project × ЦФО key and its concurrency/deployment contract are deferred to a separate Stage 7.7 Phase 0.
 
 **Next action:** mandatory STOP for owner review before PR/deployment work.
 

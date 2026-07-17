@@ -182,8 +182,8 @@
 
 - Stage 7.5 adds nullable scalar `responsibility_center_id` UUID columns to `cash_transaction`, `documents`, `document_operations`, and `pl_daily_totals`. Each column has a restrictive FK to Company-owned `financial_responsibility_centers`; Entity mappings and application writes are intentionally deferred.
 - The expand migration performs no fact backfill, classification inference, or P&L rebuild. Existing rows remain `NULL` and later UI/report stages interpret that state as `Не распределено`.
-- `pl_daily_totals` temporarily keeps the current four-column unique conflict target and adds a future five-column project × ЦФО key. Both use PostgreSQL `NULLS NOT DISTINCT`, so the existing writer remains valid while duplicate nullable-category buckets are prevented.
-- Stage 7.7a must switch the writer to the prepared five-column target before a later migration drops the four-column key. Stage 7.7b may start ЦФО propagation only after that compatibility cutover.
+- Stage 7.5 does not change `pl_daily_totals` uniqueness. In particular, nullable `pl_category_id` keeps PostgreSQL's default distinct-NULL semantics so the existing `ON DELETE SET NULL` category-deletion path cannot collide with another uncategorized total.
+- The project × ЦФО aggregation key, concurrent-writer locking, nullable-category behavior, and deployment cutover require a separate Stage 7.7 Phase 0 before any P&L writer or uniqueness change.
 
 ### Marketplace: WB financial report sync status (дневной статус)
 

@@ -14,7 +14,7 @@ use Ramsey\Uuid\Uuid;
 
 final class PLDailyTotalRepositoryTest extends IntegrationTestCase
 {
-    public function testCurrentConflictTargetUpsertsNullAndNonNullCategories(): void
+    public function testCurrentConflictTargetAndCategoryDeletionKeepNullableKeySemantics(): void
     {
         $user = new User(Uuid::uuid4()->toString());
         $user->setEmail('pnl-responsibility-center@example.test');
@@ -43,7 +43,6 @@ final class PLDailyTotalRepositoryTest extends IntegrationTestCase
         $date = new \DateTimeImmutable('2026-07-17');
 
         $repository->upsert($companyId, null, $date, $projectId, '10.00', '2.00', false);
-        $repository->upsert($companyId, null, $date, $projectId, '5.00', '3.00', false);
         $repository->upsert($companyId, $categoryId, $date, $projectId, '20.00', '4.00', false);
         $repository->upsert($companyId, $categoryId, $date, $projectId, '2.00', '1.00', false);
 
@@ -52,19 +51,30 @@ final class PLDailyTotalRepositoryTest extends IntegrationTestCase
                 SELECT pl_category_id, amount_income, amount_expense, responsibility_center_id
                 FROM pl_daily_totals
                 WHERE company_id = :company_id
-                ORDER BY pl_category_id NULLS FIRST
+                ORDER BY amount_income
                 SQL,
             ['company_id' => $companyId],
         );
 
         self::assertCount(2, $rows);
         self::assertNull($rows[0]['pl_category_id']);
-        self::assertSame('15.00', $rows[0]['amount_income']);
-        self::assertSame('5.00', $rows[0]['amount_expense']);
+        self::assertSame('10.00', $rows[0]['amount_income']);
+        self::assertSame('2.00', $rows[0]['amount_expense']);
         self::assertNull($rows[0]['responsibility_center_id']);
         self::assertSame($categoryId, $rows[1]['pl_category_id']);
         self::assertSame('22.00', $rows[1]['amount_income']);
         self::assertSame('5.00', $rows[1]['amount_expense']);
         self::assertNull($rows[1]['responsibility_center_id']);
+
+        $this->em->remove($category);
+        $this->em->flush();
+
+        self::assertSame(
+            2,
+            (int) $this->connection->fetchOne(
+                'SELECT COUNT(*) FROM pl_daily_totals WHERE company_id = :company_id AND pl_category_id IS NULL',
+                ['company_id' => $companyId],
+            ),
+        );
     }
 }

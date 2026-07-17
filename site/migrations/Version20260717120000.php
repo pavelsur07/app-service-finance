@@ -23,21 +23,6 @@ final class Version20260717120000 extends AbstractMigration
             sprintf('Migration %s supports only PostgreSQL; got platform "%s".', self::class, $platform::class),
         );
 
-        $duplicateGroups = (int) $this->connection->fetchOne(<<<'SQL'
-            SELECT COUNT(*)
-            FROM (
-                SELECT 1
-                FROM pl_daily_totals
-                GROUP BY company_id, pl_category_id, date, project_direction_id
-                HAVING COUNT(*) > 1
-            ) duplicates
-            SQL);
-
-        $this->abortIf(
-            $duplicateGroups > 0,
-            sprintf('Found %d duplicate P&L daily aggregation group(s); no data was changed.', $duplicateGroups),
-        );
-
         $this->addSql('ALTER TABLE cash_transaction ADD responsibility_center_id UUID DEFAULT NULL');
         $this->addSql('CREATE INDEX idx_cash_transaction_responsibility_center ON cash_transaction (responsibility_center_id)');
         $this->addSql('ALTER TABLE cash_transaction ADD CONSTRAINT fk_cash_transaction_responsibility_center FOREIGN KEY (responsibility_center_id) REFERENCES financial_responsibility_centers (id) ON DELETE RESTRICT NOT DEFERRABLE INITIALLY IMMEDIATE');
@@ -53,10 +38,6 @@ final class Version20260717120000 extends AbstractMigration
         $this->addSql('ALTER TABLE pl_daily_totals ADD responsibility_center_id UUID DEFAULT NULL');
         $this->addSql('CREATE INDEX idx_pl_daily_responsibility_center ON pl_daily_totals (responsibility_center_id)');
         $this->addSql('ALTER TABLE pl_daily_totals ADD CONSTRAINT fk_pl_daily_responsibility_center FOREIGN KEY (responsibility_center_id) REFERENCES financial_responsibility_centers (id) ON DELETE RESTRICT NOT DEFERRABLE INITIALLY IMMEDIATE');
-
-        $this->addSql('ALTER TABLE pl_daily_totals DROP CONSTRAINT uniq_pl_daily_company_cat_date');
-        $this->addSql('ALTER TABLE pl_daily_totals ADD CONSTRAINT uniq_pl_daily_company_cat_date UNIQUE NULLS NOT DISTINCT (company_id, pl_category_id, date, project_direction_id)');
-        $this->addSql('CREATE UNIQUE INDEX uniq_pl_daily_company_cat_date_project_center ON pl_daily_totals (company_id, pl_category_id, date, project_direction_id, responsibility_center_id) NULLS NOT DISTINCT');
 
         $this->addSql(<<<'SQL'
             DO $$

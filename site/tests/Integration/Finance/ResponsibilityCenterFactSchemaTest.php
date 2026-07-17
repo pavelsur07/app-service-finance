@@ -74,7 +74,7 @@ final class ResponsibilityCenterFactSchemaTest extends IntegrationTestCase
         }
     }
 
-    public function testFactIndexesAndTemporaryPnlUniqueKeysExist(): void
+    public function testFactIndexesExistAndPnlUniquenessIsUnchanged(): void
     {
         foreach (self::FACT_INDEXES as $table => $index) {
             $definition = (string) $this->connection->fetchOne(
@@ -87,18 +87,14 @@ final class ResponsibilityCenterFactSchemaTest extends IntegrationTestCase
 
         $legacyDefinition = $this->indexDefinition('uniq_pl_daily_company_cat_date');
         self::assertStringContainsString('UNIQUE INDEX', $legacyDefinition);
-        self::assertStringContainsString('NULLS NOT DISTINCT', $legacyDefinition);
+        self::assertStringNotContainsString('NULLS NOT DISTINCT', $legacyDefinition);
         self::assertStringContainsString(
             '(company_id, pl_category_id, date, project_direction_id)',
             $legacyDefinition,
         );
 
-        $futureDefinition = $this->indexDefinition('uniq_pl_daily_company_cat_date_project_center');
-        self::assertStringContainsString('UNIQUE INDEX', $futureDefinition);
-        self::assertStringContainsString('NULLS NOT DISTINCT', $futureDefinition);
-        self::assertStringContainsString(
-            '(company_id, pl_category_id, date, project_direction_id, responsibility_center_id)',
-            $futureDefinition,
+        self::assertNull(
+            $this->connection->fetchOne("SELECT to_regclass('public.uniq_pl_daily_company_cat_date_project_center')"),
         );
     }
 

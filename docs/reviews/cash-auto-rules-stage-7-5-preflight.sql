@@ -37,15 +37,4 @@ WITH invalid_companies AS (
 SELECT 'companies_without_exact_system_pair' AS metric, COUNT(*)::bigint AS value
 FROM invalid_companies;
 
-WITH duplicate_groups AS (
-    SELECT COUNT(*)::bigint AS rows_in_group
-    FROM pl_daily_totals
-    GROUP BY company_id, pl_category_id, date, project_direction_id
-    HAVING COUNT(*) > 1
-)
-SELECT
-    COUNT(*)::bigint AS duplicate_groups,
-    COALESCE(SUM(rows_in_group - 1), 0)::bigint AS extra_rows
-FROM duplicate_groups;
-
 ROLLBACK;
