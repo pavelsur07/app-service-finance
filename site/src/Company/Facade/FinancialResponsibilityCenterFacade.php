@@ -64,6 +64,7 @@ final readonly class FinancialResponsibilityCenterFacade
             sort: $center->getSort(),
             status: $center->getStatus()->value,
             system: $center->isSystem(),
+            version: $center->getVersion(),
         );
     }
 }

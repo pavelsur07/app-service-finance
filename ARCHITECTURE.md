@@ -516,6 +516,7 @@ getNamesByIds(array $ids): array
 getActiveChoices(string $companyId): array
 
 // Один ЦФО с обязательной проверкой company boundary.
+// DTO содержит optimistic-lock version для последующей записи.
 findByIdAndCompany(string $id, string $companyId): ?FinancialResponsibilityCenterDTO
 
 // Проверка разрешённой пары project × ЦФО в рамках компании.
@@ -524,6 +525,15 @@ isProjectAllowed(string $companyId, string $projectDirectionId, string $responsi
 // @return list<string> project direction IDs
 getAllowedProjectIds(string $companyId, string $responsibilityCenterId): array
 ```
+
+Внутреннее управление справочником выполняют company-scoped Actions:
+
+- `CreateFinancialResponsibilityCenterAction` — создаёт обычный ЦФО с автоматически сгенерированным стабильным кодом;
+- `UpdateFinancialResponsibilityCenterAction` — изменяет имя/сортировку с expected version;
+- `ArchiveFinancialResponsibilityCenterAction` — архивирует обычный ЦФО с expected version;
+- `ConfigureFinancialResponsibilityCenterProjectsAction` — атомарно заменяет разрешённые проекты, повышает версию ЦФО и не позволяет удалить системную пару.
+
+Actions не являются публичным cross-module API; соседние модули используют только facade/DTO.
 
 ### `PLCategoryFacade` (`src/Finance/Facade/PLCategoryFacade.php`)
 ```php
@@ -2316,6 +2326,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.56 | 2026-07-17 | Company: добавлены company-scoped Actions управления ЦФО и optimistic-lock настройка разрешённых проектов |
 | 1.55 | 2026-07-16 | Company: добавлены плоский справочник ЦФО, стабильные системные коды проекта/ЦФО, разрешённые пары и атомарный bootstrap новой компании |
 | 1.54 | 2026-07-13 | Marketplace/Inventory: WB Product Cards refresh дополнен карточками из корзины, которые сохраняются неактивными и участвуют в точном маппинге остатков по `chrtId` |
 | 1.53 | 2026-07-13 | Inventory: добавлен ручной WB orchestration с обязательным Product Cards refresh, async raw-загрузкой, безопасной offset-пагинацией и отдельным POST endpoint |

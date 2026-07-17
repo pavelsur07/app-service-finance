@@ -2,9 +2,9 @@
 
 ## Status
 
-- Phase: **Stage 7.2 implemented and verified on local `app_test`; production migration has not been executed**
+- Phase: **Stage 7.3 implemented and verified locally; production migration has not been executed**
 - Overall risk: **HIGH** because the model adds company master data and new financial dimensions to Cash, documents, P&L aggregates, and auto rules
-- Next action: **STOP; owner review required before Stage 7.3 or any production migration**
+- Next action: **STOP; owner review required before HIGH-risk Stage 7.4 or any production migration**
 - Production mutations: **forbidden until a separately approved migration or backfill step**
 - Historical recalculation: **forbidden by default**
 
@@ -208,6 +208,10 @@ Implementation status: DONE; the migration and Stage 7.2 tests passed on local `
 **Result:** thin company-scoped actions support create/edit/archive and project-pair configuration with optimistic locking.
 
 No public route or UI is added in this stage.
+
+Implementation status: DONE; company-scoped create/edit/archive and project-pair actions use explicit expected versions, protect the system values, and passed the full unit/integration checks.
+
+**Next action:** mandatory STOP before Stage 7.4 protected routes/UI.
 
 ### Stage 7.4 — Protected Company management UI
 

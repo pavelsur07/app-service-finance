@@ -150,6 +150,11 @@ class FinancialResponsibilityCenter
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    public function markProjectConfigurationChanged(): void
+    {
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
     public function isSystem(): bool
     {
         return self::CODE_GENERAL === $this->code;

@@ -38,6 +38,29 @@ class ProjectDirectionRepository extends ServiceEntityRepository
     }
 
     /**
+     * @param list<string> $ids
+     *
+     * @return list<ProjectDirection>
+     */
+    public function findByIdsAndCompanyId(array $ids, string $companyId): array
+    {
+        if ([] === $ids) {
+            return [];
+        }
+
+        /** @var list<ProjectDirection> $projects */
+        $projects = $this->createQueryBuilder('project')
+            ->andWhere('project.id IN (:ids)')
+            ->andWhere('IDENTITY(project.company) = :companyId')
+            ->setParameter('ids', $ids)
+            ->setParameter('companyId', $companyId)
+            ->getQuery()
+            ->getResult();
+
+        return $projects;
+    }
+
+    /**
      * @return ProjectDirection[]
      */
     public function findByCompany(Company $company): array

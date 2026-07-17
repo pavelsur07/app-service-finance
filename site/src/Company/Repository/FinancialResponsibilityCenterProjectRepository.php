@@ -53,4 +53,21 @@ final class FinancialResponsibilityCenterProjectRepository extends ServiceEntity
 
         return \array_column($rows, 'projectId');
     }
+
+    /**
+     * @return list<FinancialResponsibilityCenterProject>
+     */
+    public function findByCenterIdAndCompanyId(string $responsibilityCenterId, string $companyId): array
+    {
+        /** @var list<FinancialResponsibilityCenterProject> $pairs */
+        $pairs = $this->createQueryBuilder('pair')
+            ->andWhere('IDENTITY(pair.responsibilityCenter) = :responsibilityCenterId')
+            ->andWhere('pair.companyId = :companyId')
+            ->setParameter('responsibilityCenterId', $responsibilityCenterId)
+            ->setParameter('companyId', $companyId)
+            ->getQuery()
+            ->getResult();
+
+        return $pairs;
+    }
 }

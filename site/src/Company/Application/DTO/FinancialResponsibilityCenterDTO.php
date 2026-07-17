@@ -13,6 +13,7 @@ final readonly class FinancialResponsibilityCenterDTO
         public int $sort,
         public string $status,
         public bool $system,
+        public int $version,
     ) {
     }
 }

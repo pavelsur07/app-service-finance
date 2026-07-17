@@ -7,6 +7,7 @@ namespace App\Tests\Integration\Company;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
 use App\Company\Entity\ProjectDirection;
+use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Company\Repository\FinancialResponsibilityCenterProjectRepository;
 use App\Company\Repository\FinancialResponsibilityCenterRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -49,6 +50,7 @@ final class FinancialResponsibilityCenterRepositoryTest extends IntegrationTestC
         $centerRepository = self::getContainer()->get(FinancialResponsibilityCenterRepository::class);
         /** @var FinancialResponsibilityCenterProjectRepository $pairRepository */
         $pairRepository = self::getContainer()->get(FinancialResponsibilityCenterProjectRepository::class);
+        $facade = new FinancialResponsibilityCenterFacade($centerRepository, $pairRepository);
 
         self::assertSame([$centerA], $centerRepository->findActiveByCompanyId((string) $companyA->getId()));
         self::assertSame($centerA, $centerRepository->findOneByIdAndCompanyId($centerA->getId(), (string) $companyA->getId()));
@@ -56,5 +58,6 @@ final class FinancialResponsibilityCenterRepositoryTest extends IntegrationTestC
         self::assertTrue($pairRepository->isAllowed((string) $companyA->getId(), (string) $projectA->getId(), $centerA->getId()));
         self::assertFalse($pairRepository->isAllowed((string) $companyB->getId(), (string) $projectA->getId(), $centerA->getId()));
         self::assertSame([(string) $projectA->getId()], $pairRepository->findProjectIds((string) $companyA->getId(), $centerA->getId()));
+        self::assertSame(1, $facade->findByIdAndCompany($centerA->getId(), (string) $companyA->getId())?->version);
     }
 }
