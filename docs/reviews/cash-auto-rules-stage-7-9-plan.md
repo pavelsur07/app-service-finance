@@ -2,12 +2,12 @@
 
 ## Status
 
-- Phase: **CONTRACT APPROVED; Stage 7.9.1a is in schema-only PR #2187**
+- Phase: **Stage 7.9.1a accepted in production; Stage 7.9.1b implemented and awaiting owner review**
 - Selected transition: **Option A — coordinated cutover**
 - Overall risk: **HIGH** because the stage changes financial classification semantics and adds a nullable auto-rule target column
 - Current production behavior: **unchanged**; Stage 7.6.1 is deployed, but no Cash writer assigns the system pair and no rule targets ЦФО
 - Historical application, backfill, and recalculation: **forbidden**
-- Next action: **owner review of schema-only PR #2187**
+- Next action: **owner review of Stage 7.9.1b scalar mapping and authoring**
 
 ## Goal
 

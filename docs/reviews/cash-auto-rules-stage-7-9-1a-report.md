@@ -1,7 +1,7 @@
 ### Stage 7.9.1a: Schema-only Cash auto-rule CFO target — DONE
 
 **Risk:** HIGH
-**Next action:** owner review of schema-only PR #2187
+**Next action:** completed — PR #2187 merged and production schema acceptance passed
 
 #### What was done
 
@@ -56,3 +56,9 @@ Two initial rollback-guard harness attempts stopped before executing the migrati
 #### Open questions
 
 - none for Stage 7.9.1a; PR #2187 is the schema-only review unit.
+
+#### Production acceptance
+
+- PR #2187 was merged to `master`.
+- Deployment and `Version20260717130000` completed successfully.
+- Restricted read-only checks confirmed the nullable UUID column, index, restrictive FK, and unchanged rule data.
