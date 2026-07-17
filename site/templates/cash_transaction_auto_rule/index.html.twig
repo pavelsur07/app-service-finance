@@ -38,6 +38,7 @@
                             <th>Действие</th>
                             <th>Тип операции</th>
                             <th>Направление / проект</th>
+                            <th>ЦФО</th>
                             <th>Контрагент</th>
                             <th></th>
                         </tr>
@@ -69,6 +70,7 @@
                             </td>
                             <td>{{ item.operationType.name }}</td>
                             <td>{{ item.projectDirection ? item.projectDirection.name : '' }}</td>
+                            <td>{{ responsibilityCenterLabels[item.responsibilityCenterId]|default(item.responsibilityCenterId ? 'Недоступен или архивирован' : '') }}</td>
                             <td>
                                 {% if item.counterparty %}
                                     {{ item.counterparty.name|length > 30 ? item.counterparty.name|slice(0, 30) ~ '…' : item.counterparty.name }}
@@ -86,7 +88,7 @@
                             </td>
                         </tr>
                     {% else %}
-                        <tr><td colspan="8" class="text-center">Нет данных</td></tr>
+                        <tr><td colspan="9" class="text-center">Нет данных</td></tr>
                     {% endfor %}
                     </tbody>
                 </table>

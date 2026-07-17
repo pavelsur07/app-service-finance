@@ -11,6 +11,7 @@ use App\Company\Entity\ProjectDirection;
 use App\Shared\Form\Type\ProjectDirectionPickerType;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\CollectionType;
 use Symfony\Component\Form\Extension\Core\Type\EnumType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
@@ -75,6 +76,13 @@ class CashTransactionAutoRuleType extends AbstractType
                 'required' => false,
                 'label' => 'Направление / проект',
             ])
+            ->add('responsibilityCenterId', ChoiceType::class, [
+                'choices' => $options['responsibilityCenterChoices'],
+                'placeholder' => 'Не выбран',
+                'required' => false,
+                'label' => 'ЦФО',
+                'help' => 'Для выбранного проекта укажите совместимый ЦФО.',
+            ])
             ->add('counterparty', EntityType::class, [
                 'class' => Counterparty::class,
                 'choices' => $options['counterparties'],
@@ -104,6 +112,7 @@ class CashTransactionAutoRuleType extends AbstractType
             'counterparties' => [],
             'moneyAccounts' => [],
             'projectDirections' => [],
+            'responsibilityCenterChoices' => [],
         ]);
     }
 }

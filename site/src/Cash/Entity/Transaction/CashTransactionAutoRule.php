@@ -83,6 +83,9 @@ class CashTransactionAutoRule
     #[ORM\JoinColumn(onDelete: 'SET NULL')]
     private ?ProjectDirection $projectDirection = null;
 
+    #[ORM\Column(type: 'guid', nullable: true)]
+    private ?string $responsibilityCenterId = null;
+
     /** @var Collection<int, CashTransactionAutoRuleCondition> */
     #[ORM\OneToMany(mappedBy: 'autoRule', targetEntity: CashTransactionAutoRuleCondition::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
     #[AssertConstraint\Count(min: 1, minMessage: 'Добавьте хотя бы одно условие.')]
@@ -297,6 +300,22 @@ class CashTransactionAutoRule
     public function setProjectDirection(?ProjectDirection $projectDirection): self
     {
         $this->projectDirection = $projectDirection;
+
+        return $this;
+    }
+
+    public function getResponsibilityCenterId(): ?string
+    {
+        return $this->responsibilityCenterId;
+    }
+
+    public function setResponsibilityCenterId(?string $responsibilityCenterId): self
+    {
+        if (null !== $responsibilityCenterId) {
+            Assert::uuid($responsibilityCenterId);
+        }
+
+        $this->responsibilityCenterId = $responsibilityCenterId;
 
         return $this;
     }

@@ -4,6 +4,7 @@ namespace App\Cash\Controller\Transaction;
 
 use App\Cash\Application\DTO\CashTransactionAutoRulePreviewFilter;
 use App\Cash\Application\Service\AutoRuleDispatchGuard;
+use App\Cash\Application\Service\CashTransactionAutoRuleTargetValidator;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
@@ -15,6 +16,8 @@ use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
+use App\Company\Application\DTO\FinancialResponsibilityCenterDTO;
+use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Shared\Audit\AuditContextProvider;
@@ -24,6 +27,8 @@ use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Form\FormError;
+use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -42,8 +47,10 @@ class CashTransactionAutoRuleController extends AbstractController
         CashTransactionAutoRuleRepository $repo,
         ActiveCompanyService $companyService,
         CashflowCategoryRepository $categoryRepo,
+        FinancialResponsibilityCenterFacade $responsibilityCenterFacade,
     ): Response {
         $company = $companyService->getActiveCompany();
+        $companyId = (string) $company->getId();
         $categories = $categoryRepo->findTreeByCompany($company);
 
         $actionValue = $request->query->get('action');
@@ -106,6 +113,10 @@ class CashTransactionAutoRuleController extends AbstractController
             'actionOptions' => $actionOptions,
             'operationOptions' => $operationOptions,
             'categoryOptions' => $categoryOptions,
+            'responsibilityCenterLabels' => array_flip($this->getResponsibilityCenterChoices(
+                $responsibilityCenterFacade,
+                $companyId,
+            )),
             'filters' => [
                 'category' => $categoryValue,
                 'action' => $actionValue,
@@ -123,9 +134,12 @@ class CashTransactionAutoRuleController extends AbstractController
         CounterpartyRepository $counterpartyRepo,
         MoneyAccountRepository $moneyAccountRepo,
         ProjectDirectionRepository $projectDirectionRepo,
+        FinancialResponsibilityCenterFacade $responsibilityCenterFacade,
+        CashTransactionAutoRuleTargetValidator $targetValidator,
         AuditContextProvider $auditContextProvider,
     ): Response {
         $company = $companyService->getActiveCompany();
+        $companyId = (string) $company->getId();
         $categories = $categoryRepo->findTreeByCompany($company);
         $counterparties = $counterpartyRepo->findBy(['company' => $company]);
         $moneyAccounts = $moneyAccountRepo->findBy(['company' => $company], ['name' => 'ASC']);
@@ -145,8 +159,13 @@ class CashTransactionAutoRuleController extends AbstractController
             'counterparties' => $counterparties,
             'moneyAccounts' => $moneyAccounts,
             'projectDirections' => $projectDirections,
+            'responsibilityCenterChoices' => $this->getResponsibilityCenterChoices(
+                $responsibilityCenterFacade,
+                $companyId,
+            ),
         ]);
         $form->handleRequest($request);
+        $this->validatePairTarget($form, $targetValidator, $companyId, null, null, $rule);
 
         if ($form->isSubmitted() && $form->isValid()) {
             $em->persist($rule);
@@ -171,9 +190,12 @@ class CashTransactionAutoRuleController extends AbstractController
         CounterpartyRepository $counterpartyRepo,
         MoneyAccountRepository $moneyAccountRepo,
         ProjectDirectionRepository $projectDirectionRepo,
+        FinancialResponsibilityCenterFacade $responsibilityCenterFacade,
+        CashTransactionAutoRuleTargetValidator $targetValidator,
         AuditContextProvider $auditContextProvider,
     ): Response {
         $company = $companyService->getActiveCompany();
+        $companyId = (string) $company->getId();
         $rule = $repo->findOneByIdAndCompanyId($id, (string) $company->getId());
         if (!$rule) {
             throw $this->createNotFoundException();
@@ -183,13 +205,28 @@ class CashTransactionAutoRuleController extends AbstractController
         $counterparties = $counterpartyRepo->findBy(['company' => $company]);
         $moneyAccounts = $moneyAccountRepo->findBy(['company' => $company], ['name' => 'ASC']);
         $projectDirections = $projectDirectionRepo->findBy(['company' => $company], ['name' => 'ASC']);
+        $currentProjectDirectionId = $rule->getProjectDirection()?->getId();
+        $currentResponsibilityCenterId = $rule->getResponsibilityCenterId();
         $form = $this->createForm(CashTransactionAutoRuleType::class, $rule, [
             'categories' => $categories,
             'counterparties' => $counterparties,
             'moneyAccounts' => $moneyAccounts,
             'projectDirections' => $projectDirections,
+            'responsibilityCenterChoices' => $this->getResponsibilityCenterChoices(
+                $responsibilityCenterFacade,
+                $companyId,
+                $currentResponsibilityCenterId,
+            ),
         ]);
         $form->handleRequest($request);
+        $this->validatePairTarget(
+            $form,
+            $targetValidator,
+            $companyId,
+            $currentProjectDirectionId,
+            $currentResponsibilityCenterId,
+            $rule,
+        );
 
         if ($form->isSubmitted() && $form->isValid()) {
             $unitOfWork = $em->getUnitOfWork();
@@ -205,6 +242,10 @@ class CashTransactionAutoRuleController extends AbstractController
 
             if ($hasChanges) {
                 $rule->recordUpdate($auditContextProvider->getActorUserId());
+                $unitOfWork->recomputeSingleEntityChangeSet(
+                    $em->getClassMetadata(CashTransactionAutoRule::class),
+                    $rule,
+                );
             }
             $em->flush();
 
@@ -400,5 +441,61 @@ class CashTransactionAutoRuleController extends AbstractController
         }
 
         return $this->redirectToRoute('cash_transaction_auto_rule_index');
+    }
+
+    /** @return array<string, string> */
+    private function getResponsibilityCenterChoices(
+        FinancialResponsibilityCenterFacade $facade,
+        string $companyId,
+        ?string $currentId = null,
+    ): array {
+        $centers = $facade->getActiveChoices($companyId);
+        $activeIds = array_map(
+            static fn (FinancialResponsibilityCenterDTO $center): string => $center->id,
+            $centers,
+        );
+        if (null !== $currentId && !in_array($currentId, $activeIds, true)) {
+            $current = $facade->findByIdAndCompany($currentId, $companyId);
+            if (null !== $current) {
+                $centers[] = $current;
+            }
+        }
+
+        $choices = [];
+        foreach ($centers as $center) {
+            $choices[sprintf(
+                '%s [%s]%s',
+                $center->name,
+                $center->code,
+                $center->isActive() ? '' : ' — архив, только сохранение',
+            )] = $center->id;
+        }
+
+        return $choices;
+    }
+
+    private function validatePairTarget(
+        FormInterface $form,
+        CashTransactionAutoRuleTargetValidator $validator,
+        string $companyId,
+        ?string $currentProjectDirectionId,
+        ?string $currentResponsibilityCenterId,
+        CashTransactionAutoRule $rule,
+    ): void {
+        if (!$form->isSubmitted() || !$form->isSynchronized()) {
+            return;
+        }
+
+        try {
+            $validator->assertValidChange(
+                $companyId,
+                $currentProjectDirectionId,
+                $currentResponsibilityCenterId,
+                $rule->getProjectDirection()?->getId(),
+                $rule->getResponsibilityCenterId(),
+            );
+        } catch (\DomainException $exception) {
+            $form->get('responsibilityCenterId')->addError(new FormError($exception->getMessage()));
+        }
     }
 }
