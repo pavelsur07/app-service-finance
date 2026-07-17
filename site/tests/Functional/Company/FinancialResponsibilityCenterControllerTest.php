@@ -136,6 +136,52 @@ final class FinancialResponsibilityCenterControllerTest extends WebTestCaseBase
         self::assertResponseStatusCodeSame(404);
     }
 
+    public function testProjectChoicesPreserveDuplicateNames(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        [$owner, $company] = $this->createCompany($client, 805);
+
+        $firstParent = new ProjectDirection('33333333-3333-3333-3333-000000000805', $company, 'Краснодар');
+        $secondParent = new ProjectDirection('33333333-3333-3333-3333-000000000806', $company, 'Ростов');
+        $firstProject = new ProjectDirection('33333333-3333-3333-3333-000000000807', $company, 'Продажи');
+        $secondProject = new ProjectDirection('33333333-3333-3333-3333-000000000808', $company, 'Продажи');
+        $firstProject->setParent($firstParent);
+        $secondProject->setParent($secondParent);
+        $this->em()->persist($firstParent);
+        $this->em()->persist($secondParent);
+        $this->em()->persist($firstProject);
+        $this->em()->persist($secondProject);
+        $this->em()->flush();
+
+        /** @var FinancialResponsibilityCenterRepository $repository */
+        $repository = $client->getContainer()->get(FinancialResponsibilityCenterRepository::class);
+        $center = $repository->findGeneralByCompanyId((string) $company->getId());
+        self::assertInstanceOf(FinancialResponsibilityCenter::class, $center);
+
+        $client->loginUser($owner);
+        $this->setClientSessionValue($client, 'active_company_id', (string) $company->getId());
+        $crawler = $client->request('GET', sprintf('/financial-responsibility-centers/%s/edit', $center->getId()));
+
+        self::assertResponseIsSuccessful();
+        self::assertCount(1, $crawler->filter(sprintf('input[type="checkbox"][value="%s"]', $firstProject->getId())));
+        self::assertCount(1, $crawler->filter(sprintf('input[type="checkbox"][value="%s"]', $secondProject->getId())));
+        self::assertSelectorTextContains('body', 'Краснодар → Продажи');
+        self::assertSelectorTextContains('body', 'Ростов → Продажи');
+
+        $projectsForm = $crawler->selectButton('Сохранить проекты')->form();
+        $projectValues = $projectsForm->getPhpValues();
+        $projectValues['financial_responsibility_center_projects']['projectDirectionIds'][] = (string) $firstProject->getId();
+        $projectValues['financial_responsibility_center_projects']['projectDirectionIds'][] = (string) $secondProject->getId();
+        $client->request($projectsForm->getMethod(), $projectsForm->getUri(), $projectValues);
+        self::assertResponseRedirects(sprintf('/financial-responsibility-centers/%s/edit', $center->getId()));
+
+        /** @var FinancialResponsibilityCenterProjectRepository $pairRepository */
+        $pairRepository = $client->getContainer()->get(FinancialResponsibilityCenterProjectRepository::class);
+        self::assertTrue($pairRepository->isAllowed((string) $company->getId(), (string) $firstProject->getId(), $center->getId()));
+        self::assertTrue($pairRepository->isAllowed((string) $company->getId(), (string) $secondProject->getId(), $center->getId()));
+    }
+
     /**
      * @return array{User, Company}
      */

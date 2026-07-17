@@ -17,7 +17,8 @@ final class FinancialResponsibilityCenterProjectsType extends AbstractType
         $builder
             ->add('projectDirectionIds', ChoiceType::class, [
                 'label' => 'Разрешённые проекты',
-                'choices' => $options['project_choices'],
+                'choices' => array_keys($options['project_labels']),
+                'choice_label' => static fn (string $projectId): string => $options['project_labels'][$projectId],
                 'multiple' => true,
                 'expanded' => true,
                 'help' => 'Один проект можно разрешить для нескольких ЦФО.',
@@ -27,7 +28,7 @@ final class FinancialResponsibilityCenterProjectsType extends AbstractType
 
     public function configureOptions(OptionsResolver $resolver): void
     {
-        $resolver->setRequired('project_choices');
-        $resolver->setAllowedTypes('project_choices', 'array');
+        $resolver->setRequired('project_labels');
+        $resolver->setAllowedTypes('project_labels', 'array');
     }
 }

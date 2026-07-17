@@ -207,17 +207,22 @@ final class FinancialResponsibilityCenterController extends AbstractController
         string $companyId,
         Company $company,
     ): FormInterface {
-        $projectChoices = [];
+        $projectLabels = [];
         /** @var ProjectDirection $project */
         foreach ($projectRepository->findTreeByCompany($company) as $project) {
-            $projectChoices[$project->getIndentedName()] = (string) $project->getId();
+            $path = [];
+            for ($node = $project; null !== $node; $node = $node->getParent()) {
+                $path[] = $node->getName();
+            }
+
+            $projectLabels[(string) $project->getId()] = implode(' → ', array_reverse($path));
         }
 
         return $this->createForm(FinancialResponsibilityCenterProjectsType::class, [
             'projectDirectionIds' => $pairRepository->findProjectIds($companyId, $center->getId()),
             'version' => $center->getVersion(),
         ], [
-            'project_choices' => $projectChoices,
+            'project_labels' => $projectLabels,
             'action' => $this->generateUrl('financial_responsibility_center_projects', ['id' => $center->getId()]),
         ]);
     }

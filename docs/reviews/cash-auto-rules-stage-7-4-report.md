@@ -11,6 +11,7 @@
 - Added an explicit archived-record filter; system and archived states are visible in the list.
 - Kept all entity reads scoped by the active company and returned 404 for cross-company IDs.
 - Kept details, project configuration, and archive as separate CSRF-protected writes with expected versions.
+- Preserved every project choice by UUID and rendered its full tree path, so duplicate display names cannot overwrite valid choices.
 - Added no role, voter, public API, React entrypoint, dependency, design-system component, schema change, migration, or production mutation.
 
 #### Files changed
@@ -45,7 +46,7 @@
 - Twig lint for the three ЦФО templates and sidebar — OK.
 - `php bin/console lint:container --env=test` — OK.
 - Protected route table inspection — OK.
-- Focused functional test — OK, 3 tests / 34 assertions.
+- Focused functional test — OK, 4 tests / 46 assertions, including display and configuration of duplicate project names under different parents.
 - `make site-test-unit` — OK, 1506 tests / 8853 assertions.
 - `make site-test-integration` — OK, 711 tests / 3404 assertions.
 - Local `app_test` migration metadata restored after test resets — 216 executed / 216 available.
@@ -55,6 +56,7 @@
 
 - Review that every record load includes the active `companyId` and cross-company IDs return 404.
 - Review the separate details/project forms and expected-version handling for stale writes.
+- Review that project UUIDs are the choice values and full tree paths are labels; duplicate names remain separate choices.
 - Review that the system ЦФО cannot be archived and its system project pair cannot be removed.
 - The legacy Twig screens use classes currently reported by the repository-wide UI-kit checker. Replacing those patterns or changing the checker is intentionally outside this stage.
 - Production and financial facts remain untouched.
