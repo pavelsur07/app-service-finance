@@ -197,6 +197,8 @@ Work:
 5. Update `CompanyOwnerMembershipCreator` and direct test fixtures to create the same system pair.
 6. Add integration coverage proving all supported company-creation flows produce exactly one system project, one system ЦФО, and one allowed pair in a single transaction.
 
+Rollback policy: the migration is explicitly irreversible because it creates system projects for companies without a candidate. A Doctrine `down` aborts before changing the schema; a full data rollback requires restoring a database backup.
+
 Implementation status: DONE; the migration and Stage 7.2 tests passed on local `app_test`. Production and production facts remain unchanged.
 
 **Next action:** mandatory STOP before production migration, deployment, or Stage 7.3.

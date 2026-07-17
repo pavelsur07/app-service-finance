@@ -66,7 +66,7 @@ final class Version20260716170000 extends AbstractMigration
             SQL);
         $this->addSql('CREATE UNIQUE INDEX uniq_project_direction_company_system_code ON project_directions (company_id, system_code)');
 
-        $this->addSql("CREATE TABLE financial_responsibility_centers (id UUID NOT NULL, company_id UUID NOT NULL, code VARCHAR(64) NOT NULL, name VARCHAR(255) NOT NULL, sort INT DEFAULT 0 NOT NULL, status VARCHAR(16) NOT NULL, version INT DEFAULT 1 NOT NULL, created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, updated_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, PRIMARY KEY(id))");
+        $this->addSql('CREATE TABLE financial_responsibility_centers (id UUID NOT NULL, company_id UUID NOT NULL, code VARCHAR(64) NOT NULL, name VARCHAR(255) NOT NULL, sort INT DEFAULT 0 NOT NULL, status VARCHAR(16) NOT NULL, version INT DEFAULT 1 NOT NULL, created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, updated_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, PRIMARY KEY(id))');
         $this->addSql('CREATE UNIQUE INDEX uniq_frc_company_code ON financial_responsibility_centers (company_id, code)');
         $this->addSql('CREATE INDEX idx_frc_company_status_sort ON financial_responsibility_centers (company_id, status, sort)');
         $this->addSql('ALTER TABLE financial_responsibility_centers ADD CONSTRAINT fk_frc_company FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED');
@@ -80,7 +80,7 @@ final class Version20260716170000 extends AbstractMigration
             FROM companies company
             SQL);
 
-        $this->addSql("CREATE TABLE financial_responsibility_center_projects (id UUID NOT NULL, company_id UUID NOT NULL, project_direction_id UUID NOT NULL, responsibility_center_id UUID NOT NULL, created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, PRIMARY KEY(id))");
+        $this->addSql('CREATE TABLE financial_responsibility_center_projects (id UUID NOT NULL, company_id UUID NOT NULL, project_direction_id UUID NOT NULL, responsibility_center_id UUID NOT NULL, created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, PRIMARY KEY(id))');
         $this->addSql('CREATE INDEX IDX_9074EB0E85D43DF4 ON financial_responsibility_center_projects (project_direction_id)');
         $this->addSql('CREATE INDEX IDX_9074EB0ED63B41A6 ON financial_responsibility_center_projects (responsibility_center_id)');
         $this->addSql('CREATE UNIQUE INDEX uniq_frc_project_pair ON financial_responsibility_center_projects (project_direction_id, responsibility_center_id)');
@@ -132,15 +132,8 @@ final class Version20260716170000 extends AbstractMigration
 
     public function down(Schema $schema): void
     {
-        $platform = $this->connection->getDatabasePlatform();
-        $this->abortIf(
-            !$platform instanceof PostgreSQLPlatform,
-            sprintf('Migration %s supports only PostgreSQL; got platform "%s".', self::class, $platform::class),
+        $this->throwIrreversibleMigrationException(
+            'The migration creates system projects that cannot be distinguished safely from pre-existing projects during rollback.',
         );
-
-        $this->addSql('DROP TABLE financial_responsibility_center_projects');
-        $this->addSql('DROP TABLE financial_responsibility_centers');
-        $this->addSql('DROP INDEX uniq_project_direction_company_system_code');
-        $this->addSql('ALTER TABLE project_directions DROP system_code');
     }
 }

@@ -73,6 +73,7 @@
 - Full integration suite on clean `app_test` — OK, 705 tests / 3380 assertions.
 - Full functional suite — 218 of 219 tests passed; one unrelated time-sensitive preview regression test failed.
 - Local migration metadata restored after functional `DbReset`; `app_test` is at latest version with 216/216 migrations registered.
+- Irreversible rollback dry-run — expected failure before SQL; local `app_test` metadata remained/restored at 216/216.
 
 The functional failure is `SoftDeleteExclusionRegressionTest::testAutoRuleCheckPreviewExcludesSoftDeletedTransactions`. It creates transactions dated January 2024 but opens preview without explicit dates; in July 2026 the page defaults to the last six months and correctly scans zero rows. This predates Stage 7.2 and does not exercise ЦФО, project system codes, pairs, bootstrap, or the migration. It was not changed because it is outside the approved stage.
 
@@ -83,7 +84,7 @@ The functional failure is `SoftDeleteExclusionRegressionTest::testAutoRuleCheckP
 - System-project deletion is rejected before persistence in the controller and independently by the entity lifecycle callback.
 - Company foreign keys for the scalar tenant IDs are deferred until transaction commit, so Doctrine insert ordering cannot break the atomic new-company bootstrap.
 - Migration `up()` is additive and does not update Cash, documents, document operations, P&L totals, transfers, or aggregates.
-- Migration `down()` removes the new tables and system-code column but deliberately preserves newly created general-project rows because it cannot safely distinguish them from pre-existing projects after the code column is removed.
+- Migration `down()` is explicitly irreversible: Doctrine aborts before changing the schema because generated general-project rows cannot be distinguished safely from pre-existing projects during rollback. Operational rollback must keep the additive schema/data or restore a database backup.
 - The database foreign keys enforce record existence; cross-company pair equality is enforced in the entity constructor and company-scoped repositories, as approved in Phase 0.
 - The migration was executed only on local `app_test`. No production migration, production write, or production access occurred in Stage 7.2.
 
