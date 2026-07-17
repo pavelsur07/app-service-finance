@@ -614,6 +614,7 @@ updatePLRegisterForDocument(string $documentId): void
 - Each actual auto-rule mutation persists one `AuditLog` for the `CashTransaction` in the same flush. Its diff contains a range/transaction correlation UUID, per-field rule ID/revision, and changed field before/after IDs; descriptions, INNs, and bank payloads are excluded.
 - Range messages propagate one correlation UUID to every child transaction message and safe structured log. Optional message fields plus native-serialization wakeup keep payloads queued before this contract backward-compatible.
 - `AutoRuleDispatchGuard` carries the application plan during that flush so the generic transaction audit subscriber does not duplicate the explicit provenance record.
+- `app:cash-auto-rules:assign-general-cfo` is a manual transition command for Stage 7.9.2. It is read-only by default and targets only active `PROJECT_GENERAL` rules without a ЦФО. `--execute` requires an existing approving user UUID and the exact candidate count from dry-run, validates every company's active `PROJECT_GENERAL × CFO_GENERAL` pair before changing any rule, and commits all assignments atomically through Doctrine so rule revision and actor metadata are preserved. It never applies rules to transactions or processes history.
 
 ### `CashFacade` (`src/Cash/Facade/CashFacade.php`)
 ```php
