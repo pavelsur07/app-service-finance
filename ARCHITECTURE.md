@@ -82,6 +82,8 @@
 | `ProductBarcode` | Catalog | `string $companyId` ✅ |
 | `ProductPurchasePrice` | Catalog | `string $companyId` ✅ |
 | `AuditLog` | Shared | `string $companyId` ✅ |
+| `FinancialResponsibilityCenter` | Company | `string $companyId` ✅ |
+| `FinancialResponsibilityCenterProject` | Company | `string $companyId` + same-company pair guard ✅ |
 | `CashTransaction`, `MoneyAccount` и др. | Cash | `Company $company` (legacy) |
 | `Deal`, `ChargeType` | Deals | `Company $company` (legacy) |
 | `PLCategory`, `Document` и др. | legacy `src/Entity/` | `Company $company` (legacy) |
@@ -505,6 +507,35 @@ getChoicesForCompany(string $companyId): array
 // @return array<string, string>  uuid => 'ООО Ромашка'
 getNamesByIds(array $ids): array
 ```
+
+### `FinancialResponsibilityCenterFacade` (`src/Company/Facade/FinancialResponsibilityCenterFacade.php`)
+
+```php
+// Активные ЦФО компании как scalar DTO для форм и соседних модулей.
+// @return list<FinancialResponsibilityCenterDTO>
+getActiveChoices(string $companyId): array
+
+// Один ЦФО с обязательной проверкой company boundary.
+// DTO содержит optimistic-lock version для последующей записи.
+findByIdAndCompany(string $id, string $companyId): ?FinancialResponsibilityCenterDTO
+
+// Проверка разрешённой пары project × ЦФО в рамках компании.
+isProjectAllowed(string $companyId, string $projectDirectionId, string $responsibilityCenterId): bool
+
+// @return list<string> project direction IDs
+getAllowedProjectIds(string $companyId, string $responsibilityCenterId): array
+```
+
+Внутреннее управление справочником выполняют company-scoped Actions:
+
+- `CreateFinancialResponsibilityCenterAction` — создаёт обычный ЦФО с автоматически сгенерированным стабильным кодом;
+- `UpdateFinancialResponsibilityCenterAction` — изменяет имя/сортировку с expected version;
+- `ArchiveFinancialResponsibilityCenterAction` — архивирует обычный ЦФО с expected version;
+- `ConfigureFinancialResponsibilityCenterProjectsAction` — атомарно заменяет разрешённые проекты, повышает версию ЦФО и не позволяет удалить системную пару.
+
+Actions не являются публичным cross-module API; соседние модули используют только facade/DTO.
+
+Защищённый справочник доступен существующим пользователям через `Справочники → ЦФО` (`/financial-responsibility-centers/`). Twig-контроллеры явно ограничивают каждое чтение активной компанией и передают изменения существующих записей в Actions с expected version. Основные данные и разрешённые проекты сохраняются отдельными POST-формами, чтобы конфликт одной операции не приводил к частичному применению другой. Проекты передаются в форму по UUID, а отображаются полным путём по дереву, поэтому совпадающие названия не скрывают допустимые пары. Системный ЦФО отображается в списке, но не может быть переименован или архивирован; его системную пару нельзя снять.
 
 ### `PLCategoryFacade` (`src/Finance/Facade/PLCategoryFacade.php`)
 ```php
@@ -2297,6 +2328,9 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.57 | 2026-07-17 | Company: добавлен защищённый Twig-интерфейс `Справочники → ЦФО` с company isolation, CSRF и optimistic locking |
+| 1.56 | 2026-07-17 | Company: добавлены company-scoped Actions управления ЦФО и optimistic-lock настройка разрешённых проектов |
+| 1.55 | 2026-07-16 | Company: добавлены плоский справочник ЦФО, стабильные системные коды проекта/ЦФО, разрешённые пары и атомарный bootstrap новой компании |
 | 1.54 | 2026-07-13 | Marketplace/Inventory: WB Product Cards refresh дополнен карточками из корзины, которые сохраняются неактивными и участвуют в точном маппинге остатков по `chrtId` |
 | 1.53 | 2026-07-13 | Inventory: добавлен ручной WB orchestration с обязательным Product Cards refresh, async raw-загрузкой, безопасной offset-пагинацией и отдельным POST endpoint |
 | 1.52 | 2026-07-13 | Inventory: добавлена нормализация WB FBW raw-остатков по `chrtId + warehouseId`, точный variant-маппинг, отдельные статусы движения и выбор последней полной сессии по каждому источнику |

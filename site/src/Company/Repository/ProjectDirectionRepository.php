@@ -23,6 +23,11 @@ class ProjectDirectionRepository extends ServiceEntityRepository
     {
         $project = $this->findOneBy([
             'company' => $company,
+            'systemCode' => ProjectDirection::CODE_GENERAL,
+        ]);
+
+        $project ??= $this->findOneBy([
+            'company' => $company,
             'name' => self::DEFAULT_PROJECT_NAME,
         ]);
 
@@ -30,6 +35,29 @@ class ProjectDirectionRepository extends ServiceEntityRepository
             'company' => $company,
             'name' => self::LEGACY_DEFAULT_PROJECT_NAME,
         ]);
+    }
+
+    /**
+     * @param list<string> $ids
+     *
+     * @return list<ProjectDirection>
+     */
+    public function findByIdsAndCompanyId(array $ids, string $companyId): array
+    {
+        if ([] === $ids) {
+            return [];
+        }
+
+        /** @var list<ProjectDirection> $projects */
+        $projects = $this->createQueryBuilder('project')
+            ->andWhere('project.id IN (:ids)')
+            ->andWhere('IDENTITY(project.company) = :companyId')
+            ->setParameter('ids', $ids)
+            ->setParameter('companyId', $companyId)
+            ->getQuery()
+            ->getResult();
+
+        return $projects;
     }
 
     /**

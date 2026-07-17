@@ -6,7 +6,12 @@ namespace App\Tests\Functional\Company;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
+use App\Company\Entity\FinancialResponsibilityCenter;
+use App\Company\Entity\ProjectDirection;
 use App\Company\Entity\User;
+use App\Company\Repository\FinancialResponsibilityCenterProjectRepository;
+use App\Company\Repository\FinancialResponsibilityCenterRepository;
+use App\Company\Repository\ProjectDirectionRepository;
 use App\Shared\Service\RateLimiter\RegistrationRateLimiter;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 
@@ -57,16 +62,34 @@ final class PublicRegistrationFlowTest extends WebTestCaseBase
         self::assertSame($registeredUser->getId(), $member->getUser()->getId());
         self::assertSame(CompanyMember::ROLE_OWNER, $member->getRole());
         self::assertSame(CompanyMember::STATUS_ACTIVE, $member->getStatus());
+
+        /** @var ProjectDirectionRepository $projectRepository */
+        $projectRepository = $client->getContainer()->get(ProjectDirectionRepository::class);
+        /** @var FinancialResponsibilityCenterRepository $centerRepository */
+        $centerRepository = $client->getContainer()->get(FinancialResponsibilityCenterRepository::class);
+        /** @var FinancialResponsibilityCenterProjectRepository $pairRepository */
+        $pairRepository = $client->getContainer()->get(FinancialResponsibilityCenterProjectRepository::class);
+
+        $project = $projectRepository->findDefaultForCompany($company);
+        $center = $centerRepository->findGeneralByCompanyId((string) $company->getId());
+        self::assertInstanceOf(ProjectDirection::class, $project);
+        self::assertSame(ProjectDirection::CODE_GENERAL, $project->getSystemCode());
+        self::assertInstanceOf(FinancialResponsibilityCenter::class, $center);
+        self::assertTrue($pairRepository->isAllowed(
+            (string) $company->getId(),
+            (string) $project->getId(),
+            $center->getId(),
+        ));
     }
 
     private function uniqueClientIp(): string
     {
         return sprintf(
             '2001:db8:%x:%x:%x:%x::1',
-            random_int(0, 0xffff),
-            random_int(0, 0xffff),
-            random_int(0, 0xffff),
-            random_int(0, 0xffff),
+            random_int(0, 0xFFFF),
+            random_int(0, 0xFFFF),
+            random_int(0, 0xFFFF),
+            random_int(0, 0xFFFF),
         );
     }
 }

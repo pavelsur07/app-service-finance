@@ -3,6 +3,8 @@
 namespace App\DataFixtures;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\FinancialResponsibilityCenter;
+use App\Company\Entity\FinancialResponsibilityCenterProject;
 use App\Company\Entity\ProjectDirection;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Common\DataFixtures\DependentFixtureInterface;
@@ -21,11 +23,18 @@ final class ProjectDirectionsFixtures extends Fixture implements DependentFixtur
         /** @var Company $company */
         $company = $this->getReference(AppFixtures::REF_COMPANY_ROMASHKA, Company::class);
 
-        $make = function (string $name, ?ProjectDirection $parent, int $sort, ?string $ref = null) use ($company, $manager): ProjectDirection {
+        $make = function (
+            string $name,
+            ?ProjectDirection $parent,
+            int $sort,
+            ?string $ref = null,
+            ?string $systemCode = null,
+        ) use ($company, $manager): ProjectDirection {
             $direction = new ProjectDirection(
                 id: Uuid::uuid4()->toString(),
                 company: $company,
-                name: $name
+                name: $name,
+                systemCode: $systemCode,
             );
 
             if (null !== $parent) {
@@ -47,7 +56,25 @@ final class ProjectDirectionsFixtures extends Fixture implements DependentFixtur
         $make('Продажи на Wildberries', null, $sort += 10, self::REF_PD_WB);
         $make('Продажи на Ozon', null, $sort += 10, self::REF_PD_OZON);
         $make('Собственный интернет-магазин', null, $sort += 10, self::REF_PD_SHOP);
-        $make('Общие операции', null, $sort += 10, self::REF_PD_GENERAL);
+        $generalProject = $make(
+            'Общие операции',
+            null,
+            $sort += 10,
+            self::REF_PD_GENERAL,
+            ProjectDirection::CODE_GENERAL,
+        );
+
+        $generalCenter = new FinancialResponsibilityCenter(
+            companyId: (string) $company->getId(),
+            code: FinancialResponsibilityCenter::CODE_GENERAL,
+            name: FinancialResponsibilityCenter::NAME_GENERAL,
+        );
+        $manager->persist($generalCenter);
+        $manager->persist(new FinancialResponsibilityCenterProject(
+            companyId: (string) $company->getId(),
+            projectDirection: $generalProject,
+            responsibilityCenter: $generalCenter,
+        ));
 
         $auto = $make('Автотранспорт', null, $sort += 10);
         $auto_car = $make('Машина 1', $auto, 10);
