@@ -2,11 +2,11 @@
 
 > Этот файл читается Claude Code автоматически при старте.
 > Паттерны с примерами кода → `PATTERNS.md`.
-> **Режим работы — автономный.** Claude выполняет задачу этапами, каждый этап завершает self-review + Stage Report. Высокорисковые этапы — обязательная остановка для ревью Владельцем.
+> **Режим работы — автономный.** Claude выполняет задачу этапами, каждый этап завершает self-review, исправлением замечаний и Stage Report. Локальный риск усиливает review и тесты, но не создаёт ручную остановку. Обязательная остановка нужна только перед HIGH-EXTERNAL действием или при реальном блокере.
 
 Stack
-PHP 8.3
-Symfony 7.3
+PHP — источник истины: актуальный Docker image/runtime
+Symfony 7.4 — источник истины: `site/composer.json` и `composer.lock`
 Doctrine ORM
 PostgreSQL
 Redis
@@ -22,7 +22,7 @@ Makefile-based commands
 | Файл | Назначение | Когда читать |
 |---|---|---|
 | `CLAUDE.md` | Правила, запреты, **автономный workflow** (backend PHP/Symfony) | Всегда автоматически |
-| `CLAUDE.frontend.md` | Правила React / TypeScript / Tabler | При фронтенд-задаче |
+| `CLAUDE.frontend.md` | Правила React / TypeScript / собственного UI Kit | При фронтенд-задаче |
 | `PATTERNS.md` | Паттерны с примерами кода | По задаче, нужный раздел |
 | `ARCHITECTURE.md` | Живые данные: Facade, Enum, Entity | Перед написанием кода |
 
@@ -36,19 +36,38 @@ Makefile-based commands
 - либо `docs/tasks/<id>/TASK.md` в ветке,
 - либо чёткий бриф от Владельца в чате (scope + ограничения + acceptance).
 
-Нет спецификации → **STOP**, попросить её. Догадки и расширение scope автономно — запрещены.
+Если бриф достаточно ясен для безопасной реализации → продолжать без дополнительных вопросов. STOP нужен только когда отсутствующая информация существенно влияет на бизнес-правила, финансовую семантику, публичный контракт, безопасность данных, доступы, необратимое действие, production или scope. Догадки в таких вопросах и расширение scope автономно запрещены.
+
+### Непрерывное автономное выполнение
+
+После получения достаточно ясной задачи или завершения Phase 0 без STOP-условия выполнить весь цикл без дополнительных подтверждений Владельца:
+
+1. Реализация текущего этапа.
+2. Таргетированные и релевантные расширенные проверки.
+3. Отдельный review полного diff этапа.
+4. Исправление всех BLOCKER и IMPORTANT замечаний в scope, а также безопасных MINOR замечаний в scope.
+5. Повторные проверки и повторный review до зелёного результата.
+6. Stage Report и checkpoint, если применимо.
+7. Commit только файлов текущей задачи.
+8. Push текущей task-ветки без force.
+9. Создание или обновление Draft PR.
+10. Финальный отчёт только после готовности Draft PR либо при реальном STOP-условии.
+
+Review, исправления review, повторные тесты, локальные миграции, commit, non-force push task-ветки и Draft PR заранее разрешены в рамках согласованной задачи. Это действия, которые нужно выполнить, а не следующие шаги, предлагаемые Владельцу.
+
+Нельзя завершать выполнимую задачу сообщениями «следующий шаг — review», «после зелёного review можно коммитить», «готов сделать push после подтверждения» или «PR можно создать после разрешения». Сначала выполнить эти действия, затем отчитаться.
 
 ### Фазы работы над задачей
 
 ```
 Phase 0 (Plan)  →  Phase 1..N (Execute by Stages)  →  Phase Final (Handoff)
                           ↑
-              после каждого этапа: self-review + Stage Report
-              если этап high-risk → 🛑 STOP, ждать Владельца
-              если self-review red → fix или 🛑 STOP, не идти дальше
+              после каждого этапа: tests → review → fix → re-test → re-review
+              HIGH-LOCAL → усиленные проверки, продолжать автономно
+              HIGH-EXTERNAL или реальный блокер → 🛑 STOP
 ```
 
-### Phase 0 — Plan (всегда первая, всегда заканчивается ревью)
+### Phase 0 — Plan (всегда первая для большой задачи)
 
 1. Прочитать: `CLAUDE.md`, релевантные разделы `PATTERNS.md`, `ARCHITECTURE.md`, спецификацию задачи.
 2. Найти 2–3 похожих модуля в репозитории, опереться на их паттерны.
@@ -59,31 +78,34 @@ Phase 0 (Plan)  →  Phase 1..N (Execute by Stages)  →  Phase Final (Handoff)
    - какие тесты потребуются,
    - какие записи в `ARCHITECTURE.md` нужно обновить.
 4. Сохранить план в `docs/tasks/<id>/plan.md`.
-5. 🛑 **STOP. Дождаться одобрения плана Владельцем.** Без подтверждения — не писать код.
+5. Продолжить автоматически к Stage 1, если scope, ограничения и acceptance criteria достаточно ясны, подход соответствует существующим паттернам и не требуется HIGH-EXTERNAL действие.
+
+STOP после Phase 0 только если требования конфликтуют, отсутствует существенное бизнес-решение, варианты имеют materially different последствия для бизнеса/безопасности/данных, требуется выход за scope или HIGH-EXTERNAL действие, либо Владелец явно потребовал отдельного согласования плана.
 
 ### Классификация этапов по риску
 
-| Риск | Примеры этапов | Поведение после self-review |
+| Риск | Примеры этапов | Поведение после зелёного review |
 |---|---|---|
-| 🟢 **LOW** | Чистый внутренний рефакторинг внутри одного Action/Service; добавление unit-тестов; обновление документации; косметика | Self-review зелёный → **продолжать автономно** к следующему этапу |
-| 🟡 **MEDIUM** | Новая Entity без миграции схемы; новый Action; новый Facade-метод; новый Message + Handler | Self-review зелёный → **продолжать автономно**, Stage Report сохранить в `docs/tasks/<id>/stages/` |
-| 🔴 **HIGH** | Миграция БД; изменение API-контракта; новый публичный эндпоинт; изменение auth/RBAC/Voter; новая composer/npm зависимость; работа в legacy-зоне; удаление чего-либо; новый Messenger-транспорт | Self-review зелёный → 🛑 **STOP, обязательное ревью Владельцем перед следующим этапом** |
+| 🟢 **LOW** | Внутренний рефакторинг; unit-тесты; документация; косметика | Продолжать автономно |
+| 🟡 **MEDIUM** | Новая Entity без миграции; новый Action/Facade/Message/Handler; UI-блок по существующему паттерну | Сохранить Stage Report и продолжать автономно |
+| 🟠 **HIGH-LOCAL** | Локальная миграция; публичный endpoint, уже требуемый задачей; auth/RBAC/Voter в ветке; legacy-зона; dependency, явно необходимая задаче; Messenger routing | Усиленные тесты и review; commit, push и Draft PR без дополнительного подтверждения |
+| 🔴 **HIGH-EXTERNAL** | Production/staging mutation; live external side effect; secrets/permissions; deploy; destructive data operation; merge/release | 🛑 STOP перед выполнением |
 
-Если затрудняешься классифицировать — считай **HIGH** и остановись.
+Если неясно, может ли действие затронуть production, shared data, внешнюю систему или необратимое состояние, считать его HIGH-EXTERNAL и остановиться. Не считать обычное локальное изменение требующим ручного разрешения только потому, что аналогичное production-действие рискованно.
 
-### Обязательные точки STOP (никогда не продолжать без Владельца)
+### Обязательные точки STOP
 
-- Перед любой миграцией БД (генерация + перед запуском)
-- Перед изменением публичного API (URL, поля ответа, статус-коды, типы)
-- Перед добавлением зависимости (`composer require`, `npm i`)
-- Перед удалением: файла, класса, метода, поля БД, эндпоинта
-- Перед изменениями в `src/Entity/`, `src/Service/`, `src/Repository/`, `src/Controller/` (legacy-зона)
-- Перед изменением `config/packages/messenger.yaml` (роутинг, транспорты)
-- Перед изменением auth, Security, Voter
-- Если self-review нашёл проблему, которую не удалось починить за 1 итерацию
-- Если задача требует выйти за изначальный scope
-- Если нет нужного Facade/Enum в `ARCHITECTURE.md` (не выдумывай — спроси)
-- Финальный handoff (всегда STOP)
+- Любая мутация production или staging данных.
+- Миграция вне изолированной local/test БД.
+- Production queue processing, deploy, release, merge или изменение production state/config/secrets/permissions.
+- Live external API call с побочным эффектом, не разрешённым явно.
+- Удаление или необратимое преобразование существующих данных.
+- Выход за исходный scope.
+- Неопределённое бизнес-правило, финансовая семантика, публичный контракт или security behavior, которые нельзя однозначно вывести из ТЗ и текущего проекта.
+- Конфликт с чужими изменениями, который невозможно безопасно отделить.
+- BLOCKER/IMPORTANT finding, который после root-cause analysis и смены безопасного подхода нельзя исправить внутри scope без нового решения, доступа или HIGH-EXTERNAL действия.
+
+Не останавливаться только потому, что review нашёл замечания, тест упал, потребовалось несколько итераций исправлений, создана локальная миграция, изменяется legacy/messenger/auth код внутри явного scope либо следующим штатным действием является commit, push или Draft PR.
 
 ### Self-review checklist (выполнять в конце КАЖДОГО этапа)
 
@@ -103,8 +125,8 @@ Phase 0 (Plan)  →  Phase 1..N (Execute by Stages)  →  Phase Final (Handoff)
 - [ ] Нет логирования паролей / токенов / PII
 
 **Качество кода:**
-- [ ] `make stan` — чисто на изменённом коде
-- [ ] `make cs` — чисто
+- [ ] `make site-cs-check` — чисто
+- [ ] Статический анализ запущен через существующий project target, если он есть; не выдумывать `make stan`, когда target отсутствует
 - [ ] Нет `dump()` / `dd()` / `var_dump()`
 - [ ] Нет N+1 (проверено через Profiler / `doctrine.debug` при ручном smoke-тесте)
 - [ ] На списочных эндпоинтах — Pagerfanta с лимитом ≤ 200
@@ -112,7 +134,7 @@ Phase 0 (Plan)  →  Phase 1..N (Execute by Stages)  →  Phase Final (Handoff)
 
 **Тесты:**
 - [ ] Минимум по таблице «Тесты — минимум перед закрытием этапа» написан
-- [ ] `make test` — зелёный
+- [ ] Таргетированные тесты и `make site-test` (когда полный прогон уместен) — зелёные либо документирована доказанно несвязанная pre-existing ошибка
 - [ ] Тесты не «приглажены» под код — проверяют поведение
 
 **Документация:**
@@ -128,7 +150,7 @@ Phase 0 (Plan)  →  Phase 1..N (Execute by Stages)  →  Phase Final (Handoff)
 ```markdown
 ## Stage <N>: <название> — DONE
 
-**Риск:** 🟢 LOW | 🟡 MEDIUM | 🔴 HIGH
+**Риск:** 🟢 LOW | 🟡 MEDIUM | 🟠 HIGH-LOCAL | 🔴 HIGH-EXTERNAL
 **Следующее действие:** continue autonomously | 🛑 STOP, ждать Владельца
 
 ### Что сделано
@@ -148,8 +170,9 @@ Phase 0 (Plan)  →  Phase 1..N (Execute by Stages)  →  Phase Final (Handoff)
 - [x] ARCHITECTURE.md updated (или N/A)
 
 ### Команды для проверки
-- `make test -- --filter <TestName>`
-- `make stan`
+- `make site-test-unit`
+- `make site-test`
+- `make site-cs-check`
 
 ### Риски / на что обратить внимание ревьюеру
 - ...
@@ -158,13 +181,19 @@ Phase 0 (Plan)  →  Phase 1..N (Execute by Stages)  →  Phase Final (Handoff)
 - ... (если нет — «нет»)
 ```
 
-### Phase Final — Handoff (всегда STOP)
+### Phase Final — Handoff
 
 В конце последнего этапа:
-1. Прогнать полный набор: `make test && make stan && make cs`.
+1. Прогнать доступный полный набор: `make site-test && make site-cs-check`; для Codex Cloud — релевантные `make codex-*` targets. Статический анализ запускать только через существующий target.
 2. Сверить построчно все «Глобальные запреты» и ограничения из спецификации.
 3. Заполнить `docs/tasks/<id>/handoff.md`: суммарный отчёт по всем этапам + список миграций + список изменённых публичных контрактов + риски + follow-ups.
-4. 🛑 **STOP. Final Owner review.**
+4. Провести финальный review полного diff, исправить замечания в scope, повторить проверки и review до зелёного результата.
+5. Закоммитить только изменения текущей задачи.
+6. Выполнить non-force push task-ветки.
+7. Создать или обновить Draft PR.
+8. Передать Владельцу финальный отчёт и ссылку на Draft PR.
+
+Не останавливаться перед commit, push, Draft PR или handoff. Остановиться перед merge, release, deploy, production mutation или другим HIGH-EXTERNAL действием.
 
 ### Запрещено в автономном режиме
 
@@ -172,12 +201,11 @@ Phase 0 (Plan)  →  Phase 1..N (Execute by Stages)  →  Phase Final (Handoff)
 самовольно расширять scope                              — STOP и спросить
 коммитить незакрытый этап                               — self-review red == этап не закрыт
 пропускать self-review «потому что очевидно»            — checklist обязателен
-пропускать STOP на high-risk этапе «ради скорости»     — Владелец сам решит, что пропустить
 переписывать чужие модули по дороге («заодно»)         — отдельная задача
-делать миграцию без отдельного STOP на ревью SQL        — обязательная остановка
 merge в основную ветку                                  — никогда, только PR
 force-push в shared-ветки                               — никогда
 запуск миграций на staging/prod                         — никогда
+заканчивать с review/commit/push/Draft PR как next step — сначала выполнить, затем отчитаться
 ```
 
 ---
@@ -218,11 +246,12 @@ Read-only проверки можно выполнять после запрос
 Если нужной команды нет в wrapper:
 1. Описать точную production operation и зачем она нужна.
 2. Классифицировать: read-only, mutating/processing, dangerous/general.
-3. Добавить только точное имя Symfony console command в `/usr/local/bin/codex-console`.
-4. Не расширять sudoers и не выдавать прямой Docker-доступ.
-5. Проверить wrapper: `bash -n /usr/local/bin/codex-console`.
-6. Проверить от restricted user: `sudo -u codex-prod sudo /usr/local/bin/codex-console <command> --help` или другой безопасный read-only вызов.
-7. Durable policy changes фиксировать в `AGENTS.md` и `CLAUDE.md`; временные one-off разрешения не документировать как постоянные.
+3. STOP и получить отдельное одобрение Владельца на изменение production permission. По умолчанию изменение применяет Владелец/DevOps; Codex меняет wrapper только по явному поручению для этой точной операции.
+4. Allowlist должен проверять точное имя команды и допустимые аргументы/флаги; одного имени недостаточно, если команда имеет read-only и mutating режимы.
+5. Не расширять sudoers и не выдавать прямой Docker-доступ.
+6. Проверить wrapper: `bash -n /usr/local/bin/codex-console`.
+7. Проверить от restricted user: `sudo -u codex-prod sudo /usr/local/bin/codex-console <command> --help` или другой безопасный read-only вызов.
+8. Durable policy changes фиксировать в `AGENTS.md` и `CLAUDE.md`; временные one-off разрешения не документировать как постоянные.
 
 Запрещено добавлять dangerous/general permissions: arbitrary shell, arbitrary `docker exec`, unrestricted `docker`, write-capable `psql`, file editing on production, package installation. Для one-off production writes предпочтителен временный narrowly scoped wrapper, который Владелец удаляет после использования.
 
@@ -244,11 +273,11 @@ Read-only проверки можно выполнять после запрос
 
 ## До написания любого backend-кода
 
-1. Убедись, что Phase 0 (Plan) одобрена Владельцем
+1. Убедись, что Phase 0 завершена и нет STOP-условия; отдельное одобрение плана требуется только если Владелец запросил его явно
 2. Прочитай `ARCHITECTURE.md` — актуальные Facade-методы, Enum-значения, статус Entity
 3. Уточни модуль, если не указан явно
-4. Используй **только** Facade и Enum из `ARCHITECTURE.md` — не выдумывай
-5. Нет нужного Facade/метода → **спроси**, не создавай самостоятельно
+4. Используй существующие Facade и Enum из `ARCHITECTURE.md`; не выдумывай уже существующие контракты
+5. Если задача явно требует нового Facade/метода/Enum и контракт однозначно следует из ТЗ и существующих паттернов — создай его в scope задачи и обнови `ARCHITECTURE.md` в том же этапе. Спроси только при существенной неоднозначности контракта
 6. Нужен паттерн → читай соответствующий раздел `PATTERNS.md`
 
 ---
@@ -279,7 +308,7 @@ tests/Builders/{Module}/          src/{Module}/Infrastructure/Normalizer/
 src/Entity/   src/Service/   src/Repository/   src/Controller/
 ```
 
-Любая правка в legacy-зоне — 🔴 HIGH risk, обязательный STOP перед изменением.
+Любая правка в legacy-зоне — 🟠 HIGH-LOCAL risk: допустима только когда прямо требуется задачей, с усиленными тестами и review. Сам факт работы в legacy-зоне не является STOP-условием.
 
 ---
 
@@ -369,7 +398,7 @@ declare(strict_types=1);
 | `async_ads` | Ozon Performance polling (handler может висеть до 10 мин) |
 
 - Handler: нет `Request`/`Session`/`Security` — CLI-контекст
-- Изменение `messenger.yaml` — всегда 🔴 HIGH risk, STOP перед изменением
+- Изменение `messenger.yaml` — 🟠 HIGH-LOCAL risk внутри явного scope: проверить routing, retry/failure behavior, совместимость сообщений и выполнить усиленный review; без отдельного STOP
 - Паттерн → `PATTERNS.md` §10
 
 ---
@@ -397,7 +426,7 @@ SELECT * в raw SQL                        — явное перечислени
 циклические зависимости между модулями    — нельзя
 getRepository() чужого модуля             — только через Facade
 расширение scope задачи в автономе        — STOP и спросить
-закрытие этапа с красным self-review      — нельзя, fix или STOP
+закрытие этапа с красным self-review      — нельзя; fix → tests → repeat review до green или реального STOP-условия
 merge / force-push                        — никогда автономно
 ```
 
@@ -445,7 +474,7 @@ paths:
     '%kernel.project_dir%/templates/newmodule': NewModule
 ```
 
-Изменения в `config/packages/messenger.yaml` — 🔴 HIGH risk, STOP перед PR.
+Изменения в `config/packages/messenger.yaml` — 🟠 HIGH-LOCAL risk: усиленные проверки и review обязательны, но отдельный STOP перед изменением или Draft PR не требуется.
 
 ---
 
@@ -626,26 +655,34 @@ Query без companyId            — запрещено (IDOR + полный с
 
 В конце каждого этапа — строго по порядку:
 
-1. Прогнать `make stan && make cs && make test` (или таргетированно для этапа).
-2. Пройти **Self-review checklist** (раздел «Автономный режим»). Любой красный пункт — этап не закрыт.
-3. Сделать коммит: Conventional Commits, сообщение отражает цель этапа.
-4. Сохранить **Stage Report** в `docs/tasks/<id>/stages/stage-<N>.md`.
-5. Решить по риск-классу:
-   - 🟢 LOW / 🟡 MEDIUM → продолжать к следующему этапу автономно.
-   - 🔴 HIGH → 🛑 STOP, ждать Владельца.
-6. Добавил Facade / Facade-метод / Enum / новую Entity → **обнови `ARCHITECTURE.md` в этом же этапе**. Это источник правды для Projects-чатов. Без обновления — Projects будет выдумывать интерфейсы.
+1. Прогнать таргетированные проверки, затем доступные `make site-test` и `make site-cs-check` по масштабу этапа; для Codex Cloud — релевантные `make codex-*` targets. Статический анализ запускать только через существующий target.
+2. Провести отдельный review полного diff этапа. Любой красный пункт — этап не закрыт.
+3. Исправить все BLOCKER/IMPORTANT и безопасные in-scope MINOR findings.
+4. Повторить релевантные проверки и review до green. После трёх неудачных циклов выполнить root-cause analysis и сменить безопасный подход внутри scope; STOP только при реальном блокере.
+5. Добавил Facade / Facade-метод / Enum / новую Entity → **обнови `ARCHITECTURE.md` в этом же этапе**. Это источник правды для Projects-чатов. Без обновления — Projects будет выдумывать интерфейсы.
+6. Сохранить **Stage Report** в `docs/tasks/<id>/stages/stage-<N>.md`.
+7. Сделать commit только файлов текущей задачи: Conventional Commits, сообщение отражает цель этапа.
+8. Выполнить non-force push текущей task-ветки.
+9. Создать или обновить Draft PR.
+10. 🟢 LOW / 🟡 MEDIUM / 🟠 HIGH-LOCAL → продолжать к следующему этапу автономно. 🔴 HIGH-EXTERNAL → STOP перед внешним действием.
 
 ## Закрытие задачи (Phase Final)
 
-1. Прогнать полный набор: `make test && make stan && make cs`.
+1. Прогнать доступный полный набор: `make site-test && make site-cs-check`; для Codex Cloud — релевантные `make codex-*` targets. Статический анализ запускать только через существующий target.
 2. Сверить построчно «Глобальные запреты» и ограничения из спецификации.
-3. Собрать `docs/tasks/<id>/handoff.md`:
+3. Провести финальный review полного diff, исправить in-scope findings, повторить проверки и review до green.
+4. Собрать `docs/tasks/<id>/handoff.md`:
    - summary всех этапов,
    - список миграций (up/down, деструктивные операции),
    - список изменённых публичных контрактов,
    - риски,
    - follow-ups, которые сознательно вынесены за scope.
-4. 🛑 **STOP. Final Owner review.** Merge — только после одобрения Владельцем.
+5. Закоммитить оставшиеся изменения текущей задачи.
+6. Выполнить non-force push task-ветки.
+7. Создать или обновить Draft PR.
+8. Передать Владельцу финальный отчёт со ссылкой на Draft PR.
+
+Дополнительное подтверждение перед review, исправлениями, тестами, commit, push, Draft PR и handoff не требуется. Merge, release, deploy и production mutation — только после отдельного одобрения Владельцем.
 
 ## Design System
 
@@ -678,9 +715,10 @@ historical reference.
    the whole menu item by semantic role (default/primary/danger), not to
    icons individually. No emoji icons.
 
-5. **No new components without permission.** If a pattern isn't covered:
-    - First, propose adapting an existing component
-    - If impossible, STOP and ask before adding to ui-kit
+5. **No unnecessary new components.** If a pattern isn't covered:
+    - First, adapt an existing component when this preserves semantics and accessibility
+    - If the approved task clearly requires a new component and no existing component fits, add it autonomously using current UI Kit tokens and patterns; update `storybook.html`, `decisions.md`, tests/mapping, and CHANGELOG in the same stage
+    - STOP only when the design/behavior choice is materially ambiguous or would expand scope
     - Never invent ad-hoc components in screen files
 
 6. **Universal pickers.** For flat entity selection (contractor / project /

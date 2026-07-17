@@ -31,8 +31,8 @@ For small isolated changes, do not read all documentation files. Inspect only th
 If one of these files is missing or unavailable, report it and continue with available context.
 ---
 Stack
-PHP 8.3
-Symfony 7.3
+PHP — actual Docker/runtime configuration is the source of truth
+Symfony 7.4 according to `site/composer.json`; `composer.lock` is authoritative for installed versions
 Doctrine ORM
 PostgreSQL
 Redis
@@ -62,6 +62,31 @@ Autonomy mode
 Work autonomously inside a clear task scope or the currently approved stage.
 Autonomy means: inspect, plan, implement, test, review, improve, re-test, and report without asking for permission for routine local development actions.
 Autonomy does not mean: expand scope, invent missing business rules, perform irreversible actions, affect production without approval, or rewrite working modules unrelated to the task.
+
+Continuous autonomous execution
+After receiving a sufficiently clear task or completing Phase 0 without a STOP condition, continue through implementation, verification, review, fixes, commit, push, and Draft PR without requesting additional owner confirmation.
+
+The required autonomous sequence is:
+1. Implement the current stage.
+2. Run targeted and relevant broader checks.
+3. Perform an independent review of the complete stage diff.
+4. Fix all in-scope BLOCKER and IMPORTANT findings and safe in-scope MINOR findings.
+5. Re-run checks and repeat the independent review until green.
+6. Prepare the Stage Report and checkpoint when applicable.
+7. Commit only the files belonging to the current task.
+8. Push the current task branch without force.
+9. Create or update a Draft PR.
+10. Provide the final report only after the Draft PR is ready, or report a real STOP condition.
+
+Review, review fixes, repeated tests, local migration work, commit, non-force push of the task branch, and Draft PR creation are pre-authorized parts of an approved task. They are actions to perform, not proposed next steps.
+
+Never end a runnable task with messages such as:
+- "the next step is review",
+- "after green review we can commit",
+- "ready to push after confirmation",
+- "can create a PR after approval".
+
+Perform those actions before reporting. Do not merge, release, deploy, mutate production, or perform another HIGH-EXTERNAL action without explicit owner approval.
 
 If work stops for any reason, explicitly notify the owner. Never stop silently.
 The notification must include:
@@ -132,6 +157,8 @@ For small, isolated, low-risk tasks:
 - perform automatic review,
 - fix review findings inside scope,
 - re-run checks,
+- commit and push the task branch when the task is intended for delivery,
+- create or update the Draft PR,
 - report clearly.
 
 Do not pause only to ask whether the plan is acceptable.
@@ -161,8 +188,9 @@ Phase 0 — Plan
         -> Review findings
         -> Fix findings
         -> Re-run checks
-        -> Repeat review until green or STOP condition
+        -> Repeat review until green or a real STOP condition
     -> Stage Report + Checkpoint
+    -> Commit + push task branch + create/update Draft PR
     -> Next stage or Phase Final — Handoff
 ```
 
@@ -171,11 +199,13 @@ Main rules:
 1 stage = 1 focused result = 1 reviewable unit
 implementation is not complete until automatic review is green
 local technical work inside scope does not require owner approval
+green review leads directly to commit, push, and Draft PR without another confirmation
 ```
 
 Prefer:
 ```text
-1 stage = 1 branch/PR = 1 owner-reviewable result
+1 task/reviewable unit = 1 task branch = 1 Draft PR
+stages inside that unit may be separate focused commits
 ```
 
 Do not mix a large backend implementation and a large frontend implementation in the same stage unless explicitly requested.
@@ -242,6 +272,9 @@ Inside a clear task or approved stage, do not ask for confirmation before:
 - running safe local/container checks,
 - running local builds, linters, static analysis, and tests,
 - showing `git diff`, `git diff --stat`, or `git status`,
+- committing only the current task changes after green review,
+- pushing the current task branch without force,
+- creating or updating a Draft PR for the current task,
 - deleting code created by the agent in the same unfinished stage when needed to correct the implementation.
 
 A local action is autonomous only when it:
@@ -267,8 +300,10 @@ Never continue autonomously before:
 - installing a dependency that is not clearly required by the approved task or conflicts with existing project policy,
 - going beyond the original scope,
 - choosing between materially different business behaviors,
-- continuing when automatic review still has unresolved BLOCKER or IMPORTANT findings after the allowed review-fix iterations,
-- final handoff when owner review is required before merge/release.
+- continuing when automatic review has an unresolved BLOCKER or IMPORTANT finding that cannot be fixed safely inside scope after root-cause analysis and a reasonable alternative approach,
+- merging, releasing, deploying, or mutating production after final handoff.
+
+Do not STOP merely because review found issues, tests failed, several repair iterations were needed, a local migration was created, or the next normal action is commit, push, or Draft PR creation.
 
 Automatic stage review
 At the end of every implementation stage, perform a separate automatic review before declaring the stage complete.
@@ -314,10 +349,10 @@ Repeat the review-fix cycle until:
 - checks are green or failures are proven unrelated to the stage,
 - and the stage acceptance criteria are met.
 
-Use up to 3 review-fix iterations per stage.
 Do not stop after the first fix attempt when additional safe fixes remain inside scope.
+After 3 unsuccessful review-fix iterations, perform root-cause analysis, reconsider the implementation approach, and try a materially different safe approach inside scope.
 
-After 3 iterations, STOP only if unresolved BLOCKER or IMPORTANT findings remain. Report the exact remaining issue, attempted fixes, evidence, and recommended options.
+STOP only when a BLOCKER or IMPORTANT finding cannot be fixed safely inside scope because of a real external blocker, missing material business decision, unavailable required access, conflict with unrelated owner changes, or a required HIGH-EXTERNAL action. Report the exact remaining issue, attempted fixes, evidence, and recommended options.
 Do not hide unresolved review findings.
 
 Verification strategy
@@ -495,7 +530,7 @@ Stage Report format:
 - full relevant stage: `command` — result
 
 #### Automatic review
-- Iterations: 1..3
+- Iterations: <number>
 - BLOCKER: none
 - IMPORTANT: none
 - MINOR fixed: ...
@@ -566,7 +601,11 @@ At the end of the last stage:
 - perform the final automatic review,
 - fix in-scope findings,
 - verify all task constraints and forbidden actions,
-- prepare final handoff.
+- prepare final handoff,
+- commit only the current task changes after the final review is green,
+- push the current task branch without force,
+- create or update the Draft PR,
+- report the Draft PR and final results to the owner.
 
 If a task id exists, save final handoff to:
 ```text
@@ -584,9 +623,10 @@ Final handoff must include:
 - known limitations,
 - follow-up tasks intentionally left out of scope,
 - what the owner should review,
+- branch name and Draft PR URL when available,
 - the exact expected owner response when approval is required.
 
-Always STOP before merge, release, deployment, or production mutation. Do not merge autonomously.
+Do not STOP before commit, non-force push, Draft PR creation, or handoff reporting. Always STOP before merge, release, deployment, production mutation, or another HIGH-EXTERNAL action. Do not merge autonomously.
 
 Forbidden in autonomous mode
 Never do these autonomously:
@@ -611,6 +651,7 @@ force-push shared branches
 expose secrets or credentials
 stop silently without notifying the owner
 ask for approval for routine reversible local work already inside scope
+finish with review, commit, push, or Draft PR creation still listed as an executable next step
 ```
 
 ---
@@ -635,6 +676,9 @@ Rules:
 Do not overwrite user changes.
 Do not touch unrelated files.
 Do not run destructive git commands unless explicitly requested.
+After the final automatic review is green, commit only the current task files, push the current task branch without force, and create or update a Draft PR without asking for another confirmation.
+If unrelated uncommitted changes exist, stage only the files or hunks owned by the current task. STOP only when changes overlap and cannot be separated safely.
+Never commit secrets, generated local artifacts, unrelated owner changes, or files outside the task scope.
 Do not use:
 `git reset --hard`
 `git clean -fd`
@@ -692,11 +736,12 @@ If a required production command is not available through the existing wrappers,
 Adding production command permissions:
 1. State the exact production operation and why it is needed.
 2. Classify it as read-only, mutating/processing, or dangerous/general.
-3. Add only the exact Symfony console command name to `/usr/local/bin/codex-console`.
-4. Do not broaden sudoers and do not add direct Docker access.
-5. Verify the wrapper with `bash -n /usr/local/bin/codex-console`.
-6. Verify as the restricted user with `sudo -u codex-prod sudo /usr/local/bin/codex-console <command> --help` or another safe read-only invocation.
-7. Document durable policy changes in this file; do not document temporary one-off permissions unless they should remain available.
+3. STOP and obtain explicit owner approval for the production permission change. By default, the owner/DevOps applies it; Codex changes the wrapper only when explicitly instructed for that exact operation.
+4. Allowlist the exact Symfony command and validate permitted arguments/flags; command-name-only allowlisting is insufficient when the same command has read-only and mutating modes.
+5. Do not broaden sudoers and do not add direct Docker access.
+6. Verify the wrapper with `bash -n /usr/local/bin/codex-console`.
+7. Verify as the restricted user with `sudo -u codex-prod sudo /usr/local/bin/codex-console <command> --help` or another safe read-only invocation.
+8. Document durable policy changes in this file; do not document temporary one-off permissions unless they should remain available.
 
 Do not add dangerous/general permissions such as arbitrary shell, arbitrary `docker exec`, unrestricted `docker`, write-capable `psql`, file editing on production, or package installation. For one-off production writes, prefer a temporary narrowly scoped wrapper that the owner removes after use.
 ---
@@ -793,6 +838,8 @@ At the end of each task, report:
 What was changed.
 Files changed.
 Tests/checks run and result.
+Automatic review result.
+Commit, branch, and Draft PR URL when created.
 Risks or follow-up actions.
 Anything not completed.
 Be concise. Do not over-explain.
