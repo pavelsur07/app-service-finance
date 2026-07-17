@@ -2,10 +2,10 @@
 
 ## Status
 
-- Phase: **Stage 7.4 implemented and verified locally; production migration has not been executed**
+- Phase: **Stage 7.4 accepted in production; Stage 7.5 implemented and verified locally**
 - Overall risk: **HIGH** because the model adds company master data and new financial dimensions to Cash, documents, P&L aggregates, and auto rules
-- Next action: **STOP; owner review required before HIGH-risk Stage 7.5 or any production migration**
-- Production mutations: **forbidden until a separately approved migration or backfill step**
+- Next action: **STOP; owner review required before Stage 7.5 PR/deployment work**
+- Further production mutations: **forbidden until a separately approved migration or backfill step**
 - Historical recalculation: **forbidden by default**
 
 ## Goal
@@ -199,9 +199,9 @@ Work:
 
 Rollback policy: the migration is explicitly irreversible because it creates system projects for companies without a candidate. A Doctrine `down` aborts before changing the schema; a full data rollback requires restoring a database backup.
 
-Implementation status: DONE; the migration and Stage 7.2 tests passed on local `app_test`. Production and production facts remain unchanged.
+Implementation status: DONE; the migration and Stage 7.2 tests passed on local `app_test`, and `Version20260716170000` was applied successfully in production on 2026-07-17. Existing production financial facts remained unchanged.
 
-**Next action:** mandatory STOP before production migration, deployment, or Stage 7.3.
+The Stage 7.2 production gate was completed before Stage 7.3 began.
 
 ### Stage 7.3 — Company management backend
 
@@ -225,15 +225,23 @@ Add the route-aware `ЦФО` item to the existing `Справочники` dropd
 
 Implementation status: DONE; protected company-scoped Twig routes support list/create/edit/archive and allowed-project configuration through the Stage 7.3 Actions. Navigation and cross-company access are covered by functional tests.
 
+Production status: ACCEPTED; deployment, `Version20260716170000`, container health, and manual `Справочники → ЦФО` verification passed. Existing financial facts were not changed.
+
 **Next action:** mandatory STOP before Stage 7.5 fact-schema migration.
 
 ### Stage 7.5 — Expand Cash and Finance schema
 
-**Risk:** HIGH (additive nullable fact columns and P&L aggregation index change)
+**Risk:** HIGH (additive nullable fact columns and restrictive FKs)
 
 **Result:** nullable ЦФО columns and foreign keys are deployed before application code reads them.
 
 This is an expand-only migration unit. It does not update existing facts, rebuild P&L, or change reports.
+
+Implementation status: DONE and verified on local `app_test`. `Version20260717120000` plus focused schema/writer tests passed without changing existing facts. The detailed contract, read-only preflight, and Stage Report are in `cash-auto-rules-stage-7-5-plan.md`, `cash-auto-rules-stage-7-5-preflight.sql`, and `cash-auto-rules-stage-7-5-report.md`.
+
+Stage 7.5 leaves the current four-column P&L uniqueness and conflict target byte-for-byte unchanged. A review found that `NULLS NOT DISTINCT` would break the existing category-deletion path (`ON DELETE SET NULL`), so the future project × ЦФО key and its concurrency/deployment contract are deferred to a separate Stage 7.7 Phase 0.
+
+**Next action:** mandatory STOP for owner review before PR/deployment work.
 
 ### Stage 7.6 — Cash transaction integration
 
