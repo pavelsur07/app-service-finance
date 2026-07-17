@@ -59,4 +59,27 @@ final class FinancialResponsibilityCenterRepository extends ServiceEntityReposit
             ->getQuery()
             ->getOneOrNullResult();
     }
+
+    /**
+     * @return list<FinancialResponsibilityCenter>
+     */
+    public function findForManagement(string $companyId, bool $includeArchived = false): array
+    {
+        $queryBuilder = $this->createQueryBuilder('center')
+            ->andWhere('center.companyId = :companyId')
+            ->setParameter('companyId', $companyId)
+            ->orderBy('center.sort', 'ASC')
+            ->addOrderBy('center.name', 'ASC');
+
+        if (!$includeArchived) {
+            $queryBuilder
+                ->andWhere('center.status = :status')
+                ->setParameter('status', FinancialResponsibilityCenterStatus::ACTIVE);
+        }
+
+        /** @var list<FinancialResponsibilityCenter> $centers */
+        $centers = $queryBuilder->getQuery()->getResult();
+
+        return $centers;
+    }
 }

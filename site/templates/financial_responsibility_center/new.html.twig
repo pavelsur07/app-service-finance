@@ -1,0 +1,33 @@
+{% extends 'base.html.twig' %}
+{% block title %}Новый ЦФО{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <div class="page-pretitle">Справочники · ЦФО</div>
+                    <h2 class="page-title">Новый ЦФО</h2>
+                </div>
+                <div class="col-auto ms-auto">
+                    <a href="{{ path('financial_responsibility_center_index') }}" class="btn btn-ghost-secondary">К списку</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-xl mt-3">
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Основные данные</h3></div>
+            <div class="card-body">
+                {{ form_start(form) }}
+                {{ form_errors(form) }}
+                {{ form_row(form.name) }}
+                {{ form_row(form.sort) }}
+                {{ form_rest(form) }}
+                <button class="btn btn-primary" type="submit">Сохранить</button>
+                {{ form_end(form) }}
+            </div>
+        </div>
+    </div>
+{% endblock %}

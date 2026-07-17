@@ -535,6 +535,8 @@ getAllowedProjectIds(string $companyId, string $responsibilityCenterId): array
 
 Actions не являются публичным cross-module API; соседние модули используют только facade/DTO.
 
+Защищённый справочник доступен существующим пользователям через `Справочники → ЦФО` (`/financial-responsibility-centers/`). Twig-контроллеры явно ограничивают каждое чтение активной компанией и передают изменения существующих записей в Actions с expected version. Основные данные и разрешённые проекты сохраняются отдельными POST-формами, чтобы конфликт одной операции не приводил к частичному применению другой. Системный ЦФО отображается в списке, но не может быть переименован или архивирован; его системную пару нельзя снять.
+
 ### `PLCategoryFacade` (`src/Finance/Facade/PLCategoryFacade.php`)
 ```php
 // Дерево категорий в виде DTO (для ChoiceType в формах)
@@ -2326,6 +2328,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.57 | 2026-07-17 | Company: добавлен защищённый Twig-интерфейс `Справочники → ЦФО` с company isolation, CSRF и optimistic locking |
 | 1.56 | 2026-07-17 | Company: добавлены company-scoped Actions управления ЦФО и optimistic-lock настройка разрешённых проектов |
 | 1.55 | 2026-07-16 | Company: добавлены плоский справочник ЦФО, стабильные системные коды проекта/ЦФО, разрешённые пары и атомарный bootstrap новой компании |
 | 1.54 | 2026-07-13 | Marketplace/Inventory: WB Product Cards refresh дополнен карточками из корзины, которые сохраняются неактивными и участвуют в точном маппинге остатков по `chrtId` |

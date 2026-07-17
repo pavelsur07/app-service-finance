@@ -2,9 +2,9 @@
 
 ## Status
 
-- Phase: **Stage 7.3 implemented and verified locally; production migration has not been executed**
+- Phase: **Stage 7.4 implemented and verified locally; production migration has not been executed**
 - Overall risk: **HIGH** because the model adds company master data and new financial dimensions to Cash, documents, P&L aggregates, and auto rules
-- Next action: **STOP; owner review required before HIGH-risk Stage 7.4 or any production migration**
+- Next action: **STOP; owner review required before HIGH-risk Stage 7.5 or any production migration**
 - Production mutations: **forbidden until a separately approved migration or backfill step**
 - Historical recalculation: **forbidden by default**
 
@@ -222,6 +222,10 @@ Implementation status: DONE; company-scoped create/edit/archive and project-pair
 **Result:** existing users can open `Справочники → ЦФО` and manage flat ЦФО records and allowed project pairs using existing Twig/UI-kit patterns.
 
 Add the route-aware `ЦФО` item to the existing `Справочники` dropdown in the main sidebar. Do not add a second menu, new top-level navigation item, role, voter, API, React entrypoint, UI dependency, or design-system component.
+
+Implementation status: DONE; protected company-scoped Twig routes support list/create/edit/archive and allowed-project configuration through the Stage 7.3 Actions. Navigation and cross-company access are covered by functional tests.
+
+**Next action:** mandatory STOP before Stage 7.5 fact-schema migration.
 
 ### Stage 7.5 — Expand Cash and Finance schema
 
