@@ -7,6 +7,7 @@ use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Company\Entity\Company;
+use App\Company\Entity\ProjectDirection;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -81,5 +82,27 @@ class CashTransactionAutoRuleRepository extends ServiceEntityRepository
             ->addOrderBy('r.id', 'ASC')
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * @return list<CashTransactionAutoRule>
+     */
+    public function findActiveGeneralProjectTargetsWithoutCfo(): array
+    {
+        /** @var list<CashTransactionAutoRule> $rules */
+        $rules = $this->createQueryBuilder('rule')
+            ->innerJoin('rule.company', 'company')
+            ->innerJoin('rule.projectDirection', 'project')
+            ->addSelect('company', 'project')
+            ->andWhere('rule.isActive = true')
+            ->andWhere('rule.responsibilityCenterId IS NULL')
+            ->andWhere('project.systemCode = :projectCode')
+            ->setParameter('projectCode', ProjectDirection::CODE_GENERAL)
+            ->orderBy('company.id', 'ASC')
+            ->addOrderBy('rule.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return $rules;
     }
 }
