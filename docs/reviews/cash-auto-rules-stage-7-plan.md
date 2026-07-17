@@ -2,9 +2,9 @@
 
 ## Status
 
-- Phase: **Stage 7.5 accepted in production; Stage 7.6.1 implemented and verified locally**
+- Phase: **Stage 7.6.1 accepted in production; Stage 7.9.1a accepted on local `app_test`**
 - Overall risk: **HIGH** because the model adds company master data and new financial dimensions to Cash, documents, P&L aggregates, and auto rules
-- Next action: **STOP; owner review of Stage 7.6.1 is required before HIGH-risk Stage 7.6.2 writer work**
+- Next action: **STOP; owner review before creating the schema-only Stage 7.9.1a PR**
 - Further production mutations: **forbidden until a separately approved migration or backfill step**
 - Historical recalculation: **forbidden by default**
 
@@ -251,7 +251,7 @@ Stage 7.5 leaves the current four-column P&L uniqueness and conflict target byte
 
 Include manual forms, DTO/facade resolution, company/pair guards, audit behavior, and focused import regression tests.
 
-Phase 0 status: PREPARED. Stage 7.6.1 scalar mapping/resolution is DONE and verified locally without connecting runtime writers. The remaining implementation is split into core writers, manual UI, and import cutover. The import cutover has a mandatory dependency decision: assigning the system project makes existing project-only safe-fill auto-rules inapplicable. The approved Option A prepares the Stage 7.9 complete-pair rule contract before runtime/import defaults are enabled. See `cash-auto-rules-stage-7-6-plan.md`.
+Phase 0 status: PREPARED. Stage 7.6.1 scalar mapping/resolution is DONE and accepted in production without connecting runtime writers. The remaining implementation is split into core writers, manual UI, and import cutover. Under approved Option A, Stage 7.9 schema/authoring, explicit existing-rule configuration, and complete-pair planner acceptance must happen before runtime/import defaults are enabled. See `cash-auto-rules-stage-7-6-plan.md` and `cash-auto-rules-stage-7-9-plan.md`.
 
 ### Stage 7.7 — Document and P&L integration
 
@@ -276,6 +276,8 @@ Backend query/contract work and frontend presentation must remain separate revie
 **Result:** preview and execution can safely fill ЦФО using the existing per-field winner and provenance model.
 
 `UPDATE`, ЦФО conditions, candidate generation, and historical runs remain out of scope.
+
+Phase 0 status: PREPARED under Option A. The proposed contract adds a scalar nullable rule target first, requires explicit configuration of existing active project-target rules, then applies project and ЦФО as one validated safe-fill pair. Category and counterparty remain independent. See `cash-auto-rules-stage-7-9-plan.md` and the aggregate-only `cash-auto-rules-stage-7-9-preflight.sql`.
 
 ### Stage 7.10 — Hardening and controlled production acceptance
 

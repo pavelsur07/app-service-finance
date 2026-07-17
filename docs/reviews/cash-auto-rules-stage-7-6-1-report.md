@@ -1,7 +1,7 @@
 ### Stage 7.6.1: Cash scalar mapping and pair resolver — DONE
 
 **Risk:** MEDIUM
-**Next action:** STOP, owner review required before HIGH-risk Stage 7.6.2 writer work
+**Next action:** DONE; production accepted, complete the Stage 7.9 Option A gate before HIGH-risk Stage 7.6.2 writer work
 
 #### What was done
 
@@ -57,3 +57,12 @@
 #### Open questions
 
 - none for Stage 7.6.1; Stage 7.6.2 remains blocked by its HIGH-risk owner gate.
+
+#### Production acceptance
+
+- PR #2186 merged to `master` as `167b24d4f5502fa7c9db6668a5ef891d66f41c1a`.
+- Frontend lint, unit tests, API type sync, empty-database migrations, production image builds, rolling deployment, and the production migration job passed.
+- Rolling-deployment logs reported PHP-FPM, PostgreSQL, and Redis healthy; application workers and supporting services started/running, and deployment completed without downtime.
+- Production was already at `DoctrineMigrations\\Version20260717120000`; Stage 7.6.1 applied no migration, backfill, or historical recalculation.
+- Runtime writers remain disconnected, so this stage does not assign or change transaction ЦФО values.
+- The restricted production wrappers remained intermittent and hung without output, so a separate post-deploy SQL count was not counted as passed. Successful deployment/migration logs are the acceptance evidence; wrapper reliability remains an operational follow-up.
