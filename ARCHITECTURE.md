@@ -180,7 +180,8 @@
 
 ### Finance: responsibility-center fact-schema expansion
 
-- Stage 7.5 adds nullable scalar `responsibility_center_id` UUID columns to `cash_transaction`, `documents`, `document_operations`, and `pl_daily_totals`. Each column has a restrictive FK to Company-owned `financial_responsibility_centers`; Entity mappings and application writes are intentionally deferred.
+- Stage 7.5 adds nullable scalar `responsibility_center_id` UUID columns to `cash_transaction`, `documents`, `document_operations`, and `pl_daily_totals`. Each column has a restrictive FK to Company-owned `financial_responsibility_centers`.
+- Stage 7.6.1 maps only `CashTransaction.responsibilityCenterId` as a nullable scalar UUID. `CashTransactionResponsibilityCenterResolver` can resolve the company system pair and validate an explicit active allowed pair through `FinancialResponsibilityCenterFacade`, but no Cash writer uses it yet. Finance Entity mappings and every application write remain deferred to later approved units.
 - The expand migration performs no fact backfill, classification inference, or P&L rebuild. Existing rows remain `NULL` and later UI/report stages interpret that state as `Не распределено`.
 - Stage 7.5 does not change `pl_daily_totals` uniqueness. In particular, nullable `pl_category_id` keeps PostgreSQL's default distinct-NULL semantics so the existing `ON DELETE SET NULL` category-deletion path cannot collide with another uncategorized total.
 - The project × ЦФО aggregation key, concurrent-writer locking, nullable-category behavior, and deployment cutover require a separate Stage 7.7 Phase 0 before any P&L writer or uniqueness change.
@@ -525,6 +526,9 @@ getActiveChoices(string $companyId): array
 // Один ЦФО с обязательной проверкой company boundary.
 // DTO содержит optimistic-lock version для последующей записи.
 findByIdAndCompany(string $id, string $companyId): ?FinancialResponsibilityCenterDTO
+
+// Системная пара PROJECT_GENERAL × CFO_GENERAL компании как scalar DTO.
+findGeneralPair(string $companyId): ?FinancialResponsibilityCenterProjectDTO
 
 // Проверка разрешённой пары project × ЦФО в рамках компании.
 isProjectAllowed(string $companyId, string $projectDirectionId, string $responsibilityCenterId): bool
@@ -2335,6 +2339,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.58 | 2026-07-17 | Cash/Company: добавлены nullable scalar mapping ЦФО транзакции, read-контракт системной пары и невключённый в writers валидатор пар Stage 7.6.1 |
 | 1.57 | 2026-07-17 | Company: добавлен защищённый Twig-интерфейс `Справочники → ЦФО` с company isolation, CSRF и optimistic locking |
 | 1.56 | 2026-07-17 | Company: добавлены company-scoped Actions управления ЦФО и optimistic-lock настройка разрешённых проектов |
 | 1.55 | 2026-07-16 | Company: добавлены плоский справочник ЦФО, стабильные системные коды проекта/ЦФО, разрешённые пары и атомарный bootstrap новой компании |

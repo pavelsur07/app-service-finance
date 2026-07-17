@@ -2,9 +2,9 @@
 
 ## Status
 
-- Phase: **Stage 7.4 accepted in production; Stage 7.5 implemented and verified locally**
+- Phase: **Stage 7.5 accepted in production; Stage 7.6.1 implemented and verified locally**
 - Overall risk: **HIGH** because the model adds company master data and new financial dimensions to Cash, documents, P&L aggregates, and auto rules
-- Next action: **STOP; owner review required before Stage 7.5 PR/deployment work**
+- Next action: **STOP; owner review of Stage 7.6.1 is required before HIGH-risk Stage 7.6.2 writer work**
 - Further production mutations: **forbidden until a separately approved migration or backfill step**
 - Historical recalculation: **forbidden by default**
 
@@ -237,11 +237,11 @@ Production status: ACCEPTED; deployment, `Version20260716170000`, container heal
 
 This is an expand-only migration unit. It does not update existing facts, rebuild P&L, or change reports.
 
-Implementation status: DONE and verified on local `app_test`. `Version20260717120000` plus focused schema/writer tests passed without changing existing facts. The detailed contract, read-only preflight, and Stage Report are in `cash-auto-rules-stage-7-5-plan.md`, `cash-auto-rules-stage-7-5-preflight.sql`, and `cash-auto-rules-stage-7-5-report.md`.
+Implementation status: DONE and accepted in production. PR #2185 was merged, the deployment and production migration jobs passed, and `Version20260717120000` was applied without backfill or historical recalculation. The detailed contract, read-only preflight, and Stage Report are in `cash-auto-rules-stage-7-5-plan.md`, `cash-auto-rules-stage-7-5-preflight.sql`, and `cash-auto-rules-stage-7-5-report.md`.
 
 Stage 7.5 leaves the current four-column P&L uniqueness and conflict target byte-for-byte unchanged. A review found that `NULLS NOT DISTINCT` would break the existing category-deletion path (`ON DELETE SET NULL`), so the future project × ЦФО key and its concurrency/deployment contract are deferred to a separate Stage 7.7 Phase 0.
 
-**Next action:** mandatory STOP for owner review before PR/deployment work.
+**Next action:** DONE; mandatory STOP for owner approval of the Stage 7.6 Phase 0 contract.
 
 ### Stage 7.6 — Cash transaction integration
 
@@ -250,6 +250,8 @@ Stage 7.5 leaves the current four-column P&L uniqueness and conflict target byte
 **Result:** Cash create/edit/import paths persist one validated project/ЦФО pair; new missing values use the system pair while existing history is untouched.
 
 Include manual forms, DTO/facade resolution, company/pair guards, audit behavior, and focused import regression tests.
+
+Phase 0 status: PREPARED. Stage 7.6.1 scalar mapping/resolution is DONE and verified locally without connecting runtime writers. The remaining implementation is split into core writers, manual UI, and import cutover. The import cutover has a mandatory dependency decision: assigning the system project makes existing project-only safe-fill auto-rules inapplicable. The approved Option A prepares the Stage 7.9 complete-pair rule contract before runtime/import defaults are enabled. See `cash-auto-rules-stage-7-6-plan.md`.
 
 ### Stage 7.7 — Document and P&L integration
 

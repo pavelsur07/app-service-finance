@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Company\Repository;
 
+use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
+use App\Company\Entity\ProjectDirection;
+use App\Company\Enum\FinancialResponsibilityCenterStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -32,6 +35,23 @@ final class FinancialResponsibilityCenterProjectRepository extends ServiceEntity
             ->setParameter('projectDirectionId', $projectDirectionId)
             ->setParameter('responsibilityCenterId', $responsibilityCenterId)
             ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    public function findGeneralByCompanyId(string $companyId): ?FinancialResponsibilityCenterProject
+    {
+        return $this->createQueryBuilder('pair')
+            ->innerJoin('pair.projectDirection', 'project')
+            ->innerJoin('pair.responsibilityCenter', 'center')
+            ->andWhere('pair.companyId = :companyId')
+            ->andWhere('project.systemCode = :projectCode')
+            ->andWhere('center.code = :centerCode')
+            ->andWhere('center.status = :centerStatus')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('projectCode', ProjectDirection::CODE_GENERAL)
+            ->setParameter('centerCode', FinancialResponsibilityCenter::CODE_GENERAL)
+            ->setParameter('centerStatus', FinancialResponsibilityCenterStatus::ACTIVE)
             ->getQuery()
             ->getOneOrNullResult();
     }

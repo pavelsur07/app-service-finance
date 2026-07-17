@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Company\Facade;
 
 use App\Company\Application\DTO\FinancialResponsibilityCenterDTO;
+use App\Company\Application\DTO\FinancialResponsibilityCenterProjectDTO;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Repository\FinancialResponsibilityCenterProjectRepository;
 use App\Company\Repository\FinancialResponsibilityCenterRepository;
@@ -33,6 +34,16 @@ final readonly class FinancialResponsibilityCenterFacade
         $center = $this->centerRepository->findOneByIdAndCompanyId($id, $companyId);
 
         return null === $center ? null : self::toDTO($center);
+    }
+
+    public function findGeneralPair(string $companyId): ?FinancialResponsibilityCenterProjectDTO
+    {
+        $pair = $this->projectRepository->findGeneralByCompanyId($companyId);
+
+        return null === $pair ? null : new FinancialResponsibilityCenterProjectDTO(
+            projectDirectionId: (string) $pair->getProjectDirection()->getId(),
+            responsibilityCenterId: $pair->getResponsibilityCenter()->getId(),
+        );
     }
 
     public function isProjectAllowed(
