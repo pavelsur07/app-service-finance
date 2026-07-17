@@ -315,6 +315,7 @@ class CashTransactionAutoRuleController extends AbstractController
         ActiveCompanyService $companyService,
         CashTransactionRepository $txRepo,
         CashTransactionAutoRuleService $autoRuleService,
+        FinancialResponsibilityCenterFacade $responsibilityCenterFacade,
     ): Response {
         $company = $companyService->getActiveCompany();
 
@@ -326,6 +327,15 @@ class CashTransactionAutoRuleController extends AbstractController
 
         $skipReason = $autoRuleService->getSkipReason($t);
         $match = null === $skipReason ? $autoRuleService->match($t) : null;
+        $hasPairConflict = null !== $match && (isset($match->conflicts['projectDirection'])
+            || isset($match->conflicts['responsibilityCenterId']));
+        $plan = null !== $match && ($match->hasWinners() || $hasPairConflict)
+            ? $autoRuleService->createApplicationPlan($match, $t)
+            : null;
+        $responsibilityCenterLabels = [];
+        foreach ($responsibilityCenterFacade->getActiveChoices((string) $company->getId()) as $center) {
+            $responsibilityCenterLabels[$center->id] = $center->name;
+        }
 
         return $this->render('cash_transaction_auto_rule/_auto_rule_modal_body.html.twig', [
             'transaction' => $t,
@@ -333,6 +343,8 @@ class CashTransactionAutoRuleController extends AbstractController
             'conflictingRules' => $match?->conflictingRules ?? [],
             'conflicts' => $match?->conflicts ?? [],
             'skipReason' => $skipReason,
+            'plan' => $plan,
+            'responsibilityCenterLabels' => $responsibilityCenterLabels,
         ]);
     }
 

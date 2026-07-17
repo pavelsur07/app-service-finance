@@ -2,9 +2,9 @@
 
 ## Status
 
-- Phase: **Stage 7.6.1 and Stage 7.9.1b accepted in production; Stage 7.9.2 batch command awaiting owner review**
+- Phase: **Stage 7.6.1 and Stage 7.9.1b accepted in production; Stage 7.9.2 command deployed; Stage 7.9.3 implemented locally**
 - Overall risk: **HIGH** because the model adds company master data and new financial dimensions to Cash, documents, P&L aggregates, and auto rules
-- Next action: **review Stage 7.9.2 batch command; do not execute it in production before the immediate execution gate**
+- Next action: **complete the Stage 7.9.2 production configuration gate and review Stage 7.9.3; Stage 7.9.4 remains blocked until controlled Stage 7.9.3 production acceptance**
 - Further production mutations: **forbidden until a separately approved migration or backfill step**
 - Historical recalculation: **forbidden by default**
 

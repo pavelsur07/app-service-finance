@@ -7,10 +7,12 @@ namespace App\Company\Facade;
 use App\Company\Application\DTO\FinancialResponsibilityCenterDTO;
 use App\Company\Application\DTO\FinancialResponsibilityCenterProjectDTO;
 use App\Company\Entity\FinancialResponsibilityCenter;
+use App\Company\Entity\FinancialResponsibilityCenterProject;
+use App\Company\Entity\ProjectDirection;
 use App\Company\Repository\FinancialResponsibilityCenterProjectRepository;
 use App\Company\Repository\FinancialResponsibilityCenterRepository;
 
-final readonly class FinancialResponsibilityCenterFacade
+readonly class FinancialResponsibilityCenterFacade
 {
     public function __construct(
         private FinancialResponsibilityCenterRepository $centerRepository,
@@ -43,6 +45,23 @@ final readonly class FinancialResponsibilityCenterFacade
         return null === $pair ? null : new FinancialResponsibilityCenterProjectDTO(
             projectDirectionId: (string) $pair->getProjectDirection()->getId(),
             responsibilityCenterId: $pair->getResponsibilityCenter()->getId(),
+        );
+    }
+
+    /**
+     * @return list<FinancialResponsibilityCenterProjectDTO>
+     */
+    public function getActivePairs(string $companyId): array
+    {
+        return \array_map(
+            static fn (FinancialResponsibilityCenterProject $pair): FinancialResponsibilityCenterProjectDTO => new FinancialResponsibilityCenterProjectDTO(
+                projectDirectionId: (string) $pair->getProjectDirection()->getId(),
+                responsibilityCenterId: $pair->getResponsibilityCenter()->getId(),
+                responsibilityCenterName: $pair->getResponsibilityCenter()->getName(),
+                system: ProjectDirection::CODE_GENERAL === $pair->getProjectDirection()->getSystemCode()
+                    && $pair->getResponsibilityCenter()->isSystem(),
+            ),
+            $this->projectRepository->findActiveByCompanyId($companyId),
         );
     }
 

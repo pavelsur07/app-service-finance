@@ -34,14 +34,31 @@ final class FinancialResponsibilityCenterRepositoryTest extends IntegrationTestC
             ->withId('11111111-1111-1111-1111-000000000402')
             ->withOwner($userB)
             ->build();
-        $projectA = new ProjectDirection('33333333-3333-3333-3333-000000000401', $companyA, 'Project A');
+        $projectA = new ProjectDirection(
+            '33333333-3333-3333-3333-000000000401',
+            $companyA,
+            'Общие',
+            ProjectDirection::CODE_GENERAL,
+        );
         $projectB = new ProjectDirection('33333333-3333-3333-3333-000000000402', $companyB, 'Project B');
-        $centerA = new FinancialResponsibilityCenter((string) $companyA->getId(), 'CFO_A', 'Center A');
+        $centerA = new FinancialResponsibilityCenter(
+            (string) $companyA->getId(),
+            FinancialResponsibilityCenter::CODE_GENERAL,
+            FinancialResponsibilityCenter::NAME_GENERAL,
+        );
         $centerB = new FinancialResponsibilityCenter((string) $companyB->getId(), 'CFO_B', 'Center B');
+        $archivedProject = new ProjectDirection('33333333-3333-3333-3333-000000000403', $companyA, 'Archived');
+        $archivedCenter = new FinancialResponsibilityCenter((string) $companyA->getId(), 'CFO_ARCHIVED', 'Archived');
+        $archivedCenter->archive();
         $pairA = new FinancialResponsibilityCenterProject((string) $companyA->getId(), $projectA, $centerA);
         $pairB = new FinancialResponsibilityCenterProject((string) $companyB->getId(), $projectB, $centerB);
+        $archivedPair = new FinancialResponsibilityCenterProject(
+            (string) $companyA->getId(),
+            $archivedProject,
+            $archivedCenter,
+        );
 
-        foreach ([$userA, $userB, $companyA, $companyB, $projectA, $projectB, $centerA, $centerB, $pairA, $pairB] as $entity) {
+        foreach ([$userA, $userB, $companyA, $companyB, $projectA, $projectB, $archivedProject, $centerA, $centerB, $archivedCenter, $pairA, $pairB, $archivedPair] as $entity) {
             $this->em->persist($entity);
         }
         $this->em->flush();
@@ -59,5 +76,11 @@ final class FinancialResponsibilityCenterRepositoryTest extends IntegrationTestC
         self::assertFalse($pairRepository->isAllowed((string) $companyB->getId(), (string) $projectA->getId(), $centerA->getId()));
         self::assertSame([(string) $projectA->getId()], $pairRepository->findProjectIds((string) $companyA->getId(), $centerA->getId()));
         self::assertSame(1, $facade->findByIdAndCompany($centerA->getId(), (string) $companyA->getId())?->version);
+        $activePairs = $facade->getActivePairs((string) $companyA->getId());
+        self::assertCount(1, $activePairs);
+        self::assertSame($projectA->getId(), $activePairs[0]->projectDirectionId);
+        self::assertSame($centerA->getId(), $activePairs[0]->responsibilityCenterId);
+        self::assertSame(FinancialResponsibilityCenter::NAME_GENERAL, $activePairs[0]->responsibilityCenterName);
+        self::assertTrue($activePairs[0]->system);
     }
 }

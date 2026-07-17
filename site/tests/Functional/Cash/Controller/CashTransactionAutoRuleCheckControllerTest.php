@@ -11,6 +11,9 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
+use App\Company\Entity\FinancialResponsibilityCenter;
+use App\Company\Entity\FinancialResponsibilityCenterProject;
+use App\Company\Entity\ProjectDirection;
 use App\Shared\Entity\AuditLog;
 use App\Tests\Builders\Cash\CashflowCategoryBuilder;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
@@ -131,5 +134,79 @@ final class CashTransactionAutoRuleCheckControllerTest extends WebTestCaseBase
         $this->em()->clear();
         $reloadedTransaction = $this->em()->find(CashTransaction::class, $matchingTransaction->getId());
         self::assertNull($reloadedTransaction?->getCashflowCategory());
+    }
+
+    public function testPreviewShowsAtomicProjectAndResponsibilityCenterPlanWithoutMutation(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $user = UserBuilder::aUser()->withIndex(1)->asCompanyOwner()->build();
+        $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+        $account = MoneyAccountBuilder::aMoneyAccount()->forCompany($company)->build();
+        $category = CashflowCategoryBuilder::aCashflowCategory()
+            ->withCompany($company)
+            ->withName('Продажи')
+            ->build();
+        $project = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Продажа компьютеров');
+        $center = new FinancialResponsibilityCenter(
+            (string) $company->getId(),
+            'CFO_KRASNODAR',
+            'Краснодар',
+        );
+        $pair = new FinancialResponsibilityCenterProject((string) $company->getId(), $project, $center);
+        $rule = new CashTransactionAutoRule(
+            Uuid::uuid4()->toString(),
+            $company,
+            'Продажи Краснодар',
+            CashTransactionAutoRuleAction::FILL,
+            CashTransactionAutoRuleOperationType::ANY,
+            $category,
+        );
+        $rule->setProjectDirection($project)->setResponsibilityCenterId($center->getId());
+        $rule->addCondition(new CashTransactionAutoRuleCondition(
+            field: CashTransactionAutoRuleConditionField::DESCRIPTION,
+            operator: CashTransactionAutoRuleConditionOperator::CONTAINS,
+            value: 'компьютер',
+        ));
+        $transaction = CashTransactionBuilder::aCashTransaction()
+            ->forCompany($company)
+            ->withMoneyAccount($account)
+            ->withCashflowCategory($category)
+            ->build();
+        $transaction
+            ->setOccurredAt(new \DateTimeImmutable('today'))
+            ->setDescription('Продажа компьютера');
+
+        foreach ([$user, $company, $account, $category, $project, $center, $pair, $rule, $transaction] as $entity) {
+            $this->em()->persist($entity);
+        }
+        $this->em()->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+        $client->request('GET', sprintf(
+            '/cash-transaction-auto-rules/%s/check?dateFrom=%s&dateTo=%s&limit=10',
+            $rule->getId(),
+            (new \DateTimeImmutable('today'))->format('Y-m-d'),
+            (new \DateTimeImmutable('today'))->format('Y-m-d'),
+        ));
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.auto-rule-preview-plan', 'Проект: Не задано → Продажа компьютеров');
+        self::assertSelectorTextContains('.auto-rule-preview-plan', 'ЦФО: Не задано → Краснодар');
+        self::assertSelectorTextContains('body', 'По итоговому ЦФО');
+        self::assertSelectorTextNotContains('body', 'PAIR_');
+
+        $this->em()->clear();
+        $reloaded = $this->em()->find(CashTransaction::class, $transaction->getId());
+        self::assertInstanceOf(CashTransaction::class, $reloaded);
+        self::assertNull($reloaded->getProjectDirection());
+        self::assertNull($reloaded->getResponsibilityCenterId());
+
+        $client->request('GET', sprintf('/cash-transaction-auto-rules/match/%s', $transaction->getId()));
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'Проект: Не задано → Продажа компьютеров');
+        self::assertSelectorTextContains('body', 'ЦФО: Не задано → Краснодар');
     }
 }

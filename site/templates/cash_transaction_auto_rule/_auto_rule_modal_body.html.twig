@@ -10,6 +10,7 @@
     {% set fieldLabels = {
       cashflowCategory: 'Статья ДДС',
       projectDirection: 'Проект',
+      responsibilityCenterId: 'ЦФО',
       counterparty: 'Контрагент'
     } %}
     <div class="alert alert-warning">
@@ -26,10 +27,28 @@
       </ul>
     </div>
   {% endif %}
+  {% if plan and plan.pairIssue %}
+    <div class="alert alert-warning">
+      <div class="fw-bold">{{ plan.pairIssue.value }}</div>
+      <div>{{ plan.pairIssue.label }}</div>
+    </div>
+  {% endif %}
   <div class="mb-2">
     <div class="h3">Найдено автоправило</div>
     <div class="text-muted">«{{ rule.name }}» (безопасное заполнение, {{ rule.operationType.value }})</div>
   </div>
+
+  {% if plan and plan.changes %}
+    <div class="mb-3">
+      {% for field, change in plan.changes %}
+        {% if field == 'projectDirection' %}
+          <div><strong>Проект:</strong> {{ transaction.projectDirection ? transaction.projectDirection.name : 'Не задано' }} → {{ plan.projectDirection.name }}</div>
+        {% elseif field == 'responsibilityCenterId' %}
+          <div><strong>ЦФО:</strong> {{ transaction.responsibilityCenterId ? responsibilityCenterLabels[transaction.responsibilityCenterId]|default(transaction.responsibilityCenterId) : 'Не задано' }} → {{ responsibilityCenterLabels[plan.responsibilityCenterId]|default(plan.responsibilityCenterId) }}</div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  {% endif %}
 
   <form id="autoRuleApplyForm" method="post"
         action="{{ path('cash_transaction_auto_rule_apply_one', {transactionId: transaction.id}) }}">
@@ -41,6 +60,12 @@
     </div>
   </form>
 {% elseif conflictingRules %}
+  {% if plan and plan.pairIssue %}
+    <div class="alert alert-warning">
+      <div class="fw-bold">{{ plan.pairIssue.value }}</div>
+      <div>{{ plan.pairIssue.label }}</div>
+    </div>
+  {% endif %}
   <div class="alert alert-danger mb-0">
     <div class="fw-bold">Все найденные поля конфликтуют и не будут изменены</div>
     <ul class="mb-0 mt-2">

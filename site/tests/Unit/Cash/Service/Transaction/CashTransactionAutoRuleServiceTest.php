@@ -11,11 +11,16 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
+use App\Cash\Enum\Transaction\CashTransactionAutoRulePairIssue;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleSkipReason;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
+use App\Company\Application\DTO\FinancialResponsibilityCenterDTO;
+use App\Company\Application\DTO\FinancialResponsibilityCenterProjectDTO;
 use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
+use App\Company\Enum\FinancialResponsibilityCenterStatus;
+use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Tests\Builders\Cash\CashflowCategoryBuilder;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
@@ -120,7 +125,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
 
         $service = $this->createService(rules: [$rule]);
 
-        self::assertFalse($service->applyRule($rule, $transaction)?->hasChanges());
+        self::assertNull($service->applyRule($rule, $transaction));
         self::assertSame($assignedCategory, $transaction->getCashflowCategory());
     }
 
@@ -146,7 +151,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
 
         $service = $this->createService(rules: [$rule]);
 
-        self::assertFalse($service->applyRule($rule, $transaction)?->hasChanges());
+        self::assertNull($service->applyRule($rule, $transaction));
         self::assertSame($unallocated, $transaction->getCashflowCategory());
     }
 
@@ -247,12 +252,20 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
             $company,
             id: '22222222-2222-2222-2222-222222222222',
         )->setPriority(200)->setProjectDirection($project);
+        $responsibilityCenterId = Uuid::uuid4()->toString();
+        $projectRule->setResponsibilityCenterId($responsibilityCenterId);
         $counterparty = CounterpartyBuilder::aCounterparty()->withCompany($company)->build();
         $counterpartyRule = $this->createRule(
             $company,
             id: '33333333-3333-3333-3333-333333333333',
         )->setPriority(100)->setCounterparty($counterparty);
-        $service = $this->createService(rules: [$counterpartyRule, $projectRule, $categoryRule]);
+        $service = $this->createService(
+            rules: [$counterpartyRule, $projectRule, $categoryRule],
+            pairs: [new FinancialResponsibilityCenterProjectDTO(
+                (string) $project->getId(),
+                $responsibilityCenterId,
+            )],
+        );
 
         $match = $service->match($transaction);
         $plan = $service->applyRule($categoryRule, $transaction, $match);
@@ -260,13 +273,16 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         self::assertSame([$categoryRule, $projectRule, $counterpartyRule], $match->matchingRules);
         self::assertSame($categoryRule, $match->winners['cashflowCategory']);
         self::assertSame($projectRule, $match->winners['projectDirection']);
+        self::assertSame($projectRule, $match->winners['responsibilityCenterId']);
         self::assertSame($counterpartyRule, $match->winners['counterparty']);
         self::assertSame($categoryRule->getCashflowCategory(), $transaction->getCashflowCategory());
         self::assertSame($project, $transaction->getProjectDirection());
+        self::assertSame($responsibilityCenterId, $transaction->getResponsibilityCenterId());
         self::assertSame($counterparty, $transaction->getCounterparty());
         self::assertSame([
             'cashflowCategory' => $categoryRule,
             'projectDirection' => $projectRule,
+            'responsibilityCenterId' => $projectRule,
             'counterparty' => $counterpartyRule,
         ], $plan?->rulesByField);
     }
@@ -280,6 +296,8 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
             $company,
             id: '11111111-1111-1111-1111-111111111111',
         )->setProjectDirection($project);
+        $responsibilityCenterId = Uuid::uuid4()->toString();
+        $firstRule->setResponsibilityCenterId($responsibilityCenterId);
         $secondRule = $this->createRule(
             $company,
             CashflowCategoryBuilder::aCashflowCategory()
@@ -288,7 +306,14 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
                 ->build(),
             '22222222-2222-2222-2222-222222222222',
         )->setProjectDirection($project);
-        $service = $this->createService(rules: [$secondRule, $firstRule]);
+        $secondRule->setResponsibilityCenterId($responsibilityCenterId);
+        $service = $this->createService(
+            rules: [$secondRule, $firstRule],
+            pairs: [new FinancialResponsibilityCenterProjectDTO(
+                (string) $project->getId(),
+                $responsibilityCenterId,
+            )],
+        );
 
         $match = $service->match($transaction);
         $plan = $service->applyMatch($transaction, $match);
@@ -297,7 +322,264 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         self::assertSame($firstRule, $match->winners['projectDirection']);
         self::assertNull($transaction->getCashflowCategory());
         self::assertSame($project, $transaction->getProjectDirection());
-        self::assertSame(['projectDirection'], array_keys($plan?->changes ?? []));
+        self::assertSame($responsibilityCenterId, $transaction->getResponsibilityCenterId());
+        self::assertSame(['projectDirection', 'responsibilityCenterId'], array_keys($plan?->changes ?? []));
+    }
+
+    public function testAppliesCompletePairFromDifferentRulesWithPerFieldProvenance(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $transaction = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
+        $project = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Project');
+        $responsibilityCenterId = Uuid::uuid4()->toString();
+        $projectRule = $this->createPairRule(
+            $company,
+            '11111111-1111-1111-1111-111111111111',
+        )->setProjectDirection($project);
+        $responsibilityCenterRule = $this->createPairRule(
+            $company,
+            '22222222-2222-2222-2222-222222222222',
+        )->setResponsibilityCenterId($responsibilityCenterId);
+        $service = $this->createService(
+            rules: [$responsibilityCenterRule, $projectRule],
+            pairs: [new FinancialResponsibilityCenterProjectDTO(
+                (string) $project->getId(),
+                $responsibilityCenterId,
+                'Краснодар',
+            )],
+        );
+
+        $plan = $service->applyMatch($transaction);
+
+        self::assertSame($project, $transaction->getProjectDirection());
+        self::assertSame($responsibilityCenterId, $transaction->getResponsibilityCenterId());
+        self::assertNull($plan?->pairIssue);
+        self::assertSame([
+            'projectDirection' => $projectRule,
+            'responsibilityCenterId' => $responsibilityCenterRule,
+        ], $plan?->rulesByField);
+        self::assertSame([
+            'projectDirection' => ['id' => $projectRule->getId(), 'revision' => 1],
+            'responsibilityCenterId' => ['id' => $responsibilityCenterRule->getId(), 'revision' => 1],
+        ], $plan?->auditDiff(Uuid::uuid7()->toString())['autoRules']);
+    }
+
+    public function testReplacesSystemPairAtomically(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $systemProject = new ProjectDirection(
+            Uuid::uuid4()->toString(),
+            $company,
+            'Общие',
+            ProjectDirection::CODE_GENERAL,
+        );
+        $systemCenterId = Uuid::uuid4()->toString();
+        $targetProject = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Sales');
+        $targetCenterId = Uuid::uuid4()->toString();
+        $transaction = CashTransactionBuilder::aCashTransaction()
+            ->forCompany($company)
+            ->build()
+            ->setProjectDirection($systemProject)
+            ->setResponsibilityCenterId($systemCenterId);
+        $rule = $this->createPairRule($company)
+            ->setProjectDirection($targetProject)
+            ->setResponsibilityCenterId($targetCenterId);
+        $service = $this->createService(rules: [$rule], pairs: [
+            new FinancialResponsibilityCenterProjectDTO(
+                (string) $systemProject->getId(),
+                $systemCenterId,
+                'Общий',
+                true,
+            ),
+            new FinancialResponsibilityCenterProjectDTO(
+                (string) $targetProject->getId(),
+                $targetCenterId,
+                'Краснодар',
+            ),
+        ]);
+
+        $plan = $service->applyMatch($transaction);
+
+        self::assertSame($targetProject, $transaction->getProjectDirection());
+        self::assertSame($targetCenterId, $transaction->getResponsibilityCenterId());
+        self::assertSame($systemProject->getId(), $plan?->changes['projectDirection']['before']);
+        self::assertSame($systemCenterId, $plan?->changes['responsibilityCenterId']['before']);
+    }
+
+    public function testPreservesAssignedCustomPair(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $currentProject = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Current');
+        $currentCenterId = Uuid::uuid4()->toString();
+        $targetProject = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Target');
+        $targetCenterId = Uuid::uuid4()->toString();
+        $transaction = CashTransactionBuilder::aCashTransaction()
+            ->forCompany($company)
+            ->build()
+            ->setProjectDirection($currentProject)
+            ->setResponsibilityCenterId($currentCenterId);
+        $rule = $this->createPairRule($company)
+            ->setProjectDirection($targetProject)
+            ->setResponsibilityCenterId($targetCenterId);
+        $service = $this->createService(rules: [$rule], pairs: [
+            new FinancialResponsibilityCenterProjectDTO((string) $currentProject->getId(), $currentCenterId),
+            new FinancialResponsibilityCenterProjectDTO((string) $targetProject->getId(), $targetCenterId),
+        ]);
+
+        $match = $service->match($transaction);
+        $plan = $service->createApplicationPlan($match, $transaction);
+
+        self::assertFalse($plan?->hasChanges());
+        self::assertNull($plan?->pairIssue);
+        self::assertNull($service->applyMatch($transaction, $match));
+        self::assertSame($currentProject, $transaction->getProjectDirection());
+        self::assertSame($currentCenterId, $transaction->getResponsibilityCenterId());
+    }
+
+    public function testFillsCompatibleMissingResponsibilityCenterOnly(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $project = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Project');
+        $responsibilityCenterId = Uuid::uuid4()->toString();
+        $transaction = CashTransactionBuilder::aCashTransaction()
+            ->forCompany($company)
+            ->build()
+            ->setProjectDirection($project);
+        $rule = $this->createPairRule($company)->setResponsibilityCenterId($responsibilityCenterId);
+        $service = $this->createService(
+            rules: [$rule],
+            pairs: [new FinancialResponsibilityCenterProjectDTO(
+                (string) $project->getId(),
+                $responsibilityCenterId,
+            )],
+        );
+
+        $plan = $service->applyMatch($transaction);
+
+        self::assertSame(['responsibilityCenterId'], array_keys($plan?->changes ?? []));
+        self::assertSame($project, $transaction->getProjectDirection());
+        self::assertSame($responsibilityCenterId, $transaction->getResponsibilityCenterId());
+    }
+
+    public function testPairConflictBlocksBothPairFieldsButKeepsCategoryChange(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $transaction = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
+        $categoryRule = $this->createRule($company)->setPriority(200);
+        $firstPairRule = $this->createPairRule(
+            $company,
+            '11111111-1111-1111-1111-111111111111',
+        )->setProjectDirection(new ProjectDirection(Uuid::uuid4()->toString(), $company, 'First'))
+            ->setResponsibilityCenterId(Uuid::uuid4()->toString());
+        $secondPairRule = $this->createPairRule(
+            $company,
+            '22222222-2222-2222-2222-222222222222',
+        )->setProjectDirection(new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Second'))
+            ->setResponsibilityCenterId(Uuid::uuid4()->toString());
+        $service = $this->createService(rules: [$categoryRule, $firstPairRule, $secondPairRule]);
+
+        $plan = $service->applyMatch($transaction);
+
+        self::assertSame(CashTransactionAutoRulePairIssue::CONFLICT, $plan?->pairIssue);
+        self::assertSame(['cashflowCategory'], array_keys($plan?->changes ?? []));
+        self::assertSame($categoryRule->getCashflowCategory(), $transaction->getCashflowCategory());
+        self::assertNull($transaction->getProjectDirection());
+        self::assertNull($transaction->getResponsibilityCenterId());
+    }
+
+    public function testIncompleteOrUnavailablePairNeverPartiallyMutatesTransaction(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $project = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Project');
+        $projectOnlyRule = $this->createPairRule($company)->setProjectDirection($project);
+        $incompleteTransaction = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
+        $incompleteService = $this->createService(rules: [$projectOnlyRule]);
+        $incompleteMatch = $incompleteService->match($incompleteTransaction);
+        $incompletePlan = $incompleteService->createApplicationPlan($incompleteMatch, $incompleteTransaction);
+
+        self::assertSame(CashTransactionAutoRulePairIssue::INCOMPLETE, $incompletePlan?->pairIssue);
+        self::assertFalse($incompletePlan?->hasChanges());
+        self::assertNull($incompleteService->applyMatch($incompleteTransaction, $incompleteMatch));
+        self::assertNull($incompleteTransaction->getProjectDirection());
+
+        $centerId = Uuid::uuid4()->toString();
+        $completeRule = $this->createPairRule($company)
+            ->setProjectDirection($project)
+            ->setResponsibilityCenterId($centerId);
+        $unavailableTransaction = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
+        $unavailableService = $this->createService(rules: [$completeRule]);
+        $unavailableMatch = $unavailableService->match($unavailableTransaction);
+        $unavailablePlan = $unavailableService->createApplicationPlan($unavailableMatch, $unavailableTransaction);
+
+        self::assertSame(CashTransactionAutoRulePairIssue::UNAVAILABLE, $unavailablePlan?->pairIssue);
+        self::assertFalse($unavailablePlan?->hasChanges());
+        self::assertNull($unavailableService->applyMatch($unavailableTransaction, $unavailableMatch));
+        self::assertNull($unavailableTransaction->getProjectDirection());
+        self::assertNull($unavailableTransaction->getResponsibilityCenterId());
+    }
+
+    public function testPreviewLoadsOneActivePairSnapshotForAllTransactions(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $project = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Project');
+        $centerId = Uuid::uuid4()->toString();
+        $rule = $this->createPairRule($company)
+            ->setProjectDirection($project)
+            ->setResponsibilityCenterId($centerId);
+        $repository = $this->createMock(CashTransactionAutoRuleRepository::class);
+        $repository->method('findActiveByCompany')->with($company)->willReturn([$rule]);
+        $facade = $this->createMock(FinancialResponsibilityCenterFacade::class);
+        $facade->expects(self::once())
+            ->method('getActivePairs')
+            ->with($company->getId())
+            ->willReturn([new FinancialResponsibilityCenterProjectDTO(
+                (string) $project->getId(),
+                $centerId,
+                'Краснодар',
+            )]);
+        $service = new CashTransactionAutoRuleService($repository, $facade);
+
+        $preview = $service->previewRule($rule, [
+            CashTransactionBuilder::aCashTransaction()->forCompany($company)->build(),
+            CashTransactionBuilder::aCashTransaction()->forCompany($company)->build(),
+        ], 10);
+
+        self::assertSame(2, $preview->changesByField['projectDirection']);
+        self::assertSame(2, $preview->changesByField['responsibilityCenterId']);
+        self::assertSame('Краснодар', $preview->byResponsibilityCenter[0]['label']);
+    }
+
+    public function testPreviewLabelsCurrentResponsibilityCenterWithoutPairTargetRules(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $centerId = Uuid::uuid4()->toString();
+        $rule = $this->createRule($company);
+        $repository = $this->createMock(CashTransactionAutoRuleRepository::class);
+        $repository->method('findActiveByCompany')->with($company)->willReturn([$rule]);
+        $facade = $this->createMock(FinancialResponsibilityCenterFacade::class);
+        $facade->expects(self::never())->method('getActivePairs');
+        $facade->expects(self::once())
+            ->method('getActiveChoices')
+            ->with($company->getId())
+            ->willReturn([new FinancialResponsibilityCenterDTO(
+                $centerId,
+                'CFO_KRASNODAR',
+                'Краснодар',
+                100,
+                FinancialResponsibilityCenterStatus::ACTIVE->value,
+                false,
+                1,
+            )]);
+        $transaction = CashTransactionBuilder::aCashTransaction()
+            ->forCompany($company)
+            ->build()
+            ->setResponsibilityCenterId($centerId);
+        $service = new CashTransactionAutoRuleService($repository, $facade);
+
+        $preview = $service->previewRule($rule, [$transaction], 10);
+
+        self::assertSame('Краснодар', $preview->responsibilityCenterLabels[$centerId]);
+        self::assertSame('Краснодар', $preview->byResponsibilityCenter[0]['label']);
     }
 
     public function testMoreSpecificRuleWinsAtEqualPriority(): void
@@ -342,9 +624,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         $rule = $this->createRule($company)->setAction(CashTransactionAutoRuleAction::UPDATE);
         $service = $this->createService(rules: [$rule]);
 
-        $plan = $service->applyRule($rule, $transaction);
-
-        self::assertFalse($plan?->hasChanges());
+        self::assertNull($service->applyRule($rule, $transaction));
         self::assertSame($manualCategory, $transaction->getCashflowCategory());
         self::assertSame($manualProject, $transaction->getProjectDirection());
         self::assertSame($manualCounterparty, $transaction->getCounterparty());
@@ -553,6 +833,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         self::assertSame([
             'cashflowCategory' => 1,
             'projectDirection' => 0,
+            'responsibilityCenterId' => 0,
             'counterparty' => 0,
         ], $preview->changesByField);
         self::assertSame(['2024-03', '2024-02', '2024-01'], array_column($preview->byMonth, 'key'));
@@ -659,15 +940,17 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
     private function createService(
         ?CashTransactionAutoRuleRepository $repository = null,
         array $rules = [],
+        array $pairs = [],
     ): CashTransactionAutoRuleService {
         if (null === $repository) {
             $repository = $this->createMock(CashTransactionAutoRuleRepository::class);
             $repository->method('findActiveByCompany')->willReturn($rules);
         }
 
-        return new CashTransactionAutoRuleService(
-            $repository,
-        );
+        $facade = $this->createMock(FinancialResponsibilityCenterFacade::class);
+        $facade->method('getActivePairs')->willReturn($pairs);
+
+        return new CashTransactionAutoRuleService($repository, $facade);
     }
 
     private function createRule(
@@ -684,6 +967,17 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
             CashTransactionAutoRuleAction::FILL,
             CashTransactionAutoRuleOperationType::ANY,
             $category,
+        );
+    }
+
+    private function createPairRule(Company $company, ?string $id = null): CashTransactionAutoRule
+    {
+        return new CashTransactionAutoRule(
+            $id ?? Uuid::uuid4()->toString(),
+            $company,
+            'Pair rule',
+            CashTransactionAutoRuleAction::FILL,
+            CashTransactionAutoRuleOperationType::ANY,
         );
     }
 }

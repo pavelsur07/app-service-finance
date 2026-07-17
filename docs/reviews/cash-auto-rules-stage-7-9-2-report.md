@@ -1,7 +1,7 @@
 ### Stage 7.9.2: Existing-rule system CFO configuration command — DONE
 
 **Risk:** HIGH
-**Next action:** STOP, owner review required
+**Next action:** DONE for implementation; PR #2189 is merged/deployed, while production dry-run/execute remain separate immediate gates
 
 #### What was done
 
