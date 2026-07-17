@@ -13,15 +13,19 @@ use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
+use App\Cash\Enum\Transaction\CashTransactionAutoRulePairIssue;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleSkipReason;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
+use App\Company\Application\DTO\FinancialResponsibilityCenterProjectDTO;
 use App\Company\Entity\Company;
+use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Util\StringNormalizer;
 
 class CashTransactionAutoRuleService
 {
     public function __construct(
         private CashTransactionAutoRuleRepository $ruleRepo,
+        private FinancialResponsibilityCenterFacade $responsibilityCenterFacade,
     ) {
     }
 
@@ -64,13 +68,23 @@ class CashTransactionAutoRuleService
         $changesByField = [
             'cashflowCategory' => 0,
             'projectDirection' => 0,
+            'responsibilityCenterId' => 0,
             'counterparty' => 0,
         ];
         $byMonth = [];
         $byCurrency = [];
         $byCategory = [];
         $byProject = [];
+        $byResponsibilityCenter = [];
         $activeRules = $this->ruleRepo->findActiveByCompany($rule->getCompany());
+        $companyId = (string) $rule->getCompany()->getId();
+        $needsPairSnapshot = $this->rulesNeedPairSnapshot($activeRules);
+        $activePairs = $needsPairSnapshot
+            ? $this->responsibilityCenterFacade->getActivePairs($companyId)
+            : [];
+        $responsibilityCenterLabels = $needsPairSnapshot
+            ? $this->responsibilityCenterLabels($activePairs)
+            : $this->activeResponsibilityCenterLabels($companyId);
 
         foreach ($transactions as $transaction) {
             ++$summary['scanned'];
@@ -83,8 +97,8 @@ class CashTransactionAutoRuleService
             $match = null === $skipReason
                 ? $this->resolveMatch($transaction, $activeRules)
                 : new CashTransactionAutoRuleMatchResult(null);
-            $plan = $match->hasWinners()
-                ? $this->createApplicationPlan($match, $transaction)
+            $plan = $match->hasWinners() || $this->hasPairConflict($match)
+                ? $this->createApplicationPlan($match, $transaction, $activePairs)
                 : null;
             $wouldChange = null !== $plan && $plan->hasChanges();
             $hasConflict = $match->hasConflict();
@@ -105,6 +119,9 @@ class CashTransactionAutoRuleService
             $resultProject = null !== $plan && array_key_exists('projectDirection', $plan->changes)
                 ? $plan->projectDirection
                 : $transaction->getProjectDirection();
+            $resultResponsibilityCenterId = null !== $plan && array_key_exists('responsibilityCenterId', $plan->changes)
+                ? $plan->responsibilityCenterId
+                : $transaction->getResponsibilityCenterId();
 
             $this->incrementBreakdown(
                 $byMonth,
@@ -138,6 +155,16 @@ class CashTransactionAutoRuleService
                 $hasConflict,
                 $skipped,
             );
+            $this->incrementBreakdown(
+                $byResponsibilityCenter,
+                $resultResponsibilityCenterId ?? '__none__',
+                null === $resultResponsibilityCenterId
+                    ? 'Не задано'
+                    : ($responsibilityCenterLabels[$resultResponsibilityCenterId] ?? $resultResponsibilityCenterId),
+                $wouldChange,
+                $hasConflict,
+                $skipped,
+            );
 
             if (count($rows) >= $limit) {
                 continue;
@@ -155,6 +182,7 @@ class CashTransactionAutoRuleService
         ksort($byCurrency, \SORT_STRING);
         uasort($byCategory, static fn (array $left, array $right): int => strnatcmp(mb_strtolower($left['label']), mb_strtolower($right['label'])));
         uasort($byProject, static fn (array $left, array $right): int => strnatcmp(mb_strtolower($left['label']), mb_strtolower($right['label'])));
+        uasort($byResponsibilityCenter, static fn (array $left, array $right): int => strnatcmp(mb_strtolower($left['label']), mb_strtolower($right['label'])));
 
         return new CashTransactionAutoRulePreviewResult(
             $rows,
@@ -164,6 +192,8 @@ class CashTransactionAutoRuleService
             array_values($byCurrency),
             array_values($byCategory),
             array_values($byProject),
+            array_values($byResponsibilityCenter),
+            $responsibilityCenterLabels,
         );
     }
 
@@ -212,7 +242,7 @@ class CashTransactionAutoRuleService
 
         $winners = [];
         $conflicts = [];
-        foreach (['cashflowCategory', 'projectDirection', 'counterparty'] as $field) {
+        foreach (['cashflowCategory', 'projectDirection', 'responsibilityCenterId', 'counterparty'] as $field) {
             $candidates = array_values(array_filter(
                 $matchingRules,
                 fn (CashTransactionAutoRule $rule): bool => null !== $this->getTargetId($rule, $field),
@@ -248,7 +278,11 @@ class CashTransactionAutoRuleService
         }
 
         return new CashTransactionAutoRuleMatchResult(
-            $winners['cashflowCategory'] ?? $winners['projectDirection'] ?? $winners['counterparty'] ?? null,
+            $winners['cashflowCategory']
+                ?? $winners['projectDirection']
+                ?? $winners['responsibilityCenterId']
+                ?? $winners['counterparty']
+                ?? null,
             array_values($conflictingRules),
             $matchingRules,
             $winners,
@@ -369,6 +403,7 @@ class CashTransactionAutoRuleService
         return match ($field) {
             'cashflowCategory' => $rule->getCashflowCategory()?->getId(),
             'projectDirection' => $rule->getProjectDirection()?->getId(),
+            'responsibilityCenterId' => $rule->getResponsibilityCenterId(),
             'counterparty' => $rule->getCounterparty()?->getId(),
         };
     }
@@ -409,6 +444,10 @@ class CashTransactionAutoRuleService
         }
 
         $plan = $this->createApplicationPlan($resolvedMatch, $transaction);
+        if (!$plan->hasChanges()) {
+            return null;
+        }
+
         $this->applyPlan($plan, $transaction);
 
         return $plan;
@@ -417,6 +456,7 @@ class CashTransactionAutoRuleService
     public function createApplicationPlan(
         CashTransactionAutoRuleMatchResult $match,
         CashTransaction $t,
+        ?array $activePairs = null,
     ): CashTransactionAutoRuleApplicationPlan {
         $changes = [];
         $rulesByField = [];
@@ -441,13 +481,13 @@ class CashTransactionAutoRuleService
             ];
             $rulesByField['cashflowCategory'] = $categoryRule;
         }
-        if (null === $t->getProjectDirection() && null !== $projectRule && null !== $projectDirection) {
-            $changes['projectDirection'] = [
-                'before' => null,
-                'after' => $projectDirection->getId(),
-            ];
-            $rulesByField['projectDirection'] = $projectRule;
-        }
+        $activePairs ??= $this->matchNeedsPairPlan($match)
+            ? $this->responsibilityCenterFacade->getActivePairs((string) $t->getCompany()->getId())
+            : [];
+        $pairPlan = $this->planPair($match, $t, $activePairs);
+        $changes += $pairPlan['changes'];
+        $rulesByField += $pairPlan['rulesByField'];
+        $projectDirection = $pairPlan['projectDirection'] ?? $projectDirection;
         if (null === $t->getCounterparty() && null !== $counterpartyRule && null !== $counterparty) {
             $changes['counterparty'] = [
                 'before' => null,
@@ -456,7 +496,7 @@ class CashTransactionAutoRuleService
             $rulesByField['counterparty'] = $counterpartyRule;
         }
 
-        $primaryRule = $match->rule;
+        $primaryRule = $match->rule ?? $this->firstPairConflictingRule($match);
         if (null === $primaryRule) {
             throw new \LogicException('An application plan requires at least one winning auto rule.');
         }
@@ -467,7 +507,9 @@ class CashTransactionAutoRuleService
             $category,
             $projectDirection,
             $counterparty,
-            $rulesByField,
+            rulesByField: $rulesByField,
+            responsibilityCenterId: $pairPlan['responsibilityCenterId'],
+            pairIssue: $pairPlan['issue'],
         );
     }
 
@@ -479,6 +521,10 @@ class CashTransactionAutoRuleService
 
         if (array_key_exists('projectDirection', $plan->changes)) {
             $transaction->setProjectDirection($plan->projectDirection);
+        }
+
+        if (array_key_exists('responsibilityCenterId', $plan->changes)) {
+            $transaction->setResponsibilityCenterId($plan->responsibilityCenterId);
         }
 
         if (array_key_exists('counterparty', $plan->changes)) {
@@ -513,6 +559,187 @@ class CashTransactionAutoRuleService
         }
 
         return true;
+    }
+
+    /**
+     * @param list<FinancialResponsibilityCenterProjectDTO> $activePairs
+     *
+     * @return array{
+     *     changes: array<string, array{before: ?string, after: ?string}>,
+     *     rulesByField: array<string, CashTransactionAutoRule>,
+     *     projectDirection: ?\App\Company\Entity\ProjectDirection,
+     *     responsibilityCenterId: ?string,
+     *     issue: ?CashTransactionAutoRulePairIssue
+     * }
+     */
+    private function planPair(
+        CashTransactionAutoRuleMatchResult $match,
+        CashTransaction $transaction,
+        array $activePairs,
+    ): array {
+        $emptyPlan = [
+            'changes' => [],
+            'rulesByField' => [],
+            'projectDirection' => $transaction->getProjectDirection(),
+            'responsibilityCenterId' => $transaction->getResponsibilityCenterId(),
+            'issue' => null,
+        ];
+
+        if ($this->hasPairConflict($match)) {
+            $emptyPlan['issue'] = CashTransactionAutoRulePairIssue::CONFLICT;
+
+            return $emptyPlan;
+        }
+
+        $projectRule = $match->winners['projectDirection'] ?? null;
+        $responsibilityCenterRule = $match->winners['responsibilityCenterId'] ?? null;
+        if (null === $projectRule && null === $responsibilityCenterRule) {
+            return $emptyPlan;
+        }
+
+        $currentProject = $transaction->getProjectDirection();
+        $currentProjectId = $currentProject?->getId();
+        $currentResponsibilityCenterId = $transaction->getResponsibilityCenterId();
+        $systemPair = $this->systemPair($activePairs);
+        $isSystemPair = null !== $systemPair
+            && $currentProjectId === $systemPair->projectDirectionId
+            && $currentResponsibilityCenterId === $systemPair->responsibilityCenterId;
+
+        if (null !== $currentProjectId && null !== $currentResponsibilityCenterId && !$isSystemPair) {
+            return $emptyPlan;
+        }
+
+        $protectedProject = $isSystemPair ? null : $currentProject;
+        $protectedResponsibilityCenterId = $isSystemPair ? null : $currentResponsibilityCenterId;
+        $resultProject = $protectedProject ?? $projectRule?->getProjectDirection();
+        $resultResponsibilityCenterId = $protectedResponsibilityCenterId
+            ?? $responsibilityCenterRule?->getResponsibilityCenterId();
+
+        if (null === $resultProject || null === $resultResponsibilityCenterId) {
+            $emptyPlan['issue'] = CashTransactionAutoRulePairIssue::INCOMPLETE;
+
+            return $emptyPlan;
+        }
+
+        if (!$this->pairIsAllowed($activePairs, (string) $resultProject->getId(), $resultResponsibilityCenterId)) {
+            $emptyPlan['issue'] = CashTransactionAutoRulePairIssue::UNAVAILABLE;
+
+            return $emptyPlan;
+        }
+
+        $changes = [];
+        $rulesByField = [];
+        if ($currentProjectId !== $resultProject->getId() && null !== $projectRule) {
+            $changes['projectDirection'] = [
+                'before' => $currentProjectId,
+                'after' => $resultProject->getId(),
+            ];
+            $rulesByField['projectDirection'] = $projectRule;
+        }
+        if ($currentResponsibilityCenterId !== $resultResponsibilityCenterId && null !== $responsibilityCenterRule) {
+            $changes['responsibilityCenterId'] = [
+                'before' => $currentResponsibilityCenterId,
+                'after' => $resultResponsibilityCenterId,
+            ];
+            $rulesByField['responsibilityCenterId'] = $responsibilityCenterRule;
+        }
+
+        return [
+            'changes' => $changes,
+            'rulesByField' => $rulesByField,
+            'projectDirection' => $resultProject,
+            'responsibilityCenterId' => $resultResponsibilityCenterId,
+            'issue' => null,
+        ];
+    }
+
+    private function hasPairConflict(CashTransactionAutoRuleMatchResult $match): bool
+    {
+        return isset($match->conflicts['projectDirection'])
+            || isset($match->conflicts['responsibilityCenterId']);
+    }
+
+    private function matchNeedsPairPlan(CashTransactionAutoRuleMatchResult $match): bool
+    {
+        return isset($match->winners['projectDirection'])
+            || isset($match->winners['responsibilityCenterId'])
+            || $this->hasPairConflict($match);
+    }
+
+    /** @param list<CashTransactionAutoRule> $rules */
+    private function rulesNeedPairSnapshot(array $rules): bool
+    {
+        foreach ($rules as $rule) {
+            if (null !== $rule->getProjectDirection() || null !== $rule->getResponsibilityCenterId()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function firstPairConflictingRule(CashTransactionAutoRuleMatchResult $match): ?CashTransactionAutoRule
+    {
+        foreach (['projectDirection', 'responsibilityCenterId'] as $field) {
+            if (isset($match->conflicts[$field][0])) {
+                return $match->conflicts[$field][0];
+            }
+        }
+
+        return null;
+    }
+
+    /** @param list<FinancialResponsibilityCenterProjectDTO> $activePairs */
+    private function pairIsAllowed(array $activePairs, string $projectDirectionId, string $responsibilityCenterId): bool
+    {
+        foreach ($activePairs as $pair) {
+            if ($pair->projectDirectionId === $projectDirectionId
+                && $pair->responsibilityCenterId === $responsibilityCenterId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @param list<FinancialResponsibilityCenterProjectDTO> $activePairs */
+    private function systemPair(array $activePairs): ?FinancialResponsibilityCenterProjectDTO
+    {
+        foreach ($activePairs as $pair) {
+            if ($pair->system) {
+                return $pair;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<FinancialResponsibilityCenterProjectDTO> $activePairs
+     *
+     * @return array<string, string>
+     */
+    private function responsibilityCenterLabels(array $activePairs): array
+    {
+        $labels = [];
+        foreach ($activePairs as $pair) {
+            if (null !== $pair->responsibilityCenterName) {
+                $labels[$pair->responsibilityCenterId] = $pair->responsibilityCenterName;
+            }
+        }
+
+        return $labels;
+    }
+
+    /** @return array<string, string> */
+    private function activeResponsibilityCenterLabels(string $companyId): array
+    {
+        $labels = [];
+        foreach ($this->responsibilityCenterFacade->getActiveChoices($companyId) as $center) {
+            $labels[$center->id] = $center->name;
+        }
+
+        return $labels;
     }
 
     private function belongsToSameCompany(Company $left, Company $right): bool

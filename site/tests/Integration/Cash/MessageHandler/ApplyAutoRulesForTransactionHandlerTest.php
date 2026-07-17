@@ -20,6 +20,8 @@ use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Category\CashflowSystemCategoryService;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
 use App\Company\Entity\Company;
+use App\Company\Entity\FinancialResponsibilityCenter;
+use App\Company\Entity\FinancialResponsibilityCenterProject;
 use App\Company\Entity\ProjectDirection;
 use App\Shared\Entity\AuditLog;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
@@ -275,7 +277,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
         ], $applicationAuditLog->getDiff());
     }
 
-    public function testConflictSkipsCategoryButAppliesProject(): void
+    public function testConflictAndIncompletePairDoNotApplyProjectAlone(): void
     {
         $user = UserBuilder::aUser()->withIndex(1)->build();
         $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
@@ -326,7 +328,79 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
         $reloaded = $this->em->find(CashTransaction::class, $transaction->getId());
         self::assertInstanceOf(CashTransaction::class, $reloaded);
         self::assertSame(CashflowCategory::CODE_UNALLOCATED, $reloaded->getCashflowCategory()?->getCode());
+        self::assertNull($reloaded->getProjectDirection());
+        self::assertNull($reloaded->getResponsibilityCenterId());
+    }
+
+    public function testAppliesCompletePairOnceWithAuditProvenance(): void
+    {
+        $user = UserBuilder::aUser()->withIndex(1)->build();
+        $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+        $account = MoneyAccountBuilder::aMoneyAccount()->forCompany($company)->build();
+        $category = (new CashflowCategory(Uuid::uuid4()->toString(), $company))->setName('Аренда');
+        $project = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Краснодар — продажи');
+        $center = new FinancialResponsibilityCenter(
+            (string) $company->getId(),
+            'CFO_KRASNODAR',
+            'Краснодар',
+        );
+        $pair = new FinancialResponsibilityCenterProject((string) $company->getId(), $project, $center);
+        $rule = new CashTransactionAutoRule(
+            Uuid::uuid4()->toString(),
+            $company,
+            'Продажи Краснодар',
+            CashTransactionAutoRuleAction::FILL,
+            CashTransactionAutoRuleOperationType::ANY,
+            $category,
+        );
+        $rule->setProjectDirection($project)->setResponsibilityCenterId($center->getId());
+        $transaction = $this->createTransaction($company, $account)->setCashflowCategory($category);
+
+        foreach ([$user, $company, $account, $category, $project, $center, $pair, $rule, $transaction] as $entity) {
+            $this->em->persist($entity);
+        }
+        $this->em->flush();
+
+        $handler = new ApplyAutoRulesForTransactionHandler(
+            $this->em,
+            self::getContainer()->get(CashTransactionRepository::class),
+            self::getContainer()->get(CashTransactionAutoRuleService::class),
+            self::getContainer()->get(CashflowSystemCategoryService::class),
+            self::getContainer()->get(AutoRuleDispatchGuard::class),
+            new NullLogger(),
+        );
+        $correlationId = Uuid::uuid7()->toString();
+
+        $message = new ApplyAutoRulesForTransaction(
+            (string) $transaction->getId(),
+            (string) $company->getId(),
+            new \DateTimeImmutable('2024-01-01T00:00:00+00:00'),
+            $correlationId,
+        );
+        $handler($message);
+        $handler($message);
+
+        $reloaded = $this->em->find(CashTransaction::class, $transaction->getId());
+        self::assertInstanceOf(CashTransaction::class, $reloaded);
         self::assertSame($project->getId(), $reloaded->getProjectDirection()?->getId());
+        self::assertSame($center->getId(), $reloaded->getResponsibilityCenterId());
+
+        $applicationAudits = array_values(array_filter(
+            $this->em->getRepository(AuditLog::class)->findBy(['entityId' => $transaction->getId()]),
+            static fn (AuditLog $audit): bool => isset($audit->getDiff()['autoRules']['responsibilityCenterId']),
+        ));
+        self::assertCount(1, $applicationAudits);
+        self::assertSame([
+            'correlationId' => $correlationId,
+            'autoRules' => [
+                'projectDirection' => ['id' => $rule->getId(), 'revision' => 1],
+                'responsibilityCenterId' => ['id' => $rule->getId(), 'revision' => 1],
+            ],
+            'changes' => [
+                'projectDirection' => ['before' => null, 'after' => $project->getId()],
+                'responsibilityCenterId' => ['before' => null, 'after' => $center->getId()],
+            ],
+        ], $applicationAudits[0]->getDiff());
     }
 
     private function createTransaction(Company $company, MoneyAccount $account): CashTransaction

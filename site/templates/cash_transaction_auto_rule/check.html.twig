@@ -65,6 +65,7 @@
       <div class="d-flex flex-wrap gap-3">
         <span>Статья: <strong>{{ preview.changesByField.cashflowCategory }}</strong></span>
         <span>Проект: <strong>{{ preview.changesByField.projectDirection }}</strong></span>
+        <span>ЦФО: <strong>{{ preview.changesByField.responsibilityCenterId }}</strong></span>
         <span>Контрагент: <strong>{{ preview.changesByField.counterparty }}</strong></span>
       </div>
     </div>
@@ -73,7 +74,8 @@
       {title: 'По месяцам', rows: preview.byMonth},
       {title: 'По валютам', rows: preview.byCurrency},
       {title: 'По итоговой статье', rows: preview.byCategory},
-      {title: 'По итоговому проекту', rows: preview.byProject}
+      {title: 'По итоговому проекту', rows: preview.byProject},
+      {title: 'По итоговому ЦФО', rows: preview.byResponsibilityCenter}
     ] %}
     <div class="row row-cards mb-3">
       {% for breakdown in breakdowns %}
@@ -110,7 +112,7 @@
         <thead>
           <tr>
             <th>Дата</th><th>Счет</th><th class="text-end">Сумма</th>
-            <th>Статья</th><th>Проект</th><th>Контрагент</th><th>Описание</th><th>План</th><th>Статус и правила</th><th></th>
+            <th>Статья</th><th>Проект</th><th>ЦФО</th><th>Контрагент</th><th>Описание</th><th>План</th><th>Статус и правила</th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -125,6 +127,7 @@
             <td class="text-end">{{ t.amount|number_format(2, ',', ' ') }} {{ t.currency }}</td>
             <td>{{ t.cashflowCategory ? t.cashflowCategory.name : '' }}</td>
             <td>{{ t.projectDirection ? t.projectDirection.name : '' }}</td>
+            <td>{{ t.responsibilityCenterId ? preview.responsibilityCenterLabels[t.responsibilityCenterId]|default(t.responsibilityCenterId) : '' }}</td>
             <td>{{ t.counterparty ? t.counterparty.name : '' }}</td>
             <td>{{ t.description }}</td>
             <td class="auto-rule-preview-plan">
@@ -134,12 +137,17 @@
                     <div><strong>Статья:</strong> {{ t.cashflowCategory ? t.cashflowCategory.name : 'Не задано' }} → {{ row.plan.cashflowCategory.name }}</div>
                   {% elseif field == 'projectDirection' %}
                     <div><strong>Проект:</strong> {{ t.projectDirection ? t.projectDirection.name : 'Не задано' }} → {{ row.plan.projectDirection.name }}</div>
+                  {% elseif field == 'responsibilityCenterId' %}
+                    <div><strong>ЦФО:</strong> {{ t.responsibilityCenterId ? preview.responsibilityCenterLabels[t.responsibilityCenterId]|default(t.responsibilityCenterId) : 'Не задано' }} → {{ preview.responsibilityCenterLabels[row.plan.responsibilityCenterId]|default(row.plan.responsibilityCenterId) }}</div>
                   {% elseif field == 'counterparty' %}
                     <div><strong>Контрагент:</strong> {{ t.counterparty ? t.counterparty.name : 'Не задано' }} → {{ row.plan.counterparty.name }}</div>
                   {% endif %}
                 {% endfor %}
               {% else %}
                 <span class="text-muted">Без изменений</span>
+              {% endif %}
+              {% if row.plan and row.plan.pairIssue %}
+                <div class="text-warning mt-1"><strong>{{ row.plan.pairIssue.value }}:</strong> {{ row.plan.pairIssue.label }}</div>
               {% endif %}
             </td>
             <td>
@@ -171,6 +179,7 @@
               {% set fieldLabels = {
                 cashflowCategory: 'Статья',
                 projectDirection: 'Проект',
+                responsibilityCenterId: 'ЦФО',
                 counterparty: 'Контрагент'
               } %}
               <div class="small mt-2">
@@ -193,7 +202,7 @@
             </td>
           </tr>
         {% else %}
-          <tr><td colspan="10" class="text-center text-muted">Совпадений нет</td></tr>
+          <tr><td colspan="11" class="text-center text-muted">Совпадений нет</td></tr>
         {% endfor %}
         </tbody>
       </table>

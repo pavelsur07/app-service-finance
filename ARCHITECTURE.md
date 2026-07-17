@@ -530,6 +530,10 @@ findByIdAndCompany(string $id, string $companyId): ?FinancialResponsibilityCente
 // Системная пара PROJECT_GENERAL × CFO_GENERAL компании как scalar DTO.
 findGeneralPair(string $companyId): ?FinancialResponsibilityCenterProjectDTO
 
+// Один company-scoped snapshot всех активных разрешённых пар для batch planning.
+// @return list<FinancialResponsibilityCenterProjectDTO>
+getActivePairs(string $companyId): array
+
 // Проверка разрешённой пары project × ЦФО в рамках компании.
 isProjectAllowed(string $companyId, string $projectDirectionId, string $responsibilityCenterId): bool
 
@@ -606,11 +610,11 @@ updatePLRegisterForDocument(string $documentId): void
 
 - `CashTransactionAutoRule` is company-owned and has an immutable company, a Doctrine-managed optimistic-lock `revision`, lifecycle timestamps, and nullable user IDs for create/update/disable actors.
 - Rules are disable-only: an inactive rule cannot be re-enabled or physically deleted through the Cash auto-rule UI.
-- One matcher is shared by preview, manual apply, and the worker. It resolves category, project, and counterparty independently by priority, specificity (condition count plus a direction constraint), then immutable rule ID.
+- One matcher is shared by preview, manual apply, and the worker. It resolves category, project, ЦФО, and counterparty by the same priority, specificity (condition count plus a direction constraint), and immutable-rule-ID ordering. Project and ЦФО winners are then applied as one validated safe-fill pair; category and counterparty remain independent.
 - Exact conditions may additionally match a company-owned money account, currency, import-source identifier, transfer flag, and normalized document type. Money accounts use a foreign-key identity and are restricted to the rule company. Missing import lineage is represented explicitly by `__MISSING__`; it is not treated as an empty condition value. Existing source data is not normalized or backfilled by the rule module.
-- The authenticated company-scoped preview is read-only: it uses the same application plan as the worker, limits only displayed rows, and calculates full-period counts plus independent month, currency, resulting-category, and resulting-project breakdowns.
+- The authenticated company-scoped preview is read-only: it uses the same application plan and one active-pair snapshot as the worker, limits only displayed rows, and calculates full-period counts plus independent month, currency, resulting-category, resulting-project, and resulting-ЦФО breakdowns.
 - The authenticated rule-candidate report is also read-only and company-scoped. It inspects the last 180 days, accepts only the latest user-confirmed category assignment, requires at least five samples across three operation dates with 100% category consistency, and proposes one exact condition signal at a time. It returns at most 100 category-only candidates and never creates rules, dispatches work, or changes historical transactions.
-- A conflict skips only its field. Existing manual values are preserved, `CF_UNALLOC` is empty for category filling, and null rule targets never clear transaction fields.
+- A category/counterparty conflict skips only its field. A project or ЦФО conflict blocks both paired changes. Existing custom pairs are preserved, the exact `PROJECT_GENERAL × CFO_GENERAL` pair is an eligible placeholder, incomplete/unavailable pairs fail closed, `CF_UNALLOC` remains empty for category filling, and null rule targets never clear transaction fields.
 - Each actual auto-rule mutation persists one `AuditLog` for the `CashTransaction` in the same flush. Its diff contains a range/transaction correlation UUID, per-field rule ID/revision, and changed field before/after IDs; descriptions, INNs, and bank payloads are excluded.
 - Range messages propagate one correlation UUID to every child transaction message and safe structured log. Optional message fields plus native-serialization wakeup keep payloads queued before this contract backward-compatible.
 - `AutoRuleDispatchGuard` carries the application plan during that flush so the generic transaction audit subscriber does not duplicate the explicit provenance record.
@@ -2340,6 +2344,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.59 | 2026-07-17 | Cash/Company: Stage 7.9.3 добавляет общий атомарный planner project × ЦФО, active-pair snapshot, preview labels/breakdown и per-field audit provenance |
 | 1.58 | 2026-07-17 | Cash/Company: добавлены nullable scalar mapping ЦФО транзакции, read-контракт системной пары и невключённый в writers валидатор пар Stage 7.6.1 |
 | 1.57 | 2026-07-17 | Company: добавлен защищённый Twig-интерфейс `Справочники → ЦФО` с company isolation, CSRF и optimistic locking |
 | 1.56 | 2026-07-17 | Company: добавлены company-scoped Actions управления ЦФО и optimistic-lock настройка разрешённых проектов |

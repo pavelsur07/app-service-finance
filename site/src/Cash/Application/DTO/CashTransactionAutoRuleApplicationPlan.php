@@ -6,6 +6,7 @@ namespace App\Cash\Application\DTO;
 
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
+use App\Cash\Enum\Transaction\CashTransactionAutoRulePairIssue;
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
 
@@ -22,6 +23,8 @@ final readonly class CashTransactionAutoRuleApplicationPlan
         public ?ProjectDirection $projectDirection,
         public ?Counterparty $counterparty,
         public array $rulesByField = [],
+        public ?string $responsibilityCenterId = null,
+        public ?CashTransactionAutoRulePairIssue $pairIssue = null,
     ) {
     }
 

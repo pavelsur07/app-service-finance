@@ -57,6 +57,28 @@ final class FinancialResponsibilityCenterProjectRepository extends ServiceEntity
     }
 
     /**
+     * @return list<FinancialResponsibilityCenterProject>
+     */
+    public function findActiveByCompanyId(string $companyId): array
+    {
+        /** @var list<FinancialResponsibilityCenterProject> $pairs */
+        $pairs = $this->createQueryBuilder('pair')
+            ->addSelect('project', 'center')
+            ->innerJoin('pair.projectDirection', 'project')
+            ->innerJoin('pair.responsibilityCenter', 'center')
+            ->andWhere('pair.companyId = :companyId')
+            ->andWhere('IDENTITY(project.company) = :companyId')
+            ->andWhere('center.companyId = :companyId')
+            ->andWhere('center.status = :centerStatus')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('centerStatus', FinancialResponsibilityCenterStatus::ACTIVE)
+            ->getQuery()
+            ->getResult();
+
+        return $pairs;
+    }
+
+    /**
      * @return list<string>
      */
     public function findProjectIds(string $companyId, string $responsibilityCenterId): array
