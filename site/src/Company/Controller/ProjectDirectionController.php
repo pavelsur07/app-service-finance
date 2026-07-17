@@ -100,6 +100,12 @@ class ProjectDirectionController extends AbstractController
             throw $this->createNotFoundException();
         }
         if ($this->isCsrfTokenValid('delete'.$direction->getId(), $request->request->get('_token'))) {
+            if ($direction->isSystem()) {
+                $this->addFlash('danger', 'Системный проект нельзя удалить.');
+
+                return $this->redirectToRoute('project_direction_index');
+            }
+
             $em->remove($direction);
             $em->flush();
         }

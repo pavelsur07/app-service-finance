@@ -82,6 +82,8 @@
 | `ProductBarcode` | Catalog | `string $companyId` ✅ |
 | `ProductPurchasePrice` | Catalog | `string $companyId` ✅ |
 | `AuditLog` | Shared | `string $companyId` ✅ |
+| `FinancialResponsibilityCenter` | Company | `string $companyId` ✅ |
+| `FinancialResponsibilityCenterProject` | Company | `string $companyId` + same-company pair guard ✅ |
 | `CashTransaction`, `MoneyAccount` и др. | Cash | `Company $company` (legacy) |
 | `Deal`, `ChargeType` | Deals | `Company $company` (legacy) |
 | `PLCategory`, `Document` и др. | legacy `src/Entity/` | `Company $company` (legacy) |
@@ -504,6 +506,23 @@ getChoicesForCompany(string $companyId): array
 // Имена по списку ID — для отображения в таблицах
 // @return array<string, string>  uuid => 'ООО Ромашка'
 getNamesByIds(array $ids): array
+```
+
+### `FinancialResponsibilityCenterFacade` (`src/Company/Facade/FinancialResponsibilityCenterFacade.php`)
+
+```php
+// Активные ЦФО компании как scalar DTO для форм и соседних модулей.
+// @return list<FinancialResponsibilityCenterDTO>
+getActiveChoices(string $companyId): array
+
+// Один ЦФО с обязательной проверкой company boundary.
+findByIdAndCompany(string $id, string $companyId): ?FinancialResponsibilityCenterDTO
+
+// Проверка разрешённой пары project × ЦФО в рамках компании.
+isProjectAllowed(string $companyId, string $projectDirectionId, string $responsibilityCenterId): bool
+
+// @return list<string> project direction IDs
+getAllowedProjectIds(string $companyId, string $responsibilityCenterId): array
 ```
 
 ### `PLCategoryFacade` (`src/Finance/Facade/PLCategoryFacade.php`)
@@ -2297,6 +2316,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.55 | 2026-07-16 | Company: добавлены плоский справочник ЦФО, стабильные системные коды проекта/ЦФО, разрешённые пары и атомарный bootstrap новой компании |
 | 1.54 | 2026-07-13 | Marketplace/Inventory: WB Product Cards refresh дополнен карточками из корзины, которые сохраняются неактивными и участвуют в точном маппинге остатков по `chrtId` |
 | 1.53 | 2026-07-13 | Inventory: добавлен ручной WB orchestration с обязательным Product Cards refresh, async raw-загрузкой, безопасной offset-пагинацией и отдельным POST endpoint |
 | 1.52 | 2026-07-13 | Inventory: добавлена нормализация WB FBW raw-остатков по `chrtId + warehouseId`, точный variant-маппинг, отдельные статусы движения и выбор последней полной сессии по каждому источнику |

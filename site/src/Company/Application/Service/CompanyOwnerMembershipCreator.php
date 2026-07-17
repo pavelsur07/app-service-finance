@@ -8,6 +8,8 @@ use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
+use App\Company\Entity\FinancialResponsibilityCenter;
+use App\Company\Entity\FinancialResponsibilityCenterProject;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -33,6 +35,18 @@ final readonly class CompanyOwnerMembershipCreator
         $company->setUser($owner);
         $owner->addCompany($company);
 
+        $generalProject = new ProjectDirection(
+            id: Uuid::uuid4()->toString(),
+            company: $company,
+            name: 'Общий',
+            systemCode: ProjectDirection::CODE_GENERAL,
+        );
+        $generalCenter = new FinancialResponsibilityCenter(
+            companyId: (string) $company->getId(),
+            code: FinancialResponsibilityCenter::CODE_GENERAL,
+            name: FinancialResponsibilityCenter::NAME_GENERAL,
+        );
+
         $this->entityManager->persist($company);
         $this->entityManager->persist(new CompanyMember(
             id: Uuid::uuid4()->toString(),
@@ -40,10 +54,12 @@ final readonly class CompanyOwnerMembershipCreator
             user: $owner,
             role: CompanyMember::ROLE_OWNER,
         ));
-        $this->entityManager->persist(new ProjectDirection(
-            id: Uuid::uuid4()->toString(),
-            company: $company,
-            name: 'Общий',
+        $this->entityManager->persist($generalProject);
+        $this->entityManager->persist($generalCenter);
+        $this->entityManager->persist(new FinancialResponsibilityCenterProject(
+            companyId: (string) $company->getId(),
+            projectDirection: $generalProject,
+            responsibilityCenter: $generalCenter,
         ));
         $this->entityManager->persist(new MoneyAccount(
             id: Uuid::uuid4()->toString(),

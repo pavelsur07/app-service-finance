@@ -9,6 +9,8 @@ use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
+use App\Company\Entity\FinancialResponsibilityCenter;
+use App\Company\Entity\FinancialResponsibilityCenterProject;
 use App\Company\Entity\ProjectDirection;
 use App\Tests\Builders\Company\UserBuilder;
 use Doctrine\ORM\EntityManagerInterface;
@@ -24,7 +26,7 @@ final class CompanyOwnerMembershipCreatorTest extends TestCase
 
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager
-            ->expects(self::exactly(4))
+            ->expects(self::exactly(6))
             ->method('persist')
             ->willReturnCallback(static function (object $entity) use (&$persisted): void {
                 $persisted[] = $entity;
@@ -40,7 +42,7 @@ final class CompanyOwnerMembershipCreatorTest extends TestCase
         self::assertSame('Acme LLC', $company->getName());
         self::assertSame($owner, $company->getUser());
         self::assertTrue($owner->getCompanies()->contains($company));
-        self::assertCount(4, $persisted);
+        self::assertCount(6, $persisted);
         self::assertSame($company, $persisted[0]);
         self::assertInstanceOf(CompanyMember::class, $persisted[1]);
         self::assertSame($company, $persisted[1]->getCompany());
@@ -52,14 +54,22 @@ final class CompanyOwnerMembershipCreatorTest extends TestCase
         self::assertInstanceOf(ProjectDirection::class, $persisted[2]);
         self::assertSame($company, $persisted[2]->getCompany());
         self::assertSame('Общий', $persisted[2]->getName());
+        self::assertSame(ProjectDirection::CODE_GENERAL, $persisted[2]->getSystemCode());
         self::assertNull($persisted[2]->getParent());
-        self::assertInstanceOf(MoneyAccount::class, $persisted[3]);
-        self::assertSame($company, $persisted[3]->getCompany());
-        self::assertSame('Основной счет', $persisted[3]->getName());
-        self::assertSame(MoneyAccountType::BANK, $persisted[3]->getType());
-        self::assertSame('RUB', $persisted[3]->getCurrency());
-        self::assertTrue($persisted[3]->isActive());
-        self::assertFalse($persisted[3]->isDefault());
+        self::assertInstanceOf(FinancialResponsibilityCenter::class, $persisted[3]);
+        self::assertSame($company->getId(), $persisted[3]->getCompanyId());
+        self::assertSame(FinancialResponsibilityCenter::CODE_GENERAL, $persisted[3]->getCode());
+        self::assertSame(FinancialResponsibilityCenter::NAME_GENERAL, $persisted[3]->getName());
+        self::assertInstanceOf(FinancialResponsibilityCenterProject::class, $persisted[4]);
+        self::assertSame($persisted[2], $persisted[4]->getProjectDirection());
+        self::assertSame($persisted[3], $persisted[4]->getResponsibilityCenter());
+        self::assertInstanceOf(MoneyAccount::class, $persisted[5]);
+        self::assertSame($company, $persisted[5]->getCompany());
+        self::assertSame('Основной счет', $persisted[5]->getName());
+        self::assertSame(MoneyAccountType::BANK, $persisted[5]->getType());
+        self::assertSame('RUB', $persisted[5]->getCurrency());
+        self::assertTrue($persisted[5]->isActive());
+        self::assertFalse($persisted[5]->isDefault());
     }
 
     public function testPersistCompanyWithOwnerMembershipKeepsExistingCompanyFields(): void
@@ -72,7 +82,7 @@ final class CompanyOwnerMembershipCreatorTest extends TestCase
         $persisted = [];
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager
-            ->expects(self::exactly(4))
+            ->expects(self::exactly(6))
             ->method('persist')
             ->willReturnCallback(static function (object $entity) use (&$persisted): void {
                 $persisted[] = $entity;
@@ -91,6 +101,8 @@ final class CompanyOwnerMembershipCreatorTest extends TestCase
         self::assertSame($company, $persisted[0]);
         self::assertInstanceOf(CompanyMember::class, $persisted[1]);
         self::assertInstanceOf(ProjectDirection::class, $persisted[2]);
-        self::assertInstanceOf(MoneyAccount::class, $persisted[3]);
+        self::assertInstanceOf(FinancialResponsibilityCenter::class, $persisted[3]);
+        self::assertInstanceOf(FinancialResponsibilityCenterProject::class, $persisted[4]);
+        self::assertInstanceOf(MoneyAccount::class, $persisted[5]);
     }
 }

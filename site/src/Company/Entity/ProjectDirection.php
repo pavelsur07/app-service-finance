@@ -12,8 +12,12 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: ProjectDirectionRepository::class)]
 #[ORM\Table(name: 'project_directions')]
+#[ORM\UniqueConstraint(name: 'uniq_project_direction_company_system_code', columns: ['company_id', 'system_code'])]
+#[ORM\HasLifecycleCallbacks]
 class ProjectDirection
 {
+    public const CODE_GENERAL = 'PROJECT_GENERAL';
+
     #[ORM\Id]
     #[ORM\Column(type: 'guid', unique: true)]
     private ?string $id = null;
@@ -28,6 +32,9 @@ class ProjectDirection
     #[ORM\Column(type: 'integer')]
     private int $sort = 0;
 
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $systemCode = null;
+
     #[ORM\ManyToOne(targetEntity: self::class, inversedBy: 'children')]
     private ?self $parent = null;
 
@@ -35,12 +42,18 @@ class ProjectDirection
     #[ORM\OrderBy(['sort' => 'ASC'])]
     private Collection $children;
 
-    public function __construct(string $id, Company $company, string $name)
+    public function __construct(string $id, Company $company, string $name, ?string $systemCode = null)
     {
         Assert::uuid($id);
+        if (null !== $systemCode) {
+            Assert::regex($systemCode, '/^[A-Z][A-Z0-9_]*$/');
+            Assert::maxLength($systemCode, 64);
+        }
+
         $this->id = $id;
         $this->company = $company;
         $this->name = $name;
+        $this->systemCode = $systemCode;
         $this->children = new ArrayCollection();
     }
 
@@ -76,6 +89,29 @@ class ProjectDirection
     public function getSort(): int
     {
         return $this->sort;
+    }
+
+    public function getSystemCode(): ?string
+    {
+        return $this->systemCode;
+    }
+
+    public function isSystem(): bool
+    {
+        return null !== $this->systemCode;
+    }
+
+    public function assertCanDelete(): void
+    {
+        if ($this->isSystem()) {
+            throw new \DomainException('Системный проект нельзя удалить.');
+        }
+    }
+
+    #[ORM\PreRemove]
+    public function preventSystemProjectRemoval(): void
+    {
+        $this->assertCanDelete();
     }
 
     public function setSort(int $sort): self

@@ -23,6 +23,11 @@ class ProjectDirectionRepository extends ServiceEntityRepository
     {
         $project = $this->findOneBy([
             'company' => $company,
+            'systemCode' => ProjectDirection::CODE_GENERAL,
+        ]);
+
+        $project ??= $this->findOneBy([
+            'company' => $company,
             'name' => self::DEFAULT_PROJECT_NAME,
         ]);
 

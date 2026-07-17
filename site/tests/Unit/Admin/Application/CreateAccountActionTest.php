@@ -9,6 +9,9 @@ use App\Cash\Service\Category\CashflowSystemCategoryService;
 use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
+use App\Company\Entity\FinancialResponsibilityCenter;
+use App\Company\Entity\FinancialResponsibilityCenterProject;
+use App\Company\Entity\ProjectDirection;
 use App\Company\Entity\User;
 use App\Company\Facade\CompanyFacade;
 use App\Company\Infrastructure\Repository\CompanyRepository;
@@ -42,7 +45,7 @@ final class CreateAccountActionTest extends TestCase
         $persisted = [];
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager
-            ->expects(self::exactly(5))
+            ->expects(self::exactly(7))
             ->method('persist')
             ->willReturnCallback(static function (object $entity) use (&$persisted): void {
                 $persisted[] = $entity;
@@ -83,5 +86,10 @@ final class CreateAccountActionTest extends TestCase
         self::assertInstanceOf(CompanyMember::class, $persisted[2]);
         self::assertSame($persisted[0], $persisted[2]->getUser());
         self::assertSame(CompanyMember::ROLE_OWNER, $persisted[2]->getRole());
+        self::assertInstanceOf(ProjectDirection::class, $persisted[3]);
+        self::assertSame(ProjectDirection::CODE_GENERAL, $persisted[3]->getSystemCode());
+        self::assertInstanceOf(FinancialResponsibilityCenter::class, $persisted[4]);
+        self::assertSame(FinancialResponsibilityCenter::CODE_GENERAL, $persisted[4]->getCode());
+        self::assertInstanceOf(FinancialResponsibilityCenterProject::class, $persisted[5]);
     }
 }
