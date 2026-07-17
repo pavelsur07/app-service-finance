@@ -2,12 +2,12 @@
 
 ## Status
 
-- Phase: **Stage 7.6.1 implemented and verified locally; runtime writers remain untouched**
+- Phase: **Stage 7.6.1 accepted in production; runtime writers remain untouched**
 - Scope: **Cash transaction model, create/edit/facade/import write paths, manual form, pair validation, and audit regression coverage**
 - Overall risk: **HIGH** because the stage changes financial classification behavior for newly created Cash transactions
 - Database migration: **not required**; Stage 7.5 already deployed the nullable `cash_transaction.responsibility_center_id` column, FK, and index
 - Production writes, backfill, and historical recalculation: **forbidden**
-- Next action: **STOP; owner review of Stage 7.6.1 is required before HIGH-risk writer work**
+- Next action: **STOP; complete the approved Stage 7.9 Option A pair-rule gate before HIGH-risk writer work**
 
 ## Goal
 
@@ -143,7 +143,7 @@ No runtime writer implementation may start until the owner selects Option A or O
 
 **Result:** Cash can represent `responsibilityCenterId`, and one small Cash resolver can obtain/validate scalar pairs through the Company facade. No production writer uses it yet.
 
-Implementation status: DONE and verified locally. The existing Stage 7.5 column is mapped, the system-pair scalar read contract and pair resolver are covered by focused integration tests, and no runtime writer has been connected.
+Implementation status: DONE and accepted in production via PR #2186 / merge commit `167b24d4f5502fa7c9db6668a5ef891d66f41c1a`. The existing Stage 7.5 column is mapped, the system-pair scalar read contract and pair resolver are covered by focused integration tests, and no runtime writer has been connected.
 
 Expected work:
 
