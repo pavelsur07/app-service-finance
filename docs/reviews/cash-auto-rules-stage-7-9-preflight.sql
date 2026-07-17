@@ -52,5 +52,5 @@ WHERE rule.is_active
   AND (
       center.company_id <> rule.company_id
       OR center.status <> 'active'
-      OR pair.id IS NULL
+      OR pair.project_direction_id IS NULL
   );

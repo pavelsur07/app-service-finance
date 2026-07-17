@@ -2,9 +2,9 @@
 
 ## Status
 
-- Phase: **Stage 7.6.1 accepted in production; Stage 7.9.1a accepted on local `app_test`**
+- Phase: **Stage 7.6.1 accepted in production; Stage 7.9.1a is in schema-only PR #2187**
 - Overall risk: **HIGH** because the model adds company master data and new financial dimensions to Cash, documents, P&L aggregates, and auto rules
-- Next action: **STOP; owner review before creating the schema-only Stage 7.9.1a PR**
+- Next action: **owner review of schema-only PR #2187**
 - Further production mutations: **forbidden until a separately approved migration or backfill step**
 - Historical recalculation: **forbidden by default**
 

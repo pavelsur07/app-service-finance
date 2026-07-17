@@ -28,6 +28,7 @@ final class Version20260717130000 extends AbstractMigration
     {
         $this->assertPostgreSQL();
 
+        $this->connection->executeStatement('LOCK TABLE cash_transaction_auto_rule IN ACCESS EXCLUSIVE MODE');
         $configuredRuleCount = (int) $this->connection->fetchOne(
             'SELECT COUNT(*) FROM cash_transaction_auto_rule WHERE responsibility_center_id IS NOT NULL',
         );

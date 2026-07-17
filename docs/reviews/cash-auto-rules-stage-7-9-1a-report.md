@@ -1,7 +1,7 @@
 ### Stage 7.9.1a: Schema-only Cash auto-rule CFO target — DONE
 
 **Risk:** HIGH
-**Next action:** STOP, owner review required before creating the schema-only PR
+**Next action:** owner review of schema-only PR #2187
 
 #### What was done
 
@@ -9,6 +9,7 @@
 - Added the supporting index and restrictive foreign key to `financial_responsibility_centers(id)`.
 - Kept all existing rule rows unchanged; there is no backfill or target inference.
 - Made rollback available only while all target values are `NULL`; configured data makes the migration irreversible.
+- Acquired the table lock before the rollback guard so concurrent writers cannot race the data-loss check.
 - Verified the migration only on local `app_test` with `up -> down -> up`; the final local state is `up`.
 - Kept Entity mapping, authoring UI, matcher, preview, workers, and transaction behavior outside the schema-only deliverable.
 
@@ -16,6 +17,7 @@
 
 - `site/migrations/Version20260717130000.php` — additive target column, index, FK, and guarded rollback.
 - `docs/reviews/cash-auto-rules-stage-7-9-plan.md` — local acceptance and next gate.
+- `docs/reviews/cash-auto-rules-stage-7-9-preflight.sql` — aggregate-only configuration and pair-validity checks.
 - `docs/reviews/cash-auto-rules-stage-7-plan.md` — Stage 7 status.
 - `docs/reviews/cash-auto-rules-stage-7-9-1a-report.md` — this Stage Report.
 
@@ -53,4 +55,4 @@ Two initial rollback-guard harness attempts stopped before executing the migrati
 
 #### Open questions
 
-- none for Stage 7.9.1a; owner review is required before assembling and publishing its schema-only PR.
+- none for Stage 7.9.1a; PR #2187 is the schema-only review unit.
