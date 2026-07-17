@@ -1,7 +1,7 @@
 # Stage 7.5: Expand Cash and Finance schema — DONE
 
 **Risk:** HIGH
-**Next action:** STOP, owner review required
+**Next action:** DONE; production accepted, proceed only through the approved Stage 7.6 Phase 0 gate
 
 ## What was done
 
@@ -59,3 +59,12 @@
 ## Open questions
 
 - none
+
+## Production acceptance
+
+- PR #2185 merged to `master` as merge commit `3a47cc8673b5312f79f8138ffc862aa9737f8e5a`.
+- Unit, API type, empty-database migration, image build, frontend lint, rolling deployment, and production migration jobs passed.
+- Production migrated successfully to `DoctrineMigrations\\Version20260717120000`: one migration, 13 SQL statements, no backfill.
+- Post-deploy production containers were running; application workers, PHP-FPM, nginx, PostgreSQL, and Redis reported healthy where health checks exist.
+- The restricted `codex-psql-ro` wrapper became intermittent again after deployment, so the separate post-deploy column/null SQL check was not counted as passed. The successful migration job log is the deployment evidence; wrapper reliability remains operational follow-up work.
+- Deployment logs also reported four old executed migrations absent from the current migration registry and existing environment deprecation/warning noise. These warnings did not fail Stage 7.5 and are outside the financial stage scope.
