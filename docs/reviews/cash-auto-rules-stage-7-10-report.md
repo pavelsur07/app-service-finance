@@ -9,7 +9,7 @@
 - Fixed one pre-existing integration-test isolation failure in `NormalizeRawRecordActionTest`:
   - the test inserted a deterministic `SystemCounterparty` row;
   - migration `Version20260619110000` permanently seeds the same `system_counterparty` row in any correctly migrated test DB;
-  - the fixture now inserts the system counterparty only when missing and asserts the actual DB id by `source`.
+  - the Wildberries-only fixture now inserts the system counterparty only when missing and asserts the actual DB id by `source`.
 - Ran read-only production acceptance using approved wrappers only.
 - Confirmed production Company system-pair invariant and Cash auto-rule transition gate.
 - Confirmed no production import, queue consume, migration, recalculation, backfill, or history run was executed.
@@ -112,6 +112,12 @@ Results:
 - Confirmed findings fixed:
   - MINOR: report root-cause wording now references the migration-seeded `system_counterparty` row instead of a dirty/order-dependent DB.
 - Rejected findings with reason: none.
+
+#### GitHub review fixes
+
+- `gemini-code-assist` noted that `ensureSystemCounterparty(IngestSource $source, string $name)` accepted a generic source while hardcoding the Wildberries UUID.
+- Fixed by making the helper explicitly Wildberries-only instead of adding speculative source-to-UUID mapping.
+- Post-fix external Claude Code review result: REVIEW_GREEN.
 
 #### Risks / reviewer focus
 

@@ -34,7 +34,7 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
     {
         $companyId = Uuid::uuid7()->toString();
         $operationGroupId = Uuid::uuid7()->toString();
-        $systemCounterpartyId = $this->ensureSystemCounterparty(IngestSource::WILDBERRIES, 'Wildberries');
+        $systemCounterpartyId = $this->ensureWildberriesSystemCounterparty();
 
         $record = $this->storeRawRecord($companyId, [[
             'externalId' => 'sale-1',
@@ -344,7 +344,7 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
         );
     }
 
-    private function ensureSystemCounterparty(IngestSource $source, string $name): string
+    private function ensureWildberriesSystemCounterparty(): string
     {
         $this->connection->executeStatement(
             <<<'SQL'
@@ -354,15 +354,15 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
                 SQL,
             [
                 'id' => '95d09265-b44f-5b95-a12c-f1e3332c657d',
-                'source' => $source->value,
-                'name' => $name,
+                'source' => IngestSource::WILDBERRIES->value,
+                'name' => 'Wildberries',
                 'createdAt' => (new \DateTimeImmutable())->format('Y-m-d H:i:s.u'),
             ],
         );
 
         return (string) $this->connection->fetchOne(
             'SELECT id FROM system_counterparties WHERE source = :source',
-            ['source' => $source->value],
+            ['source' => IngestSource::WILDBERRIES->value],
         );
     }
 
