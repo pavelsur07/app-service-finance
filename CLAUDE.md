@@ -2,7 +2,7 @@
 
 > Этот файл читается Claude Code автоматически при старте.
 > Паттерны с примерами кода → `PATTERNS.md`.
-> **Режим работы — автономный.** Claude выполняет задачу этапами, каждый этап завершает self-review, исправлением замечаний и Stage Report. Локальный риск усиливает review и тесты, но не создаёт ручную остановку. Обязательная остановка нужна только перед HIGH-EXTERNAL действием или при реальном блокере.
+> **Режим работы — автономный.** Иерархия выполнения: `Work item → Stage → Release Gate → Production Gate`. Work item завершается таргетированными проверками и focused self-review без ручной остановки. Только верхнеуровневый Stage получает полный review, внешний Claude review и Stage Report. Локальный риск усиливает проверки, но не создаёт ручную остановку.
 
 Stack
 PHP — источник истины: актуальный Docker image/runtime
@@ -53,22 +53,42 @@ Makefile-based commands
 
 Если бриф достаточно ясен для безопасной реализации → продолжать без дополнительных вопросов. STOP нужен только когда отсутствующая информация существенно влияет на бизнес-правила, финансовую семантику, публичный контракт, безопасность данных, доступы, необратимое действие, production или scope. Догадки в таких вопросах и расширение scope автономно запрещены.
 
+### Иерархия выполнения: Work item → Stage → Release Gate → Production Gate
+
+Термины используются строго:
+
+- **Work item** — внутренний шаг реализации внутри верхнеуровневого Stage. Идентификаторы `1.1`, `1.2.1`, `7.6.4`, `N.M` и `N.M.K` всегда являются Work item, даже если старое ТЗ называет их Stage.
+- После Work item: выполнить таргетированные проверки, focused self-review, исправить замечания, обновить checkpoint и автономно продолжить. Work item не создаёт Stage Report, обязательный внешний review, owner review, отдельный PR, production preflight или deploy gate.
+- **Stage** — только верхнеуровневый пункт `Stage <целое число>`. Он объединяет Work items в один проверяемый результат с общей Definition of Done.
+- На границе Stage: полные релевантные проверки, внутренний review полного Stage diff, внешний read-only Claude Code review до `REVIEW_GREEN`, Stage Report, commit/push и обновление единственного Draft PR задачи.
+- **Release Gate** — явно объявленная точка решения Владельца после одного или нескольких Stage либо в финале задачи. Она управляет owner review, переводом PR в Ready, merge и release readiness.
+- **Production Gate** — отдельная точка разрешения production preflight, migrations, deploy, backfill, queue processing, acceptance и других production-действий. Release Gate не разрешает Production Gate автоматически.
+
+Для каждого Stage в плане указывать:
+
+```yaml
+owner_gate: no
+release_candidate: no
+independently_deployable: no
+```
+
+Значения по умолчанию — `no`. Если `owner_gate: no`, после завершения Stage автоматически продолжать к следующему. Если `owner_gate: yes`, остановиться только после зелёных review, commit/push, обновления Draft PR и получения доступного CI status. Draft PR нельзя переводить в Ready, merge/release/deploy нельзя выполнять без явной инструкции Владельца.
+
 ### Непрерывное автономное выполнение
 
 После получения достаточно ясной задачи или завершения Phase 0 без STOP-условия выполнить весь цикл без дополнительных подтверждений Владельца:
 
-1. Реализация текущего этапа.
-2. Таргетированные и релевантные расширенные проверки.
-3. Отдельный внутренний review полного diff этапа.
-4. Исправление всех BLOCKER и IMPORTANT замечаний в scope, а также безопасных MINOR замечаний в scope.
-5. Повторные проверки и внутренний review до зелёного результата.
-6. Внешний read-only review через Claude Code CLI по точной команде из раздела `External Claude Code CLI review` в `AGENTS.md`.
-7. Проверка findings самим Codex, исправление подтверждённых замечаний и повтор обоих review до `REVIEW_GREEN`.
-8. Stage Report и checkpoint, если применимо.
-9. Commit только файлов текущей задачи.
-10. Push текущей task-ветки без force.
-11. Создание или обновление Draft PR.
-12. Финальный отчёт только после готовности Draft PR либо при реальном STOP-условии.
+1. Зафиксировать base commit и Definition of Done текущего верхнеуровневого Stage.
+2. Реализовать все Work items Stage. После каждого — targeted checks, focused self-review, fixes и checkpoint без owner interaction.
+3. Интегрировать все Work items и выполнить полный релевантный набор проверок Stage.
+4. Провести отдельный внутренний review полного Stage diff от зафиксированного base commit, включая commits, staged/unstaged и task-owned untracked files.
+5. Исправить findings в scope, повторить проверки и внутренний review до green.
+6. Самостоятельно запустить внешний read-only Claude Code CLI review полного Stage diff по `AGENTS.md`.
+7. Проверить findings, исправить подтверждённые замечания и повторять проверки и оба review до `REVIEW_GREEN`.
+8. Подготовить один Stage Report и обновить checkpoint.
+9. Commit только task-owned изменений Stage, non-force push task-ветки и создание/обновление единственного Draft PR задачи.
+10. При `owner_gate: no` автоматически перейти к следующему Stage. При `owner_gate: yes` завершить объявленный Release Gate и запросить только конкретное решение Владельца.
+11. После последнего Stage выполнить Final Release Gate. Не входить в Production Gate без отдельного явного разрешения.
 
 Внутренний review, внешний Claude Code review, исправления review, повторные тесты, локальные миграции, commit, non-force push task-ветки и Draft PR заранее разрешены в рамках согласованной задачи. Это действия, которые нужно выполнить, а не следующие шаги, предлагаемые Владельцу.
 
@@ -81,12 +101,16 @@ Makefile-based commands
 ### Фазы работы над задачей
 
 ```
-Phase 0 (Plan)  →  Phase 1..N (Execute by Stages)  →  Phase Final (Handoff)
-                          ↑
-              после каждого этапа: tests → internal review → fix → external Claude review
-              findings → fix → re-test → оба review до REVIEW_GREEN
-              HIGH-LOCAL → усиленные проверки, продолжать автономно
-              HIGH-EXTERNAL или реальный блокер → 🛑 STOP
+Phase 0 (Plan)
+  → Stage 1..N
+      → Work item N.1 → targeted checks → focused self-review → continue
+      → Work item N.M → targeted checks → focused self-review → continue
+      → integrated Stage checks → internal review → external review → REVIEW_GREEN
+      → Stage Report → commit/push → update the single Draft PR
+      → owner_gate=no: continue | owner_gate=yes: Release Gate
+  → Final Release Gate
+  → explicit owner decision
+  → Production Gate only when separately authorized
 ```
 
 ### Phase 0 — Plan (всегда первая для большой задачи)
@@ -94,9 +118,12 @@ Phase 0 (Plan)  →  Phase 1..N (Execute by Stages)  →  Phase Final (Handoff)
 1. Прочитать: применимый `AGENTS.md`, `CLAUDE.md`, релевантные разделы `PATTERNS.md`, `ARCHITECTURE.md`, спецификацию задачи.
 2. Найти 2–3 похожих модуля в репозитории, опереться на их паттерны.
 3. Составить план:
-   - список этапов (Stage 1..N) с целью каждого,
+   - 3–6 верхнеуровневых Stage 1..N с интегрированной целью каждого,
+   - вложенные Work items с dotted identifiers (`N.M`, `N.M.K`),
    - карта изменений: какие Entity / Repository / Action / Facade / Controller / Message / миграции,
-   - риск-классификация каждого этапа (см. таблицу ниже),
+   - риск-классификация каждого Stage и HIGH-EXTERNAL действий внутри Work items,
+   - Definition of Done, `owner_gate`, `release_candidate`, `independently_deployable` и Stage base commit,
+   - явные Release Gates и Production Gate actions; не выводить их из нумерации,
    - какие тесты потребуются,
    - какие записи в `ARCHITECTURE.md` нужно обновить.
 4. Сохранить план в `docs/tasks/<id>/plan.md`.
@@ -104,9 +131,31 @@ Phase 0 (Plan)  →  Phase 1..N (Execute by Stages)  →  Phase Final (Handoff)
 
 STOP после Phase 0 только если требования конфликтуют, отсутствует существенное бизнес-решение, варианты имеют materially different последствия для бизнеса/безопасности/данных, требуется выход за scope или HIGH-EXTERNAL действие, либо Владелец явно потребовал отдельного согласования плана.
 
-### Классификация этапов по риску
+Минимальный формат Stage в плане:
 
-| Риск | Примеры этапов | Поведение после зелёного review |
+```md
+## Stage 1: <интегрированный результат>
+Risk: LOW | MEDIUM | HIGH-LOCAL | HIGH-EXTERNAL
+owner_gate: no
+release_candidate: no
+independently_deployable: no
+stage_base_commit: <зафиксировать перед реализацией>
+Definition of Done:
+- ...
+Work items:
+- 1.1 — ...
+- 1.2 — ...
+Stage checks:
+- ...
+Reviewer focus:
+- ...
+```
+
+Если план содержит `Stage 1.1` или `Stage 1.2.1`, до реализации переименовать их в Work items. Вложенная нумерация сама по себе никогда не создаёт review/owner/PR gate.
+
+### Классификация верхнеуровневых Stage по риску
+
+| Риск | Примеры Stage | Поведение после зелёного review |
 |---|---|---|
 | 🟢 **LOW** | Внутренний рефакторинг; unit-тесты; документация; косметика | Продолжать автономно |
 | 🟡 **MEDIUM** | Новая Entity без миграции; новый Action/Facade/Message/Handler; UI-блок по существующему паттерну | Сохранить Stage Report и продолжать автономно |
@@ -115,7 +164,7 @@ STOP после Phase 0 только если требования конфли�
 
 Если неясно, может ли действие затронуть production, shared data, внешнюю систему или необратимое состояние, считать его HIGH-EXTERNAL и остановиться. Не считать обычное локальное изменение требующим ручного разрешения только потому, что аналогичное production-действие рискованно.
 Метки `HIGH`, «high-risk», legacy, finance, auth или migration для изменений только в task-ветке означают HIGH-LOCAL, пока не требуется реальное HIGH-EXTERNAL действие или отсутствующее существенное решение Владельца.
-Фраза «этап HIGH-risk, поэтому STOP для owner review» не является допустимой причиной остановки локальной разработки. Owner review перед merge проводится через Draft PR после обоих зелёных review, commit и push.
+Фраза «Stage HIGH-risk, поэтому STOP для owner review» не является допустимой причиной остановки локальной разработки. Owner review выполняется только в объявленном Release Gate через Draft PR после обоих зелёных review, commit и push.
 
 ### Обязательные точки STOP
 
@@ -131,12 +180,16 @@ STOP после Phase 0 только если требования конфли�
 
 Не останавливаться только потому, что review нашёл замечания, тест упал, потребовалось несколько итераций исправлений, создана локальная миграция, изменяется legacy/messenger/auth код внутри явного scope либо следующим штатным действием является commit, push или Draft PR.
 
-### Self-review checklist (выполнять в конце КАЖДОГО этапа)
+### Focused self-review Work item
 
-Запускать в строгом порядке. Если хоть один пункт красный — этап не закрыт.
+После каждого Work item проверить только его scope, observable behavior, тесты, безопасность, совместимость и отсутствие посторонних изменений. Исправить findings, обновить checkpoint и продолжить. Не запускать обязательный внешний Claude review и не создавать Stage Report/PR gate для Work item.
+
+### Полный self-review checklist верхнеуровневого Stage
+
+Запускать после интеграции всех Work items. Если хоть один пункт красный — Stage не закрыт.
 
 **Соответствие правилам:**
-- [ ] Изменения строго в рамках цели этапа (нет out-of-scope правок)
+- [ ] Изменения строго в рамках цели Stage (нет out-of-scope правок)
 - [ ] Структура файлов — раздел «Структура файлов» соблюдён
 - [ ] Naming, модификаторы классов (`final` / `final readonly` / `class`) — раздел «Правила PHP» соблюдён
 - [ ] Использованы **только** Facade и Enum из `ARCHITECTURE.md`
@@ -157,7 +210,7 @@ STOP после Phase 0 только если требования конфли�
 - [ ] Новые FK-поля имеют индексы в миграции
 
 **Тесты:**
-- [ ] Минимум по таблице «Тесты — минимум перед закрытием этапа» написан
+- [ ] Минимум по таблице «Тесты — минимум для Work item / Stage» написан
 - [ ] Таргетированные тесты и `make site-test` (когда полный прогон уместен) — зелёные либо документирована доказанно несвязанная pre-existing ошибка
 - [ ] Тесты не «приглажены» под код — проверяют поведение
 
@@ -168,15 +221,24 @@ STOP после Phase 0 только если требования конфли�
 **Stage Report:**
 - [ ] Создан Stage Report по шаблону ниже, сохранён в `docs/tasks/<id>/stages/stage-<N>.md`
 - [ ] Внешний Claude Code review завершён `REVIEW_GREEN` для executable changes; для documentation-only записано обоснованное N/A
-- [ ] Коммит сделан с Conventional Commits префиксом, сообщение отражает цель этапа
+- [ ] Коммит сделан с Conventional Commits префиксом, сообщение отражает цель Stage
 
-### Формат Stage Report (заполняется в конце каждого этапа)
+### Формат Stage Report
+
+Stage Report создаётся один раз для каждого верхнеуровневого `Stage <целое число>`. Для Work items `N.M` и `N.M.K` Stage Report запрещён.
 
 ```markdown
 ## Stage <N>: <название> — DONE
 
 **Риск:** 🟢 LOW | 🟡 MEDIUM | 🟠 HIGH-LOCAL | 🔴 HIGH-EXTERNAL
+**Owner gate:** yes | no
+**Release candidate:** yes | no
+**Independently deployable:** yes | no
 **Следующее действие:** continue autonomously | 🛑 STOP, ждать Владельца
+
+### Scope Stage
+- Stage base commit: `<commit>`
+- Work items completed: `N.1`, `N.2`, ...
 
 ### Что сделано
 - ...
@@ -212,35 +274,51 @@ STOP после Phase 0 только если требования конфли�
 - ... (если нет — «нет»)
 ```
 
-### Phase Final — Handoff
+### Final Release Gate — Handoff
 
-В конце последнего этапа:
+В конце последнего верхнеуровневого Stage:
 1. Прогнать доступный полный набор: `make site-test && make site-cs-check`; для Codex Cloud — релевантные `make codex-*` targets. Статический анализ запускать только через существующий target.
 2. Сверить построчно все «Глобальные запреты» и ограничения из спецификации.
-3. Заполнить `docs/tasks/<id>/handoff.md`: суммарный отчёт по всем этапам + список миграций + список изменённых публичных контрактов + риски + follow-ups.
+3. Заполнить `docs/tasks/<id>/handoff.md`: суммарный отчёт по всем верхнеуровневым Stage и Work items + список миграций + список изменённых публичных контрактов + риски + follow-ups.
 4. Провести финальный внутренний review полного diff и исправить замечания в scope.
 5. Запустить финальный внешний read-only Claude Code review полного task diff по `AGENTS.md`.
 6. Повторить проверки и оба review до `REVIEW_GREEN`.
 7. Закоммитить только изменения текущей задачи.
 8. Выполнить non-force push task-ветки.
 9. Создать или обновить Draft PR.
-10. Передать Владельцу финальный отчёт и ссылку на Draft PR.
+10. Оставить PR в Draft и передать Владельцу финальный отчёт, CI status и ссылку на Draft PR.
 
-Не останавливаться перед commit, push, Draft PR или handoff. Остановиться перед merge, release, deploy, production mutation или другим HIGH-EXTERNAL действием.
+Не останавливаться перед commit, push, Draft PR или handoff. В Release Gate остановиться перед переводом Draft PR в Ready, merge или release. Даже зелёный Release Gate не разрешает Production Gate.
+
+### Production Gate
+
+После отдельной явной инструкции Владельца войти в Production Gate, а не только после одобрения Release Gate:
+
+1. Выполнить только запрошенный read-only production preflight через разрешённые wrappers.
+2. Отдельно получить разрешение на merge, если merge делегирован агенту.
+3. Непосредственно перед каждым production migration, deploy, queue processing, backfill, recalculation, repair или другой мутацией получить отдельное явное разрешение.
+4. Выполнить только разрешённое действие и явно согласованный production acceptance.
+
+Разрешение на merge не разрешает deploy. Разрешение на deploy не разрешает migrations, backfill, history rewrite, recalculation или иную production mutation, если она не указана явно.
 
 ### Запрещено в автономном режиме
 
 ```
 самовольно расширять scope                              — STOP и спросить
-коммитить незакрытый этап                               — self-review red == этап не закрыт
+коммитить незакрытый Stage                             — полный Stage gate не пройден
+считать N.M или N.M.K отдельным Stage                  — это Work items
+делать внешний review/Stage Report/PR/owner gate на Work item — нельзя
+ждать Владельца после owner_gate=no                    — продолжать автономно
 пропускать self-review «потому что очевидно»            — checklist обязателен
 пропускать внешний Claude review для executable changes — нельзя
 останавливаться только из-за HIGH-LOCAL/high-risk метки  — нельзя
 заявлять REVIEW_GREEN при ошибке/timeout/missing marker  — нельзя
 переписывать чужие модули по дороге («заодно»)         — отдельная задача
 merge в основную ветку                                  — никогда, только PR
+переводить Draft PR в Ready без явной инструкции        — нельзя
 force-push в shared-ветки                               — никогда
 запуск миграций на staging/prod                         — никогда
+входить в Production Gate из-за green CI/Release Gate  — нельзя
 заканчивать с review/commit/push/Draft PR как next step — сначала выполнить, затем отчитаться
 передавать Владельцу запуск обязательного review             — Codex запускает сам
 ```
@@ -314,7 +392,7 @@ Read-only проверки можно выполнять после запрос
 2. Прочитай `ARCHITECTURE.md` — актуальные Facade-методы, Enum-значения, статус Entity
 3. Уточни модуль, если не указан явно
 4. Используй существующие Facade и Enum из `ARCHITECTURE.md`; не выдумывай уже существующие контракты
-5. Если задача явно требует нового Facade/метода/Enum и контракт однозначно следует из ТЗ и существующих паттернов — создай его в scope задачи и обнови `ARCHITECTURE.md` в том же этапе. Спроси только при существенной неоднозначности контракта
+5. Если задача явно требует нового Facade/метода/Enum и контракт однозначно следует из ТЗ и существующих паттернов — создай его в scope задачи и обнови `ARCHITECTURE.md` в том же Work item или до закрытия Stage. Спроси только при существенной неоднозначности контракта
 6. Нужен паттерн → читай соответствующий раздел `PATTERNS.md`
 
 ---
@@ -391,7 +469,7 @@ declare(strict_types=1);
 - `$repo->find($id)` без companyId — **запрещено** (IDOR-уязвимость)
 - Паттерн → `PATTERNS.md` §14
 
-В self-review этапа этот пункт проверяется первым — IDOR в проде = инцидент.
+В focused Work-item review и полном Stage review этот пункт проверяется первым — IDOR в проде = инцидент.
 
 ---
 
@@ -418,7 +496,7 @@ declare(strict_types=1);
 - Запрещено импортировать `Service/`, `Repository/`, `Application/`, `Infrastructure/` чужого модуля
 - Паттерн → `PATTERNS.md` §7
 
-Новый Facade или Facade-метод → добавить в `ARCHITECTURE.md` **в том же этапе**, не откладывать.
+Новый Facade или Facade-метод → добавить в `ARCHITECTURE.md` **в том же Work item или до закрытия Stage**, не откладывать.
 
 ---
 
@@ -463,15 +541,15 @@ SELECT * в raw SQL                        — явное перечислени
 циклические зависимости между модулями    — нельзя
 getRepository() чужого модуля             — только через Facade
 расширение scope задачи в автономе        — STOP и спросить
-закрытие этапа с красным self-review      — нельзя; fix → tests → repeat review до green или реального STOP-условия
+закрытие Work item/Stage с красным review — нельзя; fix → tests → repeat review до green или реального STOP-условия
 merge / force-push                        — никогда автономно
 ```
 
 ---
 
-## Тесты — минимум перед закрытием этапа
+## Тесты — минимум для Work item / Stage
 
-| Что сделал на этапе | Что написать в этом же этапе |
+| Что сделано в Work item | Что написать в том же Work item или до закрытия Stage |
 |---|---|
 | Новый Action | happy-path тест + 1 негативный |
 | Новый Domain Policy | unit-тесты на все ветки |
@@ -479,7 +557,7 @@ merge / force-push                        — никогда автономно
 | Исправление бага | регрессионный тест, который красный на старом коде и зелёный на новом |
 | Новый Facade-метод | functional-тест через вызывающий код или unit на Facade |
 
-Этап без необходимых тестов = этап **не закрыт**, не переходить дальше.
+Work item без необходимых тестов не завершён. Stage не закрывается, пока тесты всех Work items не интегрированы и не прошли релевантные Stage checks.
 
 Паттерны → `PATTERNS.md` §16, §17
 
@@ -625,7 +703,7 @@ foreach ($documents as $document) {
 $counterparties = $this->counterpartyQuery->findByIds($counterpartyIds, $companyId);
 ```
 
-Обнаружил N+1 → исправь в рамках того же этапа. В self-review проверяется явно.
+Обнаружил N+1 → исправь в рамках текущего Work item или до закрытия его Stage. В Stage self-review это проверяется явно.
 
 ### Пагинация — обязательна для списков
 
@@ -688,41 +766,52 @@ Query без companyId            — запрещено (IDOR + полный с
 
 ---
 
-## Закрытие этапа
+## Закрытие Work item
 
-В конце каждого этапа — строго по порядку:
+В конце каждого Work item:
 
-1. Прогнать таргетированные проверки, затем доступные `make site-test` и `make site-cs-check` по масштабу этапа; для Codex Cloud — релевантные `make codex-*` targets. Статический анализ запускать только через существующий target.
-2. Провести отдельный внутренний review полного diff этапа. Любой красный пункт — этап не закрыт.
+1. Выполнить таргетированные тесты и проверки изменённого поведения.
+2. Провести focused self-review scope, correctness, security, compatibility и task-owned diff.
+3. Исправить findings, повторить таргетированные проверки и обновить checkpoint.
+4. Автономно продолжить к следующему Work item.
+
+Не запускать обязательный внешний Claude review, не создавать Stage Report, отдельную branch/PR, owner gate или production preflight только из-за завершения Work item.
+
+## Закрытие верхнеуровневого Stage
+
+После интеграции всех Work items Stage — строго по порядку:
+
+1. Прогнать полный релевантный набор Stage checks; для Codex Cloud — релевантные `make codex-*` targets. Статический анализ запускать только через существующий target.
+2. Провести отдельный внутренний review полного Stage diff от `stage_base_commit`, включая Work-item commits, staged/unstaged и task-owned untracked files. Любой красный пункт — Stage не закрыт.
 3. Исправить все BLOCKER/IMPORTANT и безопасные in-scope MINOR findings.
 4. Повторить релевантные проверки и внутренний review до green. После трёх неудачных циклов выполнить root-cause analysis и сменить безопасный подход внутри scope; STOP только при реальном блокере.
 5. Codex самостоятельно запускает внешний read-only Claude Code review по точной команде из `AGENTS.md`; не просит Владельца «запросить review».
 6. Проверить findings, исправить подтверждённые замечания и повторить проверки, внутренний и внешний review до `REVIEW_GREEN`.
-7. Добавил Facade / Facade-метод / Enum / новую Entity → **обнови `ARCHITECTURE.md` в этом же этапе**. Это источник правды для Projects-чатов. Без обновления — Projects будет выдумывать интерфейсы.
+7. Добавил Facade / Facade-метод / Enum / новую Entity → **обнови `ARCHITECTURE.md` до закрытия Stage**. Это источник правды для Projects-чатов. Без обновления — Projects будет выдумывать интерфейсы.
 8. Сохранить **Stage Report** в `docs/tasks/<id>/stages/stage-<N>.md` с результатами обоих review.
-9. Сделать commit только файлов текущей задачи: Conventional Commits, сообщение отражает цель этапа.
+9. Сделать commit только task-owned файлов Stage: Conventional Commits, сообщение отражает цель Stage.
 10. Выполнить non-force push текущей task-ветки.
-11. Создать или обновить Draft PR.
-12. 🟢 LOW / 🟡 MEDIUM / 🟠 HIGH-LOCAL → продолжать к следующему этапу автономно. 🔴 HIGH-EXTERNAL → STOP перед внешним действием.
+11. Создать или обновить единственный Draft PR задачи; не переводить его в Ready без явного поручения.
+12. `owner_gate: no` → продолжать к следующему Stage автономно. `owner_gate: yes` → завершить объявленный Release Gate и запросить конкретное решение Владельца. HIGH-EXTERNAL → STOP непосредственно перед внешним действием.
 
-## Закрытие задачи (Phase Final)
+## Закрытие задачи (Final Release Gate)
 
 1. Прогнать доступный полный набор: `make site-test && make site-cs-check`; для Codex Cloud — релевантные `make codex-*` targets. Статический анализ запускать только через существующий target.
 2. Сверить построчно «Глобальные запреты» и ограничения из спецификации.
 3. Провести финальный внутренний review полного task diff и исправить in-scope findings.
 4. Codex самостоятельно запускает финальный внешний read-only Claude Code review; повторяет проверки и оба review до `REVIEW_GREEN`.
 5. Собрать `docs/tasks/<id>/handoff.md`:
-   - summary всех этапов,
+   - summary всех верхнеуровневых Stage и Work items,
    - список миграций (up/down, деструктивные операции),
    - список изменённых публичных контрактов,
    - риски,
    - follow-ups, которые сознательно вынесены за scope.
 6. Закоммитить оставшиеся изменения текущей задачи.
 7. Выполнить non-force push task-ветки.
-8. Создать или обновить Draft PR.
-9. Передать Владельцу финальный отчёт со ссылкой на Draft PR.
+8. Создать или обновить Draft PR и оставить его в Draft.
+9. Передать Владельцу финальный отчёт, CI status и ссылку на Draft PR; запросить точное Release Gate решение.
 
-Дополнительное подтверждение перед review, исправлениями, тестами, commit, push, Draft PR и handoff не требуется. Merge, release, deploy и production mutation — только после отдельного одобрения Владельцем.
+Дополнительное подтверждение перед review, исправлениями, тестами, commit, push, Draft PR и handoff не требуется. Перевод PR в Ready, merge и release — только в Release Gate по явной инструкции Владельца. Production preflight и каждая mutating production action — только в отдельном Production Gate.
 
 ## Design System
 

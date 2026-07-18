@@ -73,9 +73,38 @@ Main directories:
 Do not assume a path exists. Verify with `ls`, `find`, `rg`, or `rg --files`.
 ---
 Autonomy mode
-Work autonomously inside a clear task scope or the currently approved stage.
+Work autonomously inside a clear task scope or the currently approved top-level Stage.
 Autonomy means: inspect, plan, implement, test, review, improve, re-test, and report without asking for permission for routine local development actions.
 Autonomy does not mean: expand scope, invent missing business rules, perform irreversible actions, affect production without approval, or rewrite working modules unrelated to the task.
+
+Execution hierarchy: Work item → Stage → Release Gate → Production Gate
+Use these terms strictly. Do not use `stage` as a generic name for every plan bullet.
+
+Work item
+- A Work item is an internal implementation step inside a top-level Stage.
+- Identifiers such as `1.1`, `1.2.1`, `7.6.4`, or `N.M.K` are Work items, even when an older task document calls them "Stage".
+- A Work item is not an owner-review, external-review, PR, release, or deployment boundary.
+- After a Work item: run targeted checks, perform a focused internal self-review, fix findings, update the checkpoint, and continue autonomously to the next Work item.
+- Do not create a Stage Report, run the mandatory external Claude review, request owner review, create a separate PR, mark a PR Ready, or run production preflight merely because a Work item ended.
+
+Stage
+- Only a top-level plan item named `Stage <integer>` is a Stage boundary.
+- A Stage combines all of its Work items into one coherent, reviewable result with one Definition of Done.
+- At the Stage boundary: run the full relevant Stage checks, internal review of the complete Stage diff, external Claude Code review, review-fix cycles to `REVIEW_GREEN`, then prepare one Stage Report, commit/push, and update the task Draft PR.
+- A large Work item may become its own Stage only by explicitly promoting and renumbering it in the plan before implementation. Nested numbering alone never creates a Stage gate.
+
+Release Gate
+- A Release Gate is an explicitly declared owner decision boundary after one or more completed Stages or at final handoff.
+- Each Stage plan entry must declare `owner_gate: yes|no`, `release_candidate: yes|no`, and `independently_deployable: yes|no`.
+- Default values are `owner_gate: no`, `release_candidate: no`, and `independently_deployable: no`.
+- When `owner_gate: no`, continue automatically to the next Stage after updating the Draft PR.
+- When `owner_gate: yes`, stop only after the Stage is fully checked, both reviews are green, changes are committed and pushed, CI status is known when available, and the Draft PR is updated. Provide the exact owner decision required.
+- Do not mark a Draft PR Ready for review, merge it, release it, or deploy it without explicit owner instruction.
+
+Production Gate
+- Production preflight, production migrations, queue processing, deploy, production acceptance, and rollback/forward-fix execution are separate HIGH-EXTERNAL actions.
+- A green Release Gate does not authorize any Production Gate action.
+- Obtain explicit owner approval immediately before each mutating production action. Read-only production checks require an explicit production-check request and must use the restricted wrappers below.
 
 Continuous autonomous execution
 After receiving a sufficiently clear task or completing Phase 0 without a STOP condition, continue through implementation, verification, review, fixes, commit, push, and Draft PR without requesting additional owner confirmation.
@@ -84,19 +113,20 @@ At the start of a new or resumed work session, re-read the current repository co
 Before a stage review or commit in a long-running session, check whether these instruction files changed and re-read them when they did.
 
 The required autonomous sequence is:
-1. Implement the current stage.
-2. Run targeted and relevant broader checks.
-3. Perform the internal independent review of the complete stage diff.
-4. Fix all in-scope BLOCKER and IMPORTANT findings and safe in-scope MINOR findings.
-5. Re-run checks and repeat the internal review until green.
-6. Run the external read-only Claude Code CLI review of the complete stage diff.
-7. Validate its findings; fix confirmed in-scope BLOCKER and IMPORTANT findings and safe in-scope MINOR findings.
-8. Re-run checks, internal review, and external review until the external reviewer returns `REVIEW_GREEN`.
-9. Prepare the Stage Report and checkpoint when applicable.
-10. Commit only the files belonging to the current task.
-11. Push the current task branch without force.
-12. Create or update a Draft PR.
-13. Provide the final report only after the Draft PR is ready, or report a real STOP condition.
+1. Record the Stage base commit and its Definition of Done.
+2. Implement every Work item in the current Stage.
+3. After each Work item, run targeted checks and focused internal self-review, fix findings, update the checkpoint, and continue without owner interaction.
+4. After all Work items, integrate the complete Stage and run the full relevant Stage checks.
+5. Perform the internal independent review of the complete Stage diff from the recorded Stage base, including committed and uncommitted task-owned changes.
+6. Fix all in-scope BLOCKER and IMPORTANT findings and safe in-scope MINOR findings.
+7. Re-run checks and repeat the internal review until green.
+8. Run the external read-only Claude Code CLI review of the complete Stage diff.
+9. Validate its findings; fix confirmed in-scope BLOCKER and IMPORTANT findings and safe in-scope MINOR findings.
+10. Re-run checks, internal review, and external review until the external reviewer returns `REVIEW_GREEN`.
+11. Prepare the Stage Report and update the checkpoint.
+12. Commit only task-owned Stage changes, push without force, and create or update the single task Draft PR.
+13. If `owner_gate: no`, continue automatically to the next Stage. If `owner_gate: yes`, report the completed Release Gate and request only the declared owner decision.
+14. At final handoff, complete the final Release Gate. Never continue into the Production Gate without explicit owner approval.
 
 Internal review, external Claude Code review, review fixes, repeated tests, local migration work, commit, non-force push of the task branch, and Draft PR creation are pre-authorized parts of an approved task. They are actions to perform, not proposed next steps.
 
@@ -153,11 +183,11 @@ Record:
 - whether the environment was sufficient to run the check.
 
 After implementation, compare the final result with the baseline.
-Do not attribute a pre-existing failure to the current stage.
+Do not attribute a pre-existing failure to the current Stage.
 Do not block a safe task only because an unrelated pre-existing check is red; document the evidence and continue with the checks relevant to the current scope.
 
 Stage Definition of Done
-Before implementing each stage, define explicit completion criteria.
+Before implementing each top-level Stage, define explicit completion criteria. Work items inherit the Stage goal and need only a focused local checklist.
 
 The Definition of Done must state:
 - expected observable behavior,
@@ -172,6 +202,7 @@ Do not start implementation of a large stage until its Definition of Done is cle
 For small tasks, the Definition of Done may be a short internal checklist.
 
 Small tasks
+Treat a small isolated task as one implicit top-level Stage. It receives one complete review gate at task completion, not a review gate for every edit.
 For small, isolated, low-risk tasks:
 - inspect the relevant files,
 - make the minimal focused change,
@@ -204,11 +235,13 @@ Large task flow:
 ```text
 Phase 0 — Plan
     -> Baseline
-    -> Stage Definition of Done
-    -> Stage 1..N — Implement
-        -> Targeted checks
-        -> Module checks
-        -> Full relevant stage checks
+    -> Top-level Stage 1..N + Stage Definition of Done + gate metadata
+    -> Stage N
+        -> Work item N.1 -> targeted checks -> focused self-review -> continue
+        -> Work item N.2 -> targeted checks -> focused self-review -> continue
+        -> Work item N.M -> targeted checks -> focused self-review -> continue
+        -> Integrate all Work items
+        -> Full relevant Stage checks
         -> Internal independent automatic review
         -> Review findings
         -> Fix findings
@@ -217,26 +250,33 @@ Phase 0 — Plan
         -> External read-only Claude Code CLI review
         -> Validate and fix confirmed findings
         -> Repeat checks and both reviews until REVIEW_GREEN or a real STOP condition
-    -> Stage Report + Checkpoint
-    -> Commit + push task branch + create/update Draft PR
-    -> Next stage or Phase Final — Handoff
+        -> Stage Report + Checkpoint
+        -> Commit + push task branch + create/update the single Draft PR
+        -> owner_gate=no: continue automatically to Stage N+1
+        -> owner_gate=yes: completed Release Gate, request declared owner decision
+    -> Final Release Gate
+    -> Explicit owner decision
+    -> Production Gate only when separately authorized
 ```
 
 Main rules:
 ```text
-1 stage = 1 focused result = 1 reviewable unit
-implementation is not complete until internal automatic review is green and external Claude Code review returns REVIEW_GREEN
-local technical work inside scope does not require owner approval
-both green reviews lead directly to commit, push, and Draft PR without another confirmation
+N.M and N.M.K = Work items, never Stage gates
+Stage N = one integrated result and one complete automatic review gate
+Work item completion requires targeted checks + focused self-review, not external review or owner review
+Stage completion requires full relevant checks + internal review + external REVIEW_GREEN
+owner_gate=no means continue to the next Stage without asking
+Release Gate controls owner review/merge readiness; Production Gate controls production actions
 ```
 
 Prefer:
 ```text
-1 task/reviewable unit = 1 task branch = 1 Draft PR
-stages inside that unit may be separate focused commits
+1 task = 1 task branch = 1 Draft PR
+top-level Stages may be separate focused commits in the same Draft PR
+Work items do not create separate PRs and do not mark the PR Ready
 ```
 
-Do not mix a large backend implementation and a large frontend implementation in the same stage unless explicitly requested.
+Do not mix a large backend implementation and a large frontend implementation in the same top-level Stage unless explicitly requested.
 
 Phase 0 — Plan
 For every large task, Phase 0 is mandatory and must happen before code changes.
@@ -246,9 +286,11 @@ During Phase 0:
 - inspect relevant documentation: `ARCHITECTURE.md`, `PATTERNS.md`, and `CLAUDE.frontend.md` for frontend work when relevant,
 - find 2-3 similar modules or files in the repository,
 - identify existing project patterns,
-- prepare a staged implementation plan,
-- classify each stage by risk,
-- define the Definition of Done for each stage,
+- prepare a plan with top-level Stages and nested Work items,
+- use integer-only identifiers for Stage boundaries and dotted identifiers only for Work items,
+- classify each Stage by risk and identify any HIGH-EXTERNAL Work item before execution,
+- define the Definition of Done and `owner_gate`, `release_candidate`, and `independently_deployable` values for each Stage,
+- define the exact Release Gates and Production Gate actions; do not infer them later from numbering,
 - list baseline and final tests/checks,
 - list files or areas expected to change,
 - list what must not be changed.
@@ -257,6 +299,28 @@ If a task id exists, save the plan to:
 ```text
 docs/tasks/<id>/plan.md
 ```
+
+Use this minimum plan structure:
+```md
+## Stage 1: <integrated result>
+Risk: LOW | MEDIUM | HIGH-LOCAL | HIGH-EXTERNAL
+owner_gate: no
+release_candidate: no
+independently_deployable: no
+stage_base_commit: <record immediately before implementation>
+Definition of Done:
+- ...
+Work items:
+- 1.1 — <implementation step>
+- 1.2 — <implementation step>
+- 1.3 — <implementation step>
+Stage checks:
+- ...
+Reviewer focus:
+- ...
+```
+
+Prefer 3-6 top-level Stages for most large tasks. More are valid only when each is a genuinely integrated, independently reviewable result. If a plan contains `Stage 1.1` or `Stage 1.2.1`, reclassify those entries as Work items before implementation.
 
 After Phase 0, continue automatically to Stage 1 when:
 - scope is clear,
@@ -274,7 +338,7 @@ STOP after Phase 0 only when:
 - or the owner explicitly requested plan approval before implementation.
 
 Risk classification
-Classify every stage before implementation.
+Classify every top-level Stage before implementation. Also identify HIGH-EXTERNAL actions inside Work items; their presence creates a Production Gate, not a Work-item review gate.
 
 Risk | Examples | Local behavior | Owner approval required
 LOW | documentation, tests, isolated copy/style fix, small internal change | implement, review, fix, continue | no
@@ -286,10 +350,10 @@ If unsure whether an action can affect production, shared data, external systems
 Do not classify a routine local code change as requiring approval only because the same type of change would be risky in production.
 `HIGH`, "high-risk", legacy, finance-related, auth-related, or migration-related work performed only in the task branch is HIGH-LOCAL unless it actually requires a HIGH-EXTERNAL action or an unresolved material owner decision.
 "Stage is HIGH-risk, therefore STOP for owner review" is not a valid STOP reason for local implementation.
-Owner review before merge happens through the Draft PR after the agent has completed both reviews, commit, and non-force push.
+Owner review before merge happens only at a declared Release Gate through the Draft PR after the agent has completed both reviews, commit, and non-force push.
 
 Allowed autonomous local actions
-Inside a clear task or approved stage, do not ask for confirmation before:
+Inside a clear task or approved top-level Stage, do not ask for confirmation before:
 - reading and searching repository files,
 - editing files inside the approved scope,
 - creating new classes, tests, DTOs, services, handlers, controllers, templates, and components required by the task,
@@ -307,7 +371,7 @@ Inside a clear task or approved stage, do not ask for confirmation before:
 - committing only the current task changes after both reviews are green,
 - pushing the current task branch without force,
 - creating or updating a Draft PR for the current task,
-- deleting code created by the agent in the same unfinished stage when needed to correct the implementation.
+- deleting code created by the agent in the same unfinished Work item or Stage when needed to correct the implementation.
 
 A local action is autonomous only when it:
 - stays inside scope,
@@ -337,11 +401,12 @@ Never continue autonomously before:
 
 Do not STOP merely because review found issues, tests failed, several repair iterations were needed, a local migration was created, or the next normal action is commit, push, or Draft PR creation.
 
-Internal automatic stage review
-At the end of every implementation stage, perform a separate automatic review before declaring the stage complete.
+Internal automatic Stage review
+At the end of every top-level Stage, perform a separate automatic review before declaring the Stage complete.
 Treat this review as an independent senior code review, not as a repetition of the implementation reasoning.
+Do not run this complete review gate merely because a Work item ended. Work items receive only focused self-review and targeted checks.
 
-Review the complete stage diff for:
+Review the complete Stage diff from the recorded `stage_base_commit`, including any Work-item commits and remaining task-owned working-tree changes, for:
 - task and stage scope compliance,
 - correctness and edge cases,
 - consistency with `ARCHITECTURE.md`, `PATTERNS.md`, and nearby modules,
@@ -361,8 +426,8 @@ Review the complete stage diff for:
 
 Classify every review finding:
 ```text
-BLOCKER   — correctness, security, data-loss, broken contract, or stage cannot be accepted
-IMPORTANT — must be fixed before the stage is complete
+BLOCKER   — correctness, security, data-loss, broken contract, or Stage cannot be accepted
+IMPORTANT — must be fixed before the Stage is complete
 MINOR     — improve now when local, safe, and inside scope
 FOLLOW-UP — valid improvement intentionally outside the current scope
 ```
@@ -379,7 +444,7 @@ After review:
 Repeat the review-fix cycle until:
 - there are no BLOCKER or IMPORTANT findings,
 - checks are green or failures are proven unrelated to the stage,
-- and the stage acceptance criteria are met.
+- and the Stage acceptance criteria are met.
 
 Do not stop after the first fix attempt when additional safe fixes remain inside scope.
 After 3 unsuccessful review-fix iterations, perform root-cause analysis, reconsider the implementation approach, and try a materially different safe approach inside scope.
@@ -388,8 +453,9 @@ STOP only when a BLOCKER or IMPORTANT finding cannot be fixed safely inside scop
 Do not hide unresolved review findings.
 
 External Claude Code CLI review
-After the internal automatic review is green, run a second independent review with the locally installed Claude Code CLI before a stage commit or final task commit.
+After the top-level Stage internal automatic review is green, run a second independent review with the locally installed Claude Code CLI before the Stage completion commit/push or final task commit.
 This review is mandatory for code, configuration, migration, infrastructure, and frontend changes. For a documentation-only change with no executable behavior change, it may be recorded as `N/A — documentation only`.
+Do not run the mandatory external review after individual Work items. Review their combined result once at the top-level Stage boundary.
 
 The external reviewer is read-only and advisory:
 - it must not edit files, change Git state, call external services, or create commits,
@@ -439,7 +505,7 @@ claude -p \
     "mcp__*" \
   --strict-mcp-config \
   --no-session-persistence \
-  --max-turns 20 \
+  --max-turns 40 \
   --output-format text \
   "Perform an independent senior code review of the current task diff.
 
@@ -459,7 +525,7 @@ Do not use `--dangerously-skip-permissions`. Do not grant `Edit`, `Write`, unres
 Do not send secrets, environment values, production data, or authentication output in the prompt.
 `--safe-mode` is required so project hooks, plugins, skills, MCP servers, auto-memory, and other local Claude customizations cannot introduce writes, external calls, or interactive prompts. The reviewer must still read `CLAUDE.md` explicitly as a repository file.
 
-For a stage review, review the staged and unstaged changes plus task-owned untracked files before the stage commit.
+For a Stage review, Codex must provide the exact recorded `stage_base_commit`; review `<stage_base_commit>...HEAD`, staged and unstaged changes, and all task-owned untracked files. This scope must include every Work item in the Stage.
 For the final handoff after stage commits, Codex must determine the verified task base ref or base commit without fetching, append that exact value to the prompt, and require review of `<base>...HEAD` plus any remaining working-tree changes. Never silently assume `main` or `master`.
 
 External review-fix cycle:
@@ -472,21 +538,24 @@ External review-fix cycle:
 Repeat until the final external review ends with the exact standalone line `REVIEW_GREEN` and no confirmed BLOCKER or IMPORTANT finding remains.
 Do not treat a failed command, truncated output, permission denial, timeout, authentication error, or missing `REVIEW_GREEN` marker as a green review.
 
-If the command fails, diagnose it and make one retry after a material correction. If Claude Code remains unavailable or unauthenticated, STOP as a real external reviewer blocker, report the exact sanitized error and attempted correction, and do not claim review success or commit the stage.
+`Reached max turns` is a recoverable local reviewer-configuration failure, not an owner gate. If it occurs at 40 turns, narrow the prompt to the exact Stage base and changed files, then retry automatically once with `--max-turns 80` and all safety restrictions unchanged. Do not ask the owner for permission to increase this read-only limit.
+
+For other command failures, diagnose and make one retry after a material correction. STOP as a real external reviewer blocker only when the read-only review still cannot complete after the prescribed retry, Claude Code is unavailable or unauthenticated, or a safe complete Stage review cannot be produced. Report the exact sanitized error and attempted correction; never claim review success or complete the Stage without `REVIEW_GREEN`.
 
 Verification strategy
 Use a progressive verification cascade.
 
-During implementation:
+At Work item completion:
 1. Run the narrowest relevant test or check for the changed behavior.
-2. Run the relevant module or bounded-context test set.
-3. Run static analysis, linting, or build checks relevant to changed files.
+2. Run focused static analysis, linting, or build checks relevant to changed files when practical.
+3. Perform focused internal self-review, fix findings, update the checkpoint, and continue. Do not run the full Stage gate.
 
-At stage completion:
-4. Run the full relevant stage check set.
+At top-level Stage completion:
+4. Run the relevant module or bounded-context test set.
+5. Run the full relevant Stage check set and both complete reviews.
 
 At final handoff:
-5. Run the full project check set when practical and supported by the environment.
+6. Run the full project check set when practical and supported by the environment.
 
 A targeted green test is not enough to declare a stage complete when broader relevant checks are available.
 Prefer fast feedback during implementation and broader confidence before handoff.
@@ -526,7 +595,7 @@ Prefer expand/contract for database and persistent contract changes:
 
 Do not combine schema expansion, full backfill, production switch, and removal of the old schema in one stage unless explicitly required and reviewed.
 
-For every migration-related stage, review:
+For every migration-related top-level Stage, review:
 - generated SQL,
 - indexes and constraints,
 - nullable/default behavior,
@@ -547,8 +616,11 @@ The checkpoint must include:
 ```md
 ## Current checkpoint
 
-**Phase:** <phase or stage>
+**Phase:** <phase, Stage N, Work item N.M, Release Gate, or Production Gate>
 **Status:** <planned | implementing | checking | reviewing | fixing | stopped | done>
+**Stage base commit:** <commit>
+**Current Work item:** <N.M or none>
+**Owner gate:** yes | no
 
 ### Completed
 - ...
@@ -571,7 +643,8 @@ The checkpoint must include:
 ```
 
 Update the checkpoint:
-- after completing a stage,
+- after completing each Work item,
+- after completing a top-level Stage,
 - before every mandatory STOP,
 - after an environment failure that prevents continuation,
 - before ending an unfinished work session when possible.
@@ -583,7 +656,8 @@ When resuming:
 4. Continue from the exact next action instead of repeating completed analysis.
 
 Stage completion
-A stage is complete only when:
+A top-level Stage is complete only when:
+- every planned Work item is complete and integrated,
 - its Definition of Done is satisfied,
 - implementation is finished,
 - baseline and final results were compared,
@@ -595,10 +669,15 @@ A stage is complete only when:
 - no unresolved BLOCKER or IMPORTANT findings remain,
 - acceptance criteria for the stage are met,
 - the Stage Report is prepared,
-- and the checkpoint is updated.
+- the checkpoint is updated,
+- task-owned Stage changes are committed and pushed,
+- and the single task Draft PR is created or updated.
+
+Work item completion
+A Work item is complete when its scoped behavior is implemented, targeted checks pass or unrelated failures are documented, focused self-review findings are fixed, and the checkpoint is updated. Work item completion never requires external Claude review, Stage Report, PR creation/update, owner response, production preflight, or deployment.
 
 Backend and frontend separation
-For large product work, split backend and frontend into separate stages or PRs.
+For large product work, split backend and frontend into separate top-level Stages. Keep one task Draft PR unless a result is explicitly declared independently deployable and the owner requests a separate PR.
 
 Backend stages usually cover:
 - module skeleton and documentation,
@@ -618,7 +697,7 @@ Frontend stages usually cover:
 Frontend may start before backend only when an approved API contract or mock data exists.
 
 Stage Report
-For every large-task stage, prepare a Stage Report.
+Prepare one Stage Report for every top-level Stage only. Never create a Stage Report for Work items such as `N.M` or `N.M.K`.
 
 If a task id exists, save it to:
 ```text
@@ -630,7 +709,14 @@ Stage Report format:
 ### Stage <N>: <title> — DONE
 
 **Risk:** LOW | MEDIUM | HIGH-LOCAL | HIGH-EXTERNAL
+**Owner gate:** yes | no
+**Release candidate:** yes | no
+**Independently deployable:** yes | no
 **Next action:** continue autonomously | STOP, owner action required
+
+#### Stage scope
+- Stage base commit: `<commit>`
+- Work items completed: `N.1`, `N.2`, ...
 
 #### What was done
 - ...
@@ -691,7 +777,8 @@ Alternative responses, when relevant:
 ```
 
 Waiting for owner response
-Whenever the agent finishes a stage and must wait for the owner, do not end with a vague request such as "please confirm" or "waiting for feedback".
+Wait after a completed Stage only when `owner_gate: yes`, an explicit Release Gate is reached, or a real mandatory STOP condition exists. Never wait merely because a Work item or an `owner_gate: no` Stage ended.
+When waiting is valid, do not end with a vague request such as "please confirm" or "waiting for feedback".
 
 The message must contain:
 - what was completed,
@@ -720,8 +807,8 @@ To continue, reply:
 When several valid choices exist, recommend one and provide ready-to-copy responses for each option.
 The expected response must be specific enough that the agent can continue without asking the same question again.
 
-Phase Final — Handoff
-At the end of the last stage:
+Final Release Gate — Handoff
+At the end of the last top-level Stage:
 - run the full relevant check set,
 - review the complete diff,
 - perform the final internal automatic review,
@@ -733,7 +820,8 @@ At the end of the last stage:
 - commit only the current task changes after both final reviews are green,
 - push the current task branch without force,
 - create or update the Draft PR,
-- report the Draft PR and final results to the owner.
+- keep the PR in Draft unless the owner explicitly requests `Ready for review`,
+- report the completed Release Gate, Draft PR, CI status when available, and final results to the owner.
 
 If a task id exists, save final handoff to:
 ```text
@@ -755,7 +843,17 @@ Final handoff must include:
 - branch name and Draft PR URL when available,
 - the exact expected owner response when approval is required.
 
-Do not STOP before commit, non-force push, Draft PR creation, or handoff reporting. Always STOP before merge, release, deployment, production mutation, or another HIGH-EXTERNAL action. Do not merge autonomously.
+Do not STOP before commit, non-force push, Draft PR update, or Release Gate reporting. At the Release Gate, STOP for the declared owner decision before changing Draft status, merge, release, or entering the Production Gate.
+
+Production Gate — execution
+After a separate explicit owner instruction to enter the Production Gate, not merely Release Gate approval:
+1. Perform only the explicitly requested read-only production preflight through approved wrappers.
+2. Report preflight evidence without secrets, PII, raw financial payloads, or unnecessary identifiers.
+3. Obtain separate explicit approval before merge when the owner delegates merge to the agent.
+4. Obtain separate explicit approval immediately before each production migration, deploy, queue-processing, backfill, recalculation, repair, or other mutating action.
+5. Run only the approved action, then perform the explicitly scoped production acceptance check.
+
+Approval for merge does not authorize deploy. Approval for deploy does not authorize migrations, backfill, history rewrite, recalculation, or another production mutation unless those exact actions were included explicitly.
 
 Forbidden in autonomous mode
 Never do these autonomously:
@@ -763,6 +861,9 @@ Never do these autonomously:
 expand scope without owner approval
 invent missing business or financial rules
 skip Phase 0 for a large task
+classify N.M or N.M.K as a Stage gate merely because a task document calls it Stage
+run the mandatory external Claude review, Stage Report, PR gate, or owner gate after every Work item
+wait for owner review after an owner_gate=no Stage
 skip internal automatic review because the change looks obvious
 skip external Claude Code review for executable changes
 allow the external reviewer to edit files or change Git state
@@ -785,6 +886,8 @@ stop silently without notifying the owner
 ask for approval for routine reversible local work already inside scope
 finish with review, commit, push, or Draft PR creation still listed as an executable next step
 delegate starting or conducting the required reviews to the owner
+mark a Draft PR Ready for review without explicit owner instruction
+enter the Production Gate because a Release Gate or CI is green
 ```
 
 ---
@@ -809,7 +912,10 @@ Rules:
 Do not overwrite user changes.
 Do not touch unrelated files.
 Do not run destructive git commands unless explicitly requested.
-After the final internal automatic review is green and the external Claude Code review returns `REVIEW_GREEN`, commit only the current task files, push the current task branch without force, and create or update a Draft PR without asking for another confirmation.
+Record the exact `stage_base_commit` before the first Work item of each top-level Stage.
+Work items do not create separate branches or PRs. A local checkpoint commit after a checked Work item is allowed when it materially improves recoverability, but it must remain part of the complete Stage diff and does not make the Work item a Stage gate. Do not push solely to announce a Work item completion.
+After the top-level Stage internal automatic review is green and the external Claude Code review returns `REVIEW_GREEN`, commit any remaining task-owned Stage files, push the task branch without force, and create or update the single task Draft PR without asking for another confirmation.
+Keep the PR in Draft across Stages. Do not mark it Ready until the declared Release Gate and explicit owner instruction.
 If unrelated uncommitted changes exist, stage only the files or hunks owned by the current task. STOP only when changes overlap and cannot be separated safely.
 Never commit secrets, generated local artifacts, unrelated owner changes, or files outside the task scope.
 Do not use:
