@@ -55,7 +55,7 @@ final class CreatePLDocumentActionTest extends IntegrationTestCase
         self::assertSame('PL-501', $document->getNumber());
         self::assertCount(1, $document->getOperations());
 
-        $dailyTotals = $this->em()->getRepository(PLDailyTotal::class)->findAll();
+        $dailyTotals = $this->em()->getRepository(PLDailyTotal::class)->findBy(['company' => $company]);
         self::assertCount(1, $dailyTotals);
         self::assertSame('0.00', $dailyTotals[0]->getAmountIncome());
         self::assertSame('1500.00', $dailyTotals[0]->getAmountExpense());

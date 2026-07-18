@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Finance;
 
+use App\Company\Entity\ProjectDirection;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\PLCategoryType;
 use App\Finance\Enum\PLExpenseType;
 use App\Finance\Enum\PLFlow;
+use App\Finance\Repository\PLDailyTotalRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Finance\PLCategoryBuilder;
@@ -102,5 +104,66 @@ final class PLCategoryEditControllerTest extends WebTestCaseBase
         self::assertInstanceOf(PLCategory::class, $updatedCategory);
         self::assertSame(PLExpenseType::VARIABLE, $updatedCategory->getExpenseType());
         self::assertFalse($updatedCategory->isVisible());
+    }
+
+    public function testDeleteMergesDailyTotalsIntoUncategorizedBucket(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $company = CompanyBuilder::aCompany()->withOwner($user)->build();
+        $project = new ProjectDirection('55555555-5555-5555-5555-000000077703', $company, 'Main');
+        $category = PLCategoryBuilder::aPLCategory()
+            ->forCompany($company)
+            ->withId('33333333-3333-3333-3333-000000077703')
+            ->withName('Delete me')
+            ->withFlow(PLFlow::EXPENSE)
+            ->build();
+
+        $em = $this->em();
+        foreach ([$user, $company, $project, $category] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        /** @var PLDailyTotalRepository $repository */
+        $repository = self::getContainer()->get(PLDailyTotalRepository::class);
+        $companyId = (string) $company->getId();
+        $projectId = (string) $project->getId();
+        $categoryId = (string) $category->getId();
+        $date = new \DateTimeImmutable('2026-07-18');
+
+        $repository->upsert($companyId, null, $date, $projectId, '10.00', '1.00', false);
+        $repository->upsert($companyId, $categoryId, $date, $projectId, '20.00', '2.00', false);
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $companyId);
+        $client->request('POST', '/pl-categories/'.$categoryId.'/delete', [
+            '_token' => $this->csrfToken($client, 'delete'.$categoryId),
+        ]);
+
+        self::assertResponseRedirects('/pl-categories/');
+        self::assertNull($this->em()->getRepository(PLCategory::class)->find($categoryId));
+
+        $row = $this->em()->getConnection()->fetchAssociative(
+            <<<'SQL'
+                SELECT amount_income, amount_expense
+                FROM pl_daily_totals
+                WHERE company_id = :company_id
+                  AND pl_category_id IS NULL
+                  AND date = :date
+                  AND project_direction_id = :project_id
+                SQL,
+            [
+                'company_id' => $companyId,
+                'date' => $date->format('Y-m-d'),
+                'project_id' => $projectId,
+            ],
+        );
+
+        self::assertIsArray($row);
+        self::assertSame('30.00', $row['amount_income']);
+        self::assertSame('3.00', $row['amount_expense']);
     }
 }

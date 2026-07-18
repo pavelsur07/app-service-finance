@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Finance;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\FinancialResponsibilityCenter;
+use App\Company\Entity\FinancialResponsibilityCenterProject;
 use App\Company\Entity\ProjectDirection;
 use App\Finance\Application\Service\PLRegisterUpdater;
 use App\Finance\Entity\Document;
@@ -170,6 +172,47 @@ final class PLRegisterUpdaterStornoSymmetryTest extends IntegrationTestCase
         self::assertEqualsWithDelta(0.0, abs($netReport - $opsSum), 0.005);
     }
 
+    public function testAggregatesSameProjectAndCategoryByResponsibilityCenter(): void
+    {
+        $category = $this->createCategory('CFO_SPLIT_EXPENSE', PLFlow::EXPENSE);
+        $centerA = $this->createResponsibilityCenter('CFO_SPLIT_A', 'Краснодар');
+        $centerB = $this->createResponsibilityCenter('CFO_SPLIT_B', 'Ростов');
+
+        $documentA = $this->createDocument(DocumentType::CASHFLOW_EXPENSE, '2026-04-01');
+        $documentA->setResponsibilityCenterId($centerA->getId());
+        $this->addOperation($documentA, $category, '100.00');
+
+        $documentB = $this->createDocument(DocumentType::CASHFLOW_EXPENSE, '2026-04-01');
+        $documentB->setResponsibilityCenterId($centerB->getId());
+        $this->addOperation($documentB, $category, '200.00');
+
+        foreach ([$documentA, $documentB] as $document) {
+            $this->em->persist($document);
+        }
+        $this->em->flush();
+
+        $this->updater->updateForDocument($documentA);
+
+        $rows = $this->em->getConnection()->fetchAllAssociative(
+            'SELECT responsibility_center_id, amount_income, amount_expense
+             FROM pl_daily_totals
+             WHERE company_id = :company AND pl_category_id = :category
+             ORDER BY amount_expense',
+            [
+                'company' => $this->company->getId(),
+                'category' => $category->getId(),
+            ],
+        );
+
+        self::assertCount(2, $rows);
+        self::assertSame($centerA->getId(), $rows[0]['responsibility_center_id']);
+        self::assertSame('0.00', $rows[0]['amount_income']);
+        self::assertSame('100.00', $rows[0]['amount_expense']);
+        self::assertSame($centerB->getId(), $rows[1]['responsibility_center_id']);
+        self::assertSame('0.00', $rows[1]['amount_income']);
+        self::assertSame('200.00', $rows[1]['amount_expense']);
+    }
+
     private function createCategory(string $code, PLFlow $flow): PLCategory
     {
         $category = new PLCategory(Uuid::uuid4()->toString(), $this->company);
@@ -192,6 +235,17 @@ final class PLRegisterUpdaterStornoSymmetryTest extends IntegrationTestCase
         $document->setProjectDirection($this->project);
 
         return $document;
+    }
+
+    private function createResponsibilityCenter(string $code, string $name): FinancialResponsibilityCenter
+    {
+        $center = new FinancialResponsibilityCenter((string) $this->company->getId(), $code, $name);
+
+        $this->em->persist($center);
+        $this->em->persist(new FinancialResponsibilityCenterProject((string) $this->company->getId(), $this->project, $center));
+        $this->em->flush();
+
+        return $center;
     }
 
     private function addOperation(Document $document, PLCategory $category, string $amount): void
