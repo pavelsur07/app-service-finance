@@ -29,6 +29,20 @@ Read additional documents only when relevant:
 `README.md` — for setup or project commands when needed
 For small isolated changes, do not read all documentation files. Inspect only the files needed for the task.
 If one of these files is missing or unavailable, report it and continue with available context.
+
+Instruction precedence
+For Codex execution and STOP decisions, use this order:
+1. The owner's explicit instruction in the current task or current chat.
+2. The nearest `AGENTS.md` to the files being changed.
+3. The repository-root `AGENTS.md`.
+4. The approved task specification and ADRs.
+5. `PATTERNS.md` and `ARCHITECTURE.md`.
+6. `CLAUDE.md` and `CLAUDE.frontend.md` as supplementary implementation rules.
+7. Existing code and general best practices.
+
+`CLAUDE.md`, an old Stage Report, a risk label, or a generic phrase such as "owner-reviewable" must not introduce a manual STOP that is absent from the applicable `AGENTS.md` and current owner instruction.
+Only an explicit owner gate in the current task, a mandatory STOP point below, or a real blocker can pause autonomous execution.
+If documents conflict, follow the higher-priority source, preserve safety, record the conflict, and continue when no real STOP condition exists.
 ---
 Stack
 PHP — actual Docker/runtime configuration is the source of truth
@@ -66,6 +80,9 @@ Autonomy does not mean: expand scope, invent missing business rules, perform irr
 Continuous autonomous execution
 After receiving a sufficiently clear task or completing Phase 0 without a STOP condition, continue through implementation, verification, review, fixes, commit, push, and Draft PR without requesting additional owner confirmation.
 
+At the start of a new or resumed work session, re-read the current repository copies of the root and applicable nested `AGENTS.md` files and the relevant `CLAUDE.md`. Do not rely on copies cached in conversation history or loaded before those files were updated.
+Before a stage review or commit in a long-running session, check whether these instruction files changed and re-read them when they did.
+
 The required autonomous sequence is:
 1. Implement the current stage.
 2. Run targeted and relevant broader checks.
@@ -86,9 +103,12 @@ Internal review, external Claude Code review, review fixes, repeated tests, loca
 Never end a runnable task with messages such as:
 - "the next step is review",
 - "after green review we can commit",
+- "request a repeat review of the current diff",
+- "now the owner needs to conduct/review the stage",
 - "ready to push after confirmation",
 - "can create a PR after approval".
 
+The agent invokes both reviews itself. Never instruct the owner to request, start, conduct, or approve an internal or external review.
 Perform those actions before reporting. Do not merge, release, deploy, mutate production, or perform another HIGH-EXTERNAL action without explicit owner approval.
 
 If work stops for any reason, explicitly notify the owner. Never stop silently.
@@ -264,6 +284,9 @@ HIGH-EXTERNAL | production mutation, staging/production migration, live external
 
 If unsure whether an action can affect production, shared data, external systems, or irreversible state, treat it as HIGH-EXTERNAL and STOP.
 Do not classify a routine local code change as requiring approval only because the same type of change would be risky in production.
+`HIGH`, "high-risk", legacy, finance-related, auth-related, or migration-related work performed only in the task branch is HIGH-LOCAL unless it actually requires a HIGH-EXTERNAL action or an unresolved material owner decision.
+"Stage is HIGH-risk, therefore STOP for owner review" is not a valid STOP reason for local implementation.
+Owner review before merge happens through the Draft PR after the agent has completed both reviews, commit, and non-force push.
 
 Allowed autonomous local actions
 Inside a clear task or approved stage, do not ask for confirmation before:
@@ -384,6 +407,7 @@ claude auth status >/dev/null
 
 Never print or persist the output of `claude auth status`; it may contain account and organization identifiers.
 Do not ask the owner to confirm this review call: it is a pre-authorized, local, read-only step of the approved workflow.
+The primary Codex agent must execute the configured `claude -p` command itself. It must not replace execution with a recommendation that the owner request a review.
 
 Run from the repository root:
 ```bash
@@ -419,7 +443,7 @@ claude -p \
   --output-format text \
   "Perform an independent senior code review of the current task diff.
 
-Do not edit files. Do not change Git state. Do not call external services. Do not read .env files, credentials, private keys, authentication data, or production dumps.
+You are the external reviewer invoked by Codex. Do not invoke another Claude or reviewer process recursively. Do not edit files. Do not change Git state. Do not call external services. Do not read .env files, credentials, private keys, authentication data, or production dumps.
 
 Read AGENTS.md, CLAUDE.md, the task specification available in the repository, and only the relevant sections of PATTERNS.md and ARCHITECTURE.md. Inspect git status, staged and unstaged changes, and all task-owned untracked files.
 
@@ -760,6 +784,7 @@ expose secrets or credentials
 stop silently without notifying the owner
 ask for approval for routine reversible local work already inside scope
 finish with review, commit, push, or Draft PR creation still listed as an executable next step
+delegate starting or conducting the required reviews to the owner
 ```
 
 ---
