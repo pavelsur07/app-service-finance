@@ -3,6 +3,7 @@
 namespace App\Cash\Service\Transaction;
 
 use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
+use App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver;
 use App\Cash\Application\Service\DailyBalanceRecalculator;
 use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
@@ -32,6 +33,7 @@ class CashTransactionService
         private VatPolicy $vatPolicy,
         private VatCalculator $vatCalculator,
         private SnapshotCacheInvalidator $snapshotCacheInvalidator,
+        private CashTransactionResponsibilityCenterResolver $responsibilityCenterResolver,
     ) {
     }
 
@@ -113,15 +115,19 @@ class CashTransactionService
         $category = $dto->cashflowCategoryId
             ? $this->em->getReference(CashflowCategory::class, $dto->cashflowCategoryId)
             : null;
-        $projectDirection = $dto->projectDirectionId
-            ? $this->em->getReference(ProjectDirection::class, $dto->projectDirectionId)
-            : null;
+        $responsibilityPair = $this->responsibilityCenterResolver->resolveForCreate(
+            $dto->companyId,
+            $dto->projectDirectionId,
+            $dto->responsibilityCenterId,
+        );
+        $projectDirection = $this->em->getReference(ProjectDirection::class, $responsibilityPair->projectDirectionId);
 
         $tx
             ->setDescription($dto->description)
             ->setCounterparty($counterparty)
             ->setCashflowCategory($category)
-            ->setProjectDirection($projectDirection);
+            ->setProjectDirection($projectDirection)
+            ->setResponsibilityCenterId($responsibilityPair->responsibilityCenterId);
 
         $tx->setImportSource($dto->importSource);
         $tx->setExternalId($dto->externalId);
@@ -183,13 +189,24 @@ class CashTransactionService
         $category = $dto->cashflowCategoryId
             ? $this->em->getReference(CashflowCategory::class, $dto->cashflowCategoryId)
             : null;
-        $projectDirection = $dto->projectDirectionId
-            ? $this->em->getReference(ProjectDirection::class, $dto->projectDirectionId)
-            : null;
+        $responsibilityPair = $this->responsibilityCenterResolver->resolveChangedPairForUpdate(
+            (string) $company->getId(),
+            $tx->getProjectDirection()?->getId(),
+            $tx->getResponsibilityCenterId(),
+            $dto->projectDirectionId ?? $tx->getProjectDirection()?->getId(),
+            $dto->responsibilityCenterId ?? $tx->getResponsibilityCenterId(),
+        );
+        $projectDirection = null !== $responsibilityPair
+            ? $this->em->getReference(ProjectDirection::class, $responsibilityPair->projectDirectionId)
+            : $tx->getProjectDirection();
+        $responsibilityCenterId = null !== $responsibilityPair
+            ? $responsibilityPair->responsibilityCenterId
+            : $tx->getResponsibilityCenterId();
 
         $tx->setCounterparty($counterparty)
             ->setCashflowCategory($category)
-            ->setProjectDirection($projectDirection);
+            ->setProjectDirection($projectDirection)
+            ->setResponsibilityCenterId($responsibilityCenterId);
 
         $this->applyVat($tx, $company, $dto->direction, $dto->amount);
 

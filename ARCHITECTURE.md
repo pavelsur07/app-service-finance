@@ -181,7 +181,7 @@
 ### Finance: responsibility-center fact-schema expansion
 
 - Stage 7.5 adds nullable scalar `responsibility_center_id` UUID columns to `cash_transaction`, `documents`, `document_operations`, and `pl_daily_totals`. Each column has a restrictive FK to Company-owned `financial_responsibility_centers`.
-- Stage 7.6.1 maps only `CashTransaction.responsibilityCenterId` as a nullable scalar UUID. `CashTransactionResponsibilityCenterResolver` can resolve the company system pair and validate an explicit active allowed pair through `FinancialResponsibilityCenterFacade`, but no Cash writer uses it yet. Finance Entity mappings and every application write remain deferred to later approved units.
+- Stage 7.6.2 connects `CashTransactionService` and `CashFacade` to `CashTransactionResponsibilityCenterResolver`. New core Cash/facade-created transactions with empty project/ЦФО receive the company `PROJECT_GENERAL × CFO_GENERAL` pair; explicit pairs are accepted only when active and allowed. The existing manual Cash form exposes the scalar ЦФО choice so its existing project field can submit a complete pair. Duplicate import/facade branches return before pair resolution and never rewrite existing classification. Dynamic project→ЦФО filtering, import cutover, Finance Entity mappings, and P&L writes remain deferred to later approved units.
 - The expand migration performs no fact backfill, classification inference, or P&L rebuild. Existing rows remain `NULL` and later UI/report stages interpret that state as `Не распределено`.
 - Stage 7.5 does not change `pl_daily_totals` uniqueness. In particular, nullable `pl_category_id` keeps PostgreSQL's default distinct-NULL semantics so the existing `ON DELETE SET NULL` category-deletion path cannot collide with another uncategorized total.
 - The project × ЦФО aggregation key, concurrent-writer locking, nullable-category behavior, and deployment cutover require a separate Stage 7.7 Phase 0 before any P&L writer or uniqueness change.
@@ -648,6 +648,7 @@ createTransaction(CreateCashTransactionCommand $command): CreateCashTransactionR
 - `externalId` (`nullable`)
 - `dedupeHash` (`nullable`)
 - `rawData` (`nullable`)
+- `responsibilityCenterId` (`nullable`; accepted with `projectDirectionId` only, otherwise `null/null` resolves to the company system pair)
 
 **DTO результата:** `CreateCashTransactionResult` (`src/Cash/Application/DTO/CreateCashTransactionResult.php`)
 - `transactionId: string`
@@ -656,6 +657,7 @@ createTransaction(CreateCashTransactionCommand $command): CreateCashTransactionR
 
 **Side effects:** создание через `CashFacade::createTransaction()` сохраняет все side effects `CashTransactionService::add()`:
 - VAT logic;
+- project × ЦФО pair resolution through the company-scoped Cash resolver;
 - `PaymentPlanMatcher`;
 - `ApplyAutoRulesForTransaction`;
 - `DailyBalanceRecalculator`;
@@ -2344,6 +2346,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.60 | 2026-07-17 | Cash/Company: Stage 7.6.2 подключает core Cash create/update и `CashFacade` к валидируемому project × ЦФО contract; новые empty-pair транзакции получают системную пару |
 | 1.59 | 2026-07-17 | Cash/Company: Stage 7.9.3 добавляет общий атомарный planner project × ЦФО, active-pair snapshot, preview labels/breakdown и per-field audit provenance |
 | 1.58 | 2026-07-17 | Cash/Company: добавлены nullable scalar mapping ЦФО транзакции, read-контракт системной пары и невключённый в writers валидатор пар Stage 7.6.1 |
 | 1.57 | 2026-07-17 | Company: добавлен защищённый Twig-интерфейс `Справочники → ЦФО` с company isolation, CSRF и optimistic locking |

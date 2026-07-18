@@ -2,12 +2,12 @@
 
 ## Status
 
-- Phase: **Stage 7.9.2 command merged/deployed; Stage 7.9.3 implemented locally and awaiting owner review**
+- Phase: **Stage 7.9.3 production acceptance closed; Stage 7.9.4 transition to Stage 7.6 cutover is open**
 - Selected transition: **Option A — coordinated cutover**
 - Overall risk: **HIGH** because the stage changes financial classification semantics and adds a nullable auto-rule target column
-- Current production behavior: **unchanged**; Stage 7.6.1 and rule authoring are deployed, but no Cash writer assigns the system pair and the configuration gate remains open
+- Current production behavior: **planner deployed; no Cash writer assigns the system pair yet**
 - Historical application, backfill, and recalculation: **forbidden**
-- Next action: **complete the separately gated Stage 7.9.2 production zero-unpaired-rule check, then review Stage 7.9.3; do not deploy the planner before both gates are green**
+- Next action: **return to the separately approved Stage 7.6.2 core Cash create/update cutover; keep Stage 7.6.4 import cutover gated**
 
 ## Goal
 
@@ -254,6 +254,8 @@ Mandatory STOP after green self-review and controlled production acceptance.
 **Result:** Stage 7.6.2/7.6.4 may assign the system pair without pausing complete configured auto-rules.
 
 This is not Stage 7.9 implementation work. It returns to the separately approved Stage 7.6 writer/import plan and retains its own gates.
+
+Status: OPEN. Stage 7.9.2 was executed in production and verified to zero remaining unpaired active `PROJECT_GENERAL` rules. Stage 7.9.3 was merged, deployed, and accepted with a controlled read-only preview: the rule `Перевод на карту` showed 20 July 2026 rows changing only `responsibilityCenterId` from empty to `CFO_GENERAL`, with zero conflicts and no category/project/counterparty changes. No transaction was manually applied because the rule-check page is read-only; the existing one-row apply path remains available from the Cash transaction list modal. Acceptance is therefore closed as preview-only, with no historical range run and no production transaction mutation by Codex.
 
 ## Expected change areas
 

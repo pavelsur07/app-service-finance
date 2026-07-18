@@ -2,12 +2,12 @@
 
 ## Status
 
-- Phase: **Stage 7.6.1 accepted in production; runtime writers remain untouched**
+- Phase: **Stage 7.6.2 implemented locally; owner review required before PR/merge**
 - Scope: **Cash transaction model, create/edit/facade/import write paths, manual form, pair validation, and audit regression coverage**
 - Overall risk: **HIGH** because the stage changes financial classification behavior for newly created Cash transactions
 - Database migration: **not required**; Stage 7.5 already deployed the nullable `cash_transaction.responsibility_center_id` column, FK, and index
 - Production writes, backfill, and historical recalculation: **forbidden**
-- Next action: **STOP; complete the approved Stage 7.9 Option A pair-rule gate before HIGH-risk writer work**
+- Next action: **review Stage 7.6.2; Stage 7.6.3 manual UI and Stage 7.6.4 imports remain separate gated stages**
 
 ## Goal
 
@@ -158,6 +158,8 @@ Expected work:
 **Risk:** HIGH
 
 **Result:** `CashTransactionService` and `CashFacade` use the approved pair contract without changing duplicate behavior, VAT, payment matching, daily balances, snapshots, or auto-rule dispatch.
+
+Implementation status: DONE locally. `CashTransactionDTO` and `CreateCashTransactionCommand` now accept optional scalar `responsibilityCenterId`; `CashTransactionService::add()` resolves `null/null` to the system pair or validates an explicit pair once before persist; `update()` preserves an unchanged stored pair and validates changed pairs; `CashFacade` keeps import duplicate detection before service creation. The existing manual Cash form includes the minimal scalar ЦФО field required to submit an already visible project safely. No import service, migration, history run, queue, or production operation is included.
 
 Expected work:
 

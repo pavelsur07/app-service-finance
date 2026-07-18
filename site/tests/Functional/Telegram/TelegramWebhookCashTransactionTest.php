@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Telegram;
 
+use App\Company\Entity\FinancialResponsibilityCenter;
+use App\Company\Entity\FinancialResponsibilityCenterProject;
+use App\Company\Entity\ProjectDirection;
 use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Telegram\Entity\ClientBinding;
 use App\Telegram\Entity\ImportJob;
@@ -203,6 +206,20 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
             $company->setFinanceLockBefore($financeLockBefore);
         }
         $em->persist($company);
+        $project = new ProjectDirection(
+            '44444444-4444-4444-4444-abcd0000bb01',
+            $company,
+            'Общий',
+            ProjectDirection::CODE_GENERAL,
+        );
+        $center = new FinancialResponsibilityCenter(
+            $company->getId(),
+            FinancialResponsibilityCenter::CODE_GENERAL,
+            FinancialResponsibilityCenter::NAME_GENERAL,
+        );
+        $em->persist($project);
+        $em->persist($center);
+        $em->persist(new FinancialResponsibilityCenterProject($company->getId(), $project, $center));
 
         $account = MoneyAccountBuilder::aMoneyAccount()
             ->withId('33333333-3333-3333-3333-abcd0000bb01')

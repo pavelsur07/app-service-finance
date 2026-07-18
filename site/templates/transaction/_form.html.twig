@@ -42,6 +42,11 @@
                 {{ form_widget(form.projectDirection, {'attr': {'class': 'form-select'}}) }}
                 <div class="invalid-feedback d-block">{{ form_errors(form.projectDirection) }}</div>
             </div>
+            <div class="col-md-6">
+                {{ form_label(form.responsibilityCenterId, 'ЦФО', {'label_attr': {'class': 'form-label'}}) }}
+                {{ form_widget(form.responsibilityCenterId, {'attr': {'class': 'form-select'}}) }}
+                <div class="invalid-feedback d-block">{{ form_errors(form.responsibilityCenterId) }}</div>
+            </div>
         </div>
         <div class="mb-3">
             {{ form_label(form.counterparty, 'Контрагент', {'label_attr': {'class': 'form-label'}}) }}
@@ -62,4 +67,3 @@
 {{ form_end(form, {'render_rest': false}) }}
 
 {% block scripts %}{% endblock %}
-

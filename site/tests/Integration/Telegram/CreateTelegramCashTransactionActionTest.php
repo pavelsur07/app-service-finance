@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Telegram;
 
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Company\Entity\FinancialResponsibilityCenter;
+use App\Company\Entity\FinancialResponsibilityCenterProject;
+use App\Company\Entity\ProjectDirection;
 use App\Telegram\Application\CreateTelegramCashTransactionAction;
 use App\Telegram\Application\DTO\CreateTelegramCashTransactionCommand;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
@@ -56,10 +59,24 @@ final class CreateTelegramCashTransactionActionTest extends KernelTestCase
         $owner = UserBuilder::aUser()->withIndex($companyIndex)->build();
         $company = CompanyBuilder::aCompany()->withIndex($companyIndex)->withOwner($owner)->build();
         $account = MoneyAccountBuilder::aMoneyAccount()->withId($moneyAccountId)->forCompany($company)->build();
+        $project = new ProjectDirection(
+            sprintf('44444444-4444-4444-4444-%012d', $companyIndex),
+            $company,
+            'Общий',
+            ProjectDirection::CODE_GENERAL,
+        );
+        $center = new FinancialResponsibilityCenter(
+            $company->getId(),
+            FinancialResponsibilityCenter::CODE_GENERAL,
+            FinancialResponsibilityCenter::NAME_GENERAL,
+        );
 
         $this->em->persist($owner);
         $this->em->persist($company);
         $this->em->persist($account);
+        $this->em->persist($project);
+        $this->em->persist($center);
+        $this->em->persist(new FinancialResponsibilityCenterProject($company->getId(), $project, $center));
         $this->em->flush();
 
         return [$company->getId(), $account->getId()];
