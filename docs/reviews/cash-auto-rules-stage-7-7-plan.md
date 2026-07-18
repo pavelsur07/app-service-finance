@@ -2,10 +2,10 @@
 
 ## Current status
 
-- Phase: **prepared; Stage 7.7.1 implemented**
-- Branch: `agent/cash-stage7-7-phase0`
+- Phase: **Stage 7.7.2 implemented locally; owner accepted external review max-turns blocker**
+- Branch: `agent/cash-stage7-7-2-document-writers`
 - Production actions: **none**
-- Code changes: **Stage 7.7.1 only — Finance scalar mapping and pair validator**
+- Code changes: **Stage 7.7.2 — Document writers and Cash → Document propagation; not committed yet**
 
 Stage 7.7 starts after:
 
@@ -152,11 +152,11 @@ Goal:
 
 Definition of Done:
 
-- New Cash-created documents copy Project × ЦФО to document and operation.
-- Existing documents with `NULL` ЦФО still load/save.
-- Manual form can preserve a historical archived/current ЦФО value if unchanged, matching the Cash form pattern.
-- Copy duplicates ЦФО values.
-- No PL aggregation key change yet; register may still collapse by project until Stage 7.7.3.
+- [x] New Cash-created documents copy Project × ЦФО to document and operation.
+- [x] Existing documents with `NULL` ЦФО still load/save.
+- [x] Manual form can preserve a historical archived/current ЦФО value if unchanged, matching the Cash form pattern.
+- [x] Copy duplicates ЦФО values.
+- [x] No PL aggregation key change yet; register may still collapse by project until Stage 7.7.3.
 
 Expected files:
 

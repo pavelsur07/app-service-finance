@@ -5,6 +5,7 @@ namespace App\Finance\Controller;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Form\PLCategoryFormType;
 use App\Finance\Repository\PLCategoryRepository;
+use App\Finance\Repository\PLDailyTotalRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -123,7 +124,7 @@ class PLCategoryController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'pl_category_delete', methods: ['POST'])]
-    public function delete(Request $request, PLCategory $category, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
+    public function delete(Request $request, PLCategory $category, EntityManagerInterface $em, ActiveCompanyService $companyService, PLDailyTotalRepository $dailyTotalRepository): Response
     {
         $company = $companyService->getActiveCompany();
         if ($category->getCompany() !== $company) {
@@ -131,8 +132,15 @@ class PLCategoryController extends AbstractController
         }
 
         if ($this->isCsrfTokenValid('delete'.$category->getId(), $request->request->get('_token'))) {
-            $em->remove($category);
-            $em->flush();
+            $companyId = $company->getId();
+            $categoryId = $category->getId();
+            $em->wrapInTransaction(static function () use ($em, $dailyTotalRepository, $companyId, $categoryId, $category): void {
+                if (null !== $companyId && null !== $categoryId) {
+                    $dailyTotalRepository->moveCategoryRowsToUncategorized($companyId, $categoryId);
+                }
+
+                $em->remove($category);
+            });
         }
 
         return $this->redirectToRoute('pl_category_index');

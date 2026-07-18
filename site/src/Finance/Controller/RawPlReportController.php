@@ -2,6 +2,7 @@
 
 namespace App\Finance\Controller;
 
+use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Finance\Application\Service\PlNatureResolver;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
@@ -27,10 +28,15 @@ class RawPlReportController extends AbstractController
         DocumentRepository $documentRepo,
         PLDailyTotalRepository $totalsRepo,
         PlNatureResolver $natureResolver,
+        FinancialResponsibilityCenterFacade $responsibilityCenters,
     ): Response {
         $company = $activeCompany->getActiveCompany();
         $from = new \DateTimeImmutable($request->query->get('from', 'first day of this month'));
         $to = new \DateTimeImmutable($request->query->get('to', 'last day of this month'));
+        $responsibilityCenterLabels = [];
+        foreach ($responsibilityCenters->getActiveChoices((string) $company->getId()) as $center) {
+            $responsibilityCenterLabels[$center->id] = $center->name;
+        }
 
         // --- 1. Получаем операции документов ---
         $qb = $documentRepo->createQueryBuilder('d')
@@ -78,6 +84,11 @@ class RawPlReportController extends AbstractController
                     'operation_id' => $op->getId(),
                     'category' => $category->getName(),
                     'nature' => $nature->value,
+                    'project' => $op->getProjectDirection()?->getName() ?? $doc->getProjectDirection()?->getName() ?? '-',
+                    'responsibility_center' => $this->responsibilityCenterLabel(
+                        $op->getResponsibilityCenterId() ?? $doc->getResponsibilityCenterId(),
+                        $responsibilityCenterLabels,
+                    ),
                     'amount_raw' => $op->getAmount(),
                     'amount_signed' => (float) $op->getAmount() * $sign,
                     'counterparty' => $op->getCounterparty()?->getName() ?? '-',
@@ -89,12 +100,14 @@ class RawPlReportController extends AbstractController
         // --- 2. Получаем промежуточные итоги (PLDailyTotal) ---
         $qb2 = $totalsRepo->createQueryBuilder('t')
             ->leftJoin('t.plCategory', 'c')
+            ->leftJoin('t.projectDirection', 'pd')
             ->andWhere('t.company = :company')
             ->andWhere('t.date BETWEEN :from AND :to')
             ->setParameter('company', $company)
             ->setParameter('from', $from)
             ->setParameter('to', $to)
             ->orderBy('t.date', 'ASC')
+            ->addOrderBy('pd.name', 'ASC')
             ->addOrderBy('c.name', 'ASC');
 
         $totals = [];
@@ -103,6 +116,11 @@ class RawPlReportController extends AbstractController
             $totals[] = [
                 'date' => $total->getDate()->format('Y-m-d'),
                 'category' => $total->getPlCategory()?->getName() ?? '-',
+                'project' => $total->getProjectDirection()->getName(),
+                'responsibility_center' => $this->responsibilityCenterLabel(
+                    $total->getResponsibilityCenterId(),
+                    $responsibilityCenterLabels,
+                ),
                 'income' => (float) $total->getAmountIncome(),
                 'expense' => (float) $total->getAmountExpense(),
                 'net' => (float) $total->getAmountIncome() - (float) $total->getAmountExpense(),
@@ -116,5 +134,17 @@ class RawPlReportController extends AbstractController
             'rows' => $rows,
             'totals' => $totals,
         ]);
+    }
+
+    /**
+     * @param array<string, string> $labels
+     */
+    private function responsibilityCenterLabel(?string $responsibilityCenterId, array $labels): string
+    {
+        if (null === $responsibilityCenterId || '' === $responsibilityCenterId) {
+            return '-';
+        }
+
+        return $labels[$responsibilityCenterId] ?? $responsibilityCenterId;
     }
 }

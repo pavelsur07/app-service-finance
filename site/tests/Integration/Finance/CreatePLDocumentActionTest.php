@@ -6,6 +6,8 @@ namespace App\Tests\Integration\Finance;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
+use App\Company\Entity\FinancialResponsibilityCenter;
+use App\Company\Entity\FinancialResponsibilityCenterProject;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Enum\CounterpartyType;
 use App\Finance\Application\Command\CreatePLDocumentCommand;
@@ -53,7 +55,7 @@ final class CreatePLDocumentActionTest extends IntegrationTestCase
         self::assertSame('PL-501', $document->getNumber());
         self::assertCount(1, $document->getOperations());
 
-        $dailyTotals = $this->em()->getRepository(PLDailyTotal::class)->findAll();
+        $dailyTotals = $this->em()->getRepository(PLDailyTotal::class)->findBy(['company' => $company]);
         self::assertCount(1, $dailyTotals);
         self::assertSame('0.00', $dailyTotals[0]->getAmountIncome());
         self::assertSame('1500.00', $dailyTotals[0]->getAmountExpense());
@@ -90,6 +92,61 @@ final class CreatePLDocumentActionTest extends IntegrationTestCase
             status: DocumentStatus::ACTIVE,
             operations: [
                 new CreatePLDocumentOperationCommand(amount: '100.00', categoryId: (string) $categoryB->getId()),
+            ],
+        ));
+    }
+
+    public function testCreatesDocumentWithExplicitResponsibilityCenterAndOperationFallback(): void
+    {
+        [$company, $category, $counterparty, $project] = $this->createBaseFixtures('505');
+        $center = $this->createResponsibilityPair($company, $project);
+
+        $documentId = $this->action()(new CreatePLDocumentCommand(
+            companyId: (string) $company->getId(),
+            date: new \DateTimeImmutable('2026-07-18'),
+            type: DocumentType::OTHER,
+            status: DocumentStatus::ACTIVE,
+            number: 'PL-505',
+            counterpartyId: (string) $counterparty->getId(),
+            projectDirectionId: (string) $project->getId(),
+            responsibilityCenterId: $center->getId(),
+            operations: [
+                new CreatePLDocumentOperationCommand(
+                    amount: '120.00',
+                    categoryId: (string) $category->getId(),
+                ),
+            ],
+        ));
+
+        /** @var Document $document */
+        $document = $this->em()->getRepository(Document::class)->find($documentId);
+        self::assertSame($project->getId(), $document->getProjectDirection()?->getId());
+        self::assertSame($center->getId(), $document->getResponsibilityCenterId());
+
+        $operation = $document->getOperations()->first();
+        self::assertNotFalse($operation);
+        self::assertSame($project->getId(), $operation->getProjectDirection()?->getId());
+        self::assertSame($center->getId(), $operation->getResponsibilityCenterId());
+    }
+
+    public function testThrowsWhenResponsibilityCenterPairBelongsToAnotherCompany(): void
+    {
+        [$companyA, $categoryA, , $projectA] = $this->createBaseFixtures('506');
+        [$companyB, , , $projectB] = $this->createBaseFixtures('507');
+        $centerB = $this->createResponsibilityPair($companyB, $projectB, 'CFO_FOREIGN');
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Выбранная пара проекта и ЦФО недоступна.');
+
+        $this->action()(new CreatePLDocumentCommand(
+            companyId: (string) $companyA->getId(),
+            date: new \DateTimeImmutable('2026-07-18'),
+            type: DocumentType::OTHER,
+            status: DocumentStatus::ACTIVE,
+            projectDirectionId: (string) $projectA->getId(),
+            responsibilityCenterId: $centerB->getId(),
+            operations: [
+                new CreatePLDocumentOperationCommand(amount: '100.00', categoryId: (string) $categoryA->getId()),
             ],
         ));
     }
@@ -136,6 +193,20 @@ final class CreatePLDocumentActionTest extends IntegrationTestCase
         $this->em()->flush();
 
         return [$company, $category, $counterparty, $project];
+    }
+
+    private function createResponsibilityPair(
+        Company $company,
+        ProjectDirection $project,
+        string $code = 'CFO_KRD',
+    ): FinancialResponsibilityCenter {
+        $center = new FinancialResponsibilityCenter((string) $company->getId(), $code, 'Краснодар');
+
+        $this->em()->persist($center);
+        $this->em()->persist(new FinancialResponsibilityCenterProject((string) $company->getId(), $project, $center));
+        $this->em()->flush();
+
+        return $center;
     }
 
     private function action(): CreatePLDocumentAction

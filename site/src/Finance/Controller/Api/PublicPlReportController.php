@@ -2,6 +2,7 @@
 
 namespace App\Finance\Controller\Api;
 
+use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Company\Service\ReportApiKeyManager;
 use App\Finance\Report\PlReportGridBuilder;
@@ -20,6 +21,7 @@ final class PublicPlReportController extends AbstractController
         private readonly PlReportGridBuilder $gridBuilder,
         private readonly PlReportProjectsCompareBuilder $projectsCompareBuilder,
         private readonly ProjectDirectionRepository $projectDirections,
+        private readonly FinancialResponsibilityCenterFacade $responsibilityCenters,
         private readonly ReportsApiRateLimiter $rateLimiter,
     ) {
     }
@@ -33,12 +35,14 @@ final class PublicPlReportController extends AbstractController
      *  - from, to (string, optional): даты в формате YYYY-MM-DD; если from > to, значения меняются местами;
      *    по умолчанию текущий месяц.
      *  - projectDirectionId (string, optional): идентификатор направления проекта.
+     *  - responsibilityCenterId (string, optional): идентификатор ЦФО.
      *
      * Контракт ответа (JsonResponse 200):
      *  - company (string): идентификатор компании.
      *  - grouping (string): используемый тип группировки.
      *  - from, to (string): границы периода в формате YYYY-MM-DD.
      *  - projectDirectionId (string|null): выбранное направление проекта.
+     *  - responsibilityCenterId (string|null): выбранный ЦФО.
      *  - periods (array): список периодов с полями id, label, from, to.
      *  - rows (array): агрегированные строки отчета.
      *  - rawValues (array): исходные суммы, которые использовались для построения rows.
@@ -91,7 +95,19 @@ final class PublicPlReportController extends AbstractController
             }
         }
 
-        $grid = $this->gridBuilder->build($company, $from, $to, $grouping, $selectedProjectDirection);
+        $selectedResponsibilityCenterId = $this->resolveResponsibilityCenterId(
+            (string) $r->query->get('responsibilityCenterId', ''),
+            (string) $company->getId(),
+        );
+
+        $grid = $this->gridBuilder->build(
+            $company,
+            $from,
+            $to,
+            $grouping,
+            $selectedProjectDirection,
+            $selectedResponsibilityCenterId,
+        );
 
         return $this->json([
             'company' => $company->getId(),
@@ -99,6 +115,7 @@ final class PublicPlReportController extends AbstractController
             'from' => $from->format('Y-m-d'),
             'to' => $to->format('Y-m-d'),
             'projectDirectionId' => $selectedProjectDirection?->getId(),
+            'responsibilityCenterId' => $selectedResponsibilityCenterId,
             'periods' => array_map(
                 static fn (PlReportPeriod $period): array => [
                     'id' => $period->id,
@@ -142,6 +159,10 @@ final class PublicPlReportController extends AbstractController
         }
 
         $projectDirections = $this->projectDirections->findByCompany($company);
+        $selectedResponsibilityCenterId = $this->resolveResponsibilityCenterId(
+            (string) $r->query->get('responsibilityCenterId', ''),
+            (string) $company->getId(),
+        );
         $overhead = null;
         foreach ($projectDirections as $pd) {
             $name = mb_strtolower(trim((string) $pd->getName()));
@@ -152,7 +173,14 @@ final class PublicPlReportController extends AbstractController
             }
         }
 
-        $payload = $this->projectsCompareBuilder->build($company, $from, $to, $projectDirections, $overhead);
+        $payload = $this->projectsCompareBuilder->build(
+            $company,
+            $from,
+            $to,
+            $projectDirections,
+            $overhead,
+            $selectedResponsibilityCenterId,
+        );
 
         return $this->json([
             'company' => [
@@ -162,6 +190,7 @@ final class PublicPlReportController extends AbstractController
             'from' => $from->format('Y-m-d'),
             'to' => $to->format('Y-m-d'),
             'layout' => 'projects',
+            'responsibilityCenterId' => $selectedResponsibilityCenterId,
             'period' => $payload['period'],
             'projects' => $payload['projects'],
             'rows' => $payload['rows'],
@@ -181,5 +210,16 @@ final class PublicPlReportController extends AbstractController
         } catch (\Exception) {
             return null;
         }
+    }
+
+    private function resolveResponsibilityCenterId(string $responsibilityCenterId, string $companyId): ?string
+    {
+        if ('' === $responsibilityCenterId) {
+            return null;
+        }
+
+        $center = $this->responsibilityCenters->findByIdAndCompany($responsibilityCenterId, $companyId);
+
+        return null !== $center && $center->isActive() ? $center->id : null;
     }
 }

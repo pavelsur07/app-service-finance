@@ -10,6 +10,9 @@ use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Company\Entity\Company;
+use App\Company\Entity\FinancialResponsibilityCenter;
+use App\Company\Entity\FinancialResponsibilityCenterProject;
+use App\Company\Entity\ProjectDirection;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
 use App\Finance\Entity\PLCategory;
@@ -109,6 +112,21 @@ final class CreateDocumentFromTransactionActionTest extends IntegrationTestCase
         return $tx;
     }
 
+    /**
+     * @return array{0: ProjectDirection, 1: FinancialResponsibilityCenter}
+     */
+    private function makeResponsibilityPair(Company $company): array
+    {
+        $project = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Продажа компьютеров');
+        $center = new FinancialResponsibilityCenter((string) $company->getId(), 'CFO_KRD', 'Краснодар');
+
+        $this->em->persist($project);
+        $this->em->persist($center);
+        $this->em->persist(new FinancialResponsibilityCenterProject((string) $company->getId(), $project, $center));
+
+        return [$project, $center];
+    }
+
     // -------------------------------------------------------------------------
     // Сценарий A — полный маппинг, создание без подтверждения
     // -------------------------------------------------------------------------
@@ -147,6 +165,37 @@ final class CreateDocumentFromTransactionActionTest extends IntegrationTestCase
         $this->assertSame(1000.0, $txReloaded->getAllocatedAmount());
         $this->assertSame(0.0, $txReloaded->getRemainingAmount());
         $this->assertFalse($txReloaded->isHasViolatedDocument());
+    }
+
+    public function testCopiesResponsibilityCenterFromCashTransaction(): void
+    {
+        $company = $this->makeCompany();
+        $account = $this->makeMoneyAccount($company);
+        $plCategory = $this->makePLCategory($company);
+        $cashflowCategory = $this->makeCashflowCategory($company, $plCategory);
+        [$project, $center] = $this->makeResponsibilityPair($company);
+        $tx = $this->makeTx($company, $account, '1000.00', $cashflowCategory);
+        $tx
+            ->setProjectDirection($project)
+            ->setResponsibilityCenterId($center->getId());
+
+        $this->em->flush();
+
+        $result = ($this->action)($tx, confirmed: false);
+
+        self::assertNotNull($result->documentId);
+
+        $this->em->clear();
+
+        /** @var Document $doc */
+        $doc = $this->em->find(Document::class, $result->documentId);
+        self::assertSame($project->getId(), $doc->getProjectDirection()?->getId());
+        self::assertSame($center->getId(), $doc->getResponsibilityCenterId());
+
+        /** @var DocumentOperation $op */
+        $op = $doc->getOperations()->first();
+        self::assertSame($project->getId(), $op->getProjectDirection()?->getId());
+        self::assertSame($center->getId(), $op->getResponsibilityCenterId());
     }
 
     // -------------------------------------------------------------------------

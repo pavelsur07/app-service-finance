@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Finance\Facts;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\ProjectDirection;
+use App\Company\Repository\ProjectDirectionRepository;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Entity\PLDailyTotal;
-use App\Company\Entity\ProjectDirection;
 use App\Finance\Report\PlReportPeriod;
 use App\Finance\Repository\PLCategoryRepository;
-use App\Company\Repository\ProjectDirectionRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class PLDailyTotalFactsProvider implements FactsProviderInterface
@@ -26,8 +26,13 @@ final class PLDailyTotalFactsProvider implements FactsProviderInterface
      * Возвращает сумму за период по коду категории:
      * SUM(amountIncome) - SUM(amountExpense) из PLDailyTotal по company + category + date ∈ [from; to]
      */
-    public function value(Company $company, PlReportPeriod $period, string $code, ?ProjectDirection $projectDirection = null): float
-    {
+    public function value(
+        Company $company,
+        PlReportPeriod $period,
+        string $code,
+        ?ProjectDirection $projectDirection = null,
+        ?string $responsibilityCenterId = null,
+    ): float {
         $code = trim((string) $code);
         if ('' === $code) {
             return 0.0;
@@ -62,6 +67,12 @@ final class PLDailyTotalFactsProvider implements FactsProviderInterface
             $qb
                 ->andWhere('dt.projectDirection IN (:pds)')
                 ->setParameter('pds', $nodes);
+        }
+
+        if (null !== $responsibilityCenterId && '' !== $responsibilityCenterId) {
+            $qb
+                ->andWhere('dt.responsibilityCenterId = :responsibilityCenterId')
+                ->setParameter('responsibilityCenterId', $responsibilityCenterId);
         }
 
         $row = $qb->getQuery()->getOneOrNullResult();

@@ -6,18 +6,19 @@ namespace App\Finance\Controller;
 
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Company\Entity\Company;
+use App\Company\Repository\CounterpartyRepository;
+use App\Company\Repository\ProjectDirectionRepository;
+use App\Finance\Application\Service\FinanceDocumentResponsibilityCenterNormalizer;
+use App\Finance\Application\Service\PlNatureResolver;
+use App\Finance\Application\Service\PLRegisterUpdater;
 use App\Finance\DTO\DocumentListDTO;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
+use App\Finance\Enum\DocumentStatus;
+use App\Finance\Enum\PlNature;
 use App\Finance\Form\DocumentType;
 use App\Finance\Repository\DocumentRepository;
-use App\Finance\Enum\PlNature;
-use App\Finance\Enum\DocumentStatus;
-use App\Company\Repository\CounterpartyRepository;
 use App\Finance\Repository\PLCategoryRepository;
-use App\Company\Repository\ProjectDirectionRepository;
-use App\Finance\Application\Service\PlNatureResolver;
-use App\Finance\Application\Service\PLRegisterUpdater;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -33,8 +34,10 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[Route('/documents')]
 class DocumentController extends AbstractController
 {
-    public function __construct(private readonly PLRegisterUpdater $plRegisterUpdater)
-    {
+    public function __construct(
+        private readonly PLRegisterUpdater $plRegisterUpdater,
+        private readonly FinanceDocumentResponsibilityCenterNormalizer $responsibilityCenterNormalizer,
+    ) {
     }
 
     #[Route('/', name: 'document_index', methods: ['GET'])]
@@ -75,25 +78,26 @@ class DocumentController extends AbstractController
             'categories' => $categories,
             'counterparties' => $counterparties,
             'project_directions' => $projectDirections,
+            'company' => $company,
         ]);
         $form->handleRequest($request);
         $initialStatus = $document->getStatus();
 
         if ($form->isSubmitted() && $form->isValid()) {
-            if (null !== $document->getProjectDirection()) {
-                foreach ($document->getOperations() as $operation) {
-                    if (null === $operation->getProjectDirection()) {
-                        $operation->setProjectDirection($document->getProjectDirection());
-                    }
-                }
+            try {
+                $this->responsibilityCenterNormalizer->prepareNewManualDocument($document, $company);
+            } catch (\DomainException $exception) {
+                $form->addError(new FormError($exception->getMessage()));
             }
 
-            $em->persist($document);
-            $em->flush();
+            if ($form->isValid()) {
+                $em->persist($document);
+                $em->flush();
 
-            $this->plRegisterUpdater->updateForDocument($document);
+                $this->plRegisterUpdater->updateForDocument($document);
 
-            return $this->redirectToRoute('document_index');
+                return $this->redirectToRoute('document_index');
+            }
         }
 
         return $this->render('document/new.html.twig', [
@@ -125,24 +129,25 @@ class DocumentController extends AbstractController
             'categories' => $categories,
             'counterparties' => $counterparties,
             'project_directions' => $projectDirections,
+            'company' => $company,
         ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            if (null !== $copy->getProjectDirection()) {
-                foreach ($copy->getOperations() as $operation) {
-                    if (null === $operation->getProjectDirection()) {
-                        $operation->setProjectDirection($copy->getProjectDirection());
-                    }
-                }
+            try {
+                $this->responsibilityCenterNormalizer->prepareNewManualDocument($copy, $company);
+            } catch (\DomainException $exception) {
+                $form->addError(new FormError($exception->getMessage()));
             }
 
-            $em->persist($copy);
-            $em->flush();
+            if ($form->isValid()) {
+                $em->persist($copy);
+                $em->flush();
 
-            $this->plRegisterUpdater->updateForDocument($copy);
+                $this->plRegisterUpdater->updateForDocument($copy);
 
-            return $this->redirectToRoute('document_index');
+                return $this->redirectToRoute('document_index');
+            }
         }
 
         return $this->render('document/new.html.twig', [
@@ -193,10 +198,13 @@ class DocumentController extends AbstractController
         $categories = $catRepo->findTreeByCompany($company);
         $counterparties = $cpRepo->findBy(['company' => $company]);
         $projectDirections = $projectDirectionRepo->findByCompany($company);
+        $initialResponsibilityCenterSnapshot = $this->responsibilityCenterNormalizer->snapshotDocument($document);
+        $initialOperationResponsibilityCenterSnapshots = $this->responsibilityCenterNormalizer->snapshotOperations($document);
         $form = $this->createForm(DocumentType::class, $document, [
             'categories' => $categories,
             'counterparties' => $counterparties,
             'project_directions' => $projectDirections,
+            'company' => $company,
         ]);
         $initialStatus = $document->getStatus();
         $initialDate = $document->getDate()->setTime(0, 0);
@@ -216,36 +224,41 @@ class DocumentController extends AbstractController
             }
 
             if ($form->isValid()) {
-                if ($cashTransaction instanceof CashTransaction) {
-                    $cashTransaction->recalculateAllocatedAmount();
+                try {
+                    $this->responsibilityCenterNormalizer->prepareExistingManualDocument(
+                        $document,
+                        $company,
+                        $initialResponsibilityCenterSnapshot,
+                        $initialOperationResponsibilityCenterSnapshots,
+                    );
+                } catch (\DomainException $exception) {
+                    $form->addError(new FormError($exception->getMessage()));
                 }
 
-                if (null !== $document->getProjectDirection()) {
-                    foreach ($document->getOperations() as $operation) {
-                        if (null === $operation->getProjectDirection()) {
-                            $operation->setProjectDirection($document->getProjectDirection());
-                        }
+                if ($form->isValid()) {
+                    if ($cashTransaction instanceof CashTransaction) {
+                        $cashTransaction->recalculateAllocatedAmount();
                     }
+
+                    $em->flush();
+
+                    $daysToRecalc = [];
+                    $currentDate = $document->getDate()->setTime(0, 0);
+
+                    if (DocumentStatus::ACTIVE === $initialStatus) {
+                        $daysToRecalc[$initialDate->format('Y-m-d')] = $initialDate;
+                    }
+
+                    if (DocumentStatus::ACTIVE === $document->getStatus()) {
+                        $daysToRecalc[$currentDate->format('Y-m-d')] = $currentDate;
+                    }
+
+                    foreach ($daysToRecalc as $day) {
+                        $this->plRegisterUpdater->recalcRange($company, $day, $day);
+                    }
+
+                    return $this->redirectToRoute('document_index');
                 }
-
-                $em->flush();
-
-                $daysToRecalc = [];
-                $currentDate = $document->getDate()->setTime(0, 0);
-
-                if (DocumentStatus::ACTIVE === $initialStatus) {
-                    $daysToRecalc[$initialDate->format('Y-m-d')] = $initialDate;
-                }
-
-                if (DocumentStatus::ACTIVE === $document->getStatus()) {
-                    $daysToRecalc[$currentDate->format('Y-m-d')] = $currentDate;
-                }
-
-                foreach ($daysToRecalc as $day) {
-                    $this->plRegisterUpdater->recalcRange($company, $day, $day);
-                }
-
-                return $this->redirectToRoute('document_index');
             }
         }
 
@@ -305,7 +318,7 @@ class DocumentController extends AbstractController
         }
 
         $response = $this->json($payload, Response::HTTP_OK, [], [
-            'json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE,
+            'json_encode_options' => \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE,
         ]);
         $response->headers->set('Content-Disposition', sprintf('attachment; filename="document-%s.json"', $document->getId()));
 
@@ -367,6 +380,7 @@ class DocumentController extends AbstractController
         $copy->setType($source->getType());
         $copy->setCounterparty($source->getCounterparty());
         $copy->setProjectDirection($source->getProjectDirection());
+        $copy->setResponsibilityCenterId($source->getResponsibilityCenterId());
         $copy->setDescription($source->getDescription());
         $copy->setStatus($source->getStatus());
 
@@ -376,6 +390,7 @@ class DocumentController extends AbstractController
             $operationCopy->setAmount($operation->getAmount());
             $operationCopy->setCounterparty($operation->getCounterparty());
             $operationCopy->setProjectDirection($operation->getProjectDirection());
+            $operationCopy->setResponsibilityCenterId($operation->getResponsibilityCenterId());
             $operationCopy->setComment($operation->getComment());
             $copy->addOperation($operationCopy);
         }

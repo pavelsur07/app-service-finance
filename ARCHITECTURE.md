@@ -184,9 +184,11 @@
 - Stage 7.6.2 connects `CashTransactionService` and `CashFacade` to `CashTransactionResponsibilityCenterResolver`. New core Cash/facade-created transactions with empty project/ЦФО receive the company `PROJECT_GENERAL × CFO_GENERAL` pair; explicit pairs are accepted only when active and allowed. The existing manual Cash form exposes the scalar ЦФО choice so its existing project field can submit a complete pair. Duplicate facade branches return before pair resolution and never rewrite existing classification.
 - Stage 7.6.4 keeps file, 1C client-bank, and bank-provider imports on their direct `CashTransaction` writer paths to preserve existing duplicate, overwrite, preview, batching, logging, cursor, and balance behavior. Each import resolves the company system pair once and applies it only to newly persisted transactions. Existing 1C overwrite rows keep their stored Project×ЦФО. Dynamic project→ЦФО filtering, Finance Entity mappings, and P&L writes remain deferred to later approved units.
 - Stage 7.7.1 maps the already deployed nullable scalar `responsibility_center_id` columns on `Document`, `DocumentOperation`, and `PLDailyTotal`. `FinanceResponsibilityCenterPairValidator` reuses the Company responsibility-center facade to validate only complete Project × ЦФО pairs; `NULL` ЦФО remains valid for legacy facts. No Finance writer or P&L aggregation key is switched in 7.7.1.
+- Stage 7.7.2 propagates Cash transaction ЦФО into newly created Finance `Document` and `DocumentOperation` rows. Manual Finance document forms expose a scalar ЦФО choice and validate Project × ЦФО server-side; operation-level pair overrides document-level pair, while missing operation project/ЦФО inherits from the document. New manual rows with an empty pair default to company `PROJECT_GENERAL × CFO_GENERAL`; unchanged historical incomplete or archived current pairs remain saveable. Marketplace `createPLDocument()` callers still pass `NULL` ЦФО unless a later contract stage explicitly supplies it.
+- Stage 7.7.3 switches new document-driven `pl_daily_totals` writes to the `Project × ЦФО` aggregation key. `PLRegisterUpdater` groups by operation ЦФО, falls back to document ЦФО, and keeps `NULL` as the legacy unallocated bucket. The storage contract uses two partial unique expression indexes: categorized rows key by `company_id × pl_category_id × date × project_direction_id × COALESCE(responsibility_center_id, zero-uuid)`, while uncategorized rows key by `company_id × date × project_direction_id × COALESCE(responsibility_center_id, zero-uuid) WHERE pl_category_id IS NULL`. `pl_category_id` still uses default PostgreSQL nullable semantics; no `NULLS NOT DISTINCT` is used. Category deletion merges affected daily totals into the uncategorized bucket before removing the category so the partial unique index is not violated. Reports without a ЦФО dimension continue to read summed totals.
+- Stage 7.7.4 adds the read-side `responsibilityCenterId` filter to P&L preview, preview JSON, and public P&L JSON endpoints. `PlReportCalculator`, grid builder, project comparison builder, and `PLDailyTotalFactsProvider` pass the optional ЦФО filter through to `pl_daily_totals`; invalid or foreign ЦФО ids are ignored at controller boundaries. Project comparison can now show project columns scoped to one selected ЦФО. Raw P&L debug output displays Project and ЦФО for document operations and daily totals. No historical rebuild or data backfill is performed.
 - The expand migration performs no fact backfill, classification inference, or P&L rebuild. Existing rows remain `NULL` and later UI/report stages interpret that state as `Не распределено`.
-- Stage 7.5 does not change `pl_daily_totals` uniqueness. In particular, nullable `pl_category_id` keeps PostgreSQL's default distinct-NULL semantics so the existing `ON DELETE SET NULL` category-deletion path cannot collide with another uncategorized total.
-- The project × ЦФО aggregation key, concurrent-writer locking, nullable-category behavior, and deployment cutover require a separate Stage 7.7 Phase 0 before any P&L writer or uniqueness change.
+- Stage 7.5 originally left `pl_daily_totals` uniqueness unchanged; Stage 7.7.3 is the reviewed switch point. The production pipeline deploys the Stage 7.7.3 application image before running migrations, so the code supports the required `new code / old schema` window with runtime index detection. `old code / new schema` is not a supported rollback mode after the switch migration because the old writer targets the removed project-only unique key; rollback requires a reviewed forward-fix or redeploying Stage 7.7.3-compatible code. The migration locks `pl_daily_totals` before duplicate guards and is forward-only because restoring the old project-only unique key can collapse separate ЦФО buckets.
 
 ### Marketplace: WB financial report sync status (дневной статус)
 
@@ -590,6 +592,7 @@ createPLDocument(
     string $periodFrom,
     string $periodTo,
     array $entries,
+    ?string $projectDirectionId = null,
 ): string  // ID созданного документа
 
 // Удалить PL-документ
@@ -2348,6 +2351,8 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.62 | 2026-07-18 | Finance: Stage 7.7.3 переключает новые `pl_daily_totals` записи на Project×ЦФО aggregation key с partial expression unique indexes и безопасным merge при удалении P&L категории |
+| 1.63 | 2026-07-18 | Finance: Stage 7.7.4 подключает P&L read-side к Project×ЦФО через optional `responsibilityCenterId` фильтр в preview/UI/JSON без перерасчёта истории |
 | 1.61 | 2026-07-18 | Cash/Company: Stage 7.6.4 подключает file/1C/bank import writers к system Project×ЦФО pair для новых транзакций без изменения overwrite/preview/batch semantics |
 | 1.60 | 2026-07-17 | Cash/Company: Stage 7.6.2 подключает core Cash create/update и `CashFacade` к валидируемому project × ЦФО contract; новые empty-pair транзакции получают системную пару |
 | 1.59 | 2026-07-17 | Cash/Company: Stage 7.9.3 добавляет общий атомарный planner project × ЦФО, active-pair snapshot, preview labels/breakdown и per-field audit provenance |

@@ -48,6 +48,7 @@
                     </div>
                 {% endif %}
                 {{ form_start(form) }}
+                {{ form_errors(form) }}
                 <div class="row">
                     <div class="col-md-3">
                         {{ form_row(form.date) }}
@@ -65,6 +66,9 @@
                 <div class="row">
                     <div class="col-md-3">
                         {{ form_row(form.projectDirection) }}
+                    </div>
+                    <div class="col-md-3">
+                        {{ form_row(form.responsibilityCenterId) }}
                     </div>
                 </div>
                 {{ form_row(form.description) }}
@@ -100,6 +104,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         const documentCounterpartyField = document.querySelector('[data-document-counterparty]');
         const documentProjectField = document.querySelector('[data-document-project-direction]');
+        const documentResponsibilityCenterField = document.querySelector('[data-document-responsibility-center]');
         const prefillOperationCounterparty = function(card) {
             if (!documentCounterpartyField) {
                 return;
@@ -134,6 +139,23 @@
             }
         };
 
+        const prefillOperationResponsibilityCenter = function(card) {
+            if (!documentResponsibilityCenterField) {
+                return;
+            }
+
+            const selectedResponsibilityCenter = documentResponsibilityCenterField.value;
+            if (!selectedResponsibilityCenter) {
+                return;
+            }
+
+            const operationResponsibilityCenterField = card.querySelector('[data-operation-responsibility-center]');
+            if (operationResponsibilityCenterField && !operationResponsibilityCenterField.value) {
+                operationResponsibilityCenterField.value = selectedResponsibilityCenter;
+                operationResponsibilityCenterField.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        };
+
         document.querySelectorAll('[data-collection-holder]').forEach(function(collectionHolder) {
             const addButton = collectionHolder.parentElement.querySelector('.add_item_link');
             const createOperationCard = function(formHtml) {
@@ -156,6 +178,7 @@
                 collectionHolder.appendChild(card);
                 prefillOperationCounterparty(card);
                 prefillOperationProject(card);
+                prefillOperationResponsibilityCenter(card);
                 card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             });
 

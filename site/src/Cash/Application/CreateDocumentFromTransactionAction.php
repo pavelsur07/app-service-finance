@@ -29,11 +29,11 @@ final class CreateDocumentFromTransactionAction
         }
 
         $category = $tx->getCashflowCategory();
-        if ($category !== null && !$category->isAllowPlDocument()) {
+        if (null !== $category && !$category->isAllowPlDocument()) {
             throw new \DomainException('Для этой категории ДДС создание документов ОПиУ запрещено.');
         }
         $plCategory = $category?->getPlCategory();
-        $hasPLCategory = ($plCategory !== null);
+        $hasPLCategory = (null !== $plCategory);
 
         $amount = number_format($tx->getRemainingAmount(), 2, '.', '');
 
@@ -44,6 +44,7 @@ final class CreateDocumentFromTransactionAction
                 amount: $amount,
                 counterpartyId: $tx->getCounterparty()?->getId(),
                 projectDirectionId: $tx->getProjectDirection()?->getId(),
+                responsibilityCenterId: $tx->getResponsibilityCenterId(),
                 plCategoryId: $plCategory->getId(),
                 createdWithViolation: false,
             );
@@ -70,9 +71,9 @@ final class CreateDocumentFromTransactionAction
                 documentId: null,
                 hasViolation: false,
                 warningMessage: 'У категории ДДС не задана категория ОПиУ. '
-                    . 'Документ будет создан с частично заполненными данными — '
-                    . 'дата, сумма, контрагент, проект. '
-                    . 'Категорию ОПиУ нужно будет указать вручную.',
+                    .'Документ будет создан с частично заполненными данными — '
+                    .'дата, сумма, контрагент, проект. '
+                    .'Категорию ОПиУ нужно будет указать вручную.',
             );
         }
 
@@ -82,6 +83,7 @@ final class CreateDocumentFromTransactionAction
             amount: $amount,
             counterpartyId: $tx->getCounterparty()?->getId(),
             projectDirectionId: $tx->getProjectDirection()?->getId(),
+            responsibilityCenterId: $tx->getResponsibilityCenterId(),
             plCategoryId: null,
             createdWithViolation: true,
         );

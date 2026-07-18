@@ -74,7 +74,10 @@ final class PLRegisterUpdaterTest extends TestCase
 
         self::assertCount(1, $result[$dateKey]['projects']);
         $project = array_values($result[$dateKey]['projects'])[0];
-        $categories = $project['categories'];
+        self::assertCount(1, $project['responsibilityCenters']);
+        $responsibilityCenter = array_values($project['responsibilityCenters'])[0];
+        self::assertNull($responsibilityCenter['responsibilityCenterId']);
+        $categories = $responsibilityCenter['categories'];
         self::assertCount(3, $categories, 'Only operations with PL category and resolved nature are aggregated.');
 
         $byCategoryId = [];

@@ -6,14 +6,14 @@ namespace App\Finance\Application\Service;
 
 use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
 use App\Company\Entity\Company;
+use App\Company\Entity\ProjectDirection;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Entity\PLDailyTotal;
-use App\Company\Entity\ProjectDirection;
+use App\Finance\Enum\DocumentStatus;
 use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\PlNature;
-use App\Finance\Enum\DocumentStatus;
 use App\Finance\Repository\DocumentRepository;
 use App\Finance\Repository\PLDailyTotalRepository;
 use Doctrine\DBAL\Types\Types;
@@ -104,12 +104,15 @@ final class PLRegisterUpdater
      *   date: \DateTimeImmutable,
      *   projects: array<string, array{
      *     project: ProjectDirection,
-     *     categories: array<string, array{
-     *       category: PLCategory,
-     *       income: float,
-     *       expense: float,
-     *       mpIncomeSigned: float,
-     *       mpExpenseSigned: float,
+     *     responsibilityCenters: array<string, array{
+     *       responsibilityCenterId: ?string,
+     *       categories: array<string, array{
+     *         category: PLCategory,
+     *         income: float,
+     *         expense: float,
+     *         mpIncomeSigned: float,
+     *         mpExpenseSigned: float,
+     *       }>,
      *     }>,
      *   }>,
      * }>
@@ -169,17 +172,26 @@ final class PLRegisterUpdater
                 }
 
                 $projectKey = $project->getId() ?? (string) spl_object_id($project);
+                $responsibilityCenterId = $operation->getResponsibilityCenterId() ?? $document->getResponsibilityCenterId();
+                $responsibilityCenterKey = $responsibilityCenterId ?? '';
                 $categoryKey = $category->getId() ?? (string) spl_object_id($category);
 
                 if (!isset($result[$dateKey]['projects'][$projectKey])) {
                     $result[$dateKey]['projects'][$projectKey] = [
                         'project' => $project,
+                        'responsibilityCenters' => [],
+                    ];
+                }
+
+                if (!isset($result[$dateKey]['projects'][$projectKey]['responsibilityCenters'][$responsibilityCenterKey])) {
+                    $result[$dateKey]['projects'][$projectKey]['responsibilityCenters'][$responsibilityCenterKey] = [
+                        'responsibilityCenterId' => $responsibilityCenterId,
                         'categories' => [],
                     ];
                 }
 
-                if (!isset($result[$dateKey]['projects'][$projectKey]['categories'][$categoryKey])) {
-                    $result[$dateKey]['projects'][$projectKey]['categories'][$categoryKey] = [
+                if (!isset($result[$dateKey]['projects'][$projectKey]['responsibilityCenters'][$responsibilityCenterKey]['categories'][$categoryKey])) {
+                    $result[$dateKey]['projects'][$projectKey]['responsibilityCenters'][$responsibilityCenterKey]['categories'][$categoryKey] = [
                         'category' => $category,
                         'income' => 0.0,
                         'expense' => 0.0,
@@ -197,9 +209,9 @@ final class PLRegisterUpdater
                 // с +X уйдёт в expense=-X и упрётся в CHECK chk_pl_daily_totals_amounts.
                 if (DocumentType::MARKETPLACE_PL === $document->getType()) {
                     if (PlNature::INCOME === $nature) {
-                        $result[$dateKey]['projects'][$projectKey]['categories'][$categoryKey]['mpIncomeSigned'] += $rawAmount;
+                        $result[$dateKey]['projects'][$projectKey]['responsibilityCenters'][$responsibilityCenterKey]['categories'][$categoryKey]['mpIncomeSigned'] += $rawAmount;
                     } else {
-                        $result[$dateKey]['projects'][$projectKey]['categories'][$categoryKey]['mpExpenseSigned'] += $rawAmount;
+                        $result[$dateKey]['projects'][$projectKey]['responsibilityCenters'][$responsibilityCenterKey]['categories'][$categoryKey]['mpExpenseSigned'] += $rawAmount;
                     }
 
                     continue;
@@ -208,9 +220,9 @@ final class PLRegisterUpdater
                 $amount = abs($rawAmount);
 
                 if (PlNature::INCOME === $nature) {
-                    $result[$dateKey]['projects'][$projectKey]['categories'][$categoryKey]['income'] += $amount;
+                    $result[$dateKey]['projects'][$projectKey]['responsibilityCenters'][$responsibilityCenterKey]['categories'][$categoryKey]['income'] += $amount;
                 } else {
-                    $result[$dateKey]['projects'][$projectKey]['categories'][$categoryKey]['expense'] += $amount;
+                    $result[$dateKey]['projects'][$projectKey]['responsibilityCenters'][$responsibilityCenterKey]['categories'][$categoryKey]['expense'] += $amount;
                 }
             }
         }
@@ -226,23 +238,26 @@ final class PLRegisterUpdater
             foreach ($data['projects'] as $projectData) {
                 $project = $projectData['project'];
 
-                foreach ($projectData['categories'] as $categoryData) {
-                    $income = $categoryData['income'] + abs($categoryData['mpIncomeSigned'] ?? 0.0);
-                    $expense = $categoryData['expense'] + abs($categoryData['mpExpenseSigned'] ?? 0.0);
+                foreach ($projectData['responsibilityCenters'] as $responsibilityCenterData) {
+                    foreach ($responsibilityCenterData['categories'] as $categoryData) {
+                        $income = $categoryData['income'] + abs($categoryData['mpIncomeSigned'] ?? 0.0);
+                        $expense = $categoryData['expense'] + abs($categoryData['mpExpenseSigned'] ?? 0.0);
 
-                    if (0.0 === $income && 0.0 === $expense) {
-                        continue;
+                        if (0.0 === $income && 0.0 === $expense) {
+                            continue;
+                        }
+
+                        $this->upsertDailyTotal(
+                            $company,
+                            $date,
+                            $project,
+                            $responsibilityCenterData['responsibilityCenterId'],
+                            $categoryData['category'],
+                            $income,
+                            $expense,
+                            $replace,
+                        );
                     }
-
-                    $this->upsertDailyTotal(
-                        $company,
-                        $date,
-                        $project,
-                        $categoryData['category'],
-                        $income,
-                        $expense,
-                        $replace,
-                    );
                 }
             }
         }
@@ -252,6 +267,7 @@ final class PLRegisterUpdater
         Company $company,
         \DateTimeImmutable $date,
         ProjectDirection $projectDirection,
+        ?string $responsibilityCenterId,
         PLCategory $category,
         float $income,
         float $expense,
@@ -274,6 +290,7 @@ final class PLRegisterUpdater
             $this->formatAmount($expense),
             $replace,
             new \DateTimeImmutable(),
+            responsibilityCenterId: $responsibilityCenterId,
         );
     }
 

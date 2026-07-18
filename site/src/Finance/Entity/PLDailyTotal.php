@@ -13,9 +13,8 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: PLDailyTotalRepository::class)]
 #[ORM\Table(name: 'pl_daily_totals')]
-#[ORM\UniqueConstraint(name: 'uniq_pl_daily_company_cat_date', columns: ['company_id', 'pl_category_id', 'date', 'project_direction_id'])]
 #[ORM\Index(name: 'idx_pl_daily_company_date', columns: ['company_id', 'date'])]
-#[ORM\Index(name: 'idx_pl_daily_company_cat_date', columns: ['company_id', 'pl_category_id', 'date', 'project_direction_id'])]
+#[ORM\Index(name: 'idx_pl_daily_company_cat_date_center', columns: ['company_id', 'pl_category_id', 'date', 'project_direction_id', 'responsibility_center_id'])]
 class PLDailyTotal
 {
     #[ORM\Id]
