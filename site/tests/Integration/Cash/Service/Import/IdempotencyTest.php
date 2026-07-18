@@ -2,6 +2,11 @@
 
 namespace App\Tests\Integration\Cash\Service\Import;
 
+use App\Company\Entity\FinancialResponsibilityCenter;
+use App\Company\Entity\FinancialResponsibilityCenterProject;
+use App\Company\Entity\ProjectDirection;
+use Ramsey\Uuid\Uuid;
+
 class IdempotencyTest extends ClientBank1CImportServiceTestCase
 {
     public function testDistinctDocumentsWithSamePaymentDetailsAreBothImported(): void
@@ -27,7 +32,12 @@ class IdempotencyTest extends ClientBank1CImportServiceTestCase
         self::assertSame(2, $firstSummary['created']);
         self::assertSame(0, $firstSummary['duplicates']);
         self::assertSame(0, $firstSummary['errors']);
-        self::assertCount(2, $this->transactionRepository->findAll());
+        $importedTransactions = $this->transactionRepository->findAll();
+        self::assertCount(2, $importedTransactions);
+        foreach ($importedTransactions as $transaction) {
+            self::assertSame($this->systemProject->getId(), $transaction->getProjectDirection()?->getId());
+            self::assertSame($this->systemCenter->getId(), $transaction->getResponsibilityCenterId());
+        }
 
         $secondSummary = $this->service->import($rows, $this->account, false);
 
@@ -60,14 +70,32 @@ class IdempotencyTest extends ClientBank1CImportServiceTestCase
         self::assertSame(1, $summaryFirst['created']);
         self::assertSame(0, $summaryFirst['duplicates']);
         self::assertSame(0, $summaryFirst['errors']);
+        $transaction = $this->transactionRepository->findAll()[0];
+        self::assertSame($this->systemProject->getId(), $transaction->getProjectDirection()?->getId());
+        self::assertSame($this->systemCenter->getId(), $transaction->getResponsibilityCenterId());
 
         $summarySecond = $this->service->import([$row], $this->account, false);
         self::assertSame(0, $summarySecond['created']);
         self::assertSame(1, $summarySecond['duplicates']);
         self::assertSame(0, $summarySecond['errors']);
 
-        $transaction = $this->transactionRepository->findAll()[0];
         $transaction->setDescription('Устаревшее назначение');
+        $alternateProject = new ProjectDirection(
+            Uuid::uuid4()->toString(),
+            $this->company,
+            'Сохранить проект',
+        );
+        $alternateCenter = new FinancialResponsibilityCenter($this->company->getId(), 'CFO_KEEP', 'Сохранить');
+        $this->em->persist($alternateProject);
+        $this->em->persist($alternateCenter);
+        $this->em->persist(new FinancialResponsibilityCenterProject(
+            $this->company->getId(),
+            $alternateProject,
+            $alternateCenter,
+        ));
+        $this->em->flush();
+        $transaction->setProjectDirection($alternateProject);
+        $transaction->setResponsibilityCenterId($alternateCenter->getId());
         $this->em->flush();
 
         $summaryOverwrite = $this->service->import([$row], $this->account, true);
@@ -78,5 +106,7 @@ class IdempotencyTest extends ClientBank1CImportServiceTestCase
         $transactions = $this->transactionRepository->findAll();
         self::assertCount(1, $transactions);
         self::assertSame('Оплата по договору', $transactions[0]->getDescription());
+        self::assertSame($alternateProject->getId(), $transactions[0]->getProjectDirection()?->getId());
+        self::assertSame($alternateCenter->getId(), $transactions[0]->getResponsibilityCenterId());
     }
 }

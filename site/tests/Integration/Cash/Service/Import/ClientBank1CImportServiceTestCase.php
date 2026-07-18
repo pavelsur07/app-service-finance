@@ -2,6 +2,7 @@
 
 namespace App\Tests\Integration\Cash\Service\Import;
 
+use App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
@@ -9,6 +10,9 @@ use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Import\ClientBank1CImportService;
 use App\Cash\Service\Import\ImportLogger;
 use App\Company\Entity\Company;
+use App\Company\Entity\FinancialResponsibilityCenter;
+use App\Company\Entity\FinancialResponsibilityCenterProject;
+use App\Company\Entity\ProjectDirection;
 use App\Company\Entity\User;
 use App\Company\Repository\CounterpartyRepository;
 use App\Shared\Service\ActiveCompanyService;
@@ -23,6 +27,8 @@ abstract class ClientBank1CImportServiceTestCase extends IntegrationTestCase
     protected CounterpartyRepository $counterpartyRepository;
     protected MoneyAccount $account;
     protected Company $company;
+    protected ProjectDirection $systemProject;
+    protected FinancialResponsibilityCenter $systemCenter;
     /** @var AccountBalanceService&MockObject */
     protected AccountBalanceService $accountBalanceService;
 
@@ -43,10 +49,28 @@ abstract class ClientBank1CImportServiceTestCase extends IntegrationTestCase
 
         $this->account = new MoneyAccount(Uuid::uuid4()->toString(), $this->company, MoneyAccountType::BANK, 'Main account', 'RUB');
         $this->account->setAccountNumber('40702810900000000001');
+        $this->systemProject = new ProjectDirection(
+            Uuid::uuid4()->toString(),
+            $this->company,
+            'Общий',
+            ProjectDirection::CODE_GENERAL,
+        );
+        $this->systemCenter = new FinancialResponsibilityCenter(
+            $this->company->getId(),
+            FinancialResponsibilityCenter::CODE_GENERAL,
+            FinancialResponsibilityCenter::NAME_GENERAL,
+        );
 
         $this->em->persist($user);
         $this->em->persist($this->company);
         $this->em->persist($this->account);
+        $this->em->persist($this->systemProject);
+        $this->em->persist($this->systemCenter);
+        $this->em->persist(new FinancialResponsibilityCenterProject(
+            $this->company->getId(),
+            $this->systemProject,
+            $this->systemCenter,
+        ));
         $this->em->flush();
 
         $activeCompanyService = new ImportTestActiveCompanyService($this->company);
@@ -58,6 +82,7 @@ abstract class ClientBank1CImportServiceTestCase extends IntegrationTestCase
             new ImportLogger($this->em),
             $this->em,
             $this->accountBalanceService,
+            self::getContainer()->get(CashTransactionResponsibilityCenterResolver::class),
         );
     }
 }

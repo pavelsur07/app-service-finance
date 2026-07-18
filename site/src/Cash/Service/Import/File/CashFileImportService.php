@@ -2,6 +2,7 @@
 
 namespace App\Cash\Service\Import\File;
 
+use App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
@@ -9,6 +10,7 @@ use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Import\ImportLogger;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
+use App\Company\Entity\ProjectDirection;
 use App\Company\Enum\CounterpartyType;
 use App\Company\Repository\CounterpartyRepository;
 use App\Shared\Service\Storage\ObjectStorageInterface;
@@ -35,6 +37,7 @@ final class CashFileImportService
         private readonly AccountBalanceService $accountBalanceService,
         private readonly ObjectStorageInterface $objectStorage,
         private readonly TemporaryLocalFile $temporaryLocalFile,
+        private readonly CashTransactionResponsibilityCenterResolver $responsibilityCenterResolver,
     ) {
     }
 
@@ -59,6 +62,11 @@ final class CashFileImportService
         $mapping = $job->getMapping();
         $companyId = $company->getId();
         $accountId = $moneyAccount->getId();
+        $responsibilityPair = $this->responsibilityCenterResolver->resolveForCreate($companyId, null, null);
+        $systemProject = $this->entityManager->getReference(
+            ProjectDirection::class,
+            $responsibilityPair->projectDirectionId
+        );
 
         $created = 0;
         $createdMinDate = null;
@@ -158,6 +166,8 @@ final class CashFileImportService
                         $transaction->setImportSource('file');
                         $transaction->setDocNumber($docNumber);
                         $transaction->setDescription($description);
+                        $transaction->setProjectDirection($systemProject);
+                        $transaction->setResponsibilityCenterId($responsibilityPair->responsibilityCenterId);
                         $transaction->setBookedAt($occurredAt);
                         $transaction->setRawData([
                             'row' => $rowByHeader,
