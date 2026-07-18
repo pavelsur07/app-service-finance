@@ -10,8 +10,13 @@ use App\Finance\Report\PlReportPeriod;
 
 final class NullFactsProvider implements FactsProviderInterface
 {
-    public function value(Company $company, PlReportPeriod $period, string $code, ?ProjectDirection $projectDirection = null): float
-    {
+    public function value(
+        Company $company,
+        PlReportPeriod $period,
+        string $code,
+        ?ProjectDirection $projectDirection = null,
+        ?string $responsibilityCenterId = null,
+    ): float {
         return 0.0;
     }
 }

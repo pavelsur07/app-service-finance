@@ -26,8 +26,13 @@ final class PlReportCalculatorTest extends TestCase
 
         // Факты: REV_WB = 500, COGS = 100
         $facts = new class implements FactsProviderInterface {
-            public function value(Company $company, PlReportPeriod $period, string $code, ?ProjectDirection $projectDirection = null): float
-            {
+            public function value(
+                Company $company,
+                PlReportPeriod $period,
+                string $code,
+                ?ProjectDirection $projectDirection = null,
+                ?string $responsibilityCenterId = null,
+            ): float {
                 return match ($code) {
                     'REV_WB' => 500.0,
                     'COGS' => 100.0,
@@ -48,5 +53,51 @@ final class PlReportCalculatorTest extends TestCase
         $this->assertSame(100.0, $map['VAR_COSTS_TOTAL']);  // subtotal по детям
         $this->assertSame(400.0, $map['MARGIN']);           // KPI: 500 - 100
         $this->assertEquals(0.8, $map['MARGIN_PCT'], '', 1e-6); // SAFE_DIV(400, 500) = 0.8
+    }
+
+    public function testPassesResponsibilityCenterFilterToFacts(): void
+    {
+        $company = $this->createMock(Company::class);
+        $project = new ProjectDirection('11111111-1111-1111-1111-000000000001', $company, 'Project');
+        $responsibilityCenterId = '22222222-2222-2222-2222-000000000002';
+
+        $repo = $this->createMock(PLCategoryRepository::class);
+        $repo->method('findBy')->willReturn(MiniTreeFactory::build($company));
+
+        $calls = [];
+        $facts = new class($calls) implements FactsProviderInterface {
+            public function __construct(private array &$calls)
+            {
+            }
+
+            public function value(
+                Company $company,
+                PlReportPeriod $period,
+                string $code,
+                ?ProjectDirection $projectDirection = null,
+                ?string $responsibilityCenterId = null,
+            ): float {
+                $this->calls[] = [
+                    'code' => $code,
+                    'projectDirection' => $projectDirection,
+                    'responsibilityCenterId' => $responsibilityCenterId,
+                ];
+
+                return match ($code) {
+                    'REV_WB' => 500.0,
+                    'COGS' => 100.0,
+                    default => 0.0,
+                };
+            }
+        };
+
+        $calc = new PlReportCalculator($repo, $facts);
+        $calc->calculate($company, PlReportPeriod::forMonth(new \DateTimeImmutable('2025-01-01')), $project, $responsibilityCenterId);
+
+        self::assertNotEmpty($calls);
+        foreach ($calls as $call) {
+            self::assertSame($project, $call['projectDirection']);
+            self::assertSame($responsibilityCenterId, $call['responsibilityCenterId']);
+        }
     }
 }

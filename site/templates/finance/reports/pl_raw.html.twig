@@ -41,6 +41,8 @@
                     <th>Документ</th>
                     <th>Категория</th>
                     <th>Природа</th>
+                    <th>Проект</th>
+                    <th>ЦФО</th>
                     <th>Сумма</th>
                     <th>Сумма (+/-)</th>
                     <th>Контрагент</th>
@@ -54,6 +56,8 @@
                     <td>{{ row.document }}</td>
                     <td>{{ row.category }}</td>
                     <td>{{ row.nature }}</td>
+                    <td>{{ row.project }}</td>
+                    <td>{{ row.responsibility_center }}</td>
                     <td class="text-end">{{ row.amount_raw }}</td>
                     <td class="text-end">{{ row.amount_signed|number_format(2, '.', ' ') }}</td>
                     <td>{{ row.counterparty }}</td>
@@ -71,6 +75,8 @@
                 <tr>
                     <th>Дата</th>
                     <th>Категория</th>
+                    <th>Проект</th>
+                    <th>ЦФО</th>
                     <th class="text-end">Доход</th>
                     <th class="text-end">Расход</th>
                     <th class="text-end">Нетто</th>
@@ -81,6 +87,8 @@
                 <tr>
                     <td>{{ t.date }}</td>
                     <td>{{ t.category }}</td>
+                    <td>{{ t.project }}</td>
+                    <td>{{ t.responsibility_center }}</td>
                     <td class="text-end text-success">{{ t.income|number_format(2, '.', ' ') }}</td>
                     <td class="text-end text-danger">{{ t.expense|number_format(2, '.', ' ') }}</td>
                     <td class="text-end fw-bold">{{ t.net|number_format(2, '.', ' ') }}</td>

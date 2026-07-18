@@ -35,6 +35,7 @@ final class PlReportProjectsCompareBuilder
         \DateTimeImmutable $to,
         array $projects,
         ?ProjectDirection $overheadProject = null,
+        ?string $responsibilityCenterId = null,
     ): array {
         if ($from > $to) {
             [$from, $to] = [$to, $from];
@@ -66,7 +67,7 @@ final class PlReportProjectsCompareBuilder
             }
             $projectId = (string) $p->getId();
 
-            $result = $this->calc->calculate($company, $period, $p);
+            $result = $this->calc->calculate($company, $period, $p, $responsibilityCenterId);
             $warnings = array_merge($warnings, $result->warnings);
 
             foreach ($result->rows as $r) {

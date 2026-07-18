@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Finance\Controller;
 
+use App\Company\Application\Service\AccountBootstrapper;
+use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Finance\Application\Service\PLRegisterUpdater;
 use App\Finance\Report\PlReportGridBuilder;
 use App\Finance\Report\PlReportPeriod;
 use App\Finance\Report\PlReportProjectsCompareBuilder;
-use App\Company\Application\Service\AccountBootstrapper;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -30,8 +31,10 @@ final class PlReportPreviewController extends AbstractController
         PlReportGridBuilder $gridBuilder,
         PlReportProjectsCompareBuilder $projectsCompareBuilder,
         ProjectDirectionRepository $projectDirections,
+        FinancialResponsibilityCenterFacade $responsibilityCenters,
     ): Response {
         $company = $activeCompany->getActiveCompany();
+        $companyId = (string) $company->getId();
 
         $seeded = $accountBootstrapper->ensurePlSeeded($company);
         if ($seeded) {
@@ -55,6 +58,9 @@ final class PlReportPreviewController extends AbstractController
 
         $projectDirectionId = (string) $request->query->get('projectDirectionId', '');
         $projectDirectionsList = $projectDirections->findByCompany($company);
+        $responsibilityCenterChoices = $responsibilityCenters->getActiveChoices($companyId);
+        $responsibilityCenterId = (string) $request->query->get('responsibilityCenterId', '');
+        $selectedResponsibilityCenterId = $this->resolveResponsibilityCenterId($responsibilityCenterId, $responsibilityCenterChoices);
         $overheadProject = null;
 
         foreach ($projectDirectionsList as $pd) {
@@ -81,7 +87,14 @@ final class PlReportPreviewController extends AbstractController
 
         if ('projects' === $layout) {
             try {
-                $compare = $projectsCompareBuilder->build($company, $from, $to, $projectDirectionsList, $overheadProject);
+                $compare = $projectsCompareBuilder->build(
+                    $company,
+                    $from,
+                    $to,
+                    $projectDirectionsList,
+                    $overheadProject,
+                    $selectedResponsibilityCenterId,
+                );
 
                 return $this->render('finance/report/preview.html.twig', [
                     'company' => $company,
@@ -89,6 +102,8 @@ final class PlReportPreviewController extends AbstractController
                     'showMetaColumns' => $showMetaColumns,
                     'projectDirections' => $projectDirectionsList,
                     'selectedProjectDirectionId' => $selectedProject?->getId(),
+                    'responsibilityCenters' => $responsibilityCenterChoices,
+                    'selectedResponsibilityCenterId' => $selectedResponsibilityCenterId,
                     'from' => $from,
                     'to' => $to,
                     'layout' => $layout,
@@ -109,6 +124,8 @@ final class PlReportPreviewController extends AbstractController
                     'showMetaColumns' => $showMetaColumns,
                     'projectDirections' => $projectDirectionsList,
                     'selectedProjectDirectionId' => $selectedProject?->getId(),
+                    'responsibilityCenters' => $responsibilityCenterChoices,
+                    'selectedResponsibilityCenterId' => $selectedResponsibilityCenterId,
                     'from' => $from,
                     'to' => $to,
                     'layout' => 'projects',
@@ -120,7 +137,7 @@ final class PlReportPreviewController extends AbstractController
             }
         }
 
-        $grid = $gridBuilder->build($company, $from, $to, $grouping, $selectedProject);
+        $grid = $gridBuilder->build($company, $from, $to, $grouping, $selectedProject, $selectedResponsibilityCenterId);
 
         return $this->render('finance/report/preview.html.twig', [
             'company' => $company,
@@ -128,6 +145,8 @@ final class PlReportPreviewController extends AbstractController
             'showMetaColumns' => $showMetaColumns,
             'projectDirections' => $projectDirectionsList,
             'selectedProjectDirectionId' => $selectedProject?->getId(),
+            'responsibilityCenters' => $responsibilityCenterChoices,
+            'selectedResponsibilityCenterId' => $selectedResponsibilityCenterId,
             'from' => $from,
             'to' => $to,
             'layout' => $layout,
@@ -157,8 +176,10 @@ final class PlReportPreviewController extends AbstractController
         PlReportGridBuilder $gridBuilder,
         PlReportProjectsCompareBuilder $projectsCompareBuilder,
         ProjectDirectionRepository $projectDirections,
+        FinancialResponsibilityCenterFacade $responsibilityCenters,
     ): JsonResponse {
         $company = $activeCompany->getActiveCompany();
+        $companyId = (string) $company->getId();
 
         $grouping = $request->query->get('grouping', 'month');
         if (!\in_array($grouping, ['day', 'week', 'month'], true)) {
@@ -172,6 +193,11 @@ final class PlReportPreviewController extends AbstractController
 
         $projectDirectionId = (string) $request->query->get('projectDirectionId', '');
         $projectDirectionsList = $projectDirections->findByCompany($company);
+        $responsibilityCenterId = (string) $request->query->get('responsibilityCenterId', '');
+        $selectedResponsibilityCenterId = $this->resolveResponsibilityCenterId(
+            $responsibilityCenterId,
+            $responsibilityCenters->getActiveChoices($companyId),
+        );
         $overheadProject = null;
 
         foreach ($projectDirectionsList as $pd) {
@@ -196,7 +222,7 @@ final class PlReportPreviewController extends AbstractController
 
         if ('projects' === $layout) {
             try {
-                $compare = $projectsCompareBuilder->build($company, $from, $to, $projectDirectionsList, $overheadProject);
+                $compare = $projectsCompareBuilder->build($company, $from, $to, $projectDirectionsList, $overheadProject, $selectedResponsibilityCenterId);
                 $payload = [
                     'meta' => [
                         'company' => (string) $company->getName(),
@@ -204,6 +230,7 @@ final class PlReportPreviewController extends AbstractController
                         'from' => $from->format('Y-m-d'),
                         'to' => $to->format('Y-m-d'),
                         'layout' => 'projects',
+                        'responsibility_center_id' => $selectedResponsibilityCenterId,
                         'generated_at' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
                     ],
                     'projects' => $compare['projects'],
@@ -218,6 +245,7 @@ final class PlReportPreviewController extends AbstractController
                         'from' => $from->format('Y-m-d'),
                         'to' => $to->format('Y-m-d'),
                         'layout' => 'projects',
+                        'responsibility_center_id' => $selectedResponsibilityCenterId,
                         'generated_at' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
                     ],
                     'error' => $e->getMessage(),
@@ -226,7 +254,7 @@ final class PlReportPreviewController extends AbstractController
                 ];
             }
         } else {
-            $grid = $gridBuilder->build($company, $from, $to, $grouping, $selectedProject);
+            $grid = $gridBuilder->build($company, $from, $to, $grouping, $selectedProject, $selectedResponsibilityCenterId);
 
             $payload = [
                 'meta' => [
@@ -237,6 +265,7 @@ final class PlReportPreviewController extends AbstractController
                     'grouping' => $grouping,
                     'layout' => 'periods',
                     'project_direction_id' => $projectDirectionId ?: null,
+                    'responsibility_center_id' => $selectedResponsibilityCenterId,
                     'generated_at' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
                 ],
                 'periods' => array_map(
@@ -293,6 +322,7 @@ final class PlReportPreviewController extends AbstractController
                 'layout' => $request->request->get('layout', 'periods'),
                 'show_meta' => $request->request->getBoolean('show_meta'),
                 'projectDirectionId' => $request->request->get('projectDirectionId'),
+                'responsibilityCenterId' => $request->request->get('responsibilityCenterId'),
             ]);
         }
 
@@ -313,6 +343,7 @@ final class PlReportPreviewController extends AbstractController
                 'layout' => $request->request->get('layout', 'periods'),
                 'show_meta' => $request->request->getBoolean('show_meta'),
                 'projectDirectionId' => $request->request->get('projectDirectionId'),
+                'responsibilityCenterId' => $request->request->get('responsibilityCenterId'),
             ]);
         }
 
@@ -330,6 +361,7 @@ final class PlReportPreviewController extends AbstractController
                 'layout' => $request->request->get('layout', 'periods'),
                 'show_meta' => $request->request->getBoolean('show_meta'),
                 'projectDirectionId' => $request->request->get('projectDirectionId'),
+                'responsibilityCenterId' => $request->request->get('responsibilityCenterId'),
             ]);
         }
 
@@ -355,6 +387,7 @@ final class PlReportPreviewController extends AbstractController
             'layout' => $request->request->get('layout', 'periods'),
             'show_meta' => $request->request->getBoolean('show_meta'),
             'projectDirectionId' => $request->request->get('projectDirectionId'),
+            'responsibilityCenterId' => $request->request->get('responsibilityCenterId'),
         ]);
     }
 
@@ -389,5 +422,20 @@ final class PlReportPreviewController extends AbstractController
         } catch (\Exception) {
             return null;
         }
+    }
+
+    private function resolveResponsibilityCenterId(string $responsibilityCenterId, array $choices): ?string
+    {
+        if ('' === $responsibilityCenterId) {
+            return null;
+        }
+
+        foreach ($choices as $choice) {
+            if ($choice->id === $responsibilityCenterId) {
+                return $choice->id;
+            }
+        }
+
+        return null;
     }
 }
