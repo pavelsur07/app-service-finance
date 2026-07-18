@@ -261,6 +261,8 @@ Phase 0 status: PREPARED. Stage 7.6.1 scalar mapping/resolution is DONE and acce
 
 No historical rebuild is run. Existing null rows remain in an explicit `Не распределено` bucket.
 
+Phase 0 status: PREPARED. The implementation is split into Finance scalar mapping/pair validation, document writer propagation, P&L daily-total key switch, and optional marketplace caller contract. The plan is in `cash-auto-rules-stage-7-7-plan.md`. Owner decisions required before implementation: operation-vs-document fallback, nullable-category uniqueness policy, and marketplace/ingestion scope.
+
 ### Stage 7.8 — Read-only Cash/P&L analytics
 
 **Risk:** HIGH if routes/contracts change; otherwise MEDIUM for internal queries
