@@ -1,10 +1,11 @@
 ### Stage 7.6.2: Core Cash create/update and CashFacade pair contract — DONE
 
 **Risk:** HIGH
-**Next action:** STOP, owner review required
+**Next action:** DONE; PR #2191 merged and production deploy passed
 
 #### What was done
 
+- Merged and deployed via PR #2191 / merge commit `6db658f4cbb48ff070f0f58b44a3947e04875136`; production deploy run `29630236198` passed.
 - Added optional scalar `responsibilityCenterId` to `CashTransactionDTO` and the end of `CreateCashTransactionCommand`.
 - Mapped the new command field through `CashFacade` without changing duplicate lookup behavior.
 - Connected `CashTransactionService::add()` to the existing `CashTransactionResponsibilityCenterResolver`:
