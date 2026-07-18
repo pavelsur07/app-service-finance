@@ -23,6 +23,7 @@ final readonly class CreatePLDocumentCommand
         public ?string $description = null,
         public ?string $counterpartyId = null,
         public ?string $projectDirectionId = null,
+        public ?string $responsibilityCenterId = null,
         public array $operations = [],
         public ?PLDocumentSource $source = null,      // ← НОВОЕ
         public ?PLDocumentStream $stream = null,      // ← НОВОЕ

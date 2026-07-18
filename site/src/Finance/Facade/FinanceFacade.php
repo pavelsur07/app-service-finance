@@ -12,6 +12,7 @@ use App\Finance\Application\Command\CreatePLDocumentCommand;
 use App\Finance\Application\Command\CreatePLDocumentOperationCommand;
 use App\Finance\Application\CreatePLDocumentAction;
 use App\Finance\Application\DeletePLDocumentAction;
+use App\Finance\Application\Service\FinanceDocumentResponsibilityCenterNormalizer;
 use App\Finance\Application\Service\PLRegisterUpdater;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
@@ -43,6 +44,7 @@ final class FinanceFacade
         private readonly PLCategoryRepository $plCategoryRepository,
         private readonly DocumentRepository $documentRepository,
         private readonly PLRegisterUpdater $plRegisterUpdater,
+        private readonly FinanceDocumentResponsibilityCenterNormalizer $responsibilityCenterNormalizer,
         private readonly EntityManagerInterface $entityManager,
     ) {
     }
@@ -50,13 +52,13 @@ final class FinanceFacade
     /**
      * Создаёт документ ОПиУ с набором строк.
      *
-     * @param string           $companyId          UUID компании
-     * @param PLDocumentSource $source             Источник данных (WB, Ozon, manual...)
-     * @param PLDocumentStream $stream             Поток (revenue, costs, storno)
-     * @param string           $periodFrom         Начало периода (Y-m-d)
-     * @param string           $periodTo           Конец периода (Y-m-d)
-     * @param array            $entries            Массив PLEntryDTO[]
-     * @param string|null      $projectDirectionId UUID проекта ОПиУ для документа и строк (nullable)
+     * @param string $companyId UUID компании
+     * @param PLDocumentSource $source Источник данных (WB, Ozon, manual...)
+     * @param PLDocumentStream $stream Поток (revenue, costs, storno)
+     * @param string $periodFrom Начало периода (Y-m-d)
+     * @param string $periodTo Конец периода (Y-m-d)
+     * @param array $entries Массив PLEntryDTO[]
+     * @param string|null $projectDirectionId UUID проекта ОПиУ для документа и строк (nullable)
      *
      * @return string documentId (UUID созданного документа)
      */
@@ -88,26 +90,28 @@ final class FinanceFacade
             }
 
             $operations[] = new CreatePLDocumentOperationCommand(
-                amount:             $amount,
-                categoryId:         $entry->plCategoryId,
-                counterpartyId:     null,
+                amount: $amount,
+                categoryId: $entry->plCategoryId,
+                counterpartyId: null,
                 projectDirectionId: $entry->projectId ?? $projectDirectionId,
-                comment:            $entry->description,
+                responsibilityCenterId: null,
+                comment: $entry->description,
             );
         }
 
         $command = new CreatePLDocumentCommand(
-            companyId:          $companyId,
-            date:               new \DateTimeImmutable($periodTo),
-            type:               DocumentType::MARKETPLACE_PL,
-            status:             DocumentStatus::ACTIVE,
-            number:             null,
-            description:        $description,
-            counterpartyId:     null,
+            companyId: $companyId,
+            date: new \DateTimeImmutable($periodTo),
+            type: DocumentType::MARKETPLACE_PL,
+            status: DocumentStatus::ACTIVE,
+            number: null,
+            description: $description,
+            counterpartyId: null,
             projectDirectionId: $projectDirectionId,
-            operations:         $operations,
-            source:             $source,
-            stream:             $stream,
+            responsibilityCenterId: null,
+            operations: $operations,
+            source: $source,
+            stream: $stream,
         );
 
         return ($this->createAction)($command);
@@ -145,7 +149,7 @@ final class FinanceFacade
         }
 
         $counterparty = null;
-        if ($command->counterpartyId !== null) {
+        if (null !== $command->counterpartyId) {
             $counterparty = $this->counterpartyRepository->find($command->counterpartyId);
             if (!$counterparty || $counterparty->getCompany()->getId() !== $companyId) {
                 throw new \DomainException('Контрагент не найден или не принадлежит компании.');
@@ -153,7 +157,7 @@ final class FinanceFacade
         }
 
         $projectDirection = null;
-        if ($command->projectDirectionId !== null) {
+        if (null !== $command->projectDirectionId) {
             $projectDirection = $this->projectDirectionRepository->find($command->projectDirectionId);
             if (!$projectDirection || $projectDirection->getCompany()->getId() !== $companyId) {
                 throw new \DomainException('Направление проекта не найдено или не принадлежит компании.');
@@ -161,7 +165,7 @@ final class FinanceFacade
         }
 
         $plCategory = null;
-        if ($command->plCategoryId !== null) {
+        if (null !== $command->plCategoryId) {
             $plCategory = $this->plCategoryRepository->find($command->plCategoryId);
             if (!$plCategory || $plCategory->getCompany()->getId() !== $companyId) {
                 throw new \DomainException('Категория ОПиУ не найдена или не принадлежит компании.');
@@ -174,6 +178,7 @@ final class FinanceFacade
         $document->setDescription($tx->getDescription());
         $document->setCounterparty($counterparty);
         $document->setProjectDirection($projectDirection);
+        $document->setResponsibilityCenterId($command->responsibilityCenterId);
 
         if ($command->createdWithViolation) {
             $document->markAsCreatedWithViolation();
@@ -184,8 +189,11 @@ final class FinanceFacade
         $operation->setAmount($command->amount);
         $operation->setCounterparty($counterparty);
         $operation->setProjectDirection($projectDirection);
+        $operation->setResponsibilityCenterId($command->responsibilityCenterId);
         $operation->setCategory($plCategory);
         $document->addOperation($operation);
+
+        $this->responsibilityCenterNormalizer->prepareExplicitDocument($document, $tx->getCompany());
 
         $tx->assertCanAllocateAmount((float) $command->amount);
 

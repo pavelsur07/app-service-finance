@@ -4,13 +4,13 @@ namespace App\Cash\Service\Transaction;
 
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Company\Entity\ProjectDirection;
+use App\Company\Repository\ProjectDirectionRepository;
+use App\Finance\Application\Service\PLRegisterUpdater;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
 use App\Finance\Entity\PLCategory;
-use App\Company\Entity\ProjectDirection;
 use App\Finance\Enum\DocumentType;
-use App\Company\Repository\ProjectDirectionRepository;
-use App\Finance\Application\Service\PLRegisterUpdater;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 
@@ -72,6 +72,7 @@ class CashTransactionToDocumentService
         $operation->setAmount($transaction->getAmount());
         $operation->setCounterparty($transaction->getCounterparty());
         $operation->setProjectDirection($this->resolveProjectDirection($transaction));
+        $operation->setResponsibilityCenterId($transaction->getResponsibilityCenterId());
 
         $category = $transaction->getCashflowCategory();
         if ($category instanceof CashflowCategory) {
@@ -110,6 +111,7 @@ class CashTransactionToDocumentService
             ->setType(DocumentType::CASHFLOW_EXPENSE)
             ->setCounterparty($transaction->getCounterparty())
             ->setProjectDirection($projectDirection)
+            ->setResponsibilityCenterId($transaction->getResponsibilityCenterId())
             ->setCashTransaction($transaction);
 
         $operation = new DocumentOperation();
@@ -117,7 +119,8 @@ class CashTransactionToDocumentService
             ->setAmount(number_format($amount, 2, '.', ''))
             ->setCounterparty($transaction->getCounterparty())
             ->setCategory($plCategory)
-            ->setProjectDirection($projectDirection);
+            ->setProjectDirection($projectDirection)
+            ->setResponsibilityCenterId($transaction->getResponsibilityCenterId());
 
         $document->addOperation($operation);
         $transaction->addDocument($document);
