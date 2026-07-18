@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Service\Import;
 
+use App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
@@ -11,6 +12,9 @@ use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Import\ClientBank1CImportService;
 use App\Cash\Service\Import\ImportLogger;
 use App\Company\Entity\Company;
+use App\Company\Entity\FinancialResponsibilityCenter;
+use App\Company\Entity\FinancialResponsibilityCenterProject;
+use App\Company\Entity\ProjectDirection;
 use App\Company\Repository\CounterpartyRepository;
 use App\Shared\Service\ActiveCompanyService;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
@@ -63,10 +67,28 @@ final class ClientBank1CImportServiceSoftDeleteTest extends IntegrationTestCase
             ->withName('Main account')
             ->build();
         $this->account->setAccountNumber('40702810900000000001');
+        $systemProject = new ProjectDirection(
+            '22222222-2222-4222-8222-000000000101',
+            $this->company,
+            'Общий',
+            ProjectDirection::CODE_GENERAL,
+        );
+        $systemCenter = new FinancialResponsibilityCenter(
+            $this->company->getId(),
+            FinancialResponsibilityCenter::CODE_GENERAL,
+            FinancialResponsibilityCenter::NAME_GENERAL,
+        );
 
         $this->entityManager->persist($user);
         $this->entityManager->persist($this->company);
         $this->entityManager->persist($this->account);
+        $this->entityManager->persist($systemProject);
+        $this->entityManager->persist($systemCenter);
+        $this->entityManager->persist(new FinancialResponsibilityCenterProject(
+            $this->company->getId(),
+            $systemProject,
+            $systemCenter,
+        ));
         $this->entityManager->flush();
 
         $this->service = new ClientBank1CImportService(
@@ -76,6 +98,7 @@ final class ClientBank1CImportServiceSoftDeleteTest extends IntegrationTestCase
             new ImportLogger($this->entityManager),
             $this->entityManager,
             $this->accountBalanceService,
+            self::getContainer()->get(CashTransactionResponsibilityCenterResolver::class),
         );
     }
 
