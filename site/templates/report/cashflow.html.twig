@@ -83,6 +83,35 @@
 {% endfor %}
 {% endmacro %}
 
+{% macro center_label(row, centerLabels) %}
+    {{ row.responsibility_center_name ?? centerLabels[row.responsibility_center_id]|default(row.responsibility_center_id) }}
+{% endmacro %}
+
+{% macro render_project_center_rows(rows, currency, periods, primary, centerLabels) %}
+    {% for row in rows %}
+        {% set vals = row.totals[currency]|default([]) %}
+        {% if vals is not empty %}
+            <tr>
+                {% if primary == 'center' %}
+                    <td>{{ _self.center_label(row, centerLabels) }}</td>
+                    <td>{{ row.project_name }}</td>
+                {% else %}
+                    <td>{{ row.project_name }}</td>
+                    <td>{{ _self.center_label(row, centerLabels) }}</td>
+                {% endif %}
+                {% for i, p in periods %}
+                    <td class="text-end">{{ _self.format_amount(vals[i]|default(0))|raw }}</td>
+                {% endfor %}
+            </tr>
+        {% endif %}
+    {% endfor %}
+{% endmacro %}
+
+{% set responsibilityCenterLabels = {} %}
+{% for center in responsibilityCenters|default([]) %}
+    {% set responsibilityCenterLabels = responsibilityCenterLabels|merge({(center.id): center.name}) %}
+{% endfor %}
+
 {% for currency, values in openings %}
     <div class="card mb-4">
         <div class="card-header">
@@ -119,6 +148,53 @@
         </div>
     </div>
 {% endfor %}
+
+{% if projectCenterMatrix.rowsByCenter|default([]) is not empty %}
+    {% for currency in projectCenterMatrix.currencies %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="card-title">Матрица Проект × ЦФО: {{ currency }}</h3>
+            </div>
+            <div class="card-body">
+                <h4>ЦФО → проекты</h4>
+                <div class="table-responsive mb-4">
+                    <table class="table table-sm table-bordered table-striped">
+                        <thead>
+                            <tr>
+                                <th>ЦФО</th>
+                                <th>Проект</th>
+                                {% for p in periods %}
+                                    <th>{{ p.label }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{ macros.render_project_center_rows(projectCenterMatrix.rowsByCenter, currency, periods, 'center', responsibilityCenterLabels) }}
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4>Проект → ЦФО</h4>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered table-striped">
+                        <thead>
+                            <tr>
+                                <th>Проект</th>
+                                <th>ЦФО</th>
+                                {% for p in periods %}
+                                    <th>{{ p.label }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{ macros.render_project_center_rows(projectCenterMatrix.rowsByProject, currency, periods, 'project', responsibilityCenterLabels) }}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+{% endif %}
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {

@@ -58,6 +58,23 @@ final class CashflowReportJsonFormatterTest extends TestCase
             'closings' => ['USD' => [133.45]],
             'tree' => $tree,
             'categoryTree' => $categoryTree,
+            'projectCenterMatrix' => [
+                'currencies' => ['USD'],
+                'rowsByCenter' => [[
+                    'project_id' => '33333333-3333-4333-8333-333333333333',
+                    'project_name' => 'Main',
+                    'responsibility_center_id' => '44444444-4444-4444-8444-444444444444',
+                    'responsibility_center_name' => null,
+                    'totals' => ['USD' => [123.45]],
+                ]],
+                'rowsByProject' => [[
+                    'project_id' => '33333333-3333-4333-8333-333333333333',
+                    'project_name' => 'Main',
+                    'responsibility_center_id' => '44444444-4444-4444-8444-444444444444',
+                    'responsibility_center_name' => null,
+                    'totals' => ['USD' => [123.45]],
+                ]],
+            ],
         ]);
 
         self::assertSame([
@@ -84,6 +101,23 @@ final class CashflowReportJsonFormatterTest extends TestCase
             'closings' => ['USD' => [133.45]],
             'tree' => $tree,
             'categoryTree' => $categoryTree,
+            'projectCenterMatrix' => [
+                'currencies' => ['USD'],
+                'rowsByCenter' => [[
+                    'project_id' => '33333333-3333-4333-8333-333333333333',
+                    'project_name' => 'Main',
+                    'responsibility_center_id' => '44444444-4444-4444-8444-444444444444',
+                    'responsibility_center_name' => null,
+                    'totals' => ['USD' => [123.45]],
+                ]],
+                'rowsByProject' => [[
+                    'project_id' => '33333333-3333-4333-8333-333333333333',
+                    'project_name' => 'Main',
+                    'responsibility_center_id' => '44444444-4444-4444-8444-444444444444',
+                    'responsibility_center_name' => null,
+                    'totals' => ['USD' => [123.45]],
+                ]],
+            ],
         ], $formatted);
     }
 

@@ -70,12 +70,16 @@ final class CashflowReportBuilderTest extends TestCase
                 'amount' => '100.00',
                 'currency' => 'USD',
                 'occurredAt' => new \DateTimeImmutable('2026-01-10 12:00:00'),
+                'project_id' => null,
+                'project_name' => null,
+                'responsibility_center_id' => null,
             ],
         ]);
 
         $whereExpressions = [];
         $queryBuilder = $this->createMock(QueryBuilder::class);
         $queryBuilder->method('select')->willReturnSelf();
+        $queryBuilder->method('leftJoin')->willReturnSelf();
         $queryBuilder->method('where')->willReturnSelf();
         $queryBuilder->method('andWhere')
             ->willReturnCallback(function (string $expr) use (&$whereExpressions, $queryBuilder): QueryBuilder {
@@ -156,6 +160,9 @@ final class CashflowReportBuilderTest extends TestCase
                 'amount' => '100.00',
                 'currency' => 'RUB',
                 'occurredAt' => new \DateTimeImmutable('2026-01-10 12:00:00'),
+                'project_id' => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                'project_name' => 'Продажа компьютеров',
+                'responsibility_center_id' => $centerId,
             ],
         ]);
         $companyQuery = $this->createMock(Query::class);
@@ -166,6 +173,9 @@ final class CashflowReportBuilderTest extends TestCase
                 'amount' => '100.00',
                 'currency' => 'RUB',
                 'occurredAt' => new \DateTimeImmutable('2026-01-10 12:00:00'),
+                'project_id' => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                'project_name' => 'Продажа компьютеров',
+                'responsibility_center_id' => $centerId,
             ],
             [
                 'category' => $category->getId(),
@@ -173,6 +183,9 @@ final class CashflowReportBuilderTest extends TestCase
                 'amount' => '50.00',
                 'currency' => 'RUB',
                 'occurredAt' => new \DateTimeImmutable('2026-01-10 13:00:00'),
+                'project_id' => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+                'project_name' => 'Сервисные услуги',
+                'responsibility_center_id' => '22222222-2222-4222-8222-222222222222',
             ],
         ]);
 
@@ -180,6 +193,7 @@ final class CashflowReportBuilderTest extends TestCase
         $parameters = [];
         $filteredQueryBuilder = $this->createMock(QueryBuilder::class);
         $filteredQueryBuilder->method('select')->willReturnSelf();
+        $filteredQueryBuilder->method('leftJoin')->willReturnSelf();
         $filteredQueryBuilder->method('where')->willReturnSelf();
         $filteredQueryBuilder->method('andWhere')
             ->willReturnCallback(function (string $expr) use (&$whereExpressions, $filteredQueryBuilder): QueryBuilder {
@@ -197,6 +211,7 @@ final class CashflowReportBuilderTest extends TestCase
 
         $companyQueryBuilder = $this->createMock(QueryBuilder::class);
         $companyQueryBuilder->method('select')->willReturnSelf();
+        $companyQueryBuilder->method('leftJoin')->willReturnSelf();
         $companyQueryBuilder->method('where')->willReturnSelf();
         $companyQueryBuilder->method('andWhere')->willReturnSelf();
         $companyQueryBuilder->method('setParameter')->willReturnSelf();
@@ -236,5 +251,10 @@ final class CashflowReportBuilderTest extends TestCase
         self::assertSame(100.0, $payload['categoryTotals'][$category->getId()]['totals']['RUB'][0]);
         self::assertSame(1000.0, $payload['openings']['RUB'][0]);
         self::assertSame(1150.0, $payload['closings']['RUB'][0]);
+        self::assertSame(['RUB'], $payload['projectCenterMatrix']['currencies']);
+        self::assertSame('Продажа компьютеров', $payload['projectCenterMatrix']['rowsByProject'][0]['project_name']);
+        self::assertSame($centerId, $payload['projectCenterMatrix']['rowsByProject'][0]['responsibility_center_id']);
+        self::assertSame(100.0, $payload['projectCenterMatrix']['rowsByProject'][0]['totals']['RUB'][0]);
+        self::assertCount(1, $payload['projectCenterMatrix']['rowsByProject']);
     }
 }
