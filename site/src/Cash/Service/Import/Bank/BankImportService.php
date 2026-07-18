@@ -2,6 +2,7 @@
 
 namespace App\Cash\Service\Import\Bank;
 
+use App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Bank\BankConnection;
 use App\Cash\Entity\Import\ImportLog;
@@ -13,6 +14,7 @@ use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Import\Bank\Provider\BankStatementsProviderInterface;
 use App\Cash\Service\Import\ImportLogger;
 use App\Company\Entity\Company;
+use App\Company\Entity\ProjectDirection;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
@@ -26,6 +28,7 @@ class BankImportService
         private readonly EntityManagerInterface $entityManager,
         private readonly LoggerInterface $logger,
         private readonly ImportLogger $importLogger,
+        private readonly CashTransactionResponsibilityCenterResolver $responsibilityCenterResolver,
     ) {
     }
 
@@ -43,6 +46,12 @@ class BankImportService
         $importLog = $this->importLogger->start($company, 'bank:'.$bankCode, false, null, null);
 
         try {
+            $responsibilityPair = $this->responsibilityCenterResolver->resolveForCreate($company->getId(), null, null);
+            $systemProject = $this->entityManager->getReference(
+                ProjectDirection::class,
+                $responsibilityPair->projectDirectionId
+            );
+
             $accountsResponse = $provider->getAccounts($connection);
             $accountNumbers = $this->extractAccountNumbers($accountsResponse);
             $totalAccountsFound += count($accountNumbers);
@@ -138,6 +147,8 @@ class BankImportService
                             $cashTransaction
                                 ->setExternalId($externalId)
                                 ->setImportSource($bankCode)
+                                ->setProjectDirection($systemProject)
+                                ->setResponsibilityCenterId($responsibilityPair->responsibilityCenterId)
                                 ->setDescription($description);
 
                             $this->entityManager->persist($cashTransaction);

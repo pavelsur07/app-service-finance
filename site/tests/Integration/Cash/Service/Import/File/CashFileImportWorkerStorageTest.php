@@ -7,6 +7,9 @@ namespace App\Tests\Integration\Cash\Service\Import\File;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Service\Import\File\CashFileImportService;
+use App\Company\Entity\FinancialResponsibilityCenter;
+use App\Company\Entity\FinancialResponsibilityCenterProject;
+use App\Company\Entity\ProjectDirection;
 use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -34,10 +37,28 @@ final class CashFileImportWorkerStorageTest extends IntegrationTestCase
             ->forCompany($company)
             ->withCurrency('RUB')
             ->build();
+        $systemProject = new ProjectDirection(
+            '44444444-4444-4444-8444-4444444444b1',
+            $company,
+            'Общий',
+            ProjectDirection::CODE_GENERAL,
+        );
+        $systemCenter = new FinancialResponsibilityCenter(
+            $company->getId(),
+            FinancialResponsibilityCenter::CODE_GENERAL,
+            FinancialResponsibilityCenter::NAME_GENERAL,
+        );
 
         $this->em->persist($owner);
         $this->em->persist($company);
         $this->em->persist($account);
+        $this->em->persist($systemProject);
+        $this->em->persist($systemCenter);
+        $this->em->persist(new FinancialResponsibilityCenterProject(
+            $company->getId(),
+            $systemProject,
+            $systemCenter,
+        ));
         $this->em->flush();
 
         $csv = "Дата;Сумма;Назначение\n01.12.2025;1000,50;Оплата услуг\n";
@@ -67,6 +88,8 @@ final class CashFileImportWorkerStorageTest extends IntegrationTestCase
 
         $transactions = $this->em->getRepository(CashTransaction::class)->findBy(['company' => $company]);
         self::assertCount(1, $transactions, 'Воркер должен был прочитать файл из хранилища и создать транзакцию.');
+        self::assertSame($systemProject->getId(), $transactions[0]->getProjectDirection()?->getId());
+        self::assertSame($systemCenter->getId(), $transactions[0]->getResponsibilityCenterId());
 
         $storage->delete($storageKey);
     }

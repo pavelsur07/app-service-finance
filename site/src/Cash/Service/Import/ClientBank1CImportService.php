@@ -2,6 +2,7 @@
 
 namespace App\Cash\Service\Import;
 
+use App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Import\ImportLog;
 use App\Cash\Entity\Transaction\CashTransaction;
@@ -10,6 +11,7 @@ use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
+use App\Company\Entity\ProjectDirection;
 use App\Company\Enum\CounterpartyType;
 use App\Company\Repository\CounterpartyRepository;
 use App\Shared\Service\ActiveCompanyService;
@@ -32,6 +34,7 @@ class ClientBank1CImportService
         private readonly ImportLogger $importLogger,
         private readonly EntityManagerInterface $entityManager,
         private readonly AccountBalanceService $accountBalanceService,
+        private readonly CashTransactionResponsibilityCenterResolver $responsibilityCenterResolver,
         #[Autowire(service: 'monolog.logger.import.bank1c')]
         private ?LoggerInterface $logger = null,
     ) {
@@ -236,6 +239,11 @@ class ClientBank1CImportService
 
         $companyId = $company->getId();
         $accountId = $account->getId();
+        $responsibilityPair = $this->responsibilityCenterResolver->resolveForCreate($companyId, null, null);
+        $systemProject = $this->entityManager->getReference(
+            ProjectDirection::class,
+            $responsibilityPair->projectDirectionId
+        );
 
         foreach ($preview as $rowNo => $row) {
             $currentRow = $rowNo + 1;
@@ -335,6 +343,8 @@ class ClientBank1CImportService
                 );
                 $transaction->setExternalId($externalId);
                 $transaction->setDedupeHash($dedupeHash);
+                $transaction->setProjectDirection($systemProject);
+                $transaction->setResponsibilityCenterId($responsibilityPair->responsibilityCenterId);
 
                 if (!$isPreview) {
                     $this->entityManager->persist($transaction);
