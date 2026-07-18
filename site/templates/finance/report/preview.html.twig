@@ -39,7 +39,8 @@
                         'to': to|date('Y-m-d'),
                         'grouping': grouping,
                         'layout': layout,
-                        'projectDirectionId': selectedProjectDirectionId ?? ''
+                        'projectDirectionId': selectedProjectDirectionId ?? '',
+                        'responsibilityCenterId': selectedResponsibilityCenterId ?? ''
                     }) }}"
                     class="btn btn-outline-secondary"
                     title="Скачать отчёт в формате JSON для проверки"
@@ -61,6 +62,7 @@
                     <input type="hidden" name="layout" value="{{ layout }}">
                     <input type="hidden" name="show_meta" value="{{ showMetaColumns ? 1 : 0 }}">
                     <input type="hidden" name="projectDirectionId" value="{{ selectedProjectDirectionId ?? '' }}">
+                    <input type="hidden" name="responsibilityCenterId" value="{{ selectedResponsibilityCenterId ?? '' }}">
                     <label class="form-label mb-0" for="recalc_from">Пересчитать с</label>
                     <input
                         class="form-control"
@@ -107,6 +109,15 @@
                                 <option value="">Все проекты</option>
                                 {% for p in projectDirections %}
                                     <option value="{{ p.id }}" {{ selectedProjectDirectionId == p.id ? 'selected' }}>{{ p.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label" for="pl-preview-filter-responsibility-center">ЦФО</label>
+                            <select id="pl-preview-filter-responsibility-center" class="form-select" name="responsibilityCenterId" form="pl-preview-filter-form">
+                                <option value="">Все ЦФО</option>
+                                {% for center in responsibilityCenters %}
+                                    <option value="{{ center.id }}" {{ selectedResponsibilityCenterId == center.id ? 'selected' }}>{{ center.name }}</option>
                                 {% endfor %}
                             </select>
                         </div>

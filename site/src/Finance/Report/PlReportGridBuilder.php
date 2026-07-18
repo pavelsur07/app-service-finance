@@ -28,6 +28,7 @@ final class PlReportGridBuilder
         \DateTimeImmutable $to,
         string $grouping,
         ?ProjectDirection $projectDirection = null,
+        ?string $responsibilityCenterId = null,
     ): array {
         if ($from > $to) {
             [$from, $to] = [$to, $from];
@@ -38,7 +39,7 @@ final class PlReportGridBuilder
         $results = [];
         $warnings = [];
         foreach ($periods as $period) {
-            $result = $this->calc->calculate($company, $period, $projectDirection);
+            $result = $this->calc->calculate($company, $period, $projectDirection, $responsibilityCenterId);
             $results[] = $result;
             $warnings = array_merge($warnings, $result->warnings);
         }

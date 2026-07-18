@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace App\Finance\Report;
 
 use App\Company\Entity\Company;
-use App\Finance\Entity\PLCategory;
 use App\Company\Entity\ProjectDirection;
-use App\Finance\Enum\PLCategoryType;
 use App\Finance\Engine\DependencyExtractor;
 use App\Finance\Engine\Graph;
 use App\Finance\Engine\TopoSort;
 use App\Finance\Engine\ValueFormatter;
+use App\Finance\Entity\PLCategory;
+use App\Finance\Enum\PLCategoryType;
 use App\Finance\Facts\FactsProviderInterface;
 use App\Finance\Formula\Evaluator;
 use App\Finance\Formula\Parser;
@@ -37,8 +37,12 @@ final class PlReportCalculator
         return true;
     }
 
-    public function calculate(Company $company, PlReportPeriod $period, ?ProjectDirection $projectDirection = null): PlReportResult
-    {
+    public function calculate(
+        Company $company,
+        PlReportPeriod $period,
+        ?ProjectDirection $projectDirection = null,
+        ?string $responsibilityCenterId = null,
+    ): PlReportResult {
         $all = $this->categories->findBy(['company' => $company], ['parent' => 'ASC', 'sortOrder' => 'ASC']);
         $displayOrder = $this->orderByTree($all);
         /** @var array<string,PLCategory> $byId */
@@ -84,13 +88,14 @@ final class PlReportCalculator
         $order = $this->topo->sort($g, $byId);
 
         $values = [];
-        $env = new class($values, $all, $company, $period, $projectDirection, $this->facts, $warnings) implements \App\Finance\Formula\Env {
+        $env = new class($values, $all, $company, $period, $projectDirection, $responsibilityCenterId, $this->facts, $warnings) implements \App\Finance\Formula\Env {
             public function __construct(
                 public array &$values,
                 private array $all,
                 private Company $company,
                 private PlReportPeriod $period,
                 private ?ProjectDirection $projectDirection,
+                private ?string $responsibilityCenterId,
                 private FactsProviderInterface $facts,
                 private array &$warnings,
             ) {
@@ -100,7 +105,13 @@ final class PlReportCalculator
             {
                 foreach ($this->all as $c) {
                     if ($c->getCode() && strtoupper($c->getCode()) === strtoupper($code)) {
-                        $v = $this->values[$c->getId()] ?? $this->facts->value($this->company, $this->period, $code, $this->projectDirection);
+                        $v = $this->values[$c->getId()] ?? $this->facts->value(
+                            $this->company,
+                            $this->period,
+                            $code,
+                            $this->projectDirection,
+                            $this->responsibilityCenterId,
+                        );
 
                         return (float) $v;
                     }
@@ -124,7 +135,7 @@ final class PlReportCalculator
 
             if (PLCategoryType::LEAF_INPUT === $t) {
                 $code = (string) $c->getCode();
-                $val = $this->facts->value($company, $period, $code, $projectDirection);
+                $val = $this->facts->value($company, $period, $code, $projectDirection, $responsibilityCenterId);
             } elseif (PLCategoryType::SUBTOTAL === $t) {
                 $formula = trim((string) ($c->getFormula() ?? ''));
                 if ('' === $formula) {
@@ -178,7 +189,7 @@ final class PlReportCalculator
             }
         }
 
-        $bySort = function (PLCategory $a, PLCategory $b): int {
+        $bySort = static function (PLCategory $a, PLCategory $b): int {
             return $a->getSortOrder() <=> $b->getSortOrder();
         };
 
@@ -188,7 +199,7 @@ final class PlReportCalculator
         }
 
         $out = [];
-        $walk = function (PLCategory $node) use (&$walk, &$out, $childrenByParent): void {
+        $walk = static function (PLCategory $node) use (&$walk, &$out, $childrenByParent): void {
             $out[] = $node;
             foreach ($childrenByParent[$node->getId()] ?? [] as $ch) {
                 $walk($ch);
