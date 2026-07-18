@@ -2,11 +2,12 @@
 
 ## Status
 
-- Phase: **Stage 7.6.1 and Stage 7.9.1b accepted in production; Stage 7.9.2 command deployed; Stage 7.9.3 implemented locally**
+- Phase: **Stage A complete; Stage B / Stage 7.11 consolidated cleanup in progress**
 - Overall risk: **HIGH** because the model adds company master data and new financial dimensions to Cash, documents, P&L aggregates, and auto rules
-- Next action: **complete the Stage 7.9.2 production configuration gate and review Stage 7.9.3; Stage 7.9.4 remains blocked until controlled Stage 7.9.3 production acceptance**
+- Next action: **finish Stage B / Stage 7.11, then proceed linearly to Stage C / Stage 7.8.2 and Stage D final closure**
 - Further production mutations: **forbidden until a separately approved migration or backfill step**
 - Historical recalculation: **forbidden by default**
+- Current status source: `docs/reviews/cash-auto-rules-stage-7-current-status.md`
 
 ## Goal
 

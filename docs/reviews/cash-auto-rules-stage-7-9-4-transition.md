@@ -1,7 +1,7 @@
-### Stage 7.9.4: Resume Stage 7.6 cutover — TRANSITION OPEN
+### Stage 7.9.4: Resume Stage 7.6 cutover — TRANSITION CLOSED
 
 **Risk:** HIGH
-**Next action:** Stage 7.6.2 is merged/deployed; proceed only after owner approval of Stage 7.6.4 import cutover Phase 0
+**Next action:** DONE; Stage 7.6.4 import cutover is merged/deployed
 
 #### What was closed
 
@@ -23,14 +23,14 @@
 - The auto-rule gate no longer blocks Stage 7.6 writer work.
 - Stage 7.6.2 core Cash create/update and `CashFacade` command contract is merged/deployed via PR #2191.
 - Stage 7.6.3 minimal manual UI field shipped in #2191 because it was required to avoid a project-only manual form regression.
-- Stage 7.6.4 import cutover remains a separate HIGH-risk stage.
+- Stage 7.6.4 import cutover was completed as a separate HIGH-risk stage.
 
 #### Self-review
 
 - [x] Scope limited to transition documentation
 - [x] No code, migration, production write, history run, import run, queue change, or recalculation
 - [x] Stage 7.9.2 and Stage 7.9.3 gates recorded
-- [x] Stage 7.6.4 import cutover remains gated
+- [x] Stage 7.6.4 import cutover completed separately
 
 #### Checks
 

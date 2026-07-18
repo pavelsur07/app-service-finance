@@ -2,12 +2,12 @@
 
 ## Status
 
-- Phase: **Stage 7.6.2 merged/deployed; Stage 7.6.4 Phase 0 prepared**
+- Phase: **Stage 7.6 complete**
 - Scope: **Cash transaction model, create/edit/facade/import write paths, manual form, pair validation, and audit regression coverage**
 - Overall risk: **HIGH** because the stage changes financial classification behavior for newly created Cash transactions
 - Database migration: **not required**; Stage 7.5 already deployed the nullable `cash_transaction.responsibility_center_id` column, FK, and index
 - Production writes, backfill, and historical recalculation: **forbidden**
-- Next action: **STOP for owner approval before HIGH-risk Stage 7.6.4 import cutover implementation**
+- Next action: **DONE; do not reopen Stage 7.6 unless a new bug is reported**
 
 ## Goal
 
@@ -195,11 +195,9 @@ Mandatory STOP after self-review.
 
 **Result:** every newly persisted file/1C/bank transaction receives the system pair; preview, duplicate, overwrite, batching, logging, and balance behavior stay unchanged.
 
-Implementation status: Phase 0 prepared in `cash-auto-rules-stage-7-6-4-plan.md`.
+Implementation status: DONE. Stage 7.6.4 import cutover was implemented, reviewed, merged, deployed, and recorded in `cash-auto-rules-stage-7-6-4-report.md`.
 
-This unit was blocked until the mandatory auto-rule transition decision was resolved. The Stage 7.9 gate is now closed, but Stage 7.6.4 remains a separate HIGH-risk implementation and production acceptance gate.
-
-Mandatory STOP and controlled production acceptance after self-review.
+Production import smoke remains excluded because it mutates production and is not required to close Stage 7.6.
 
 ## Expected change areas
 
