@@ -271,6 +271,8 @@ Phase 0 status: PREPARED. The implementation is split into Finance scalar mappin
 
 Backend query/contract work and frontend presentation must remain separate reviewable units if a new endpoint or UI screen is required.
 
+Implementation status: Stage 7.7.4 already covers the P&L read-side ЦФО filter, project comparison inside selected ЦФО, and public P&L JSON support. Stage 7.8.1 therefore limits the remaining scope to the existing ДДС cashflow report/API: optional active company-owned `responsibilityCenterId` filters transaction category totals while preserving unfiltered behavior and company-wide account balances.
+
 ### Stage 7.9 — ЦФО auto-rule target
 
 **Risk:** HIGH (new rule output and nullable rule foreign key)

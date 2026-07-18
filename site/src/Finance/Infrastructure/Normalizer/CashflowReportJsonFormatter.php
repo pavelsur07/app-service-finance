@@ -33,6 +33,7 @@ final readonly class CashflowReportJsonFormatter
         if ($options['include_filters'] ?? false) {
             $result['filters'] = [
                 'group' => $payload['group'],
+                'responsibility_center_id' => $payload['responsibility_center_id'] ?? null,
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
             ];
@@ -41,6 +42,7 @@ final readonly class CashflowReportJsonFormatter
         return $result + [
             'company' => $payload['company']->getId(),
             'group' => $payload['group'],
+            'responsibility_center_id' => $payload['responsibility_center_id'] ?? null,
             'date_from' => $dateFrom,
             'date_to' => $dateTo,
             'periods' => array_map(fn (array $period): array => [

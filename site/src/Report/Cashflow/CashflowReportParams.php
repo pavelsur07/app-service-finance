@@ -11,6 +11,7 @@ final class CashflowReportParams
         public readonly string $group,
         public readonly \DateTimeImmutable $from,
         public readonly \DateTimeImmutable $to,
+        public readonly ?string $responsibilityCenterId = null,
     ) {
     }
 }
