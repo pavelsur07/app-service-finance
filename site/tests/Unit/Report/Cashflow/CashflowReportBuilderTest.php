@@ -2,7 +2,9 @@
 
 namespace App\Tests\Unit\Report\Cashflow;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
@@ -103,5 +105,136 @@ final class CashflowReportBuilderTest extends TestCase
 
         self::assertContains('t.deletedAt IS NULL', $whereExpressions);
         self::assertSame(100.0, $payload['categoryTotals'][$category->getId()]['totals']['USD'][0]);
+    }
+
+    public function testBuildFiltersTransactionsByResponsibilityCenter(): void
+    {
+        $categoryRepository = $this->getMockBuilder(CashflowCategoryRepository::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['findTreeByCompany'])
+            ->getMock();
+        $transactionRepository = $this->getMockBuilder(CashTransactionRepository::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['createQueryBuilder'])
+            ->getMock();
+        $accountRepository = $this->getMockBuilder(MoneyAccountRepository::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['findBy'])
+            ->getMock();
+        $balanceRepository = $this->getMockBuilder(MoneyAccountDailyBalanceRepository::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['findOneBy', 'findLastBefore'])
+            ->getMock();
+
+        $builder = new CashflowReportBuilder(
+            $categoryRepository,
+            $transactionRepository,
+            $accountRepository,
+            $balanceRepository,
+        );
+
+        $user = new User(Uuid::uuid4()->toString());
+        $user->setEmail('cashflow-report-filter@example.com');
+        $user->setPassword('pass');
+
+        $company = new Company(Uuid::uuid4()->toString(), $user);
+        $company->setName('Cashflow Co');
+
+        $category = new CashflowCategory(Uuid::uuid4()->toString(), $company);
+        $category->setName('Operations');
+        $centerId = '11111111-1111-4111-8111-111111111111';
+
+        $categoryRepository->method('findTreeByCompany')
+            ->with($company)
+            ->willReturn([$category]);
+
+        $filteredQuery = $this->createMock(Query::class);
+        $filteredQuery->expects(self::once())->method('getArrayResult')->willReturn([
+            [
+                'category' => $category->getId(),
+                'direction' => CashDirection::INFLOW->value,
+                'amount' => '100.00',
+                'currency' => 'RUB',
+                'occurredAt' => new \DateTimeImmutable('2026-01-10 12:00:00'),
+            ],
+        ]);
+        $companyQuery = $this->createMock(Query::class);
+        $companyQuery->expects(self::once())->method('getArrayResult')->willReturn([
+            [
+                'category' => $category->getId(),
+                'direction' => CashDirection::INFLOW->value,
+                'amount' => '100.00',
+                'currency' => 'RUB',
+                'occurredAt' => new \DateTimeImmutable('2026-01-10 12:00:00'),
+            ],
+            [
+                'category' => $category->getId(),
+                'direction' => CashDirection::INFLOW->value,
+                'amount' => '50.00',
+                'currency' => 'RUB',
+                'occurredAt' => new \DateTimeImmutable('2026-01-10 13:00:00'),
+            ],
+        ]);
+
+        $whereExpressions = [];
+        $parameters = [];
+        $filteredQueryBuilder = $this->createMock(QueryBuilder::class);
+        $filteredQueryBuilder->method('select')->willReturnSelf();
+        $filteredQueryBuilder->method('where')->willReturnSelf();
+        $filteredQueryBuilder->method('andWhere')
+            ->willReturnCallback(function (string $expr) use (&$whereExpressions, $filteredQueryBuilder): QueryBuilder {
+                $whereExpressions[] = $expr;
+
+                return $filteredQueryBuilder;
+            });
+        $filteredQueryBuilder->method('setParameter')
+            ->willReturnCallback(function (string $name, mixed $value) use (&$parameters, $filteredQueryBuilder): QueryBuilder {
+                $parameters[$name] = $value;
+
+                return $filteredQueryBuilder;
+            });
+        $filteredQueryBuilder->method('getQuery')->willReturn($filteredQuery);
+
+        $companyQueryBuilder = $this->createMock(QueryBuilder::class);
+        $companyQueryBuilder->method('select')->willReturnSelf();
+        $companyQueryBuilder->method('where')->willReturnSelf();
+        $companyQueryBuilder->method('andWhere')->willReturnSelf();
+        $companyQueryBuilder->method('setParameter')->willReturnSelf();
+        $companyQueryBuilder->method('getQuery')->willReturn($companyQuery);
+
+        $transactionRepository->expects(self::exactly(2))
+            ->method('createQueryBuilder')
+            ->with('t')
+            ->willReturnOnConsecutiveCalls($filteredQueryBuilder, $companyQueryBuilder);
+
+        $account = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Main', 'RUB');
+        $account->setOpeningBalance('1000.00');
+
+        $accountRepository->expects(self::once())
+            ->method('findBy')
+            ->with(['company' => $company])
+            ->willReturn([$account]);
+        $balanceRepository->expects(self::once())
+            ->method('findOneBy')
+            ->willReturn(null);
+        $balanceRepository->expects(self::once())
+            ->method('findLastBefore')
+            ->with($company, $account, new \DateTimeImmutable('2026-01-10'))
+            ->willReturn(null);
+
+        $payload = $builder->build(new CashflowReportParams(
+            $company,
+            'day',
+            new \DateTimeImmutable('2026-01-10'),
+            new \DateTimeImmutable('2026-01-10'),
+            $centerId,
+        ));
+
+        self::assertContains('t.responsibilityCenterId = :responsibilityCenterId', $whereExpressions);
+        self::assertSame($centerId, $parameters['responsibilityCenterId']);
+        self::assertSame($centerId, $payload['responsibility_center_id']);
+        self::assertSame(100.0, $payload['categoryTotals'][$category->getId()]['totals']['RUB'][0]);
+        self::assertSame(1000.0, $payload['openings']['RUB'][0]);
+        self::assertSame(1150.0, $payload['closings']['RUB'][0]);
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Finance\Controller;
 
+use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Finance\Infrastructure\Normalizer\CashflowReportJsonFormatter;
 use App\Report\Cashflow\CashflowReportBuilder;
 use App\Report\Cashflow\CashflowReportParams;
@@ -24,6 +25,7 @@ class ReportCashflowController extends AbstractController
         private CashflowReportRequestMapper $mapper,
         private CashflowReportBuilder $builder,
         private CashflowReportJsonFormatter $jsonFormatter,
+        private FinancialResponsibilityCenterFacade $responsibilityCenters,
     ) {
     }
 
@@ -61,6 +63,9 @@ class ReportCashflowController extends AbstractController
         $params = $this->mapper->fromRequest($request, $company);
         $payload = $this->builder->build($params);
 
-        return $this->render('finance/report/cashflow.html.twig', $payload);
+        return $this->render('finance/report/cashflow.html.twig', $payload + [
+            'responsibilityCenters' => $this->responsibilityCenters->getActiveChoices((string) $company->getId()),
+            'selectedResponsibilityCenterId' => $params->responsibilityCenterId,
+        ]);
     }
 }

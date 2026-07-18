@@ -7,6 +7,8 @@ use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
+use App\Company\Entity\Company;
+use Doctrine\ORM\QueryBuilder;
 
 final class CashflowReportBuilder
 {
@@ -38,17 +40,23 @@ final class CashflowReportBuilder
             ];
         }
 
-        $rows = $this->transactionRepository->createQueryBuilder('t')
-            ->select('IDENTITY(t.cashflowCategory) AS category', 't.direction', 't.amount', 't.currency', 't.occurredAt')
-            ->where('t.company = :company')
-            ->andWhere('t.occurredAt BETWEEN :from AND :to')
-            ->andWhere('t.deletedAt IS NULL')
-            ->setParameter('company', $company)
-            ->setParameter('from', $from->setTime(0, 0))
-            ->setParameter('to', $to->setTime(23, 59, 59))
-            ->getQuery()->getArrayResult();
+        $transactionQueryBuilder = $this->createTransactionRowsQueryBuilder($company, $from, $to);
 
-        $companyTotals = [];
+        if (null !== $params->responsibilityCenterId) {
+            $transactionQueryBuilder
+                ->andWhere('t.responsibilityCenterId = :responsibilityCenterId')
+                ->setParameter('responsibilityCenterId', $params->responsibilityCenterId);
+        }
+
+        $rows = $transactionQueryBuilder
+            ->getQuery()
+            ->getArrayResult();
+        $companyRows = null === $params->responsibilityCenterId
+            ? $rows
+            : $this->createTransactionRowsQueryBuilder($company, $from, $to)
+                ->getQuery()
+                ->getArrayResult();
+
         foreach ($rows as $row) {
             $catId = $row['category'];
             if (!$catId || !isset($categoryMap[$catId])) {
@@ -73,6 +81,28 @@ final class CashflowReportBuilder
             }
 
             $categoryMap[$catId]['totals'][$currency][$periodIndex] += $amount;
+        }
+
+        $companyTotals = [];
+        foreach ($companyRows as $row) {
+            $catId = $row['category'];
+            if (!$catId || !isset($categoryMap[$catId])) {
+                continue;
+            }
+
+            $amount = (float) $row['amount'];
+            $direction = $row['direction'] instanceof CashDirection
+                ? $row['direction']->value
+                : $row['direction'];
+            $amount = $direction === CashDirection::OUTFLOW->value
+                ? -abs($amount)
+                : abs($amount);
+            $currency = $row['currency'];
+            $periodIndex = $this->findPeriodIndex($periods, $row['occurredAt']);
+            if (null === $periodIndex) {
+                continue;
+            }
+
             $companyTotals[$currency][$periodIndex] = ($companyTotals[$currency][$periodIndex] ?? 0) + $amount;
         }
 
@@ -147,6 +177,7 @@ final class CashflowReportBuilder
         return [
             'company' => $company,
             'group' => $group,
+            'responsibility_center_id' => $params->responsibilityCenterId,
             'date_from' => $from,
             'date_to' => $to,
             'periods' => $periods,
@@ -157,6 +188,21 @@ final class CashflowReportBuilder
             'tree' => $tree,
             'categoryTree' => $categoryTree,
         ];
+    }
+
+    private function createTransactionRowsQueryBuilder(
+        Company $company,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+    ): QueryBuilder {
+        return $this->transactionRepository->createQueryBuilder('t')
+            ->select('IDENTITY(t.cashflowCategory) AS category', 't.direction', 't.amount', 't.currency', 't.occurredAt')
+            ->where('t.company = :company')
+            ->andWhere('t.occurredAt BETWEEN :from AND :to')
+            ->andWhere('t.deletedAt IS NULL')
+            ->setParameter('company', $company)
+            ->setParameter('from', $from->setTime(0, 0))
+            ->setParameter('to', $to->setTime(23, 59, 59));
     }
 
     /**
@@ -208,7 +254,7 @@ final class CashflowReportBuilder
      *   'children'=> array<node>
      * ].
      *
-     * @param \App\Cash\Entity\Transaction\CashflowCategory[] $allCategories // полный список (findTreeByCompany)
+     * @param \App\Cash\Entity\Transaction\CashflowCategory[]                                                                  $allCategories // полный список (findTreeByCompany)
      * @param array<string,array{entity:\App\Cash\Entity\Transaction\CashflowCategory, totals:array<string,array<int,float>>}> $categoryMap
      *
      * @return array<int,array>

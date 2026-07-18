@@ -24,6 +24,14 @@
     </div>
     <input type="hidden" name="group" value="{{ group }}" id="group-input"/>
     <div class="col-auto">
+        <select name="responsibilityCenterId" class="form-select" aria-label="ЦФО">
+            <option value="">Все ЦФО</option>
+            {% for center in responsibilityCenters|default([]) %}
+                <option value="{{ center.id }}" {{ selectedResponsibilityCenterId|default(null) == center.id ? 'selected' }}>{{ center.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-auto">
         <div class="btn-group" role="group">
             <button type="submit" class="btn btn-outline-primary {% if group == 'day' %}active{% endif %}" onclick="document.getElementById('group-input').value='day'">По дням</button>
             <button type="submit" class="btn btn-outline-primary {% if group == 'week' %}active{% endif %}" onclick="document.getElementById('group-input').value='week'">По неделям</button>
@@ -37,6 +45,12 @@
         <a href="{{ path('report_cashflow_export_json', app.request.query.all) }}" class="btn btn-outline-secondary">JSON</a>
     </div>
 </form>
+
+{% if selectedResponsibilityCenterId|default(null) %}
+    <div class="alert alert-info">
+        Фильтр ЦФО применяется к операциям и строкам ДДС. Сальдо на начало и конец остаётся общим по компании, так как остатки по счетам не ведутся в разрезе ЦФО.
+    </div>
+{% endif %}
 
 {% set periodCount = periods|length %}
 {% import _self as macros %}
