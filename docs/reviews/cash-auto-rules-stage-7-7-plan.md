@@ -2,10 +2,10 @@
 
 ## Current status
 
-- Phase: **prepared**
+- Phase: **prepared; Stage 7.7.1 implemented**
 - Branch: `agent/cash-stage7-7-phase0`
 - Production actions: **none**
-- Code changes: **none**
+- Code changes: **Stage 7.7.1 only — Finance scalar mapping and pair validator**
 
 Stage 7.7 starts after:
 

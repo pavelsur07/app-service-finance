@@ -7,6 +7,7 @@ namespace App\Finance\Entity;
 use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
 use App\Finance\Repository\PLDailyTotalRepository;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
@@ -41,6 +42,9 @@ class PLDailyTotal
 
     #[ORM\Column(type: 'decimal', precision: 18, scale: 2)]
     private string $amountExpense = '0';
+
+    #[ORM\Column(type: Types::GUID, nullable: true)]
+    private ?string $responsibilityCenterId = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
@@ -136,6 +140,18 @@ class PLDailyTotal
     public function setAmountExpense(string $amount): self
     {
         $this->amountExpense = $amount;
+
+        return $this;
+    }
+
+    public function getResponsibilityCenterId(): ?string
+    {
+        return $this->responsibilityCenterId;
+    }
+
+    public function setResponsibilityCenterId(?string $responsibilityCenterId): self
+    {
+        $this->responsibilityCenterId = $responsibilityCenterId;
 
         return $this;
     }

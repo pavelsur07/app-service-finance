@@ -6,8 +6,8 @@ namespace App\Finance\Entity;
 
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
-use App\Finance\Entity\PLCategory;
 use App\Finance\Repository\DocumentOperationRepository;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 use Webmozart\Assert\Assert;
@@ -37,6 +37,9 @@ class DocumentOperation
     #[ORM\ManyToOne(targetEntity: ProjectDirection::class)]
     #[ORM\JoinColumn(nullable: true)]
     private ?ProjectDirection $projectDirection = null;
+
+    #[ORM\Column(type: Types::GUID, nullable: true)]
+    private ?string $responsibilityCenterId = null;
 
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $comment = null;
@@ -119,6 +122,18 @@ class DocumentOperation
     public function setProjectDirection(?ProjectDirection $projectDirection): self
     {
         $this->projectDirection = $projectDirection;
+
+        return $this;
+    }
+
+    public function getResponsibilityCenterId(): ?string
+    {
+        return $this->responsibilityCenterId;
+    }
+
+    public function setResponsibilityCenterId(?string $responsibilityCenterId): self
+    {
+        $this->responsibilityCenterId = $responsibilityCenterId;
 
         return $this;
     }
