@@ -10,7 +10,6 @@ use App\Ingestion\Application\DTO\FinancialTransactionView;
 use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Entity\FinancialTransaction;
 use App\Ingestion\Entity\IngestRawRecord;
-use App\Ingestion\Entity\SystemCounterparty;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\NormalizationIssueKind;
 use App\Ingestion\Enum\RawNormalizationStatus;
@@ -35,13 +34,7 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
     {
         $companyId = Uuid::uuid7()->toString();
         $operationGroupId = Uuid::uuid7()->toString();
-        $systemCounterparty = new SystemCounterparty(
-            id: '95d09265-b44f-5b95-a12c-f1e3332c657d',
-            source: IngestSource::WILDBERRIES,
-            name: 'Wildberries',
-        );
-        $this->em->persist($systemCounterparty);
-        $this->em->flush();
+        $systemCounterpartyId = $this->ensureWildberriesSystemCounterparty();
 
         $record = $this->storeRawRecord($companyId, [[
             'externalId' => 'sale-1',
@@ -76,7 +69,7 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
         self::assertSame('sale-1', $transactions[0]->getExternalId());
         self::assertSame(10000, $transactions[0]->getAmountMinor());
         self::assertSame('RUB', $transactions[0]->getCurrency());
-        self::assertSame($systemCounterparty->getId(), $transactions[0]->getCounterpartyId());
+        self::assertSame($systemCounterpartyId, $transactions[0]->getCounterpartyId());
 
         /** @var IngestionFacade $facade */
         $facade = self::getContainer()->get(IngestionFacade::class);
@@ -348,6 +341,28 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
             description: null,
             sourceData: ['amountMinor' => $amount],
             sourceTz: 'UTC',
+        );
+    }
+
+    private function ensureWildberriesSystemCounterparty(): string
+    {
+        $this->connection->executeStatement(
+            <<<'SQL'
+                INSERT INTO system_counterparties (id, source, name, created_at)
+                VALUES (:id, :source, :name, :createdAt)
+                ON CONFLICT (source) DO NOTHING
+                SQL,
+            [
+                'id' => '95d09265-b44f-5b95-a12c-f1e3332c657d',
+                'source' => IngestSource::WILDBERRIES->value,
+                'name' => 'Wildberries',
+                'createdAt' => (new \DateTimeImmutable())->format('Y-m-d H:i:s.u'),
+            ],
+        );
+
+        return (string) $this->connection->fetchOne(
+            'SELECT id FROM system_counterparties WHERE source = :source',
+            ['source' => IngestSource::WILDBERRIES->value],
         );
     }
 
