@@ -186,20 +186,28 @@ Goal:
 
 - Change new `PLRegisterUpdater` writes to aggregate by Project × ЦФО.
 - Extend `PLDailyTotalRepository::upsert()` with nullable `responsibilityCenterId`.
-- Add the new conflict target without breaking category deletion with nullable `pl_category_id`.
+- Add the new conflict targets without breaking category deletion with nullable `pl_category_id`.
 - Keep old report totals unchanged when no ЦФО filter is applied: totals across ЦФО buckets must sum to the same project/category/date values.
 
 Required database policy:
 
 - Keep PostgreSQL default distinct-`NULL` semantics for `pl_category_id`.
 - Do not use `NULLS NOT DISTINCT` on `pl_category_id`; Stage 7.5 proved it breaks `ON DELETE SET NULL`.
-- Prefer additive unique index:
+- Use two additive uniqueness contracts so `ON CONFLICT` remains deterministic:
+  - populated category rows: unique index on
 
 ```text
 company_id × pl_category_id × date × project_direction_id × responsibility_center_id
 ```
 
-with the same nullable-category semantics as today.
+  - uncategorized rows: partial unique index on
+
+```text
+company_id × date × project_direction_id × responsibility_center_id
+WHERE pl_category_id IS NULL
+```
+
+- `PLDailyTotalRepository::upsert()` must use the matching conflict target for the category-present and category-null paths. A single standard unique index is not enough for `pl_category_id IS NULL`, because PostgreSQL treats `NULL` values as distinct and would insert duplicates instead of triggering `ON CONFLICT`.
 
 Concurrency policy:
 
@@ -210,6 +218,7 @@ Definition of Done:
 
 - Two document operations with the same date/category/project but different ЦФО persist as two `pl_daily_totals` rows.
 - Same key and same ЦФО upserts accumulate/replace exactly as before.
+- Uncategorized totals also upsert instead of duplicating rows for the same company/date/project/ЦФО.
 - Category deletion still succeeds when multiple category rows collapse to `NULL`.
 - Legacy `responsibility_center_id IS NULL` rows remain valid.
 - No historical rebuild is run by the stage.
@@ -267,15 +276,18 @@ Recommended:
 ```text
 Operation Project/ЦФО overrides Document Project/ЦФО.
 If operation Project or ЦФО is empty, inherit the missing value from the document.
-If after inheritance the pair is incomplete, keep legacy NULL behavior and skip ЦФО validation for that row.
+If after inheritance an existing row still has an incomplete pair and Project/ЦФО were not changed, keep legacy NULL behavior for that unchanged row.
+For new rows, or when Project/ЦФО are changed, a non-system project without ЦФО is invalid and must fail closed.
+New rows with empty Project/ЦФО should receive PROJECT_GENERAL × CFO_GENERAL through the writer path when the stage wires writers.
 If both Project and ЦФО are present, validate active same-company allowed pair.
 ```
 
 Reason:
 
 - Matches current project fallback behavior.
-- Preserves legacy incomplete documents.
-- Avoids inventing ЦФО where Finance data is intentionally incomplete.
+- Preserves legacy incomplete documents only when they are not reclassified.
+- Prevents new or edited manual documents from bypassing the Stage 7 rule: non-system project without ЦФО is invalid.
+- Avoids inventing ЦФО for historical data while still making new writer behavior deterministic.
 
 ### Decision B — P&L uniqueness / nullable category policy
 
@@ -284,6 +296,7 @@ Recommended:
 ```text
 Extend the P&L upsert key with responsibility_center_id, but keep pl_category_id nullable with PostgreSQL default distinct-NULL semantics.
 Do not use NULLS NOT DISTINCT for pl_category_id.
+Use a category-present unique index and a separate partial unique index/upsert path for pl_category_id IS NULL.
 Do not backfill existing rows.
 ```
 
