@@ -11,6 +11,7 @@ final readonly class CreatePLDocumentOperationCommand
         public ?string $categoryId = null,
         public ?string $counterpartyId = null,
         public ?string $projectDirectionId = null,
+        public ?string $responsibilityCenterId = null,
         public ?string $comment = null,
     ) {
     }

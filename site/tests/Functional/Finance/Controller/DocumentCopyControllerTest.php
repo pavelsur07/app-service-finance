@@ -6,6 +6,9 @@ namespace App\Tests\Functional\Finance\Controller;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
+use App\Company\Entity\FinancialResponsibilityCenter;
+use App\Company\Entity\FinancialResponsibilityCenterProject;
+use App\Company\Entity\ProjectDirection;
 use App\Company\Entity\User;
 use App\Company\Enum\CounterpartyType;
 use App\Finance\Entity\Document;
@@ -33,6 +36,19 @@ final class DocumentCopyControllerTest extends WebTestCaseBase
         $user = $this->createUser($hasher, 'copy@example.com');
         $company = $this->createCompany($user, 'Copy Co');
         $counterparty = new Counterparty(Uuid::uuid4()->toString(), $company, 'Client', CounterpartyType::LEGAL_ENTITY);
+        $systemProject = new ProjectDirection(
+            Uuid::uuid4()->toString(),
+            $company,
+            ProjectDirection::CODE_GENERAL,
+            ProjectDirection::CODE_GENERAL,
+        );
+        $systemCenter = new FinancialResponsibilityCenter(
+            (string) $company->getId(),
+            FinancialResponsibilityCenter::CODE_GENERAL,
+            FinancialResponsibilityCenter::NAME_GENERAL,
+        );
+        $project = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Продажа компьютеров');
+        $center = new FinancialResponsibilityCenter((string) $company->getId(), 'CFO_KRD', 'Краснодар');
 
         $incomeCategory = new PLCategory(Uuid::uuid4()->toString(), $company);
         $incomeCategory->setName('Income');
@@ -48,11 +64,15 @@ final class DocumentCopyControllerTest extends WebTestCaseBase
         $document->setType(DocumentType::OTHER);
         $document->setCounterparty($counterparty);
         $document->setDescription('Original document');
+        $document->setProjectDirection($project);
+        $document->setResponsibilityCenterId($center->getId());
 
         $incomeOperation = new DocumentOperation();
         $incomeOperation->setPlCategory($incomeCategory);
         $incomeOperation->setAmount('100.00');
         $incomeOperation->setCounterparty($counterparty);
+        $incomeOperation->setProjectDirection($project);
+        $incomeOperation->setResponsibilityCenterId($center->getId());
         $incomeOperation->setComment('Income line');
         $document->addOperation($incomeOperation);
 
@@ -60,18 +80,27 @@ final class DocumentCopyControllerTest extends WebTestCaseBase
         $expenseOperation->setPlCategory($expenseCategory);
         $expenseOperation->setAmount('40.00');
         $expenseOperation->setCounterparty($counterparty);
+        $expenseOperation->setProjectDirection($project);
+        $expenseOperation->setResponsibilityCenterId($center->getId());
         $expenseOperation->setComment('Expense line');
         $document->addOperation($expenseOperation);
 
         $em->persist($user);
         $em->persist($company);
         $em->persist($counterparty);
+        $em->persist($systemProject);
+        $em->persist($systemCenter);
+        $em->persist(new FinancialResponsibilityCenterProject((string) $company->getId(), $systemProject, $systemCenter));
+        $em->persist($project);
+        $em->persist($center);
+        $em->persist(new FinancialResponsibilityCenterProject((string) $company->getId(), $project, $center));
         $em->persist($incomeCategory);
         $em->persist($expenseCategory);
         $em->persist($document);
         $em->flush();
 
         $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
         $client->request('GET', sprintf('/documents/%s/copy', $document->getId()));
 
         self::assertResponseIsSuccessful();
@@ -97,6 +126,8 @@ final class DocumentCopyControllerTest extends WebTestCaseBase
         self::assertSame($document->getNumber(), $copied->getNumber());
         self::assertSame($document->getType(), $copied->getType());
         self::assertSame($document->getCounterparty()?->getId(), $copied->getCounterparty()?->getId());
+        self::assertSame($document->getProjectDirection()?->getId(), $copied->getProjectDirection()?->getId());
+        self::assertSame($document->getResponsibilityCenterId(), $copied->getResponsibilityCenterId());
         self::assertEquals($document->getDate(), $copied->getDate());
 
         $originalOperations = $document->getOperations();
@@ -110,6 +141,8 @@ final class DocumentCopyControllerTest extends WebTestCaseBase
                 'amount' => $operation->getAmount(),
                 'category' => $operation->getPlCategory()?->getName(),
                 'counterparty' => $operation->getCounterparty()?->getId(),
+                'project' => $operation->getProjectDirection()?->getId(),
+                'responsibilityCenterId' => $operation->getResponsibilityCenterId(),
                 'id' => $operation->getId(),
             ];
         }
@@ -120,6 +153,8 @@ final class DocumentCopyControllerTest extends WebTestCaseBase
             self::assertSame($operation->getAmount(), $mappedCopied[$key]['amount']);
             self::assertSame($operation->getPlCategory()?->getName(), $mappedCopied[$key]['category']);
             self::assertSame($operation->getCounterparty()?->getId(), $mappedCopied[$key]['counterparty']);
+            self::assertSame($operation->getProjectDirection()?->getId(), $mappedCopied[$key]['project']);
+            self::assertSame($operation->getResponsibilityCenterId(), $mappedCopied[$key]['responsibilityCenterId']);
             self::assertNotSame($operation->getId(), $mappedCopied[$key]['id']);
         }
     }

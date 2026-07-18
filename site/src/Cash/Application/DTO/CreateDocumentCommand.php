@@ -12,6 +12,7 @@ final readonly class CreateDocumentCommand
         public string $amount,
         public ?string $counterpartyId,
         public ?string $projectDirectionId,
+        public ?string $responsibilityCenterId,
         public ?string $plCategoryId,
         public bool $createdWithViolation,
     ) {
