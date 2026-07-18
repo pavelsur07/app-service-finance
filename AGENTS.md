@@ -69,16 +69,19 @@ After receiving a sufficiently clear task or completing Phase 0 without a STOP c
 The required autonomous sequence is:
 1. Implement the current stage.
 2. Run targeted and relevant broader checks.
-3. Perform an independent review of the complete stage diff.
+3. Perform the internal independent review of the complete stage diff.
 4. Fix all in-scope BLOCKER and IMPORTANT findings and safe in-scope MINOR findings.
-5. Re-run checks and repeat the independent review until green.
-6. Prepare the Stage Report and checkpoint when applicable.
-7. Commit only the files belonging to the current task.
-8. Push the current task branch without force.
-9. Create or update a Draft PR.
-10. Provide the final report only after the Draft PR is ready, or report a real STOP condition.
+5. Re-run checks and repeat the internal review until green.
+6. Run the external read-only Claude Code CLI review of the complete stage diff.
+7. Validate its findings; fix confirmed in-scope BLOCKER and IMPORTANT findings and safe in-scope MINOR findings.
+8. Re-run checks, internal review, and external review until the external reviewer returns `REVIEW_GREEN`.
+9. Prepare the Stage Report and checkpoint when applicable.
+10. Commit only the files belonging to the current task.
+11. Push the current task branch without force.
+12. Create or update a Draft PR.
+13. Provide the final report only after the Draft PR is ready, or report a real STOP condition.
 
-Review, review fixes, repeated tests, local migration work, commit, non-force push of the task branch, and Draft PR creation are pre-authorized parts of an approved task. They are actions to perform, not proposed next steps.
+Internal review, external Claude Code review, review fixes, repeated tests, local migration work, commit, non-force push of the task branch, and Draft PR creation are pre-authorized parts of an approved task. They are actions to perform, not proposed next steps.
 
 Never end a runnable task with messages such as:
 - "the next step is review",
@@ -154,9 +157,11 @@ For small, isolated, low-risk tasks:
 - make the minimal focused change,
 - add or update tests when needed,
 - run the relevant checks,
-- perform automatic review,
+- perform internal automatic review,
 - fix review findings inside scope,
 - re-run checks,
+- run external read-only Claude Code CLI review,
+- validate its findings and repeat fixes, checks, and both reviews until `REVIEW_GREEN`,
 - commit and push the task branch when the task is intended for delivery,
 - create or update the Draft PR,
 - report clearly.
@@ -184,11 +189,14 @@ Phase 0 — Plan
         -> Targeted checks
         -> Module checks
         -> Full relevant stage checks
-        -> Independent automatic review
+        -> Internal independent automatic review
         -> Review findings
         -> Fix findings
         -> Re-run checks
-        -> Repeat review until green or a real STOP condition
+        -> Repeat internal review until green
+        -> External read-only Claude Code CLI review
+        -> Validate and fix confirmed findings
+        -> Repeat checks and both reviews until REVIEW_GREEN or a real STOP condition
     -> Stage Report + Checkpoint
     -> Commit + push task branch + create/update Draft PR
     -> Next stage or Phase Final — Handoff
@@ -197,9 +205,9 @@ Phase 0 — Plan
 Main rules:
 ```text
 1 stage = 1 focused result = 1 reviewable unit
-implementation is not complete until automatic review is green
+implementation is not complete until internal automatic review is green and external Claude Code review returns REVIEW_GREEN
 local technical work inside scope does not require owner approval
-green review leads directly to commit, push, and Draft PR without another confirmation
+both green reviews lead directly to commit, push, and Draft PR without another confirmation
 ```
 
 Prefer:
@@ -272,7 +280,8 @@ Inside a clear task or approved stage, do not ask for confirmation before:
 - running safe local/container checks,
 - running local builds, linters, static analysis, and tests,
 - showing `git diff`, `git diff --stat`, or `git status`,
-- committing only the current task changes after green review,
+- running the configured read-only Claude Code CLI review,
+- committing only the current task changes after both reviews are green,
 - pushing the current task branch without force,
 - creating or updating a Draft PR for the current task,
 - deleting code created by the agent in the same unfinished stage when needed to correct the implementation.
@@ -300,12 +309,12 @@ Never continue autonomously before:
 - installing a dependency that is not clearly required by the approved task or conflicts with existing project policy,
 - going beyond the original scope,
 - choosing between materially different business behaviors,
-- continuing when automatic review has an unresolved BLOCKER or IMPORTANT finding that cannot be fixed safely inside scope after root-cause analysis and a reasonable alternative approach,
+- continuing when either review has a confirmed unresolved BLOCKER or IMPORTANT finding that cannot be fixed safely inside scope after root-cause analysis and a reasonable alternative approach,
 - merging, releasing, deploying, or mutating production after final handoff.
 
 Do not STOP merely because review found issues, tests failed, several repair iterations were needed, a local migration was created, or the next normal action is commit, push, or Draft PR creation.
 
-Automatic stage review
+Internal automatic stage review
 At the end of every implementation stage, perform a separate automatic review before declaring the stage complete.
 Treat this review as an independent senior code review, not as a repetition of the implementation reasoning.
 
@@ -335,7 +344,7 @@ MINOR     — improve now when local, safe, and inside scope
 FOLLOW-UP — valid improvement intentionally outside the current scope
 ```
 
-Automatic review-fix cycle
+Internal automatic review-fix cycle
 After review:
 1. Fix all BLOCKER findings inside scope.
 2. Fix all IMPORTANT findings inside scope.
@@ -354,6 +363,92 @@ After 3 unsuccessful review-fix iterations, perform root-cause analysis, reconsi
 
 STOP only when a BLOCKER or IMPORTANT finding cannot be fixed safely inside scope because of a real external blocker, missing material business decision, unavailable required access, conflict with unrelated owner changes, or a required HIGH-EXTERNAL action. Report the exact remaining issue, attempted fixes, evidence, and recommended options.
 Do not hide unresolved review findings.
+
+External Claude Code CLI review
+After the internal automatic review is green, run a second independent review with the locally installed Claude Code CLI before a stage commit or final task commit.
+This review is mandatory for code, configuration, migration, infrastructure, and frontend changes. For a documentation-only change with no executable behavior change, it may be recorded as `N/A — documentation only`.
+
+The external reviewer is read-only and advisory:
+- it must not edit files, change Git state, call external services, or create commits,
+- it does not replace Codex tests or the internal automatic review,
+- Codex must independently verify every finding against the task, repository, and project rules,
+- a false positive may be rejected only with a recorded technical reason,
+- confirmed BLOCKER and IMPORTANT findings must be fixed before commit,
+- safe in-scope MINOR findings should be fixed; FOLLOW-UP findings are recorded without expanding scope.
+
+Preflight:
+```bash
+command -v claude >/dev/null
+claude auth status >/dev/null
+```
+
+Never print or persist the output of `claude auth status`; it may contain account and organization identifiers.
+Do not ask the owner to confirm this review call: it is a pre-authorized, local, read-only step of the approved workflow.
+
+Run from the repository root:
+```bash
+claude -p \
+  --safe-mode \
+  --permission-mode dontAsk \
+  --effort high \
+  --tools "Read,Glob,Grep,Bash" \
+  --allowedTools \
+    "Read" \
+    "Glob" \
+    "Grep" \
+    "Bash(git status)" \
+    "Bash(git status *)" \
+    "Bash(git diff)" \
+    "Bash(git diff *)" \
+    "Bash(git log)" \
+    "Bash(git log *)" \
+    "Bash(git show)" \
+    "Bash(git show *)" \
+    "Bash(git rev-parse *)" \
+    "Bash(git merge-base *)" \
+  --disallowedTools \
+    "Edit" \
+    "Write" \
+    "NotebookEdit" \
+    "WebFetch" \
+    "WebSearch" \
+    "mcp__*" \
+  --strict-mcp-config \
+  --no-session-persistence \
+  --max-turns 20 \
+  --output-format text \
+  "Perform an independent senior code review of the current task diff.
+
+Do not edit files. Do not change Git state. Do not call external services. Do not read .env files, credentials, private keys, authentication data, or production dumps.
+
+Read AGENTS.md, CLAUDE.md, the task specification available in the repository, and only the relevant sections of PATTERNS.md and ARCHITECTURE.md. Inspect git status, staged and unstaged changes, and all task-owned untracked files.
+
+Review scope compliance, correctness, edge cases, backward compatibility, tenant isolation and IDOR, authorization, financial calculations and Money, transactions and idempotency, migrations and indexes, Messenger retries and concurrency, error handling and observability, performance and N+1, test quality, secrets and PII, and unnecessary complexity. Apply only the categories relevant to this diff.
+
+Classify every finding as BLOCKER, IMPORTANT, MINOR, or FOLLOW-UP. For each finding provide file:line, evidence, impact, and a concrete fix.
+
+If there are no BLOCKER or IMPORTANT findings, end with the exact line:
+REVIEW_GREEN"
+```
+
+Do not use `--dangerously-skip-permissions`. Do not grant `Edit`, `Write`, unrestricted `Bash`, web, or MCP tools to the external reviewer.
+Do not send secrets, environment values, production data, or authentication output in the prompt.
+`--safe-mode` is required so project hooks, plugins, skills, MCP servers, auto-memory, and other local Claude customizations cannot introduce writes, external calls, or interactive prompts. The reviewer must still read `CLAUDE.md` explicitly as a repository file.
+
+For a stage review, review the staged and unstaged changes plus task-owned untracked files before the stage commit.
+For the final handoff after stage commits, Codex must determine the verified task base ref or base commit without fetching, append that exact value to the prompt, and require review of `<base>...HEAD` plus any remaining working-tree changes. Never silently assume `main` or `master`.
+
+External review-fix cycle:
+1. Capture the review result in the Stage Report or final handoff.
+2. Verify every finding; record rejected findings and their reasons.
+3. Fix confirmed in-scope findings according to their severity.
+4. Re-run the relevant checks and the internal automatic review.
+5. Run the external Claude Code review again on the updated complete diff.
+
+Repeat until the final external review ends with the exact standalone line `REVIEW_GREEN` and no confirmed BLOCKER or IMPORTANT finding remains.
+Do not treat a failed command, truncated output, permission denial, timeout, authentication error, or missing `REVIEW_GREEN` marker as a green review.
+
+If the command fails, diagnose it and make one retry after a material correction. If Claude Code remains unavailable or unauthenticated, STOP as a real external reviewer blocker, report the exact sanitized error and attempted correction, and do not claim review success or commit the stage.
 
 Verification strategy
 Use a progressive verification cascade.
@@ -469,7 +564,8 @@ A stage is complete only when:
 - implementation is finished,
 - baseline and final results were compared,
 - the relevant verification cascade was completed,
-- automatic review was performed,
+- internal automatic review was performed,
+- external Claude Code review was performed and returned `REVIEW_GREEN`, or was explicitly `N/A — documentation only`,
 - review fixes were applied,
 - repeat checks were run,
 - no unresolved BLOCKER or IMPORTANT findings remain,
@@ -529,12 +625,18 @@ Stage Report format:
 - module: `command` — result
 - full relevant stage: `command` — result
 
-#### Automatic review
+#### Internal automatic review
 - Iterations: <number>
 - BLOCKER: none
 - IMPORTANT: none
 - MINOR fixed: ...
 - FOLLOW-UP: ... or none
+
+#### External Claude Code review
+- Iterations: <number>
+- Result: REVIEW_GREEN
+- Confirmed findings fixed: ... or none
+- Rejected findings with reason: ... or none
 
 #### Review fixes applied
 - ...
@@ -598,11 +700,13 @@ Phase Final — Handoff
 At the end of the last stage:
 - run the full relevant check set,
 - review the complete diff,
-- perform the final automatic review,
+- perform the final internal automatic review,
+- run the final external read-only Claude Code review of the complete diff,
 - fix in-scope findings,
 - verify all task constraints and forbidden actions,
 - prepare final handoff,
-- commit only the current task changes after the final review is green,
+- repeat checks and both reviews until the external review returns `REVIEW_GREEN`,
+- commit only the current task changes after both final reviews are green,
 - push the current task branch without force,
 - create or update the Draft PR,
 - report the Draft PR and final results to the owner.
@@ -618,7 +722,8 @@ Final handoff must include:
 - migrations and whether they are destructive,
 - public API or contract changes,
 - checks run and results,
-- automatic review summary and review-fix iterations,
+- internal automatic review summary and review-fix iterations,
+- external Claude Code review result, iterations, confirmed fixes, and reasoned rejections,
 - risks,
 - known limitations,
 - follow-up tasks intentionally left out of scope,
@@ -634,7 +739,10 @@ Never do these autonomously:
 expand scope without owner approval
 invent missing business or financial rules
 skip Phase 0 for a large task
-skip automatic review because the change looks obvious
+skip internal automatic review because the change looks obvious
+skip external Claude Code review for executable changes
+allow the external reviewer to edit files or change Git state
+claim REVIEW_GREEN when the external review command failed or did not return the marker
 skip baseline or Definition of Done for a large stage without documenting why
 declare a stage complete with unresolved BLOCKER or IMPORTANT findings
 repeat the same failed command without a new diagnostic hypothesis or change
@@ -676,7 +784,7 @@ Rules:
 Do not overwrite user changes.
 Do not touch unrelated files.
 Do not run destructive git commands unless explicitly requested.
-After the final automatic review is green, commit only the current task files, push the current task branch without force, and create or update a Draft PR without asking for another confirmation.
+After the final internal automatic review is green and the external Claude Code review returns `REVIEW_GREEN`, commit only the current task files, push the current task branch without force, and create or update a Draft PR without asking for another confirmation.
 If unrelated uncommitted changes exist, stage only the files or hunks owned by the current task. STOP only when changes overlap and cannot be separated safely.
 Never commit secrets, generated local artifacts, unrelated owner changes, or files outside the task scope.
 Do not use:
@@ -838,7 +946,8 @@ At the end of each task, report:
 What was changed.
 Files changed.
 Tests/checks run and result.
-Automatic review result.
+Internal automatic review result.
+External Claude Code review result and iterations.
 Commit, branch, and Draft PR URL when created.
 Risks or follow-up actions.
 Anything not completed.
