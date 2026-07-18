@@ -66,8 +66,11 @@ final class PlReportCalculatorTest extends TestCase
 
         $calls = [];
         $facts = new class($calls) implements FactsProviderInterface {
-            public function __construct(private array &$calls)
+            private array $calls;
+
+            public function __construct(array &$calls)
             {
+                $this->calls = &$calls;
             }
 
             public function value(
