@@ -142,6 +142,8 @@ final class PLDailyTotalRepositoryTest extends IntegrationTestCase
         $date = new \DateTimeImmutable('2026-07-18');
 
         $repository->upsert($companyId, $categoryId, $date, $projectId, '10.00', '1.00', false, responsibilityCenterId: $center->getId());
+        self::assertFalse($this->getProjectCenterUniquenessCache($repository));
+
         $repository->upsert($companyId, $categoryId, $date, $projectId, '2.00', '3.00', false, responsibilityCenterId: $center->getId());
         $repository->upsert($companyId, null, $date, $projectId, '5.00', '6.00', false, responsibilityCenterId: $center->getId());
         $repository->moveCategoryRowsToUncategorized($companyId, $categoryId);
@@ -171,5 +173,12 @@ final class PLDailyTotalRepositoryTest extends IntegrationTestCase
     {
         $property = new \ReflectionProperty($repository, 'projectCenterUniquenessEnabled');
         $property->setValue($repository, null);
+    }
+
+    private function getProjectCenterUniquenessCache(PLDailyTotalRepository $repository): ?bool
+    {
+        $property = new \ReflectionProperty($repository, 'projectCenterUniquenessEnabled');
+
+        return $property->getValue($repository);
     }
 }

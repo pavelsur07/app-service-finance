@@ -255,17 +255,15 @@ SQL,
 
     private function projectCenterUniquenessEnabled(): bool
     {
-        if (true === $this->projectCenterUniquenessEnabled) {
-            return true;
+        if (null !== $this->projectCenterUniquenessEnabled) {
+            return $this->projectCenterUniquenessEnabled;
         }
 
         $enabled = null !== $this->getEntityManager()->getConnection()->fetchOne(
             "SELECT to_regclass('public.uniq_pl_daily_company_cat_date_project_center')",
         );
 
-        if ($enabled) {
-            $this->projectCenterUniquenessEnabled = true;
-        }
+        $this->projectCenterUniquenessEnabled = $enabled;
 
         return $enabled;
     }
