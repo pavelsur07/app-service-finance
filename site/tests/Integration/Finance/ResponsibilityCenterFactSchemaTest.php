@@ -74,7 +74,7 @@ final class ResponsibilityCenterFactSchemaTest extends IntegrationTestCase
         }
     }
 
-    public function testFactIndexesExistAndPnlUniquenessIsUnchanged(): void
+    public function testFactIndexesExistAndPnlUniquenessUsesProjectCenterKey(): void
     {
         foreach (self::FACT_INDEXES as $table => $index) {
             $definition = (string) $this->connection->fetchOne(
@@ -85,17 +85,27 @@ final class ResponsibilityCenterFactSchemaTest extends IntegrationTestCase
             self::assertStringContainsString('(responsibility_center_id)', $definition);
         }
 
-        $legacyDefinition = $this->indexDefinition('uniq_pl_daily_company_cat_date');
-        self::assertStringContainsString('UNIQUE INDEX', $legacyDefinition);
-        self::assertStringNotContainsString('NULLS NOT DISTINCT', $legacyDefinition);
-        self::assertStringContainsString(
-            '(company_id, pl_category_id, date, project_direction_id)',
-            $legacyDefinition,
+        self::assertNull(
+            $this->connection->fetchOne("SELECT to_regclass('public.uniq_pl_daily_company_cat_date')"),
         );
 
-        self::assertNull(
-            $this->connection->fetchOne("SELECT to_regclass('public.uniq_pl_daily_company_cat_date_project_center')"),
+        $categorizedDefinition = $this->indexDefinition('uniq_pl_daily_company_cat_date_project_center');
+        self::assertStringContainsString('UNIQUE INDEX', $categorizedDefinition);
+        self::assertStringNotContainsString('NULLS NOT DISTINCT', $categorizedDefinition);
+        self::assertStringContainsString(
+            "company_id, pl_category_id, date, project_direction_id, COALESCE(responsibility_center_id, '00000000-0000-0000-0000-000000000000'::uuid)",
+            $categorizedDefinition,
         );
+        self::assertStringContainsString('WHERE (pl_category_id IS NOT NULL)', $categorizedDefinition);
+
+        $uncategorizedDefinition = $this->indexDefinition('uniq_pl_daily_uncat_date_project_center');
+        self::assertStringContainsString('UNIQUE INDEX', $uncategorizedDefinition);
+        self::assertStringNotContainsString('NULLS NOT DISTINCT', $uncategorizedDefinition);
+        self::assertStringContainsString(
+            "company_id, date, project_direction_id, COALESCE(responsibility_center_id, '00000000-0000-0000-0000-000000000000'::uuid)",
+            $uncategorizedDefinition,
+        );
+        self::assertStringContainsString('WHERE (pl_category_id IS NULL)', $uncategorizedDefinition);
     }
 
     private function indexDefinition(string $index): string
