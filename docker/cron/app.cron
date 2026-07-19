@@ -103,7 +103,7 @@
 30 6 * * * cd /app && php -d memory_limit=1G bin/console app:ingestion:ozon-accrual:reconcile-financial-projection --days-back=30 --execute --repair-enrichment-only --summary-only --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 
 # Read-only контроль после rolling refresh и normalize workers: latest raw coverage vs canonical.
-45 6 * * * cd /app && php -d memory_limit=1G bin/console app:ingestion:ozon-accrual:verify-rolling-refresh --days-back=45 --limit=100 --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+45 6 * * * cd /app && php -d memory_limit=1G bin/console app:ingestion:ozon-accrual:verify-rolling-refresh --days-back=45 --limit=100 --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 
 # Ежедневная загрузка Ozon Performance ingestion с начала месяца до вчерашнего дня.
 # Команда только планирует SyncJob/chunks; HTTP-загрузка выполняется async worker'ом.

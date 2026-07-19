@@ -119,6 +119,7 @@ final class OzonAccrualVerifyRollingRefreshCommand extends Command
 
         $rows = [];
         $failedTargets = 0;
+        $failedTargetDetails = [];
         $totals = [
             'targets' => count($targets),
             'rawRecords' => 0,
@@ -142,6 +143,10 @@ final class OzonAccrualVerifyRollingRefreshCommand extends Command
 
             if (!$result['ok']) {
                 ++$failedTargets;
+                $failedTargetDetails[] = [
+                    'companyId' => $target['companyId'],
+                    'shopRef' => $target['shopRef'],
+                ] + array_diff_key($result, ['ok' => true]);
             }
 
             $rows[] = [
@@ -178,8 +183,9 @@ final class OzonAccrualVerifyRollingRefreshCommand extends Command
         ]);
 
         if ($failedTargets > 0) {
-            $this->logger->warning('Ozon accrual rolling refresh verification found mismatches.', [
+            $this->logger->error('Ozon accrual rolling refresh verification found mismatches.', [
                 'failedTargets' => $failedTargets,
+                'failedTargetDetails' => $failedTargetDetails,
                 'from' => $from->format('Y-m-d'),
                 'to' => $to->format('Y-m-d'),
             ]);
