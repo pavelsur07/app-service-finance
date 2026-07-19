@@ -160,7 +160,12 @@ final class SoftDeleteExclusionRegressionTest extends WebTestCaseBase
         $em->flush();
 
         $this->loginWithActiveCompany($client, $user, $company->getId());
-        $client->request('GET', sprintf('/cash-transaction-auto-rules/%s/check', $rule->getId()));
+        // Без явного диапазона превью берёт последние 6 месяцев от сегодня,
+        // и транзакции 2024 года в него не попадают.
+        $client->request('GET', sprintf('/cash-transaction-auto-rules/%s/check', $rule->getId()), [
+            'dateFrom' => '2024-01-01',
+            'dateTo' => '2024-01-31',
+        ]);
 
         self::assertResponseIsSuccessful();
         $content = (string) $client->getResponse()->getContent();
