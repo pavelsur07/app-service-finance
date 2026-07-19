@@ -87,6 +87,7 @@ final class SeedExternalCategoryMappingsActionTest extends IntegrationTestCase
             'AcceleratedReviewCollection' => ['ozon_accelerated_reviews', 'Ускоренный сбор отзывов', 'Продвижение и реклама', TransactionType::ADVERTISING],
             'BrandCommission' => ['ozon_brand_commission', 'Продвижение бренда', 'Продвижение и реклама', TransactionType::ADVERTISING],
             'Compensation' => ['ozon_compensation', 'Компенсация', 'Компенсации', TransactionType::ADJUSTMENT],
+            'CustomerReviews' => ['ozon_customer_reviews', 'Начисления за отзывы клиентов', 'Продвижение и реклама', TransactionType::ADVERTISING],
             'DefectFineComplaint' => ['ozon_defect_fine_complaint', 'Штраф за жалобу', 'Другие услуги и штрафы', TransactionType::PENALTY],
             'DefectFineShipmentDelayRate' => ['ozon_defect_fine_shipment_delay', 'Штраф за задержку отгрузки', 'Другие услуги и штрафы', TransactionType::PENALTY],
             'Drop-Off' => ['ozon_drop_off', 'Drop-off', 'Услуги доставки', TransactionType::LOGISTICS],
