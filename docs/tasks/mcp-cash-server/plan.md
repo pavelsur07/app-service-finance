@@ -26,7 +26,7 @@ docker compose run --rm -T site-php-cli php bin/console app:mcp:serve --company-
 | 1 | Вынести write-логику статей и автоправил из контроллеров в Action | 🟠 HIGH-LOCAL |
 | 2 | MCP-ядро: `McpServeCommand`, `ToolRegistry`, `McpToolInterface` | 🟡 MEDIUM |
 | 3 | 5 tools MVP + методы `CashFacade` | 🟡 MEDIUM |
-| 4 | Функциональные тесты протокола + `docs/mcp.md` | 🟢 LOW |
+| 4 | Функциональные тесты протокола + `docs/mcp/mcp.md` | 🟢 LOW |
 
 ## Tools MVP
 
