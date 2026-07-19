@@ -18,6 +18,8 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Monolog\Handler\TestHandler;
+use Monolog\LogRecord;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
@@ -38,6 +40,10 @@ final class OzonAccrualVerifyRollingRefreshCommandTest extends IntegrationTestCa
         $handler(new NormalizeRawRecordMessage($rawRecord->getId(), $company->getId()));
         $this->em->clear();
 
+        /** @var TestHandler $logHandler */
+        $logHandler = self::getContainer()->get(TestHandler::class);
+        $logHandler->clear();
+
         $tester = $this->tester('app:ingestion:ozon-accrual:verify-rolling-refresh');
         $exit = $tester->execute([
             '--company-id' => $company->getId(),
@@ -47,6 +53,7 @@ final class OzonAccrualVerifyRollingRefreshCommandTest extends IntegrationTestCa
         self::assertSame(Command::SUCCESS, $exit);
         self::assertStringContainsString('ok', $tester->getDisplay());
         self::assertStringContainsString('amountMismatches', $tester->getDisplay());
+        self::assertFalse($logHandler->hasErrorRecords());
     }
 
     public function testFailsWhenDoneRawHasNoCanonicalTransactions(): void
@@ -59,6 +66,10 @@ final class OzonAccrualVerifyRollingRefreshCommandTest extends IntegrationTestCa
         $rawRecord->markNormalizationDone();
         $this->em->flush();
 
+        /** @var TestHandler $logHandler */
+        $logHandler = self::getContainer()->get(TestHandler::class);
+        $logHandler->clear();
+
         $tester = $this->tester('app:ingestion:ozon-accrual:verify-rolling-refresh');
         $exit = $tester->execute([
             '--company-id' => $company->getId(),
@@ -67,6 +78,24 @@ final class OzonAccrualVerifyRollingRefreshCommandTest extends IntegrationTestCa
 
         self::assertSame(Command::FAILURE, $exit);
         self::assertStringContainsString('fail', $tester->getDisplay());
+        self::assertStringContainsString($company->getId(), $tester->getDisplay());
+        self::assertStringContainsString($connection->getId(), $tester->getDisplay());
+        self::assertStringContainsString('amountMismatches', $tester->getDisplay());
+        self::assertStringContainsString('countMismatches', $tester->getDisplay());
+        self::assertTrue($logHandler->hasErrorThatPasses(
+            static function (LogRecord $record) use ($company, $connection): bool {
+                $details = $record->context['failedTargetDetails'][0] ?? null;
+
+                return 'Ozon accrual rolling refresh verification found mismatches.' === $record->message
+                    && 1 === ($record->context['failedTargets'] ?? null)
+                    && is_array($details)
+                    && $company->getId() === ($details['companyId'] ?? null)
+                    && $connection->getId() === ($details['shopRef'] ?? null)
+                    && !array_key_exists('ok', $details)
+                    && ($details['amountMismatches'] ?? 0) > 0
+                    && ($details['countMismatches'] ?? 0) > 0;
+            },
+        ));
     }
 
     private function seedCompany(int $index): Company
