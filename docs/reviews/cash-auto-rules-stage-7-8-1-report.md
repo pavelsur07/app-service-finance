@@ -1,7 +1,7 @@
 ### Stage 7.8.1: Cashflow report ЦФО filter — DONE
 
 **Risk:** MEDIUM  
-**Next action:** commit, push, and create Draft PR
+**Next action:** DONE; PR #2198 merged, deployed, and Stage A production acceptance recorded
 
 #### What was done
 
@@ -91,3 +91,10 @@
 #### Open questions
 
 - none for Stage 7.8.1.
+
+#### Post-merge production acceptance
+
+- PR #2198 merged to `master` as merge commit `238fa83a0138008d1bfc7e17d67d2e94474fc23e`.
+- `master` deploy and migrations jobs passed.
+- Stage A read-only production acceptance is recorded in `docs/reviews/cash-auto-rules-stage-7-a-8-1-production-acceptance.md`.
+- Production currently has 0 active Cash rows with non-null `responsibility_center_id`, so positive live UI subset comparison is not possible without a production mutation. The behavior remains covered by regression tests and CI.

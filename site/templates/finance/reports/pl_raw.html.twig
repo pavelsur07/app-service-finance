@@ -27,6 +27,15 @@
             >
         </div>
         <div class="col-auto">
+            <label for="responsibilityCenterId" class="form-label">ЦФО</label>
+            <select id="responsibilityCenterId" name="responsibilityCenterId" class="form-select">
+                <option value="">Все ЦФО</option>
+                {% for center in responsibilityCenters %}
+                    <option value="{{ center.id }}" {{ selectedResponsibilityCenterId == center.id ? 'selected' : '' }}>{{ center.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-auto">
             <button type="submit" class="btn btn-primary">Показать</button>
         </div>
     </form>

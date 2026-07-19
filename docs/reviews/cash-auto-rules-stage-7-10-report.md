@@ -1,7 +1,7 @@
 ### Stage 7.10: Hardening and controlled production acceptance — DONE
 
 **Risk:** HIGH-EXTERNAL for production acceptance; LOW for local test-only fix  
-**Next action:** commit, push, Draft PR
+**Next action:** DONE; Stage B / Stage 7.11 handles remaining cleanup follow-ups
 
 #### What was done
 
