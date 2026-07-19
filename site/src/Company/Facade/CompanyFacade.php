@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Company\Facade;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\Counterparty;
 use App\Company\Entity\User;
 use App\Company\Infrastructure\Repository\CompanyRepository;
+use App\Company\Repository\CounterpartyRepository;
 use App\Company\Service\CompanyOwnerAccountCreator;
 use Ramsey\Uuid\Uuid;
 
@@ -18,6 +20,7 @@ final class CompanyFacade
     public function __construct(
         private readonly CompanyRepository $repository,
         private readonly CompanyOwnerAccountCreator $accountCreator,
+        private readonly CounterpartyRepository $counterpartyRepository,
     ) {
     }
 
@@ -59,5 +62,20 @@ final class CompanyFacade
     public function getCompaniesByIds(array $companyIds): array
     {
         return $this->repository->findByIds($companyIds);
+    }
+
+    /**
+     * Контрагент строго в рамках компании — защита от обращения к чужим данным по id.
+     */
+    public function findCounterpartyByIdAndCompany(string $counterpartyId, string $companyId): ?Counterparty
+    {
+        if (!Uuid::isValid($counterpartyId) || !Uuid::isValid($companyId)) {
+            return null;
+        }
+
+        return $this->counterpartyRepository->findOneBy([
+            'id' => $counterpartyId,
+            'company' => $companyId,
+        ]);
     }
 }

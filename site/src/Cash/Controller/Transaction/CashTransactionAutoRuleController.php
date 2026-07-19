@@ -3,6 +3,7 @@
 namespace App\Cash\Controller\Transaction;
 
 use App\Cash\Application\DTO\CashTransactionAutoRulePreviewFilter;
+use App\Cash\Application\SaveCashTransactionAutoRuleAction;
 use App\Cash\Application\Service\AutoRuleDispatchGuard;
 use App\Cash\Application\Service\CashTransactionAutoRuleTargetValidator;
 use App\Cash\Entity\Transaction\CashflowCategory;
@@ -128,7 +129,7 @@ class CashTransactionAutoRuleController extends AbstractController
     #[Route('/new', name: 'cash_transaction_auto_rule_new', methods: ['GET', 'POST'])]
     public function new(
         Request $request,
-        EntityManagerInterface $em,
+        SaveCashTransactionAutoRuleAction $save,
         ActiveCompanyService $companyService,
         CashflowCategoryRepository $categoryRepo,
         CounterpartyRepository $counterpartyRepo,
@@ -168,10 +169,13 @@ class CashTransactionAutoRuleController extends AbstractController
         $this->validatePairTarget($form, $targetValidator, $companyId, null, null, $rule);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $em->persist($rule);
-            $em->flush();
+            try {
+                $save($rule, $auditContextProvider->getActorUserId());
 
-            return $this->redirectToRoute('cash_transaction_auto_rule_index');
+                return $this->redirectToRoute('cash_transaction_auto_rule_index');
+            } catch (\DomainException $exception) {
+                $form->addError(new FormError($exception->getMessage()));
+            }
         }
 
         return $this->render('cash_transaction_auto_rule/new.html.twig', [
@@ -184,7 +188,7 @@ class CashTransactionAutoRuleController extends AbstractController
         string $id,
         Request $request,
         CashTransactionAutoRuleRepository $repo,
-        EntityManagerInterface $em,
+        SaveCashTransactionAutoRuleAction $save,
         ActiveCompanyService $companyService,
         CashflowCategoryRepository $categoryRepo,
         CounterpartyRepository $counterpartyRepo,
@@ -229,27 +233,18 @@ class CashTransactionAutoRuleController extends AbstractController
         );
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $unitOfWork = $em->getUnitOfWork();
-            $unitOfWork->computeChangeSets();
-            $hasChanges = [] !== $unitOfWork->getEntityChangeSet($rule)
-                || $rule->getConditions()->exists(
-                    static fn ($key, $condition): bool => [] !== $unitOfWork->getEntityChangeSet($condition),
-                );
-
-            foreach ($unitOfWork->getScheduledCollectionUpdates() as $collection) {
-                $hasChanges = $hasChanges || $collection->getOwner() === $rule;
-            }
-
-            if ($hasChanges) {
-                $rule->recordUpdate($auditContextProvider->getActorUserId());
-                $unitOfWork->recomputeSingleEntityChangeSet(
-                    $em->getClassMetadata(CashTransactionAutoRule::class),
+            try {
+                $save(
                     $rule,
+                    $auditContextProvider->getActorUserId(),
+                    $currentProjectDirectionId,
+                    $currentResponsibilityCenterId,
                 );
-            }
-            $em->flush();
 
-            return $this->redirectToRoute('cash_transaction_auto_rule_index');
+                return $this->redirectToRoute('cash_transaction_auto_rule_index');
+            } catch (\DomainException $exception) {
+                $form->addError(new FormError($exception->getMessage()));
+            }
         }
 
         return $this->render('cash_transaction_auto_rule/edit.html.twig', [
