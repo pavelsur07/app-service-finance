@@ -509,6 +509,9 @@ getAllActiveCompanyIds(): array
 // @param list<string> $companyIds
 // @return list<array{id: string, name: string}>
 getCompaniesByIds(array $companyIds): array
+
+// Контрагент строго в рамках компании — защита от обращения к чужим данным по id
+findCounterpartyByIdAndCompany(string $counterpartyId, string $companyId): ?Counterparty
 ```
 
 ### `CounterpartyFacade` (`src/Company/Facade/CounterpartyFacade.php`)
@@ -631,9 +634,27 @@ updatePLRegisterForDocument(string $documentId): void
 ```php
 // Создать ДДС-транзакцию из внешнего модуля (идемпотентно для внешних источников)
 createTransaction(CreateCashTransactionCommand $command): CreateCashTransactionResult
+
+// Чтение: постраничный список транзакций компании, per_page ≤ CashFacade::MAX_PER_PAGE (200)
+listTransactions(string $companyId, array $filters = [], int $page = 1, int $perPage = 50): array
+
+// Чтение: плоское дерево статей ДДС компании (id, name, level, parentId, status, flowKind, sort, isSystem)
+listCashflowCategories(string $companyId): array
+
+// Чтение: автоправила компании вместе с условиями
+listAutoRules(string $companyId): array
+
+// Запись: создать (без id) или изменить (с id) статью ДДС, возвращает id
+upsertCashflowCategory(string $companyId, CashflowCategoryInput $input): string
+
+// Запись: создать (без id) или изменить (с id) автоправило, возвращает id
+upsertAutoRule(string $companyId, AutoRuleInput $input, ?string $actorUserId = null): string
 ```
 
-**Назначение:** `CashFacade` — единственный публичный контракт Cash-модуля для создания ДДС-транзакций из других модулей.
+Все методы принимают `companyId` и бросают `\DomainException`, если компания или
+запрошенная сущность к ней не относится. Во входных DTO `null` означает «не менять».
+
+**Назначение:** `CashFacade` — единственный публичный контракт Cash-модуля для чтения и записи данных ДДС из других модулей (в том числе из MCP-инструментов).
 
 Другие модули не должны:
 - создавать `CashTransaction` напрямую;
@@ -2364,6 +2385,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 | 1.55 | 2026-07-16 | Company: добавлены плоский справочник ЦФО, стабильные системные коды проекта/ЦФО, разрешённые пары и атомарный bootstrap новой компании |
 | 1.54 | 2026-07-13 | Marketplace/Inventory: WB Product Cards refresh дополнен карточками из корзины, которые сохраняются неактивными и участвуют в точном маппинге остатков по `chrtId` |
 | 1.53 | 2026-07-13 | Inventory: добавлен ручной WB orchestration с обязательным Product Cards refresh, async raw-загрузкой, безопасной offset-пагинацией и отдельным POST endpoint |
+| 1.53 | 2026-07-19 | Mcp: локальный stdio MCP-сервер `app:mcp:serve` (без внешних доступов); `CashFacade` расширен чтением транзакций и CRUD статей ДДС и автоправил, `CompanyFacade::findCounterpartyByIdAndCompany()` |
 | 1.52 | 2026-07-13 | Inventory: добавлена нормализация WB FBW raw-остатков по `chrtId + warehouseId`, точный variant-маппинг, отдельные статусы движения и выбор последней полной сессии по каждому источнику |
 | 1.51 | 2026-07-13 | Marketplace: добавлена атомарная синхронизация WB Product Cards → `MarketplaceListing.marketplaceVariantId` и barcodes |
 | 1.50 | 2026-07-13 | Marketplace: в `MarketplaceListing` добавлен generic `marketplaceVariantId` (`chrtId` для WB) и точный batch-контракт facade |

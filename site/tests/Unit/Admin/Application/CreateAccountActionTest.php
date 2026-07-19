@@ -16,6 +16,7 @@ use App\Company\Entity\User;
 use App\Company\Facade\CompanyFacade;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Message\SendRegistrationEmailMessage;
+use App\Company\Repository\CounterpartyRepository;
 use App\Company\Service\CompanyOwnerAccountCreator;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -68,7 +69,11 @@ final class CreateAccountActionTest extends TestCase
             new CompanyOwnerMembershipCreator($entityManager),
             $this->createMock(CashflowSystemCategoryService::class),
         );
-        $companyFacade = new CompanyFacade($this->createMock(CompanyRepository::class), $accountCreator);
+        $companyFacade = new CompanyFacade(
+            $this->createMock(CompanyRepository::class),
+            $accountCreator,
+            $this->createMock(CounterpartyRepository::class),
+        );
         $action = new CreateAccountAction($companyFacade);
 
         $company = $action($account, 'plain-password', '  ООО Ромашка  ');
