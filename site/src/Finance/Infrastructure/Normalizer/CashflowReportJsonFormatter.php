@@ -59,6 +59,11 @@ final readonly class CashflowReportJsonFormatter
             'closings' => $payload['closings'],
             'tree' => $payload['tree'],
             'categoryTree' => $payload['categoryTree'],
+            'projectCenterMatrix' => $payload['projectCenterMatrix'] ?? [
+                'currencies' => [],
+                'rowsByCenter' => [],
+                'rowsByProject' => [],
+            ],
         ];
     }
 

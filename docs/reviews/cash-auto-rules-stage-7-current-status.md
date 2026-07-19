@@ -5,8 +5,8 @@
 No jumping between old reports. Work proceeds in this order:
 
 1. **Stage A — Stage 7.8.1 post-merge production acceptance:** DONE.
-2. **Stage B / Stage 7.11 — consolidated cleanup/follow-ups:** checking/reviewing in branch `agent/stage7-linear-closure`.
-3. **Stage C / Stage 7.8.2 — Cashflow Project × ЦФО matrix:** next product stage after Stage B is merged and accepted.
+2. **Stage B / Stage 7.11 — consolidated cleanup/follow-ups:** Ready for review in PR #2199.
+3. **Stage C / Stage 7.8.2 — Cashflow Project × ЦФО matrix:** implemented/checking in stacked branch `agent/stage7-8-2-cashflow-matrix`.
 4. **Stage D — final Stage 7 closure:** final handoff after Stage C.
 
 ## Closed stages
@@ -42,7 +42,7 @@ Cleanup and hardening only:
 
 Product analytics:
 
-- Cashflow Project × ЦФО matrix;
+- Cashflow Project × ЦФО matrix added to existing report/API;
 - ЦФО → projects;
 - project → ЦФО.
 
