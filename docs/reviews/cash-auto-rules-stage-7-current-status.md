@@ -2,12 +2,12 @@
 
 ## Current linear plan
 
-No jumping between old reports. Work proceeds in this order:
+No jumping between old reports. Stage 7 is closed:
 
 1. **Stage A — Stage 7.8.1 post-merge production acceptance:** DONE.
-2. **Stage B / Stage 7.11 — consolidated cleanup/follow-ups:** Ready for review in PR #2199.
-3. **Stage C / Stage 7.8.2 — Cashflow Project × ЦФО matrix:** implemented/checking in stacked branch `agent/stage7-8-2-cashflow-matrix`.
-4. **Stage D — final Stage 7 closure:** final handoff after Stage C.
+2. **Stage B / Stage 7.11 — consolidated cleanup/follow-ups:** DONE, merged as #2199.
+3. **Stage C / Stage 7.8.2 — Cashflow Project × ЦФО matrix:** DONE, merged as #2201. Original stacked PR #2200 was closed after its base branch was deleted by #2199 merge.
+4. **Stage D — final Stage 7 closure:** DONE.
 
 ## Closed stages
 
@@ -27,7 +27,7 @@ No jumping between old reports. Work proceeds in this order:
 - Stage 7.9 — ЦФО auto-rule target and production configuration gate: DONE.
 - Stage 7.10 — hardening/read-only production acceptance: DONE.
 
-## Open work
+## Final closure
 
 ### Stage B / Stage 7.11
 
@@ -37,6 +37,7 @@ Cleanup and hardening only:
 - P&L daily-total old-schema runtime detection removed;
 - raw P&L debug ЦФО filter added;
 - failed Messenger diagnostics recorded read-only without mutating queue state.
+- merged to `master` as #2199.
 
 ### Stage C / Stage 7.8.2
 
@@ -45,12 +46,13 @@ Product analytics:
 - Cashflow Project × ЦФО matrix added to existing report/API;
 - ЦФО → projects;
 - project → ЦФО.
+- merged to `master` as #2201.
 
 ### Stage D
 
-Final Stage 7 handoff and closure.
+Final Stage 7 handoff and closure is complete.
 
-## Explicitly not open inside Stage 7.11
+## Explicitly not done by Stage 7
 
 - Production import smoke — separate production mutation approval if ever needed.
 - Historical backfill/recalculation — forbidden unless separately scoped.
