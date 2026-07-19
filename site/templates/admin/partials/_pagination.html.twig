@@ -1,0 +1,59 @@
+{#
+  UI Kit table pagination (.t-pagination) поверх Pagerfanta.
+  Использование: {% include 'admin/partials/_pagination.html.twig' with { pager: pager } %}
+  Опционально: route, params (по умолчанию — текущий маршрут и query).
+#}
+{% set route = route ?? app.request.attributes.get('_route') %}
+{% set params = params ?? app.request.query.all %}
+
+{% if pager is defined and pager.nbResults > 0 %}
+    {% set totalPages = pager.nbPages %}
+    {% set currentPage = pager.currentPage %}
+    {% set from = (currentPage - 1) * pager.maxPerPage + 1 %}
+    {% set to = min(currentPage * pager.maxPerPage, pager.nbResults) %}
+    {% set delta = 2 %}
+
+    {% set pages = [] %}
+    {% if totalPages <= 9 %}
+        {% set pages = 1..totalPages %}
+    {% else %}
+        {% set pages = pages|merge([1]) %}
+        {% set startPage = max(2, currentPage - delta) %}
+        {% set endPage = min(totalPages - 1, currentPage + delta) %}
+        {% if startPage > 2 %}
+            {% set pages = pages|merge(['…']) %}
+        {% else %}
+            {% set startPage = 2 %}
+        {% endif %}
+        {% for pageNumber in startPage..endPage %}
+            {% set pages = pages|merge([pageNumber]) %}
+        {% endfor %}
+        {% if endPage < totalPages - 1 %}
+            {% set pages = pages|merge(['…']) %}
+        {% endif %}
+        {% set pages = pages|merge([totalPages]) %}
+    {% endif %}
+
+    <nav class="t-pagination" aria-label="Пагинация">
+        <div class="t-pagination-info">Показано <b>{{ from }}–{{ to }}</b> из <b>{{ pager.nbResults }}</b></div>
+        {% if totalPages > 1 %}
+            <div class="t-pagination-pages">
+                {% if pager.hasPreviousPage %}
+                    <a class="t-pg-btn" href="{{ path(route, params|merge({'page': pager.previousPage})) }}" title="Предыдущая" aria-label="Предыдущая страница"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></a>
+                {% endif %}
+                {% for pageNumber in pages %}
+                    {% if pageNumber == '…' %}
+                        <span class="t-pg-ellipsis">…</span>
+                    {% elseif pageNumber == currentPage %}
+                        <span class="t-pg-btn is-active" aria-current="page">{{ pageNumber }}</span>
+                    {% else %}
+                        <a class="t-pg-btn" href="{{ path(route, params|merge({'page': pageNumber})) }}">{{ pageNumber }}</a>
+                    {% endif %}
+                {% endfor %}
+                {% if pager.hasNextPage %}
+                    <a class="t-pg-btn" href="{{ path(route, params|merge({'page': pager.nextPage})) }}" title="Следующая" aria-label="Следующая страница"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </nav>
+{% endif %}

@@ -62,6 +62,7 @@ final class CreateAccountController extends AbstractController
             'recentUsers' => $userRepository->countRegisteredUsersSince($lastWeek),
             'accountForm' => $accountForm,
             'showAccountModal' => true,
+            'roleLabels' => UserController::ROLE_LABELS,
         ], new Response(status: Response::HTTP_UNPROCESSABLE_ENTITY));
     }
 }

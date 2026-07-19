@@ -54,7 +54,7 @@ final class AdminUserCreateAccountTest extends WebTestCaseBase
         $client->request('GET', '/admin/users');
 
         self::assertResponseIsSuccessful();
-        self::assertSelectorTextContains('button[data-bs-target="#account-create-modal"]', 'Добавить аккаунт');
+        self::assertSelectorTextContains('button[data-admin-dialog-open="account-create-dialog"]', 'Добавить аккаунт');
     }
 
     public function testValidPostCreatesUserCompanyAndOwnerCompanyMemberWithoutAdminRole(): void
@@ -128,7 +128,7 @@ final class AdminUserCreateAccountTest extends WebTestCaseBase
         self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
         self::assertSelectorTextContains('.invalid-feedback', 'There is already an account with this email');
         self::assertStringContainsString(
-            'window.bootstrap.Modal.getOrCreateInstance(modalElement).show();',
+            "document.getElementById('account-create-dialog')?.showModal();",
             $client->getResponse()->getContent(),
         );
 

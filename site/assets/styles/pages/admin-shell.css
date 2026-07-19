@@ -9,3 +9,25 @@
 /* Brand logo in app-header (moved out of inline twig styles). */
 .app-header-brand a { display: block; text-decoration: none; }
 .app-header-brand img { display: block; height: 32px; width: auto; max-width: 100%; }
+
+/* Workzone page scaffold: title row + KPI row (shared by admin screens).
+   ponytail: живёт здесь как admin-shell layout; при появлении второго
+   потребителя вне админки — перенести в UI Kit через screen-intake. */
+.wz-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s-4);
+  margin-bottom: var(--s-5);
+}
+.wz-title {
+  margin: 0;
+  /* 28px — размер page title из storybook; токены --font-* заканчиваются на 14,
+     крупные размеры UI Kit задаёт в px (см. kpi-value--hero: 28px). */
+  font-size: 28px; font-weight: 700; line-height: 1.2;
+  color: var(--text-strong);
+}
+.wz-kpi-row {
+  display: flex; flex-wrap: wrap;
+  gap: var(--s-4);
+  margin-bottom: var(--s-5);
+}
+

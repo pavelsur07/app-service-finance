@@ -3,158 +3,137 @@
 {% block title %}Admin · Пользователи{% endblock %}
 
 {% block body %}
-  <div class="page-header d-print-none">
-    <div class="row align-items-center">
-      <div class="col">
-        <h2 class="page-title">{{ title }}</h2>
-      </div>
-      <div class="col-auto ms-auto">
-        <button
-          type="button"
-          class="btn btn-primary"
-          data-bs-toggle="modal"
-          data-bs-target="#account-create-modal"
-        >
-          <i class="ti ti-plus me-1"></i>
-          Добавить аккаунт
-        </button>
-      </div>
+  <div class="wz-head">
+    <h1 class="wz-title">{{ title }}</h1>
+    <button type="button" class="btn btn-md btn-primary" data-admin-dialog-open="account-create-dialog">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Добавить аккаунт
+    </button>
+  </div>
+
+  <div class="wz-kpi-row">
+    <div class="kpi u-flex-1 u-min-w-200">
+      <div class="kpi-label">Всего пользователей</div>
+      <div class="kpi-value">{{ totalUsers }}</div>
+    </div>
+    <div class="kpi u-flex-1 u-min-w-200">
+      <div class="kpi-label">За последние 7 дней</div>
+      <div class="kpi-value">{{ recentUsers }}</div>
+      <div class="kpi-meta">новые регистрации</div>
     </div>
   </div>
 
-  <div class="row row-cards mt-3">
-    <div class="col-sm-6 col-lg-3">
-      <div class="card">
-        <div class="card-body">
-          <div class="subheader">Всего пользователей</div>
-          <div class="h1 mb-0">{{ totalUsers }}</div>
-        </div>
+  {% if users is not empty %}
+    <div class="card u-p-0" style="overflow-x:auto;">
+      <table class="t-table">
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th style="width:160px">Дата регистрации</th>
+            <th>Роли</th>
+            <th class="t-cell--right" style="width:160px">Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for user in users %}
+            {# ROLE_USER есть у всех — шум; незнакомые роли показываем как есть, чтобы не прятать выданные права #}
+            {% set userRoleLabels = user.roles|filter(role => role != 'ROLE_USER')|map(role => roleLabels[role] ?? role) %}
+            <tr>
+              <td>{{ user.email }}</td>
+              <td style="font-variant-numeric:tabular-nums;">{{ user.createdAt|date('d.m.Y') }}</td>
+              <td>
+                {% if userRoleLabels is not empty %}
+                  {{ userRoleLabels|join(', ') }}
+                {% else %}
+                  <span style="color:var(--text-faint);">—</span>
+                {% endif %}
+              </td>
+              <td class="t-cell--right">
+                <a href="{{ path('admin_user_update_roles', { id: user.id }) }}" class="btn btn-sm btn-secondary">Изменить роль</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {# route явно: при 422 re-render из CreateAccountController текущий _route — POST-only #}
+      {% include 'admin/partials/_pagination.html.twig' with { pager: pager, route: 'admin_user_index' } %}
+    </div>
+  {% else %}
+    <div class="empty">
+      <div class="empty-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       </div>
+      <div class="empty-title">Нет зарегистрированных пользователей</div>
+      <div class="empty-text">Создайте первый аккаунт — пользователь и его компания появятся в этом списке.</div>
+      <button type="button" class="btn btn-md btn-primary" data-admin-dialog-open="account-create-dialog">Добавить аккаунт</button>
     </div>
-    <div class="col-sm-6 col-lg-3">
-      <div class="card">
-        <div class="card-body">
-          <div class="subheader">За последние 7 дн.</div>
-          <div class="h1 mb-0">{{ recentUsers }}</div>
-        </div>
-      </div>
-    </div>
-  </div>
+  {% endif %}
+{% endblock %}
 
-  <div class="card mt-3">
-    <div class="card-body">
-      {% if users is not empty %}
-        <div class="table-responsive">
-          <table class="table table-vcenter">
-            <thead>
-              <tr>
-                <th scope="col">Email</th>
-                <th scope="col">Дата регистрации</th>
-                <th scope="col">Идентификатор</th>
-                <th scope="col">Роли</th>
-                <th scope="col" class="text-end">Действия</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for user in users %}
-                <tr>
-                  <td>{{ user.email }}</td>
-                  <td>{{ user.createdAt|date('d-m-y') }}</td>
-                  <td><code>{{ user.id }}</code></td>
-                  <td>
-                    {% for role in user.roles %}
-                      <span class="badge bg-blue-lt text-uppercase">{{ role }}</span>
-                    {% else %}
-                      <span class="text-muted">—</span>
-                    {% endfor %}
-                  </td>
-                  <td class="text-end">
-                    <div class="btn-list justify-content-end">
-                      <a
-                        href="{{ path('admin_user_update_roles', { id: user.id }) }}"
-                        class="btn btn-primary btn-sm"
-                      >
-                        Изменить роль
-                      </a>
-                      {#
-                      <a
-                        href="{{ path('admin_user_delete', { id: user.id }) }}"
-                        class="btn btn-sm btn-icon btn-outline-danger"
-                        title="Удалить пользователя"
-                        aria-label="Удалить пользователя"
-                      >
-                        <i class="ti ti-trash"></i>
-                      </a>
-                      #}
-                    </div>
-                  </td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      {% else %}
-        <p class="text-muted mb-0">Нет зарегистрированных пользователей.</p>
-      {% endif %}
-    </div>
-    <div class="card-footer d-flex align-items-center">
-      {% include 'partials/_pagerfanta.html.twig' with { pager: pager } %}
-    </div>
-  </div>
-
-  <div class="modal modal-blur fade" id="account-create-modal" tabindex="-1" aria-labelledby="account-create-modal-title" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
-      <div class="modal-content">
-        {{ form_start(accountForm, { action: path('admin_user_create_account'), method: 'POST' }) }}
-          <div class="modal-header">
-            <h5 class="modal-title" id="account-create-modal-title">Добавить аккаунт</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+{% block admin_modals %}
+  <dialog id="account-create-dialog" class="dlg" aria-labelledby="account-create-title">
+    <div class="mdl">
+      {{ form_start(accountForm, { action: path('admin_user_create_account'), method: 'POST' }) }}
+        <div class="mdl-head">
+          <div class="u-flex-1">
+            <h3 id="account-create-title">Добавить аккаунт</h3>
+            <div class="sub">Создаёт пользователя и его компанию</div>
           </div>
-          <div class="modal-body">
-            {% if accountForm.vars.errors|length > 0 %}
-              <div class="alert alert-danger" role="alert">
-                {{ form_errors(accountForm) }}
-              </div>
-            {% endif %}
-
-            <div class="row g-3">
-              <div class="col-12">
-                {{ form_label(accountForm.email, 'Email', { label_attr: { class: 'form-label' } }) }}
-                {{ form_widget(accountForm.email, {
-                  attr: { class: 'form-control', placeholder: 'user@example.com', autocomplete: 'email' }
-                }) }}
-                {{ form_errors(accountForm.email) }}
-              </div>
-
-              <div class="col-12">
-                {{ form_label(accountForm.plainPassword, 'Пароль', { label_attr: { class: 'form-label' } }) }}
-                {{ form_widget(accountForm.plainPassword, {
-                  attr: { class: 'form-control', placeholder: '••••••••', autocomplete: 'new-password' }
-                }) }}
-                {{ form_errors(accountForm.plainPassword) }}
-              </div>
-
-              <div class="col-12">
-                {{ form_label(accountForm.companyName, 'Название компании', { label_attr: { class: 'form-label' } }) }}
-                {{ form_widget(accountForm.companyName, {
-                  attr: { class: 'form-control', placeholder: 'ООО Ромашка' }
-                }) }}
-                {{ form_errors(accountForm.companyName) }}
+          <button type="button" class="btn btn-sm btn-ghost u-w-28 u-p-0" data-admin-dialog-close aria-label="Закрыть">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="mdl-body">
+          {% if accountForm.vars.errors|length > 0 %}
+            <div class="alert alert--danger" role="alert" style="margin-bottom:var(--s-3);">
+              <div class="a-body">
+                <div class="a-text">{{ form_errors(accountForm) }}</div>
               </div>
             </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Отмена</button>
-            <button type="submit" class="btn btn-primary ms-auto">
-              <i class="ti ti-plus me-1"></i>
-              Создать аккаунт
-            </button>
-          </div>
-        {{ form_end(accountForm) }}
-      </div>
-    </div>
-  </div>
+          {% endif %}
 
+          <div class="form-field">
+            {{ form_label(accountForm.email, 'Email', { label_attr: { class: 'form-label' } }) }}
+            {{ form_widget(accountForm.email, {
+              attr: {
+                class: 'input' ~ (accountForm.email.vars.errors|length > 0 ? ' is-error'),
+                placeholder: 'user@example.com',
+                autocomplete: 'email'
+              }
+            }) }}
+            {{ form_errors(accountForm.email) }}
+          </div>
+
+          <div class="form-field">
+            {{ form_label(accountForm.plainPassword, 'Пароль', { label_attr: { class: 'form-label' } }) }}
+            {{ form_widget(accountForm.plainPassword, {
+              attr: {
+                class: 'input' ~ (accountForm.plainPassword.vars.errors|length > 0 ? ' is-error'),
+                placeholder: '••••••••',
+                autocomplete: 'new-password'
+              }
+            }) }}
+            {{ form_errors(accountForm.plainPassword) }}
+          </div>
+
+          <div class="form-field">
+            {{ form_label(accountForm.companyName, 'Название компании', { label_attr: { class: 'form-label' } }) }}
+            {{ form_widget(accountForm.companyName, {
+              attr: {
+                class: 'input' ~ (accountForm.companyName.vars.errors|length > 0 ? ' is-error'),
+                placeholder: 'ООО Ромашка'
+              }
+            }) }}
+            {{ form_errors(accountForm.companyName) }}
+          </div>
+        </div>
+        <div class="mdl-foot">
+          <button type="button" class="btn btn-md btn-secondary" data-admin-dialog-close>Отмена</button>
+          <button type="submit" class="btn btn-md btn-primary">Создать аккаунт</button>
+        </div>
+      {{ form_end(accountForm) }}
+    </div>
+  </dialog>
 {% endblock %}
 
 {% block admin_scripts %}
@@ -162,10 +141,7 @@
   {% if showAccountModal %}
     <script>
       document.addEventListener('DOMContentLoaded', () => {
-        const modalElement = document.getElementById('account-create-modal');
-        if (modalElement && window.bootstrap) {
-          window.bootstrap.Modal.getOrCreateInstance(modalElement).show();
-        }
+        document.getElementById('account-create-dialog')?.showModal();
       });
     </script>
   {% endif %}
