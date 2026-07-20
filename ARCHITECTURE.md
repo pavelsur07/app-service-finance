@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.54 / 2026-07-13
+> Версия: 1.64 / 2026-07-20
 
 ---
 
@@ -12,7 +12,7 @@
 |---|---|---|
 | `Cash` | Денежные счета, транзакции, банковский импорт, план платежей | `Company $company` (legacy) |
 | `Marketplace` | WB/Ozon: продажи, возвраты, расходы, закрытие месяца | смешанный |
-| `Catalog` | Товары, штрихкоды, закупочные цены | `string $companyId` ✅ |
+| `Catalog` | Товары, штрихкоды, закупочные цены | смешанный (см. ниже) |
 | `Deals` | Сделки | `Company $company` (legacy) |
 | `Finance` | PnL-отчёты, кэшфлоу, фасады финансовой аналитики | `Company $company` (legacy) |
 | `Company` | Компании, пользователи, приглашения, тарифы | — (владелец) |
@@ -30,12 +30,13 @@
 | `Notification` | Каналы уведомлений (email и др.) | — |
 | `Shared` | Общий код: ActiveCompanyService, аудит, безопасность, storage | — |
 | `Admin` | Административная панель (отдельный firewall) | — |
+| `Mcp` | MCP-сервер: инструменты для LLM-агентов над Cash-данными | — |
+| `Report` | Построители отчётов (ДДС cashflow) | — |
 
-**Legacy-зона** (технический долг, новый код туда НЕ идёт):
+**Legacy-зона** (пуста после миграции, новый код туда НЕ идёт):
 `src/Entity/` · `src/Service/` · `src/Repository/` · `src/Controller/`
 
-Текущие legacy-сущности в `src/Entity/`:
-`Document` · `DocumentOperation` · `PLCategory` · `PLDailyTotal` · `PLMonthlySnapshot` · `ProjectDirection` · `Counterparty` · `ReportApiKey`
+Все директории на диске пусты (только `.gitignore`) — Entity, ранее жившие здесь, перенесены в модули: `Document`, `DocumentOperation`, `PLCategory`, `PLDailyTotal`, `PLMonthlySnapshot` → `Finance/Entity/`; `ProjectDirection`, `Counterparty`, `ReportApiKey` → `Company/Entity/`. Директории оставлены как guard-путь: класть новые Entity/Service/Repository/Controller сюда всё равно запрещено — используй `src/{Module}/`.
 
 ---
 
@@ -78,6 +79,7 @@
 | `ExternalCategoryMapping` | Ingestion | global mapping dictionary, no company filter |
 | `NormalizationIssue` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
 | `PLDirtyPeriod` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
+| `Product` | Catalog | `Company $company` (legacy) — ещё не мигрирован |
 | `ProductImport` | Catalog | `string $companyId` ✅ |
 | `ProductBarcode` | Catalog | `string $companyId` ✅ |
 | `ProductPurchasePrice` | Catalog | `string $companyId` ✅ |
@@ -86,7 +88,8 @@
 | `FinancialResponsibilityCenterProject` | Company | `string $companyId` + same-company pair guard ✅ |
 | `CashTransaction`, `MoneyAccount` и др. | Cash | `Company $company` (legacy) |
 | `Deal`, `ChargeType` | Deals | `Company $company` (legacy) |
-| `PLCategory`, `Document` и др. | legacy `src/Entity/` | `Company $company` (legacy) |
+| `PLCategory`, `Document`, `DocumentOperation`, `PLDailyTotal`, `PLMonthlySnapshot` | Finance | `Company $company` (legacy) |
+| `ProjectDirection`, `Counterparty`, `ReportApiKey` | Company | `Company $company` (legacy) |
 
 ### Ingestion: tenant isolation
 
@@ -2374,6 +2377,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.64 | 2026-07-20 | Doc sync: legacy-зона (`src/Entity|Service|Repository|Controller`) отмечена пустой (Entity уже перенесены в модули), таблица companyId поправлена (`Catalog\Product` всё ещё `Company $company`, модуль — смешанный, не ✅), в карту модулей добавлены `Mcp` и `Report` |
 | 1.62 | 2026-07-18 | Finance: Stage 7.7.3 переключает новые `pl_daily_totals` записи на Project×ЦФО aggregation key с partial expression unique indexes и безопасным merge при удалении P&L категории |
 | 1.63 | 2026-07-18 | Finance: Stage 7.7.4 подключает P&L read-side к Project×ЦФО через optional `responsibilityCenterId` фильтр в preview/UI/JSON без перерасчёта истории |
 | 1.61 | 2026-07-18 | Cash/Company: Stage 7.6.4 подключает file/1C/bank import writers к system Project×ЦФО pair для новых транзакций без изменения overwrite/preview/batch semantics |
