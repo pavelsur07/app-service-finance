@@ -49,6 +49,8 @@
 
 ## Known follow-ups intentionally outside Stage 7
 
+The execution triggers, acceptance timing, and safety gates for these follow-ups are tracked in [GitHub issue #2214](https://github.com/pavelsur07/app-service-finance/issues/2214).
+
 - Production import smoke with explicit source/company/date bounds.
 - Historical backfill or recalculation.
 - Queue failed-message payload inspection, retry, or delete.
