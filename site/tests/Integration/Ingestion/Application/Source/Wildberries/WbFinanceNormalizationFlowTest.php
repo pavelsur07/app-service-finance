@@ -60,7 +60,7 @@ final class WbFinanceNormalizationFlowTest extends IntegrationTestCase
         /** @var FinancialTransactionRepository $transactionRepository */
         $transactionRepository = self::getContainer()->get(FinancialTransactionRepository::class);
         $transactions = $transactionRepository->findByRawRecordId($companyId, $record->getId());
-        self::assertCount(5, $transactions);
+        self::assertCount(4, $transactions);
 
         $byExternalId = [];
         foreach ($transactions as $transaction) {
@@ -71,18 +71,13 @@ final class WbFinanceNormalizationFlowTest extends IntegrationTestCase
         self::assertArrayHasKey('wb:sales-report-detailed:101:sale', $byExternalId);
         self::assertSame(TransactionType::SALE, $byExternalId['wb:sales-report-detailed:101:sale']->getType());
         self::assertSame(TransactionDirection::IN, $byExternalId['wb:sales-report-detailed:101:sale']->getDirection());
-        self::assertSame(92000, $byExternalId['wb:sales-report-detailed:101:sale']->getAmountMinor());
+        self::assertSame(100000, $byExternalId['wb:sales-report-detailed:101:sale']->getAmountMinor());
         self::assertSame('sale-srid', $byExternalId['wb:sales-report-detailed:101:sale']->getOrderRef());
         self::assertSame('sku-1', $byExternalId['wb:sales-report-detailed:101:sale']->getSourceData()['sku']);
 
         self::assertArrayHasKey('wb:sales-report-detailed:101:commission', $byExternalId);
         self::assertSame(TransactionDirection::OUT, $byExternalId['wb:sales-report-detailed:101:commission']->getDirection());
         self::assertSame(13000, $byExternalId['wb:sales-report-detailed:101:commission']->getAmountMinor());
-
-        self::assertArrayHasKey('wb:sales-report-detailed:101:spp_compensation', $byExternalId);
-        self::assertSame(TransactionType::BONUS, $byExternalId['wb:sales-report-detailed:101:spp_compensation']->getType());
-        self::assertSame(TransactionDirection::IN, $byExternalId['wb:sales-report-detailed:101:spp_compensation']->getDirection());
-        self::assertSame(8000, $byExternalId['wb:sales-report-detailed:101:spp_compensation']->getAmountMinor());
 
         self::assertArrayHasKey('wb:sales-report-detailed:101:acquiring', $byExternalId);
         self::assertSame(TransactionDirection::OUT, $byExternalId['wb:sales-report-detailed:101:acquiring']->getDirection());

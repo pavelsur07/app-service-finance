@@ -11,9 +11,8 @@ use Ramsey\Uuid\Uuid;
 final readonly class WbFinanceSalesReportDetailedPreviewMapper
 {
     private const SOURCE_TZ = 'UTC';
-    private const MAPPER_VERSION = 2;
+    private const MAPPER_VERSION = 3;
     private const COMPONENT_SALE_PAYOUT_ADJUSTMENT = 'sale_payout_adjustment';
-    private const COMPONENT_SPP_COMPENSATION = 'spp_compensation';
 
     /**
      * @param iterable<array<string, mixed>> $rows
@@ -60,6 +59,9 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
             $rowTransactions = array_slice($transactions, $rowTransactionsStart);
             if ([] !== $rowTransactions && $this->isSaleOrReturn($docTypeName) && $this->hasPayoutCheckFields($row)) {
                 $expectedNetMinor = $this->minor($row, 'forPay', 'ppvz_for_pay');
+                if (!$this->isSalePayoutAdjustment($sellerOperName, $docTypeName)) {
+                    $expectedNetMinor = abs($expectedNetMinor);
+                }
                 if ($this->isReturn($docTypeName)) {
                     $expectedNetMinor *= -1;
                 }
@@ -116,12 +118,12 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
             return;
         }
 
-        $retailMinor = abs($this->minor($row, 'retailAmount', 'retail_amount'));
+        $retailAmountMinor = abs($this->minor($row, 'retailAmount', 'retail_amount'));
         $forPayMinor = $this->minor($row, 'forPay', 'ppvz_for_pay');
         $acquiringMinor = $this->minor($row, 'acquiringFee', 'acquiring_fee');
         if (
             $this->isSalePayoutAdjustment($sellerOperName, $docTypeName)
-            && 0 === $retailMinor
+            && 0 === $retailAmountMinor
             && 0 === $acquiringMinor
             && 0 !== $forPayMinor
         ) {
@@ -147,41 +149,22 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
         $grossWithoutSppMinor = abs($this->minor($row, 'retailPriceWithDisc', 'retail_price_withdisc_rub'))
             * abs((int) $this->string($row, 'quantity'));
         $commissionMinor = $grossWithoutSppMinor - abs($forPayMinor) - abs($acquiringMinor);
-        $sppCompensationMinor = $grossWithoutSppMinor - $retailMinor;
         $isReturn = $this->isReturn($docTypeName);
 
-        if (0 !== $retailMinor) {
+        if (0 !== $grossWithoutSppMinor) {
             $this->add(
                 transactions: $transactions,
                 operationGroupId: $operationGroupId,
                 rowKey: $rowKey,
                 component: $isReturn ? 'refund' : 'sale',
                 type: $isReturn ? TransactionType::REFUND : TransactionType::SALE,
-                signedAmountMinor: $isReturn ? -abs($retailMinor) : abs($retailMinor),
+                signedAmountMinor: $isReturn ? -$grossWithoutSppMinor : $grossWithoutSppMinor,
                 currency: $currency,
                 occurredAt: $occurredAt,
-                field: 'retailAmount',
+                field: 'retailPriceWithDisc*quantity',
                 sellerOperName: $sellerOperName,
                 docTypeName: $docTypeName,
                 description: $isReturn ? 'WB refund gross amount' : 'WB sale gross amount',
-                row: $row,
-            );
-        }
-
-        if (0 !== $sppCompensationMinor) {
-            $this->add(
-                transactions: $transactions,
-                operationGroupId: $operationGroupId,
-                rowKey: $rowKey,
-                component: self::COMPONENT_SPP_COMPENSATION,
-                type: TransactionType::BONUS,
-                signedAmountMinor: $isReturn ? -$sppCompensationMinor : $sppCompensationMinor,
-                currency: $currency,
-                occurredAt: $occurredAt,
-                field: 'retailPriceWithDisc*quantity-retailAmount',
-                sellerOperName: $sellerOperName,
-                docTypeName: $docTypeName,
-                description: 'WB SPP compensation',
                 row: $row,
             );
         }
@@ -399,7 +382,6 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
         return array_values(array_filter(
             $transactions,
             static fn (WbFinancePreviewTransaction $transaction): bool => self::COMPONENT_SALE_PAYOUT_ADJUSTMENT === $transaction->component
-                || self::COMPONENT_SPP_COMPENSATION === $transaction->component
                 || in_array(
                     $transaction->type,
                     [TransactionType::SALE, TransactionType::REFUND, TransactionType::COMMISSION, TransactionType::ACQUIRING],

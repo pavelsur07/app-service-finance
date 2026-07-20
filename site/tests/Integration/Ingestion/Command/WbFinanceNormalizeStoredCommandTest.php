@@ -224,7 +224,7 @@ final class WbFinanceNormalizeStoredCommandTest extends IntegrationTestCase
 
         /** @var FinancialTransactionRepository $transactionRepository */
         $transactionRepository = self::getContainer()->get(FinancialTransactionRepository::class);
-        self::assertCount(5, $transactionRepository->findByRawRecordId($companyId, $record->getId()));
+        self::assertCount(4, $transactionRepository->findByRawRecordId($companyId, $record->getId()));
         self::assertStringContainsString('Normalized 1 Wildberries finance raw records inline.', $tester->getDisplay());
     }
 
@@ -326,9 +326,9 @@ final class WbFinanceNormalizeStoredCommandTest extends IntegrationTestCase
             connectionRef: $connectionRef,
             rawRecordId: $record->getId(),
             operationGroupId: $operationGroupId,
-            externalId: 'wb:sales-report-detailed:301:obsolete_component',
-            type: TransactionType::COMMISSION,
-            amountMinor: 400,
+            externalId: 'wb:sales-report-detailed:301:spp_compensation',
+            type: TransactionType::BONUS,
+            amountMinor: 8000,
             fetchedAt: $record->getFetchedAt(),
         );
         $record->markNormalizationDone();
@@ -357,9 +357,9 @@ final class WbFinanceNormalizeStoredCommandTest extends IntegrationTestCase
 
         self::assertSame(RawNormalizationStatus::DONE, $this->rawStatusById($companyId, $record->getId()));
         self::assertSame(13000, $this->transactionAmount($companyId, 'wb:sales-report-detailed:301:commission'));
-        self::assertSame(8000, $this->transactionAmount($companyId, 'wb:sales-report-detailed:301:spp_compensation'));
-        self::assertSame(0, $this->transactionAmount($companyId, 'wb:sales-report-detailed:301:obsolete_component'));
-        self::assertSame(5, $this->transactionCount($companyId, $record->getId()));
+        self::assertSame(100000, $this->transactionAmount($companyId, 'wb:sales-report-detailed:301:sale'));
+        self::assertSame(0, $this->transactionAmount($companyId, 'wb:sales-report-detailed:301:spp_compensation'));
+        self::assertSame(4, $this->transactionCount($companyId, $record->getId()));
         self::assertSame(0, $this->openIssueCount($companyId, $record->getId()));
         self::assertSame(1, $this->resolvedIssueCount($companyId, $record->getId()));
         self::assertSame(0, $this->duplicateNaturalKeyCount($companyId));
