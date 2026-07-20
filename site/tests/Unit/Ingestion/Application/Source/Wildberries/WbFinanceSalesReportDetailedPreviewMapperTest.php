@@ -14,7 +14,7 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
 {
     private const COMPANY_ID = '19621cff-b028-45d9-9193-11f47ad9a8b2';
 
-    public function testMapsSaleRowToBuyerRevenueSppCompensationCommissionAndAcquiring(): void
+    public function testMapsSaleRowToSellerPriceCommissionAndAcquiring(): void
     {
         $result = $this->mapper()->preview(self::COMPANY_ID, [[
             'rrdId' => 101,
@@ -34,18 +34,15 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
             'sku' => 'sku-1',
         ]]);
 
-        self::assertCount(4, $result->transactions);
+        self::assertCount(3, $result->transactions);
 
         $sale = $this->transaction($result->transactions, 'wb:sales-report-detailed:101:sale');
         self::assertSame(TransactionType::SALE, $sale->type);
         self::assertSame(TransactionDirection::IN, $sale->direction);
-        self::assertSame(92000, $sale->amountMinor);
+        self::assertSame(100000, $sale->amountMinor);
+        self::assertSame('retailPriceWithDisc*quantity', $sale->field);
+        self::assertSame(3, $sale->sourceData['_ingestion_mapper_version']);
         self::assertSame('2026-06-21 10:15:00', $sale->occurredAt->format('Y-m-d H:i:s'));
-
-        $spp = $this->transaction($result->transactions, 'wb:sales-report-detailed:101:spp_compensation');
-        self::assertSame(TransactionType::BONUS, $spp->type);
-        self::assertSame(TransactionDirection::IN, $spp->direction);
-        self::assertSame(8000, $spp->amountMinor);
 
         $commission = $this->transaction($result->transactions, 'wb:sales-report-detailed:101:commission');
         self::assertSame(TransactionType::COMMISSION, $commission->type);
@@ -85,7 +82,7 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
             'cashbackDiscount' => '4.10',
         ]]);
 
-        self::assertCount(6, $result->transactions);
+        self::assertCount(5, $result->transactions);
         $this->transaction($result->transactions, 'wb:sales-report-detailed:107:logistics_delivery');
         $this->transaction($result->transactions, 'wb:sales-report-detailed:107:loyalty_discount_compensation');
         self::assertNotContains(
@@ -97,7 +94,7 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
         self::assertSame(85000, $result->rowChecks[0]->expectedNetMinor);
         self::assertSame(85000, $result->rowChecks[0]->actualNetMinor);
         self::assertSame(0, $result->rowChecks[0]->deltaMinor);
-        self::assertSame(4, $result->rowChecks[0]->transactionCount);
+        self::assertSame(3, $result->rowChecks[0]->transactionCount);
     }
 
     public function testMapsSalePayoutAdjustmentsWithoutFlippingForPaySign(): void
@@ -144,23 +141,18 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
             'saleDt' => '2026-06-21T12:00:00Z',
             'retailPriceWithDisc' => '1000.00',
             'retailAmount' => '920.00',
-            'forPay' => '850.00',
-            'acquiringFee' => '20.00',
+            'forPay' => '-850.00',
+            'acquiringFee' => '-20.00',
             'ppvzVw' => '40.00',
             'ppvzVwNds' => '10.00',
         ]]);
 
-        self::assertCount(4, $result->transactions);
+        self::assertCount(3, $result->transactions);
 
         $refund = $this->transaction($result->transactions, 'wb:sales-report-detailed:102:refund');
         self::assertSame(TransactionType::REFUND, $refund->type);
         self::assertSame(TransactionDirection::OUT, $refund->direction);
-        self::assertSame(92000, $refund->amountMinor);
-
-        $spp = $this->transaction($result->transactions, 'wb:sales-report-detailed:102:spp_compensation');
-        self::assertSame(TransactionType::BONUS, $spp->type);
-        self::assertSame(TransactionDirection::OUT, $spp->direction);
-        self::assertSame(8000, $spp->amountMinor);
+        self::assertSame(100000, $refund->amountMinor);
 
         $commission = $this->transaction($result->transactions, 'wb:sales-report-detailed:102:commission');
         self::assertSame(TransactionType::COMMISSION, $commission->type);
@@ -195,7 +187,7 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
             'vwNds' => '4.45',
         ]]);
 
-        self::assertSame(3268, $this->transaction($result->transactions, 'wb:sales-report-detailed:110:spp_compensation')->amountMinor);
+        self::assertSame(39968, $this->transaction($result->transactions, 'wb:sales-report-detailed:110:sale')->amountMinor);
         self::assertSame(780, $this->transaction($result->transactions, 'wb:sales-report-detailed:110:commission')->amountMinor);
         self::assertSame(0, $result->rowChecks[0]->deltaMinor);
     }

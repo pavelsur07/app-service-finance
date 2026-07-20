@@ -43,18 +43,19 @@ final class WbFinanceSalesReportDetailedMapperTest extends TestCase
             'sku' => 'sku-1',
         ]]);
 
-        self::assertCount(4, $transactions);
+        self::assertCount(3, $transactions);
 
         $sale = $this->transaction($transactions, 'wb:sales-report-detailed:101:sale');
         self::assertSame(TransactionType::SALE, $sale->type);
         self::assertSame(TransactionDirection::IN, $sale->direction);
-        self::assertSame(92000, $sale->money->amountMinor());
+        self::assertSame(100000, $sale->money->amountMinor());
         self::assertSame('2026-06-21 10:15:00', $sale->occurredAt->format('Y-m-d H:i:s'));
         self::assertSame('UTC', $sale->sourceTz);
         self::assertSame($rawRecord->getFetchedAt(), $sale->externalUpdatedAt);
         self::assertSame('sale-srid', $sale->orderRef);
         self::assertSame('42880202606211', $sale->payoutRef);
         self::assertSame(WbResourceType::FINANCE_SALES_REPORT_DETAILED, $sale->sourceData['_ingestion_resource']);
+        self::assertSame(3, $sale->sourceData['_ingestion_mapper_version']);
         self::assertSame('sale', $sale->sourceData['_ingestion_component']);
         self::assertSame('123', $sale->sourceData['nmId']);
         self::assertSame('sku-1', $sale->sourceData['sku']);
@@ -63,11 +64,6 @@ final class WbFinanceSalesReportDetailedMapperTest extends TestCase
         self::assertSame(TransactionType::COMMISSION, $commission->type);
         self::assertSame(TransactionDirection::OUT, $commission->direction);
         self::assertSame(13000, $commission->money->amountMinor());
-
-        $spp = $this->transaction($transactions, 'wb:sales-report-detailed:101:spp_compensation');
-        self::assertSame(TransactionType::BONUS, $spp->type);
-        self::assertSame(TransactionDirection::IN, $spp->direction);
-        self::assertSame(8000, $spp->money->amountMinor());
 
         $acquiring = $this->transaction($transactions, 'wb:sales-report-detailed:101:acquiring');
         self::assertSame(TransactionType::ACQUIRING, $acquiring->type);

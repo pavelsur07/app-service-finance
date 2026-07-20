@@ -196,15 +196,3 @@ returnLogisticsCost: return_amount
 ```http
 Authorization: <finance-token>
 ```
-
-## LEGACY (ТОЛЬКО ДЛЯ ИСТОРИЧЕСКОЙ СПРАВКИ)
-Старый endpoint (не использовать в активном pipeline):
-```http
-GET /api/v5/supplier/reportDetailByPeriod
-```
-
-Параметры legacy-запроса:
-- `dateFrom`
-- `dateTo`
-- `limit`
-- `rrdid`
