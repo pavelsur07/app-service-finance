@@ -832,6 +832,17 @@ bank API credentials
 production database credentials
 If a task requires environment variables, reference only variable names, not values.
 ---
+## SSH и удалённые операции
+- Не использовать SSH-agent, проброшенный из JetBrains Remote Development.
+- Для Git использовать настроенный в репозитории `core.sshCommand`.
+- SSH-команды выполнять только в неинтерактивном режиме (`BatchMode=yes`).
+- Не запрашивать повторно доступ к SSH-ключу, если проверка `git ls-remote origin HEAD` проходит успешно.
+- Недоступность GitHub или production не должна останавливать текущий Stage:
+  необходимо завершить локальную разработку, self-review и доступные тесты.
+- Если удалённая операция недоступна, зафиксировать блокировку и продолжить всю доступную работу.
+- Запрашивать участие пользователя только на `Release/Production Gate`, если без него невозможно выполнить push или deploy.
+- Не изменять SSH-ключи, права доступа и SSH-конфигурацию без отдельного задания пользователя.
+---
 Production access
 Use the restricted production access path only when the owner explicitly asks for a production check or operation.
 
