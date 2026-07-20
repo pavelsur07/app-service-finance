@@ -163,6 +163,26 @@ final readonly class WbFinanceSalesReportDetailedMapper implements SourceMapperI
             );
         }
 
+        foreach ($preview->validationIssues as $validationIssue) {
+            $issues[] = new MappedPreviewIssue(
+                operationGroupId: $validationIssue->operationGroupId,
+                kind: NormalizationIssueKind::UNKNOWN_FIELD,
+                details: [
+                    'message' => sprintf(
+                        'WB finance row "%s" has invalid canonical input "%s": %s.',
+                        $validationIssue->rowKey,
+                        $validationIssue->field,
+                        $validationIssue->reason,
+                    ),
+                    'check' => 'wb_invalid_canonical_input',
+                    'rowKey' => $validationIssue->rowKey,
+                    'field' => $validationIssue->field,
+                    'reason' => $validationIssue->reason,
+                    'operationGroupId' => $validationIssue->operationGroupId,
+                ],
+            );
+        }
+
         return $issues;
     }
 

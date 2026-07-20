@@ -9,9 +9,10 @@ use App\Ingestion\Application\Command\RecordNormalizationIssueCommand;
 use App\Ingestion\Application\Command\UpsertFinancialTransactionCommand;
 use App\Ingestion\Application\DTO\MappedControlSum;
 use App\Ingestion\Application\DTO\MappedPreviewIssue;
-use App\Ingestion\Application\Service\OzonAccrualStaleProjectionPruner;
 use App\Ingestion\Application\Service\ListingResolverRegistry;
+use App\Ingestion\Application\Service\OzonAccrualStaleProjectionPruner;
 use App\Ingestion\Application\Service\SystemCounterpartyResolver;
+use App\Ingestion\Application\Service\WbFinanceStaleComponentVoider;
 use App\Ingestion\Domain\Contract\PreviewIssueAwareMapperInterface;
 use App\Ingestion\Domain\Contract\RawRecordAwareControlSumMapperInterface;
 use App\Ingestion\Domain\Event\AffectedPeriod;
@@ -42,6 +43,7 @@ final readonly class NormalizeRawRecordAction
         private NormalizationIssueRepository $normalizationIssueRepository,
         private UpsertFinancialTransactionAction $upsertFinancialTransactionAction,
         private OzonAccrualStaleProjectionPruner $ozonAccrualStaleProjectionPruner,
+        private WbFinanceStaleComponentVoider $wbFinanceStaleComponentVoider,
         private RecordNormalizationIssueAction $recordNormalizationIssueAction,
         private EntityManagerInterface $entityManager,
         private EventDispatcherInterface $eventDispatcher,
@@ -61,7 +63,7 @@ final readonly class NormalizeRawRecordAction
                 throw new RawRecordNotFoundException('Raw record not found for requested company.');
             }
 
-            if (RawNormalizationStatus::DONE === $rawRecord->getNormalizationStatus()) {
+            if (RawNormalizationStatus::DONE === $rawRecord->getNormalizationStatus() && !$command->forceReplay) {
                 $connection->commit();
 
                 return;
@@ -148,6 +150,7 @@ final readonly class NormalizeRawRecordAction
                     counterpartyId: $counterpartyId,
                     listingId: $listingResolution?->listingId,
                     listingSku: $listingResolution?->listingSku,
+                    allowSameVersion: $command->forceReplay,
                 ));
 
                 if (null !== $result && $result->affectsFinancialReport) {
@@ -155,6 +158,18 @@ final readonly class NormalizeRawRecordAction
                         shopRef: $rawRecord->getShopRef(),
                         oldOccurredAt: $result->oldOccurredAt,
                         newOccurredAt: $result->newOccurredAt,
+                    );
+                }
+            }
+
+            $this->entityManager->flush();
+
+            if ($command->forceReplay) {
+                foreach ($this->wbFinanceStaleComponentVoider->void($rawRecord, $mappedTransactions) as $affectedAt) {
+                    $affectedPeriods[] = new AffectedPeriod(
+                        shopRef: $rawRecord->getShopRef(),
+                        oldOccurredAt: $affectedAt,
+                        newOccurredAt: $affectedAt,
                     );
                 }
             }

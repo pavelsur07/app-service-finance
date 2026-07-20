@@ -8,8 +8,9 @@ final readonly class WbFinancePreviewResult
 {
     /**
      * @param list<WbFinancePreviewTransaction> $transactions
-     * @param list<WbFinancePreviewRowCheck>    $rowChecks
-     * @param list<WbFinancePreviewUnknownRow>  $unknownRows
+     * @param list<WbFinancePreviewRowCheck> $rowChecks
+     * @param list<WbFinancePreviewUnknownRow> $unknownRows
+     * @param list<WbFinancePreviewValidationIssue> $validationIssues
      */
     public function __construct(
         public array $transactions,
@@ -17,6 +18,7 @@ final readonly class WbFinancePreviewResult
         public array $unknownRows,
         public int $scannedRows,
         public int $emptyRows,
+        public array $validationIssues = [],
     ) {
     }
 }

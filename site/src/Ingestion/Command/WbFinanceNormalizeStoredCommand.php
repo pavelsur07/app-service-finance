@@ -15,7 +15,6 @@ use App\Ingestion\Enum\NormalizationIssueKind;
 use App\Ingestion\Enum\RawNormalizationStatus;
 use App\Ingestion\Message\NormalizeRawRecordMessage;
 use App\Ingestion\Repository\IngestRawRecordRepository;
-use App\Ingestion\Repository\NormalizationIssueRepository;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -37,7 +36,6 @@ final class WbFinanceNormalizeStoredCommand extends Command
     public function __construct(
         private readonly Connection $connection,
         private readonly IngestRawRecordRepository $rawRecordRepository,
-        private readonly NormalizationIssueRepository $normalizationIssueRepository,
         private readonly EntityManagerInterface $entityManager,
         private readonly MessageBusInterface $messageBus,
         private readonly NormalizeRawRecordAction $normalizeRawRecordAction,
@@ -54,6 +52,7 @@ final class WbFinanceNormalizeStoredCommand extends Command
             ->addOption('to', null, InputOption::VALUE_REQUIRED, 'End report date YYYY-MM-DD.')
             ->addOption('shop-ref', null, InputOption::VALUE_REQUIRED, 'Optional shop reference.')
             ->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Raw records to process, 1..500.', 100)
+            ->addOption('include-done', null, InputOption::VALUE_NONE, 'Explicitly include already normalized raw records for force replay.')
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Show selected records without changing them.')
             ->addOption('dispatch', null, InputOption::VALUE_NONE, 'Reset selected records to pending and dispatch async normalization messages.')
             ->addOption('execute-inline', null, InputOption::VALUE_NONE, 'Reset selected records and normalize them synchronously in this process.');
@@ -68,14 +67,18 @@ final class WbFinanceNormalizeStoredCommand extends Command
             [$from, $to] = $this->requiredDateWindow($input);
             $shopRef = $this->optionalStringOption($input, 'shop-ref');
             $limit = $this->intOption($input, 'limit', 1, 500);
+            $includeDone = (bool) $input->getOption('include-done');
             $mode = $this->mode($input);
+            if ($includeDone && 'dispatch' === $mode) {
+                throw new \InvalidArgumentException('--include-done requires --execute-inline so replay intent cannot be lost in the queue.');
+            }
         } catch (\Throwable $exception) {
             $io->error($exception->getMessage());
 
             return Command::FAILURE;
         }
 
-        $rawRecords = $this->rawRecords($companyId, $from, $to, $shopRef, $limit);
+        $rawRecords = $this->rawRecords($companyId, $from, $to, $shopRef, $limit, $includeDone);
 
         $io->title('Wildberries finance stored normalization');
         $this->printRawRecords($io, $rawRecords);
@@ -91,14 +94,14 @@ final class WbFinanceNormalizeStoredCommand extends Command
         }
 
         if ('dispatch' === $mode) {
-            $resultRows = $this->dispatch($companyId, $rawRecords);
+            $resultRows = $this->dispatch($companyId, $rawRecords, $includeDone);
             $this->printActionResult($io, $resultRows);
             $io->success(sprintf('Dispatched %d Wildberries finance raw records for normalization.', count($resultRows)));
 
             return Command::SUCCESS;
         }
 
-        $resultRows = $this->executeInline($companyId, $rawRecords);
+        $resultRows = $this->executeInline($companyId, $rawRecords, $includeDone);
         $this->printActionResult($io, $resultRows);
 
         $failed = array_values(array_filter($resultRows, static fn (array $row): bool => 'done' !== $row['status']));
@@ -122,6 +125,7 @@ final class WbFinanceNormalizeStoredCommand extends Command
         \DateTimeImmutable $to,
         ?string $shopRef,
         int $limit,
+        bool $includeDone,
     ): array {
         $externalReportDate = "substring(r.external_id from '^wb-sales-report-detailed:([0-9]{4}-[0-9]{2}-[0-9]{2}):rrd-[0-9]+$')::date";
         $recordDate = sprintf('COALESCE(j.window_from, %s, DATE(r.fetched_at))', $externalReportDate);
@@ -135,11 +139,16 @@ final class WbFinanceNormalizeStoredCommand extends Command
                 OR (j.window_from IS NULL AND {$recordDate} >= :fromDate AND {$recordDate} <= :toDate)
             )",
         ];
+        $statuses = [RawNormalizationStatus::SKIPPED->value, RawNormalizationStatus::FAILED->value];
+        if ($includeDone) {
+            $statuses[] = RawNormalizationStatus::DONE->value;
+        }
+
         $params = [
             'companyId' => $companyId,
             'source' => IngestSource::WILDBERRIES->value,
             'resourceType' => WbResourceType::FINANCE_SALES_REPORT_DETAILED,
-            'statuses' => [RawNormalizationStatus::SKIPPED->value, RawNormalizationStatus::FAILED->value],
+            'statuses' => $statuses,
             'fromDate' => $from->format('Y-m-d'),
             'toDate' => $to->format('Y-m-d'),
         ];
@@ -180,9 +189,9 @@ final class WbFinanceNormalizeStoredCommand extends Command
      *
      * @return list<array<string, string|int>>
      */
-    private function dispatch(string $companyId, array $rawRecords): array
+    private function dispatch(string $companyId, array $rawRecords, bool $includeDone): array
     {
-        $records = $this->resetSelectedRecordsToPending($companyId, $rawRecords);
+        $records = $this->resetSelectedRecordsToPending($companyId, $rawRecords, $includeDone);
         $this->entityManager->flush();
 
         $resultRows = [];
@@ -192,7 +201,7 @@ final class WbFinanceNormalizeStoredCommand extends Command
                 'rawId' => $record->getId(),
                 'status' => RawNormalizationStatus::PENDING->value,
                 'txCount' => 0,
-                'openIssues' => 0,
+                'openIssues' => $this->openIssueCount($companyId, $record->getId()),
             ];
         }
 
@@ -204,23 +213,22 @@ final class WbFinanceNormalizeStoredCommand extends Command
      *
      * @return list<array<string, string|int>>
      */
-    private function executeInline(string $companyId, array $rawRecords): array
+    private function executeInline(string $companyId, array $rawRecords, bool $includeDone): array
     {
         $resultRows = [];
 
         foreach ($rawRecords as $row) {
             $rawRecordId = (string) $row['id'];
             $record = $this->rawRecordRepository->findByIdAndCompany($rawRecordId, $companyId);
-            if (null === $record || RawNormalizationStatus::DONE === $record->getNormalizationStatus()) {
+            if (null === $record || !$this->canReset($record, $includeDone)) {
                 continue;
             }
 
-            $record->markNormalizationPending();
-            $this->resolveOpenIssues($companyId, $rawRecordId);
+            $this->resetRecordToPending($record);
             $this->entityManager->flush();
 
             try {
-                ($this->normalizeRawRecordAction)(new NormalizeRawRecordCommand($rawRecordId, $companyId));
+                ($this->normalizeRawRecordAction)(new NormalizeRawRecordCommand($rawRecordId, $companyId, forceReplay: $includeDone));
             } catch (\Throwable $exception) {
                 $this->markInlineFailure($record, $exception);
 
@@ -251,21 +259,38 @@ final class WbFinanceNormalizeStoredCommand extends Command
      *
      * @return list<IngestRawRecord>
      */
-    private function resetSelectedRecordsToPending(string $companyId, array $rawRecords): array
+    private function resetSelectedRecordsToPending(string $companyId, array $rawRecords, bool $includeDone): array
     {
         $records = [];
         foreach ($rawRecords as $row) {
             $record = $this->rawRecordRepository->findByIdAndCompany((string) $row['id'], $companyId);
-            if (null === $record || RawNormalizationStatus::DONE === $record->getNormalizationStatus()) {
+            if (null === $record || !$this->canReset($record, $includeDone)) {
                 continue;
             }
 
-            $record->markNormalizationPending();
-            $this->resolveOpenIssues($companyId, $record->getId());
+            $this->resetRecordToPending($record);
             $records[] = $record;
         }
 
         return $records;
+    }
+
+    private function canReset(IngestRawRecord $record, bool $includeDone): bool
+    {
+        if (RawNormalizationStatus::DONE === $record->getNormalizationStatus()) {
+            return $includeDone;
+        }
+
+        return in_array($record->getNormalizationStatus(), [RawNormalizationStatus::SKIPPED, RawNormalizationStatus::FAILED], true);
+    }
+
+    private function resetRecordToPending(IngestRawRecord $record): void
+    {
+        if (RawNormalizationStatus::DONE === $record->getNormalizationStatus()) {
+            $record->markNormalizationFailed();
+        }
+
+        $record->markNormalizationPending();
     }
 
     private function markInlineFailure(IngestRawRecord $record, \Throwable $exception): void
@@ -285,13 +310,6 @@ final class WbFinanceNormalizeStoredCommand extends Command
         $this->entityManager->flush();
     }
 
-    private function resolveOpenIssues(string $companyId, string $rawRecordId): void
-    {
-        foreach ($this->normalizationIssueRepository->findOpenByRawRecord($companyId, $rawRecordId) as $issue) {
-            $issue->markResolved();
-        }
-    }
-
     /**
      * @param list<array<string, mixed>> $rawRecords
      */
@@ -299,7 +317,7 @@ final class WbFinanceNormalizeStoredCommand extends Command
     {
         $io->section('Selected raw records');
         if ([] === $rawRecords) {
-            $io->writeln('No skipped or failed raw records found for the selected period.');
+            $io->writeln('No skipped, failed, or explicitly included done raw records found for the selected period.');
 
             return;
         }

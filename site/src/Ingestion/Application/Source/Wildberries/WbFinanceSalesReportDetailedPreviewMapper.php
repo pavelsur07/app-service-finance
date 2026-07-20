@@ -11,7 +11,9 @@ use Ramsey\Uuid\Uuid;
 final readonly class WbFinanceSalesReportDetailedPreviewMapper
 {
     private const SOURCE_TZ = 'UTC';
+    private const MAPPER_VERSION = 2;
     private const COMPONENT_SALE_PAYOUT_ADJUSTMENT = 'sale_payout_adjustment';
+    private const COMPONENT_SPP_COMPENSATION = 'spp_compensation';
 
     /**
      * @param iterable<array<string, mixed>> $rows
@@ -21,6 +23,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
         $transactions = [];
         $rowChecks = [];
         $unknownRows = [];
+        $validationIssues = [];
         $scannedRows = 0;
         $emptyRows = 0;
 
@@ -41,6 +44,15 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
             $sellerOperName = $this->string($row, 'sellerOperName', 'supplier_oper_name');
             $occurredAt = $this->operationDate($row);
             $rowTransactionsStart = count($transactions);
+
+            foreach ($this->canonicalInputErrors($row, $sellerOperName, $docTypeName) as $field => $reason) {
+                $validationIssues[] = new WbFinancePreviewValidationIssue(
+                    rowKey: $rowKey,
+                    operationGroupId: $operationGroupId,
+                    field: $field,
+                    reason: $reason,
+                );
+            }
 
             $this->collectSaleRefundComponents($transactions, $row, $operationGroupId, $rowKey, $currency, $occurredAt, $sellerOperName, $docTypeName);
             $this->collectCostComponents($transactions, $row, $operationGroupId, $rowKey, $currency, $occurredAt, $sellerOperName, $docTypeName);
@@ -83,12 +95,12 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
             }
         }
 
-        return new WbFinancePreviewResult($transactions, $rowChecks, $unknownRows, $scannedRows, $emptyRows);
+        return new WbFinancePreviewResult($transactions, $rowChecks, $unknownRows, $scannedRows, $emptyRows, $validationIssues);
     }
 
     /**
      * @param list<WbFinancePreviewTransaction> $transactions
-     * @param array<string, mixed>              $row
+     * @param array<string, mixed> $row
      */
     private function collectSaleRefundComponents(
         array &$transactions,
@@ -104,7 +116,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
             return;
         }
 
-        $retailMinor = $this->minor($row, 'retailAmount', 'retail_amount');
+        $retailMinor = abs($this->minor($row, 'retailAmount', 'retail_amount'));
         $forPayMinor = $this->minor($row, 'forPay', 'ppvz_for_pay');
         $acquiringMinor = $this->minor($row, 'acquiringFee', 'acquiring_fee');
         if (
@@ -132,7 +144,10 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
             return;
         }
 
-        $commissionMinor = abs($this->minor($row, 'ppvzVw', 'vw', 'ppvz_vw')) + abs($this->minor($row, 'ppvzVwNds', 'vwNds', 'ppvz_vw_nds'));
+        $grossWithoutSppMinor = abs($this->minor($row, 'retailPriceWithDisc', 'retail_price_withdisc_rub'))
+            * abs((int) $this->string($row, 'quantity'));
+        $commissionMinor = $grossWithoutSppMinor - abs($forPayMinor) - abs($acquiringMinor);
+        $sppCompensationMinor = $grossWithoutSppMinor - $retailMinor;
         $isReturn = $this->isReturn($docTypeName);
 
         if (0 !== $retailMinor) {
@@ -153,6 +168,24 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
             );
         }
 
+        if (0 !== $sppCompensationMinor) {
+            $this->add(
+                transactions: $transactions,
+                operationGroupId: $operationGroupId,
+                rowKey: $rowKey,
+                component: self::COMPONENT_SPP_COMPENSATION,
+                type: TransactionType::BONUS,
+                signedAmountMinor: $isReturn ? -$sppCompensationMinor : $sppCompensationMinor,
+                currency: $currency,
+                occurredAt: $occurredAt,
+                field: 'retailPriceWithDisc*quantity-retailAmount',
+                sellerOperName: $sellerOperName,
+                docTypeName: $docTypeName,
+                description: 'WB SPP compensation',
+                row: $row,
+            );
+        }
+
         if (0 !== $commissionMinor) {
             $this->add(
                 transactions: $transactions,
@@ -160,10 +193,10 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
                 rowKey: $rowKey,
                 component: 'commission',
                 type: TransactionType::COMMISSION,
-                signedAmountMinor: $isReturn ? abs($commissionMinor) : -abs($commissionMinor),
+                signedAmountMinor: $isReturn ? $commissionMinor : -$commissionMinor,
                 currency: $currency,
                 occurredAt: $occurredAt,
-                field: 'ppvzVw+ppvzVwNds',
+                field: 'retailPriceWithDisc*quantity-forPay-acquiringFee',
                 sellerOperName: $sellerOperName,
                 docTypeName: $docTypeName,
                 description: 'WB marketplace commission',
@@ -192,7 +225,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
 
     /**
      * @param list<WbFinancePreviewTransaction> $transactions
-     * @param array<string, mixed>              $row
+     * @param array<string, mixed> $row
      */
     private function collectCostComponents(
         array &$transactions,
@@ -242,7 +275,9 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
         $this->addCostField($transactions, $row, $operationGroupId, $rowKey, $currency, $occurredAt, $sellerOperName, $docTypeName, 'penalty', TransactionType::PENALTY, 'penalty', null, 'WB penalty');
         $this->addCostField($transactions, $row, $operationGroupId, $rowKey, $currency, $occurredAt, $sellerOperName, $docTypeName, 'deduction', TransactionType::ADJUSTMENT, 'deduction', null, 'WB deduction');
         $this->addCostField($transactions, $row, $operationGroupId, $rowKey, $currency, $occurredAt, $sellerOperName, $docTypeName, 'warehouse_logistics', TransactionType::LOGISTICS, 'rebillLogisticCost', 'rebill_logistic_cost', 'WB warehouse logistics');
-        $this->addCostField($transactions, $row, $operationGroupId, $rowKey, $currency, $occurredAt, $sellerOperName, $docTypeName, 'pvz_processing', TransactionType::LOGISTICS, 'ppvzReward', 'ppvz_reward', 'WB PVZ processing');
+        if ($this->isPvzProcessing($sellerOperName)) {
+            $this->addCostField($transactions, $row, $operationGroupId, $rowKey, $currency, $occurredAt, $sellerOperName, $docTypeName, 'pvz_processing', TransactionType::LOGISTICS, 'ppvzReward', 'ppvz_reward', 'WB PVZ processing');
+        }
 
         $additionalPaymentMinor = $this->minor($row, 'additionalPayment', 'additional_payment');
         if (0 !== $additionalPaymentMinor) {
@@ -285,7 +320,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
 
     /**
      * @param list<WbFinancePreviewTransaction> $transactions
-     * @param array<string, mixed>              $row
+     * @param array<string, mixed> $row
      */
     private function addCostField(
         array &$transactions,
@@ -329,7 +364,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
 
     /**
      * @param list<WbFinancePreviewTransaction> $transactions
-     * @param array<string, mixed>              $row
+     * @param array<string, mixed> $row
      */
     private function addCost(
         array &$transactions,
@@ -364,6 +399,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
         return array_values(array_filter(
             $transactions,
             static fn (WbFinancePreviewTransaction $transaction): bool => self::COMPONENT_SALE_PAYOUT_ADJUSTMENT === $transaction->component
+                || self::COMPONENT_SPP_COMPENSATION === $transaction->component
                 || in_array(
                     $transaction->type,
                     [TransactionType::SALE, TransactionType::REFUND, TransactionType::COMMISSION, TransactionType::ACQUIRING],
@@ -374,7 +410,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
 
     /**
      * @param list<WbFinancePreviewTransaction> $transactions
-     * @param array<string, mixed>              $row
+     * @param array<string, mixed> $row
      */
     private function add(
         array &$transactions,
@@ -411,6 +447,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
             description: $description,
             sourceData: [
                 '_ingestion_resource' => WbResourceType::FINANCE_SALES_REPORT_DETAILED,
+                '_ingestion_mapper_version' => self::MAPPER_VERSION,
                 '_ingestion_component' => $component,
                 '_ingestion_field' => $field,
                 '_ingestion_source_key' => sprintf('wb:sales-report-detailed:%s:%s', $this->normalizeComponent($rowKey), $component),
@@ -418,6 +455,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
                 'reportId' => $this->string($row, 'reportId', 'realizationreport_id'),
                 'sellerOperName' => $sellerOperName,
                 'docTypeName' => $docTypeName,
+                'quantity' => $this->raw($row, 'quantity'),
                 'srid' => $this->string($row, 'srid'),
                 'nmId' => $this->string($row, 'nmId', 'nm_id'),
                 'sku' => $this->string($row, 'sku', 'barcode'),
@@ -525,9 +563,34 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
         return 0 !== $this->minor($row, 'retailPriceWithDisc', 'retail_price_withdisc_rub')
             || 0 !== $this->minor($row, 'retailAmount', 'retail_amount')
             || 0 !== $this->minor($row, 'forPay', 'ppvz_for_pay')
-            || 0 !== $this->minor($row, 'acquiringFee', 'acquiring_fee')
-            || 0 !== $this->minor($row, 'ppvzVw', 'vw', 'ppvz_vw')
-            || 0 !== $this->minor($row, 'ppvzVwNds', 'vwNds', 'ppvz_vw_nds');
+            || 0 !== $this->minor($row, 'acquiringFee', 'acquiring_fee');
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     *
+     * @return array<string, string>
+     */
+    private function canonicalInputErrors(array $row, string $sellerOperName, string $docTypeName): array
+    {
+        if (
+            !$this->isSaleOrReturn($docTypeName)
+            || !$this->hasPayoutCheckFields($row)
+            || $this->isSalePayoutAdjustment($sellerOperName, $docTypeName)
+        ) {
+            return [];
+        }
+
+        $errors = [];
+        $quantity = trim((string) ($this->raw($row, 'quantity') ?? ''));
+        if (1 !== preg_match('/^-?[1-9]\d*$/', $quantity)) {
+            $errors['quantity'] = 'must be a non-zero integer';
+        }
+        if (0 === $this->minor($row, 'retailPriceWithDisc', 'retail_price_withdisc_rub')) {
+            $errors['retailPriceWithDisc'] = 'must be a non-zero money value';
+        }
+
+        return $errors;
     }
 
     private function isSale(string $docTypeName): bool
@@ -551,6 +614,11 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
             ['коррекция продаж', 'добровольная компенсация при возврате'],
             true,
         );
+    }
+
+    private function isPvzProcessing(string $sellerOperName): bool
+    {
+        return 'возмещение за выдачу и возврат товаров на пвз' === mb_strtolower(trim($sellerOperName));
     }
 
     /**

@@ -67,6 +67,29 @@ gross_without_spp = retailPriceWithDisc × abs(quantity)
 в finance API `forPay` считается с учётом СПП-компенсаций WB и сумма не сходится
 с ценой продавца (проверено на PROD: 0 совпадений из 2423 строк за июнь 2026).
 
+### Каноническая декомпозиция Ingestion
+
+Для товарной строки Ingestion сохраняет отдельно сумму покупателя, компенсацию
+СПП, комиссию и эквайринг:
+
+```text
+gross_without_spp = abs(retailPriceWithDisc) × abs(quantity)
+spp_compensation = gross_without_spp − abs(retailAmount)
+commission = gross_without_spp − abs(forPay) − abs(acquiringFee)
+
+Продажа: retailAmount + spp_compensation − commission − acquiringFee = forPay
+Возврат: −retailAmount − spp_compensation + commission + acquiringFee = −forPay
+```
+
+- `retailAmount` → `SALE`/`REFUND`;
+- `spp_compensation` → отдельный компонент `BONUS`;
+- `commission` → `COMMISSION`;
+- `acquiringFee` → `ACQUIRING`;
+- `vw`/`vwNds` сохраняются только для аудита в `sourceData`;
+- `ppvzReward` → `LOGISTICS/pvz_processing` только на строках операции
+  «Возмещение за выдачу и возврат товаров на ПВЗ» и не входит в товарное
+  тождество `forPay`.
+
 ## ПРАВИЛА ЗНАКОВ ДЛЯ УЧЁТА
 - Продажа: комиссия и эквайринг учитываются как расход (`CHARGE`).
 - Возврат: комиссия и эквайринг учитываются как сторно расхода (`STORNO`).

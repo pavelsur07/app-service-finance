@@ -32,6 +32,7 @@ final class WbFinanceNormalizationFlowTest extends IntegrationTestCase
             'currency' => 'RUB',
             'docTypeName' => 'Продажа',
             'sellerOperName' => 'Продажа',
+            'quantity' => 1,
             'saleDt' => '2026-06-21T10:15:00Z',
             'retailPriceWithDisc' => '1000.00',
             'retailAmount' => '920.00',
@@ -59,7 +60,7 @@ final class WbFinanceNormalizationFlowTest extends IntegrationTestCase
         /** @var FinancialTransactionRepository $transactionRepository */
         $transactionRepository = self::getContainer()->get(FinancialTransactionRepository::class);
         $transactions = $transactionRepository->findByRawRecordId($companyId, $record->getId());
-        self::assertCount(4, $transactions);
+        self::assertCount(5, $transactions);
 
         $byExternalId = [];
         foreach ($transactions as $transaction) {
@@ -76,7 +77,12 @@ final class WbFinanceNormalizationFlowTest extends IntegrationTestCase
 
         self::assertArrayHasKey('wb:sales-report-detailed:101:commission', $byExternalId);
         self::assertSame(TransactionDirection::OUT, $byExternalId['wb:sales-report-detailed:101:commission']->getDirection());
-        self::assertSame(5000, $byExternalId['wb:sales-report-detailed:101:commission']->getAmountMinor());
+        self::assertSame(13000, $byExternalId['wb:sales-report-detailed:101:commission']->getAmountMinor());
+
+        self::assertArrayHasKey('wb:sales-report-detailed:101:spp_compensation', $byExternalId);
+        self::assertSame(TransactionType::BONUS, $byExternalId['wb:sales-report-detailed:101:spp_compensation']->getType());
+        self::assertSame(TransactionDirection::IN, $byExternalId['wb:sales-report-detailed:101:spp_compensation']->getDirection());
+        self::assertSame(8000, $byExternalId['wb:sales-report-detailed:101:spp_compensation']->getAmountMinor());
 
         self::assertArrayHasKey('wb:sales-report-detailed:101:acquiring', $byExternalId);
         self::assertSame(TransactionDirection::OUT, $byExternalId['wb:sales-report-detailed:101:acquiring']->getDirection());
@@ -125,7 +131,7 @@ final class WbFinanceNormalizationFlowTest extends IntegrationTestCase
         self::assertSame(['forPay'], $issues[0]->getDetails()['nonZeroFields']);
     }
 
-    public function testPayoutMismatchRowsNormalizeWithSumMismatchIssue(): void
+    public function testNegativeCommissionUsesReverseDirectionWithoutFalseMismatch(): void
     {
         $companyId = Uuid::uuid7()->toString();
         $record = $this->storeRawRecord($companyId, [[
@@ -133,6 +139,7 @@ final class WbFinanceNormalizationFlowTest extends IntegrationTestCase
             'currency' => 'RUB',
             'docTypeName' => 'Продажа',
             'sellerOperName' => 'Продажа',
+            'quantity' => 1,
             'saleDt' => '2026-06-21T10:15:00Z',
             'retailPriceWithDisc' => '1000.00',
             'retailAmount' => '1000.00',
@@ -155,16 +162,18 @@ final class WbFinanceNormalizationFlowTest extends IntegrationTestCase
         /** @var FinancialTransactionRepository $transactionRepository */
         $transactionRepository = self::getContainer()->get(FinancialTransactionRepository::class);
         $transactions = $transactionRepository->findByRawRecordId($companyId, $record->getId());
-        self::assertCount(1, $transactions);
-        self::assertSame(100000, $transactions[0]->getAmountMinor());
+        self::assertCount(2, $transactions);
+        $byType = [];
+        foreach ($transactions as $transaction) {
+            $byType[$transaction->getType()->value] = $transaction;
+        }
+        self::assertSame(100000, $byType[TransactionType::SALE->value]->getAmountMinor());
+        self::assertSame(TransactionDirection::IN, $byType[TransactionType::COMMISSION->value]->getDirection());
+        self::assertSame(10000, $byType[TransactionType::COMMISSION->value]->getAmountMinor());
 
         /** @var NormalizationIssueRepository $issueRepository */
         $issueRepository = self::getContainer()->get(NormalizationIssueRepository::class);
-        $issues = $issueRepository->findOpenByRawRecord($companyId, $record->getId());
-        self::assertCount(1, $issues);
-        self::assertSame(NormalizationIssueKind::SUM_MISMATCH, $issues[0]->getKind());
-        self::assertSame('wb_payout_check', $issues[0]->getDetails()['check']);
-        self::assertSame(-10000, $issues[0]->getDetails()['deltaMinor']);
+        self::assertSame([], $issueRepository->findOpenByRawRecord($companyId, $record->getId()));
     }
 
     public function testEmptyWildberriesFinanceRawRecordNormalizesWithoutTransactions(): void
