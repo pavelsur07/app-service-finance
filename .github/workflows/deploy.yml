@@ -350,6 +350,108 @@ jobs:
                   MESSENGER_TRANSPORT_DSN: "redis://127.0.0.1:6379/messages"
               run: php bin/console doctrine:migrations:migrate --no-interaction
 
+    # 4.1 CS-CHECK — php-cs-fixer dry-run, только при изменении бэкенда.
+    cs-check:
+        name: 🧹 CS check
+        needs: changes
+        if: ${{ needs.changes.outputs.backend == 'true' }}
+        runs-on: ubuntu-latest
+        steps:
+            - name: 📦 Checkout repository
+              uses: actions/checkout@v4
+
+            - name: 🐘 Setup PHP
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: 8.3
+                  tools: composer
+
+            - name: 📦 Install dependencies
+              working-directory: site
+              run: composer install --no-interaction --prefer-dist --no-progress --no-scripts
+
+            - name: 🧹 Run cs:check
+              working-directory: site
+              run: composer cs:check
+
+    # 4.2 ИНТЕГРАЦИОННЫЕ И ФУНКЦИОНАЛЬНЫЕ ТЕСТЫ — на реальной БД, только при изменении бэкенда.
+    #     Unit-тесты уже покрыты job'ом unit-tests (docker, composer test:unit) — здесь не дублируются.
+    backend-tests:
+        name: 🧪 Integration & functional tests
+        needs: changes
+        if: ${{ needs.changes.outputs.backend == 'true' }}
+        runs-on: ubuntu-latest
+        services:
+            postgres:
+                image: postgres:15-alpine
+                env:
+                    POSTGRES_DB: app
+                    POSTGRES_USER: app
+                    POSTGRES_PASSWORD: app
+                ports:
+                    - 5432:5432
+                options: >-
+                    --health-cmd="pg_isready -U app -d app"
+                    --health-interval=10s
+                    --health-timeout=5s
+                    --health-retries=5
+            redis:
+                image: redis:7-alpine
+                ports:
+                    - "6379:6379"
+                options: >-
+                    --health-cmd="redis-cli ping"
+                    --health-interval=10s
+                    --health-timeout=5s
+                    --health-retries=10
+
+        steps:
+            - name: 📦 Checkout repository
+              uses: actions/checkout@v4
+
+            - name: 🐘 Setup PHP
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: 8.3
+                  tools: composer
+
+            - name: 📦 Install dependencies
+              working-directory: site
+              run: composer install --no-interaction --prefer-dist --no-progress --no-scripts
+
+            - name: Install psql client
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y postgresql-client
+
+            - name: Create test database (app_test)
+              env:
+                  PGPASSWORD: app
+              run: psql -h 127.0.0.1 -p 5432 -U app -d postgres -c "CREATE DATABASE app_test"
+
+            - name: 🧬 Run Doctrine migrations
+              working-directory: site
+              env: &backend_tests_env
+                  APP_ENV: test
+                  APP_DEBUG: 0
+                  DATABASE_URL: "pgsql://app:app@127.0.0.1:5432/app_test?serverVersion=15&charset=utf8"
+                  REDIS_DSN: "redis://127.0.0.1:6379"
+                  MESSENGER_TRANSPORT_DSN_SYNC: "redis://127.0.0.1:6379/messages_sync"
+                  MESSENGER_TRANSPORT_DSN_PIPELINE: "redis://127.0.0.1:6379/messages_pipeline"
+                  MESSENGER_TRANSPORT_DSN_ADS: "redis://127.0.0.1:6379/messages_ads"
+                  MESSENGER_TRANSPORT_DSN_WB_FINANCE: "redis://127.0.0.1:6379/messages_wb_finance"
+              run: php bin/console doctrine:migrations:migrate --no-interaction
+
+            - name: 🧪 Run integration tests
+              working-directory: site
+              env: *backend_tests_env
+              run: composer test:integration
+
+            - name: 🧪 Run functional tests
+              working-directory: site
+              env: *backend_tests_env
+              run: composer test:functional
+
     # 5. ПРОВЕРКА СИНХРОНИЗАЦИИ API-ТИПОВ — при изменении бэкенда или фронта.
     api-types-check:
         name: 🔍 Check API types sync
