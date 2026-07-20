@@ -59,12 +59,14 @@ final readonly class PnlCategoryResolver
                 TransactionType::SALE => 'INGESTION_SALE',
                 TransactionType::REFUND => 'INGESTION_REFUND_IN',
                 TransactionType::BONUS => 'INGESTION_BONUS',
+                TransactionType::COMMISSION => 'INGESTION_COMMISSION',
                 default => self::OTHER_INCOME_CODE,
             };
         }
 
         return match ($type) {
             TransactionType::COMMISSION => 'INGESTION_COMMISSION',
+            TransactionType::BONUS => 'INGESTION_BONUS',
             TransactionType::LOGISTICS => 'INGESTION_LOGISTICS',
             TransactionType::STORAGE => 'INGESTION_STORAGE',
             TransactionType::LAST_MILE => 'INGESTION_LAST_MILE',

@@ -30,6 +30,7 @@ final class WbFinanceSalesReportDetailedMapperTest extends TestCase
             'currency' => 'RUB',
             'docTypeName' => 'Продажа',
             'sellerOperName' => 'Продажа',
+            'quantity' => 1,
             'saleDt' => '2026-06-21T10:15:00Z',
             'retailPriceWithDisc' => '1000.00',
             'retailAmount' => '920.00',
@@ -42,7 +43,7 @@ final class WbFinanceSalesReportDetailedMapperTest extends TestCase
             'sku' => 'sku-1',
         ]]);
 
-        self::assertCount(3, $transactions);
+        self::assertCount(4, $transactions);
 
         $sale = $this->transaction($transactions, 'wb:sales-report-detailed:101:sale');
         self::assertSame(TransactionType::SALE, $sale->type);
@@ -61,7 +62,12 @@ final class WbFinanceSalesReportDetailedMapperTest extends TestCase
         $commission = $this->transaction($transactions, 'wb:sales-report-detailed:101:commission');
         self::assertSame(TransactionType::COMMISSION, $commission->type);
         self::assertSame(TransactionDirection::OUT, $commission->direction);
-        self::assertSame(5000, $commission->money->amountMinor());
+        self::assertSame(13000, $commission->money->amountMinor());
+
+        $spp = $this->transaction($transactions, 'wb:sales-report-detailed:101:spp_compensation');
+        self::assertSame(TransactionType::BONUS, $spp->type);
+        self::assertSame(TransactionDirection::IN, $spp->direction);
+        self::assertSame(8000, $spp->money->amountMinor());
 
         $acquiring = $this->transaction($transactions, 'wb:sales-report-detailed:101:acquiring');
         self::assertSame(TransactionType::ACQUIRING, $acquiring->type);
@@ -76,6 +82,7 @@ final class WbFinanceSalesReportDetailedMapperTest extends TestCase
             'currency' => 'RUB',
             'docTypeName' => 'Продажа',
             'sellerOperName' => 'Продажа',
+            'quantity' => 1,
             'saleDt' => '2026-06-21T10:15:00Z',
             'retailPriceWithDisc' => '1000.00',
             'retailAmount' => '920.00',
@@ -87,7 +94,7 @@ final class WbFinanceSalesReportDetailedMapperTest extends TestCase
 
         self::assertCount(1, $controlSums);
         self::assertSame('RUB', $controlSums[0]->currency);
-        self::assertSame(99000, $controlSums[0]->amountMinor);
+        self::assertSame(115000, $controlSums[0]->amountMinor);
     }
 
     public function testMapsSalePayoutAdjustmentRowsWithoutPayoutMismatch(): void
@@ -128,7 +135,7 @@ final class WbFinanceSalesReportDetailedMapperTest extends TestCase
         self::assertSame(19722, $compensation->money->amountMinor());
     }
 
-    public function testPayoutMismatchStillMapsAndIsReportedAsPreviewIssue(): void
+    public function testNegativeCommissionMapsWithReverseDirectionWithoutPreviewIssue(): void
     {
         $rawRecord = $this->rawRecord();
         $rows = [[
@@ -136,6 +143,7 @@ final class WbFinanceSalesReportDetailedMapperTest extends TestCase
             'currency' => 'RUB',
             'docTypeName' => 'Продажа',
             'sellerOperName' => 'Продажа',
+            'quantity' => 1,
             'saleDt' => '2026-06-21T10:15:00Z',
             'retailPriceWithDisc' => '1000.00',
             'retailAmount' => '1000.00',
@@ -146,18 +154,13 @@ final class WbFinanceSalesReportDetailedMapperTest extends TestCase
         ]];
 
         $transactions = $this->mapper()->map($rawRecord, $rows);
-        self::assertCount(1, $transactions);
+        self::assertCount(2, $transactions);
         self::assertSame(100000, $this->transaction($transactions, 'wb:sales-report-detailed:102:sale')->money->amountMinor());
+        $commission = $this->transaction($transactions, 'wb:sales-report-detailed:102:commission');
+        self::assertSame(TransactionDirection::IN, $commission->direction);
+        self::assertSame(10000, $commission->money->amountMinor());
 
-        $issues = $this->mapper()->previewIssues($rawRecord, $rows);
-        self::assertCount(1, $issues);
-        self::assertSame(NormalizationIssueKind::SUM_MISMATCH, $issues[0]->kind);
-        self::assertNotNull($issues[0]->operationGroupId);
-        self::assertSame('wb_payout_check', $issues[0]->details['check']);
-        self::assertSame('102', $issues[0]->details['rowKey']);
-        self::assertSame(110000, $issues[0]->details['expectedAmountMinor']);
-        self::assertSame(100000, $issues[0]->details['actualAmountMinor']);
-        self::assertSame(-10000, $issues[0]->details['deltaMinor']);
+        self::assertSame([], $this->mapper()->previewIssues($rawRecord, $rows));
     }
 
     public function testUnknownRowsWithNonZeroAmountsStillMapAndAreReportedAsPreviewIssue(): void
@@ -189,6 +192,7 @@ final class WbFinanceSalesReportDetailedMapperTest extends TestCase
             'currency' => 'RUB',
             'docTypeName' => 'Продажа',
             'sellerOperName' => 'Продажа',
+            'quantity' => 1,
             'saleDt' => '2026-06-21T10:15:00Z',
             'retailPriceWithDisc' => '1000.00',
             'retailAmount' => '920.00',
@@ -197,6 +201,33 @@ final class WbFinanceSalesReportDetailedMapperTest extends TestCase
             'ppvzVw' => '40.00',
             'ppvzVwNds' => '10.00',
         ]]));
+    }
+
+    public function testInvalidCanonicalInputsAreReportedEvenWhenPayoutIdentityBalances(): void
+    {
+        $issues = $this->mapper()->previewIssues($this->rawRecord(), [[
+            'rrdId' => 111,
+            'currency' => 'RUB',
+            'docTypeName' => 'Продажа',
+            'sellerOperName' => 'Продажа',
+            'quantity' => 'not-a-number',
+            'saleDt' => '2026-06-21T10:15:00Z',
+            'retailPriceWithDisc' => '0',
+            'retailAmount' => '920.00',
+            'forPay' => '850.00',
+            'acquiringFee' => '20.00',
+        ]]);
+
+        self::assertCount(2, $issues);
+        self::assertSame(['quantity', 'retailPriceWithDisc'], array_column(array_map(
+            static fn ($issue): array => $issue->details,
+            $issues,
+        ), 'field'));
+        foreach ($issues as $issue) {
+            self::assertSame(NormalizationIssueKind::UNKNOWN_FIELD, $issue->kind);
+            self::assertSame('wb_invalid_canonical_input', $issue->details['check']);
+            self::assertNotNull($issue->operationGroupId);
+        }
     }
 
     /**

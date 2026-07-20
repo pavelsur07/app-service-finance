@@ -192,8 +192,9 @@ class FinancialTransaction implements TenantOwnedInterface
         string $rawRecordId,
         ?string $listingId = null,
         ?string $listingSku = null,
+        bool $allowSameVersion = false,
     ): void {
-        if ($externalUpdatedAt <= $this->externalUpdatedAt) {
+        if ($allowSameVersion ? $externalUpdatedAt < $this->externalUpdatedAt : $externalUpdatedAt <= $this->externalUpdatedAt) {
             throw new StaleTransactionUpdateException('Incoming transaction version is not newer than existing version.');
         }
 
@@ -220,6 +221,23 @@ class FinancialTransaction implements TenantOwnedInterface
         $this->sourceData = $sourceData;
         $this->rawRecordId = $rawRecordId;
         $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function voidForReplay(string $reason): bool
+    {
+        Assert::notEmpty($reason);
+
+        if ('0' === $this->amountMinor && true === ($this->sourceData['_ingestion_voided'] ?? false)) {
+            return false;
+        }
+
+        $this->oldOccurredAt = $this->occurredAt;
+        $this->amountMinor = '0';
+        $this->sourceData['_ingestion_voided'] = true;
+        $this->sourceData['_ingestion_void_reason'] = $reason;
+        $this->updatedAt = new \DateTimeImmutable();
+
+        return true;
     }
 
     public function reattributeRawRecord(string $rawRecordId, \DateTimeImmutable $externalUpdatedAt): bool

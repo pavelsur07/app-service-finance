@@ -103,6 +103,7 @@ final readonly class UpsertFinancialTransactionAction
                 rawRecordId: $command->rawRecordId,
                 listingId: $command->listingId,
                 listingSku: $command->listingSku,
+                allowSameVersion: $command->allowSameVersion,
             );
         } catch (StaleTransactionUpdateException) {
             return null;
