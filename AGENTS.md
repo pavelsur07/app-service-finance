@@ -439,7 +439,7 @@ claude -p \
     "mcp__*" \
   --strict-mcp-config \
   --no-session-persistence \
-  --max-turns 20 \
+  --max-turns 120 \
   --output-format text \
   "Perform an independent senior code review of the current task diff.
 
