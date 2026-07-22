@@ -2,6 +2,8 @@
 
 namespace App\Cash\Message;
 
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleApplyMode;
+
 final readonly class EnqueueAutoRulesForRange
 {
     /**
@@ -13,6 +15,8 @@ final readonly class EnqueueAutoRulesForRange
         public ?\DateTimeImmutable $to = null,
         public ?array $moneyAccountIds = null,
         public ?string $correlationId = null,
+        public CashTransactionAutoRuleApplyMode $mode = CashTransactionAutoRuleApplyMode::SAFE,
+        public ?string $initiatedByUserId = null,
     ) {
     }
 
@@ -23,5 +27,7 @@ final readonly class EnqueueAutoRulesForRange
         $this->to = $data['to'] ?? null;
         $this->moneyAccountIds = $data['moneyAccountIds'] ?? null;
         $this->correlationId = $data['correlationId'] ?? null;
+        $this->mode = $data['mode'] ?? CashTransactionAutoRuleApplyMode::SAFE;
+        $this->initiatedByUserId = $data['initiatedByUserId'] ?? null;
     }
 }

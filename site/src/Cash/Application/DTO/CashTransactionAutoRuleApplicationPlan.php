@@ -6,6 +6,7 @@ namespace App\Cash\Application\DTO;
 
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleApplyMode;
 use App\Cash\Enum\Transaction\CashTransactionAutoRulePairIssue;
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
@@ -33,9 +34,11 @@ final readonly class CashTransactionAutoRuleApplicationPlan
         return [] !== $this->changes;
     }
 
-    /** @return array{correlationId: string, autoRules: array<string, array{id: ?string, revision: int}>, changes: array<string, array{before: ?string, after: ?string}>} */
-    public function auditDiff(string $correlationId): array
-    {
+    /** @return array{correlationId: string, mode: string, autoRules: array<string, array{id: ?string, revision: int}>, changes: array<string, array{before: ?string, after: ?string}>} */
+    public function auditDiff(
+        string $correlationId,
+        CashTransactionAutoRuleApplyMode $mode = CashTransactionAutoRuleApplyMode::SAFE,
+    ): array {
         $rulesByField = $this->rulesByField;
         if ([] === $rulesByField) {
             foreach (array_keys($this->changes) as $field) {
@@ -45,6 +48,7 @@ final readonly class CashTransactionAutoRuleApplicationPlan
 
         return [
             'correlationId' => $correlationId,
+            'mode' => $mode->value,
             'autoRules' => array_map(
                 static fn (CashTransactionAutoRule $rule): array => [
                     'id' => $rule->getId(),

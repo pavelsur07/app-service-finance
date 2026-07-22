@@ -6,12 +6,14 @@ namespace App\Tests\Integration\Cash\MessageHandler;
 
 use App\Cash\Application\DTO\CashTransactionAutoRuleMatchResult;
 use App\Cash\Application\Service\AutoRuleDispatchGuard;
+use App\Cash\Application\Service\CashTransactionAutoRuleProvenanceResolver;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleApplyMode;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleSkipReason;
 use App\Cash\Message\ApplyAutoRulesForTransaction;
@@ -24,6 +26,7 @@ use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
 use App\Company\Entity\ProjectDirection;
 use App\Shared\Entity\AuditLog;
+use App\Shared\Enum\AuditLogAction;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -62,6 +65,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             $autoRuleService,
             self::getContainer()->get(CashflowSystemCategoryService::class),
             self::getContainer()->get(AutoRuleDispatchGuard::class),
+            self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class),
             $logger,
         );
 
@@ -102,6 +106,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             $autoRuleService,
             self::getContainer()->get(CashflowSystemCategoryService::class),
             self::getContainer()->get(AutoRuleDispatchGuard::class),
+            self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class),
             new NullLogger(),
         );
 
@@ -143,6 +148,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             $autoRuleService,
             $cashflowSystemCategoryService,
             self::getContainer()->get(AutoRuleDispatchGuard::class),
+            self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class),
             new NullLogger(),
         );
 
@@ -234,6 +240,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             self::getContainer()->get(CashTransactionAutoRuleService::class),
             self::getContainer()->get(CashflowSystemCategoryService::class),
             self::getContainer()->get(AutoRuleDispatchGuard::class),
+            self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class),
             $logger,
         );
         $correlationId = Uuid::uuid7()->toString();
@@ -262,6 +269,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
         self::assertSame([$correlationId, $correlationId], $loggedCorrelationIds);
         self::assertSame([
             'correlationId' => $correlationId,
+            'mode' => CashTransactionAutoRuleApplyMode::SAFE->value,
             'autoRules' => [
                 'cashflowCategory' => [
                     'id' => $rule->getId(),
@@ -316,6 +324,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             self::getContainer()->get(CashTransactionAutoRuleService::class),
             self::getContainer()->get(CashflowSystemCategoryService::class),
             self::getContainer()->get(AutoRuleDispatchGuard::class),
+            self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class),
             new NullLogger(),
         );
 
@@ -367,6 +376,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             self::getContainer()->get(CashTransactionAutoRuleService::class),
             self::getContainer()->get(CashflowSystemCategoryService::class),
             self::getContainer()->get(AutoRuleDispatchGuard::class),
+            self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class),
             new NullLogger(),
         );
         $correlationId = Uuid::uuid7()->toString();
@@ -392,6 +402,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
         self::assertCount(1, $applicationAudits);
         self::assertSame([
             'correlationId' => $correlationId,
+            'mode' => CashTransactionAutoRuleApplyMode::SAFE->value,
             'autoRules' => [
                 'projectDirection' => ['id' => $rule->getId(), 'revision' => 1],
                 'responsibilityCenterId' => ['id' => $rule->getId(), 'revision' => 1],
@@ -401,6 +412,149 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
                 'responsibilityCenterId' => ['before' => null, 'after' => $center->getId()],
             ],
         ], $applicationAudits[0]->getDiff());
+    }
+
+    public function testUnsafeModeReplacesAutoAssignedCategoryAndKeepsActorInAudit(): void
+    {
+        $user = UserBuilder::aUser()->withIndex(1)->build();
+        $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+        $account = MoneyAccountBuilder::aMoneyAccount()->forCompany($company)->build();
+        $oldCategory = (new CashflowCategory(Uuid::uuid4()->toString(), $company))->setName('Старая');
+        $newCategory = (new CashflowCategory(Uuid::uuid4()->toString(), $company))->setName('Новая');
+        $rule = new CashTransactionAutoRule(
+            Uuid::uuid4()->toString(),
+            $company,
+            'Новое правило',
+            CashTransactionAutoRuleAction::FILL,
+            CashTransactionAutoRuleOperationType::ANY,
+            $newCategory,
+        );
+        $transaction = $this->createTransaction($company, $account)->setCashflowCategory($oldCategory);
+
+        foreach ([$user, $company, $account, $oldCategory, $newCategory, $rule, $transaction] as $entity) {
+            $this->em->persist($entity);
+        }
+        $this->em->flush();
+        $this->em->persist(new AuditLog(
+            (string) $company->getId(),
+            CashTransaction::class,
+            (string) $transaction->getId(),
+            AuditLogAction::UPDATE,
+            [
+                'autoRules' => [
+                    'cashflowCategory' => ['id' => Uuid::uuid4()->toString(), 'revision' => 1],
+                ],
+                'changes' => [
+                    'cashflowCategory' => ['before' => null, 'after' => $oldCategory->getId()],
+                ],
+            ],
+            createdAt: new \DateTimeImmutable('+1 minute'),
+        ));
+        $this->em->flush();
+
+        $handler = new ApplyAutoRulesForTransactionHandler(
+            $this->em,
+            self::getContainer()->get(CashTransactionRepository::class),
+            self::getContainer()->get(CashTransactionAutoRuleService::class),
+            self::getContainer()->get(CashflowSystemCategoryService::class),
+            self::getContainer()->get(AutoRuleDispatchGuard::class),
+            self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class),
+            new NullLogger(),
+        );
+        $handler(new ApplyAutoRulesForTransaction(
+            (string) $transaction->getId(),
+            (string) $company->getId(),
+            new \DateTimeImmutable(),
+            Uuid::uuid7()->toString(),
+            CashTransactionAutoRuleApplyMode::REPLACE_AUTO_ASSIGNED,
+            (string) $user->getId(),
+        ));
+
+        $reloaded = $this->em->find(CashTransaction::class, $transaction->getId());
+        self::assertSame($newCategory->getId(), $reloaded?->getCashflowCategory()?->getId());
+        $replacementAudits = array_values(array_filter(
+            $this->em->getRepository(AuditLog::class)->findBy(['entityId' => $transaction->getId()]),
+            static fn (AuditLog $audit): bool => $newCategory->getId()
+                === ($audit->getDiff()['changes']['cashflowCategory']['after'] ?? null),
+        ));
+        self::assertCount(1, $replacementAudits);
+        self::assertSame($user->getId(), $replacementAudits[0]->getActorUserId());
+    }
+
+    public function testUnsafeModePreservesCategoryAfterManualChange(): void
+    {
+        $user = UserBuilder::aUser()->withIndex(1)->build();
+        $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+        $account = MoneyAccountBuilder::aMoneyAccount()->forCompany($company)->build();
+        $autoCategory = (new CashflowCategory(Uuid::uuid4()->toString(), $company))->setName('Авто');
+        $manualCategory = (new CashflowCategory(Uuid::uuid4()->toString(), $company))->setName('Ручная');
+        $targetCategory = (new CashflowCategory(Uuid::uuid4()->toString(), $company))->setName('Новая');
+        $rule = new CashTransactionAutoRule(
+            Uuid::uuid4()->toString(),
+            $company,
+            'Изменённое правило',
+            CashTransactionAutoRuleAction::FILL,
+            CashTransactionAutoRuleOperationType::ANY,
+            $targetCategory,
+        );
+        $transaction = $this->createTransaction($company, $account)->setCashflowCategory($manualCategory);
+
+        foreach ([$user, $company, $account, $autoCategory, $manualCategory, $targetCategory, $rule, $transaction] as $entity) {
+            $this->em->persist($entity);
+        }
+        $this->em->flush();
+        $this->em->persist(new AuditLog(
+            (string) $company->getId(),
+            CashTransaction::class,
+            (string) $transaction->getId(),
+            AuditLogAction::UPDATE,
+            [
+                'autoRules' => [
+                    'cashflowCategory' => ['id' => Uuid::uuid4()->toString(), 'revision' => 1],
+                ],
+                'changes' => [
+                    'cashflowCategory' => ['before' => null, 'after' => $autoCategory->getId()],
+                ],
+            ],
+            createdAt: new \DateTimeImmutable('2030-01-01 10:00:00'),
+        ));
+        $this->em->persist(new AuditLog(
+            (string) $company->getId(),
+            CashTransaction::class,
+            (string) $transaction->getId(),
+            AuditLogAction::UPDATE,
+            ['cashflowCategory' => [$autoCategory->getId(), $manualCategory->getId()]],
+            (string) $user->getId(),
+            new \DateTimeImmutable('2030-01-01 10:01:00'),
+        ));
+        $this->em->flush();
+
+        $handler = new ApplyAutoRulesForTransactionHandler(
+            $this->em,
+            self::getContainer()->get(CashTransactionRepository::class),
+            self::getContainer()->get(CashTransactionAutoRuleService::class),
+            self::getContainer()->get(CashflowSystemCategoryService::class),
+            self::getContainer()->get(AutoRuleDispatchGuard::class),
+            self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class),
+            new NullLogger(),
+        );
+        $handler(new ApplyAutoRulesForTransaction(
+            (string) $transaction->getId(),
+            (string) $company->getId(),
+            new \DateTimeImmutable(),
+            Uuid::uuid7()->toString(),
+            CashTransactionAutoRuleApplyMode::REPLACE_AUTO_ASSIGNED,
+            (string) $user->getId(),
+        ));
+
+        $reloaded = $this->em->find(CashTransaction::class, $transaction->getId());
+        self::assertSame($manualCategory->getId(), $reloaded?->getCashflowCategory()?->getId());
+        $replacementAudits = array_filter(
+            $this->em->getRepository(AuditLog::class)->findBy(['entityId' => $transaction->getId()]),
+            static fn (AuditLog $audit): bool => $targetCategory->getId()
+                === ($audit->getDiff()['changes']['cashflowCategory']['after'] ?? null),
+        );
+        self::assertCount(0, $replacementAudits);
     }
 
     private function createTransaction(Company $company, MoneyAccount $account): CashTransaction
