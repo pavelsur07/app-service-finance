@@ -83,7 +83,7 @@ class CashTransactionController extends AbstractController
     public function autoRuleApplyPage(): Response
     {
         $today = new \DateTimeImmutable('today');
-        $from = $today->modify('-6 months');
+        $from = $today->setDate((int) $today->format('Y'), 1, 1);
 
         return $this->render('transaction/auto_rule_apply.html.twig', [
             'from' => $from,
@@ -105,7 +105,7 @@ class CashTransactionController extends AbstractController
         }
 
         $today = new \DateTimeImmutable('today');
-        $from = $today->modify('-6 months');
+        $from = $today->setDate((int) $today->format('Y'), 1, 1);
 
         $bus->dispatch(new EnqueueAutoRulesForRange(
             $company->getId(),
