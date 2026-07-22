@@ -67,11 +67,10 @@ when@prod:
                 formatter: monolog.formatter.json
 
             marketplace_ads:
-                type: rotating_file
-                path: "%kernel.logs_dir%/marketplace_ads.log"
-                level: debug
+                type: stream
+                path: php://stderr
+                level: info
                 channels: [marketplace_ads]
-                max_files: 14
                 formatter: monolog.formatter.json
 
             sentry:

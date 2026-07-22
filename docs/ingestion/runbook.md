@@ -1,5 +1,9 @@
 # Ingestion Runbook — инструкция для саппорта
 
+> Перед ручными операциями прочитайте
+> [`docs/maintenance/production-logging.md`](../maintenance/production-logging.md).
+> Относительные пути вывода и сохранение логов, backup или audit-файлов в `/root` запрещены.
+
 ## Доступ
 
 Все команды выполняются на production сервере:

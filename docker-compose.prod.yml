@@ -56,6 +56,7 @@ services:
         image: traefik:3.3
         container_name: traefik
         restart: always
+        logging: *default-logging
         environment:
             - TZ=Europe/Moscow
         command:
@@ -97,6 +98,7 @@ services:
         image: ghcr.io/pavelsur07/land-nginx:latest
         container_name: land-nginx
         restart: always
+        logging: *default-logging
         environment:
             - TZ=Europe/Moscow
         expose:
@@ -128,6 +130,7 @@ services:
         image: ghcr.io/pavelsur07/site-nginx:latest
         container_name: site-nginx
         restart: always
+        logging: *default-logging
         environment:
             - TZ=Europe/Moscow
         depends_on:
@@ -200,6 +203,7 @@ services:
     site-php-cli:
         image: ghcr.io/pavelsur07/site-php-cli:latest
         container_name: site-php-cli
+        logging: *default-logging
         environment:
             <<: *php-env
         networks:
@@ -218,6 +222,7 @@ services:
         image: ghcr.io/pavelsur07/site-php-cli:latest
         container_name: site-messenger-worker-sync
         restart: always
+        logging: *default-logging
         command: php bin/console messenger:consume async_sync -vv --time-limit=3600 --memory-limit=160M
         environment:
             <<: *php-env
@@ -250,6 +255,7 @@ services:
         image: ghcr.io/pavelsur07/site-php-cli:latest
         container_name: site-messenger-worker-pipeline
         restart: always
+        logging: *default-logging
         command: php bin/console messenger:consume async_pipeline -vv --time-limit=3600 --memory-limit=500M
         environment:
             <<: *php-env
@@ -282,6 +288,7 @@ services:
         image: ghcr.io/pavelsur07/site-php-cli:latest
         container_name: site-messenger-worker-wb-finance
         restart: always
+        logging: *default-logging
         command: php bin/console messenger:consume async_wb_finance --time-limit=3600 --memory-limit=256M --sleep=5 --no-interaction
         environment:
             <<: *php-env
@@ -314,6 +321,7 @@ services:
         image: ghcr.io/pavelsur07/site-php-cli:latest
         container_name: site-messenger-worker-ads
         restart: always
+        logging: *default-logging
         # --time-limit=3600 means the worker restarts mid-poll at worst once/hour;
         # Messenger redelivers the in-flight message automatically.
         command: php bin/console messenger:consume async_ads -vv --time-limit=3600 --memory-limit=160M
@@ -377,6 +385,7 @@ services:
         image: redis:7-alpine
         container_name: site-redis
         restart: always
+        logging: *default-logging
         environment:
             - TZ=Europe/Moscow
         command: ["redis-server", "--appendonly", "yes"]
@@ -395,6 +404,7 @@ services:
     scheduler:
         image: ghcr.io/pavelsur07/site-php-cli:latest
         container_name: scheduler
+        logging: *default-logging
         user: root
         entrypoint: ["/usr/local/bin/supercronic"]
         # supercronic v0.2.31 может логировать "waitid: no child processes"

@@ -259,6 +259,14 @@ force-push в shared-ветки                               — никогда
 - Не запускать произвольный `sudo docker`, произвольный `docker exec` или произвольные privileged shell-команды.
 - Не печатать и не коммитить production IP, private keys, passwords, tokens, env values.
 
+Логи и operational artifacts на PROD:
+- Приложение, workers и scheduler пишут в stdout/stderr контейнеров; ротацией управляет Docker.
+- Не добавлять cron-редиректы в host-файлы.
+- Не писать логи, backup и audit-файлы в `/root`, home-каталог пользователя или относительный путь.
+- Постоянные ручные логи: `/var/log/app-service-finance/maintenance/`; backup: `/var/backups/app-service-finance/`; временные аудиты: `/var/tmp/app-service-finance.*`.
+- Создание каталогов, установка logrotate, перенос и удаление существующих файлов являются production mutation и требуют explicit owner gate.
+- Runbook: `docs/maintenance/production-logging.md`.
+
 Разрешённые wrappers:
 - `sudo /usr/local/bin/codex-docker-ps`
 - `sudo /usr/local/bin/codex-psql-ro`

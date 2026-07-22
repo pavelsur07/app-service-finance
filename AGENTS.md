@@ -855,6 +855,14 @@ Do not add the Codex production user to the `docker` group.
 Do not run arbitrary `sudo docker`, arbitrary `docker exec`, or arbitrary privileged shell commands.
 Do not print or commit production IP addresses, private keys, passwords, tokens, or environment values.
 
+Production logging and maintenance artifacts:
+Application, worker, and scheduler logs must go to container stdout/stderr; Docker owns their rotation.
+Do not add cron redirections to host log files.
+Never write operational artifacts to `/root` or another user's home directory, and never use a relative output path on production.
+Use `/var/log/app-service-finance/maintenance/` for retained manual logs, `/var/backups/app-service-finance/` for backups, and `/var/tmp/app-service-finance.*` for temporary audits.
+Creating these paths, installing logrotate configuration, moving existing files, or deleting them is a production mutation and requires an explicit owner gate.
+Follow `docs/maintenance/production-logging.md`.
+
 Allowed production wrappers:
 `sudo /usr/local/bin/codex-docker-ps`
 `sudo /usr/local/bin/codex-psql-ro`

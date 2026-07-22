@@ -1,0 +1,9 @@
+/var/log/app-service-finance/maintenance/*.log {
+    daily
+    rotate 14
+    maxsize 10M
+    compress
+    missingok
+    notifempty
+    copytruncate
+}
