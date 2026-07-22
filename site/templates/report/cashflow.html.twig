@@ -1,5 +1,44 @@
 {% extends 'base.html.twig' %}
 
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        /* Таблица ДДС: «Категория» закреплена слева, столбцы периодов фиксированной ширины.
+           Селекторы .table.cf-table — чтобы правила не перебивались .table из app.css, который грузится ниже. */
+        .table.cf-table {
+            --cf-col-name: 280px;
+            --cf-col-period: 120px;
+            /* table-layout: fixed работает только при определённой ширине таблицы;
+               при width:auto браузер молча откатывается на auto-раскладку.
+               Ширину даёт .table (width:100%), а min-width задаётся инлайном по числу периодов. */
+            table-layout: fixed;
+        }
+        .table.cf-table th,
+        .table.cf-table td {
+            white-space: nowrap;
+        }
+        .table.cf-table col.cf-col-name { width: var(--cf-col-name); }
+        .table.cf-table col.cf-col-period { width: var(--cf-col-period); }
+        .table.cf-table th:first-child,
+        .table.cf-table td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 2;
+            background: var(--tblr-bg-surface);
+            /* при border-collapse граница залипшей ячейки не рисуется поверх уезжающих — подменяем тенью */
+            box-shadow: inset -1px 0 0 var(--tblr-border-color);
+        }
+        .table.cf-table .cf-toggle,
+        .table.cf-table .cf-toggle-spacer {
+            flex: none;
+            width: 16px;
+            margin-right: 4px;
+            text-align: center;
+        }
+        .table.cf-table .cf-toggle { cursor: pointer; }
+    </style>
+{% endblock %}
+
 {#{% block breadcrumbs %}
     {% include 'partials/_breadcrumbs.html.twig' with {
         breadcrumbs: [
@@ -65,13 +104,15 @@
 {% set hasChildren = cat.children|length > 0 %}
 {% set hidden = cat.level >= 2 %}
 <tr data-id="{{ cat.id }}" data-parent="{{ parentId }}" data-level="{{ cat.level }}"{% if hidden %} style="display:none"{% endif %}>
-    <td style="padding-left: {{ (cat.level - 1) * 20 }}px; white-space: nowrap;">
-        {%- if hasChildren -%}
-            <span class="cf-toggle" data-target="{{ cat.id }}" style="cursor:pointer; display:inline-block; width:16px; text-align:center; margin-right:4px;">&#9654;</span>
-        {%- else -%}
-            <span style="display:inline-block; width:16px; margin-right:4px;"></span>
-        {%- endif -%}
-        {{ cat.name }}
+    <td style="padding-left: {{ (cat.level - 1) * 20 }}px;">
+        <div class="d-flex align-items-center">
+            {%- if hasChildren -%}
+                <span class="cf-toggle" data-target="{{ cat.id }}">&#9654;</span>
+            {%- else -%}
+                <span class="cf-toggle-spacer"></span>
+            {%- endif -%}
+            <span class="text-truncate" title="{{ cat.name }}">{{ cat.name }}</span>
+        </div>
     </td>
     {% for i in 0..periodCount-1 %}
         {% set val = totals[cat.id].totals[currency][i] ?? 0 %}
@@ -118,7 +159,11 @@
             <h3 class="card-title">Валюта: {{ currency }}</h3>
         </div>
         <div class="table-responsive">
-            <table class="table table-bordered table-striped">
+            <table class="table table-bordered cf-table" style="min-width: calc(var(--cf-col-name) + {{ periodCount }} * var(--cf-col-period));">
+                <colgroup>
+                    <col class="cf-col-name">
+                    {% for p in periods %}<col class="cf-col-period">{% endfor %}
+                </colgroup>
                 <thead>
                     <tr>
                         <th>Категория</th>
