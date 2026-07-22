@@ -1,0 +1,35 @@
+<!-- @react CardHead -->
+<!-- @uiKit v2.6 -->
+<!-- @docs ui-kit/components/card-head.css -->
+
+<!--
+  CardHead — заголовок секции внутри .card (Decision 25).
+  Variants: A — .card-head в карточке с паддингом (отбивка --s-3 до контента);
+            B — .card--flush + .card-head для таблицы edge-to-edge
+                (шапка получает --card-padding и разделитель 1px снизу).
+  Slots: .card-head-aside — вторичный текст справа (счётчик, период).
+-->
+
+        <span class="demo-label">Вариант A · .card-head в карточке с паддингом (форма/контент)</span>
+        <div class="demo demo--column">
+          <div class="card" style="width:100%">
+            <div class="card-head">Контрагент и описание</div>
+            <div style="font-size:13px;">Стандартный блок секции в drawer'ах и на страницах. Заголовок 11px uppercase, отбивка s-3 (12px) до контента.</div>
+          </div>
+        </div>
+
+        <span class="demo-label">Вариант B · .card--flush + .card-head над таблицей edge-to-edge</span>
+        <div class="demo demo--column">
+          <div class="card card--flush" style="width:100%">
+            <div class="card-head">Операции за июнь <span class="card-head-aside">248 строк</span></div>
+            <table class="t-table">
+              <thead>
+                <tr><th>Дата</th><th>Контрагент</th><th class="t-cell--right">Сумма</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>24.06</td><td>ООО «Ромашка-Бэст»</td><td class="t-cell--right">+245&thinsp;000 ₽</td></tr>
+                <tr><td>23.06</td><td>ИП Петров Л. А.</td><td class="t-cell--right">−156&thinsp;200 ₽</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>

@@ -1,0 +1,43 @@
+<!-- @react PageScaffold -->
+<!-- @uiKit v2.6 -->
+<!-- @docs ui-kit/patterns/page-scaffold.css -->
+
+<!--
+  PageScaffold — вертикальный ритм контента внутри .app-workzone (Decision 26).
+  Структура: .wz-head (.wz-title + .wz-sub + .wz-head-actions) → .wz-row (KPI) →
+  .wz-row (карточки-секции) → .wz-row (карточка с таблицей).
+  Заголовок 28px/700 · отбивка s-5 · gap в ряду s-4 · между рядами s-5.
+  Карточки в ряду равные, переносятся при < ~200px на карточку.
+  Префикс wz-* канонизирован из assets/styles/pages/admin-shell.css.
+-->
+
+        <div class="demo" style="padding:var(--s-6); display:block; background:var(--bg-page);">
+          <div class="wz-head">
+            <h1 class="wz-title">Пользователи<span class="wz-sub">Управление доступом к рабочему пространству</span></h1>
+            <div class="wz-head-actions">
+              <button class="btn btn-md btn-primary">+ Добавить</button>
+            </div>
+          </div>
+          <div class="wz-row">
+            <div class="kpi"><div class="kpi-label">Всего пользователей</div><div class="kpi-value">18</div></div>
+            <div class="kpi"><div class="kpi-label">Активных</div><div class="kpi-value">15</div></div>
+            <div class="kpi"><div class="kpi-label">Приглашения</div><div class="kpi-value">2</div></div>
+            <div class="kpi"><div class="kpi-label">Аутсорсеры</div><div class="kpi-value">3</div></div>
+          </div>
+          <div class="wz-row">
+            <div class="card"><div class="card-head">Роли и права</div><div style="font-size:13px; color:var(--text-secondary);">Секция-карточка слева. Ряд из двух равных колонок, переносится на узком экране.</div></div>
+            <div class="card"><div class="card-head">Последняя активность</div><div style="font-size:13px; color:var(--text-secondary);">Секция-карточка справа.</div></div>
+          </div>
+          <div class="wz-row">
+            <div class="card card--flush" style="width:100%">
+              <div class="card-head">Список пользователей <span class="card-head-aside">18 записей</span></div>
+              <table class="t-table">
+                <thead><tr><th>Имя</th><th>Роль</th><th class="t-cell--right">Статус</th></tr></thead>
+                <tbody>
+                  <tr><td>Анна Кузнецова</td><td>Владелец</td><td class="t-cell--right"><span class="status status--success"><span class="dot"></span>Активен</span></td></tr>
+                  <tr><td>Пётр Лунёв</td><td>Администратор</td><td class="t-cell--right"><span class="status status--success"><span class="dot"></span>Активен</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>

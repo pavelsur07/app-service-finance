@@ -1,0 +1,26 @@
+/* ============ PAGE-SCAFFOLD ============ */
+/* Ритм контента внутри .app-workzone (workzone content rhythm). */
+/* Вертикальный ритм контента внутри .app-workzone (Decision 26).
+   Префикс wz-* канонизирован из admin-shell.css (миграция /admin/*).
+   Заголовок → ряды KPI → ряды секций. Ряд переносится на узком экране. */
+.wz-head {
+  display: flex; align-items: flex-start; gap: var(--s-4);
+  margin-bottom: var(--s-5);
+}
+.wz-title {
+  font-size: 28px; font-weight: 700; letter-spacing: -0.02em;
+  color: var(--text-strong); margin: 0;
+}
+.wz-title .wz-sub {
+  display: block; margin-top: var(--s-1);
+  font-size: var(--font-13); font-weight: 400; letter-spacing: 0;
+  color: var(--text-tertiary);
+}
+.wz-head-actions { margin-left: auto; display: flex; gap: var(--s-2); flex-shrink: 0; }
+/* Ряд карточек — KPI или секции. Равные колонки, перенос при < ~200px. */
+.wz-row {
+  display: flex; flex-wrap: wrap; gap: var(--s-4);
+  margin-bottom: var(--s-5);
+}
+.wz-row > * { flex: 1 1 200px; min-width: 200px; }
+.wz-row:last-child { margin-bottom: 0; }

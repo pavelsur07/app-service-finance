@@ -1,5 +1,5 @@
 <!-- @react Modal -->
-<!-- @uiKit v2.1 -->
+<!-- @uiKit v2.6 -->
 <!-- @docs ui-kit/patterns/modal.css -->
 
         <div class="demo demo--hero" style="padding:var(--s-6)">
@@ -107,6 +107,92 @@
             <div class="mdl-foot">
               <button class="btn btn-md btn-secondary">Отмена</button>
               <button class="btn btn-md btn-primary">Выбрать</button>
+            </div>
+          </div>
+        </div>
+
+        <span class="demo-label">L (640) · <code class="code-inline">.mdl--l</code> — компактная таблица / визард</span>
+        <div class="demo demo--hero" style="padding:var(--s-6)">
+          <div class="mdl mdl--l">
+            <div class="mdl-head">
+              <div class="u-flex-1">
+                <h3>Сопоставление статей импорта</h3>
+                <div class="sub">6 из 12 строк размечены автоматически</div>
+              </div>
+              <button class="btn btn-sm btn-ghost u-w-28 u-p-0" aria-label="Закрыть"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+            </div>
+            <div class="mdl-body" style="padding:0">
+              <table class="t-table">
+                <thead><tr><th>Строка из файла</th><th>Статья ДДС</th><th class="t-cell--right">Сумма</th></tr></thead>
+                <tbody>
+                  <tr><td>Оплата по счёту №1247</td><td>Оплата за услуги</td><td class="t-cell--right">+245&thinsp;000 ₽</td></tr>
+                  <tr><td>Аренда офиса, июнь</td><td>Аренда</td><td class="t-cell--right">−156&thinsp;200 ₽</td></tr>
+                  <tr><td>Зарплата, 1 половина</td><td>Зарплата</td><td class="t-cell--right">−420&thinsp;000 ₽</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="mdl-foot">
+              <button class="btn btn-md btn-secondary">Отмена</button>
+              <button class="btn btn-md btn-primary">Применить сопоставление</button>
+            </div>
+          </div>
+        </div>
+
+        <span class="demo-label">XL (800) · <code class="code-inline">.mdl--xl</code> — широкий контент / сравнение</span>
+        <div class="demo demo--hero" style="padding:var(--s-6)">
+          <div class="mdl mdl--xl">
+            <div class="mdl-head">
+              <div class="u-flex-1">
+                <h3>Сравнение периодов</h3>
+                <div class="sub">II квартал 2026 против I квартала 2026</div>
+              </div>
+              <button class="btn btn-sm btn-ghost u-w-28 u-p-0" aria-label="Закрыть"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+            </div>
+            <div class="mdl-body">
+              <div class="wz-row" style="margin:0 0 var(--s-4)">
+                <div class="kpi"><div class="kpi-label">Выручка</div><div class="kpi-value">5,7 М ₽</div></div>
+                <div class="kpi"><div class="kpi-label">Расходы</div><div class="kpi-value">3,0 М ₽</div></div>
+                <div class="kpi"><div class="kpi-label">Прибыль</div><div class="kpi-value">2,7 М ₽</div></div>
+              </div>
+              <table class="t-table">
+                <thead><tr><th>Статья</th><th class="t-cell--right">I кв.</th><th class="t-cell--right">II кв.</th><th class="t-cell--right">Δ</th></tr></thead>
+                <tbody>
+                  <tr><td>Доходы</td><td class="t-cell--right">4&thinsp;820&thinsp;450</td><td class="t-cell--right">5&thinsp;670&thinsp;000</td><td class="t-cell--right">+17,6%</td></tr>
+                  <tr><td>Расходы</td><td class="t-cell--right">2&thinsp;968&thinsp;720</td><td class="t-cell--right">2&thinsp;994&thinsp;100</td><td class="t-cell--right">+0,9%</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="mdl-foot">
+              <button class="btn btn-md btn-secondary">Закрыть</button>
+              <button class="btn btn-md btn-primary">Выгрузить в Excel</button>
+            </div>
+          </div>
+        </div>
+
+        <span class="demo-label">Side (full-height, справа) · <code class="code-inline">.mdl--side</code> — длинная форма / мастер</span>
+        <div class="demo" style="padding:0; position:relative; height:480px; overflow:hidden; background:var(--bg-page);">
+          <div style="position:absolute; inset:0; background:rgba(11,18,32,var(--backdrop-opacity));"></div>
+          <div class="mdl mdl--side" style="position:absolute; height:100%; max-height:100%; animation:none;">
+            <div class="mdl-head">
+              <div class="u-flex-1">
+                <h3>Новый контрагент</h3>
+                <div class="sub">Заполните реквизиты — форма длиннее, чем помещается в модалку</div>
+              </div>
+              <button class="btn btn-sm btn-ghost u-w-28 u-p-0" aria-label="Закрыть"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+            </div>
+            <div class="mdl-body" style="display:flex; flex-direction:column; gap:14px;">
+              <div class="form-field"><label class="form-label">Наименование <span class="req">*</span></label><input class="input" value="ООО «Ромашка-Бэст»"></div>
+              <div class="form-field"><label class="form-label">ИНН <span class="req">*</span></label><input class="input" value="7723812931"></div>
+              <div class="form-field"><label class="form-label">КПП</label><input class="input" value="772301001"></div>
+              <div class="form-field"><label class="form-label">Расчётный счёт</label><input class="input" placeholder="40702810…"></div>
+              <div class="form-field"><label class="form-label">Банк</label><input class="input" placeholder="Наименование банка"></div>
+              <div class="form-field"><label class="form-label">Категория по умолчанию</label><input class="input" placeholder="Не выбрана"></div>
+              <div class="form-field"><label class="form-label">Комментарий</label><textarea class="input" rows="3" placeholder="Заметка…"></textarea></div>
+            </div>
+            <div class="mdl-foot">
+              <button class="btn btn-md btn-danger btn-ghost" style="margin-right:auto">Удалить</button>
+              <button class="btn btn-md btn-secondary">Отмена</button>
+              <button class="btn btn-md btn-primary">Сохранить</button>
             </div>
           </div>
         </div>

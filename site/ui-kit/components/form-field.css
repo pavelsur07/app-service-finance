@@ -4,8 +4,18 @@
   flex-direction: column;
   gap: 5px;
 }
+/* Стек-хелпер: вертикальный интервал между form-field в обычном блочном потоке.
+   ВАЖНО: контейнеры, управляющие интервалом через gap (grid/flex — .row-2col,
+   .row-3col, .form-grid, .demo), НЕ должны получать этот margin, иначе первый
+   элемент грид-строки без margin, а второй — с margin → перекос и двойной интервал. */
 .form-field + .form-field {
   margin-top: var(--s-3);
+}
+.row-2col > .form-field + .form-field,
+.row-3col > .form-field + .form-field,
+.form-grid > .form-field + .form-field,
+.demo > .form-field + .form-field {
+  margin-top: 0;
 }
 .form-label {
   font-size: var(--font-11_5);

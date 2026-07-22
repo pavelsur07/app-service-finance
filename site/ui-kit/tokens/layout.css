@@ -1,8 +1,10 @@
 :root {
   /* ===== Layout tokens ===== */
   --card-padding: var(--s-4) var(--s-5);
-  --modal-width-compact: 440px;
-  --modal-width-standard: 520px;
+  --modal-width-compact: 440px;      /* S · выбор компании, подтверждение */
+  --modal-width-standard: 520px;     /* M · форма до 8 полей, пикер */
+  --modal-width-l: 640px;            /* L · контент: компактная таблица, визард */
+  --modal-width-xl: 800px;           /* XL · широкий контент: сравнение, превью */
   --backdrop-opacity: 0.45;
   --backdrop-blur: 6px;
   --bg-hero-tint: rgba(11, 18, 32, 0.05);

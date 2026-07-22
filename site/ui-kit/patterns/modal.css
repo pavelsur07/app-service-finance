@@ -1,16 +1,19 @@
 /* ============ MODAL ============ */
 .mdl {
-  width: 100%; max-width: var(--modal-width-standard);
+  width: 100%; max-width: min(var(--modal-width-standard), calc(100vw - var(--s-8)));
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: var(--r-4);
   box-shadow: var(--shadow-modal);
 }
-.mdl--compact { max-width: var(--modal-width-compact); }
+.mdl--compact { max-width: min(var(--modal-width-compact), calc(100vw - var(--s-8))); }  /* S · 440 */
+.mdl--m { max-width: min(var(--modal-width-standard), calc(100vw - var(--s-8))); }        /* M · 520 */
+.mdl--l { max-width: min(var(--modal-width-l), calc(100vw - var(--s-8))); }               /* L · 640 */
+.mdl--xl { max-width: min(var(--modal-width-xl), calc(100vw - var(--s-8))); }             /* XL · 800 */
 .mdl-head { padding: 18px 20px 12px; display: flex; align-items: flex-start; gap: 12px; }
 .mdl-head h3 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.015em; }
 .mdl-head .sub { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
-.mdl-body { padding: 0 var(--s-5) var(--s-3); min-height: 60px; }
+.mdl-body { padding: 0 var(--s-5) var(--s-3); min-height: 60px; max-height: min(70vh, 640px); overflow-y: auto; }
 .mdl-foot { border-top: 1px solid var(--border); padding: var(--s-3) var(--s-5); display: flex; gap: 8px; justify-content: flex-end; }
 
 /* Interactive modal dialogs (live demos in UIKit) */
@@ -26,3 +29,23 @@
   -webkit-backdrop-filter: blur(var(--backdrop-blur));
 }
 .dlg .mdl { box-shadow: var(--shadow-modal); }
+
+/* Side modal (right-docked sheet) — full-height panel слева от края экрана.
+   Модальный chrome (.mdl-head/-body/-foot), но док справа во всю высоту.
+   Для длинных форм и мастеров, которым тесно в M/L. Best practices:
+   fixed к правому краю, height 100vh, body — единственная скролл-зона (flex:1),
+   head/foot sticky за счёт flex-column, slide-in из-за края. */
+.mdl--side {
+  position: fixed; top: 0; right: 0;
+  height: 100vh; max-height: 100vh;
+  width: 100%; max-width: min(var(--modal-width-l), calc(100vw - var(--s-8)));
+  display: flex; flex-direction: column;
+  border-radius: 0;
+  border-top: 0; border-right: 0; border-bottom: 0;
+  box-shadow: var(--shadow-drawer);
+  animation: mdl-slide-in 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.mdl--side .mdl-body { max-height: none; flex: 1 1 auto; }
+.mdl--side .mdl-foot { position: sticky; bottom: 0; background: var(--card-bg); }
+@keyframes mdl-slide-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.dlg .mdl--side { box-shadow: var(--shadow-drawer); }
