@@ -3,160 +3,206 @@
 {% block title %}Неизвестные затраты — Маркетплейсы{% endblock %}
 
 {% block body %}
+  {% set marketplace_tones = {
+    'ozon': 'ozon',
+    'wb': 'wb',
+    'wildberries': 'wb',
+    'yandex_market': 'yamarket',
+    'yandex-market': 'yamarket',
+    'megamarket': 'megamarket',
+  } %}
+  {% set marketplace_labels = {
+    'ozon': 'Озон',
+    'wb': 'Wildberries',
+    'wildberries': 'Wildberries',
+    'yandex_market': 'Яндекс Маркет',
+    'yandex-market': 'Яндекс Маркет',
+    'megamarket': 'Мегамаркет',
+  } %}
+  {% set marketplace_marks = {
+    'ozon': 'Oz',
+    'wb': 'WB',
+    'wildberries': 'WB',
+    'yandex_market': 'ЯМ',
+    'yandex-market': 'ЯМ',
+    'megamarket': 'ММ',
+  } %}
 
-    <div class="page-header">
-        <div class="row align-items-center">
-            <div class="col">
-                <h2 class="page-title">
-                    Неизвестные затраты
-                    {% if unresolved_count > 0 %}
-                        <span class="badge bg-danger ms-2">{{ unresolved_count }}</span>
-                    {% endif %}
-                </h2>
-                <div class="text-muted mt-1">
-                    Service names не найденные в OzonServiceCategoryMap.
-                    После добавления в маппинг — отметить как решённое.
-                </div>
-            </div>
-            <div class="col-auto">
-                <a href="{{ path('admin_marketplace_mapping_errors', {all: show_all ? 0 : 1}) }}"
-                   class="btn btn-outline-secondary btn-sm">
-                    {% if show_all %}Показать только нерешённые{% else %}Показать все{% endif %}
-                </a>
-            </div>
-        </div>
+  <div class="wz-head">
+    <h1 class="wz-title">
+      Неизвестные затраты
+      <span class="wz-sub">Service name не найден в OzonServiceCategoryMap. После добавления маппинга отметьте запись как решённую.</span>
+    </h1>
+    <div class="wz-head-actions">
+      {% if unresolved_count > 0 %}
+        <span class="status status--danger"><span class="dot"></span>Нерешено: {{ unresolved_count }}</span>
+      {% endif %}
+      <a href="{{ path('admin_marketplace_mapping_errors', {all: show_all ? 0 : 1}) }}"
+         class="btn btn-md btn-secondary">
+        {% if show_all %}Только нерешённые{% else %}Показать все{% endif %}
+      </a>
     </div>
+  </div>
 
-    {% if errors is empty %}
-        <div class="card">
-            <div class="card-body text-center py-5 text-muted">
-                {% if show_all %}
-                    Ошибок маппинга нет.
-                {% else %}
-                    Нерешённых ошибок нет. 🎉
-                {% endif %}
-            </div>
-        </div>
-    {% else %}
-        <div class="card">
-            <div class="table-responsive">
-                <table class="table table-vcenter table-hover card-table">
-                    <thead>
-                    <tr>
-                        <th>Компания</th>
-                        <th>Контакт</th>
-                        <th>Маркетплейс</th>
-                        <th>Период</th>
-                        <th>Service name</th>
-                        <th>Operation type</th>
-                        <th class="text-end">Сумма</th>
-                        <th class="text-end">Строк</th>
-                        <th>Обнаружено</th>
-                        <th>Статус</th>
-                        <th></th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {% for error in errors %}
-                        <tr class="{{ error.resolved_at ? 'opacity-50' : '' }}">
-                            <td>
-                                <div class="fw-medium">{{ error.company_name }}</div>
-                                <div class="text-muted small">{{ error.company_id|slice(0, 8) }}…</div>
-                            </td>
-                            <td>
-                                {% if error.contact_email %}
-                                    <a href="mailto:{{ error.contact_email }}">{{ error.contact_email }}</a>
-                                {% else %}
-                                    <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <span class="badge bg-blue-lt text-uppercase">{{ error.marketplace }}</span>
-                            </td>
-                            <td class="text-nowrap">
-                                {{ ['','Янв','Фев','Мар','Апр','Май','Июн',
-                                    'Июл','Авг','Сен','Окт','Ноя','Дек'][error.month] }}
-                                {{ error.year }}
-                            </td>
-                            <td>
-                                <code class="text-danger fw-medium">{{ error.service_name }}</code>
-                            </td>
-                            <td>
-                                <span class="text-muted small">{{ error.operation_type ?: '—' }}</span>
-                            </td>
-                            <td class="text-end">
-                                {{ error.total_amount|number_format(2, '.', ' ') }}
-                            </td>
-                            <td class="text-end text-muted">
-                                {{ error.rows_count }}
-                            </td>
-                            <td class="text-nowrap text-muted small">
-                                {{ error.detected_at|date('d.m.Y H:i') }}
-                            </td>
-                            <td>
-                                {% if error.resolved_at %}
-                                    <span class="badge bg-success-lt">Решено</span>
-                                    <div class="text-muted small">{{ error.resolved_at|date('d.m.Y') }}</div>
-                                {% else %}
-                                    <span class="badge bg-danger-lt">Новое</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div class="d-flex gap-2">
-                                    {% if error.sample_raw_json %}
-                                        <button type="button"
-                                                class="btn btn-sm btn-ghost-secondary"
-                                                data-bs-toggle="modal"
-                                                data-bs-target="#sample-{{ error.id|replace({'-': ''}) }}">
-                                            JSON
-                                        </button>
-                                    {% endif %}
-                                    {% if not error.resolved_at %}
-                                        <form method="post"
-                                              action="{{ path('admin_marketplace_mapping_error_resolve', {id: error.id}) }}">
-                                            <button type="button"
-                                                    class="btn btn-sm btn-success"
-                                                    onclick="if(confirm('Отметить как решённое?')) this.closest('form').submit()">
-                                                Решено
-                                            </button>
-                                        </form>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    {% endif %}
-
-    {# Модалки с сырым JSON для диагностики #}
-    {% for error in errors %}
-        {% if error.sample_raw_json %}
-            <div class="modal fade" id="sample-{{ error.id|replace({'-': ''}) }}" tabindex="-1">
-                <div class="modal-dialog modal-lg">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">
-                                Образец сырых данных — <code>{{ error.service_name }}</code>
-                            </h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <pre class="bg-dark text-white p-3 rounded small" style="max-height:400px;overflow:auto">{{ error.sample_raw_json|json_encode(constant('JSON_PRETTY_PRINT') b-or constant('JSON_UNESCAPED_UNICODE')) }}</pre>
-                            <div class="mt-3 p-3 bg-light rounded small">
-                                <strong>Как добавить в маппинг:</strong><br>
-                                Открыть <code>OzonServiceCategoryMap.php</code>, найти подходящую секцию, добавить:<br>
-                                <code>'{{ error.service_name }}' => 'ozon_CATEGORY_CODE',</code><br>
-                                После добавления — переобработать затраты за
-                                {{ error.year }}-{{ '%02d'|format(error.month) }}.
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+  {% if errors is empty %}
+    <div class="empty">
+      <div class="empty-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M20 6 9 17l-5-5"/>
+        </svg>
+      </div>
+      <div class="empty-title">
+        {% if show_all %}Ошибок маппинга нет{% else %}Все ошибки разобраны{% endif %}
+      </div>
+      <div class="empty-text">
+        {% if show_all %}
+          Новые неизвестные затраты появятся здесь после обработки отчётов.
+        {% else %}
+          Сейчас нет затрат, которые требуют ручной проверки маппинга.
         {% endif %}
-    {% endfor %}
+      </div>
+    </div>
+  {% else %}
+    <div class="card card--flush">
+      <div class="card-head">
+        <span>{% if show_all %}Все ошибки{% else %}Требуют решения{% endif %}</span>
+        <span class="card-head-aside">В списке: {{ errors|length }}</span>
+      </div>
+      <div class="report-scroll">
+        <table class="t-table">
+          <thead>
+            <tr>
+              <th>Компания</th>
+              <th>Контакт</th>
+              <th>Маркетплейс</th>
+              <th>Период</th>
+              <th>Service name</th>
+              <th>Operation type</th>
+              <th class="t-cell--right">Сумма</th>
+              <th class="t-cell--right">Строк</th>
+              <th>Обнаружено</th>
+              <th>Статус</th>
+              <th><span class="sr-only">Действия</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for error in errors %}
+              {% set marketplace_key = error.marketplace|lower %}
+              {% set marketplace_tone = marketplace_tones[marketplace_key] ?? null %}
+              {% set amount = error.total_amount ?? 0 %}
+              <tr>
+                <td>
+                  <strong>{{ error.company_name }}</strong><br>
+                  <code>{{ error.company_id|slice(0, 8) }}…</code>
+                </td>
+                <td>
+                  {% if error.contact_email %}
+                    <a href="mailto:{{ error.contact_email }}">{{ error.contact_email }}</a>
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="mp-chip">
+                    {% if marketplace_tone %}
+                      <span class="mp-mark mp-mark--{{ marketplace_tone }}">{{ marketplace_marks[marketplace_key] }}</span>
+                    {% endif %}
+                    {{ marketplace_labels[marketplace_key] ?? error.marketplace|upper }}
+                  </span>
+                </td>
+                <td>
+                  {{ ['', 'Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'][error.month] }}
+                  {{ error.year }}
+                </td>
+                <td><code>{{ error.service_name }}</code></td>
+                <td>{{ error.operation_type ?: '—' }}</td>
+                <td class="t-cell--right">
+                  <span class="money money--14 money--strong">
+                    {% if amount < 0 %}−{{ amount|abs|number_format(2, ',', ' ') }}{% else %}{{ amount|number_format(2, ',', ' ') }}{% endif %}&nbsp;₽
+                  </span>
+                </td>
+                <td class="t-cell--right">{{ error.rows_count }}</td>
+                <td><time datetime="{{ error.detected_at|date('c') }}">{{ error.detected_at|date('d.m.Y H:i') }}</time></td>
+                <td>
+                  {% if error.resolved_at %}
+                    <span class="status status--success"><span class="dot"></span>Решено</span><br>
+                    <time datetime="{{ error.resolved_at|date('c') }}">{{ error.resolved_at|date('d.m.Y') }}</time>
+                  {% else %}
+                    <span class="status status--danger"><span class="dot"></span>Новое</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="wz-head-actions">
+                    {% if error.sample_raw_json %}
+                      <button type="button" class="btn btn-sm btn-secondary"
+                              data-admin-dialog-open="sample-{{ error.id|replace({'-': ''}) }}">
+                        JSON
+                      </button>
+                    {% endif %}
+                    {% if not error.resolved_at %}
+                      <form method="post" action="{{ path('admin_marketplace_mapping_error_resolve', {id: error.id}) }}">
+                        <button type="submit" class="btn btn-sm btn-primary"
+                                data-admin-confirm="Запись исчезнет из списка нерешённых. Продолжить?"
+                                data-admin-confirm-title="Отметить ошибку как решённую?"
+                                data-admin-confirm-label="Отметить решённой"
+                                data-admin-confirm-tone="primary">
+                          Решено
+                        </button>
+                      </form>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}
 
+{% block admin_modals %}
+  {% for error in errors %}
+    {% if error.sample_raw_json %}
+      <dialog id="sample-{{ error.id|replace({'-': ''}) }}" class="dlg"
+              aria-labelledby="sample-title-{{ error.id|replace({'-': ''}) }}">
+        <div class="mdl mdl--xl">
+          <div class="mdl-head">
+            <div class="u-flex-1">
+              <h3 id="sample-title-{{ error.id|replace({'-': ''}) }}">Образец сырых данных</h3>
+              <div class="sub">{{ error.service_name }}</div>
+            </div>
+            <button type="button" class="btn btn-sm btn-ghost u-w-28 u-p-0"
+                    data-admin-dialog-close aria-label="Закрыть">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <line x1="6" y1="6" x2="18" y2="18"/>
+                <line x1="18" y1="6" x2="6" y2="18"/>
+              </svg>
+            </button>
+          </div>
+          <div class="mdl-body form-field">
+            <textarea class="textarea" rows="18" readonly spellcheck="false" aria-label="JSON образца">{{ error.sample_raw_json }}</textarea>
+            <div class="alert alert--info">
+              <svg class="a-ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"/>
+                <path d="M12 11v5"/>
+                <path d="M12 8h.01"/>
+              </svg>
+              <div class="a-body">
+                <div class="a-title">Как добавить в маппинг</div>
+                <div class="a-text">
+                  Добавьте <code>'{{ error.service_name }}' =&gt; 'ozon_CATEGORY_CODE'</code> в подходящую секцию
+                  <code>OzonServiceCategoryMap.php</code>, затем переобработайте затраты за
+                  {{ error.year }}-{{ '%02d'|format(error.month) }}.
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="mdl-foot">
+            <button type="button" class="btn btn-md btn-secondary" data-admin-dialog-close>Закрыть</button>
+          </div>
+        </div>
+      </dialog>
+    {% endif %}
+  {% endfor %}
 {% endblock %}
