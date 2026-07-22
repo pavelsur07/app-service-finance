@@ -20,6 +20,7 @@ final readonly class UpsertFinancialTransactionCommand
         public ?string $counterpartyId,
         public ?string $listingId = null,
         public ?string $listingSku = null,
+        public bool $allowSameVersion = false,
     ) {
         Assert::uuid($this->companyId);
         Assert::notEmpty($this->connectionRef);

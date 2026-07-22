@@ -1,7 +1,7 @@
 ### Stage 7.6.4: Import cutover — DONE
 
 **Risk:** HIGH
-**Next action:** STOP, owner review required before PR/merge or any production acceptance
+**Next action:** DONE; merged/deployed, no production import smoke in scope
 
 #### What was done
 

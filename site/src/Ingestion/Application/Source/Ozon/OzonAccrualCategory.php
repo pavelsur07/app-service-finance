@@ -72,6 +72,7 @@ final readonly class OzonAccrualCategory
 
             new self('ozon_cpc', 'Оплата за клик', 'Продвижение и реклама', TransactionType::ADVERTISING, 900, aliases: ['Оплата за клик Ozon', 'PayPerClick']),
             new self('ozon_accelerated_reviews', 'Ускоренный сбор отзывов', 'Продвижение и реклама', TransactionType::ADVERTISING, 910, aliases: ['Приобретение отзывов Ozon', 'Баллы за отзывы', 'AcceleratedReviewCollection']),
+            new self('ozon_customer_reviews', 'Начисления за отзывы клиентов', 'Продвижение и реклама', TransactionType::ADVERTISING, 915, aliases: ['CustomerReviews']),
             new self('ozon_stars_membership', 'Звёздные товары', 'Продвижение и реклама', TransactionType::ADVERTISING, 920, aliases: ['StarsMembership']),
             new self('ozon_brand_commission', 'Продвижение бренда', 'Продвижение и реклама', TransactionType::ADVERTISING, 930, aliases: ['BrandCommission']),
             new self('ozon_push_campaign', 'Push-кампании', 'Продвижение и реклама', TransactionType::ADVERTISING, 940, aliases: ['PushCampaign']),

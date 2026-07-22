@@ -24,7 +24,7 @@ final class UserController extends AbstractController
     /**
      * @var array<string, string>
      */
-    private const ROLE_LABELS = [
+    public const ROLE_LABELS = [
         'ROLE_ADMIN' => 'Администратор',
         'ROLE_COMPANY_OWNER' => 'Владелец компании',
         'ROLE_COMPANY_USER' => 'Сотрудник компании',
@@ -65,6 +65,7 @@ final class UserController extends AbstractController
             'recentUsers' => $userRepository->countRegisteredUsersSince($lastWeek),
             'accountForm' => $accountForm,
             'showAccountModal' => $showAccountModal,
+            'roleLabels' => self::ROLE_LABELS,
         ]);
     }
 

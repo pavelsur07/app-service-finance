@@ -3,10 +3,17 @@
 namespace App\Report\Cashflow;
 
 use App\Company\Entity\Company;
+use App\Company\Facade\FinancialResponsibilityCenterFacade;
+use Ramsey\Uuid\Uuid;
 use Symfony\Component\HttpFoundation\Request;
 
 final class CashflowReportRequestMapper
 {
+    public function __construct(
+        private readonly FinancialResponsibilityCenterFacade $responsibilityCenters,
+    ) {
+    }
+
     public function fromRequest(Request $request, Company $company): CashflowReportParams
     {
         $group = $request->query->get('group', 'month');
@@ -25,6 +32,26 @@ final class CashflowReportRequestMapper
             [$from, $to] = [$to, $from];
         }
 
-        return new CashflowReportParams($company, $group, $from, $to);
+        return new CashflowReportParams(
+            $company,
+            $group,
+            $from,
+            $to,
+            $this->resolveResponsibilityCenterId((string) $request->query->get('responsibilityCenterId', ''), $company),
+        );
+    }
+
+    private function resolveResponsibilityCenterId(string $responsibilityCenterId, Company $company): ?string
+    {
+        if ('' === $responsibilityCenterId || !Uuid::isValid($responsibilityCenterId)) {
+            return null;
+        }
+
+        $center = $this->responsibilityCenters->findByIdAndCompany(
+            $responsibilityCenterId,
+            (string) $company->getId(),
+        );
+
+        return null !== $center && $center->isActive() ? $center->id : null;
     }
 }

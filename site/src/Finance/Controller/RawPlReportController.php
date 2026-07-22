@@ -12,6 +12,7 @@ use App\Finance\Enum\PlNature;
 use App\Finance\Repository\DocumentRepository;
 use App\Finance\Repository\PLDailyTotalRepository;
 use App\Shared\Service\ActiveCompanyService;
+use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -34,9 +35,14 @@ class RawPlReportController extends AbstractController
         $from = new \DateTimeImmutable($request->query->get('from', 'first day of this month'));
         $to = new \DateTimeImmutable($request->query->get('to', 'last day of this month'));
         $responsibilityCenterLabels = [];
-        foreach ($responsibilityCenters->getActiveChoices((string) $company->getId()) as $center) {
+        $responsibilityCenterChoices = $responsibilityCenters->getActiveChoices((string) $company->getId());
+        foreach ($responsibilityCenterChoices as $center) {
             $responsibilityCenterLabels[$center->id] = $center->name;
         }
+        $selectedResponsibilityCenterId = $this->resolveResponsibilityCenterId(
+            (string) $request->query->get('responsibilityCenterId', ''),
+            $responsibilityCenterLabels,
+        );
 
         // --- 1. Получаем операции документов ---
         $qb = $documentRepo->createQueryBuilder('d')
@@ -51,11 +57,22 @@ class RawPlReportController extends AbstractController
             ->addOrderBy('d.id', 'ASC')
             ->addOrderBy('o.id', 'ASC');
 
+        if (null !== $selectedResponsibilityCenterId) {
+            $qb
+                ->andWhere('o.responsibilityCenterId = :responsibilityCenterId OR (o.responsibilityCenterId IS NULL AND d.responsibilityCenterId = :responsibilityCenterId)')
+                ->setParameter('responsibilityCenterId', $selectedResponsibilityCenterId);
+        }
+
         $rows = [];
         /** @var Document $doc */
         foreach ($qb->getQuery()->getResult() as $doc) {
             foreach ($doc->getOperations() as $op) {
                 if (!$op instanceof DocumentOperation) {
+                    continue;
+                }
+
+                $operationResponsibilityCenterId = $op->getResponsibilityCenterId() ?? $doc->getResponsibilityCenterId();
+                if (null !== $selectedResponsibilityCenterId && $operationResponsibilityCenterId !== $selectedResponsibilityCenterId) {
                     continue;
                 }
 
@@ -86,7 +103,7 @@ class RawPlReportController extends AbstractController
                     'nature' => $nature->value,
                     'project' => $op->getProjectDirection()?->getName() ?? $doc->getProjectDirection()?->getName() ?? '-',
                     'responsibility_center' => $this->responsibilityCenterLabel(
-                        $op->getResponsibilityCenterId() ?? $doc->getResponsibilityCenterId(),
+                        $operationResponsibilityCenterId,
                         $responsibilityCenterLabels,
                     ),
                     'amount_raw' => $op->getAmount(),
@@ -109,6 +126,12 @@ class RawPlReportController extends AbstractController
             ->orderBy('t.date', 'ASC')
             ->addOrderBy('pd.name', 'ASC')
             ->addOrderBy('c.name', 'ASC');
+
+        if (null !== $selectedResponsibilityCenterId) {
+            $qb2
+                ->andWhere('t.responsibilityCenterId = :responsibilityCenterId')
+                ->setParameter('responsibilityCenterId', $selectedResponsibilityCenterId);
+        }
 
         $totals = [];
         /** @var PLDailyTotal $total */
@@ -133,7 +156,21 @@ class RawPlReportController extends AbstractController
             'to' => $to,
             'rows' => $rows,
             'totals' => $totals,
+            'responsibilityCenters' => $responsibilityCenterChoices,
+            'selectedResponsibilityCenterId' => $selectedResponsibilityCenterId,
         ]);
+    }
+
+    /**
+     * @param array<string, string> $labels
+     */
+    private function resolveResponsibilityCenterId(string $responsibilityCenterId, array $labels): ?string
+    {
+        if ('' === $responsibilityCenterId || !Uuid::isValid($responsibilityCenterId)) {
+            return null;
+        }
+
+        return isset($labels[$responsibilityCenterId]) ? $responsibilityCenterId : null;
     }
 
     /**

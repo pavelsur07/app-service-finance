@@ -70,6 +70,13 @@ final class OzonAccrualCategoryTest extends TestCase
         self::assertNotNull($stockInsurance);
         self::assertSame('ozon_stock_insurance', $stockInsurance->code);
         self::assertSame(TransactionType::FEE, $stockInsurance->transactionType);
+
+        $customerReviews = OzonAccrualCategory::findByOzonName('CustomerReviews');
+        self::assertNotNull($customerReviews);
+        self::assertSame('ozon_customer_reviews', $customerReviews->code);
+        self::assertSame('Начисления за отзывы клиентов', $customerReviews->label);
+        self::assertSame('Продвижение и реклама', $customerReviews->group);
+        self::assertSame(TransactionType::ADVERTISING, $customerReviews->transactionType);
     }
 
     public function testFindsObservedInternalOzonExternalCodes(): void
@@ -80,6 +87,7 @@ final class OzonAccrualCategoryTest extends TestCase
             'BrandCommission' => 'ozon_brand_commission',
             'Compensation' => 'ozon_compensation',
             'CrossDock' => 'ozon_cross_docking',
+            'CustomerReviews' => 'ozon_customer_reviews',
             'DefectFineComplaint' => 'ozon_defect_fine_complaint',
             'DefectFineErrors' => 'ozon_other_services',
             'DefectFineShipmentDelayRate' => 'ozon_defect_fine_shipment_delay',

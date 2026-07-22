@@ -237,3 +237,18 @@ body.layout-fluid-vertical .page-wrapper {
     min-height: 100vh;
     height: auto;
 }
+
+/* ===== UI Kit ↔ app bridge (owner=code) ===== */
+
+/* .t-pg-btn в ките сверстан как <button>; пагинация рендерит ссылки —
+   гасим UA-подчёркивание для паритета. */
+a.t-pg-btn { text-decoration: none; }
+
+/* Symfony form_errors() (тема bootstrap_5_layout) внутри полей UI Kit:
+   bootstrap CSS не грузится, поэтому .invalid-feedback стилизуем здесь. */
+.form-field .invalid-feedback,
+.mdl .invalid-feedback {
+    display: block;
+    font-size: var(--font-11_5);
+    color: var(--danger-text);
+}

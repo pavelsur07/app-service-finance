@@ -10,6 +10,8 @@ use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Company\Entity\Company;
+use App\Company\Entity\FinancialResponsibilityCenter;
+use App\Company\Entity\ProjectDirection;
 use App\Company\Entity\User;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -113,9 +115,71 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
             'tree',
             'categoryTree',
             'categoryTotals',
+            'projectCenterMatrix',
         ] as $key) {
             self::assertArrayHasKey($key, $payload);
         }
+    }
+
+    public function testPayloadContainsProjectCenterMatrix(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        [$user, $company] = $this->seedCompanyContext('a5');
+        $project = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Продажа компьютеров');
+        $center = new FinancialResponsibilityCenter((string) $company->getId(), 'CFO_KRD', 'Краснодар');
+        $this->em()->persist($project);
+        $this->em()->persist($center);
+        $this->seedCashflowData($company, '100.00', '2026-04-15', $project, $center->getId());
+        $this->em()->flush();
+
+        $this->loginWithActiveCompany($client, $user, $company);
+
+        $client->request('GET', self::EXPORT_URL.sprintf(
+            '?from=2026-04-01&to=2026-04-30&group=month&responsibilityCenterId=%s',
+            $center->getId(),
+        ));
+
+        self::assertResponseIsSuccessful();
+        $payload = $this->decodeJson($client);
+
+        self::assertSame(['RUB'], $payload['projectCenterMatrix']['currencies']);
+        self::assertSame('Продажа компьютеров', $payload['projectCenterMatrix']['rowsByProject'][0]['project_name']);
+        self::assertSame($project->getId(), $payload['projectCenterMatrix']['rowsByProject'][0]['project_id']);
+        self::assertSame($center->getId(), $payload['projectCenterMatrix']['rowsByProject'][0]['responsibility_center_id']);
+        self::assertEquals([100.0], $payload['projectCenterMatrix']['rowsByProject'][0]['totals']['RUB']);
+        self::assertSame($payload['projectCenterMatrix']['rowsByProject'], $payload['projectCenterMatrix']['rowsByCenter']);
+    }
+
+    public function testCashflowPageRendersProjectCenterMatrixBothWays(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        [$user, $company] = $this->seedCompanyContext('a6');
+        $project = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Сервисные услуги');
+        $center = new FinancialResponsibilityCenter((string) $company->getId(), 'CFO_RND', 'Ростов');
+        $this->em()->persist($project);
+        $this->em()->persist($center);
+        $this->seedCashflowData($company, '250.00', '2026-04-15', $project, $center->getId());
+        $this->em()->flush();
+
+        $this->loginWithActiveCompany($client, $user, $company);
+
+        $client->request('GET', sprintf(
+            '/finance/reports/cashflow?from=2026-04-01&to=2026-04-30&group=month&responsibilityCenterId=%s',
+            $center->getId(),
+        ));
+
+        self::assertResponseIsSuccessful();
+        $content = $client->getResponse()->getContent() ?: '';
+        self::assertStringContainsString('Матрица Проект × ЦФО: RUB', $content);
+        self::assertStringContainsString('ЦФО → проекты', $content);
+        self::assertStringContainsString('Проект → ЦФО', $content);
+        self::assertStringContainsString('Сервисные услуги', $content);
+        self::assertStringContainsString('Ростов', $content);
+        self::assertStringContainsString('+250,00', $content);
     }
 
     public function testExportIsScopedToCurrentUsersActiveCompany(): void
@@ -165,8 +229,13 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
         return [$user, $company];
     }
 
-    private function seedCashflowData(Company $company, string $amount, string $occurredAt): CashflowCategory
-    {
+    private function seedCashflowData(
+        Company $company,
+        string $amount,
+        string $occurredAt,
+        ?ProjectDirection $project = null,
+        ?string $responsibilityCenterId = null,
+    ): CashflowCategory {
         $category = new CashflowCategory(Uuid::uuid4()->toString(), $company);
         $category->setName('Operating inflow '.$occurredAt);
 
@@ -190,6 +259,8 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
             new \DateTimeImmutable($occurredAt),
         );
         $transaction->setCashflowCategory($category);
+        $transaction->setProjectDirection($project);
+        $transaction->setResponsibilityCenterId($responsibilityCenterId);
 
         $em = $this->em();
         $em->persist($category);

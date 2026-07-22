@@ -66,11 +66,13 @@ final class OzonAccrualRollingRefreshCommandTest extends IntegrationTestCase
         self::assertSame(0, $this->parentBackfillJobCount($wbCompany->getId()));
         self::assertSame(1, $this->jobCount($ozonCompany->getId(), OzonResourceType::ACCRUAL_TYPES, SyncJobKind::INCREMENTAL));
 
+        // Без фильтра по kind сюда попадает ещё и INCREMENTAL-задача ACCRUAL_TYPES:
+        // она тоже без родителя, и какая из двух строк вернётся — зависит от порядка в куче.
         $parent = $this->connection->fetchAssociative(
             'SELECT resource_type, shop_ref, progress_total
              FROM ingest_sync_jobs
-             WHERE company_id = :companyId AND parent_job_id IS NULL',
-            ['companyId' => $ozonCompany->getId()],
+             WHERE company_id = :companyId AND parent_job_id IS NULL AND kind = :kind',
+            ['companyId' => $ozonCompany->getId(), 'kind' => SyncJobKind::BACKFILL->value],
         );
 
         self::assertIsArray($parent);

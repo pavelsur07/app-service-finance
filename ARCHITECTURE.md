@@ -187,8 +187,10 @@
 - Stage 7.7.2 propagates Cash transaction ЦФО into newly created Finance `Document` and `DocumentOperation` rows. Manual Finance document forms expose a scalar ЦФО choice and validate Project × ЦФО server-side; operation-level pair overrides document-level pair, while missing operation project/ЦФО inherits from the document. New manual rows with an empty pair default to company `PROJECT_GENERAL × CFO_GENERAL`; unchanged historical incomplete or archived current pairs remain saveable. Marketplace `createPLDocument()` callers still pass `NULL` ЦФО unless a later contract stage explicitly supplies it.
 - Stage 7.7.3 switches new document-driven `pl_daily_totals` writes to the `Project × ЦФО` aggregation key. `PLRegisterUpdater` groups by operation ЦФО, falls back to document ЦФО, and keeps `NULL` as the legacy unallocated bucket. The storage contract uses two partial unique expression indexes: categorized rows key by `company_id × pl_category_id × date × project_direction_id × COALESCE(responsibility_center_id, zero-uuid)`, while uncategorized rows key by `company_id × date × project_direction_id × COALESCE(responsibility_center_id, zero-uuid) WHERE pl_category_id IS NULL`. `pl_category_id` still uses default PostgreSQL nullable semantics; no `NULLS NOT DISTINCT` is used. Category deletion merges affected daily totals into the uncategorized bucket before removing the category so the partial unique index is not violated. Reports without a ЦФО dimension continue to read summed totals.
 - Stage 7.7.4 adds the read-side `responsibilityCenterId` filter to P&L preview, preview JSON, and public P&L JSON endpoints. `PlReportCalculator`, grid builder, project comparison builder, and `PLDailyTotalFactsProvider` pass the optional ЦФО filter through to `pl_daily_totals`; invalid or foreign ЦФО ids are ignored at controller boundaries. Project comparison can now show project columns scoped to one selected ЦФО. Raw P&L debug output displays Project and ЦФО for document operations and daily totals. No historical rebuild or data backfill is performed.
+- Stage 7.8.1 adds the same optional read-only ЦФО filter to the existing ДДС cashflow report and public cashflow JSON/CSV endpoints. `CashflowReportRequestMapper` resolves active company-owned `responsibilityCenterId` values through `FinancialResponsibilityCenterFacade`; invalid, archived, or foreign ids are ignored. `CashflowReportBuilder` filters transaction category totals by `CashTransaction::responsibilityCenterId` when selected, while account opening/closing balances remain company-wide because account balances are not stored by ЦФО. The default unfiltered report remains unchanged and includes legacy `NULL` rows.
+- Stage 7.8.2 adds an additive read-side Project × ЦФО matrix to the existing ДДС cashflow report and JSON payload. `CashflowReportBuilder` groups the selected transaction row set by project, responsibility center, currency, and existing period buckets; inflows stay positive and outflows negative. The UI renders the same matrix in both directions (`ЦФО → проекты` and `Проект → ЦФО`). Legacy `NULL` ЦФО rows appear as `Не задано`; missing projects appear as `Без проекта`. Account balances remain company-wide and no historical recalculation is performed.
 - The expand migration performs no fact backfill, classification inference, or P&L rebuild. Existing rows remain `NULL` and later UI/report stages interpret that state as `Не распределено`.
-- Stage 7.5 originally left `pl_daily_totals` uniqueness unchanged; Stage 7.7.3 is the reviewed switch point. The production pipeline deploys the Stage 7.7.3 application image before running migrations, so the code supports the required `new code / old schema` window with runtime index detection. `old code / new schema` is not a supported rollback mode after the switch migration because the old writer targets the removed project-only unique key; rollback requires a reviewed forward-fix or redeploying Stage 7.7.3-compatible code. The migration locks `pl_daily_totals` before duplicate guards and is forward-only because restoring the old project-only unique key can collapse separate ЦФО buckets.
+- Stage 7.5 originally left `pl_daily_totals` uniqueness unchanged; Stage 7.7.3 is the reviewed switch point. Stage 7.11 removed the temporary runtime old-schema detection after production migration acceptance, so the runtime writer now requires the Project × ЦФО indexes. `old code / new schema` is not a supported rollback mode after the switch migration because the old writer targets the removed project-only unique key; rollback requires a reviewed forward-fix or redeploying Stage 7.7.3-compatible code. The migration locks `pl_daily_totals` before duplicate guards and is forward-only because restoring the old project-only unique key can collapse separate ЦФО buckets.
 
 ### Marketplace: WB financial report sync status (дневной статус)
 
@@ -507,6 +509,9 @@ getAllActiveCompanyIds(): array
 // @param list<string> $companyIds
 // @return list<array{id: string, name: string}>
 getCompaniesByIds(array $companyIds): array
+
+// Контрагент строго в рамках компании — защита от обращения к чужим данным по id
+findCounterpartyByIdAndCompany(string $counterpartyId, string $companyId): ?Counterparty
 ```
 
 ### `CounterpartyFacade` (`src/Company/Facade/CounterpartyFacade.php`)
@@ -629,9 +634,27 @@ updatePLRegisterForDocument(string $documentId): void
 ```php
 // Создать ДДС-транзакцию из внешнего модуля (идемпотентно для внешних источников)
 createTransaction(CreateCashTransactionCommand $command): CreateCashTransactionResult
+
+// Чтение: постраничный список транзакций компании, per_page ≤ CashFacade::MAX_PER_PAGE (200)
+listTransactions(string $companyId, array $filters = [], int $page = 1, int $perPage = 50): array
+
+// Чтение: плоское дерево статей ДДС компании (id, name, level, parentId, status, flowKind, sort, isSystem)
+listCashflowCategories(string $companyId): array
+
+// Чтение: автоправила компании вместе с условиями
+listAutoRules(string $companyId): array
+
+// Запись: создать (без id) или изменить (с id) статью ДДС, возвращает id
+upsertCashflowCategory(string $companyId, CashflowCategoryInput $input): string
+
+// Запись: создать (без id) или изменить (с id) автоправило, возвращает id
+upsertAutoRule(string $companyId, AutoRuleInput $input, ?string $actorUserId = null): string
 ```
 
-**Назначение:** `CashFacade` — единственный публичный контракт Cash-модуля для создания ДДС-транзакций из других модулей.
+Все методы принимают `companyId` и бросают `\DomainException`, если компания или
+запрошенная сущность к ней не относится. Во входных DTO `null` означает «не менять».
+
+**Назначение:** `CashFacade` — единственный публичный контракт Cash-модуля для чтения и записи данных ДДС из других модулей (в том числе из MCP-инструментов).
 
 Другие модули не должны:
 - создавать `CashTransaction` напрямую;
@@ -2362,6 +2385,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 | 1.55 | 2026-07-16 | Company: добавлены плоский справочник ЦФО, стабильные системные коды проекта/ЦФО, разрешённые пары и атомарный bootstrap новой компании |
 | 1.54 | 2026-07-13 | Marketplace/Inventory: WB Product Cards refresh дополнен карточками из корзины, которые сохраняются неактивными и участвуют в точном маппинге остатков по `chrtId` |
 | 1.53 | 2026-07-13 | Inventory: добавлен ручной WB orchestration с обязательным Product Cards refresh, async raw-загрузкой, безопасной offset-пагинацией и отдельным POST endpoint |
+| 1.53 | 2026-07-19 | Mcp: локальный stdio MCP-сервер `app:mcp:serve` (без внешних доступов); `CashFacade` расширен чтением транзакций и CRUD статей ДДС и автоправил, `CompanyFacade::findCounterpartyByIdAndCompany()` |
 | 1.52 | 2026-07-13 | Inventory: добавлена нормализация WB FBW raw-остатков по `chrtId + warehouseId`, точный variant-маппинг, отдельные статусы движения и выбор последней полной сессии по каждому источнику |
 | 1.51 | 2026-07-13 | Marketplace: добавлена атомарная синхронизация WB Product Cards → `MarketplaceListing.marketplaceVariantId` и barcodes |
 | 1.50 | 2026-07-13 | Marketplace: в `MarketplaceListing` добавлен generic `marketplaceVariantId` (`chrtId` для WB) и точный batch-контракт facade |

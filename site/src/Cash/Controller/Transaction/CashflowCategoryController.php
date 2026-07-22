@@ -2,6 +2,7 @@
 
 namespace App\Cash\Controller\Transaction;
 
+use App\Cash\Application\SaveCashflowCategoryAction;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Form\Transaction\CashflowCategoryType;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
@@ -63,7 +64,7 @@ class CashflowCategoryController extends AbstractController
     public function new(
         Request $request,
         CashflowCategoryRepository $repo,
-        EntityManagerInterface $em,
+        SaveCashflowCategoryAction $save,
         ActiveCompanyService $companyService,
         PLCategoryRepository $plCategoryRepository,
     ): Response {
@@ -82,14 +83,12 @@ class CashflowCategoryController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            if ($article->getParent() && $article->getParent()->getLevel() >= 5) {
-                $this->addFlash('danger', 'Максимальная вложенность — 5 уровней');
-            } else {
-                $article->syncFlowKindSubtree();
-                $em->persist($article);
-                $em->flush();
+            try {
+                $save($article);
 
                 return $this->redirectToRoute('cashflow_category_index');
+            } catch (\DomainException $exception) {
+                $this->addFlash('danger', $exception->getMessage());
             }
         }
 
@@ -103,7 +102,7 @@ class CashflowCategoryController extends AbstractController
         Request $request,
         CashflowCategory $article,
         CashflowCategoryRepository $repo,
-        EntityManagerInterface $em,
+        SaveCashflowCategoryAction $save,
         ActiveCompanyService $companyService,
         PLCategoryRepository $plCategoryRepository,
     ): Response {
@@ -124,13 +123,12 @@ class CashflowCategoryController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            if ($article->getParent() && $article->getParent()->getLevel() >= 5) {
-                $this->addFlash('danger', 'Максимальная вложенность — 5 уровней');
-            } else {
-                $article->syncFlowKindSubtree();
-                $em->flush();
+            try {
+                $save($article);
 
                 return $this->redirectToRoute('cashflow_category_index');
+            } catch (\DomainException $exception) {
+                $this->addFlash('danger', $exception->getMessage());
             }
         }
 

@@ -14,13 +14,14 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
 {
     private const COMPANY_ID = '19621cff-b028-45d9-9193-11f47ad9a8b2';
 
-    public function testMapsSaleRowToGrossSaleCommissionAndAcquiring(): void
+    public function testMapsSaleRowToSellerPriceCommissionAndAcquiring(): void
     {
         $result = $this->mapper()->preview(self::COMPANY_ID, [[
             'rrdId' => 101,
             'currency' => 'RUB',
             'docTypeName' => 'Продажа',
             'sellerOperName' => 'Продажа',
+            'quantity' => 1,
             'saleDt' => '2026-06-21T10:15:00Z',
             'retailPriceWithDisc' => '1000.00',
             'retailAmount' => '920.00',
@@ -38,14 +39,16 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
         $sale = $this->transaction($result->transactions, 'wb:sales-report-detailed:101:sale');
         self::assertSame(TransactionType::SALE, $sale->type);
         self::assertSame(TransactionDirection::IN, $sale->direction);
-        self::assertSame(92000, $sale->amountMinor);
+        self::assertSame(100000, $sale->amountMinor);
+        self::assertSame('retailPriceWithDisc*quantity', $sale->field);
+        self::assertSame(3, $sale->sourceData['_ingestion_mapper_version']);
         self::assertSame('2026-06-21 10:15:00', $sale->occurredAt->format('Y-m-d H:i:s'));
 
         $commission = $this->transaction($result->transactions, 'wb:sales-report-detailed:101:commission');
         self::assertSame(TransactionType::COMMISSION, $commission->type);
         self::assertSame(TransactionDirection::OUT, $commission->direction);
-        self::assertSame(5000, $commission->amountMinor);
-        self::assertSame('ppvzVw+ppvzVwNds', $commission->field);
+        self::assertSame(13000, $commission->amountMinor);
+        self::assertSame('retailPriceWithDisc*quantity-forPay-acquiringFee', $commission->field);
 
         $acquiring = $this->transaction($result->transactions, 'wb:sales-report-detailed:101:acquiring');
         self::assertSame(TransactionType::ACQUIRING, $acquiring->type);
@@ -65,6 +68,7 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
             'currency' => 'RUB',
             'docTypeName' => 'Продажа',
             'sellerOperName' => 'Продажа',
+            'quantity' => 1,
             'saleDt' => '2026-06-21T10:15:00Z',
             'retailPriceWithDisc' => '1000.00',
             'retailAmount' => '920.00',
@@ -78,10 +82,13 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
             'cashbackDiscount' => '4.10',
         ]]);
 
-        self::assertCount(6, $result->transactions);
+        self::assertCount(5, $result->transactions);
         $this->transaction($result->transactions, 'wb:sales-report-detailed:107:logistics_delivery');
-        $this->transaction($result->transactions, 'wb:sales-report-detailed:107:pvz_processing');
         $this->transaction($result->transactions, 'wb:sales-report-detailed:107:loyalty_discount_compensation');
+        self::assertNotContains(
+            'wb:sales-report-detailed:107:pvz_processing',
+            array_map(static fn (WbFinancePreviewTransaction $transaction): string => $transaction->sourceKey, $result->transactions),
+        );
 
         self::assertCount(1, $result->rowChecks);
         self::assertSame(85000, $result->rowChecks[0]->expectedNetMinor);
@@ -130,11 +137,12 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
             'currency' => 'RUB',
             'docTypeName' => 'Возврат',
             'sellerOperName' => 'Возврат',
+            'quantity' => 1,
             'saleDt' => '2026-06-21T12:00:00Z',
             'retailPriceWithDisc' => '1000.00',
             'retailAmount' => '920.00',
-            'forPay' => '850.00',
-            'acquiringFee' => '20.00',
+            'forPay' => '-850.00',
+            'acquiringFee' => '-20.00',
             'ppvzVw' => '40.00',
             'ppvzVwNds' => '10.00',
         ]]);
@@ -144,12 +152,12 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
         $refund = $this->transaction($result->transactions, 'wb:sales-report-detailed:102:refund');
         self::assertSame(TransactionType::REFUND, $refund->type);
         self::assertSame(TransactionDirection::OUT, $refund->direction);
-        self::assertSame(92000, $refund->amountMinor);
+        self::assertSame(100000, $refund->amountMinor);
 
         $commission = $this->transaction($result->transactions, 'wb:sales-report-detailed:102:commission');
         self::assertSame(TransactionType::COMMISSION, $commission->type);
         self::assertSame(TransactionDirection::IN, $commission->direction);
-        self::assertSame(5000, $commission->amountMinor);
+        self::assertSame(13000, $commission->amountMinor);
 
         $acquiring = $this->transaction($result->transactions, 'wb:sales-report-detailed:102:acquiring');
         self::assertSame(TransactionType::ACQUIRING, $acquiring->type);
@@ -159,6 +167,28 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
         self::assertCount(1, $result->rowChecks);
         self::assertSame(-85000, $result->rowChecks[0]->expectedNetMinor);
         self::assertSame(-85000, $result->rowChecks[0]->actualNetMinor);
+        self::assertSame(0, $result->rowChecks[0]->deltaMinor);
+    }
+
+    public function testUsesCanonicalFormulaInsteadOfVwFields(): void
+    {
+        $result = $this->mapper()->preview(self::COMPANY_ID, [[
+            'rrdId' => 110,
+            'currency' => 'RUB',
+            'docTypeName' => 'Продажа',
+            'sellerOperName' => 'Продажа',
+            'quantity' => 1,
+            'saleDt' => '2026-03-21T00:00:00Z',
+            'retailPriceWithDisc' => '399.68',
+            'retailAmount' => '367.00',
+            'forPay' => '376.99',
+            'acquiringFee' => '14.89',
+            'vw' => '22.25',
+            'vwNds' => '4.45',
+        ]]);
+
+        self::assertSame(39968, $this->transaction($result->transactions, 'wb:sales-report-detailed:110:sale')->amountMinor);
+        self::assertSame(780, $this->transaction($result->transactions, 'wb:sales-report-detailed:110:commission')->amountMinor);
         self::assertSame(0, $result->rowChecks[0]->deltaMinor);
     }
 
@@ -222,11 +252,14 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
             'docTypeName' => 'Продажа',
             'rrDate' => '2026-06-21',
             'ppvzReward' => '-17.25',
+            'vw' => '-14.38',
+            'vwNds' => '-2.87',
         ]]);
 
         self::assertCount(1, $result->transactions);
         self::assertSame([], $result->rowChecks);
         self::assertSame([], $result->unknownRows);
+        self::assertSame([], $result->validationIssues);
 
         $transaction = $this->transaction($result->transactions, 'wb:sales-report-detailed:104:pvz_processing');
         self::assertSame(TransactionType::LOGISTICS, $transaction->type);
@@ -250,6 +283,7 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
         self::assertCount(1, $result->transactions);
         self::assertSame([], $result->rowChecks);
         self::assertSame([], $result->unknownRows);
+        self::assertSame([], $result->validationIssues);
 
         $transaction = $this->transaction($result->transactions, 'wb:sales-report-detailed:105:loyalty_discount_compensation');
         self::assertSame(TransactionType::BONUS, $transaction->type);

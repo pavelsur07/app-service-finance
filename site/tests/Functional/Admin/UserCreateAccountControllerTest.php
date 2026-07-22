@@ -87,11 +87,11 @@ final class UserCreateAccountControllerTest extends WebTestCaseBase
         $client->submit($form);
 
         self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
-        self::assertSelectorTextContains('h2.page-title', 'Зарегистрированные пользователи');
+        self::assertSelectorTextContains('h1.wz-title', 'Зарегистрированные пользователи');
         self::assertStringContainsString('existing@example.test', $client->getResponse()->getContent());
         self::assertSelectorTextContains('.invalid-feedback', 'There is already an account with this email');
         self::assertStringContainsString(
-            'window.bootstrap.Modal.getOrCreateInstance(modalElement).show();',
+            "document.getElementById('account-create-dialog')?.showModal();",
             $client->getResponse()->getContent()
         );
     }

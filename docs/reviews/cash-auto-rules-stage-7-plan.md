@@ -2,11 +2,12 @@
 
 ## Status
 
-- Phase: **Stage 7.6.1 and Stage 7.9.1b accepted in production; Stage 7.9.2 command deployed; Stage 7.9.3 implemented locally**
+- Phase: **Stage 7 closed**
 - Overall risk: **HIGH** because the model adds company master data and new financial dimensions to Cash, documents, P&L aggregates, and auto rules
-- Next action: **complete the Stage 7.9.2 production configuration gate and review Stage 7.9.3; Stage 7.9.4 remains blocked until controlled Stage 7.9.3 production acceptance**
+- Next action: **none inside Stage 7; open a new scoped stage/task for future work**
 - Further production mutations: **forbidden until a separately approved migration or backfill step**
 - Historical recalculation: **forbidden by default**
+- Current status source: `docs/reviews/cash-auto-rules-stage-7-current-status.md`
 
 ## Goal
 
@@ -270,6 +271,8 @@ Phase 0 status: PREPARED. The implementation is split into Finance scalar mappin
 **Result:** users can view totals by ЦФО, projects within ЦФО, ЦФО within project, and the project × ЦФО matrix.
 
 Backend query/contract work and frontend presentation must remain separate reviewable units if a new endpoint or UI screen is required.
+
+Implementation status: Stage 7.7.4 already covers the P&L read-side ЦФО filter, project comparison inside selected ЦФО, and public P&L JSON support. Stage 7.8.1 therefore limits the remaining scope to the existing ДДС cashflow report/API: optional active company-owned `responsibilityCenterId` filters transaction category totals while preserving unfiltered behavior and company-wide account balances.
 
 ### Stage 7.9 — ЦФО auto-rule target
 

@@ -1,5 +1,44 @@
 {% extends 'base.html.twig' %}
 
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        /* Таблица ДДС: «Категория» закреплена слева, столбцы периодов фиксированной ширины.
+           Селекторы .table.cf-table — чтобы правила не перебивались .table из app.css, который грузится ниже. */
+        .table.cf-table {
+            --cf-col-name: 280px;
+            --cf-col-period: 120px;
+            /* table-layout: fixed работает только при определённой ширине таблицы;
+               при width:auto браузер молча откатывается на auto-раскладку.
+               Ширину даёт .table (width:100%), а min-width задаётся инлайном по числу периодов. */
+            table-layout: fixed;
+        }
+        .table.cf-table th,
+        .table.cf-table td {
+            white-space: nowrap;
+        }
+        .table.cf-table col.cf-col-name { width: var(--cf-col-name); }
+        .table.cf-table col.cf-col-period { width: var(--cf-col-period); }
+        .table.cf-table th:first-child,
+        .table.cf-table td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 2;
+            background: var(--tblr-bg-surface);
+            /* при border-collapse граница залипшей ячейки не рисуется поверх уезжающих — подменяем тенью */
+            box-shadow: inset -1px 0 0 var(--tblr-border-color);
+        }
+        .table.cf-table .cf-toggle,
+        .table.cf-table .cf-toggle-spacer {
+            flex: none;
+            width: 16px;
+            margin-right: 4px;
+            text-align: center;
+        }
+        .table.cf-table .cf-toggle { cursor: pointer; }
+    </style>
+{% endblock %}
+
 {#{% block breadcrumbs %}
     {% include 'partials/_breadcrumbs.html.twig' with {
         breadcrumbs: [
@@ -24,6 +63,14 @@
     </div>
     <input type="hidden" name="group" value="{{ group }}" id="group-input"/>
     <div class="col-auto">
+        <select name="responsibilityCenterId" class="form-select" aria-label="ЦФО">
+            <option value="">Все ЦФО</option>
+            {% for center in responsibilityCenters|default([]) %}
+                <option value="{{ center.id }}" {{ selectedResponsibilityCenterId|default(null) == center.id ? 'selected' }}>{{ center.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-auto">
         <div class="btn-group" role="group">
             <button type="submit" class="btn btn-outline-primary {% if group == 'day' %}active{% endif %}" onclick="document.getElementById('group-input').value='day'">По дням</button>
             <button type="submit" class="btn btn-outline-primary {% if group == 'week' %}active{% endif %}" onclick="document.getElementById('group-input').value='week'">По неделям</button>
@@ -38,6 +85,12 @@
     </div>
 </form>
 
+{% if selectedResponsibilityCenterId|default(null) %}
+    <div class="alert alert-info">
+        Фильтр ЦФО применяется к операциям и строкам ДДС. Сальдо на начало и конец остаётся общим по компании, так как остатки по счетам не ведутся в разрезе ЦФО.
+    </div>
+{% endif %}
+
 {% set periodCount = periods|length %}
 {% import _self as macros %}
 
@@ -51,13 +104,15 @@
 {% set hasChildren = cat.children|length > 0 %}
 {% set hidden = cat.level >= 2 %}
 <tr data-id="{{ cat.id }}" data-parent="{{ parentId }}" data-level="{{ cat.level }}"{% if hidden %} style="display:none"{% endif %}>
-    <td style="padding-left: {{ (cat.level - 1) * 20 }}px; white-space: nowrap;">
-        {%- if hasChildren -%}
-            <span class="cf-toggle" data-target="{{ cat.id }}" style="cursor:pointer; display:inline-block; width:16px; text-align:center; margin-right:4px;">&#9654;</span>
-        {%- else -%}
-            <span style="display:inline-block; width:16px; margin-right:4px;"></span>
-        {%- endif -%}
-        {{ cat.name }}
+    <td style="padding-left: {{ (cat.level - 1) * 20 }}px;">
+        <div class="d-flex align-items-center">
+            {%- if hasChildren -%}
+                <span class="cf-toggle" data-target="{{ cat.id }}">&#9654;</span>
+            {%- else -%}
+                <span class="cf-toggle-spacer"></span>
+            {%- endif -%}
+            <span class="text-truncate" title="{{ cat.name }}">{{ cat.name }}</span>
+        </div>
     </td>
     {% for i in 0..periodCount-1 %}
         {% set val = totals[cat.id].totals[currency][i] ?? 0 %}
@@ -69,13 +124,46 @@
 {% endfor %}
 {% endmacro %}
 
+{% macro center_label(row, centerLabels) %}
+    {{ row.responsibility_center_name ?? centerLabels[row.responsibility_center_id]|default(row.responsibility_center_id) }}
+{% endmacro %}
+
+{% macro render_project_center_rows(rows, currency, periods, primary, centerLabels) %}
+    {% for row in rows %}
+        {% set vals = row.totals[currency]|default([]) %}
+        {% if vals is not empty %}
+            <tr>
+                {% if primary == 'center' %}
+                    <td>{{ _self.center_label(row, centerLabels) }}</td>
+                    <td>{{ row.project_name }}</td>
+                {% else %}
+                    <td>{{ row.project_name }}</td>
+                    <td>{{ _self.center_label(row, centerLabels) }}</td>
+                {% endif %}
+                {% for i, p in periods %}
+                    <td class="text-end">{{ _self.format_amount(vals[i]|default(0))|raw }}</td>
+                {% endfor %}
+            </tr>
+        {% endif %}
+    {% endfor %}
+{% endmacro %}
+
+{% set responsibilityCenterLabels = {} %}
+{% for center in responsibilityCenters|default([]) %}
+    {% set responsibilityCenterLabels = responsibilityCenterLabels|merge({(center.id): center.name}) %}
+{% endfor %}
+
 {% for currency, values in openings %}
     <div class="card mb-4">
         <div class="card-header">
             <h3 class="card-title">Валюта: {{ currency }}</h3>
         </div>
         <div class="table-responsive">
-            <table class="table table-bordered table-striped">
+            <table class="table table-bordered cf-table" style="min-width: calc(var(--cf-col-name) + {{ periodCount }} * var(--cf-col-period));">
+                <colgroup>
+                    <col class="cf-col-name">
+                    {% for p in periods %}<col class="cf-col-period">{% endfor %}
+                </colgroup>
                 <thead>
                     <tr>
                         <th>Категория</th>
@@ -105,6 +193,53 @@
         </div>
     </div>
 {% endfor %}
+
+{% if projectCenterMatrix.rowsByCenter|default([]) is not empty %}
+    {% for currency in projectCenterMatrix.currencies %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="card-title">Матрица Проект × ЦФО: {{ currency }}</h3>
+            </div>
+            <div class="card-body">
+                <h4>ЦФО → проекты</h4>
+                <div class="table-responsive mb-4">
+                    <table class="table table-sm table-bordered table-striped">
+                        <thead>
+                            <tr>
+                                <th>ЦФО</th>
+                                <th>Проект</th>
+                                {% for p in periods %}
+                                    <th>{{ p.label }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{ macros.render_project_center_rows(projectCenterMatrix.rowsByCenter, currency, periods, 'center', responsibilityCenterLabels) }}
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4>Проект → ЦФО</h4>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered table-striped">
+                        <thead>
+                            <tr>
+                                <th>Проект</th>
+                                <th>ЦФО</th>
+                                {% for p in periods %}
+                                    <th>{{ p.label }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{ macros.render_project_center_rows(projectCenterMatrix.rowsByProject, currency, periods, 'project', responsibilityCenterLabels) }}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+{% endif %}
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {

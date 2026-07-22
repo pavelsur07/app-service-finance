@@ -103,7 +103,41 @@ final class OzonAccrualDailyMaintenanceCommandTest extends IntegrationTestCase
         ]);
 
         self::assertSame(Command::SUCCESS, $exit, $tester->getDisplay());
-        self::assertStringContainsString('global taxonomy health is informational', $tester->getDisplay());
+        self::assertStringContainsString('taxonomy health is informational', $tester->getDisplay());
+    }
+
+    public function testExecuteFailsWhenUnclassifiedTransactionInsideWindow(): void
+    {
+        $runner = new FakeOzonAccrualCategoryMetadataBulkRunner();
+        self::getContainer()->set(OzonAccrualCategoryMetadataBulkRunnerInterface::class, $runner);
+        $this->persistUnclassifiedTransaction('2026-06-10 00:00:00+03:00');
+
+        $tester = $this->tester();
+        $exit = $tester->execute([
+            '--from' => '2026-06-01',
+            '--to' => '2026-06-25',
+            '--execute' => true,
+        ]);
+
+        self::assertSame(Command::FAILURE, $exit, $tester->getDisplay());
+        self::assertStringContainsString('finished with failures', $tester->getDisplay());
+    }
+
+    public function testExecuteIgnoresUnclassifiedTransactionOutsideWindow(): void
+    {
+        $runner = new FakeOzonAccrualCategoryMetadataBulkRunner();
+        self::getContainer()->set(OzonAccrualCategoryMetadataBulkRunnerInterface::class, $runner);
+        $this->persistUnclassifiedTransaction('2026-05-20 00:00:00+03:00');
+
+        $tester = $this->tester();
+        $exit = $tester->execute([
+            '--from' => '2026-06-01',
+            '--to' => '2026-06-25',
+            '--execute' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exit, $tester->getDisplay());
+        self::assertStringContainsString('Ozon accrual daily maintenance finished.', $tester->getDisplay());
     }
 
     public function testRejectsOutOfRangeIntegerOptions(): void
@@ -131,7 +165,7 @@ final class OzonAccrualDailyMaintenanceCommandTest extends IntegrationTestCase
         return new CommandTester($app->find('app:ingestion:ozon-accrual:daily-maintenance'));
     }
 
-    private function persistUnclassifiedTransaction(): void
+    private function persistUnclassifiedTransaction(string $occurredAt = '2026-06-25 00:00:00+03:00'): void
     {
         $companyId = Uuid::uuid7()->toString();
         $connectionRef = Uuid::uuid7()->toString();
@@ -148,7 +182,7 @@ final class OzonAccrualDailyMaintenanceCommandTest extends IntegrationTestCase
             type: TransactionType::FEE,
             direction: TransactionDirection::OUT,
             money: Money::fromMinor(100, 'RUB'),
-            occurredAt: new \DateTimeImmutable('2026-06-25 00:00:00+03:00'),
+            occurredAt: new \DateTimeImmutable($occurredAt),
             rawRecordId: $rawRecordId,
             description: 'Ozon accrual unclassified test',
             sourceData: [

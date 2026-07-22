@@ -10,6 +10,7 @@ use App\Ingestion\Application\Action\RefreshOzonAccrualCategoryMetadataAction;
 use App\Ingestion\Application\Action\SeedExternalCategoryMappingsAction;
 use App\Ingestion\Application\Action\UpdateExternalCategoryMappingAction;
 use App\Ingestion\Enum\ExternalCategoryMappingStatus;
+use App\Ingestion\Enum\ExternalCategoryStatus;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\TransactionType;
 use App\Ingestion\Infrastructure\Query\ExternalCategoryAdminQuery;
@@ -33,6 +34,7 @@ final class IngestionExternalCategoriesController extends AbstractController
             'latest_categories' => $query->latestCategories(),
             'transaction_types' => TransactionType::cases(),
             'mapping_statuses' => ExternalCategoryMappingStatus::cases(),
+            'category_statuses' => ExternalCategoryStatus::cases(),
             'last_refresh' => null,
         ]);
     }
@@ -133,6 +135,7 @@ final class IngestionExternalCategoriesController extends AbstractController
                 'latest_categories' => $query->latestCategories(),
                 'transaction_types' => TransactionType::cases(),
                 'mapping_statuses' => ExternalCategoryMappingStatus::cases(),
+                'category_statuses' => ExternalCategoryStatus::cases(),
                 'last_refresh' => $result + ['mode' => $mode],
             ]);
         } catch (\Throwable $exception) {

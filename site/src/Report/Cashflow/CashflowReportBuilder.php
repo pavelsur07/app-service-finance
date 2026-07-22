@@ -7,9 +7,14 @@ use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
+use App\Company\Entity\Company;
+use Doctrine\ORM\QueryBuilder;
 
 final class CashflowReportBuilder
 {
+    private const NO_PROJECT_KEY = '__no_project__';
+    private const NO_RESPONSIBILITY_CENTER_KEY = '__no_responsibility_center__';
+
     public function __construct(
         private CashflowCategoryRepository $categoryRepository,
         private CashTransactionRepository $transactionRepository,
@@ -38,30 +43,30 @@ final class CashflowReportBuilder
             ];
         }
 
-        $rows = $this->transactionRepository->createQueryBuilder('t')
-            ->select('IDENTITY(t.cashflowCategory) AS category', 't.direction', 't.amount', 't.currency', 't.occurredAt')
-            ->where('t.company = :company')
-            ->andWhere('t.occurredAt BETWEEN :from AND :to')
-            ->andWhere('t.deletedAt IS NULL')
-            ->setParameter('company', $company)
-            ->setParameter('from', $from->setTime(0, 0))
-            ->setParameter('to', $to->setTime(23, 59, 59))
-            ->getQuery()->getArrayResult();
+        $transactionQueryBuilder = $this->createTransactionRowsQueryBuilder($company, $from, $to);
 
-        $companyTotals = [];
+        if (null !== $params->responsibilityCenterId) {
+            $transactionQueryBuilder
+                ->andWhere('t.responsibilityCenterId = :responsibilityCenterId')
+                ->setParameter('responsibilityCenterId', $params->responsibilityCenterId);
+        }
+
+        $rows = $transactionQueryBuilder
+            ->getQuery()
+            ->getArrayResult();
+        $companyRows = null === $params->responsibilityCenterId
+            ? $rows
+            : $this->createTransactionRowsQueryBuilder($company, $from, $to)
+                ->getQuery()
+                ->getArrayResult();
+
         foreach ($rows as $row) {
             $catId = $row['category'];
             if (!$catId || !isset($categoryMap[$catId])) {
                 continue;
             }
 
-            $amount = (float) $row['amount'];
-            $direction = $row['direction'] instanceof CashDirection
-                ? $row['direction']->value
-                : $row['direction'];
-            $amount = $direction === CashDirection::OUTFLOW->value
-                ? -abs($amount)
-                : abs($amount);
+            $amount = $this->signedAmount($row);
             $currency = $row['currency'];
             $periodIndex = $this->findPeriodIndex($periods, $row['occurredAt']);
             if (null === $periodIndex) {
@@ -73,6 +78,22 @@ final class CashflowReportBuilder
             }
 
             $categoryMap[$catId]['totals'][$currency][$periodIndex] += $amount;
+        }
+
+        $companyTotals = [];
+        foreach ($companyRows as $row) {
+            $catId = $row['category'];
+            if (!$catId || !isset($categoryMap[$catId])) {
+                continue;
+            }
+
+            $amount = $this->signedAmount($row);
+            $currency = $row['currency'];
+            $periodIndex = $this->findPeriodIndex($periods, $row['occurredAt']);
+            if (null === $periodIndex) {
+                continue;
+            }
+
             $companyTotals[$currency][$periodIndex] = ($companyTotals[$currency][$periodIndex] ?? 0) + $amount;
         }
 
@@ -147,6 +168,7 @@ final class CashflowReportBuilder
         return [
             'company' => $company,
             'group' => $group,
+            'responsibility_center_id' => $params->responsibilityCenterId,
             'date_from' => $from,
             'date_to' => $to,
             'periods' => $periods,
@@ -156,7 +178,127 @@ final class CashflowReportBuilder
             'closings' => $closings,
             'tree' => $tree,
             'categoryTree' => $categoryTree,
+            'projectCenterMatrix' => $this->buildProjectCenterMatrix($rows, $periods),
         ];
+    }
+
+    private function createTransactionRowsQueryBuilder(
+        Company $company,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+    ): QueryBuilder {
+        return $this->transactionRepository->createQueryBuilder('t')
+            ->select(
+                'IDENTITY(t.cashflowCategory) AS category',
+                'IDENTITY(t.projectDirection) AS project_id',
+                'project.name AS project_name',
+                't.responsibilityCenterId AS responsibility_center_id',
+                't.direction',
+                't.amount',
+                't.currency',
+                't.occurredAt',
+            )
+            ->leftJoin('t.projectDirection', 'project')
+            ->where('t.company = :company')
+            ->andWhere('t.occurredAt BETWEEN :from AND :to')
+            ->andWhere('t.deletedAt IS NULL')
+            ->setParameter('company', $company)
+            ->setParameter('from', $from->setTime(0, 0))
+            ->setParameter('to', $to->setTime(23, 59, 59));
+    }
+
+    /**
+     * @param list<array<string,mixed>>                                                 $rows
+     * @param list<array{label:string,start:\DateTimeInterface,end:\DateTimeInterface}> $periods
+     *
+     * @return array{
+     *     currencies:list<string>,
+     *     rowsByCenter:list<array<string,mixed>>,
+     *     rowsByProject:list<array<string,mixed>>
+     * }
+     */
+    private function buildProjectCenterMatrix(array $rows, array $periods): array
+    {
+        $periodCount = count($periods);
+        $pairs = [];
+        $currencies = [];
+
+        foreach ($rows as $row) {
+            $periodIndex = $this->findPeriodIndex($periods, $row['occurredAt']);
+            if (null === $periodIndex) {
+                continue;
+            }
+
+            $projectId = $row['project_id'] ?? null;
+            $projectKey = null === $projectId ? self::NO_PROJECT_KEY : (string) $projectId;
+            $centerId = $row['responsibility_center_id'] ?? null;
+            $centerKey = null === $centerId ? self::NO_RESPONSIBILITY_CENTER_KEY : (string) $centerId;
+            $pairKey = $centerKey.'|'.$projectKey;
+            $currency = (string) $row['currency'];
+            $currencies[$currency] = $currency;
+
+            if (!isset($pairs[$pairKey])) {
+                $pairs[$pairKey] = [
+                    'project_key' => $projectKey,
+                    'project_id' => null === $projectId ? null : (string) $projectId,
+                    'project_name' => $row['project_name'] ?? 'Без проекта',
+                    'responsibility_center_key' => $centerKey,
+                    'responsibility_center_id' => null === $centerId ? null : (string) $centerId,
+                    'responsibility_center_name' => null === $centerId ? 'Не задано' : null,
+                    'totals' => [],
+                ];
+            }
+
+            if (!isset($pairs[$pairKey]['totals'][$currency])) {
+                $pairs[$pairKey]['totals'][$currency] = array_fill(0, $periodCount, 0.0);
+            }
+
+            $pairs[$pairKey]['totals'][$currency][$periodIndex] += $this->signedAmount($row);
+        }
+
+        $rowsByCenter = array_values($pairs);
+        usort(
+            $rowsByCenter,
+            static fn (array $a, array $b): int => [
+                $a['responsibility_center_name'] ?? $a['responsibility_center_id'] ?? '',
+                $a['project_name'],
+            ] <=> [
+                $b['responsibility_center_name'] ?? $b['responsibility_center_id'] ?? '',
+                $b['project_name'],
+            ],
+        );
+
+        $rowsByProject = $rowsByCenter;
+        usort(
+            $rowsByProject,
+            static fn (array $a, array $b): int => [
+                $a['project_name'],
+                $a['responsibility_center_name'] ?? $a['responsibility_center_id'] ?? '',
+            ] <=> [
+                $b['project_name'],
+                $b['responsibility_center_name'] ?? $b['responsibility_center_id'] ?? '',
+            ],
+        );
+
+        return [
+            'currencies' => array_values($currencies),
+            'rowsByCenter' => $rowsByCenter,
+            'rowsByProject' => $rowsByProject,
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $row
+     */
+    private function signedAmount(array $row): float
+    {
+        $direction = $row['direction'] instanceof CashDirection
+            ? $row['direction']->value
+            : $row['direction'];
+
+        return $direction === CashDirection::OUTFLOW->value
+            ? -abs((float) $row['amount'])
+            : abs((float) $row['amount']);
     }
 
     /**
@@ -208,7 +350,7 @@ final class CashflowReportBuilder
      *   'children'=> array<node>
      * ].
      *
-     * @param \App\Cash\Entity\Transaction\CashflowCategory[] $allCategories // полный список (findTreeByCompany)
+     * @param \App\Cash\Entity\Transaction\CashflowCategory[]                                                                  $allCategories // полный список (findTreeByCompany)
      * @param array<string,array{entity:\App\Cash\Entity\Transaction\CashflowCategory, totals:array<string,array<int,float>>}> $categoryMap
      *
      * @return array<int,array>

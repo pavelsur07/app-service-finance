@@ -10,6 +10,8 @@ use App\Company\Entity\User;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Finance\Application\Action\RebuildPnlPeriodAction;
 use App\Finance\Application\Command\RebuildPnlPeriodCommand;
+use App\Finance\Entity\PLCategory;
+use App\Finance\Enum\PLFlow;
 use App\Ingestion\Entity\FinancialTransaction;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\PLDirtyPeriodStatus;
@@ -81,6 +83,40 @@ final class RebuildPnlPeriodActionTest extends IntegrationTestCase
         ));
     }
 
+    public function testRebuildNetsCommissionAndBonusReversalsInTheirCanonicalCategories(): void
+    {
+        $company = $this->createCompanyWithDefaultProject();
+        $companyId = (string) $company->getId();
+        $this->persistCategory($company, 'INGESTION_COMMISSION', PLFlow::EXPENSE);
+        $this->persistCategory($company, 'INGESTION_BONUS', PLFlow::INCOME);
+        $this->persistTransaction($companyId, TransactionType::COMMISSION, TransactionDirection::OUT, 2000, '2026-02-10 10:00:00 UTC', 'commission-out');
+        $this->persistTransaction($companyId, TransactionType::COMMISSION, TransactionDirection::IN, 1000, '2026-02-10 11:00:00 UTC', 'commission-in');
+        $this->persistTransaction($companyId, TransactionType::BONUS, TransactionDirection::IN, 3000, '2026-02-10 12:00:00 UTC', 'bonus-in');
+        $this->persistTransaction($companyId, TransactionType::BONUS, TransactionDirection::OUT, 4000, '2026-02-10 13:00:00 UTC', 'bonus-out');
+        $this->em->flush();
+
+        /** @var RebuildPnlPeriodAction $action */
+        $action = self::getContainer()->get(RebuildPnlPeriodAction::class);
+        $action(new RebuildPnlPeriodCommand($companyId, 2026, 2));
+
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT c.code,
+                    SUM(d.amount_income)::numeric(18,2)::text AS amount_income,
+                    SUM(d.amount_expense)::numeric(18,2)::text AS amount_expense
+             FROM pl_daily_totals d
+             INNER JOIN pl_categories c ON c.id = d.pl_category_id
+             WHERE d.company_id = :company_id
+             GROUP BY c.code
+             ORDER BY c.code',
+            ['company_id' => $companyId],
+        );
+
+        self::assertSame([
+            ['code' => 'INGESTION_BONUS', 'amount_income' => '30.00', 'amount_expense' => '40.00'],
+            ['code' => 'INGESTION_COMMISSION', 'amount_income' => '10.00', 'amount_expense' => '20.00'],
+        ], $rows);
+    }
+
     public function testSourceScopedRebuildIsFailedUntilFinanceSourceLinkingIsDecided(): void
     {
         $company = $this->createCompanyWithDefaultProject();
@@ -147,6 +183,16 @@ final class RebuildPnlPeriodActionTest extends IntegrationTestCase
             occurredAt: new \DateTimeImmutable($occurredAt),
             rawRecordId: Uuid::uuid7()->toString(),
         ));
+    }
+
+    private function persistCategory(Company $company, string $code, PLFlow $flow): void
+    {
+        $category = new PLCategory(Uuid::uuid4()->toString(), $company);
+        $category
+            ->setName($code)
+            ->setCode($code)
+            ->setFlow($flow);
+        $this->em->persist($category);
     }
 
     private function sumColumn(string $table, string $companyId, string $column): string

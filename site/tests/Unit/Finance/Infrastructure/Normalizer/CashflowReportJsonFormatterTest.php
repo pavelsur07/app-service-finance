@@ -58,11 +58,29 @@ final class CashflowReportJsonFormatterTest extends TestCase
             'closings' => ['USD' => [133.45]],
             'tree' => $tree,
             'categoryTree' => $categoryTree,
+            'projectCenterMatrix' => [
+                'currencies' => ['USD'],
+                'rowsByCenter' => [[
+                    'project_id' => '33333333-3333-4333-8333-333333333333',
+                    'project_name' => 'Main',
+                    'responsibility_center_id' => '44444444-4444-4444-8444-444444444444',
+                    'responsibility_center_name' => null,
+                    'totals' => ['USD' => [123.45]],
+                ]],
+                'rowsByProject' => [[
+                    'project_id' => '33333333-3333-4333-8333-333333333333',
+                    'project_name' => 'Main',
+                    'responsibility_center_id' => '44444444-4444-4444-8444-444444444444',
+                    'responsibility_center_name' => null,
+                    'totals' => ['USD' => [123.45]],
+                ]],
+            ],
         ]);
 
         self::assertSame([
             'company' => $company->getId(),
             'group' => 'month',
+            'responsibility_center_id' => null,
             'date_from' => '2026-01-01',
             'date_to' => '2026-01-31',
             'periods' => [[
@@ -83,6 +101,23 @@ final class CashflowReportJsonFormatterTest extends TestCase
             'closings' => ['USD' => [133.45]],
             'tree' => $tree,
             'categoryTree' => $categoryTree,
+            'projectCenterMatrix' => [
+                'currencies' => ['USD'],
+                'rowsByCenter' => [[
+                    'project_id' => '33333333-3333-4333-8333-333333333333',
+                    'project_name' => 'Main',
+                    'responsibility_center_id' => '44444444-4444-4444-8444-444444444444',
+                    'responsibility_center_name' => null,
+                    'totals' => ['USD' => [123.45]],
+                ]],
+                'rowsByProject' => [[
+                    'project_id' => '33333333-3333-4333-8333-333333333333',
+                    'project_name' => 'Main',
+                    'responsibility_center_id' => '44444444-4444-4444-8444-444444444444',
+                    'responsibility_center_name' => null,
+                    'totals' => ['USD' => [123.45]],
+                ]],
+            ],
         ], $formatted);
     }
 
@@ -95,6 +130,7 @@ final class CashflowReportJsonFormatterTest extends TestCase
         $formatted = $formatter->format([
             'company' => $company,
             'group' => 'day',
+            'responsibility_center_id' => '44444444-4444-4444-8444-444444444444',
             'date_from' => new \DateTimeImmutable('2026-02-01'),
             'date_to' => new \DateTimeImmutable('2026-02-02'),
             'periods' => [],
@@ -115,6 +151,7 @@ final class CashflowReportJsonFormatterTest extends TestCase
         self::assertSame('cashflow', $formatted['dataset']);
         self::assertSame([
             'group' => 'day',
+            'responsibility_center_id' => '44444444-4444-4444-8444-444444444444',
             'date_from' => '2026-02-01',
             'date_to' => '2026-02-02',
         ], $formatted['filters']);
