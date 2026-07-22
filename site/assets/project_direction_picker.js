@@ -8,13 +8,9 @@ function escapeSelector(value) {
     return String(value).replace(/([ #;?%&,.+*~':"!^$[\]()=>|/\\])/g, '\\$1');
 }
 
-function getBootstrap() {
-    // Tabler обычно включает Bootstrap bundle; если нет — graceful fallback
-    return window.bootstrap || null;
-}
-
 function resolveBootstrap() {
-    return window.bootstrap || null;
+    // Tabler 1.2 кладёт Bootstrap в window.tabler.bootstrap; base.html.twig ставит алиас window.bootstrap.
+    return window.bootstrap || window.tabler?.bootstrap || null;
 }
 
 function isCollapseShown(el) {
@@ -75,6 +71,8 @@ function hideModalSafe(modal, fallbackFocusEl) {
     qsa(document, '.modal-backdrop').forEach((el) => el.remove());
     document.body.classList.remove('modal-open');
     document.body.style.removeProperty('padding-right');
+    // Bootstrap блокирует прокрутку страницы через inline overflow — без снятия скролл body остаётся мёртвым.
+    document.body.style.removeProperty('overflow');
 }
 
 function initOnePicker(picker) {

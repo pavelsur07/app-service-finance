@@ -57,6 +57,9 @@
         </div>
     </div>
 <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.2.0/dist/js/tabler.min.js"></script>
+{# Tabler 1.2 отдаёт Bootstrap как window.tabler.bootstrap и не создаёт window.bootstrap,
+   на который рассчитывают наши скрипты (пикеры, модалки, тосты). #}
+<script>window.bootstrap = window.bootstrap || (window.tabler && window.tabler.bootstrap);</script>
 {% block scripts %}
     {% block javascripts %}{% endblock %}
             {{ vite_entry_script_tags('app') }}
