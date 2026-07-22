@@ -31,3 +31,38 @@
   margin-bottom: var(--s-5);
 }
 
+/* Секции workzone: ряд карточек рядом (.wz-row) или одна во всю ширину (.wz-sec). */
+.wz-row {
+  display: flex; flex-wrap: wrap;
+  gap: var(--s-4);
+  margin-bottom: var(--s-5);
+}
+.wz-sec { margin-bottom: var(--s-5); }
+
+/* Заголовок секции внутри карточки. UI Kit держит его инлайновым (см.
+   ui-kit/components/card.html) — здесь один класс на все админ-экраны.
+   .wz-card-head — тот же заголовок как шапка карточки с таблицей (.card.u-p-0). */
+.wz-sec-title,
+.wz-card-head {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--text-tertiary);
+}
+.wz-sec-title { margin-bottom: var(--s-3); }
+.wz-card-head { padding: var(--card-padding); border-bottom: 1px solid var(--border); }
+
+/* Таблица шире карточки — скроллим её, а не страницу. */
+.wz-scroll { overflow-x: auto; }
+
+/* Сетка полей формы; .wz-span-all — поле во всю ширину сетки. */
+.wz-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--s-3);
+}
+.wz-span-all { grid-column: 1 / -1; }
+.wz-form-actions {
+  display: flex; flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-top: var(--s-4);
+}
+
