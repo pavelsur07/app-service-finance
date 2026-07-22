@@ -54,6 +54,7 @@
 | `OzonTransactionTotalsCheck` | Marketplace | `string $companyId` ✅ |
 | `MarketplaceFinancialReportSyncStatus` | Marketplace | `string $companyId` ✅ |
 | `MarketplaceFinancialReportSyncError` | Marketplace | `string $companyId` ✅ |
+| `MarketplaceListingTag` | Marketplace | `string $companyId` ✅ |
 | `UnitEconomyCostMapping` | MarketplaceAnalytics | `string $companyId` ✅ |
 | `ListingDailySnapshot` | MarketplaceAnalytics | `string $companyId` ✅ |
 | `AdRawDocument` | MarketplaceAds | `string $companyId` ✅ |
@@ -208,6 +209,17 @@
 - Назначение: хранит отдельные записи ошибок синхронизации как append-only историю; retry не перезаписывает предыдущую диагностику.
 - Поля: `syncStatusId`, `companyId`, `connectionId`, `businessDate`, `errorClass`, `errorMessage`, `statusCode`, `responseExcerpt`, `requestPayload`, `createdAt`.
 - `requestPayload` хранится в JSON-формате и **не должен** содержать API token, plaintext secret или полный raw response body.
+
+### Marketplace: теги листингов
+
+- Entity: `MarketplaceListingTag` (таблица `marketplace_listing_tags`).
+- Назначение: пользовательские теги листингов как аналитическое измерение (сезон, коллекция, статус продвижения).
+- Поля: `id` (UUID v7), `companyId`, `name`, `slug`, `createdAt`.
+- `slug` = `mb_strtolower(trim(name))`, уникален в паре `(company_id, slug)` — «Зима» / «зима» / «ЗИМА» это один тег.
+- Связи «листинг ↔ тег» лежат в таблице `marketplace_listing_tag_assignments` **без ORM-маппинга**: все операции массовые и идут через
+  `App\Marketplace\Infrastructure\Query\ListingTagAssignmentRepository` (DBAL). FK на `marketplace_listings` и `marketplace_listing_tags` — с `ON DELETE CASCADE`.
+- Скоуп компании обеспечивается внутри SQL (`INSERT … SELECT … WHERE l.company_id = :companyId`), а не проверкой в PHP.
+- Facade пока нет: единственный потребитель — сам модуль Marketplace. `ListingTagFacade` появится вместе с фильтром тегов в `MarketplaceAnalytics`.
 
 ### `UnitEconomyCostMapping` — поля
 
