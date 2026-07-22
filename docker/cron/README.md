@@ -5,7 +5,8 @@
 ## Логи
 
 * `docker compose logs -f scheduler` — потоковые логи контейнера планировщика (JSON-формат supercronic).
-* `var/log/cron/app.log` — агрегированный вывод команд cron в рабочей директории проекта.
+* Вывод cron-команд остаётся в stdout/stderr; Docker ограничивает каждый лог `10m × 3` через `x-logging` в `docker-compose.prod.yml`.
+* Ручные maintenance-логи и backup-файлы размещаются по правилам из [`docs/maintenance/production-logging.md`](../../docs/maintenance/production-logging.md), не в домашнем каталоге пользователя.
 
 ## Валидация
 

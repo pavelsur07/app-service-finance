@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\MarketplaceAds\Controller\Api\Admin;
 
+use App\MarketplaceAds\Controller\Api\Admin\MarketplaceAdsLogsController;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use Symfony\Component\HttpFoundation\Request;
 
 final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
 {
@@ -20,6 +22,26 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
     {
         $this->cleanupLogFiles();
         parent::tearDown();
+    }
+
+    public function testProductionReturnsContainerLogInstructionsWithoutReadingStaleFiles(): void
+    {
+        $controller = new MarketplaceAdsLogsController('/path-that-must-not-be-read', 'prod');
+
+        $response = $controller(new Request(['lines' => 500, 'search' => 'ozon']));
+
+        self::assertStringContainsString('text/plain', (string) $response->headers->get('Content-Type'));
+        self::assertStringContainsString('stderr контейнеров', (string) $response->getContent());
+        self::assertStringContainsString('Владелец/DevOps', (string) $response->getContent());
+        self::assertStringContainsString('--since 1h --tail 500', (string) $response->getContent());
+        self::assertStringContainsString('site-php-fpm', (string) $response->getContent());
+        self::assertStringContainsString('site-messenger-worker-ads', (string) $response->getContent());
+        self::assertStringContainsString('site-messenger-worker-pipeline', (string) $response->getContent());
+        self::assertStringContainsString('scheduler', (string) $response->getContent());
+        self::assertStringContainsString("2>&1 | grep -F marketplace_ads\n", (string) $response->getContent());
+        self::assertStringContainsString('Параметр search не применяется', (string) $response->getContent());
+        self::assertStringContainsString('docs/maintenance/production-logging.md', (string) $response->getContent());
+        self::assertStringNotContainsString('No log file yet', (string) $response->getContent());
     }
 
     public function testReturns200AndTailForSuperAdmin(): void
