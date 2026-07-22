@@ -157,7 +157,7 @@ final class OzonAccrualDailyMaintenanceCommand extends Command
 
         if ($dryRun) {
             $io->note('Dry-run only. No canonical transactions or taxonomy rows were changed.');
-            $this->printHealth($io, scoped: null !== $companyId || null !== $shopRef);
+            $this->printHealth($io, scoped: null !== $companyId || null !== $shopRef, from: $from, to: $to);
 
             return $hasFailure ? Command::FAILURE : Command::SUCCESS;
         }
@@ -189,19 +189,19 @@ final class OzonAccrualDailyMaintenanceCommand extends Command
         );
 
         $scopedRun = null !== $companyId || null !== $shopRef;
-        $health = $this->health();
+        $health = $this->health($from, $to);
         $io->section('Health check');
         $this->printMetrics($io, $health);
 
         if ($scopedRun) {
-            $this->logger->warning('Ozon accrual daily maintenance scoped run skipped global health gate.', [
+            $this->logger->warning('Ozon accrual daily maintenance scoped run skipped health gate.', [
                 'from' => $from->format('Y-m-d'),
                 'to' => $to->format('Y-m-d'),
                 'company_id' => $companyId,
                 'shop_ref' => $shopRef,
                 'health' => $health,
             ]);
-            $io->note('Scoped run: global taxonomy health is informational and does not affect exit code.');
+            $io->note('Scoped run: taxonomy health is informational and does not affect exit code.');
         } elseif ($health['unclassifiedTransactions'] > 0 || $health['unclassifiedGroups'] > 0) {
             $hasFailure = true;
             $this->logger->error('Ozon accrual daily maintenance health check failed.', [
@@ -276,21 +276,24 @@ final class OzonAccrualDailyMaintenanceCommand extends Command
         return $modes[0];
     }
 
-    private function printHealth(SymfonyStyle $io, bool $scoped): void
+    private function printHealth(SymfonyStyle $io, bool $scoped, \DateTimeImmutable $from, \DateTimeImmutable $to): void
     {
         $io->section('Health check');
-        $this->printMetrics($io, $this->health());
+        $this->printMetrics($io, $this->health($from, $to));
         if ($scoped) {
-            $io->note('Scoped run: global taxonomy health is informational and does not affect exit code.');
+            $io->note('Scoped run: taxonomy health is informational and does not affect exit code.');
         }
     }
 
     /**
      * @return array<string, int>
      */
-    private function health(): array
+    private function health(\DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
-        $unclassified = $this->categoryAdminQuery->unclassifiedOzonAccrualTransactions();
+        // The gate is windowed to the repair range: rows older than the window
+        // can never be rewritten by this run, so counting them globally made
+        // the nightly ERROR permanent once a stale row aged out of the window.
+        $unclassified = $this->categoryAdminQuery->unclassifiedOzonAccrualTransactions($from, $to);
 
         return [
             'unclassifiedTransactions' => $unclassified['transactions'],
