@@ -2,6 +2,8 @@
 
 namespace App\Company\Repository;
 
+use App\Company\Entity\Company;
+use App\Company\Entity\CompanyMember;
 use App\Company\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -77,6 +79,31 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         $normalizedEmail = User::normalizeEmail($identifier);
 
         return $this->findOneBy(['email' => $normalizedEmail]);
+    }
+
+    public function findOneByIdAndCompanyId(string $userId, string $companyId): ?User
+    {
+        return $this->createQueryBuilder('user')
+            ->leftJoin(
+                Company::class,
+                'ownedCompany',
+                'WITH',
+                'ownedCompany.user = user AND ownedCompany.id = :companyId',
+            )
+            ->leftJoin(
+                CompanyMember::class,
+                'membership',
+                'WITH',
+                'membership.user = user AND IDENTITY(membership.company) = :companyId AND membership.status = :activeStatus',
+            )
+            ->andWhere('user.id = :userId')
+            ->andWhere('ownedCompany.id IS NOT NULL OR membership.id IS NOT NULL')
+            ->setParameter('userId', $userId)
+            ->setParameter('companyId', $companyId)
+            ->setParameter('activeStatus', CompanyMember::STATUS_ACTIVE)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
     }
 
     //    /**

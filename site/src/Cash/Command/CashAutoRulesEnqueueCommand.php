@@ -2,7 +2,9 @@
 
 namespace App\Cash\Command;
 
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleApplyMode;
 use App\Cash\Message\EnqueueAutoRulesForRange;
+use App\Company\Repository\UserRepository;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -20,6 +22,7 @@ final class CashAutoRulesEnqueueCommand extends Command
 {
     public function __construct(
         private readonly MessageBusInterface $bus,
+        private readonly UserRepository $userRepository,
     ) {
         parent::__construct();
     }
@@ -30,12 +33,46 @@ final class CashAutoRulesEnqueueCommand extends Command
             ->addArgument('companyId', InputArgument::REQUIRED, 'UUID компании')
             ->addOption('from', null, InputOption::VALUE_OPTIONAL, 'Начальная дата (YYYY-MM-DD)')
             ->addOption('to', null, InputOption::VALUE_OPTIONAL, 'Конечная дата (YYYY-MM-DD)')
-            ->addOption('accounts', null, InputOption::VALUE_OPTIONAL, 'Список ID счетов через запятую');
+            ->addOption('accounts', null, InputOption::VALUE_OPTIONAL, 'Список ID счетов через запятую')
+            ->addOption('mode', null, InputOption::VALUE_OPTIONAL, 'Режим: safe или replace_auto_assigned', 'safe')
+            ->addOption('actor-user-id', null, InputOption::VALUE_OPTIONAL, 'UUID пользователя для небезопасного режима')
+            ->addOption('confirm-replace', null, InputOption::VALUE_NONE, 'Подтвердить небезопасную замену');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $companyId = (string) $input->getArgument('companyId');
+        if (!Uuid::isValid($companyId)) {
+            $output->writeln('<error>Аргумент companyId должен содержать UUID.</error>');
+
+            return Command::FAILURE;
+        }
+
+        $mode = CashTransactionAutoRuleApplyMode::tryFrom((string) $input->getOption('mode'));
+        if (null === $mode) {
+            $output->writeln('<error>Опция --mode должна быть safe или replace_auto_assigned.</error>');
+
+            return Command::FAILURE;
+        }
+
+        $initiatedByUserId = trim((string) $input->getOption('actor-user-id')) ?: null;
+        if (null !== $initiatedByUserId && !Uuid::isValid($initiatedByUserId)) {
+            $output->writeln('<error>Опция --actor-user-id должна содержать UUID.</error>');
+
+            return Command::FAILURE;
+        }
+        if ($mode->replacesAutoAssigned()
+            && (!(bool) $input->getOption('confirm-replace') || null === $initiatedByUserId)) {
+            $output->writeln('<error>Для replace_auto_assigned нужны --confirm-replace и корректный --actor-user-id.</error>');
+
+            return Command::FAILURE;
+        }
+        if (null !== $initiatedByUserId
+            && null === $this->userRepository->findOneByIdAndCompanyId($initiatedByUserId, $companyId)) {
+            $output->writeln('<error>Пользователь из --actor-user-id не принадлежит указанной компании.</error>');
+
+            return Command::FAILURE;
+        }
 
         $from = $this->parseDateOption((string) $input->getOption('from'));
         if (false === $from) {
@@ -80,12 +117,15 @@ final class CashAutoRulesEnqueueCommand extends Command
             $to,
             $accountIds,
             Uuid::uuid7()->toString(),
+            $mode,
+            $initiatedByUserId,
         ));
 
         $output->writeln('<info>Сообщение поставлено в очередь.</info>');
         $output->writeln(sprintf('Компания: %s', $companyId));
         $output->writeln(sprintf('Диапазон дат: %s — %s', $from?->format('Y-m-d') ?? 'не задан', $to?->format('Y-m-d') ?? 'не задан'));
         $output->writeln(sprintf('Счета: %s', $accountIds ? implode(', ', $accountIds) : 'все счета'));
+        $output->writeln(sprintf('Режим: %s', $mode->value));
         $output->writeln('Следите за прогрессом: php bin/console messenger:consume async -vv');
 
         return Command::SUCCESS;

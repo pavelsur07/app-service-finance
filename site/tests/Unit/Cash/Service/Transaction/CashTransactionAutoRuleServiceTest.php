@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Service\Transaction;
 
+use App\Cash\Application\DTO\CashTransactionAutoRuleProvenance;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Entity\Transaction\CashTransactionAutoRuleCondition;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleApplyMode;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
@@ -126,6 +128,78 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         $service = $this->createService(rules: [$rule]);
 
         self::assertNull($service->applyRule($rule, $transaction));
+        self::assertSame($assignedCategory, $transaction->getCashflowCategory());
+    }
+
+    public function testReplaceModeReplacesCategoryAssignedByAutoRule(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $assignedCategory = CashflowCategoryBuilder::aCashflowCategory()
+            ->withId(Uuid::uuid4()->toString())
+            ->withCompany($company)
+            ->build();
+        $transaction = CashTransactionBuilder::aCashTransaction()
+            ->forCompany($company)
+            ->withCashflowCategory($assignedCategory)
+            ->build();
+        $rule = $this->createRule($company);
+        $service = $this->createService(rules: [$rule]);
+
+        $plan = $service->applyMatch(
+            $transaction,
+            mode: CashTransactionAutoRuleApplyMode::REPLACE_AUTO_ASSIGNED,
+            provenance: new CashTransactionAutoRuleProvenance(['cashflowCategory' => true]),
+        );
+
+        self::assertTrue($plan?->hasChanges());
+        self::assertSame($rule->getCashflowCategory(), $transaction->getCashflowCategory());
+    }
+
+    public function testReplaceModePreservesCategoryWithoutAutoRuleProvenance(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $assignedCategory = CashflowCategoryBuilder::aCashflowCategory()
+            ->withId(Uuid::uuid4()->toString())
+            ->withCompany($company)
+            ->build();
+        $transaction = CashTransactionBuilder::aCashTransaction()
+            ->forCompany($company)
+            ->withCashflowCategory($assignedCategory)
+            ->build();
+        $service = $this->createService(rules: [$this->createRule($company)]);
+
+        self::assertNull($service->applyMatch(
+            $transaction,
+            mode: CashTransactionAutoRuleApplyMode::REPLACE_AUTO_ASSIGNED,
+            provenance: new CashTransactionAutoRuleProvenance(['cashflowCategory' => false]),
+        ));
+        self::assertSame($assignedCategory, $transaction->getCashflowCategory());
+    }
+
+    public function testReplaceModeDoesNotDowngradeCategoryToUnallocated(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $assignedCategory = CashflowCategoryBuilder::aCashflowCategory()
+            ->withId(Uuid::uuid4()->toString())
+            ->withCompany($company)
+            ->build();
+        $unallocated = CashflowCategoryBuilder::aCashflowCategory()
+            ->withId(Uuid::uuid4()->toString())
+            ->withCompany($company)
+            ->withName('Не распределено')
+            ->build()
+            ->markAsSystem(CashflowCategory::CODE_UNALLOCATED);
+        $transaction = CashTransactionBuilder::aCashTransaction()
+            ->forCompany($company)
+            ->withCashflowCategory($assignedCategory)
+            ->build();
+        $service = $this->createService(rules: [$this->createRule($company, $unallocated)]);
+
+        self::assertNull($service->applyMatch(
+            $transaction,
+            mode: CashTransactionAutoRuleApplyMode::REPLACE_AUTO_ASSIGNED,
+            provenance: new CashTransactionAutoRuleProvenance(['cashflowCategory' => true]),
+        ));
         self::assertSame($assignedCategory, $transaction->getCashflowCategory());
     }
 
@@ -432,6 +506,72 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         self::assertFalse($plan?->hasChanges());
         self::assertNull($plan?->pairIssue);
         self::assertNull($service->applyMatch($transaction, $match));
+        self::assertSame($currentProject, $transaction->getProjectDirection());
+        self::assertSame($currentCenterId, $transaction->getResponsibilityCenterId());
+    }
+
+    public function testReplaceModeReplacesAutoAssignedPairAtomically(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $currentProject = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Current');
+        $currentCenterId = Uuid::uuid4()->toString();
+        $targetProject = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Target');
+        $targetCenterId = Uuid::uuid4()->toString();
+        $transaction = CashTransactionBuilder::aCashTransaction()
+            ->forCompany($company)
+            ->build()
+            ->setProjectDirection($currentProject)
+            ->setResponsibilityCenterId($currentCenterId);
+        $rule = $this->createPairRule($company)
+            ->setProjectDirection($targetProject)
+            ->setResponsibilityCenterId($targetCenterId);
+        $service = $this->createService(rules: [$rule], pairs: [
+            new FinancialResponsibilityCenterProjectDTO((string) $currentProject->getId(), $currentCenterId),
+            new FinancialResponsibilityCenterProjectDTO((string) $targetProject->getId(), $targetCenterId),
+        ]);
+
+        $plan = $service->applyMatch(
+            $transaction,
+            mode: CashTransactionAutoRuleApplyMode::REPLACE_AUTO_ASSIGNED,
+            provenance: new CashTransactionAutoRuleProvenance([
+                'projectDirection' => true,
+                'responsibilityCenterId' => true,
+            ]),
+        );
+
+        self::assertTrue($plan?->hasChanges());
+        self::assertSame($targetProject, $transaction->getProjectDirection());
+        self::assertSame($targetCenterId, $transaction->getResponsibilityCenterId());
+    }
+
+    public function testReplaceModeProtectsPairWhenOneFieldWasChangedManually(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $currentProject = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Current');
+        $currentCenterId = Uuid::uuid4()->toString();
+        $targetProject = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Target');
+        $targetCenterId = Uuid::uuid4()->toString();
+        $transaction = CashTransactionBuilder::aCashTransaction()
+            ->forCompany($company)
+            ->build()
+            ->setProjectDirection($currentProject)
+            ->setResponsibilityCenterId($currentCenterId);
+        $rule = $this->createPairRule($company)
+            ->setProjectDirection($targetProject)
+            ->setResponsibilityCenterId($targetCenterId);
+        $service = $this->createService(rules: [$rule], pairs: [
+            new FinancialResponsibilityCenterProjectDTO((string) $currentProject->getId(), $currentCenterId),
+            new FinancialResponsibilityCenterProjectDTO((string) $targetProject->getId(), $targetCenterId),
+        ]);
+
+        self::assertNull($service->applyMatch(
+            $transaction,
+            mode: CashTransactionAutoRuleApplyMode::REPLACE_AUTO_ASSIGNED,
+            provenance: new CashTransactionAutoRuleProvenance([
+                'projectDirection' => true,
+                'responsibilityCenterId' => false,
+            ]),
+        ));
         self::assertSame($currentProject, $transaction->getProjectDirection());
         self::assertSame($currentCenterId, $transaction->getResponsibilityCenterId());
     }
@@ -900,6 +1040,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         ], $plan->changes);
         self::assertSame([
             'correlationId' => $correlationId,
+            'mode' => CashTransactionAutoRuleApplyMode::SAFE->value,
             'autoRules' => [
                 'cashflowCategory' => [
                     'id' => $rule->getId(),

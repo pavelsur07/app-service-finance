@@ -83,6 +83,8 @@ final class EnqueueAutoRulesForRangeHandler
                 $message->companyId,
                 new \DateTimeImmutable(),
                 $correlationId,
+                $message->mode,
+                $message->initiatedByUserId,
             ));
 
             ++$enqueued;
@@ -100,6 +102,8 @@ final class EnqueueAutoRulesForRangeHandler
             'from' => $message->from?->format(\DATE_ATOM),
             'to' => $message->to?->format(\DATE_ATOM),
             'moneyAccountIds' => $message->moneyAccountIds,
+            'mode' => $message->mode->value,
+            'initiatedByUserId' => $message->initiatedByUserId,
             'durationMs' => (int) ((microtime(true) - $startTime) * 1000),
         ]);
 

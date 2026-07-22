@@ -5,11 +5,13 @@ namespace App\Cash\Service\Transaction;
 use App\Cash\Application\DTO\CashTransactionAutoRuleApplicationPlan;
 use App\Cash\Application\DTO\CashTransactionAutoRuleMatchResult;
 use App\Cash\Application\DTO\CashTransactionAutoRulePreviewResult;
+use App\Cash\Application\DTO\CashTransactionAutoRuleProvenance;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Entity\Transaction\CashTransactionAutoRuleCondition;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleApplyMode;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
@@ -433,6 +435,8 @@ class CashTransactionAutoRuleService
     public function applyMatch(
         CashTransaction $transaction,
         ?CashTransactionAutoRuleMatchResult $resolvedMatch = null,
+        CashTransactionAutoRuleApplyMode $mode = CashTransactionAutoRuleApplyMode::SAFE,
+        ?CashTransactionAutoRuleProvenance $provenance = null,
     ): ?CashTransactionAutoRuleApplicationPlan {
         if (null !== $this->getSkipReason($transaction)) {
             return null;
@@ -443,7 +447,7 @@ class CashTransactionAutoRuleService
             return null;
         }
 
-        $plan = $this->createApplicationPlan($resolvedMatch, $transaction);
+        $plan = $this->createApplicationPlan($resolvedMatch, $transaction, mode: $mode, provenance: $provenance);
         if (!$plan->hasChanges()) {
             return null;
         }
@@ -457,6 +461,8 @@ class CashTransactionAutoRuleService
         CashTransactionAutoRuleMatchResult $match,
         CashTransaction $t,
         ?array $activePairs = null,
+        CashTransactionAutoRuleApplyMode $mode = CashTransactionAutoRuleApplyMode::SAFE,
+        ?CashTransactionAutoRuleProvenance $provenance = null,
     ): CashTransactionAutoRuleApplicationPlan {
         $changes = [];
         $rulesByField = [];
@@ -473,8 +479,16 @@ class CashTransactionAutoRuleService
             [CashflowCategory::CODE_UNALLOCATED, CashflowCategory::SYSTEM_UNALLOCATED],
             true,
         );
+        $canReplaceCategory = CashTransactionAutoRuleApplyMode::REPLACE_AUTO_ASSIGNED === $mode
+            && true === $provenance?->isAutoAssigned('cashflowCategory');
+        $targetIsUnallocated = in_array(
+            $category?->getCode(),
+            [CashflowCategory::CODE_UNALLOCATED, CashflowCategory::SYSTEM_UNALLOCATED],
+            true,
+        );
         if (null !== $categoryRule && null !== $category
-            && $currentCategory?->getId() !== $category->getId() && $isCategoryEmpty) {
+            && $currentCategory?->getId() !== $category->getId()
+            && ($isCategoryEmpty || ($canReplaceCategory && !$targetIsUnallocated))) {
             $changes['cashflowCategory'] = [
                 'before' => $currentCategory?->getId(),
                 'after' => $category->getId(),
@@ -484,7 +498,7 @@ class CashTransactionAutoRuleService
         $activePairs ??= $this->matchNeedsPairPlan($match)
             ? $this->responsibilityCenterFacade->getActivePairs((string) $t->getCompany()->getId())
             : [];
-        $pairPlan = $this->planPair($match, $t, $activePairs);
+        $pairPlan = $this->planPair($match, $t, $activePairs, $mode, $provenance);
         $changes += $pairPlan['changes'];
         $rulesByField += $pairPlan['rulesByField'];
         $projectDirection = $pairPlan['projectDirection'] ?? $projectDirection;
@@ -576,6 +590,8 @@ class CashTransactionAutoRuleService
         CashTransactionAutoRuleMatchResult $match,
         CashTransaction $transaction,
         array $activePairs,
+        CashTransactionAutoRuleApplyMode $mode,
+        ?CashTransactionAutoRuleProvenance $provenance,
     ): array {
         $emptyPlan = [
             'changes' => [],
@@ -604,13 +620,16 @@ class CashTransactionAutoRuleService
         $isSystemPair = null !== $systemPair
             && $currentProjectId === $systemPair->projectDirectionId
             && $currentResponsibilityCenterId === $systemPair->responsibilityCenterId;
+        $canReplacePair = CashTransactionAutoRuleApplyMode::REPLACE_AUTO_ASSIGNED === $mode
+            && true === $provenance?->isAutoAssigned('projectDirection')
+            && $provenance->isAutoAssigned('responsibilityCenterId');
 
-        if (null !== $currentProjectId && null !== $currentResponsibilityCenterId && !$isSystemPair) {
+        if (null !== $currentProjectId && null !== $currentResponsibilityCenterId && !$isSystemPair && !$canReplacePair) {
             return $emptyPlan;
         }
 
-        $protectedProject = $isSystemPair ? null : $currentProject;
-        $protectedResponsibilityCenterId = $isSystemPair ? null : $currentResponsibilityCenterId;
+        $protectedProject = $isSystemPair || $canReplacePair ? null : $currentProject;
+        $protectedResponsibilityCenterId = $isSystemPair || $canReplacePair ? null : $currentResponsibilityCenterId;
         $resultProject = $protectedProject ?? $projectRule?->getProjectDirection();
         $resultResponsibilityCenterId = $protectedResponsibilityCenterId
             ?? $responsibilityCenterRule?->getResponsibilityCenterId();

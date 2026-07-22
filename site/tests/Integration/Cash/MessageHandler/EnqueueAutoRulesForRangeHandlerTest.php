@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\MessageHandler;
 
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleApplyMode;
 use App\Cash\Message\ApplyAutoRulesForTransaction;
 use App\Cash\Message\EnqueueAutoRulesForRange;
 use App\Cash\MessageHandler\EnqueueAutoRulesForRangeHandler;
@@ -82,6 +83,8 @@ final class EnqueueAutoRulesForRangeHandlerTest extends IntegrationTestCase
             (string) $company->getId(),
             new \DateTimeImmutable('2024-01-01'),
             new \DateTimeImmutable('2024-01-31'),
+            mode: CashTransactionAutoRuleApplyMode::REPLACE_AUTO_ASSIGNED,
+            initiatedByUserId: (string) $user->getId(),
         ));
 
         self::assertCount(2, $dispatched);
@@ -92,5 +95,10 @@ final class EnqueueAutoRulesForRangeHandlerTest extends IntegrationTestCase
         self::assertIsString($correlationId);
         self::assertTrue(Uuid::isValid($correlationId));
         self::assertSame([$correlationId, $correlationId], array_column($dispatched, 'correlationId'));
+        self::assertSame(
+            [CashTransactionAutoRuleApplyMode::REPLACE_AUTO_ASSIGNED, CashTransactionAutoRuleApplyMode::REPLACE_AUTO_ASSIGNED],
+            array_column($dispatched, 'mode'),
+        );
+        self::assertSame([(string) $user->getId(), (string) $user->getId()], array_column($dispatched, 'initiatedByUserId'));
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Cash\MessageHandler;
 
 use App\Cash\Application\Service\AutoRuleDispatchGuard;
+use App\Cash\Application\Service\CashTransactionAutoRuleProvenanceResolver;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Message\ApplyAutoRulesForTransaction;
@@ -25,6 +26,7 @@ final class ApplyAutoRulesForTransactionHandler
         private readonly CashTransactionAutoRuleService $autoRuleService,
         private readonly CashflowSystemCategoryService $cashflowSystemCategoryService,
         private readonly AutoRuleDispatchGuard $dispatchGuard,
+        private readonly CashTransactionAutoRuleProvenanceResolver $provenanceResolver,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -43,6 +45,7 @@ final class ApplyAutoRulesForTransactionHandler
                 'companyId' => $message->companyId,
                 'correlationId' => $correlationId,
                 'createdAt' => $message->createdAt->format(\DATE_ATOM),
+                'mode' => $message->mode->value,
             ]);
 
             return;
@@ -56,6 +59,7 @@ final class ApplyAutoRulesForTransactionHandler
                 'correlationId' => $correlationId,
                 'messageCreatedAt' => $message->createdAt->format(\DATE_ATOM),
                 'reason' => $skipReason->value,
+                'mode' => $message->mode->value,
             ]);
 
             $this->entityManager->clear(CashTransaction::class);
@@ -65,7 +69,15 @@ final class ApplyAutoRulesForTransactionHandler
 
         $match = $this->autoRuleService->match($transaction);
         $rule = $match->rule;
-        $applicationPlan = $this->autoRuleService->applyMatch($transaction, $match);
+        $provenance = $message->mode->replacesAutoAssigned() && $match->hasWinners()
+            ? $this->provenanceResolver->resolve($transaction)
+            : null;
+        $applicationPlan = $this->autoRuleService->applyMatch(
+            $transaction,
+            $match,
+            $message->mode,
+            $provenance,
+        );
         $changed = $applicationPlan?->hasChanges() ?? false;
         $ruleId = null;
         $ruleName = null;
@@ -80,6 +92,7 @@ final class ApplyAutoRulesForTransactionHandler
                     $match->conflictingRules,
                 ),
                 'fields' => array_keys($match->conflicts),
+                'mode' => $message->mode->value,
             ]);
         }
 
@@ -100,7 +113,8 @@ final class ApplyAutoRulesForTransactionHandler
                 CashTransaction::class,
                 (string) $transaction->getId(),
                 AuditLogAction::UPDATE,
-                $applicationPlan->auditDiff($correlationId),
+                $applicationPlan->auditDiff($correlationId, $message->mode),
+                $message->initiatedByUserId,
             ));
         }
 
@@ -120,6 +134,8 @@ final class ApplyAutoRulesForTransactionHandler
             'conflict' => $match->hasConflict(),
             'ruleId' => $ruleId,
             'ruleName' => $ruleName,
+            'mode' => $message->mode->value,
+            'initiatedByUserId' => $message->initiatedByUserId,
         ]);
 
         $this->entityManager->clear(CashTransaction::class);

@@ -42,6 +42,40 @@
 
         <form method="post" action="{{ path('cash_transaction_auto_rule_apply_enqueue') }}">
             <input type="hidden" name="_token" value="{{ csrf_token('cash_transaction_auto_rule_apply_enqueue') }}">
+
+            <fieldset class="mb-4">
+                <legend class="h3 mb-3">Режим применения</legend>
+
+                <label class="form-check mb-3">
+                    <input class="form-check-input" type="radio" name="mode" value="safe" checked>
+                    <span class="form-check-label">
+                        <strong>Безопасный</strong><br>
+                        Заполнить только пустые и системные значения. Текущее поведение.
+                    </span>
+                </label>
+
+                <label class="form-check mb-3">
+                    <input class="form-check-input" type="radio" name="mode" value="replace_auto_assigned">
+                    <span class="form-check-label">
+                        <strong>Небезопасный</strong><br>
+                        Заменить категорию и пару проект–ЦФО, только если их последнее изменение выполнено автоправилом.
+                    </span>
+                </label>
+
+                <div class="alert alert-danger mb-3" role="alert">
+                    Ручные и неизвестные значения не заменяются. Если пользователь изменил проект или ЦФО,
+                    вся пара защищается. Предпросмотр правил показывает только безопасное заполнение и не отражает
+                    замены небезопасного режима.
+                </div>
+
+                <label class="form-check">
+                    <input class="form-check-input" type="checkbox" name="confirm_replace" value="1">
+                    <span class="form-check-label">
+                        Подтверждаю небезопасную замену значений, ранее назначенных автоправилами.
+                    </span>
+                </label>
+            </fieldset>
+
             <button type="submit" class="btn btn-primary">
                 <i class="ti ti-settings-automation me-1"></i>
                 Запустить

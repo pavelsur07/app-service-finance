@@ -5,6 +5,7 @@ namespace App\Cash\Controller\Transaction;
 use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleApplyMode;
 use App\Cash\Form\Transaction\CashTransactionType;
 use App\Cash\Message\EnqueueAutoRulesForRange;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
@@ -14,6 +15,7 @@ use App\Cash\Service\Transaction\CashTransactionService;
 use App\Cash\Service\Transaction\CashTransactionToDocumentService;
 use App\Company\Repository\CounterpartyRepository;
 use App\Finance\Entity\Document;
+use App\Shared\Audit\AuditContextProvider;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\CompanyContextService;
 use Doctrine\ORM\Exception\ORMException;
@@ -95,11 +97,30 @@ class CashTransactionController extends AbstractController
     public function autoRuleApplyEnqueue(
         Request $request,
         MessageBusInterface $bus,
+        AuditContextProvider $auditContextProvider,
     ): RedirectResponse {
         $company = $this->companyService->getActiveCompany();
 
         if (!$this->isCsrfTokenValid('cash_transaction_auto_rule_apply_enqueue', (string) $request->request->get('_token'))) {
             $this->addFlash('danger', 'Неверный CSRF токен.');
+
+            return $this->redirectToRoute('cash_transaction_auto_rule_apply_page');
+        }
+
+        $mode = CashTransactionAutoRuleApplyMode::tryFrom((string) $request->request->get(
+            'mode',
+            CashTransactionAutoRuleApplyMode::SAFE->value,
+        ));
+        if (null === $mode) {
+            $this->addFlash('danger', 'Выберите режим применения автоправил.');
+
+            return $this->redirectToRoute('cash_transaction_auto_rule_apply_page');
+        }
+
+        $initiatedByUserId = $auditContextProvider->getActorUserId();
+        if ($mode->replacesAutoAssigned()
+            && ('1' !== $request->request->get('confirm_replace') || null === $initiatedByUserId)) {
+            $this->addFlash('danger', 'Подтвердите небезопасную замену значений, назначенных автоправилами.');
 
             return $this->redirectToRoute('cash_transaction_auto_rule_apply_page');
         }
@@ -113,10 +134,13 @@ class CashTransactionController extends AbstractController
             $today,
             null,
             Uuid::uuid7()->toString(),
+            $mode,
+            $initiatedByUserId,
         ));
 
         $this->addFlash('success', sprintf(
-            'Автоправила поставлены в очередь за период %s — %s.',
+            'Автоправила поставлены в очередь в режиме «%s» за период %s — %s.',
+            $mode->replacesAutoAssigned() ? 'Небезопасный' : 'Безопасный',
             $from->format('d.m.Y'),
             $today->format('d.m.Y'),
         ));
