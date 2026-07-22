@@ -5,6 +5,7 @@
 @import url('./badge.css');
 @import url('./button.css');
 @import url('./card.css');
+@import url('./card-head.css'); /* после card.css: .card--flush переопределяет padding .card (равная специфичность) */
 @import url('./checkbox.css');
 @import url('./confirm.css');
 @import url('./coverage.css');

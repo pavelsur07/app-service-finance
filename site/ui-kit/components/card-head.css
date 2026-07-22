@@ -1,0 +1,26 @@
+/* ============ CARD-HEAD ============ */
+/* Card header — заголовок секции внутри карточки (Decision 25).
+   Вариант A: карточка с паддингом, .card-head отбивается s-3 до контента.
+   Вариант B: .card--flush убирает паддинг у карточки (таблица edge-to-edge),
+   .card-head сам получает --card-padding и разделитель 1px снизу. */
+.card-head {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: var(--s-3);
+}
+.card-head .card-head-aside {
+  float: right;
+  text-transform: none; letter-spacing: 0; font-weight: 500;
+  color: var(--text-muted); font-size: var(--font-12);
+}
+.card--flush { padding: 0; }
+.card--flush .card-head {
+  margin: 0;
+  padding: var(--card-padding);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: var(--s-3);
+}
+.card--flush .card-head .card-head-aside { float: none; margin-left: auto; }

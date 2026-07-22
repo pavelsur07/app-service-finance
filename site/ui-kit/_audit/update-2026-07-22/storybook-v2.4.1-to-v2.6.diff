@@ -1,0 +1,573 @@
+--- storybook-old.html	2026-07-22 13:29:26.530199647 +0000
++++ storybook-new.html	2026-07-22 13:29:26.525199657 +0000
+@@ -3,14 +3,14 @@
+ <head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1">
+-<title>UI Kit · Ваш Финдир v2.4.1</title>
++<title>UI Kit · Ваш Финдир v2.6</title>
+ <link rel="preconnect" href="https://fonts.googleapis.com">
+ <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+ <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+ <style>
+ /* ================================================================
+    UI Kit · Ваш Финдир — CANONICAL STYLESHEET
+-   v2.4 · 8 июля 2026
++   v2.6 · 22 июля 2026
+    Source of truth. UIKit.html links this file for storybook demos;
+    product pages (Login, Signup, dialogs …) link this file only —
+    no inline primitive styles allowed on pages.
+@@ -150,8 +150,10 @@
+ 
+   /* ===== Layout tokens ===== */
+   --card-padding: var(--s-4) var(--s-5);
+-  --modal-width-compact: 440px;
+-  --modal-width-standard: 520px;
++  --modal-width-compact: 440px;      /* S · выбор компании, подтверждение */
++  --modal-width-standard: 520px;     /* M · форма до 8 полей, пикер */
++  --modal-width-l: 640px;            /* L · контент: компактная таблица, визард */
++  --modal-width-xl: 800px;           /* XL · широкий контент: сравнение, превью */
+   --backdrop-opacity: 0.45;
+   --backdrop-blur: 6px;
+   --bg-hero-tint: rgba(11, 18, 32, 0.05);
+@@ -608,9 +610,19 @@
+   flex-direction: column;
+   gap: 5px;
+ }
++/* Стек-хелпер: вертикальный интервал между form-field в обычном блочном потоке.
++   ВАЖНО: контейнеры, управляющие интервалом через gap (grid/flex — .row-2col,
++   .row-3col, .form-grid, .demo), НЕ должны получать этот margin, иначе первый
++   элемент грид-строки без margin, а второй — с margin → перекос и двойной интервал. */
+ .form-field + .form-field {
+   margin-top: var(--s-3);
+ }
++.row-2col > .form-field + .form-field,
++.row-3col > .form-field + .form-field,
++.form-grid > .form-field + .form-field,
++.demo > .form-field + .form-field {
++  margin-top: 0;
++}
+ .form-label {
+   font-size: var(--font-11_5);
+   color: var(--form-label-text);
+@@ -1892,17 +1904,20 @@
+ 
+ /* ============ MODAL ============ */
+ .mdl {
+-  width: 100%; max-width: var(--modal-width-standard);
++  width: 100%; max-width: min(var(--modal-width-standard), calc(100vw - var(--s-8)));
+   background: var(--card-bg);
+   border: 1px solid var(--card-border);
+   border-radius: var(--r-4);
+   box-shadow: var(--shadow-modal);
+ }
+-.mdl--compact { max-width: var(--modal-width-compact); }
++.mdl--compact { max-width: min(var(--modal-width-compact), calc(100vw - var(--s-8))); }  /* S · 440 */
++.mdl--m { max-width: min(var(--modal-width-standard), calc(100vw - var(--s-8))); }        /* M · 520 */
++.mdl--l { max-width: min(var(--modal-width-l), calc(100vw - var(--s-8))); }               /* L · 640 */
++.mdl--xl { max-width: min(var(--modal-width-xl), calc(100vw - var(--s-8))); }             /* XL · 800 */
+ .mdl-head { padding: 18px 20px 12px; display: flex; align-items: flex-start; gap: 12px; }
+ .mdl-head h3 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.015em; }
+ .mdl-head .sub { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+-.mdl-body { padding: 0 var(--s-5) var(--s-3); min-height: 60px; }
++.mdl-body { padding: 0 var(--s-5) var(--s-3); min-height: 60px; max-height: min(70vh, 640px); overflow-y: auto; }
+ .mdl-foot { border-top: 1px solid var(--border); padding: var(--s-3) var(--s-5); display: flex; gap: 8px; justify-content: flex-end; }
+ 
+ /* Interactive modal dialogs (live demos in UIKit) */
+@@ -1919,6 +1934,26 @@
+ }
+ .dlg .mdl { box-shadow: var(--shadow-modal); }
+ 
++/* Side modal (right-docked sheet) — full-height panel слева от края экрана.
++   Модальный chrome (.mdl-head/-body/-foot), но док справа во всю высоту.
++   Для длинных форм и мастеров, которым тесно в M/L. Best practices:
++   fixed к правому краю, height 100vh, body — единственная скролл-зона (flex:1),
++   head/foot sticky за счёт flex-column, slide-in из-за края. */
++.mdl--side {
++  position: fixed; top: 0; right: 0;
++  height: 100vh; max-height: 100vh;
++  width: 100%; max-width: min(var(--modal-width-l), calc(100vw - var(--s-8)));
++  display: flex; flex-direction: column;
++  border-radius: 0;
++  border-top: 0; border-right: 0; border-bottom: 0;
++  box-shadow: var(--shadow-drawer);
++  animation: mdl-slide-in 0.24s cubic-bezier(0.22, 1, 0.36, 1);
++}
++.mdl--side .mdl-body { max-height: none; flex: 1 1 auto; }
++.mdl--side .mdl-foot { position: sticky; bottom: 0; background: var(--card-bg); }
++@keyframes mdl-slide-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
++.dlg .mdl--side { box-shadow: var(--shadow-drawer); }
++
+ 
+ /* ============ CARD ============ */
+ /* Generic content card — base surface for section blocks on pages and
+@@ -1932,6 +1967,33 @@
+   box-shadow: var(--card-shadow);
+ }
+ 
++/* ============ CARD-HEAD ============ */
++/* Card header — заголовок секции внутри карточки (Decision 25).
++   Вариант A: карточка с паддингом, .card-head отбивается s-3 до контента.
++   Вариант B: .card--flush убирает паддинг у карточки (таблица edge-to-edge),
++   .card-head сам получает --card-padding и разделитель 1px снизу. */
++.card-head {
++  font-size: 11px;
++  font-weight: 700;
++  letter-spacing: 0.05em;
++  text-transform: uppercase;
++  color: var(--text-tertiary);
++  margin-bottom: var(--s-3);
++}
++.card-head .card-head-aside {
++  float: right;
++  text-transform: none; letter-spacing: 0; font-weight: 500;
++  color: var(--text-muted); font-size: var(--font-12);
++}
++.card--flush { padding: 0; }
++.card--flush .card-head {
++  margin: 0;
++  padding: var(--card-padding);
++  border-bottom: 1px solid var(--border);
++  display: flex; align-items: center; gap: var(--s-3);
++}
++.card--flush .card-head .card-head-aside { float: none; margin-left: auto; }
++
+ /* ============ ACCOUNT-CARD ============ */
+ .acc-card {
+   background: var(--bg-card);
+@@ -2138,16 +2200,19 @@
+ .app {
+   display: flex;
+   flex-direction: column;
+-  min-height: 100vh;
++  height: 100vh;
++  overflow: hidden;
+ }
+ .app-body {
+   display: flex;
+   flex: 1;
+   min-height: 0;
++  overflow: hidden;
+ }
+ .app-sidebar {
+   width: var(--app-sidebar-width);
+   flex-shrink: 0;
++  min-height: 0;
+ }
+ .app-sidebar .sb {
+   height: 100%;
+@@ -2162,8 +2227,48 @@
+ .app-workzone {
+   flex: 1;
+   min-width: 0;
++  min-height: 0;
+   padding: var(--s-6) var(--s-7);
++  overflow: auto;
++}
++
++/* App-shell владеет скроллом вьюпорта: root/body фиксированы, скроллится workzone */
++html:has(> body > .app) {
++  height: 100%;
++  overflow: hidden;
++  scrollbar-gutter: auto;
++}
++body:has(> .app) {
++  height: 100%;
++  overflow: hidden;
++}
++
++/* ============ PAGE-SCAFFOLD ============ */
++/* Ритм контента внутри .app-workzone (workzone content rhythm). */
++/* Вертикальный ритм контента внутри .app-workzone (Decision 26).
++   Префикс wz-* канонизирован из admin-shell.css (миграция /admin/*).
++   Заголовок → ряды KPI → ряды секций. Ряд переносится на узком экране. */
++.wz-head {
++  display: flex; align-items: flex-start; gap: var(--s-4);
++  margin-bottom: var(--s-5);
++}
++.wz-title {
++  font-size: 28px; font-weight: 700; letter-spacing: -0.02em;
++  color: var(--text-strong); margin: 0;
++}
++.wz-title .wz-sub {
++  display: block; margin-top: var(--s-1);
++  font-size: var(--font-13); font-weight: 400; letter-spacing: 0;
++  color: var(--text-tertiary);
+ }
++.wz-head-actions { margin-left: auto; display: flex; gap: var(--s-2); flex-shrink: 0; }
++/* Ряд карточек — KPI или секции. Равные колонки, перенос при < ~200px. */
++.wz-row {
++  display: flex; flex-wrap: wrap; gap: var(--s-4);
++  margin-bottom: var(--s-5);
++}
++.wz-row > * { flex: 1 1 200px; min-width: 200px; }
++.wz-row:last-child { margin-bottom: 0; }
+ 
+ /* ============ ABC-PILL ============ */
+ .abc-pill {
+@@ -2376,7 +2481,7 @@
+       <div class="nav-logo">ВФ</div>
+       <div>
+         <div class="nav-title">UI Kit</div>
+-        <div class="nav-version">v2.4.1 · 09.07.2026</div>
++        <div class="nav-version">v2.6 · 22.07.2026</div>
+       </div>
+     </div>
+ 
+@@ -2416,6 +2521,7 @@
+     <a href="#coverage">Coverage matrix <span class="num">new</span></a>
+     <a href="#acc-card">Account card</a>
+     <a href="#card">Card</a>
++    <a href="#card-head">Card head <span class="num">new</span></a>
+     <a href="#menu">Dropdown menu</a>
+     <a href="#tabs">Tabs</a>
+     <a href="#sidebar">Sidebar <span class="num">new</span></a>
+@@ -2423,6 +2529,8 @@
+     <a href="#tree-picker">TreePicker <span class="num">new</span></a>
+     <a href="#drawer">Drawer</a>
+     <a href="#modal">Modal</a>
++    <a href="#modal-sizes">Modal sizes <span class="num">new</span></a>
++    <a href="#side-modal">Side modal <span class="num">new</span></a>
+     <a href="#empty">Empty state</a>
+     <a href="#direction">Direction</a>
+     <a href="#toast">Toast <span class="num">new</span></a>
+@@ -2447,6 +2555,7 @@
+     <div class="nav-section">05 Patterns</div>
+     <a href="#patterns">Patterns</a>
+     <a href="#app-shell">App Shell <span class="num">new</span></a>
++    <a href="#page-scaffold">Page scaffold <span class="num">new</span></a>
+     <a href="#heavy-table">Heavy analytical table <span class="num">new</span></a>
+ 
+     <div class="nav-section">Версия</div>
+@@ -2461,7 +2570,7 @@
+       Канонический источник истины для всех экранов финансового SaaS-продукта.
+       Зафиксированы дизайн-токены, разрешены расхождения из аудита, собраны компоненты со всеми состояниями.
+     </p>
+-    <div class="page-meta">v2.4.1 · 9 июля 2026 · Светлая тема</div>
++    <div class="page-meta">v2.6 · 22 июля 2026 · Светлая тема</div>
+ 
+     <!-- ===================== 01. DECISIONS ===================== -->
+     <section id="decisions">
+@@ -2661,6 +2770,54 @@
+             <div class="decision-why">Два одинаковых по назначению layout-примитива (v1.x <code class="code-inline">.field</code> и v2.2 <code class="code-inline">.form-field</code>) — путаница «что выбрать». Оставляем старые рабочими, чтобы legacy-шаблоны не сломались — но все demo переведены на новый примитив как единственный образец.</div>
+           </div>
+         </div>
++        <div class="decision-item">
++          <div class="decision-num">25</div>
++          <div class="decision-body">
++            <div class="decision-title">CARD-HEAD — заголовок секции в карточке</div>
++            <div class="decision-value"><code class="code-inline">.card-head</code> — 11px uppercase 700, tracking 0.05em, <code class="code-inline">--text-tertiary</code>, отбивка <code class="code-inline">--s-3</code>. Вариант B — <code class="code-inline">.card--flush</code> для таблиц edge-to-edge (шапка получает <code class="code-inline">--card-padding</code> + разделитель 1px).</div>
++            <div class="decision-why">Заголовки секций внутри карточек были инлайн-стилями в демо. Вынесены в компонент — единый вид и один способ верстки.</div>
++          </div>
++        </div>
++        <div class="decision-item">
++          <div class="decision-num">26</div>
++          <div class="decision-body">
++            <div class="decision-title">PAGE SCAFFOLD — ритм контента workzone (<code class="code-inline">.wz-*</code>)</div>
++            <div class="decision-value">Семейство <code class="code-inline">.wz-head</code> / <code class="code-inline">.wz-title</code> / <code class="code-inline">.wz-row</code> — вертикальный ритм в <code class="code-inline">.app-workzone</code>. Заголовок 28px/700, отбивка <code class="code-inline">--s-5</code>; gap в ряду <code class="code-inline">--s-4</code>, между рядами <code class="code-inline">--s-5</code>; перенос ряда при &lt;200px на карточку.</div>
++            <div class="decision-why">Ритм страницы верстался инлайн-отступами вразнобой. Канонизирован из <code class="code-inline">admin-shell.css</code> (миграция /admin/*).</div>
++          </div>
++        </div>
++        <div class="decision-item">
++          <div class="decision-num">27</div>
++          <div class="decision-body">
++            <div class="decision-title">Modal vs drawer для форм — потолок 520 / drawer 680</div>
++            <div class="decision-value">Форма — в модалке до 8 полей (S 440 / M 520). Шире формы или &gt; 8 полей — drawer 680, не широкая модалка. L/XL модалки — только для контента (таблица, визард, сравнение).</div>
++            <div class="decision-why">Широкая модалка под длинную форму рвёт зрительный поток и хуже читается, чем полноразмерный drawer. Границу зафиксировали, чтобы не плодить 640-модалки под формы.</div>
++          </div>
++        </div>
++        <div class="decision-item">
++          <div class="decision-num">28</div>
++          <div class="decision-body">
++            <div class="decision-title">MODAL SIZES — шкала S/M/L/XL</div>
++            <div class="decision-value"><code class="code-inline">.mdl--compact</code> 440 (S) · <code class="code-inline">.mdl</code>≡<code class="code-inline">.mdl--m</code> 520 (M) · <code class="code-inline">.mdl--l</code> 640 (L) · <code class="code-inline">.mdl--xl</code> 800 (XL). Все clamp к <code class="code-inline">min(&lt;токен&gt;, 100vw − --s-8)</code>. <code class="code-inline">.mdl-body</code> скроллится при <code class="code-inline">max-height min(70vh,640px)</code>, head/foot sticky.</div>
++            <div class="decision-why">Размеры модалок были разовыми инлайн-max-width. Свёрнуты в четыре именованных ступени — предсказуемый выбор под сценарий.</div>
++          </div>
++        </div>
++        <div class="decision-item">
++          <div class="decision-num">29</div>
++          <div class="decision-body">
++            <div class="decision-title">SIDE MODAL — full-height сайд-шит (<code class="code-inline">.mdl--side</code>)</div>
++            <div class="decision-value"><code class="code-inline">.mdl--side</code> — модалка, док справа во всю высоту: <code class="code-inline">position:fixed</code>, <code class="code-inline">height:100vh</code>, <code class="code-inline">.mdl-body</code> — единственная скролл-зона (flex:1), head/foot sticky, slide-in <code class="code-inline">mdl-slide-in</code>, тень <code class="code-inline">--shadow-drawer</code>.</div>
++            <div class="decision-why">Для длинных форм и мастеров в именно модальном (blocking) сценарии, когда M/L тесны. Пересекается с drawer 680 — не плодить оба на одном экране.</div>
++          </div>
++        </div>
++        <div class="decision-item">
++          <div class="decision-num">30</div>
++          <div class="decision-body">
++            <div class="decision-title">Form-field интервал — только в блочном потоке (bugfix)</div>
++            <div class="decision-value">Правило <code class="code-inline">.form-field + .form-field { margin-top: --s-3 }</code> сброшено в gap-контейнерах: <code class="code-inline">.row-2col</code> / <code class="code-inline">.row-3col</code> / <code class="code-inline">.form-grid</code> / <code class="code-inline">.demo</code>. Там интервал даёт <code class="code-inline">gap</code>.</div>
++            <div class="decision-why">Стек-хелпер протекал в grid-строки: первый элемент без margin, второй — с margin 12px → правая колонка съезжала вниз. Интервал в grid обеспечивает только <code class="code-inline">gap</code>.</div>
++          </div>
++        </div>
+       </div>
+     </section>
+     <section id="foundations">
+@@ -2773,7 +2930,7 @@
+ 
+       <!-- Spacing -->
+       <h3 class="sub-h" id="spacing">Spacing</h3>
+-      <p class="section-sub">Шкала 4-base. Используем через токены <code class="code-inline">--s-1</code> … <code class="code-inline">--s-7</code>.</p>
++      <p class="section-sub">Шкала 4-base. Используем через токены <code class="code-inline">--s-1</code> … <code class="code-inline">--s-8</code>.</p>
+       <div class="cb">
+         <div class="spacing-row"><div class="spacing-meta"><b>s-1</b> 4px</div><div class="spacing-bar" style="width:4px"></div></div>
+         <div class="spacing-row"><div class="spacing-meta"><b>s-2</b> 8px</div><div class="spacing-bar" style="width:8px"></div></div>
+@@ -2782,6 +2939,7 @@
+         <div class="spacing-row"><div class="spacing-meta"><b>s-5</b> 20px</div><div class="spacing-bar" style="width:20px"></div></div>
+         <div class="spacing-row"><div class="spacing-meta"><b>s-6</b> 24px</div><div class="spacing-bar" style="width:24px"></div></div>
+         <div class="spacing-row"><div class="spacing-meta"><b>s-7</b> 32px</div><div class="spacing-bar" style="width:32px"></div></div>
++        <div class="spacing-row"><div class="spacing-meta"><b>s-8</b> 40px</div><div class="spacing-bar" style="width:40px"></div></div>
+       </div>
+ 
+       <!-- Radius -->
+@@ -4081,13 +4239,31 @@
+       <div class="cb" id="card">
+         <div class="cb-head">
+           <span class="cb-name">Card</span>
+-          <span class="cb-tag">.card · padding 16px 20px</span>
+-          <span class="cb-when">Базовый блок. Един padding. Не использовать «компактный» вариант — отделять секции через spacing вокруг.</span>
++          <span class="cb-tag">.card · .card-head · .card--flush</span>
++          <span class="cb-when">Базовый блок. Един padding 16×20. Заголовок секции — .card-head (не инлайн). Для таблицы edge-to-edge — .card--flush (padding уходит на .card-head и содержимое).</span>
+         </div>
++
++        <span class="demo-label" id="card-head">Вариант A · .card-head в карточке с паддингом (форма/контент)</span>
+         <div class="demo demo--column">
+           <div class="card" style="width:100%">
+-            <div style="font-size:11px; font-weight:700; color:var(--text-tertiary); letter-spacing:0.05em; text-transform:uppercase; margin-bottom:10px;">Контрагент и описание</div>
+-            <div style="font-size:13px;">Стандартный блок секции в drawer'ах и на страницах.</div>
++            <div class="card-head">Контрагент и описание</div>
++            <div style="font-size:13px;">Стандартный блок секции в drawer'ах и на страницах. Заголовок 11px uppercase, отбивка s-3 (12px) до контента.</div>
++          </div>
++        </div>
++
++        <span class="demo-label">Вариант B · .card--flush + .card-head над таблицей edge-to-edge</span>
++        <div class="demo demo--column">
++          <div class="card card--flush" style="width:100%">
++            <div class="card-head">Операции за июнь <span class="card-head-aside">248 строк</span></div>
++            <table class="t-table">
++              <thead>
++                <tr><th>Дата</th><th>Контрагент</th><th class="t-cell--right">Сумма</th></tr>
++              </thead>
++              <tbody>
++                <tr><td>24.06</td><td>ООО «Ромашка-Бэст»</td><td class="t-cell--right">+245&thinsp;000 ₽</td></tr>
++                <tr><td>23.06</td><td>ИП Петров Л. А.</td><td class="t-cell--right">−156&thinsp;200 ₽</td></tr>
++              </tbody>
++            </table>
+           </div>
+         </div>
+       </div>
+@@ -4251,10 +4427,10 @@
+       <div class="cb" id="modal">
+         <div class="cb-head">
+           <span class="cb-name">Modal</span>
+-          <span class="cb-tag">.mdl · 440 / 520</span>
+-          <span class="cb-when">Compact (440) — выбор компании. Standard (520) — выбор контрагента/категории. Если шире 520 — переходим на drawer.</span>
++          <span class="cb-tag">.mdl · S/M/L/XL + side · 440 / 520 / 640 / 800</span>
++          <span class="cb-when">S (.mdl--compact, 440) — выбор/подтверждение. M (.mdl или .mdl--m, 520) — пикер/форма до 8 полей. L (.mdl--l, 640) и XL (.mdl--xl, 800) — для контента (таблица, визард, сравнение), не для длинных форм — те уходят в drawer 680 (Decision 27). Любой размер не шире 100vw−s-8, .mdl-body скроллится при max-height 70vh.</span>
+         </div>
+-        <div class="demo demo--hero" style="padding:var(--s-6)">
++        <div class="demo demo--hero" style="padding:var(--s-6)" id="modal-sizes">
+           <div class="mdl mdl--compact">
+             <div class="mdl-head">
+               <div class="u-flex-1">
+@@ -4362,6 +4538,93 @@
+             </div>
+           </div>
+         </div>
++
++        <span class="demo-label">L (640) · <code class="code-inline">.mdl--l</code> — компактная таблица / визард</span>
++        <div class="demo demo--hero" style="padding:var(--s-6)">
++          <div class="mdl mdl--l">
++            <div class="mdl-head">
++              <div class="u-flex-1">
++                <h3>Сопоставление статей импорта</h3>
++                <div class="sub">6 из 12 строк размечены автоматически</div>
++              </div>
++              <button class="btn btn-sm btn-ghost u-w-28 u-p-0" aria-label="Закрыть"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
++            </div>
++            <div class="mdl-body" style="padding:0">
++              <table class="t-table">
++                <thead><tr><th>Строка из файла</th><th>Статья ДДС</th><th class="t-cell--right">Сумма</th></tr></thead>
++                <tbody>
++                  <tr><td>Оплата по счёту №1247</td><td>Оплата за услуги</td><td class="t-cell--right">+245&thinsp;000 ₽</td></tr>
++                  <tr><td>Аренда офиса, июнь</td><td>Аренда</td><td class="t-cell--right">−156&thinsp;200 ₽</td></tr>
++                  <tr><td>Зарплата, 1 половина</td><td>Зарплата</td><td class="t-cell--right">−420&thinsp;000 ₽</td></tr>
++                </tbody>
++              </table>
++            </div>
++            <div class="mdl-foot">
++              <button class="btn btn-md btn-secondary">Отмена</button>
++              <button class="btn btn-md btn-primary">Применить сопоставление</button>
++            </div>
++          </div>
++        </div>
++
++        <span class="demo-label">XL (800) · <code class="code-inline">.mdl--xl</code> — широкий контент / сравнение</span>
++        <div class="demo demo--hero" style="padding:var(--s-6)">
++          <div class="mdl mdl--xl">
++            <div class="mdl-head">
++              <div class="u-flex-1">
++                <h3>Сравнение периодов</h3>
++                <div class="sub">II квартал 2026 против I квартала 2026</div>
++              </div>
++              <button class="btn btn-sm btn-ghost u-w-28 u-p-0" aria-label="Закрыть"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
++            </div>
++            <div class="mdl-body">
++              <div class="wz-row" style="margin:0 0 var(--s-4)">
++                <div class="kpi"><div class="kpi-label">Выручка</div><div class="kpi-value">5,7 М ₽</div></div>
++                <div class="kpi"><div class="kpi-label">Расходы</div><div class="kpi-value">3,0 М ₽</div></div>
++                <div class="kpi"><div class="kpi-label">Прибыль</div><div class="kpi-value">2,7 М ₽</div></div>
++              </div>
++              <table class="t-table">
++                <thead><tr><th>Статья</th><th class="t-cell--right">I кв.</th><th class="t-cell--right">II кв.</th><th class="t-cell--right">Δ</th></tr></thead>
++                <tbody>
++                  <tr><td>Доходы</td><td class="t-cell--right">4&thinsp;820&thinsp;450</td><td class="t-cell--right">5&thinsp;670&thinsp;000</td><td class="t-cell--right">+17,6%</td></tr>
++                  <tr><td>Расходы</td><td class="t-cell--right">2&thinsp;968&thinsp;720</td><td class="t-cell--right">2&thinsp;994&thinsp;100</td><td class="t-cell--right">+0,9%</td></tr>
++                </tbody>
++              </table>
++            </div>
++            <div class="mdl-foot">
++              <button class="btn btn-md btn-secondary">Закрыть</button>
++              <button class="btn btn-md btn-primary">Выгрузить в Excel</button>
++            </div>
++          </div>
++        </div>
++
++        <span class="demo-label" id="side-modal">Side (full-height, справа) · <code class="code-inline">.mdl--side</code> — длинная форма / мастер</span>
++        <div class="demo" style="padding:0; position:relative; height:480px; overflow:hidden; background:var(--bg-page);">
++          <div style="position:absolute; inset:0; background:rgba(11,18,32,var(--backdrop-opacity));"></div>
++          <div class="mdl mdl--side" style="position:absolute; height:100%; max-height:100%; animation:none;">
++            <div class="mdl-head">
++              <div class="u-flex-1">
++                <h3>Новый контрагент</h3>
++                <div class="sub">Заполните реквизиты — форма длиннее, чем помещается в модалку</div>
++              </div>
++              <button class="btn btn-sm btn-ghost u-w-28 u-p-0" aria-label="Закрыть"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
++            </div>
++            <div class="mdl-body" style="display:flex; flex-direction:column; gap:14px;">
++              <div class="form-field"><label class="form-label">Наименование <span class="req">*</span></label><input class="input" value="ООО «Ромашка-Бэст»"></div>
++              <div class="form-field"><label class="form-label">ИНН <span class="req">*</span></label><input class="input" value="7723812931"></div>
++              <div class="form-field"><label class="form-label">КПП</label><input class="input" value="772301001"></div>
++              <div class="form-field"><label class="form-label">Расчётный счёт</label><input class="input" placeholder="40702810…"></div>
++              <div class="form-field"><label class="form-label">Банк</label><input class="input" placeholder="Наименование банка"></div>
++              <div class="form-field"><label class="form-label">Категория по умолчанию</label><input class="input" placeholder="Не выбрана"></div>
++              <div class="form-field"><label class="form-label">Комментарий</label><textarea class="input" rows="3" placeholder="Заметка…"></textarea></div>
++            </div>
++            <div class="mdl-foot">
++              <button class="btn btn-md btn-danger btn-ghost" style="margin-right:auto">Удалить</button>
++              <button class="btn btn-md btn-secondary">Отмена</button>
++              <button class="btn btn-md btn-primary">Сохранить</button>
++            </div>
++          </div>
++        </div>
++        <div class="cb-note" style="margin-top:10px;">Side-модалка перекрывается по назначению с drawer 680. Выбирай <b>drawer</b>, когда это штатный slide-in редактор сущности; <b>.mdl--side</b> — когда нужен именно модальный сценарий (blocking, поверх контекста) с длинной формой. Не плоди оба на одном экране.</div>
+       </div>
+ 
+       <!-- ============== SIDEBAR ============== -->
+@@ -5409,6 +5672,47 @@
+         </div>
+       </div>
+ 
++      <!-- PAGE LAYOUT -->
++      <h3 class="sub-h" id="page-scaffold">Page scaffold</h3>
++      <div class="section-sub">Вертикальный ритм контента внутри <code class="code-inline">.app-workzone</code>: заголовок страницы → ряд KPI → ряды секций. Семейство <code class="code-inline">wz-*</code> (Decision 26). Заголовок 28px/700, отбивка s-5. Gap в ряду s-4, между рядами s-5. Карточки в ряду равные, переносятся на узком экране.</div>
++      <div class="cb" id="page-layout-cb">
++        <div class="cb-head">
++          <span class="cb-name">Page scaffold</span>
++          <span class="cb-tag">.wz-head · .wz-title · .wz-row</span>
++          <span class="cb-when">Раскладка страницы: .wz-head (заголовок + слот действий) → .wz-row (ряд KPI) → .wz-row (две карточки-секции) → карточка с таблицей. Ряды переносятся при < ~200px на карточку.</span>
++        </div>
++        <div class="demo" style="padding:var(--s-6); display:block; background:var(--bg-page);">
++          <div class="wz-head">
++            <h1 class="wz-title">Пользователи<span class="wz-sub">Управление доступом к рабочему пространству</span></h1>
++            <div class="wz-head-actions">
++              <button class="btn btn-md btn-primary">+ Добавить</button>
++            </div>
++          </div>
++          <div class="wz-row">
++            <div class="kpi"><div class="kpi-label">Всего пользователей</div><div class="kpi-value">18</div></div>
++            <div class="kpi"><div class="kpi-label">Активных</div><div class="kpi-value">15</div></div>
++            <div class="kpi"><div class="kpi-label">Приглашения</div><div class="kpi-value">2</div></div>
++            <div class="kpi"><div class="kpi-label">Аутсорсеры</div><div class="kpi-value">3</div></div>
++          </div>
++          <div class="wz-row">
++            <div class="card"><div class="card-head">Роли и права</div><div style="font-size:13px; color:var(--text-secondary);">Секция-карточка слева. Ряд из двух равных колонок, переносится на узком экране.</div></div>
++            <div class="card"><div class="card-head">Последняя активность</div><div style="font-size:13px; color:var(--text-secondary);">Секция-карточка справа.</div></div>
++          </div>
++          <div class="wz-row">
++            <div class="card card--flush" style="width:100%">
++              <div class="card-head">Список пользователей <span class="card-head-aside">18 записей</span></div>
++              <table class="t-table">
++                <thead><tr><th>Имя</th><th>Роль</th><th class="t-cell--right">Статус</th></tr></thead>
++                <tbody>
++                  <tr><td>Анна Кузнецова</td><td>Владелец</td><td class="t-cell--right"><span class="status status--success"><span class="dot"></span>Активен</span></td></tr>
++                  <tr><td>Пётр Лунёв</td><td>Администратор</td><td class="t-cell--right"><span class="status status--success"><span class="dot"></span>Активен</span></td></tr>
++                </tbody>
++              </table>
++            </div>
++          </div>
++        </div>
++      </div>
++
+       <!-- TABLE: SORT HEADER -->
+       <div class="cb" id="t-sort">
+         <div class="cb-head">
+@@ -5769,7 +6073,7 @@
+           <div style="width:100%; max-width:380px; padding:20px; background:var(--bg-page); border-radius:var(--r-4);">
+             <div class="alert alert--success" style="margin-bottom:14px;">
+               <svg class="a-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+-              <div class="a-body"><div class="a-text">Код подтверждения отправлен на <b><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="4d2c23232c0d2e22203d2c2334633f38">[email&#160;protected]</a></b></div></div>
++              <div class="a-body"><div class="a-text">Код подтверждения отправлен на <b>anna@company.ru</b></div></div>
+             </div>
+             <div class="form-field"><label class="form-label">Код из письма</label><input class="input" value="" placeholder="6 цифр"></div>
+           </div>
+@@ -5970,6 +6274,31 @@
+       <h2 class="section-h">Changelog</h2>
+ 
+       <div class="cb">
++        <div class="cl-version">v2.6 — 22 июля 2026</div>
++        <div class="cl-summary">➕ CARD-HEAD, PAGE SCAFFOLD (wz-*), MODAL S/M/L/XL + side modal, правило modal-vs-drawer. 🐛 FORM-FIELD перекос в grid.</div>
++        <ul class="cl-list">
++          <li>🐛 <b>FIX: перекос form-field в grid</b> — <code class="code-inline">.form-field + .form-field { margin-top }</code> (стек-хелпер) протекал в grid-контейнеры: первый элемент грид-строки без margin, второй — с margin 12px → правая колонка смещена вниз (+ двойной интервал в <code class="code-inline">.demo--column</code>). Сброшен в <code class="code-inline">.row-2col</code> / <code class="code-inline">.row-3col</code> / <code class="code-inline">.form-grid</code> / <code class="code-inline">.demo</code> — там интервал даёт <code class="code-inline">gap</code>. <b>Decision 30</b>.</li>
++          <li>➕ <b>CARD-HEAD</b> (<code class="code-inline">.card-head</code>) — заголовок секции внутри карточки (был инлайн-стилями в демо). Вариант A — 11px uppercase, отбивка <code class="code-inline">--s-3</code>; вариант B — <code class="code-inline">.card--flush</code> для таблицы edge-to-edge (шапка с <code class="code-inline">--card-padding</code> + разделитель). <b>Decision 25</b>.</li>
++          <li>➕ <b>PAGE SCAFFOLD</b> (<code class="code-inline">.wz-head</code> / <code class="code-inline">.wz-title</code> / <code class="code-inline">.wz-row</code>) — вертикальный ритм контента в <code class="code-inline">.app-workzone</code>, канонизирован из <code class="code-inline">admin-shell.css</code>. Заголовок 28px/700 · отбивка s-5 · gap в ряду s-4 · между рядами s-5 · перенос при <200px. Demo-секция <code class="code-inline">#page-scaffold</code>. <b>Decision 26</b>.</li>
++          <li>📐 <b>Decision 27</b>: потолок модалки-формы — 520 (до 8 полей). Шире / > 8 полей — drawer 680. Широкая модалка — только для контента.</li>
++          <li>➕ <b>MODAL SIZES S/M/L/XL</b> (<code class="code-inline">.mdl--compact</code> 440 · <code class="code-inline">.mdl</code>/<code class="code-inline">.mdl--m</code> 520 · <code class="code-inline">.mdl--l</code> 640 · <code class="code-inline">.mdl--xl</code> 800). Best practices: <code class="code-inline">max-width: min(&lt;токен&gt;, calc(100vw − --s-8))</code> — не шире вьюпорта; <code class="code-inline">.mdl-body</code> — <code class="code-inline">max-height: min(70vh, 640px)</code> + <code class="code-inline">overflow-y:auto</code>, head/foot sticky. L/XL — для контента (таблица, визард, сравнение), не для форм. <b>Decision 28</b>.</li>
++          <li>➕ <b>SIDE MODAL</b> (<code class="code-inline">.mdl--side</code>) — full-height модалка, док справа. fixed к краю, <code class="code-inline">height:100vh</code>, <code class="code-inline">.mdl-body</code> — единственная скролл-зона (flex:1), head/foot sticky, slide-in <code class="code-inline">mdl-slide-in</code> из-за края, тень <code class="code-inline">--shadow-drawer</code>. Для длинных форм/мастеров в модальном сценарии. <b>Decision 29</b>.</li>
++          <li>➕ <b>Доводка перед разбором</b> — Decisions 25–30 добавлены в <code class="code-inline">#decisions</code> (были битые ссылки из changelog); маркеры <code class="code-inline">CARD-HEAD</code> и <code class="code-inline">PAGE-SCAFFOLD</code> (layout — отдельный, не уедет в card/modal при разборе); nav-якоря демо <code class="code-inline">#card-head</code> / <code class="code-inline">#page-scaffold</code> / <code class="code-inline">#modal-sizes</code> / <code class="code-inline">#side-modal</code>.</li>
++          <li>📐 Version bump v2.5 → v2.6 в <code class="code-inline">&lt;title&gt;</code>, <code class="code-inline">.nav-version</code>, <code class="code-inline">.page-meta</code>. (<code class="code-inline">uikit.css</code> отстаёт на v2.3 — синк отдельной задачей.)</li>
++        </ul>
++      </div>
++
++      <div class="cb">
++        <div class="cl-version">v2.5 — 9 июля 2026</div>
++        <div class="cl-summary">🔧 APP-SHELL: workzone-scroll модель. 🔧 <code class="code-inline">--s-8</code> восстановлен в шкале.</div>
++        <ul class="cl-list">
++          <li>🔧 <b>APP-SHELL scroll model</b>: root/body фиксированы (<code class="code-inline">height:100%</code>, <code class="code-inline">overflow:hidden</code>), скроллится <code class="code-inline">.app-workzone</code> (<code class="code-inline">overflow:auto</code> + <code class="code-inline">min-height:0</code>). <code class="code-inline">html:has(&gt; body &gt; .app)</code> / <code class="code-inline">body:has(&gt; .app)</code> управляют scrollbar-gutter — header flush до края.</li>
++          <li>🔧 <code class="code-inline">--s-8</code> (40px) восстановлен в шкале (используется в проде: login, app-shell). Шкала <code class="code-inline">--s-1</code> … <code class="code-inline">--s-8</code>.</li>
++          <li>📐 Version bump v2.4.1 → v2.5 в <code class="code-inline">&lt;title&gt;</code>, <code class="code-inline">.nav-version</code>, <code class="code-inline">.page-meta</code>.</li>
++        </ul>
++      </div>
++
++      <div class="cb">
+         <div class="cl-version">v2.4.1 — 9 июля 2026</div>
+         <div class="cl-summary">➕ AppShell sidebar-footer получил кнопку выхода. ✂️ .me-name обрезается ellipsis.</div>
+         <ul class="cl-list">
+@@ -6019,7 +6348,7 @@
+           <li>🔗 <code class="code-inline">--backdrop-opacity</code> + <code class="code-inline">--backdrop-blur</code> подключены в <code class="code-inline">.dlg::backdrop</code>. Раньше жили как декларация без потребителя.</li>
+           <li>🔗 <code class="code-inline">--button-secondary-border-hover</code> подключён в <code class="code-inline">.btn-secondary:hover</code> (вместо raw <code class="code-inline">--border-hover</code>).</li>
+           <li>🔗 <code class="code-inline">--input-border-error</code> подключён в <code class="code-inline">.input.is-error</code> / <code class="code-inline">.input-error</code> / <code class="code-inline">.textarea.is-error</code> + добавлен <code class="code-inline">.select.is-error</code> для полноты.</li>
+-          <li>🧹 Удалены: <code class="code-inline">--drawer-width</code> (компонента Drawer как отдельного не существует), <code class="code-inline">--s-8</code> (не использовался; шкала теперь --s-1…--s-7). <code class="code-inline">--font-9</code> в файле никогда не жил — путаница со скобками; актуален <code class="code-inline">--font-9_5</code>.</li>
++          <li>🧹 Удалены: <code class="code-inline">--drawer-width</code> (компонента Drawer как отдельного не существует). <code class="code-inline">--font-9</code> в файле никогда не жил — путаница со скобками; актуален <code class="code-inline">--font-9_5</code>.</li>
+           <li>➕ <code class="code-inline">--bg-hero-tint: rgba(11,18,32,0.05)</code> + модификатор <code class="code-inline">.demo--hero</code>. 9 inline-фонов в модальных демо заменены на класс.</li>
+           <li>➕ Utility-классы для повторяющегося layout-inline: <code class="code-inline">.u-w-28</code>, <code class="code-inline">.u-w-32</code>, <code class="code-inline">.u-p-0</code>, <code class="code-inline">.u-pl-4</code>, <code class="code-inline">.u-min-w-200</code>, <code class="code-inline">.u-min-w-220</code>. Заменено ~34 inline-стилей.</li>
+           <li>📐 Version bump v2.0 → v2.1 в <code class="code-inline">&lt;title&gt;</code>, <code class="code-inline">.nav-version</code>, <code class="code-inline">.page-meta</code>.</li>
+@@ -6230,7 +6559,7 @@
+   </main>
+ </div>
+ 
+-<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
++<script>
+   // Wire up <dialog>-based interactive modals (data-open / data-close)
+   (function () {
+     document.addEventListener('click', function (e) {
