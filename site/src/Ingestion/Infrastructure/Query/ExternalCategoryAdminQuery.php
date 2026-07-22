@@ -114,10 +114,30 @@ final readonly class ExternalCategoryAdminQuery
     }
 
     /**
+     * Without a window the count is global (admin dashboard, status command).
+     * The daily maintenance health gate passes its repair window so the gate
+     * only fails on rows the maintenance run can actually rewrite.
+     *
      * @return array{transactions: int, groups: int}
      */
-    public function unclassifiedOzonAccrualTransactions(): array
+    public function unclassifiedOzonAccrualTransactions(?\DateTimeImmutable $from = null, ?\DateTimeImmutable $to = null): array
     {
+        $params = [
+            'source' => IngestSource::OZON->value,
+            'resourceType' => OzonResourceType::ACCRUAL_BY_DAY,
+        ];
+
+        $window = '';
+        if (null !== $from) {
+            $window .= ' AND ft.occurred_at >= :fromAt';
+            $params['fromAt'] = $from->format('Y-m-d 00:00:00');
+        }
+
+        if (null !== $to) {
+            $window .= ' AND ft.occurred_at < :toExclusive';
+            $params['toExclusive'] = $to->modify('+1 day')->format('Y-m-d 00:00:00');
+        }
+
         $row = $this->connection->fetchAssociative(
             "SELECT
                 COUNT(*) AS transactions,
@@ -137,11 +157,8 @@ final readonly class ExternalCategoryAdminQuery
                     OR ft.source_data->>'_ozon_category_group' IN ('Неизвестные категории Ozon', 'Требует классификации', 'Без группы Ozon')
                     OR ft.source_data->>'_ozon_category_label' LIKE 'Неизвест%'
                     OR COALESCE(ft.description, '') LIKE 'Ozon accrual%'
-               )",
-            [
-                'source' => IngestSource::OZON->value,
-                'resourceType' => OzonResourceType::ACCRUAL_BY_DAY,
-            ],
+               )".$window,
+            $params,
         );
 
         return [
