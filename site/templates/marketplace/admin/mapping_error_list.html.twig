@@ -2,6 +2,41 @@
 
 {% block title %}Неизвестные затраты — Маркетплейсы{% endblock %}
 
+{% block admin_styles %}
+  <style>
+    table.t-table[data-mapping-errors-table] {
+      --mapping-errors-col-company: 180px;
+      --mapping-errors-col-marketplace: 150px;
+      --mapping-errors-col-service: 280px;
+      --mapping-errors-col-amount: 150px;
+      --mapping-errors-col-rows: 70px;
+      --mapping-errors-col-detected: 145px;
+      --mapping-errors-col-status: 110px;
+      --mapping-errors-col-actions: 170px;
+      --mapping-errors-table-width: calc(
+        var(--mapping-errors-col-company) + var(--mapping-errors-col-marketplace) +
+        var(--mapping-errors-col-service) + var(--mapping-errors-col-amount) +
+        var(--mapping-errors-col-rows) + var(--mapping-errors-col-detected) +
+        var(--mapping-errors-col-status) + var(--mapping-errors-col-actions)
+      );
+      width: 100%;
+      min-width: var(--mapping-errors-table-width);
+      table-layout: fixed;
+    }
+    [data-mapping-errors-table] col:nth-child(1) { width: var(--mapping-errors-col-company); }
+    [data-mapping-errors-table] col:nth-child(2) { width: var(--mapping-errors-col-marketplace); }
+    [data-mapping-errors-table] col:nth-child(3) { width: var(--mapping-errors-col-service); }
+    [data-mapping-errors-table] col:nth-child(4) { width: var(--mapping-errors-col-amount); }
+    [data-mapping-errors-table] col:nth-child(5) { width: var(--mapping-errors-col-rows); }
+    [data-mapping-errors-table] col:nth-child(6) { width: var(--mapping-errors-col-detected); }
+    [data-mapping-errors-table] col:nth-child(7) { width: var(--mapping-errors-col-status); }
+    [data-mapping-errors-table] col:nth-child(8) { width: var(--mapping-errors-col-actions); }
+    [data-mapping-errors-table] :is(td:nth-child(1), td:nth-child(3) code) { overflow-wrap: anywhere; }
+    [data-mapping-errors-table] :is(th, td):nth-child(4),
+    [data-mapping-errors-table] :is(th, td):nth-child(6) { white-space: nowrap; }
+  </style>
+{% endblock %}
+
 {% block body %}
   {% set marketplace_tones = {
     'ozon': 'ozon',
@@ -69,15 +104,22 @@
         <span class="card-head-aside">В списке: {{ errors|length }}</span>
       </div>
       <div class="report-scroll">
-        <table class="t-table">
+        <table class="t-table" data-mapping-errors-table>
+          <colgroup>
+            <col>
+            <col>
+            <col>
+            <col>
+            <col>
+            <col>
+            <col>
+            <col>
+          </colgroup>
           <thead>
             <tr>
               <th>Компания</th>
-              <th>Контакт</th>
               <th>Маркетплейс</th>
-              <th>Период</th>
               <th>Service name</th>
-              <th>Operation type</th>
               <th class="t-cell--right">Сумма</th>
               <th class="t-cell--right">Строк</th>
               <th>Обнаружено</th>
@@ -91,17 +133,7 @@
               {% set marketplace_tone = marketplace_tones[marketplace_key] ?? null %}
               {% set amount = error.total_amount ?? 0 %}
               <tr>
-                <td>
-                  <strong>{{ error.company_name }}</strong><br>
-                  <code>{{ error.company_id|slice(0, 8) }}…</code>
-                </td>
-                <td>
-                  {% if error.contact_email %}
-                    <a href="mailto:{{ error.contact_email }}">{{ error.contact_email }}</a>
-                  {% else %}
-                    —
-                  {% endif %}
-                </td>
+                <td><strong>{{ error.company_name }}</strong></td>
                 <td>
                   <span class="mp-chip">
                     {% if marketplace_tone %}
@@ -110,12 +142,7 @@
                     {{ marketplace_labels[marketplace_key] ?? error.marketplace|upper }}
                   </span>
                 </td>
-                <td>
-                  {{ ['', 'Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'][error.month] }}
-                  {{ error.year }}
-                </td>
                 <td><code>{{ error.service_name }}</code></td>
-                <td>{{ error.operation_type ?: '—' }}</td>
                 <td class="t-cell--right">
                   <span class="money money--14 money--strong">
                     {% if amount < 0 %}−{{ amount|abs|number_format(2, ',', ' ') }}{% else %}{{ amount|number_format(2, ',', ' ') }}{% endif %}&nbsp;₽
