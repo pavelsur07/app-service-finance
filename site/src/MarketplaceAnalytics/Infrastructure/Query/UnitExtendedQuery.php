@@ -25,7 +25,7 @@ final readonly class UnitExtendedQuery
     /**
      * @param list<string> $tagIds фильтр по тегам листингов; пустой = без фильтра
      *
-     * @return array{items: list<array<string, mixed>>, totals: array<string, mixed>}
+     * @return array{items: list<array<string, mixed>>, totals: array<string, mixed>, tagSummary: list<array<string, mixed>>}
      */
     public function execute(
         string $companyId,
@@ -36,6 +36,7 @@ final readonly class UnitExtendedQuery
         ?string $search = null,
         array $tagIds = [],
         bool $tagsMatchAll = false,
+        bool $withTagSummary = false,
     ): array {
         $from = new \DateTimeImmutable($periodFrom);
         $to = new \DateTimeImmutable($periodTo);
@@ -83,6 +84,7 @@ final readonly class UnitExtendedQuery
         $listingMeta = $this->marketplaceFacade->getListingsMetaByIds($companyId, $nonSalesIds);
 
         $items = [];
+        $summaryRows = [];
         $totals = [
             'revenue' => 0.0,
             'quantity' => 0,
@@ -226,6 +228,22 @@ final readonly class UnitExtendedQuery
             // при активном фильтре по тегам, где полный период неприменим.
             $totals['adSpend'] += $adSpend;
 
+            // Свод по тегам считаем по ВСЕМ листингам (как totals), до search-фильтра.
+            if ($withTagSummary) {
+                $summaryRows[] = [
+                    'tags' => $tagsByListing[$listingId] ?? [],
+                    'revenue' => $revenue,
+                    'quantity' => $quantity,
+                    'returnsQuantity' => $returnsQuantity,
+                    'returnsTotal' => $returnsTotal,
+                    'costPriceTotal' => $costPriceTotal,
+                    'commission' => $commission,
+                    'logistics' => $logistics,
+                    'otherCosts' => $otherCosts,
+                    'adSpend' => $adSpend,
+                ];
+            }
+
             if (null === $normalizedSearch || $this->matchesSearch($row, $normalizedSearch)) {
                 $items[] = $row;
             }
@@ -278,7 +296,126 @@ final readonly class UnitExtendedQuery
         // Limit items for response; totals remain complete
         $items = \array_slice($items, 0, $limit);
 
-        return ['items' => $items, 'totals' => $totals];
+        return [
+            'items' => $items,
+            'totals' => $totals,
+            'tagSummary' => $withTagSummary ? $this->buildTagSummary($summaryRows) : [],
+        ];
+    }
+
+    /**
+     * Агрегат по тегам. Листинг с несколькими тегами намеренно попадает в каждый бакет
+     * (сумма по тегам может превышать итог — честная подпись, не взаимоисключающие группы);
+     * листинги без тегов собираются в отдельный бакет «Без тегов».
+     *
+     * @param list<array<string, mixed>> $summaryRows
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function buildTagSummary(array $summaryRows): array
+    {
+        $untaggedKey = '__untagged__';
+        $buckets = [];
+
+        foreach ($summaryRows as $row) {
+            /** @var list<ListingTagDTO> $tags */
+            $tags = $row['tags'];
+
+            if ([] === $tags) {
+                $this->accumulateSummaryBucket($buckets, $untaggedKey, null, 'Без тегов', $row);
+
+                continue;
+            }
+
+            foreach ($tags as $tag) {
+                $this->accumulateSummaryBucket($buckets, $tag->id, $tag->id, $tag->name, $row);
+            }
+        }
+
+        $result = [];
+        foreach ($buckets as $bucket) {
+            $revenue = round($bucket['revenue'], 2);
+            $returnsTotal = round($bucket['returnsTotal'], 2);
+            $costPriceTotal = round($bucket['costPriceTotal'], 2);
+            $commission = round($bucket['commission'], 2);
+            $logistics = round($bucket['logistics'], 2);
+            $otherCosts = round($bucket['otherCosts'], 2);
+            $adSpend = round($bucket['adSpend'], 2);
+            $totalCosts = round($commission + $logistics + $otherCosts + $adSpend, 2);
+            $profit = round($revenue - $returnsTotal - $costPriceTotal - $commission - $logistics - $otherCosts - $adSpend, 2);
+            $netSoldQty = $bucket['quantity'] - $bucket['returnsQuantity'];
+
+            $result[] = [
+                'tagId' => $bucket['tagId'],
+                'name' => $bucket['name'],
+                'listingsCount' => $bucket['listingsCount'],
+                'revenue' => $revenue,
+                'quantity' => $bucket['quantity'],
+                'returnsTotal' => $returnsTotal,
+                'returnsQuantity' => $bucket['returnsQuantity'],
+                'costPriceTotal' => $costPriceTotal,
+                'commission' => $commission,
+                'commissionAverageRub' => $this->averagePerNetSoldQty($commission, $netSoldQty),
+                'adSpend' => $adSpend,
+                'cacRub' => $this->averagePerNetSoldQty($adSpend, $netSoldQty),
+                'drrPercent' => $revenue > 0 ? round($adSpend / $revenue * 100, 1) : null,
+                'logistics' => $logistics,
+                'otherCosts' => $otherCosts,
+                'totalCosts' => $totalCosts,
+                'profit' => $profit,
+                'marginPercent' => $revenue > 0 ? round($profit / $revenue * 100, 1) : null,
+                'roiPercent' => $costPriceTotal > 0 ? round($profit / $costPriceTotal * 100, 1) : null,
+            ];
+        }
+
+        // Тегированные бакеты по выручке DESC; «Без тегов» всегда последним.
+        usort($result, static function (array $a, array $b): int {
+            if (null === $a['tagId']) {
+                return 1;
+            }
+            if (null === $b['tagId']) {
+                return -1;
+            }
+
+            return $b['revenue'] <=> $a['revenue'];
+        });
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $buckets
+     * @param array<string, mixed>                $row
+     */
+    private function accumulateSummaryBucket(array &$buckets, string $key, ?string $tagId, string $name, array $row): void
+    {
+        if (!isset($buckets[$key])) {
+            $buckets[$key] = [
+                'tagId' => $tagId,
+                'name' => $name,
+                'listingsCount' => 0,
+                'revenue' => 0.0,
+                'quantity' => 0,
+                'returnsQuantity' => 0,
+                'returnsTotal' => 0.0,
+                'costPriceTotal' => 0.0,
+                'commission' => 0.0,
+                'logistics' => 0.0,
+                'otherCosts' => 0.0,
+                'adSpend' => 0.0,
+            ];
+        }
+
+        ++$buckets[$key]['listingsCount'];
+        $buckets[$key]['revenue'] += $row['revenue'];
+        $buckets[$key]['quantity'] += $row['quantity'];
+        $buckets[$key]['returnsQuantity'] += $row['returnsQuantity'];
+        $buckets[$key]['returnsTotal'] += $row['returnsTotal'];
+        $buckets[$key]['costPriceTotal'] += $row['costPriceTotal'];
+        $buckets[$key]['commission'] += $row['commission'];
+        $buckets[$key]['logistics'] += $row['logistics'];
+        $buckets[$key]['otherCosts'] += $row['otherCosts'];
+        $buckets[$key]['adSpend'] += $row['adSpend'];
     }
 
     private function averagePerNetSoldQty(float $amount, int $netSoldQty): ?float

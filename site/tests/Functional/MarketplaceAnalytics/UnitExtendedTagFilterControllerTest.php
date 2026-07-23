@@ -42,6 +42,40 @@ final class UnitExtendedTagFilterControllerTest extends WebTestCaseBase
         self::assertNotContains($untagged->getId(), $listingIds);
     }
 
+    public function testTagSummaryReturnedOnlyWithFlag(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        [$owner, , , $tagId] = $this->seed();
+        $client->loginUser($owner);
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
+
+        // Без флага — свод пустой.
+        $client->request('GET', self::URL, [
+            'marketplace' => 'ozon',
+            'periodFrom' => '2026-04-01',
+            'periodTo' => '2026-04-30',
+        ]);
+        self::assertResponseIsSuccessful();
+        $data = json_decode((string) $client->getResponse()->getContent(), true);
+        self::assertSame([], $data['tagSummary']);
+
+        // С флагом — есть бакет тега и бакет «Без тегов».
+        $client->request('GET', self::URL, [
+            'marketplace' => 'ozon',
+            'periodFrom' => '2026-04-01',
+            'periodTo' => '2026-04-30',
+            'withTagSummary' => '1',
+        ]);
+        self::assertResponseIsSuccessful();
+        $data = json_decode((string) $client->getResponse()->getContent(), true);
+
+        $tagIds = array_column($data['tagSummary'], 'tagId');
+        self::assertContains($tagId, $tagIds);
+        self::assertContains(null, $tagIds, 'Ожидается бакет «Без тегов»');
+    }
+
     public function testRejectsNonUuidTag(): void
     {
         $client = static::createClient();

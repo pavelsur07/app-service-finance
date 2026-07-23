@@ -81,6 +81,7 @@ final class UnitExtendedController extends AbstractController
         /** @var list<string> $tagIds */
         $tagIds = array_values($tagIds);
         $tagsMatchAll = 'all' === $request->query->get('tagsMatch');
+        $withTagSummary = $request->query->getBoolean('withTagSummary');
 
         $result = $this->unitExtendedQuery->execute(
             $companyId,
@@ -90,6 +91,7 @@ final class UnitExtendedController extends AbstractController
             search: $search,
             tagIds: $tagIds,
             tagsMatchAll: $tagsMatchAll,
+            withTagSummary: $withTagSummary,
         );
 
         return $this->json($result);

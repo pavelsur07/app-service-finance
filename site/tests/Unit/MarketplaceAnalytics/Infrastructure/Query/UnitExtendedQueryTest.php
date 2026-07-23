@@ -241,6 +241,80 @@ final class UnitExtendedQueryTest extends TestCase
         self::assertSame([['id' => 't-1', 'name' => 'tag-t-1']], $row['tags']);
     }
 
+    public function testTagSummaryOmittedWithoutFlag(): void
+    {
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l-1', 'Товар', 'SKU-1', 'ozon', '1000.00', 5, '300.00', 5),
+        ]);
+        $this->stubTags(['l-1' => ['t-1']]);
+
+        $result = $this->execute();
+
+        self::assertSame([], $result['tagSummary']);
+    }
+
+    public function testTagSummaryDoubleCountsMultiTaggedListingAndSeparatesUntagged(): void
+    {
+        $this->stubSales([
+            // l-both несёт оба тега → его выручка попадёт и в t-a, и в t-b.
+            new ListingSalesAggregateDTO('l-both', 'Оба', 'SKU-B', 'ozon', '1000.00', 5, '300.00', 5),
+            new ListingSalesAggregateDTO('l-a', 'Только A', 'SKU-A', 'ozon', '400.00', 2, '100.00', 2),
+            new ListingSalesAggregateDTO('l-none', 'Без тегов', 'SKU-N', 'ozon', '200.00', 1, '50.00', 1),
+        ]);
+        $this->stubAdSpend(['l-both' => '100.00']);
+        $this->stubTags([
+            'l-both' => ['t-a', 't-b'],
+            'l-a' => ['t-a'],
+        ]);
+
+        $summary = $this->execute(withTagSummary: true)['tagSummary'];
+
+        $tagA = $this->findTagSummaryRow($summary, 't-a');
+        $tagB = $this->findTagSummaryRow($summary, 't-b');
+        $untagged = $this->findTagSummaryRow($summary, null);
+
+        self::assertNotNull($tagA);
+        self::assertNotNull($tagB);
+        self::assertNotNull($untagged);
+
+        // t-a = l-both + l-a: revenue 1400, две позиции.
+        self::assertSame(2, $tagA['listingsCount']);
+        self::assertSame(1400.0, $tagA['revenue']);
+
+        // t-b = только l-both: revenue 1000. Двойной счёт: l-both учтён и в t-a, и в t-b.
+        self::assertSame(1, $tagB['listingsCount']);
+        self::assertSame(1000.0, $tagB['revenue']);
+
+        // Untagged = l-none отдельно.
+        self::assertSame(1, $untagged['listingsCount']);
+        self::assertSame(200.0, $untagged['revenue']);
+        self::assertNull($untagged['tagId']);
+
+        // profit t-b = 1000 - 0 - 300 - 0 - 0 - 0 - adSpend(100) = 600; margin = 60%.
+        self::assertSame(600.0, $tagB['profit']);
+        self::assertSame(60.0, $tagB['marginPercent']);
+    }
+
+    public function testTagSummarySortedByRevenueWithUntaggedLast(): void
+    {
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l-small', 'Мелкий', 'SKU-S', 'ozon', '100.00', 1, '0.00', 1),
+            new ListingSalesAggregateDTO('l-big', 'Крупный', 'SKU-B', 'ozon', '5000.00', 10, '0.00', 10),
+            new ListingSalesAggregateDTO('l-none', 'Без тегов', 'SKU-N', 'ozon', '9999.00', 1, '0.00', 1),
+        ]);
+        $this->stubTags([
+            'l-small' => ['t-small'],
+            'l-big' => ['t-big'],
+        ]);
+
+        $summary = $this->execute(withTagSummary: true)['tagSummary'];
+
+        // Крупный тег первым, мелкий вторым, «Без тегов» последним несмотря на большую выручку.
+        self::assertSame('t-big', $summary[0]['tagId']);
+        self::assertSame('t-small', $summary[1]['tagId']);
+        self::assertNull($summary[2]['tagId']);
+    }
+
     public function testRowDrrPercentIsNullWhenRevenueIsZero(): void
     {
         // Listing with cost row but no sales → revenue = 0; adSpend may exist
@@ -609,9 +683,9 @@ final class UnitExtendedQueryTest extends TestCase
     /**
      * @param list<string> $tagIds
      *
-     * @return array{items: list<array<string, mixed>>, totals: array<string, mixed>}
+     * @return array{items: list<array<string, mixed>>, totals: array<string, mixed>, tagSummary: list<array<string, mixed>>}
      */
-    private function execute(array $tagIds = [], bool $tagsMatchAll = false): array
+    private function execute(array $tagIds = [], bool $tagsMatchAll = false, bool $withTagSummary = false): array
     {
         return $this->query->execute(
             self::COMPANY_ID,
@@ -620,7 +694,24 @@ final class UnitExtendedQueryTest extends TestCase
             self::PERIOD_TO,
             tagIds: $tagIds,
             tagsMatchAll: $tagsMatchAll,
+            withTagSummary: $withTagSummary,
         );
+    }
+
+    /**
+     * @param list<array<string, mixed>> $summary
+     *
+     * @return array<string, mixed>|null
+     */
+    private function findTagSummaryRow(array $summary, ?string $tagId): ?array
+    {
+        foreach ($summary as $row) {
+            if (($row['tagId'] ?? null) === $tagId) {
+                return $row;
+            }
+        }
+
+        return null;
     }
 
     /**
