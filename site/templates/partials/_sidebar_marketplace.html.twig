@@ -17,6 +17,7 @@
                 and not (current_route starts with 'marketplace_analytics_')
                 and not (current_route starts with 'marketplace_ads_')
                 and current_route != 'marketplace_reconciliation'
+                and current_route != 'marketplace_listing_tags_manage'
             %}
             <a class="dropdown-item {{ mp_charges_active ? 'active' : '' }}" href="{{ path('marketplace_index') }}">
                 <span>Начисления</span>
@@ -32,6 +33,11 @@
             {% set mp_ads_active = current_route starts with 'inventory_' %}
             <a class="dropdown-item {{ mp_ads_active ? 'active' : '' }}" href="{{ path('inventory_stocks_index') }}">
                 <span>Товары и остатки</span>
+            </a>
+
+            {% set mp_tags_active = current_route == 'marketplace_listing_tags_manage' %}
+            <a class="dropdown-item {{ mp_tags_active ? 'active' : '' }}" href="{{ path('marketplace_listing_tags_manage') }}">
+                <span>Тэги</span>
             </a>
 
             {% set mp_reconciliation_active = current_route == 'marketplace_efficiency' %}
