@@ -51,6 +51,11 @@ class MarketplaceListingTag
         return \mb_strtolower(trim($name));
     }
 
+    public function rename(string $name): void
+    {
+        $this->applyName($name);
+    }
+
     public function getId(): string
     {
         return $this->id;

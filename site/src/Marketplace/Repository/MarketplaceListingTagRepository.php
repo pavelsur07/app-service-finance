@@ -66,4 +66,9 @@ final class MarketplaceListingTagRepository
     {
         $this->em->persist($tag);
     }
+
+    public function remove(MarketplaceListingTag $tag): void
+    {
+        $this->em->remove($tag);
+    }
 }

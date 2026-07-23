@@ -1,0 +1,176 @@
+{% extends 'marketplace/layout.html.twig' %}
+
+{% block tab_content %}
+    <div class="container-xl py-4">
+
+        <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+            <a href="{{ path('marketplace_listings_index') }}" class="btn btn-ghost-secondary">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="16" height="16"
+                     viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                    <path d="M5 12l14 0"></path><path d="M5 12l6 6"></path><path d="M5 12l6 -6"></path>
+                </svg>
+                К листингам
+            </a>
+            <h3 class="mb-0 me-auto">Управление тегами</h3>
+        </div>
+
+        <div class="card" data-tags="{{ tags|json_encode|e('html_attr') }}">
+            {% if tags is empty %}
+                <div class="card-body">
+                    <div class="empty">
+                        <p class="empty-title">Тегов пока нет</p>
+                        <p class="empty-subtitle text-muted">
+                            Создайте тег на странице листингов: выделите строки и введите название в панели.
+                        </p>
+                    </div>
+                </div>
+            {% else %}
+                <div class="table-responsive">
+                    <table class="table card-table table-vcenter">
+                        <thead>
+                        <tr>
+                            <th>Тег</th>
+                            <th class="text-end w-1">Листингов</th>
+                            <th class="w-1"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for tag in tags %}
+                            <tr data-tag-id="{{ tag.id }}" data-tag-name="{{ tag.name }}">
+                                <td class="tag-cell">
+                                    <span class="tag-chip tag-name">{{ tag.name }}</span>
+                                </td>
+                                <td class="text-end">{{ tag.listingsCount }}</td>
+                                <td>
+                                    <div class="d-flex justify-content-end gap-1">
+                                        <button type="button" class="btn btn-sm btn-ghost-secondary rename-tag-btn">
+                                            Переименовать
+                                        </button>
+                                        <div class="dropdown">
+                                            <button type="button" class="btn btn-sm btn-ghost-secondary dropdown-toggle merge-tag-btn"
+                                                    data-bs-toggle="dropdown" aria-expanded="false"
+                                                    {{ tags|length < 2 ? 'disabled' : '' }}>
+                                                Слить в…
+                                            </button>
+                                            <div class="dropdown-menu dropdown-menu-end merge-menu"></div>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-ghost-danger delete-tag-btn">
+                                            Удалить
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const cardEl = document.querySelector('.card[data-tags]');
+            const allTags = cardEl ? JSON.parse(cardEl.dataset.tags || '[]') : [];
+
+            async function postJson(url, body) {
+                try {
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: body ? JSON.stringify(body) : '{}',
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                        alert(data.error?.message || 'Не удалось выполнить операцию');
+                        return false;
+                    }
+                    return true;
+                } catch {
+                    alert('Ошибка сети');
+                    return false;
+                }
+            }
+
+            // Переименование — inline-поле в ячейке тега.
+            document.querySelectorAll('.rename-tag-btn').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const row = this.closest('tr');
+                    const cell = row.querySelector('.tag-cell');
+                    const currentName = row.dataset.tagName;
+                    const tagId = row.dataset.tagId;
+
+                    cell.innerHTML = '';
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.className = 'form-control form-control-sm';
+                    input.value = currentName;
+                    input.maxLength = 50;
+                    input.style.maxWidth = '260px';
+                    cell.appendChild(input);
+                    input.focus();
+                    input.select();
+
+                    async function commit() {
+                        const name = input.value.trim();
+                        if (name === '' || name === currentName) {
+                            window.location.reload();
+                            return;
+                        }
+                        if (await postJson('/api/marketplace/listings/tags/' + tagId + '/rename', {name})) {
+                            window.location.reload();
+                        }
+                    }
+
+                    input.addEventListener('keydown', e => {
+                        if (e.key === 'Enter') { commit(); }
+                        if (e.key === 'Escape') { window.location.reload(); }
+                    });
+                    input.addEventListener('blur', commit);
+                });
+            });
+
+            // Удаление.
+            document.querySelectorAll('.delete-tag-btn').forEach(btn => {
+                btn.addEventListener('click', async function () {
+                    const row = this.closest('tr');
+                    const name = row.dataset.tagName;
+                    const count = parseInt(row.children[1].textContent, 10) || 0;
+                    const warn = count > 0
+                        ? 'Тег «' + name + '» снимется с ' + count + ' листинг(ов). Удалить?'
+                        : 'Удалить тег «' + name + '»?';
+                    if (!window.confirm(warn)) {
+                        return;
+                    }
+                    if (await postJson('/api/marketplace/listings/tags/' + row.dataset.tagId + '/delete')) {
+                        window.location.reload();
+                    }
+                });
+            });
+
+            // Слияние — меню с остальными тегами как целями.
+            document.querySelectorAll('.merge-tag-btn').forEach(btn => {
+                const row = btn.closest('tr');
+                const sourceId = row.dataset.tagId;
+                const menu = row.querySelector('.merge-menu');
+
+                allTags.filter(t => t.id !== sourceId).forEach(target => {
+                    const item = document.createElement('button');
+                    item.type = 'button';
+                    item.className = 'dropdown-item';
+                    item.textContent = target.name;
+                    item.addEventListener('click', async () => {
+                        if (!window.confirm('Слить «' + row.dataset.tagName + '» в «' + target.name + '»? Тег «' + row.dataset.tagName + '» будет удалён.')) {
+                            return;
+                        }
+                        if (await postJson('/api/marketplace/listings/tags/merge', {sourceTagId: sourceId, targetTagId: target.id})) {
+                            window.location.reload();
+                        }
+                    });
+                    menu.appendChild(item);
+                });
+            });
+        });
+    </script>
+{% endblock %}
