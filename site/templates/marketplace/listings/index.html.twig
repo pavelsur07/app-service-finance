@@ -36,11 +36,21 @@
 
         <div class="card">
             <div class="card-header d-flex align-items-center gap-3 flex-wrap">
-                <h3 class="card-title me-auto mb-0">
+                <h3 class="card-title mb-0">
                     {% if filter == 'mapped' %}Привязанные листинги
                     {% elseif filter == 'unmapped' %}Листинги без привязки
                     {% else %}Все листинги{% endif %}
                 </h3>
+                <a href="{{ path('marketplace_listing_tags_manage') }}" class="btn btn-ghost-secondary me-auto">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="16" height="16"
+                         viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                        <path d="M7.859 6h-2.834a2.025 2.025 0 0 0 -2.025 2.025v2.834c0 .537 .213 1.052 .593 1.432l6.116 6.116a2.025 2.025 0 0 0 2.864 0l2.834 -2.834a2.025 2.025 0 0 0 0 -2.864l-6.117 -6.116a2.025 2.025 0 0 0 -1.431 -.593z"></path>
+                        <path d="M17.573 18.407l2.834 -2.834a2.025 2.025 0 0 0 0 -2.864l-6.117 -6.116"></path>
+                        <path d="M6 9h-.01"></path>
+                    </svg>
+                    Управление тегами
+                </a>
                 <select class="form-select w-auto" id="marketplace-filter"
                         onchange="window.location.href = this.value">
                     <option value="{{ path('marketplace_listings_index', {filter: filter}) }}"

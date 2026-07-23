@@ -39,11 +39,30 @@ final class MarketplaceListingTagSlugTest extends TestCase
         self::assertSame('зимняя коллекция', $tag->getSlug());
     }
 
+    public function testRenameRecalculatesNameAndSlug(): void
+    {
+        $tag = $this->tag('Зма');
+
+        $tag->rename('  Зимняя Коллекция  ');
+
+        self::assertSame('Зимняя Коллекция', $tag->getName());
+        self::assertSame('зимняя коллекция', $tag->getSlug());
+    }
+
     public function testRejectsBlankName(): void
     {
         $this->expectException(\InvalidArgumentException::class);
 
         $this->tag('   ');
+    }
+
+    public function testRenameRejectsBlankName(): void
+    {
+        $tag = $this->tag('Зима');
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $tag->rename('   ');
     }
 
     public function testRejectsTooLongName(): void

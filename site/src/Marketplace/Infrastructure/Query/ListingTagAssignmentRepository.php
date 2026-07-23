@@ -128,6 +128,57 @@ final readonly class ListingTagAssignmentRepository
     }
 
     /**
+     * Число листингов под каждым тегом компании (для справочника управления).
+     *
+     * @return array<string, int> ключ — tagId, значение — число листингов
+     */
+    public function countsByTag(string $companyId): array
+    {
+        /** @var list<array{tag_id: string, cnt: int|string}> $rows */
+        $rows = $this->connection->fetchAllAssociative(
+            <<<'SQL'
+            SELECT tag_id, COUNT(*) AS cnt
+            FROM marketplace_listing_tag_assignments
+            WHERE company_id = :companyId
+            GROUP BY tag_id
+            SQL,
+            ['companyId' => $companyId],
+        );
+
+        $result = [];
+        foreach ($rows as $row) {
+            $result[$row['tag_id']] = (int) $row['cnt'];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Перевешивает все листинги тега-источника на тег-цель (слияние тегов).
+     * Дубли гасятся ON CONFLICT. Связи источника удалятся каскадом при удалении самого тега.
+     *
+     * @return int сколько связей реально создано на теге-цели
+     */
+    public function reassign(string $companyId, string $sourceTagId, string $targetTagId): int
+    {
+        return (int) $this->connection->executeStatement(
+            <<<'SQL'
+            INSERT INTO marketplace_listing_tag_assignments (listing_id, tag_id, company_id, created_at)
+            SELECT listing_id, :targetTagId, company_id, NOW()
+            FROM marketplace_listing_tag_assignments
+            WHERE company_id = :companyId
+              AND tag_id = :sourceTagId
+            ON CONFLICT DO NOTHING
+            SQL,
+            [
+                'targetTagId' => $targetTagId,
+                'sourceTagId' => $sourceTagId,
+                'companyId' => $companyId,
+            ],
+        );
+    }
+
+    /**
      * Один запрос на всю страницу реестра — иначе колонка тегов даёт N+1.
      *
      * @param list<string> $listingIds
