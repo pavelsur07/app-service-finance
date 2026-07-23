@@ -7,6 +7,7 @@ namespace App\MarketplaceAnalytics\Controller\Api;
 use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAnalytics\Infrastructure\Query\UnitExtendedQuery;
 use App\Shared\Service\ActiveCompanyService;
+use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -22,6 +23,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class UnitExtendedController extends AbstractController
 {
     private const MAX_SEARCH_LENGTH = 255;
+    private const MAX_TAGS = 100;
 
     public function __construct(
         private readonly ActiveCompanyService $companyService,
@@ -31,11 +33,11 @@ final class UnitExtendedController extends AbstractController
 
     public function __invoke(Request $request): JsonResponse
     {
-        $company   = $this->companyService->getActiveCompany();
+        $company = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
         $marketplace = $request->query->get('marketplace');
-        if ($marketplace === null || $marketplace === '') {
+        if (null === $marketplace || '' === $marketplace) {
             $marketplace = null;
         } else {
             $validValues = array_map(
@@ -44,15 +46,15 @@ final class UnitExtendedController extends AbstractController
             );
             if (!in_array($marketplace, $validValues, true)) {
                 return $this->json([
-                    'error' => 'Invalid marketplace. Allowed: ' . implode(', ', $validValues),
+                    'error' => 'Invalid marketplace. Allowed: '.implode(', ', $validValues),
                 ], 422);
             }
         }
 
         $periodFrom = $request->query->get('periodFrom', '');
-        $periodTo   = $request->query->get('periodTo', '');
+        $periodTo = $request->query->get('periodTo', '');
 
-        if ($periodFrom === '' || $periodTo === '') {
+        if ('' === $periodFrom || '' === $periodTo) {
             return $this->json(['error' => 'periodFrom and periodTo are required'], 422);
         }
 
@@ -65,7 +67,20 @@ final class UnitExtendedController extends AbstractController
         if (\mb_strlen($search) > self::MAX_SEARCH_LENGTH) {
             return $this->json(['error' => 'search must be <= 255 characters'], 422);
         }
-        $search = $search !== '' ? $search : null;
+        $search = '' !== $search ? $search : null;
+
+        $tagIds = $request->query->all('tags');
+        foreach ($tagIds as $tagId) {
+            if (!is_string($tagId) || !Uuid::isValid($tagId)) {
+                return $this->json(['error' => 'tags must be a list of uuids'], 422);
+            }
+        }
+        if (count($tagIds) > self::MAX_TAGS) {
+            return $this->json(['error' => 'too many tags (max '.self::MAX_TAGS.')'], 422);
+        }
+        /** @var list<string> $tagIds */
+        $tagIds = array_values($tagIds);
+        $tagsMatchAll = 'all' === $request->query->get('tagsMatch');
 
         $result = $this->unitExtendedQuery->execute(
             $companyId,
@@ -73,6 +88,8 @@ final class UnitExtendedController extends AbstractController
             $periodFrom,
             $periodTo,
             search: $search,
+            tagIds: $tagIds,
+            tagsMatchAll: $tagsMatchAll,
         );
 
         return $this->json($result);

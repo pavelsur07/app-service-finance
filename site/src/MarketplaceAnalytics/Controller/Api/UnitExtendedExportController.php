@@ -9,6 +9,7 @@ use App\MarketplaceAnalytics\Infrastructure\Export\UnitExtendedExportRequest;
 use App\MarketplaceAnalytics\Infrastructure\Export\UnitExtendedXlsxExporter;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\RateLimiter\ReportsApiRateLimiter;
+use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -71,11 +72,22 @@ final class UnitExtendedExportController extends AbstractController
             return new JsonResponse(['error' => 'periodFrom must be <= periodTo'], 400);
         }
 
+        $tagIds = $request->query->all('tags');
+        foreach ($tagIds as $tagId) {
+            if (!is_string($tagId) || !Uuid::isValid($tagId)) {
+                return new JsonResponse(['error' => 'tags must be a list of uuids'], 400);
+            }
+        }
+        /** @var list<string> $tagIds */
+        $tagIds = array_values($tagIds);
+
         $exportRequest = new UnitExtendedExportRequest(
             companyId: $companyId,
             marketplace: $marketplace,
             periodFrom: $periodFrom,
             periodTo: $periodTo,
+            tagIds: $tagIds,
+            tagsMatchAll: 'all' === $request->query->get('tagsMatch'),
         );
 
         $exporter = $this->exporter;

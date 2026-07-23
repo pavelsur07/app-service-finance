@@ -7,6 +7,8 @@ interface UseUnitExtendedParams {
     periodFrom: string;
     periodTo: string;
     search?: string;
+    tagIds?: string[];
+    tagsMatchAll?: boolean;
 }
 
 interface UseUnitExtendedResult {
@@ -25,7 +27,7 @@ export function useUnitExtended(params: UseUnitExtendedParams): UseUnitExtendedR
             return;
         }
 
-        const query: Record<string, string> = {
+        const query: Record<string, string | string[]> = {
             periodFrom: params.periodFrom,
             periodTo: params.periodTo,
         };
@@ -39,11 +41,18 @@ export function useUnitExtended(params: UseUnitExtendedParams): UseUnitExtendedR
             query.search = search;
         }
 
+        if (params.tagIds && params.tagIds.length > 0) {
+            query.tags = params.tagIds;
+            if (params.tagsMatchAll) {
+                query.tagsMatch = 'all';
+            }
+        }
+
         void run({
             url: '/api/marketplace-analytics/unit-extended',
             query,
         });
-    }, [params.marketplace, params.periodFrom, params.periodTo, params.search, run]);
+    }, [params.marketplace, params.periodFrom, params.periodTo, params.search, params.tagIds, params.tagsMatchAll, run]);
 
     useEffect(() => {
         load();

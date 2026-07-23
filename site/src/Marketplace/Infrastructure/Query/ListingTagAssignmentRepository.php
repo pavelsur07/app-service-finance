@@ -7,6 +7,7 @@ namespace App\Marketplace\Infrastructure\Query;
 use App\Marketplace\DTO\ListingTagDTO;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\ParameterType;
 
 /**
  * Связи «листинг ↔ тег». Таблица без ORM-маппинга: все операции здесь массовые,
@@ -78,6 +79,52 @@ final readonly class ListingTagAssignmentRepository
             ],
             ['listingIds' => ArrayParameterType::STRING],
         );
+    }
+
+    /**
+     * Листинги компании, у которых есть заданные теги.
+     *
+     * @param list<string> $tagIds
+     *
+     * @return list<string> listingId
+     */
+    public function listingIdsByTags(string $companyId, array $tagIds, bool $matchAll): array
+    {
+        $tagIds = array_values(array_unique($tagIds));
+        if ([] === $tagIds) {
+            return [];
+        }
+
+        // matchAll: листинг должен нести ВСЕ выбранные теги — считаем совпавшие теги
+        // и сравниваем с их числом. any: достаточно одного, DISTINCT снимает дубли.
+        $sql = $matchAll
+            ? <<<'SQL'
+                SELECT listing_id
+                FROM marketplace_listing_tag_assignments
+                WHERE company_id = :companyId
+                  AND tag_id IN (:tagIds)
+                GROUP BY listing_id
+                HAVING COUNT(DISTINCT tag_id) = :tagCount
+                SQL
+            : <<<'SQL'
+                SELECT DISTINCT listing_id
+                FROM marketplace_listing_tag_assignments
+                WHERE company_id = :companyId
+                  AND tag_id IN (:tagIds)
+                SQL;
+
+        $params = ['companyId' => $companyId, 'tagIds' => $tagIds];
+        $types = ['tagIds' => ArrayParameterType::STRING];
+
+        if ($matchAll) {
+            $params['tagCount'] = count($tagIds);
+            $types['tagCount'] = ParameterType::INTEGER;
+        }
+
+        /** @var list<string> $ids */
+        $ids = $this->connection->fetchFirstColumn($sql, $params, $types);
+
+        return $ids;
     }
 
     /**

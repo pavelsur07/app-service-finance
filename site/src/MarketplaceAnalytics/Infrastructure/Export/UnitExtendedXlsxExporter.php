@@ -33,6 +33,7 @@ final readonly class UnitExtendedXlsxExporter
         ['label' => 'Наименование',    'field' => 'title',          'type' => 'string'],
         ['label' => 'Артикул',         'field' => 'sellerArticle',  'type' => 'string'],
         ['label' => 'Маркетплейс',     'field' => 'marketplace',    'type' => 'string'],
+        ['label' => 'Теги',            'field' => 'tags',           'type' => 'tags'],
         ['label' => 'Выручка',         'field' => 'revenue',        'type' => 'money'],
         ['label' => 'Кол-во',          'field' => 'quantity',       'type' => 'integer'],
         ['label' => 'Возвраты',        'field' => 'returnsTotal',   'type' => 'money'],
@@ -67,6 +68,8 @@ final readonly class UnitExtendedXlsxExporter
             $request->periodFrom,
             $request->periodTo,
             \PHP_INT_MAX,
+            tagIds: $request->tagIds,
+            tagsMatchAll: $request->tagsMatchAll,
         );
 
         $dataStyles = $this->buildDataStyles();
@@ -158,7 +161,7 @@ final readonly class UnitExtendedXlsxExporter
             }
 
             // Totals are computed per-listing and not aggregated for these fields.
-            if (in_array($column['field'], ['title', 'marketplace', 'sellerArticle', 'costPriceUnit', 'stockQty', 'stockCapitalRub'], true)) {
+            if (in_array($column['field'], ['title', 'marketplace', 'sellerArticle', 'tags', 'costPriceUnit', 'stockQty', 'stockCapitalRub'], true)) {
                 $cells[] = Cell::fromValue('', $styles['blank']);
 
                 continue;
@@ -181,8 +184,28 @@ final readonly class UnitExtendedXlsxExporter
             'money', 'percent' => Cell::fromValue((float) $value, $style),
             'integer' => Cell::fromValue((int) $value, $style),
             'number' => Cell::fromValue((float) $value, $style),
+            'tags' => Cell::fromValue($this->formatTags($value), $style),
             default => Cell::fromValue((string) $value, $style),
         };
+    }
+
+    /**
+     * @param mixed $value list<array{id: string, name: string}>
+     */
+    private function formatTags(mixed $value): string
+    {
+        if (!is_array($value)) {
+            return '';
+        }
+
+        $names = [];
+        foreach ($value as $tag) {
+            if (is_array($tag) && isset($tag['name']) && is_string($tag['name'])) {
+                $names[] = $tag['name'];
+            }
+        }
+
+        return implode(', ', $names);
     }
 
     /**
@@ -192,6 +215,7 @@ final readonly class UnitExtendedXlsxExporter
     {
         return [
             'string' => new Style(),
+            'tags' => new Style(),
             'money' => (new Style())->setFormat(self::FORMAT_MONEY),
             'integer' => (new Style())->setFormat(self::FORMAT_INTEGER),
             'percent' => (new Style())->setFormat(self::FORMAT_PERCENT),

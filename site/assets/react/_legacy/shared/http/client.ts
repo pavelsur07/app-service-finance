@@ -29,7 +29,7 @@ export class ApiError extends Error {
 
 type RequestOptions = {
     method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-    query?: Record<string, string | number | boolean | null | undefined>;
+    query?: Record<string, string | number | boolean | null | undefined | Array<string | number>>;
     body?: unknown;
     signal?: AbortSignal;
     csrfToken?: string | null;
@@ -45,6 +45,11 @@ function buildUrl(url: string, query?: RequestOptions["query"]): string {
 
     Object.entries(query).forEach(([key, value]) => {
         if (value === null || value === undefined) return;
+        if (Array.isArray(value)) {
+            // Symfony-совместимый формат повторяющихся параметров: key[]=a&key[]=b
+            value.forEach((item) => u.searchParams.append(`${key}[]`, String(item)));
+            return;
+        }
         u.searchParams.set(key, String(value));
     });
 

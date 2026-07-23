@@ -1,3 +1,8 @@
+export interface ListingTag {
+    id: string;
+    name: string;
+}
+
 export interface CostCategory {
     code: string;
     name: string;
@@ -41,6 +46,7 @@ export interface UnitExtendedItem {
     roiPercent: number | null;
     otherCostsBreakdown: CostGroupBreakdown[];
     allCostsBreakdown: CostGroupBreakdown[];
+    tags: ListingTag[];
 }
 
 export interface UnitExtendedTotals {

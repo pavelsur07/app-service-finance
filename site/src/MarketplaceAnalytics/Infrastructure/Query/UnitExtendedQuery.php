@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\MarketplaceAnalytics\Infrastructure\Query;
 
 use App\Inventory\Facade\InventoryFacade;
+use App\Marketplace\DTO\ListingTagDTO;
+use App\Marketplace\Facade\ListingTagFacade;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
@@ -16,10 +18,13 @@ final readonly class UnitExtendedQuery
         private MarketplaceAdsFacade $adsFacade,
         private InventoryFacade $inventoryFacade,
         private MarketplaceCostAnalyticsGroupResolver $groupResolver,
+        private ListingTagFacade $listingTagFacade,
     ) {
     }
 
     /**
+     * @param list<string> $tagIds фильтр по тегам листингов; пустой = без фильтра
+     *
      * @return array{items: list<array<string, mixed>>, totals: array<string, mixed>}
      */
     public function execute(
@@ -29,6 +34,8 @@ final readonly class UnitExtendedQuery
         string $periodTo,
         int $limit = 500,
         ?string $search = null,
+        array $tagIds = [],
+        bool $tagsMatchAll = false,
     ): array {
         $from = new \DateTimeImmutable($periodFrom);
         $to = new \DateTimeImmutable($periodTo);
@@ -58,6 +65,18 @@ final readonly class UnitExtendedQuery
             array_keys($returns),
             array_keys($costs),
         ));
+
+        // Фильтр по тегам сужает набор ДО цикла, поэтому totals считаются уже по
+        // отфильтрованным листингам без отдельной логики агрегатов.
+        $tagIds = array_values(array_unique($tagIds));
+        $tagFilterActive = [] !== $tagIds;
+        if ($tagFilterActive) {
+            $taggedListingIds = $this->listingTagFacade->listingIdsByTags($companyId, $tagIds, $tagsMatchAll);
+            $allListingIds = array_values(array_intersect($allListingIds, $taggedListingIds));
+        }
+
+        // Теги для колонки/экспорта — один batch-запрос на весь (отфильтрованный) набор.
+        $tagsByListing = $this->listingTagFacade->tagsForListings($companyId, array_values($allListingIds));
 
         // Fetch metadata (title, sku, marketplace) for listings not present in sales
         $nonSalesIds = array_values(array_diff($allListingIds, array_keys($sales)));
@@ -184,6 +203,10 @@ final readonly class UnitExtendedQuery
                 'roiPercent' => $costPriceTotal > 0 ? round($profit / $costPriceTotal * 100, 1) : null,
                 'otherCostsBreakdown' => $otherBreakdown,
                 'allCostsBreakdown' => $allBreakdown,
+                'tags' => array_map(
+                    static fn (ListingTagDTO $tag): array => $tag->toArray(),
+                    $tagsByListing[$listingId] ?? [],
+                ),
             ];
 
             // Totals accumulate across ALL listings (not limited).
@@ -199,6 +222,9 @@ final readonly class UnitExtendedQuery
             $totals['commission'] += $commission;
             $totals['logistics'] += $logistics;
             $totals['otherCosts'] += $otherCosts;
+            // Сумма построчной (атрибутированной) рекламы — используется как totals.adSpend
+            // при активном фильтре по тегам, где полный период неприменим.
+            $totals['adSpend'] += $adSpend;
 
             if (null === $normalizedSearch || $this->matchesSearch($row, $normalizedSearch)) {
                 $items[] = $row;
@@ -213,30 +239,33 @@ final readonly class UnitExtendedQuery
             $totals[$key] = is_float($val) ? round($val, 2) : $val;
         }
 
-        // totals.adSpend — full ad cost for the period (including non-attributed),
-        // for parity with /marketplace-ads/efficiency. Recompute totalCosts/profit
-        // accordingly. Sum of per-row adSpend may be smaller — that is OK.
-        $totalAdSpend = round((float) $this->adsFacade->getTotalAdCostForPeriod(
-            $companyId,
-            $from,
-            $to,
-            $marketplace,
-        ), 2);
+        // Без фильтра totals.adSpend — полная реклама за период (включая неатрибутированную),
+        // для паритета с /marketplace-ads/efficiency. С фильтром по тегам полный период неверен:
+        // берём сумму построчной атрибутированной рекламы по отфильтрованным листингам
+        // (накоплена в цикле в $totals['adSpend']).
+        $effectiveAdSpend = $tagFilterActive
+            ? round((float) $totals['adSpend'], 2)
+            : round((float) $this->adsFacade->getTotalAdCostForPeriod(
+                $companyId,
+                $from,
+                $to,
+                $marketplace,
+            ), 2);
 
-        $totals['adSpend'] = $totalAdSpend;
+        $totals['adSpend'] = $effectiveAdSpend;
         $totalsNetSoldQty = $totals['quantity'] - $totals['returnsQuantity'];
         $totals['commissionAverageRub'] = $this->averagePerNetSoldQty((float) $totals['commission'], $totalsNetSoldQty);
-        $totals['cacRub'] = $this->averagePerNetSoldQty($totalAdSpend, $totalsNetSoldQty);
+        $totals['cacRub'] = $this->averagePerNetSoldQty($effectiveAdSpend, $totalsNetSoldQty);
         $totals['drrPercent'] = $totals['revenue'] > 0
-            ? round($totalAdSpend / $totals['revenue'] * 100, 1)
+            ? round($effectiveAdSpend / $totals['revenue'] * 100, 1)
             : null;
         $totals['totalCosts'] = round(
-            $totals['commission'] + $totals['logistics'] + $totals['otherCosts'] + $totalAdSpend,
+            $totals['commission'] + $totals['logistics'] + $totals['otherCosts'] + $effectiveAdSpend,
             2,
         );
         $totals['profit'] = round(
             $totals['revenue'] - $totals['returnsTotal'] - $totals['costPriceTotal']
-            - $totals['commission'] - $totals['logistics'] - $totals['otherCosts'] - $totalAdSpend,
+            - $totals['commission'] - $totals['logistics'] - $totals['otherCosts'] - $effectiveAdSpend,
             2,
         );
         $totals['marginPercent'] = $totals['revenue'] > 0

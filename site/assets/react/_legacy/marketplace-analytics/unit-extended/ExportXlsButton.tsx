@@ -4,16 +4,28 @@ interface ExportXlsButtonProps {
     marketplace: string;
     periodFrom: string;
     periodTo: string;
+    tagIds?: string[];
+    tagsMatchAll?: boolean;
     disabled?: boolean;
 }
 
 const EXPORT_URL = '/api/marketplace-analytics/unit-extended/export';
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
-function buildExportUrl(marketplace: string, periodFrom: string, periodTo: string): string {
+function buildExportUrl(
+    marketplace: string,
+    periodFrom: string,
+    periodTo: string,
+    tagIds: string[],
+    tagsMatchAll: boolean,
+): string {
     const params = new URLSearchParams({ periodFrom, periodTo });
     if (marketplace) {
         params.set('marketplace', marketplace);
+    }
+    tagIds.forEach((tagId) => params.append('tags[]', tagId));
+    if (tagIds.length > 0 && tagsMatchAll) {
+        params.set('tagsMatch', 'all');
     }
     return `${EXPORT_URL}?${params.toString()}`;
 }
@@ -39,6 +51,8 @@ const ExportXlsButton: React.FC<ExportXlsButtonProps> = ({
     marketplace,
     periodFrom,
     periodTo,
+    tagIds = [],
+    tagsMatchAll = false,
     disabled = false,
 }) => {
     const [isLoading, setIsLoading] = useState(false);
@@ -48,9 +62,10 @@ const ExportXlsButton: React.FC<ExportXlsButtonProps> = ({
 
         setIsLoading(true);
         try {
-            const response = await fetch(buildExportUrl(marketplace, periodFrom, periodTo), {
-                credentials: 'same-origin',
-            });
+            const response = await fetch(
+                buildExportUrl(marketplace, periodFrom, periodTo, tagIds, tagsMatchAll),
+                { credentials: 'same-origin' },
+            );
 
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
