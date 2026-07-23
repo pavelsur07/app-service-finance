@@ -201,6 +201,7 @@ final readonly class UnitExtendedQuery
                 'otherCosts' => $otherCosts,
                 'totalCosts' => $totalCostsVal,
                 'profit' => $profit,
+                'profitUnit' => $this->averagePerNetSoldQty($profit, $netSoldQty),
                 'marginPercent' => $revenue > 0 ? round($profit / $revenue * 100, 1) : null,
                 'roiPercent' => $costPriceTotal > 0 ? round($profit / $costPriceTotal * 100, 1) : null,
                 'otherCostsBreakdown' => $otherBreakdown,
@@ -286,6 +287,7 @@ final readonly class UnitExtendedQuery
             - $totals['commission'] - $totals['logistics'] - $totals['otherCosts'] - $effectiveAdSpend,
             2,
         );
+        $totals['profitUnit'] = $this->averagePerNetSoldQty((float) $totals['profit'], $totalsNetSoldQty);
         $totals['marginPercent'] = $totals['revenue'] > 0
             ? round($totals['profit'] / $totals['revenue'] * 100, 1)
             : null;

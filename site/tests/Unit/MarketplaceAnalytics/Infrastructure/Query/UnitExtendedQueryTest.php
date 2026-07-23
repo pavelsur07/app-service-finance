@@ -152,6 +152,9 @@ final class UnitExtendedQueryTest extends TestCase
         self::assertSame(150.0, $row['totalCosts']);
         // profit = revenue(1000) - returns(0) - costPrice(300) - 0 - 0 - 0 - adSpend(150) = 550
         self::assertSame(550.0, $row['profit']);
+        // profitUnit = profit(550) / netSoldQty(quantity 5 - returns 0) = 110.0
+        self::assertSame(110.0, $row['profitUnit']);
+        self::assertSame(110.0, $result['totals']['profitUnit']);
         // drrPercent = 150 / 1000 * 100 = 15.0
         self::assertSame(15.0, $row['drrPercent']);
         // marginPercent = 550 / 1000 * 100 = 55.0
@@ -337,6 +340,7 @@ final class UnitExtendedQueryTest extends TestCase
         self::assertSame(0.0, $row['revenue']);
         self::assertSame(40.0, $row['adSpend']);
         self::assertNull($row['drrPercent'], 'revenue = 0 → drrPercent must be null');
+        self::assertNull($row['profitUnit'], 'netSoldQty = 0 → profitUnit must be null');
     }
 
     public function testRowWithoutAdSpendHasZeroAdSpendAndZeroDrr(): void

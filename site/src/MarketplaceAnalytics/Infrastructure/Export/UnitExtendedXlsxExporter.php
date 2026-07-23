@@ -49,6 +49,7 @@ final readonly class UnitExtendedXlsxExporter
         ['label' => 'Логистика',       'field' => 'logistics',      'type' => 'money'],
         ['label' => 'Прочие затраты',  'field' => 'otherCosts',     'type' => 'money'],
         ['label' => 'Итого затрат',    'field' => 'totalCosts',     'type' => 'money'],
+        ['label' => 'Прибыль ед.',     'field' => 'profitUnit',     'type' => 'money'],
         ['label' => 'Прибыль',         'field' => 'profit',         'type' => 'money'],
         ['label' => 'Маржа %',         'field' => 'marginPercent',  'type' => 'percent'],
         ['label' => 'ROI %',           'field' => 'roiPercent',     'type' => 'percent'],
