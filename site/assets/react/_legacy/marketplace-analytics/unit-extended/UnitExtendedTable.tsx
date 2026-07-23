@@ -24,6 +24,7 @@ type SortField =
     | 'logistics'
     | 'otherCosts'
     | 'totalCosts'
+    | 'profitUnit'
     | 'profit'
     | 'marginPercent'
     | 'roiPercent';
@@ -157,6 +158,7 @@ const HEADERS: { field: SortField; label: React.ReactNode; align?: string; toolt
     { field: 'logistics', label: 'Логистика', align: 'text-end' },
     { field: 'otherCosts', label: 'Прочие затраты', align: 'text-end' },
     { field: 'totalCosts', label: 'Итого затрат', align: 'text-end' },
+    { field: 'profitUnit', label: 'Прибыль ед.', align: 'text-end', tooltip: 'Прибыль на 1 нетто-проданную единицу (продажи − возвраты)' },
     { field: 'profit', label: 'Прибыль', align: 'text-end' },
     { field: 'marginPercent', label: 'Маржа %', align: 'text-end' },
     { field: 'roiPercent', label: 'ROI %', align: 'text-end' },
@@ -509,6 +511,13 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
                                         </td>
                                         <td className="text-end">{formatMoney(row.totalCosts)}</td>
                                         <td className="text-end">
+                                            {row.profitUnit === null ? '—' : (
+                                                <span className={row.profitUnit >= 0 ? 'text-green' : 'text-red'}>
+                                                    {formatMoney(row.profitUnit)}
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="text-end">
                                             <span className={row.profit >= 0 ? 'text-green' : 'text-red'}>
                                                 {formatMoney(row.profit)}
                                             </span>
@@ -575,6 +584,13 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
                                 <td className="text-end">{formatMoney(totals.logistics)}</td>
                                 <td className="text-end">{formatMoney(totals.otherCosts)}</td>
                                 <td className="text-end">{formatMoney(totals.totalCosts)}</td>
+                                <td className="text-end">
+                                    {totals.profitUnit === null ? '—' : (
+                                        <span className={totals.profitUnit >= 0 ? 'text-green' : 'text-red'}>
+                                            {formatMoney(totals.profitUnit)}
+                                        </span>
+                                    )}
+                                </td>
                                 <td className="text-end">
                                     <span className={totals.profit >= 0 ? 'text-green' : 'text-red'}>
                                         {formatMoney(totals.profit)}
