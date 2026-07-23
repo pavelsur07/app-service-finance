@@ -1,3 +1,8 @@
+export interface ListingTag {
+    id: string;
+    name: string;
+}
+
 export interface CostCategory {
     code: string;
     name: string;
@@ -41,6 +46,7 @@ export interface UnitExtendedItem {
     roiPercent: number | null;
     otherCostsBreakdown: CostGroupBreakdown[];
     allCostsBreakdown: CostGroupBreakdown[];
+    tags: ListingTag[];
 }
 
 export interface UnitExtendedTotals {
@@ -62,7 +68,30 @@ export interface UnitExtendedTotals {
     roiPercent: number | null;
 }
 
+export interface TagSummaryRow {
+    tagId: string | null;
+    name: string;
+    listingsCount: number;
+    revenue: number;
+    quantity: number;
+    returnsTotal: number;
+    returnsQuantity: number;
+    costPriceTotal: number;
+    commission: number;
+    commissionAverageRub: number | null;
+    adSpend: number;
+    cacRub: number | null;
+    drrPercent: number | null;
+    logistics: number;
+    otherCosts: number;
+    totalCosts: number;
+    profit: number;
+    marginPercent: number | null;
+    roiPercent: number | null;
+}
+
 export interface UnitExtendedResponse {
     items: UnitExtendedItem[];
     totals: UnitExtendedTotals;
+    tagSummary?: TagSummaryRow[];
 }

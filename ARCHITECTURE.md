@@ -54,6 +54,7 @@
 | `OzonTransactionTotalsCheck` | Marketplace | `string $companyId` ✅ |
 | `MarketplaceFinancialReportSyncStatus` | Marketplace | `string $companyId` ✅ |
 | `MarketplaceFinancialReportSyncError` | Marketplace | `string $companyId` ✅ |
+| `MarketplaceListingTag` | Marketplace | `string $companyId` ✅ |
 | `UnitEconomyCostMapping` | MarketplaceAnalytics | `string $companyId` ✅ |
 | `ListingDailySnapshot` | MarketplaceAnalytics | `string $companyId` ✅ |
 | `AdRawDocument` | MarketplaceAds | `string $companyId` ✅ |
@@ -208,6 +209,17 @@
 - Назначение: хранит отдельные записи ошибок синхронизации как append-only историю; retry не перезаписывает предыдущую диагностику.
 - Поля: `syncStatusId`, `companyId`, `connectionId`, `businessDate`, `errorClass`, `errorMessage`, `statusCode`, `responseExcerpt`, `requestPayload`, `createdAt`.
 - `requestPayload` хранится в JSON-формате и **не должен** содержать API token, plaintext secret или полный raw response body.
+
+### Marketplace: теги листингов
+
+- Entity: `MarketplaceListingTag` (таблица `marketplace_listing_tags`).
+- Назначение: пользовательские теги листингов как аналитическое измерение (сезон, коллекция, статус продвижения).
+- Поля: `id` (UUID v7), `companyId`, `name`, `slug`, `createdAt`.
+- `slug` = `mb_strtolower(trim(name))`, уникален в паре `(company_id, slug)` — «Зима» / «зима» / «ЗИМА» это один тег.
+- Связи «листинг ↔ тег» лежат в таблице `marketplace_listing_tag_assignments` **без ORM-маппинга**: все операции массовые и идут через
+  `App\Marketplace\Infrastructure\Query\ListingTagAssignmentRepository` (DBAL). FK на `marketplace_listings` и `marketplace_listing_tags` — с `ON DELETE CASCADE`.
+- Скоуп компании обеспечивается внутри SQL (`INSERT … SELECT … WHERE l.company_id = :companyId`), а не проверкой в PHP.
+- Кросс-модульный доступ — только через `ListingTagFacade` (см. раздел Facade). Внутри модуля Marketplace контроллеры реестра листингов ходят в репозитории напрямую.
 
 ### `UnitEconomyCostMapping` — поля
 
@@ -780,6 +792,25 @@ deleteCostMapping(string $companyId, string $mappingId): void
 // Выбрасывает DomainException если маппинг не найден
 remapCostMapping(string $companyId, string $mappingId, UnitEconomyCostType $newType): UnitEconomyCostMapping
 ```
+
+### `ListingTagFacade` (`src/Marketplace/Facade/ListingTagFacade.php`)
+```php
+// Справочник тегов листингов компании (для фильтров/автоподсказки)
+// @return list<ListingTagDTO> {id, name}
+list(string $companyId): array
+
+// Листинги компании, помеченные заданными тегами.
+// matchAll=false — любой из тегов; matchAll=true — все теги сразу. Пустой $tagIds → [].
+// @param list<string> $tagIds
+// @return list<string> listingId
+listingIdsByTags(string $companyId, array $tagIds, bool $matchAll = false): array
+
+// Теги по набору листингов одним запросом (без N+1 в списочных таблицах)
+// @param list<string> $listingIds
+// @return array<string, list<ListingTagDTO>> ключ — listingId
+tagsForListings(string $companyId, array $listingIds): array
+```
+Потребитель: `MarketplaceAnalytics` (фильтр `tags[]` + колонка тегов в расширенной юнит-экономике).
 
 ### `MarketplaceFacade` (`src/Marketplace/Facade/MarketplaceFacade.php`)
 ```php

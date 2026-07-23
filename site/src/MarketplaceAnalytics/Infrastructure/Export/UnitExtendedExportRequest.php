@@ -6,11 +6,16 @@ namespace App\MarketplaceAnalytics\Infrastructure\Export;
 
 final readonly class UnitExtendedExportRequest
 {
+    /**
+     * @param list<string> $tagIds
+     */
     public function __construct(
         public string $companyId,
         public ?string $marketplace,
         public string $periodFrom,
         public string $periodTo,
+        public array $tagIds = [],
+        public bool $tagsMatchAll = false,
     ) {
     }
 

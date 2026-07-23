@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\MarketplaceAnalytics\Infrastructure\Query;
 
 use App\Inventory\Facade\InventoryFacade;
+use App\Marketplace\DTO\ListingTagDTO;
+use App\Marketplace\Facade\ListingTagFacade;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
@@ -16,11 +18,14 @@ final readonly class UnitExtendedQuery
         private MarketplaceAdsFacade $adsFacade,
         private InventoryFacade $inventoryFacade,
         private MarketplaceCostAnalyticsGroupResolver $groupResolver,
+        private ListingTagFacade $listingTagFacade,
     ) {
     }
 
     /**
-     * @return array{items: list<array<string, mixed>>, totals: array<string, mixed>}
+     * @param list<string> $tagIds фильтр по тегам листингов; пустой = без фильтра
+     *
+     * @return array{items: list<array<string, mixed>>, totals: array<string, mixed>, tagSummary: list<array<string, mixed>>}
      */
     public function execute(
         string $companyId,
@@ -29,6 +34,9 @@ final readonly class UnitExtendedQuery
         string $periodTo,
         int $limit = 500,
         ?string $search = null,
+        array $tagIds = [],
+        bool $tagsMatchAll = false,
+        bool $withTagSummary = false,
     ): array {
         $from = new \DateTimeImmutable($periodFrom);
         $to = new \DateTimeImmutable($periodTo);
@@ -59,11 +67,24 @@ final readonly class UnitExtendedQuery
             array_keys($costs),
         ));
 
+        // Фильтр по тегам сужает набор ДО цикла, поэтому totals считаются уже по
+        // отфильтрованным листингам без отдельной логики агрегатов.
+        $tagIds = array_values(array_unique($tagIds));
+        $tagFilterActive = [] !== $tagIds;
+        if ($tagFilterActive) {
+            $taggedListingIds = $this->listingTagFacade->listingIdsByTags($companyId, $tagIds, $tagsMatchAll);
+            $allListingIds = array_values(array_intersect($allListingIds, $taggedListingIds));
+        }
+
+        // Теги для колонки/экспорта — один batch-запрос на весь (отфильтрованный) набор.
+        $tagsByListing = $this->listingTagFacade->tagsForListings($companyId, array_values($allListingIds));
+
         // Fetch metadata (title, sku, marketplace) for listings not present in sales
         $nonSalesIds = array_values(array_diff($allListingIds, array_keys($sales)));
         $listingMeta = $this->marketplaceFacade->getListingsMetaByIds($companyId, $nonSalesIds);
 
         $items = [];
+        $summaryRows = [];
         $totals = [
             'revenue' => 0.0,
             'quantity' => 0,
@@ -184,6 +205,10 @@ final readonly class UnitExtendedQuery
                 'roiPercent' => $costPriceTotal > 0 ? round($profit / $costPriceTotal * 100, 1) : null,
                 'otherCostsBreakdown' => $otherBreakdown,
                 'allCostsBreakdown' => $allBreakdown,
+                'tags' => array_map(
+                    static fn (ListingTagDTO $tag): array => $tag->toArray(),
+                    $tagsByListing[$listingId] ?? [],
+                ),
             ];
 
             // Totals accumulate across ALL listings (not limited).
@@ -199,6 +224,25 @@ final readonly class UnitExtendedQuery
             $totals['commission'] += $commission;
             $totals['logistics'] += $logistics;
             $totals['otherCosts'] += $otherCosts;
+            // Сумма построчной (атрибутированной) рекламы — используется как totals.adSpend
+            // при активном фильтре по тегам, где полный период неприменим.
+            $totals['adSpend'] += $adSpend;
+
+            // Свод по тегам считаем по ВСЕМ листингам (как totals), до search-фильтра.
+            if ($withTagSummary) {
+                $summaryRows[] = [
+                    'tags' => $tagsByListing[$listingId] ?? [],
+                    'revenue' => $revenue,
+                    'quantity' => $quantity,
+                    'returnsQuantity' => $returnsQuantity,
+                    'returnsTotal' => $returnsTotal,
+                    'costPriceTotal' => $costPriceTotal,
+                    'commission' => $commission,
+                    'logistics' => $logistics,
+                    'otherCosts' => $otherCosts,
+                    'adSpend' => $adSpend,
+                ];
+            }
 
             if (null === $normalizedSearch || $this->matchesSearch($row, $normalizedSearch)) {
                 $items[] = $row;
@@ -213,30 +257,33 @@ final readonly class UnitExtendedQuery
             $totals[$key] = is_float($val) ? round($val, 2) : $val;
         }
 
-        // totals.adSpend — full ad cost for the period (including non-attributed),
-        // for parity with /marketplace-ads/efficiency. Recompute totalCosts/profit
-        // accordingly. Sum of per-row adSpend may be smaller — that is OK.
-        $totalAdSpend = round((float) $this->adsFacade->getTotalAdCostForPeriod(
-            $companyId,
-            $from,
-            $to,
-            $marketplace,
-        ), 2);
+        // Без фильтра totals.adSpend — полная реклама за период (включая неатрибутированную),
+        // для паритета с /marketplace-ads/efficiency. С фильтром по тегам полный период неверен:
+        // берём сумму построчной атрибутированной рекламы по отфильтрованным листингам
+        // (накоплена в цикле в $totals['adSpend']).
+        $effectiveAdSpend = $tagFilterActive
+            ? round((float) $totals['adSpend'], 2)
+            : round((float) $this->adsFacade->getTotalAdCostForPeriod(
+                $companyId,
+                $from,
+                $to,
+                $marketplace,
+            ), 2);
 
-        $totals['adSpend'] = $totalAdSpend;
+        $totals['adSpend'] = $effectiveAdSpend;
         $totalsNetSoldQty = $totals['quantity'] - $totals['returnsQuantity'];
         $totals['commissionAverageRub'] = $this->averagePerNetSoldQty((float) $totals['commission'], $totalsNetSoldQty);
-        $totals['cacRub'] = $this->averagePerNetSoldQty($totalAdSpend, $totalsNetSoldQty);
+        $totals['cacRub'] = $this->averagePerNetSoldQty($effectiveAdSpend, $totalsNetSoldQty);
         $totals['drrPercent'] = $totals['revenue'] > 0
-            ? round($totalAdSpend / $totals['revenue'] * 100, 1)
+            ? round($effectiveAdSpend / $totals['revenue'] * 100, 1)
             : null;
         $totals['totalCosts'] = round(
-            $totals['commission'] + $totals['logistics'] + $totals['otherCosts'] + $totalAdSpend,
+            $totals['commission'] + $totals['logistics'] + $totals['otherCosts'] + $effectiveAdSpend,
             2,
         );
         $totals['profit'] = round(
             $totals['revenue'] - $totals['returnsTotal'] - $totals['costPriceTotal']
-            - $totals['commission'] - $totals['logistics'] - $totals['otherCosts'] - $totalAdSpend,
+            - $totals['commission'] - $totals['logistics'] - $totals['otherCosts'] - $effectiveAdSpend,
             2,
         );
         $totals['marginPercent'] = $totals['revenue'] > 0
@@ -249,7 +296,126 @@ final readonly class UnitExtendedQuery
         // Limit items for response; totals remain complete
         $items = \array_slice($items, 0, $limit);
 
-        return ['items' => $items, 'totals' => $totals];
+        return [
+            'items' => $items,
+            'totals' => $totals,
+            'tagSummary' => $withTagSummary ? $this->buildTagSummary($summaryRows) : [],
+        ];
+    }
+
+    /**
+     * Агрегат по тегам. Листинг с несколькими тегами намеренно попадает в каждый бакет
+     * (сумма по тегам может превышать итог — честная подпись, не взаимоисключающие группы);
+     * листинги без тегов собираются в отдельный бакет «Без тегов».
+     *
+     * @param list<array<string, mixed>> $summaryRows
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function buildTagSummary(array $summaryRows): array
+    {
+        $untaggedKey = '__untagged__';
+        $buckets = [];
+
+        foreach ($summaryRows as $row) {
+            /** @var list<ListingTagDTO> $tags */
+            $tags = $row['tags'];
+
+            if ([] === $tags) {
+                $this->accumulateSummaryBucket($buckets, $untaggedKey, null, 'Без тегов', $row);
+
+                continue;
+            }
+
+            foreach ($tags as $tag) {
+                $this->accumulateSummaryBucket($buckets, $tag->id, $tag->id, $tag->name, $row);
+            }
+        }
+
+        $result = [];
+        foreach ($buckets as $bucket) {
+            $revenue = round($bucket['revenue'], 2);
+            $returnsTotal = round($bucket['returnsTotal'], 2);
+            $costPriceTotal = round($bucket['costPriceTotal'], 2);
+            $commission = round($bucket['commission'], 2);
+            $logistics = round($bucket['logistics'], 2);
+            $otherCosts = round($bucket['otherCosts'], 2);
+            $adSpend = round($bucket['adSpend'], 2);
+            $totalCosts = round($commission + $logistics + $otherCosts + $adSpend, 2);
+            $profit = round($revenue - $returnsTotal - $costPriceTotal - $commission - $logistics - $otherCosts - $adSpend, 2);
+            $netSoldQty = $bucket['quantity'] - $bucket['returnsQuantity'];
+
+            $result[] = [
+                'tagId' => $bucket['tagId'],
+                'name' => $bucket['name'],
+                'listingsCount' => $bucket['listingsCount'],
+                'revenue' => $revenue,
+                'quantity' => $bucket['quantity'],
+                'returnsTotal' => $returnsTotal,
+                'returnsQuantity' => $bucket['returnsQuantity'],
+                'costPriceTotal' => $costPriceTotal,
+                'commission' => $commission,
+                'commissionAverageRub' => $this->averagePerNetSoldQty($commission, $netSoldQty),
+                'adSpend' => $adSpend,
+                'cacRub' => $this->averagePerNetSoldQty($adSpend, $netSoldQty),
+                'drrPercent' => $revenue > 0 ? round($adSpend / $revenue * 100, 1) : null,
+                'logistics' => $logistics,
+                'otherCosts' => $otherCosts,
+                'totalCosts' => $totalCosts,
+                'profit' => $profit,
+                'marginPercent' => $revenue > 0 ? round($profit / $revenue * 100, 1) : null,
+                'roiPercent' => $costPriceTotal > 0 ? round($profit / $costPriceTotal * 100, 1) : null,
+            ];
+        }
+
+        // Тегированные бакеты по выручке DESC; «Без тегов» всегда последним.
+        usort($result, static function (array $a, array $b): int {
+            if (null === $a['tagId']) {
+                return 1;
+            }
+            if (null === $b['tagId']) {
+                return -1;
+            }
+
+            return $b['revenue'] <=> $a['revenue'];
+        });
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $buckets
+     * @param array<string, mixed>                $row
+     */
+    private function accumulateSummaryBucket(array &$buckets, string $key, ?string $tagId, string $name, array $row): void
+    {
+        if (!isset($buckets[$key])) {
+            $buckets[$key] = [
+                'tagId' => $tagId,
+                'name' => $name,
+                'listingsCount' => 0,
+                'revenue' => 0.0,
+                'quantity' => 0,
+                'returnsQuantity' => 0,
+                'returnsTotal' => 0.0,
+                'costPriceTotal' => 0.0,
+                'commission' => 0.0,
+                'logistics' => 0.0,
+                'otherCosts' => 0.0,
+                'adSpend' => 0.0,
+            ];
+        }
+
+        ++$buckets[$key]['listingsCount'];
+        $buckets[$key]['revenue'] += $row['revenue'];
+        $buckets[$key]['quantity'] += $row['quantity'];
+        $buckets[$key]['returnsQuantity'] += $row['returnsQuantity'];
+        $buckets[$key]['returnsTotal'] += $row['returnsTotal'];
+        $buckets[$key]['costPriceTotal'] += $row['costPriceTotal'];
+        $buckets[$key]['commission'] += $row['commission'];
+        $buckets[$key]['logistics'] += $row['logistics'];
+        $buckets[$key]['otherCosts'] += $row['otherCosts'];
+        $buckets[$key]['adSpend'] += $row['adSpend'];
     }
 
     private function averagePerNetSoldQty(float $amount, int $netSoldQty): ?float

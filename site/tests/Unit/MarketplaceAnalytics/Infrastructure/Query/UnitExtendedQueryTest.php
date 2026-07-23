@@ -9,6 +9,8 @@ use App\Marketplace\DTO\ListingCostCategoryAggregateDTO;
 use App\Marketplace\DTO\ListingMetaDTO;
 use App\Marketplace\DTO\ListingReturnAggregateDTO;
 use App\Marketplace\DTO\ListingSalesAggregateDTO;
+use App\Marketplace\DTO\ListingTagDTO;
+use App\Marketplace\Facade\ListingTagFacade;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
@@ -19,6 +21,7 @@ use PHPUnit\Framework\TestCase;
 BypassFinals::allowPaths([
     '*/src/MarketplaceAds/Facade/MarketplaceAdsFacade.php',
     '*/src/Inventory/Facade/InventoryFacade.php',
+    '*/src/Marketplace/Facade/ListingTagFacade.php',
 ]);
 
 final class UnitExtendedQueryTest extends TestCase
@@ -30,7 +33,13 @@ final class UnitExtendedQueryTest extends TestCase
     private MarketplaceFacade $marketplaceFacade;
     private MarketplaceAdsFacade $adsFacade;
     private InventoryFacade $inventoryFacade;
+    private ListingTagFacade $listingTagFacade;
     private UnitExtendedQuery $query;
+
+    /** @var array<string, list<string>> listingId => tagIds */
+    private array $tagsByListing = [];
+    /** @var array{list<string>, bool}|null */
+    private ?array $lastListingIdsByTagsCall = null;
 
     /** @var array<string, ListingSalesAggregateDTO> */
     private array $salesAggregates = [];
@@ -55,12 +64,42 @@ final class UnitExtendedQueryTest extends TestCase
         $this->marketplaceFacade = $this->createMock(MarketplaceFacade::class);
         $this->adsFacade = $this->createMock(MarketplaceAdsFacade::class);
         $this->inventoryFacade = $this->createMock(InventoryFacade::class);
+        $this->listingTagFacade = $this->createMock(ListingTagFacade::class);
         $this->query = new UnitExtendedQuery(
             $this->marketplaceFacade,
             $this->adsFacade,
             $this->inventoryFacade,
             new MarketplaceCostAnalyticsGroupResolver(),
+            $this->listingTagFacade,
         );
+
+        $this->listingTagFacade->method('list')->willReturn([]);
+        $this->listingTagFacade->method('listingIdsByTags')
+            ->willReturnCallback(function (string $companyId, array $tagIds, bool $matchAll): array {
+                $this->lastListingIdsByTagsCall = [$tagIds, $matchAll];
+
+                $matched = [];
+                foreach ($this->tagsByListing as $listingId => $listingTagIds) {
+                    $common = array_intersect($tagIds, $listingTagIds);
+                    $hit = $matchAll ? count($common) === count($tagIds) : [] !== $common;
+                    if ($hit) {
+                        $matched[] = $listingId;
+                    }
+                }
+
+                return $matched;
+            });
+        $this->listingTagFacade->method('tagsForListings')
+            ->willReturnCallback(function (string $companyId, array $listingIds): array {
+                $result = [];
+                foreach ($listingIds as $listingId) {
+                    foreach ($this->tagsByListing[$listingId] ?? [] as $tagId) {
+                        $result[$listingId][] = new ListingTagDTO($tagId, 'tag-'.$tagId);
+                    }
+                }
+
+                return $result;
+            });
 
         $this->marketplaceFacade->method('getSalesAggregatesByListing')
             ->willReturnCallback(fn (): array => $this->salesAggregates);
@@ -121,6 +160,159 @@ final class UnitExtendedQueryTest extends TestCase
         self::assertSame(183.3, $row['roiPercent']);
         self::assertSame(0.0, $row['stockQty']);
         self::assertSame(0.0, $row['stockCapitalRub']);
+    }
+
+    public function testTagFilterNarrowsItemsAndTotals(): void
+    {
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l-winter', 'Зимний', 'SKU-W', 'ozon', '1000.00', 5, '300.00', 5),
+            new ListingSalesAggregateDTO('l-summer', 'Летний', 'SKU-S', 'ozon', '2000.00', 8, '500.00', 8),
+        ]);
+        $this->stubAdSpend(['l-winter' => '150.00', 'l-summer' => '400.00']);
+        $this->stubTotalAdSpend('999.00'); // full-period value must NOT leak into filtered totals
+        $this->stubTags([
+            'l-winter' => ['t-winter'],
+            'l-summer' => ['t-summer'],
+        ]);
+
+        $result = $this->execute(['t-winter']);
+
+        // Only the winter listing survives the filter.
+        self::assertCount(1, $result['items']);
+        self::assertSame('l-winter', $result['items'][0]['listingId']);
+
+        // Totals reflect only the filtered listing.
+        self::assertSame(1000.0, $result['totals']['revenue']);
+
+        // adSpend = sum of per-row attributed spend on tagged listings (150), not the
+        // full-period 999 from getTotalAdCostForPeriod().
+        self::assertSame(150.0, $result['totals']['adSpend']);
+        self::assertNull($this->lastTotalAdSpendCall, 'getTotalAdCostForPeriod must not be called when tags filter is active');
+
+        // profit = 1000 - 0 - 300 - 0 - 0 - 0 - 150 = 550
+        self::assertSame(550.0, $result['totals']['profit']);
+        self::assertSame(15.0, $result['totals']['drrPercent']);
+    }
+
+    public function testWithoutTagFilterTotalsUseFullPeriodAdSpend(): void
+    {
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l-1', 'Товар', 'SKU-1', 'ozon', '1000.00', 5, '300.00', 5),
+        ]);
+        $this->stubAdSpend(['l-1' => '150.00']);
+        $this->stubTotalAdSpend('999.00');
+
+        $result = $this->execute();
+
+        // No tag filter → parity with /marketplace-ads/efficiency: full-period ad cost.
+        self::assertSame(999.0, $result['totals']['adSpend']);
+        self::assertNotNull($this->lastTotalAdSpendCall);
+    }
+
+    public function testTagFilterMatchAllRequiresEveryTag(): void
+    {
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l-both', 'Оба', 'SKU-B', 'ozon', '1000.00', 5, '300.00', 5),
+            new ListingSalesAggregateDTO('l-one', 'Один', 'SKU-O', 'ozon', '2000.00', 8, '500.00', 8),
+        ]);
+        $this->stubTags([
+            'l-both' => ['t-a', 't-b'],
+            'l-one' => ['t-a'],
+        ]);
+
+        $result = $this->execute(['t-a', 't-b'], true);
+
+        self::assertSame([true], [$this->lastListingIdsByTagsCall[1]]);
+        self::assertCount(1, $result['items']);
+        self::assertSame('l-both', $result['items'][0]['listingId']);
+    }
+
+    public function testRowCarriesTags(): void
+    {
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l-1', 'Товар', 'SKU-1', 'ozon', '1000.00', 5, '300.00', 5),
+        ]);
+        $this->stubTags(['l-1' => ['t-1']]);
+
+        $result = $this->execute();
+
+        $row = $this->findRow($result['items'], 'l-1');
+        self::assertNotNull($row);
+        self::assertSame([['id' => 't-1', 'name' => 'tag-t-1']], $row['tags']);
+    }
+
+    public function testTagSummaryOmittedWithoutFlag(): void
+    {
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l-1', 'Товар', 'SKU-1', 'ozon', '1000.00', 5, '300.00', 5),
+        ]);
+        $this->stubTags(['l-1' => ['t-1']]);
+
+        $result = $this->execute();
+
+        self::assertSame([], $result['tagSummary']);
+    }
+
+    public function testTagSummaryDoubleCountsMultiTaggedListingAndSeparatesUntagged(): void
+    {
+        $this->stubSales([
+            // l-both несёт оба тега → его выручка попадёт и в t-a, и в t-b.
+            new ListingSalesAggregateDTO('l-both', 'Оба', 'SKU-B', 'ozon', '1000.00', 5, '300.00', 5),
+            new ListingSalesAggregateDTO('l-a', 'Только A', 'SKU-A', 'ozon', '400.00', 2, '100.00', 2),
+            new ListingSalesAggregateDTO('l-none', 'Без тегов', 'SKU-N', 'ozon', '200.00', 1, '50.00', 1),
+        ]);
+        $this->stubAdSpend(['l-both' => '100.00']);
+        $this->stubTags([
+            'l-both' => ['t-a', 't-b'],
+            'l-a' => ['t-a'],
+        ]);
+
+        $summary = $this->execute(withTagSummary: true)['tagSummary'];
+
+        $tagA = $this->findTagSummaryRow($summary, 't-a');
+        $tagB = $this->findTagSummaryRow($summary, 't-b');
+        $untagged = $this->findTagSummaryRow($summary, null);
+
+        self::assertNotNull($tagA);
+        self::assertNotNull($tagB);
+        self::assertNotNull($untagged);
+
+        // t-a = l-both + l-a: revenue 1400, две позиции.
+        self::assertSame(2, $tagA['listingsCount']);
+        self::assertSame(1400.0, $tagA['revenue']);
+
+        // t-b = только l-both: revenue 1000. Двойной счёт: l-both учтён и в t-a, и в t-b.
+        self::assertSame(1, $tagB['listingsCount']);
+        self::assertSame(1000.0, $tagB['revenue']);
+
+        // Untagged = l-none отдельно.
+        self::assertSame(1, $untagged['listingsCount']);
+        self::assertSame(200.0, $untagged['revenue']);
+        self::assertNull($untagged['tagId']);
+
+        // profit t-b = 1000 - 0 - 300 - 0 - 0 - 0 - adSpend(100) = 600; margin = 60%.
+        self::assertSame(600.0, $tagB['profit']);
+        self::assertSame(60.0, $tagB['marginPercent']);
+    }
+
+    public function testTagSummarySortedByRevenueWithUntaggedLast(): void
+    {
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l-small', 'Мелкий', 'SKU-S', 'ozon', '100.00', 1, '0.00', 1),
+            new ListingSalesAggregateDTO('l-big', 'Крупный', 'SKU-B', 'ozon', '5000.00', 10, '0.00', 10),
+            new ListingSalesAggregateDTO('l-none', 'Без тегов', 'SKU-N', 'ozon', '9999.00', 1, '0.00', 1),
+        ]);
+        $this->stubTags([
+            'l-small' => ['t-small'],
+            'l-big' => ['t-big'],
+        ]);
+
+        $summary = $this->execute(withTagSummary: true)['tagSummary'];
+
+        // Крупный тег первым, мелкий вторым, «Без тегов» последним несмотря на большую выручку.
+        self::assertSame('t-big', $summary[0]['tagId']);
+        self::assertSame('t-small', $summary[1]['tagId']);
+        self::assertNull($summary[2]['tagId']);
     }
 
     public function testRowDrrPercentIsNullWhenRevenueIsZero(): void
@@ -489,16 +681,45 @@ final class UnitExtendedQueryTest extends TestCase
     }
 
     /**
-     * @return array{items: list<array<string, mixed>>, totals: array<string, mixed>}
+     * @param list<string> $tagIds
+     *
+     * @return array{items: list<array<string, mixed>>, totals: array<string, mixed>, tagSummary: list<array<string, mixed>>}
      */
-    private function execute(): array
+    private function execute(array $tagIds = [], bool $tagsMatchAll = false, bool $withTagSummary = false): array
     {
         return $this->query->execute(
             self::COMPANY_ID,
             'ozon',
             self::PERIOD_FROM,
             self::PERIOD_TO,
+            tagIds: $tagIds,
+            tagsMatchAll: $tagsMatchAll,
+            withTagSummary: $withTagSummary,
         );
+    }
+
+    /**
+     * @param list<array<string, mixed>> $summary
+     *
+     * @return array<string, mixed>|null
+     */
+    private function findTagSummaryRow(array $summary, ?string $tagId): ?array
+    {
+        foreach ($summary as $row) {
+            if (($row['tagId'] ?? null) === $tagId) {
+                return $row;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, list<string>> $tagsByListing listingId => tagIds
+     */
+    private function stubTags(array $tagsByListing): void
+    {
+        $this->tagsByListing = $tagsByListing;
     }
 
     /**

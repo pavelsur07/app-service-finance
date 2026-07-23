@@ -7,12 +7,15 @@ import { getMonthRange } from '../utils/utils';
 import { getMonthPeriodKey, getPeriodKeyForRange, getPeriodRange, normalizePeriod } from '../components/PeriodPresets';
 import type { PeriodKey } from '../components/PeriodPresets';
 import type { MarketplaceOption } from '../types/analytics.types';
+import type { ListingTag } from './unitExtended.types';
 import UnitExtendedFilters from './UnitExtendedFilters';
 import UnitExtendedTable from './UnitExtendedTable';
+import TagSummaryTable from './TagSummaryTable';
 import ExportXlsButton from './ExportXlsButton';
 
 interface UnitExtendedWidgetProps {
     marketplaces: MarketplaceOption[];
+    tags?: ListingTag[];
 }
 
 interface Filters {
@@ -83,10 +86,13 @@ function setFiltersToUrl(filters: Filters): void {
     window.history.replaceState(null, '', window.location.pathname + (search ? `?${search}` : ''));
 }
 
-const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces }) => {
+const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces, tags = [] }) => {
     const [filters, setFilters] = useState<Filters>(getFiltersFromUrl);
     const [searchQuery, setSearchQuery] = useState('');
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+    const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+    const [tagsMatchAll, setTagsMatchAll] = useState(false);
+    const [showTagSummary, setShowTagSummary] = useState(false);
 
     useEffect(() => {
         setFiltersToUrl(filters);
@@ -100,11 +106,14 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces })
         return () => window.clearTimeout(timerId);
     }, [searchQuery]);
 
-    const { items, totals, isLoading, isError, errorMessage } = useUnitExtended({
+    const { items, totals, tagSummary, isLoading, isError, errorMessage } = useUnitExtended({
         marketplace: filters.marketplace,
         periodFrom: filters.dateFrom,
         periodTo: filters.dateTo,
         search: debouncedSearchQuery,
+        tagIds: selectedTagIds,
+        tagsMatchAll,
+        withTagSummary: showTagSummary,
     });
 
     const widgets = useWidgets({
@@ -134,6 +143,16 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces })
         setFilters((prev) => ({ ...prev, dateFrom: from, dateTo: to, period }));
     }, []);
 
+    const handleToggleTag = useCallback((tagId: string) => {
+        setSelectedTagIds((prev) => (
+            prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
+        ));
+    }, []);
+
+    const handleClearTags = useCallback(() => {
+        setSelectedTagIds([]);
+    }, []);
+
     return (
         <>
             <style>{UNIT_EXTENDED_WIDGET_STYLES}</style>
@@ -152,10 +171,16 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces })
                 dateFrom={filters.dateFrom}
                 dateTo={filters.dateTo}
                 period={filters.period}
+                tags={tags}
+                selectedTagIds={selectedTagIds}
+                tagsMatchAll={tagsMatchAll}
                 onMarketplaceChange={handleMarketplaceChange}
                 onDateFromChange={handleDateFromChange}
                 onDateToChange={handleDateToChange}
                 onDateRangeChange={handleDateRangeChange}
+                onToggleTag={handleToggleTag}
+                onTagsMatchAllChange={setTagsMatchAll}
+                onClearTags={handleClearTags}
             />
 
             <ErrorBoundary widgetName="UnitEconomyWidgets">
@@ -174,6 +199,26 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces })
                     {errorMessage ?? 'Не удалось загрузить данные'}
                 </div>
             )}
+
+            <div className="card mb-3">
+                <div className="card-header">
+                    <h3 className="card-title">Свод по тегам</h3>
+                    <div className="card-options">
+                        <label className="form-check form-switch m-0">
+                            <input
+                                className="form-check-input"
+                                type="checkbox"
+                                checked={showTagSummary}
+                                onChange={(event) => setShowTagSummary(event.target.checked)}
+                            />
+                            <span className="form-check-label">Показать</span>
+                        </label>
+                    </div>
+                </div>
+                {showTagSummary && (
+                    <TagSummaryTable rows={tagSummary} isLoading={isLoading} />
+                )}
+            </div>
 
             <div className="card">
                 <div className="card-header flex-wrap">
@@ -194,6 +239,8 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces })
                             marketplace={filters.marketplace}
                             periodFrom={filters.dateFrom}
                             periodTo={filters.dateTo}
+                            tagIds={selectedTagIds}
+                            tagsMatchAll={tagsMatchAll}
                             disabled={!filters.dateFrom || !filters.dateTo}
                         />
                         {items.length > 0 && (

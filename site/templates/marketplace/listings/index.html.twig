@@ -71,16 +71,32 @@
                     </div>
                 </div>
             {% else %}
+                <div class="card-body border-bottom py-2 d-none" id="bulk-tag-panel"
+                     data-all-tags="{{ all_tags|json_encode|e('html_attr') }}">
+                    <div class="d-flex align-items-center gap-3 flex-wrap">
+                        <span class="text-muted small"><span id="bulk-count">0</span> выбрано</span>
+                        <div class="tags-input" id="bulk-tag-input" style="max-width:320px">
+                            <input type="text" placeholder="Тег…" autocomplete="off" id="bulk-tag-name">
+                            <div class="suggest d-none" id="bulk-tag-suggest"></div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="table-responsive">
                     <table class="table card-table table-vcenter">
                         <thead>
                         <tr>
+                            <th class="w-1">
+                                <input type="checkbox" class="form-check-input m-0" id="select-all"
+                                       aria-label="Выбрать все листинги на странице">
+                            </th>
                             <th>Маркетплейс</th>
                             <th>Marketplace SKU</th>
                             <th>Supplier SKU</th>
                             <th>Размер</th>
                             <th>Цена</th>
                             <th>Товар</th>
+                            <th>Теги</th>
                             <th>Создан</th>
                             <th class="w-1"></th>
                         </tr>
@@ -88,6 +104,11 @@
                         <tbody>
                         {% for listing in pager %}
                             <tr>
+                                <td>
+                                    <input type="checkbox" class="form-check-input m-0 row-select"
+                                           value="{{ listing.id }}"
+                                           aria-label="Выбрать листинг {{ listing.marketplaceSku }}">
+                                </td>
                                 <td><span class="badge bg-azure-lt">{{ listing.marketplace.value|upper }}</span></td>
                                 <td><strong>{{ listing.marketplaceSku }}</strong></td>
                                 <td>
@@ -120,6 +141,19 @@
                                             Привязать
                                         </button>
                                     {% endif %}
+                                </td>
+                                <td class="listing-tags" data-listing-id="{{ listing.id }}">
+                                    <div class="d-flex flex-wrap gap-1">
+                                        {% for tag in tags_by_listing[listing.id]|default([]) %}
+                                            <span class="tag-chip">{{ tag.name }}
+                                                <button type="button" class="x detach-tag-btn"
+                                                        data-listing-id="{{ listing.id }}"
+                                                        data-tag-id="{{ tag.id }}"
+                                                        title="Снять тег {{ tag.name }}"
+                                                        aria-label="Снять тег {{ tag.name }}">×</button>
+                                            </span>
+                                        {% endfor %}
+                                    </div>
                                 </td>
                                 <td><span class="text-muted">{{ listing.createdAt|date('d.m.Y') }}</span></td>
                                 <td>
@@ -318,6 +352,128 @@
                     row.style.display = row.textContent.toLowerCase().includes(term) ? '' : 'none';
                 });
             });
+
+            // ---- Теги листингов ----
+            const bulkPanel = document.getElementById('bulk-tag-panel');
+            const allTags = bulkPanel ? JSON.parse(bulkPanel.dataset.allTags || '[]') : [];
+            const tagInput = document.getElementById('bulk-tag-name');
+            const tagInputWrap = document.getElementById('bulk-tag-input');
+            const suggestBox = document.getElementById('bulk-tag-suggest');
+
+            function selectedListingIds() {
+                return Array.from(document.querySelectorAll('.row-select:checked')).map(cb => cb.value);
+            }
+
+            function hideSuggest() {
+                suggestBox?.classList.add('d-none');
+            }
+
+            function refreshBulkPanel() {
+                if (!bulkPanel) {
+                    return;
+                }
+                const count = selectedListingIds().length;
+                document.getElementById('bulk-count').textContent = String(count);
+                bulkPanel.classList.toggle('d-none', count === 0);
+                if (count === 0) {
+                    hideSuggest();
+                }
+            }
+
+            async function postTagRequest(url, body) {
+                try {
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(body),
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                        alert(data.error?.message || 'Не удалось выполнить операцию');
+                        return false;
+                    }
+                    return true;
+                } catch {
+                    alert('Ошибка сети');
+                    return false;
+                }
+            }
+
+            // Перезагрузка вместо точечного обновления DOM — страница и так
+            // перезагружается после привязки товара.
+            async function assignTag(tagRef) {
+                const listingIds = selectedListingIds();
+                if (listingIds.length === 0) {
+                    return;
+                }
+                if (await postTagRequest('/api/marketplace/listings/tags/assign', {listingIds, ...tagRef})) {
+                    window.location.reload();
+                }
+            }
+
+            function renderSuggest() {
+                if (!suggestBox || !tagInput) {
+                    return;
+                }
+                const raw = tagInput.value.trim();
+                const term = raw.toLowerCase();
+                const matches = allTags.filter(t => t.name.toLowerCase().includes(term)).slice(0, 20);
+                const hasExact = allTags.some(t => t.name.toLowerCase() === term);
+
+                suggestBox.innerHTML = '';
+
+                matches.forEach(tag => {
+                    const item = document.createElement('div');
+                    item.className = 'suggest-item';
+                    item.textContent = tag.name;
+                    item.addEventListener('click', () => assignTag({tagId: tag.id}));
+                    suggestBox.appendChild(item);
+                });
+
+                if (raw !== '' && !hasExact) {
+                    const create = document.createElement('div');
+                    create.className = 'suggest-create';
+                    create.textContent = 'Создать «' + raw + '»';
+                    create.addEventListener('click', () => assignTag({name: raw}));
+                    suggestBox.appendChild(create);
+                }
+
+                suggestBox.classList.toggle('d-none', suggestBox.childElementCount === 0);
+            }
+
+            document.getElementById('select-all')?.addEventListener('change', function () {
+                document.querySelectorAll('.row-select').forEach(cb => {
+                    cb.checked = this.checked;
+                });
+                refreshBulkPanel();
+            });
+
+            document.querySelectorAll('.row-select').forEach(cb => {
+                cb.addEventListener('change', refreshBulkPanel);
+            });
+
+            tagInput?.addEventListener('input', renderSuggest);
+            tagInput?.addEventListener('focus', renderSuggest);
+            tagInputWrap?.addEventListener('click', () => tagInput?.focus());
+            document.addEventListener('click', e => {
+                if (!tagInputWrap?.contains(e.target)) {
+                    hideSuggest();
+                }
+            });
+
+            document.querySelectorAll('.detach-tag-btn').forEach(btn => {
+                btn.addEventListener('click', async function () {
+                    const ok = await postTagRequest('/api/marketplace/listings/tags/detach', {
+                        listingIds: [this.dataset.listingId],
+                        tagId: this.dataset.tagId,
+                    });
+                    if (ok) {
+                        window.location.reload();
+                    }
+                });
+            });
+
+            refreshBulkPanel();
         });
     </script>
 {% endblock %}

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\Controller;
 
+use App\Marketplace\DTO\ListingTagDTO;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Facade\ListingTagFacade;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
@@ -16,6 +18,7 @@ final class UnitExtendedIndexController extends AbstractController
 {
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
+        private readonly ListingTagFacade $listingTagFacade,
     ) {
     }
 
@@ -26,7 +29,7 @@ final class UnitExtendedIndexController extends AbstractController
     )]
     public function __invoke(): Response
     {
-        $this->activeCompanyService->getActiveCompany();
+        $company = $this->activeCompanyService->getActiveCompany();
 
         $marketplaces = [
             ['value' => '', 'label' => 'Все'],
@@ -39,8 +42,14 @@ final class UnitExtendedIndexController extends AbstractController
             ),
         ];
 
+        $tags = array_map(
+            static fn (ListingTagDTO $tag): array => $tag->toArray(),
+            $this->listingTagFacade->list((string) $company->getId()),
+        );
+
         return $this->render('marketplace_analytics/unit_extended/index.html.twig', [
             'marketplaces' => $marketplaces,
+            'tags' => $tags,
         ]);
     }
 }
