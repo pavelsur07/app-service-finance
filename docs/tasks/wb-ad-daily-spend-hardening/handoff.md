@@ -53,8 +53,11 @@ documents-without-lines total = __unallocated__ total + unmapped-nmId total
 - Stage 3 internal review: green.
 - Stage 3 external review: three iterations, final `REVIEW_GREEN`; no
   unresolved BLOCKER/IMPORTANT.
-- Final whole-task review is performed from the exact task base before the
-  Release Gate handoff.
+- Final whole-task internal review from
+  `44b28304d27c5e1025e8c29230d75b928a36681f`: green.
+- Final whole-task external review: initial 40-turn attempt was retried with
+  the prescribed narrowed 80-turn scope; result `REVIEW_GREEN`, no
+  BLOCKER/IMPORTANT findings.
 
 ## Совместимость и scope
 

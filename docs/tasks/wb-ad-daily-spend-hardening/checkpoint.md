@@ -1,9 +1,9 @@
 ## Current checkpoint
 
 **Phase:** Stage 3
-**Status:** complete, pending commit
+**Status:** done — Release Gate
 **Stage base commit:** `597c5514bba6832ab81d4cea4de9fbe62c907dae`
-**Current Work item:** 3.4 complete
+**Current Work item:** complete
 **Owner gate:** yes
 
 ### Completed
@@ -106,11 +106,18 @@
   are unchanged.
 - Stage 3 external review: three iterations, final `REVIEW_GREEN`; all safe
   in-scope MINOR findings were fixed.
+- Stage 3 committed and pushed as `178f7ced`; Draft PR #2233 updated.
+- Final internal whole-task review from
+  `44b28304d27c5e1025e8c29230d75b928a36681f`: green.
+- Final external whole-task review: first run reached the 40-turn limit; the
+  prescribed narrowed retry at 80 turns completed with `REVIEW_GREEN` and no
+  BLOCKER/IMPORTANT findings.
 
 ### Exact next action
 
-- Commit and push task-owned Stage 3 files, update Draft PR #2233, then run the
-  final whole-task Release Gate review from the exact task base.
+- Owner decides whether to mark Draft PR #2233 Ready for review. Merge,
+  deploy, production checks, and live WB loading remain separate and are not
+  authorized.
 
 ### Files to inspect first on resume
 
