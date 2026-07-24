@@ -32,3 +32,76 @@ a.t-pg-btn {
     color: var(--text-muted);
     font-size: var(--font-11_5);
 }
+
+/* Customer app shell: admin/auth layouts keep their own composition. */
+.app-customer .app-header-brand a {
+    display: block;
+    text-decoration: none;
+}
+
+.app-customer .app-company {
+    max-width: 240px;
+    overflow: hidden;
+    color: var(--text-secondary);
+    font-size: var(--font-12_5);
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-customer .app-dashboard .wz-row > .kpi {
+    min-width: 220px;
+}
+
+.app-customer .app-mobile-logout {
+    display: none;
+}
+
+@media (max-width: 900px) {
+    .app-customer .app-company,
+    .app-customer .crumbs {
+        display: none;
+    }
+
+    .app-customer .app-header-brand {
+        width: auto;
+        padding-inline: var(--s-4);
+        border-right: 0;
+    }
+
+    .app-customer .app-header-brand img {
+        max-width: 120px;
+    }
+
+    .app-customer .app-header-body {
+        padding-inline: var(--s-4);
+    }
+}
+
+@media (max-width: 760px) {
+    .app-customer .app-sidebar {
+        display: none;
+    }
+
+    .app-customer .app-workzone {
+        padding: var(--s-4);
+    }
+
+    .app-customer .ui-mode-switch-label {
+        display: none;
+    }
+
+    .app-customer .app-mobile-logout {
+        display: inline-flex;
+    }
+}
+
+@media (max-width: 420px) {
+    .app-customer .app-header-brand img {
+        max-width: 80px;
+    }
+
+    .app-customer .app-header-body {
+        padding-right: var(--s-2);
+    }
+}

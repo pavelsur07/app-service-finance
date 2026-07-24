@@ -252,6 +252,10 @@
 - `base.html.twig` сохраняет совместимость и расширяет `_layout/legacy.html.twig`.
 - Legacy layout загружает только Tabler и entrypoint `legacy_app`.
 - App layout загружает только UI Kit и entrypoint `app`.
+- Customer app shell собирается в `templates/app/_shell/` из UI Kit
+  `app-header`, `app-shell` и `sidebar`.
+- На этапе пилота только `/` имеет отдельный app-шаблон; остальные customer
+  routes продолжают рендерить legacy layout.
 - Общие бизнес-данные и маршруты не дублируются; контроллер выбирает готовый
   шаблон для поддерживаемых app-экранов.
 

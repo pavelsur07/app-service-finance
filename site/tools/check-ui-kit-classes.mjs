@@ -34,6 +34,10 @@ const CONFIG = {
     'ui-kit/components',
     'ui-kit/patterns',
   ],
+  additionalCssFiles: [
+    'ui-kit/base.css',
+    'assets/styles/app.css',
+  ],
   uiKitHtmlFallbacks: [
     'ui-kit/storybook.html', // если ещё не разнесли на отдельные .css
   ],
@@ -135,6 +139,16 @@ async function collectUiKitClasses() {
         defined.add(c);
         sources.push({ class: c, file: relative(ROOT, file) });
       }
+    }
+  }
+
+  for (const cssPath of CONFIG.additionalCssFiles) {
+    const full = resolve(ROOT, cssPath);
+    const content = await readFile(full, 'utf8');
+    const classes = extractClassesFromCss(content);
+    for (const c of classes) {
+      defined.add(c);
+      sources.push({ class: c, file: relative(ROOT, full) });
     }
   }
 

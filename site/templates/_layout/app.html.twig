@@ -12,7 +12,15 @@
     {% block stylesheets %}{% endblock %}
 </head>
 <body class="uikit-base">
-    {% block body %}{% endblock %}
+    <div class="app app-customer">
+        {% include 'app/_shell/header.html.twig' %}
+        <div class="app-body">
+            {% include 'app/_shell/sidebar.html.twig' %}
+            <main class="app-workzone">
+                {% block content %}{% block body %}{% endblock %}{% endblock %}
+            </main>
+        </div>
+    </div>
     {{ vite_entry_script_tags('app') }}
     {% block javascripts %}{% endblock %}
 </body>

@@ -108,7 +108,7 @@ Risk: HIGH-LOCAL
 owner_gate: yes
 release_candidate: yes
 independently_deployable: yes
-stage_base_commit: to be recorded immediately before Stage 3
+stage_base_commit: `b05340a6d2fd1c4c3c20afce0b0e6bbc6b1f4d1f`
 
 Definition of Done:
 

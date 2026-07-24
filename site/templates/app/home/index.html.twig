@@ -1,0 +1,48 @@
+{% extends '_layout/app.html.twig' %}
+
+{% set app_breadcrumb = 'Финансовый обзор' %}
+{% set app_nav_active = 'home' %}
+
+{% macro rubles(value) %}
+    {% if value < 0 %}−{% endif %}{{ value|abs|number_format(0, ',', ' ') }} ₽
+{% endmacro %}
+
+{% block title %}Финансовый обзор{% endblock %}
+
+{% block content %}
+    {% set net_flow = kpi.inflow30 - kpi.outflow30 %}
+    <section class="app-dashboard" data-dashboard-mode="app" aria-labelledby="dashboard-title">
+        <header class="wz-head">
+            <h1 class="wz-title" id="dashboard-title">
+                Финансовый обзор
+                <span class="wz-sub">Ключевые показатели компании на текущую дату</span>
+            </h1>
+        </header>
+
+        <div class="wz-row" aria-label="Ключевые финансовые показатели">
+            <article class="kpi kpi--dark">
+                <div class="kpi-label">Остаток на сегодня</div>
+                <div class="kpi-value kpi-value--hero money">{{ _self.rubles(kpi.todayBalance) }}</div>
+                <div class="kpi-meta">По активным денежным счетам</div>
+            </article>
+
+            <article class="kpi kpi--accent-success">
+                <div class="kpi-label">Приход</div>
+                <div class="kpi-value money">{{ _self.rubles(kpi.inflow30) }}</div>
+                <div class="kpi-meta">Последние 30 дней</div>
+            </article>
+
+            <article class="kpi kpi--accent-danger">
+                <div class="kpi-label">Расход</div>
+                <div class="kpi-value money">{{ _self.rubles(kpi.outflow30) }}</div>
+                <div class="kpi-meta">Последние 30 дней</div>
+            </article>
+
+            <article class="kpi kpi--accent-primary">
+                <div class="kpi-label">Чистый поток</div>
+                <div class="kpi-value money">{{ _self.rubles(net_flow) }}</div>
+                <div class="kpi-meta">Приход минус расход за 30 дней</div>
+            </article>
+        </div>
+    </section>
+{% endblock %}
