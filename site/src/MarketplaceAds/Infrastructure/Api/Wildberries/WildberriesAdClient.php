@@ -121,10 +121,7 @@ final readonly class WildberriesAdClient implements AdPlatformClientInterface
         $campaignIds = array_values(array_unique($campaignIds));
         $count = count($campaignIds);
         if ($count < 1 || $count > self::FULL_STATS_BATCH_SIZE) {
-            throw new \InvalidArgumentException(sprintf(
-                'WB fullstats campaign count must be between 1 and %d.',
-                self::FULL_STATS_BATCH_SIZE,
-            ));
+            throw new \InvalidArgumentException(sprintf('WB fullstats campaign count must be between 1 and %d.', self::FULL_STATS_BATCH_SIZE));
         }
         foreach ($campaignIds as $campaignId) {
             if ('' === $campaignId || !ctype_digit($campaignId)) {
@@ -178,10 +175,7 @@ final readonly class WildberriesAdClient implements AdPlatformClientInterface
             $headers = $response->getHeaders(false);
             $body = $response->getContent(false);
         } catch (TransportExceptionInterface $exception) {
-            throw new WildberriesAdTransientException(
-                'WB Promotion API transport error.',
-                previous: $exception,
-            );
+            throw new WildberriesAdTransientException('WB Promotion API transport error.', previous: $exception);
         } finally {
             $this->logger->info('WB Promotion API request finished.', [
                 'companyId' => $companyId,
@@ -199,10 +193,7 @@ final readonly class WildberriesAdClient implements AdPlatformClientInterface
         try {
             return $this->jsonDecoder->decodeObjectList($body);
         } catch (\JsonException|\UnexpectedValueException $exception) {
-            throw new WildberriesAdTransientException(
-                'WB Promotion API returned an invalid JSON list.',
-                previous: $exception,
-            );
+            throw new WildberriesAdTransientException('WB Promotion API returned an invalid JSON list.', previous: $exception);
         }
     }
 
@@ -231,22 +222,13 @@ final readonly class WildberriesAdClient implements AdPlatformClientInterface
             throw new WildberriesAdAuthException('WB Promotion API authentication failed.');
         }
         if (429 === $statusCode) {
-            throw new WildberriesAdRateLimitException(
-                'WB Promotion API rate limit exceeded.',
-                $this->retryAfterSeconds($headers),
-            );
+            throw new WildberriesAdRateLimitException('WB Promotion API rate limit exceeded.', $this->retryAfterSeconds($headers));
         }
         if ($statusCode >= 500) {
-            throw new WildberriesAdTransientException(sprintf(
-                'WB Promotion API server error %d.',
-                $statusCode,
-            ));
+            throw new WildberriesAdTransientException(sprintf('WB Promotion API server error %d.', $statusCode));
         }
         if (200 !== $statusCode) {
-            throw new \RuntimeException(sprintf(
-                'WB Promotion API returned unexpected HTTP %d.',
-                $statusCode,
-            ));
+            throw new \RuntimeException(sprintf('WB Promotion API returned unexpected HTTP %d.', $statusCode));
         }
     }
 
@@ -274,9 +256,7 @@ final readonly class WildberriesAdClient implements AdPlatformClientInterface
         foreach ($expenses as $row) {
             $advertId = $row['advertId'] ?? null;
             if (!is_string($advertId) || !ctype_digit($advertId)) {
-                throw new WildberriesAdTransientException(
-                    'WB expenses response contains an invalid advertId.',
-                );
+                throw new WildberriesAdTransientException('WB expenses response contains an invalid advertId.');
             }
 
             if (!isset($seen['id:'.$advertId])) {

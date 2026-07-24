@@ -115,8 +115,8 @@ final class AdRawDocumentTest extends TestCase
         $builder = AdRawDocumentBuilder::aRawDocument();
         $doc = match ($terminal) {
             AdRawDocumentStatus::PROCESSED => $builder->asProcessed()->build(),
-            AdRawDocumentStatus::FAILED    => $builder->asFailed()->build(),
-            default                        => throw new \LogicException('unexpected'),
+            AdRawDocumentStatus::FAILED => $builder->asFailed()->build(),
+            default => throw new \LogicException('unexpected'),
         };
 
         $this->expectException(\DomainException::class);
@@ -131,7 +131,7 @@ final class AdRawDocumentTest extends TestCase
     {
         return [
             'already PROCESSED' => [AdRawDocumentStatus::PROCESSED],
-            'already FAILED'    => [AdRawDocumentStatus::FAILED],
+            'already FAILED' => [AdRawDocumentStatus::FAILED],
         ];
     }
 

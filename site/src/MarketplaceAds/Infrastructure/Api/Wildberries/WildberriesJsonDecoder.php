@@ -29,7 +29,7 @@ final class WildberriesJsonDecoder
             }
         }
 
-        /** @var list<array<string, mixed>> $decoded */
+        /* @var list<array<string, mixed>> $decoded */
         return $decoded;
     }
 

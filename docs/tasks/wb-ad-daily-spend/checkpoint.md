@@ -1,8 +1,10 @@
 # Checkpoint
 
 Current phase: Final Release Gate
+Status: done — owner decision required
 Current Stage: Stage 3 complete
 Stage base commit: `b21a8e99802bffbd8744ba4e03d6ed7c404e6292`
+Owner gate: yes
 
 ## Completed
 
@@ -47,6 +49,15 @@ Stage base commit: `b21a8e99802bffbd8744ba4e03d6ed7c404e6292`
   - command registration/help, container lint and Doctrine mapping: green.
 - Stage 3 internal review is green.
 - Stage 3 external review is `REVIEW_GREEN`.
+- Final MarketplaceAds unit suite is green: 332 tests / 2105 assertions.
+- Final MarketplaceAds integration suite is green:
+  169 tests / 681 assertions.
+- Task-scoped PHP CS Fixer is green: 26 files / 0 findings.
+- Final internal review of the complete task diff is green.
+- Final external review of the complete task diff is `REVIEW_GREEN`;
+  no BLOCKER or IMPORTANT findings remain.
+- Current official WB documentation re-confirms that `/adv/v3/fullstats` is a
+  GET endpoint with `ids`, `beginDate`, and `endDate` query parameters.
 
 ## Current Definition of Done
 
@@ -57,3 +68,16 @@ See Stage 3 in `plan.md`.
 - Host PHP is unavailable; use the Docker PHP CLI service.
 - No live API or production operation is authorized.
 - Unrelated untracked files present before this task remain untouched.
+- Full `make site-test` remains blocked by pre-existing test-schema drift at
+  `bot_links.updated_at`; the task migration passed in the isolated test DB.
+- Repository-wide `make site-cs-check` remains red on 591 pre-existing files;
+  task-scoped style is green.
+
+## Exact next action
+
+- Commit and push the final task-scoped formatter and handoff updates.
+- Update Draft PR #2232 and record its CI status.
+- STOP before changing Draft status, merge, release, deployment, production
+  migration, production cron activation, or a live WB import.
+- Expected owner response:
+  `Разрешаю перевести Draft PR #2232 в Ready for review. Production Gate не разрешаю.`

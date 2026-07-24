@@ -171,13 +171,13 @@ final class WbAdDailySpendCommand extends Command
     }
 
     /**
-     * @return string|null|false false means invalid
+     * @return string|false|null false means invalid
      */
     private function uuidOption(
         InputInterface $input,
         OutputInterface $output,
         string $name,
-    ): string|null|false {
+    ): string|false|null {
         $value = trim((string) $input->getOption($name));
         if ('' === $value) {
             return null;
