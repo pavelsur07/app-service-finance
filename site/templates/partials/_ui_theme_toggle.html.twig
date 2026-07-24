@@ -1,0 +1,13 @@
+{% if is_granted('ROLE_ADMIN') %}
+<div class="d-flex align-items-center gap-2 ms-auto" data-vf-theme-url="{{ path('app_ui_theme_switch') }}">
+    <span class="text-muted small">UI:</span>
+    <div class="btn-group btn-group-sm" role="group">
+        <button type="button"
+                class="btn {{ not vf_mode() ? 'btn-primary' : 'btn-outline-primary' }}"
+                data-vf-theme="tabler">Classic</button>
+        <button type="button"
+                class="btn {{ vf_mode() ? 'btn-primary' : 'btn-outline-primary' }}"
+                data-vf-theme="vf">New</button>
+    </div>
+</div>
+{% endif %}
