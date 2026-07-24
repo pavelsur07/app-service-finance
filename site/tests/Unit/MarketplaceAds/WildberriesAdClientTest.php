@@ -14,6 +14,7 @@ use App\MarketplaceAds\Infrastructure\Api\Wildberries\WildberriesAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Wildberries\WildberriesJsonDecoder;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -173,17 +174,17 @@ final class WildberriesAdClientTest extends TestCase
         );
     }
 
-    public function testClassifiesAuthRateLimitServerAndInvalidJsonResponses(): void
+    public function testClassifiesAuthAndInvalidJsonResponsesWithoutRetry(): void
     {
         $cases = [
             [new MockResponse('', ['http_code' => 403]), WildberriesAdAuthException::class],
-            [new MockResponse('', ['http_code' => 500]), WildberriesAdTransientException::class],
             [new MockResponse('not-json', ['http_code' => 200]), WildberriesAdTransientException::class],
         ];
 
         foreach ($cases as [$response, $exceptionClass]) {
+            $http = new MockHttpClient($response);
             try {
-                $this->client(new MockHttpClient($response))->fetchExpenses(
+                $this->client($http)->fetchExpenses(
                     self::COMPANY_ID,
                     self::CONNECTION_ID,
                     new \DateTimeImmutable('2026-07-20'),
@@ -192,13 +193,118 @@ final class WildberriesAdClientTest extends TestCase
             } catch (\Throwable $exception) {
                 self::assertInstanceOf($exceptionClass, $exception);
             }
+            self::assertSame(1, $http->getRequestsCount());
         }
+    }
 
-        try {
-            $this->client(new MockHttpClient(new MockResponse('', [
+    public function testRetriesRateLimitUsingIntegerRetryAfter(): void
+    {
+        $http = new MockHttpClient([
+            new MockResponse('', [
                 'http_code' => 429,
                 'response_headers' => ['retry-after' => '37'],
-            ])))->fetchExpenses(
+            ]),
+            new MockResponse('[]', ['http_code' => 200]),
+        ]);
+        $clock = new MockClock('2026-07-21 00:00:00 UTC');
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger
+            ->expects(self::once())
+            ->method('warning')
+            ->with(
+                'WB Promotion API request retry scheduled.',
+                self::callback(static fn (array $context): bool => 'wb_ad_spend_request_retry' === ($context['event'] ?? null)
+                    && 429 === ($context['statusCode'] ?? null)
+                    && 37 === ($context['delaySeconds'] ?? null)
+                    && 1 === ($context['attempt'] ?? null)
+                    && 2 === ($context['nextAttempt'] ?? null)),
+            );
+
+        self::assertSame([], $this->client($http, $clock, $logger)->fetchExpenses(
+            self::COMPANY_ID,
+            self::CONNECTION_ID,
+            new \DateTimeImmutable('2026-07-20'),
+        ));
+        self::assertSame(2, $http->getRequestsCount());
+        self::assertSame('2026-07-21 00:00:37', $clock->now()->format('Y-m-d H:i:s'));
+    }
+
+    public function testRetriesServerErrorUsingShortFallbackBackoff(): void
+    {
+        $http = new MockHttpClient([
+            new MockResponse('', [
+                'http_code' => 503,
+                'response_headers' => ['retry-after' => 'tomorrow'],
+            ]),
+            new MockResponse('[]', ['http_code' => 200]),
+        ]);
+        $clock = new MockClock('2026-07-21 00:00:00 UTC');
+
+        self::assertSame([], $this->client($http, $clock)->fetchExpenses(
+            self::COMPANY_ID,
+            self::CONNECTION_ID,
+            new \DateTimeImmutable('2026-07-20'),
+        ));
+        self::assertSame(2, $http->getRequestsCount());
+        self::assertSame('2026-07-21 00:00:02', $clock->now()->format('Y-m-d H:i:s'));
+    }
+
+    public function testRetriesUsingHttpDateRetryAfter(): void
+    {
+        $http = new MockHttpClient([
+            new MockResponse('', [
+                'http_code' => 503,
+                'response_headers' => ['retry-after' => 'Tue, 21 Jul 2026 00:00:30 GMT'],
+            ]),
+            new MockResponse('[]', ['http_code' => 200]),
+        ]);
+        $clock = new MockClock('2026-07-21 00:00:00 UTC');
+
+        self::assertSame([], $this->client($http, $clock)->fetchExpenses(
+            self::COMPANY_ID,
+            self::CONNECTION_ID,
+            new \DateTimeImmutable('2026-07-20'),
+        ));
+        self::assertSame('2026-07-21 00:00:30', $clock->now()->format('Y-m-d H:i:s'));
+    }
+
+    public function testExhaustsExactlyThreeServerErrorAttempts(): void
+    {
+        $http = new MockHttpClient([
+            new MockResponse('', ['http_code' => 500]),
+            new MockResponse('', ['http_code' => 502]),
+            new MockResponse('', ['http_code' => 503]),
+        ]);
+        $clock = new MockClock('2026-07-21 00:00:00 UTC');
+
+        try {
+            $this->client($http, $clock)->fetchExpenses(
+                self::COMPANY_ID,
+                self::CONNECTION_ID,
+                new \DateTimeImmutable('2026-07-20'),
+            );
+            self::fail('Expected server error exhaustion.');
+        } catch (WildberriesAdTransientException $exception) {
+            self::assertSame('WB Promotion API server error 503.', $exception->getMessage());
+        }
+
+        self::assertSame(3, $http->getRequestsCount());
+        self::assertSame('2026-07-21 00:00:06', $clock->now()->format('Y-m-d H:i:s'));
+    }
+
+    public function testExhaustedRateLimitKeepsRetryAfterOnException(): void
+    {
+        $responses = array_fill(0, 3, null);
+        $http = new MockHttpClient(array_map(
+            static fn (): MockResponse => new MockResponse('', [
+                'http_code' => 429,
+                'response_headers' => ['retry-after' => '37'],
+            ]),
+            $responses,
+        ));
+
+        try {
+            $this->client($http)->fetchExpenses(
                 self::COMPANY_ID,
                 self::CONNECTION_ID,
                 new \DateTimeImmutable('2026-07-20'),
@@ -207,6 +313,79 @@ final class WildberriesAdClientTest extends TestCase
         } catch (WildberriesAdRateLimitException $exception) {
             self::assertSame(37, $exception->retryAfterSeconds);
         }
+        self::assertSame(3, $http->getRequestsCount());
+    }
+
+    public function testExhaustedZeroRetryAfterKeepsExistingExceptionDefault(): void
+    {
+        $http = new MockHttpClient(array_map(
+            static fn (): MockResponse => new MockResponse('', [
+                'http_code' => 429,
+                'response_headers' => ['retry-after' => '0'],
+            ]),
+            array_fill(0, 3, null),
+        ));
+
+        try {
+            $this->client($http)->fetchExpenses(
+                self::COMPANY_ID,
+                self::CONNECTION_ID,
+                new \DateTimeImmutable('2026-07-20'),
+            );
+            self::fail('Expected rate limit exhaustion.');
+        } catch (WildberriesAdRateLimitException $exception) {
+            self::assertSame(20, $exception->retryAfterSeconds);
+        }
+        self::assertSame(3, $http->getRequestsCount());
+    }
+
+    public function testDoesNotRetryOtherClientErrors(): void
+    {
+        $http = new MockHttpClient(new MockResponse('', ['http_code' => 400]));
+
+        try {
+            $this->client($http)->fetchExpenses(
+                self::COMPANY_ID,
+                self::CONNECTION_ID,
+                new \DateTimeImmutable('2026-07-20'),
+            );
+            self::fail('Expected unexpected client error.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame('WB Promotion API returned unexpected HTTP 400.', $exception->getMessage());
+        }
+        self::assertSame(1, $http->getRequestsCount());
+    }
+
+    public function testDoesNotWaitWhenRetryAfterExceedsBound(): void
+    {
+        $http = new MockHttpClient(new MockResponse('', [
+            'http_code' => 429,
+            'response_headers' => ['retry-after' => '121'],
+        ]));
+        $clock = new MockClock('2026-07-21 00:00:00 UTC');
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger
+            ->expects(self::once())
+            ->method('warning')
+            ->with(
+                'WB Promotion API request retry abandoned.',
+                self::callback(static fn (array $context): bool => 'wb_ad_spend_request_retry_abandoned' === ($context['event'] ?? null)
+                    && 121 === ($context['delaySeconds'] ?? null)
+                    && 120 === ($context['maxDelaySeconds'] ?? null)),
+            );
+
+        try {
+            $this->client($http, $clock, $logger)->fetchExpenses(
+                self::COMPANY_ID,
+                self::CONNECTION_ID,
+                new \DateTimeImmutable('2026-07-20'),
+            );
+            self::fail('Expected bounded rate limit failure.');
+        } catch (WildberriesAdRateLimitException $exception) {
+            self::assertSame(121, $exception->retryAfterSeconds);
+        }
+        self::assertSame(1, $http->getRequestsCount());
+        self::assertSame('2026-07-21 00:00:00', $clock->now()->format('Y-m-d H:i:s'));
     }
 
     public function testMissingCredentialsAreClassifiedWithoutHttpRequest(): void
@@ -229,13 +408,14 @@ final class WildberriesAdClientTest extends TestCase
     private function client(
         HttpClientInterface $httpClient,
         ?MockClock $clock = null,
+        ?LoggerInterface $logger = null,
     ): WildberriesAdClient {
         return new WildberriesAdClient(
             $httpClient,
             $this->marketplaceFacade,
             new WildberriesJsonDecoder(),
             $clock ?? new MockClock('2026-07-21 00:00:00 UTC'),
-            new NullLogger(),
+            $logger ?? new NullLogger(),
         );
     }
 }

@@ -59,6 +59,15 @@ Production Gate action and requires explicit owner authorization.
 - Campaign IDs are split into batches of 50.
 - Consecutive fullstats batches are separated by 20 seconds in the cron
   process. No Messenger worker is occupied.
+- Each individual request gets at most three total attempts for HTTP 429/5xx.
+- Integer and HTTP-date `Retry-After` values are honored without shortening.
+  A value above 120 seconds fails immediately; absent or invalid values use
+  bounded 2/4-second delays.
+- Authentication and other 4xx responses are not retried.
+- `event=wb_ad_spend_request_retry` marks each scheduled retry in the
+  `marketplace_ads` channel.
+- `event=wb_ad_spend_request_retry_abandoned` records a WB-supplied delay above
+  the 120-second bound before the request fails without waiting.
 
 ## Monitoring
 
@@ -67,10 +76,22 @@ Each successful connection logs:
 - company ID, connection ID, date, and raw document ID;
 - raw status;
 - campaign and SKU counts;
-- attributed, unallocated, and actual totals;
+- `/upd` source, `AdDocument`, `AdDocumentLine`, without-line, intentional
+  unallocated, and real unmapped totals;
+- real unmapped document count and exact reconciliation status;
 - duration.
 
 No token or response body is logged.
+
+The stdout summary keeps `total` as a compatibility alias for `source` and
+prints these reconciliation fields:
+`persisted_unallocated`, `documents`, `lines`, `without_lines`, `unmapped`,
+`unmapped_count`, `reconciled`, `catalog_refresh_attempted`,
+`catalog_refreshed`, and `projection_retries`. `catalog_refreshed=yes` means
+the refresh call completed successfully; it may still leave unknown IDs.
+A successful line always has
+`reconciled=yes`; mismatches fail the connection before a success line is
+printed.
 
 Recommended alerts/checks:
 
@@ -79,17 +100,141 @@ Recommended alerts/checks:
 - a WB raw document remains `DRAFT` because one or more `nmId` values are
   unmapped;
 - unallocated amount or ratio increases materially;
-- the logged invariant `attributed + unallocated = actual` does not hold.
+- any persisted reconciliation invariant does not hold:
+
+  ```text
+  source = AdDocument
+  AdDocument = AdDocumentLine + without-line
+  without-line = __unallocated__ + unmapped-nmId
+  source __unallocated__ = persisted __unallocated__
+  ```
+
+An `__unallocated__` document carrying a listing line intentionally breaks
+reconciliation; the projection never creates such a line, so this is a
+fail-closed corruption check.
+
+Use `event=wb_ad_spend_reconciliation_failed` as the stable log-query marker
+for a persisted reconciliation failure.
+
+If one or more connections still return `review_required`, the command emits
+exactly one `ERROR` through the normal application logger with
+`event=wb_ad_spend_review_required`, the date, total count, and at most ten
+company/connection/raw IDs with remaining unmapped totals. This reaches the
+configured Sentry/GlitchTip handler; detailed request/recovery logs remain in
+the excluded `marketplace_ads` channel.
+
+A reconciliation mismatch resets the raw document to `DRAFT`, fails the
+affected connection, and makes the command exit non-zero. Intentional
+`__unallocated__` remains visible in `without_lines`, but does not require
+review; only a real unmapped `nmId` contributes to the unmapped amount/count.
+An entry with an empty `campaignName` is skipped by projection and therefore
+also causes the source/document invariant to fail instead of being accepted as
+a partial success.
+The inconsistent projection rows are retained for auditability and remain
+queryable until the next idempotent rerun replaces them; the `DRAFT` raw status
+is the operational marker that they require recovery.
 
 ## Recovery
 
-1. Fix token scope, API availability, or listing mapping.
-2. Rerun the affected completed date with the narrowest company/connection
+For real unmapped `nmId`, the loader first refreshes the WB listing catalog
+once and reprocesses the same persisted raw document once. It does not fetch
+advertising endpoints again. A refresh failure leaves the first financial
+projection intact in `DRAFT`; unresolved IDs after the retry also remain
+`DRAFT` and trigger the aggregated review alert.
+`event=wb_ad_spend_catalog_recovery_finished` records a completed refresh and
+same-raw reprojection, including the remaining unmapped totals.
+
+Manual recovery:
+
+1. Inspect `wb_ad_spend_review_required`,
+   `wb_ad_spend_catalog_refresh_failed`, and the remaining unmapped sample.
+2. Fix token scope, catalog API availability, or the listing mapping.
+3. Rerun the affected completed date with the narrowest company/connection
    filters.
-3. Confirm the raw status and exact totals in the completion log.
-4. Do not run a broad historical backfill until its date range and API budget
+4. Confirm the raw status, refresh fields, and exact totals in the completion
+   log.
+5. Do not run a broad historical backfill until its date range and API budget
    are explicitly approved.
 
 WB may revise recent history. The initial production scope remains D-1 only;
 rolling 7-day refresh and month-close refresh should be added as a separately
 approved operational policy after observed correction rates justify them.
+
+## Production CLI image acceptance
+
+The production CLI runtime intentionally comments out only
+`docker-php-ext-opcache.ini`'s dynamic-load entry. Workers and scheduler
+commands do not need opcache; the PHP-FPM image and its opcache configuration
+are unchanged.
+
+The image build and local acceptance checks are:
+
+```bash
+cd site
+
+docker build \
+  --file docker/production/php-cli/Dockerfile \
+  --tag app-service-finance/site-php-cli:wb-ad-hardening \
+  .
+
+docker run --rm --entrypoint php \
+  app-service-finance/site-php-cli:wb-ad-hardening -v
+docker run --rm --entrypoint php \
+  app-service-finance/site-php-cli:wb-ad-hardening -m
+docker run --rm --entrypoint php \
+  app-service-finance/site-php-cli:wb-ad-hardening \
+  bin/console --env=prod app:marketplace-ads:wb-daily-spend \
+  --help --no-interaction
+docker run --rm \
+  app-service-finance/site-php-cli:wb-ad-hardening php -v
+docker run --rm --entrypoint supercronic \
+  app-service-finance/site-php-cli:wb-ad-hardening -version
+```
+
+All PHP commands must finish without `Failed loading Zend extension
+'opcache'` on stderr. The Symfony help command does not call WB or mutate
+application data. The command without `--entrypoint` also validates the real
+runtime entrypoint and its switch to the non-root `app` user.
+
+For a machine-verifiable warning check:
+
+```bash
+set -euo pipefail
+
+assert_clean_php() {
+  local output
+  output="$(docker run --rm "$@" 2>&1)"
+  printf '%s\n' "$output"
+  if grep -Fq "Failed loading Zend extension" <<<"$output"; then
+    return 1
+  fi
+}
+
+assert_clean_php --entrypoint php \
+  app-service-finance/site-php-cli:wb-ad-hardening -v
+assert_clean_php --entrypoint php \
+  app-service-finance/site-php-cli:wb-ad-hardening -m
+assert_clean_php --entrypoint php \
+  app-service-finance/site-php-cli:wb-ad-hardening \
+  bin/console --env=prod app:marketplace-ads:wb-daily-spend \
+  --help --no-interaction
+assert_clean_php \
+  app-service-finance/site-php-cli:wb-ad-hardening php -v
+```
+
+After a separately authorized deployment, the owner/DevOps operator may run
+acceptance on the application host against the deployed scheduler container:
+
+```bash
+docker exec -w /app scheduler php -v
+docker exec -w /app scheduler php -m
+docker exec -w /app scheduler \
+  php bin/console --env=prod app:marketplace-ads:wb-daily-spend \
+  --help --no-interaction
+```
+
+Even these read-only production checks require an explicit production-check
+request. Codex must not run the raw `docker exec` block; if separately
+authorized, it uses only the production wrappers allowed by `AGENTS.md`. A
+dated load or rerun is a separate mutating Production Gate action and is not
+part of image acceptance.

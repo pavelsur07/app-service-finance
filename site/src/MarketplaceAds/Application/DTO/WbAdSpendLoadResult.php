@@ -15,7 +15,17 @@ final readonly class WbAdSpendLoadResult
         public int $skuCount,
         public string $attributedTotal,
         public string $unallocatedTotal,
+        public string $persistedUnallocatedTotal,
         public string $actualTotal,
+        public string $documentTotal,
+        public string $lineTotal,
+        public string $withoutLineTotal,
+        public string $unmappedTotal,
+        public int $unmappedCount,
+        public bool $reconciled,
+        public bool $catalogRefreshAttempted = false,
+        public bool $catalogRefreshed = false,
+        public int $projectionRetryCount = 0,
     ) {
     }
 }

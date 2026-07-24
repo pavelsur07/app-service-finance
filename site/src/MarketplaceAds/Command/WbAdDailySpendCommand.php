@@ -7,6 +7,7 @@ namespace App\MarketplaceAds\Command;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Application\LoadWbAdSpendDayActionInterface;
 use App\MarketplaceAds\Enum\AdRawDocumentStatus;
+use App\Shared\Service\AppLogger;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Clock\ClockInterface;
@@ -27,6 +28,7 @@ final class WbAdDailySpendCommand extends Command
     use LockableTrait;
 
     private const TIMEZONE = 'Europe/Moscow';
+    private const REVIEW_SAMPLE_LIMIT = 10;
 
     public function __construct(
         private readonly MarketplaceFacade $marketplaceFacade,
@@ -34,6 +36,7 @@ final class WbAdDailySpendCommand extends Command
         private readonly ClockInterface $clock,
         #[Autowire(service: 'monolog.logger.marketplace_ads')]
         private readonly LoggerInterface $logger,
+        private readonly AppLogger $appLogger,
     ) {
         parent::__construct();
     }
@@ -86,6 +89,7 @@ final class WbAdDailySpendCommand extends Command
             $loaded = 0;
             $reviewRequired = 0;
             $failed = 0;
+            $reviewSample = [];
 
             foreach ($connections as $connection) {
                 $currentCompanyId = $connection['companyId'];
@@ -100,10 +104,24 @@ final class WbAdDailySpendCommand extends Command
                     ++$loaded;
                     if (AdRawDocumentStatus::DRAFT === $result->status) {
                         ++$reviewRequired;
+                        if (count($reviewSample) < self::REVIEW_SAMPLE_LIMIT) {
+                            $reviewSample[] = [
+                                'companyId' => $currentCompanyId,
+                                'connectionId' => $currentConnectionId,
+                                'rawDocumentId' => $result->rawDocumentId,
+                                'unmappedTotal' => $result->unmappedTotal,
+                                'unmappedCount' => $result->unmappedCount,
+                                'catalogRefreshAttempted' => $result->catalogRefreshAttempted,
+                                'catalogRefreshed' => $result->catalogRefreshed,
+                                'projectionRetryCount' => $result->projectionRetryCount,
+                            ];
+                        }
                     }
 
+                    // `total` is retained as a compatibility alias for the
+                    // explicit `/upd`-derived `source` field.
                     $output->writeln(sprintf(
-                        'company=%s connection=%s status=%s campaigns=%d sku=%d attributed=%s unallocated=%s total=%s',
+                        'company=%s connection=%s status=%s campaigns=%d sku=%d attributed=%s unallocated=%s persisted_unallocated=%s total=%s source=%s documents=%s lines=%s without_lines=%s unmapped=%s unmapped_count=%d reconciled=%s catalog_refresh_attempted=%s catalog_refreshed=%s projection_retries=%d',
                         $currentCompanyId,
                         $currentConnectionId,
                         $result->status->value,
@@ -111,7 +129,18 @@ final class WbAdDailySpendCommand extends Command
                         $result->skuCount,
                         $result->attributedTotal,
                         $result->unallocatedTotal,
+                        $result->persistedUnallocatedTotal,
                         $result->actualTotal,
+                        $result->actualTotal,
+                        $result->documentTotal,
+                        $result->lineTotal,
+                        $result->withoutLineTotal,
+                        $result->unmappedTotal,
+                        $result->unmappedCount,
+                        $result->reconciled ? 'yes' : 'no',
+                        $result->catalogRefreshAttempted ? 'yes' : 'no',
+                        $result->catalogRefreshed ? 'yes' : 'no',
+                        $result->projectionRetryCount,
                     ));
                 } catch (\Throwable $exception) {
                     ++$failed;
@@ -129,6 +158,15 @@ final class WbAdDailySpendCommand extends Command
                         $exception->getMessage(),
                     ));
                 }
+            }
+
+            if ($reviewRequired > 0) {
+                $this->appLogger->error('WB daily ad spend review required.', context: [
+                    'event' => 'wb_ad_spend_review_required',
+                    'date' => $date->format('Y-m-d'),
+                    'reviewRequired' => $reviewRequired,
+                    'sample' => $reviewSample,
+                ]);
             }
 
             $output->writeln(sprintf(

@@ -9,6 +9,7 @@ use App\MarketplaceAds\Application\DTO\WbAdSpendLoadResult;
 use App\MarketplaceAds\Application\LoadWbAdSpendDayActionInterface;
 use App\MarketplaceAds\Command\WbAdDailySpendCommand;
 use App\MarketplaceAds\Enum\AdRawDocumentStatus;
+use App\Shared\Service\AppLogger;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Clock\MockClock;
@@ -39,10 +40,13 @@ final class WbAdDailySpendCommandTest extends TestCase
             });
 
         // 21:30 UTC is already 00:30 on July 22 in Moscow, so yesterday is July 21.
+        $appLogger = $this->createMock(AppLogger::class);
+        $appLogger->expects(self::never())->method('error');
         $tester = $this->tester(
             $facade,
             $action,
             new MockClock('2026-07-21T21:30:00+00:00'),
+            appLogger: $appLogger,
         );
 
         self::assertSame(Command::SUCCESS, $tester->execute([]));
@@ -52,6 +56,10 @@ final class WbAdDailySpendCommandTest extends TestCase
         ], $seen);
         self::assertStringContainsString(
             'WB ad spend date=2026-07-21 loaded=2 review_required=0 failed=0',
+            $tester->getDisplay(),
+        );
+        self::assertStringContainsString(
+            'total=11.00 source=11.00 documents=11.00 lines=10.00 without_lines=1.00 unmapped=0.00 unmapped_count=0 reconciled=yes',
             $tester->getDisplay(),
         );
     }
@@ -68,7 +76,7 @@ final class WbAdDailySpendCommandTest extends TestCase
                 self::CONNECTION_2,
                 self::callback(static fn (\DateTimeImmutable $date): bool => '2026-07-10' === $date->format('Y-m-d')),
             )
-            ->willReturn($this->loadResult(AdRawDocumentStatus::DRAFT));
+            ->willReturn($this->loadResult(AdRawDocumentStatus::DRAFT, '2.00', 1));
 
         $tester = $this->tester($facade, $action);
         $exitCode = $tester->execute([
@@ -79,6 +87,7 @@ final class WbAdDailySpendCommandTest extends TestCase
 
         self::assertSame(Command::SUCCESS, $exitCode);
         self::assertStringContainsString('review_required=1', $tester->getDisplay());
+        self::assertStringContainsString('unmapped=2.00 unmapped_count=1', $tester->getDisplay());
     }
 
     public function testContinuesAfterConnectionFailureAndReturnsFailure(): void
@@ -112,6 +121,53 @@ final class WbAdDailySpendCommandTest extends TestCase
         self::assertSame(Command::FAILURE, $tester->execute(['--date' => '2026-07-10']));
         self::assertSame([self::COMPANY_1, self::COMPANY_2], $attempted);
         self::assertStringContainsString('loaded=1 review_required=0 failed=1', $tester->getDisplay());
+    }
+
+    public function testEmitsOneAggregatedAlertForAllReviewRequiredResults(): void
+    {
+        $connections = [];
+        for ($index = 1; $index <= 12; ++$index) {
+            $connections[] = [
+                'connectionId' => sprintf('22222222-2222-2222-2222-%012d', $index),
+                'companyId' => sprintf('11111111-1111-1111-1111-%012d', $index),
+                'marketplace' => 'wildberries',
+                'connectionType' => 'seller',
+            ];
+        }
+        $facade = $this->facadeWithConnections($connections);
+        $action = $this->createMock(LoadWbAdSpendDayActionInterface::class);
+        $action
+            ->expects(self::exactly(12))
+            ->method('__invoke')
+            ->willReturn($this->loadResult(
+                AdRawDocumentStatus::DRAFT,
+                '2.00',
+                1,
+                catalogRefreshAttempted: true,
+                projectionRetryCount: 1,
+            ));
+
+        $appLogger = $this->createMock(AppLogger::class);
+        $appLogger
+            ->expects(self::once())
+            ->method('error')
+            ->with(
+                'WB daily ad spend review required.',
+                null,
+                self::callback(static fn (array $context): bool => 'wb_ad_spend_review_required' === ($context['event'] ?? null)
+                    && '2026-07-10' === ($context['date'] ?? null)
+                    && 12 === ($context['reviewRequired'] ?? null)
+                    && 10 === count($context['sample'] ?? [])
+                    && self::COMPANY_1 === ($context['sample'][0]['companyId'] ?? null)
+                    && self::COMPANY_2 === ($context['sample'][1]['companyId'] ?? null)
+                    && true === ($context['sample'][0]['catalogRefreshAttempted'] ?? null)
+                    && 1 === ($context['sample'][0]['projectionRetryCount'] ?? null)),
+            );
+
+        $tester = $this->tester($facade, $action, appLogger: $appLogger);
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['--date' => '2026-07-10']));
+        self::assertStringContainsString('loaded=12 review_required=12 failed=0', $tester->getDisplay());
     }
 
     public function testRejectsInvalidOrIncompleteDateBeforeLoadingConnections(): void
@@ -157,6 +213,7 @@ final class WbAdDailySpendCommandTest extends TestCase
                 $action,
                 new MockClock('2026-07-22 12:00:00 Europe/Moscow'),
                 $this->createMock(LoggerInterface::class),
+                $this->createMock(AppLogger::class),
             );
             $property = new \ReflectionProperty($command, 'lockFactory');
             $property->setValue($command, $factory);
@@ -189,12 +246,14 @@ final class WbAdDailySpendCommandTest extends TestCase
         LoadWbAdSpendDayActionInterface $action,
         ?MockClock $clock = null,
         ?LoggerInterface $logger = null,
+        ?AppLogger $appLogger = null,
     ): CommandTester {
         return new CommandTester(new WbAdDailySpendCommand(
             $facade,
             $action,
             $clock ?? new MockClock('2026-07-22 12:00:00 Europe/Moscow'),
             $logger ?? $this->createMock(LoggerInterface::class),
+            $appLogger ?? $this->createMock(AppLogger::class),
         ));
     }
 
@@ -219,8 +278,14 @@ final class WbAdDailySpendCommandTest extends TestCase
         ];
     }
 
-    private function loadResult(AdRawDocumentStatus $status): WbAdSpendLoadResult
-    {
+    private function loadResult(
+        AdRawDocumentStatus $status,
+        string $unmappedTotal = '0.00',
+        int $unmappedCount = 0,
+        bool $catalogRefreshAttempted = false,
+        bool $catalogRefreshed = false,
+        int $projectionRetryCount = 0,
+    ): WbAdSpendLoadResult {
         return new WbAdSpendLoadResult(
             rawDocumentId: '33333333-3333-3333-3333-333333333333',
             status: $status,
@@ -228,7 +293,17 @@ final class WbAdDailySpendCommandTest extends TestCase
             skuCount: 3,
             attributedTotal: '10.00',
             unallocatedTotal: '1.00',
+            persistedUnallocatedTotal: '1.00',
             actualTotal: '11.00',
+            documentTotal: '11.00',
+            lineTotal: bcsub('10.00', $unmappedTotal, 2),
+            withoutLineTotal: bcadd('1.00', $unmappedTotal, 2),
+            unmappedTotal: $unmappedTotal,
+            unmappedCount: $unmappedCount,
+            reconciled: true,
+            catalogRefreshAttempted: $catalogRefreshAttempted,
+            catalogRefreshed: $catalogRefreshed,
+            projectionRetryCount: $projectionRetryCount,
         );
     }
 }

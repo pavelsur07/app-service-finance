@@ -5,13 +5,20 @@ declare(strict_types=1);
 namespace App\MarketplaceAds\Application;
 
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Application\DTO\AdRawEntry;
 use App\MarketplaceAds\Application\DTO\WbAdSpendLoadResult;
+use App\MarketplaceAds\Application\DTO\WbAdSpendReconciliation;
 use App\MarketplaceAds\Entity\AdRawDocument;
+use App\MarketplaceAds\Enum\AdRawDocumentStatus;
+use App\MarketplaceAds\Exception\WbAdSpendReconciliationException;
 use App\MarketplaceAds\Infrastructure\Api\Wildberries\WildberriesAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Wildberries\WildberriesAdRawDataParser;
+use App\MarketplaceAds\Infrastructure\Query\WbAdSpendReconciliationQuery;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
+use App\Shared\Domain\ValueObject\Money;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Webmozart\Assert\Assert;
@@ -23,7 +30,10 @@ final readonly class LoadWbAdSpendDayAction implements LoadWbAdSpendDayActionInt
         private WildberriesAdRawDataParser $parser,
         private AdRawDocumentRepository $rawDocumentRepository,
         private ProcessAdRawDocumentAction $processAction,
+        private MarketplaceFacade $marketplaceFacade,
+        private WbAdSpendReconciliationQuery $reconciliationQuery,
         private EntityManagerInterface $entityManager,
+        private ManagerRegistry $managerRegistry,
         #[Autowire(service: 'monolog.logger.marketplace_ads')]
         private LoggerInterface $logger,
     ) {
@@ -80,18 +90,132 @@ final readonly class LoadWbAdSpendDayAction implements LoadWbAdSpendDayActionInt
         // once more only to build the operational summary returned to the
         // command; persistence remains the source of truth.
         $entries = $this->parser->parse($payload);
-        $result = $this->result($rawDocument, $entries);
+        $reconciliation = $this->reconciliationQuery->get($companyId, $rawDocument->getId());
+        $result = $this->result($rawDocument, $entries, $reconciliation);
+        $this->assertReconciled($result, $rawDocument, $companyId, $connectionId, $dateString);
+
+        if ($result->unmappedCount > 0) {
+            try {
+                $refreshedListingCount = $this->marketplaceFacade->refreshWbListingCatalog(
+                    $companyId,
+                    $connectionId,
+                );
+            } catch (\Throwable $exception) {
+                $entityManagerReset = !$this->entityManager->isOpen();
+                if ($entityManagerReset) {
+                    $this->managerRegistry->resetManager();
+                }
+                $result = $this->result(
+                    $rawDocument,
+                    $entries,
+                    $reconciliation,
+                    catalogRefreshAttempted: true,
+                );
+                $this->logger->warning('WB ad spend catalog refresh failed.', [
+                    'event' => 'wb_ad_spend_catalog_refresh_failed',
+                    'companyId' => $companyId,
+                    'connectionId' => $connectionId,
+                    'date' => $dateString,
+                    'rawDocumentId' => $result->rawDocumentId,
+                    'unmappedTotal' => $result->unmappedTotal,
+                    'unmappedCount' => $result->unmappedCount,
+                    'entityManagerReset' => $entityManagerReset,
+                    'exception' => $exception::class,
+                    'error' => $exception->getMessage(),
+                ]);
+
+                return $this->finish($result, $companyId, $connectionId, $dateString, $startedAt);
+            }
+
+            ($this->processAction)($companyId, $rawDocument->getId());
+            $reconciliation = $this->reconciliationQuery->get($companyId, $rawDocument->getId());
+            $result = $this->result(
+                $rawDocument,
+                $entries,
+                $reconciliation,
+                catalogRefreshAttempted: true,
+                catalogRefreshed: true,
+                projectionRetryCount: 1,
+            );
+            $this->assertReconciled($result, $rawDocument, $companyId, $connectionId, $dateString);
+            $this->logger->info('WB ad spend catalog recovery finished.', [
+                'event' => 'wb_ad_spend_catalog_recovery_finished',
+                'companyId' => $companyId,
+                'connectionId' => $connectionId,
+                'date' => $dateString,
+                'rawDocumentId' => $result->rawDocumentId,
+                'refreshedListingCount' => $refreshedListingCount,
+                'unmappedTotal' => $result->unmappedTotal,
+                'unmappedCount' => $result->unmappedCount,
+                'status' => $result->status->value,
+            ]);
+        }
+
+        return $this->finish($result, $companyId, $connectionId, $dateString, $startedAt);
+    }
+
+    private function assertReconciled(
+        WbAdSpendLoadResult $result,
+        AdRawDocument $rawDocument,
+        string $companyId,
+        string $connectionId,
+        string $date,
+    ): void {
+        if ($result->reconciled) {
+            return;
+        }
+
+        $this->logger->error('WB daily ad spend reconciliation failed.', [
+            'event' => 'wb_ad_spend_reconciliation_failed',
+            'companyId' => $companyId,
+            'connectionId' => $connectionId,
+            'date' => $date,
+            'rawDocumentId' => $result->rawDocumentId,
+            'sourceTotal' => $result->actualTotal,
+            'documentTotal' => $result->documentTotal,
+            'lineTotal' => $result->lineTotal,
+            'withoutLineTotal' => $result->withoutLineTotal,
+            'sourceUnallocatedTotal' => $result->unallocatedTotal,
+            'persistedUnallocatedTotal' => $result->persistedUnallocatedTotal,
+            'unmappedTotal' => $result->unmappedTotal,
+            'unmappedCount' => $result->unmappedCount,
+        ]);
+        if (AdRawDocumentStatus::DRAFT !== $rawDocument->getStatus()) {
+            $rawDocument->resetToDraft();
+            $this->entityManager->flush();
+        }
+
+        throw new WbAdSpendReconciliationException(sprintf('WB ad spend reconciliation failed for raw document %s.', $result->rawDocumentId));
+    }
+
+    private function finish(
+        WbAdSpendLoadResult $result,
+        string $companyId,
+        string $connectionId,
+        string $date,
+        float $startedAt,
+    ): WbAdSpendLoadResult {
         $this->logger->info('WB daily ad spend load finished.', [
             'companyId' => $companyId,
             'connectionId' => $connectionId,
-            'date' => $dateString,
+            'date' => $date,
             'rawDocumentId' => $result->rawDocumentId,
             'status' => $result->status->value,
             'campaignCount' => $result->campaignCount,
             'skuCount' => $result->skuCount,
             'attributedTotal' => $result->attributedTotal,
             'unallocatedTotal' => $result->unallocatedTotal,
+            'persistedUnallocatedTotal' => $result->persistedUnallocatedTotal,
             'actualTotal' => $result->actualTotal,
+            'documentTotal' => $result->documentTotal,
+            'lineTotal' => $result->lineTotal,
+            'withoutLineTotal' => $result->withoutLineTotal,
+            'unmappedTotal' => $result->unmappedTotal,
+            'unmappedCount' => $result->unmappedCount,
+            'reconciled' => $result->reconciled,
+            'catalogRefreshAttempted' => $result->catalogRefreshAttempted,
+            'catalogRefreshed' => $result->catalogRefreshed,
+            'projectionRetryCount' => $result->projectionRetryCount,
             'durationMs' => (int) ((microtime(true) - $startedAt) * 1000),
         ]);
 
@@ -101,31 +225,50 @@ final readonly class LoadWbAdSpendDayAction implements LoadWbAdSpendDayActionInt
     /**
      * @param list<AdRawEntry> $entries
      */
-    private function result(AdRawDocument $rawDocument, array $entries): WbAdSpendLoadResult
-    {
+    private function result(
+        AdRawDocument $rawDocument,
+        array $entries,
+        WbAdSpendReconciliation $reconciliation,
+        bool $catalogRefreshAttempted = false,
+        bool $catalogRefreshed = false,
+        int $projectionRetryCount = 0,
+    ): WbAdSpendLoadResult {
         $campaigns = [];
         $skuCount = 0;
-        $attributed = '0.00';
-        $unallocated = '0.00';
+        $attributed = Money::fromMinor(0, 'RUB');
+        $unallocated = Money::fromMinor(0, 'RUB');
 
         foreach ($entries as $entry) {
             $campaigns['id:'.$entry->campaignId] = true;
+            $cost = Money::fromString($entry->cost, 'RUB');
             if (AdRawEntry::UNALLOCATED_PARENT_SKU === $entry->parentSku) {
-                $unallocated = bcadd($unallocated, $entry->cost, 2);
+                $unallocated = $unallocated->add($cost);
             } else {
                 ++$skuCount;
-                $attributed = bcadd($attributed, $entry->cost, 2);
+                $attributed = $attributed->add($cost);
             }
         }
+
+        $actual = $attributed->add($unallocated);
 
         return new WbAdSpendLoadResult(
             rawDocumentId: $rawDocument->getId(),
             status: $rawDocument->getStatus(),
             campaignCount: count($campaigns),
             skuCount: $skuCount,
-            attributedTotal: $attributed,
-            unallocatedTotal: $unallocated,
-            actualTotal: bcadd($attributed, $unallocated, 2),
+            attributedTotal: $attributed->toDecimalString(),
+            unallocatedTotal: $unallocated->toDecimalString(),
+            persistedUnallocatedTotal: $reconciliation->unallocatedTotal->toDecimalString(),
+            actualTotal: $actual->toDecimalString(),
+            documentTotal: $reconciliation->documentTotal->toDecimalString(),
+            lineTotal: $reconciliation->lineTotal->toDecimalString(),
+            withoutLineTotal: $reconciliation->withoutLineTotal->toDecimalString(),
+            unmappedTotal: $reconciliation->unmappedTotal->toDecimalString(),
+            unmappedCount: $reconciliation->unmappedCount,
+            reconciled: $reconciliation->reconciles($actual, $unallocated),
+            catalogRefreshAttempted: $catalogRefreshAttempted,
+            catalogRefreshed: $catalogRefreshed,
+            projectionRetryCount: $projectionRetryCount,
         );
     }
 }
