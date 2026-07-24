@@ -34,7 +34,9 @@
                 <div class="container-fluid">
                     <h1 class="navbar-brand">Сервис</h1>
                     {% include '@Partials/_active_company_widget.html.twig' %}
-                    {% block ui_mode_switch %}{% endblock %}
+                    {% block ui_mode_switch %}
+                        {% include '@Partials/_ui_mode_switch.html.twig' with {variant: 'legacy'} only %}
+                    {% endblock %}
                 </div>
             </header>
 

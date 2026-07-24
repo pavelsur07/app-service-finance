@@ -17,3 +17,18 @@ a.t-pg-btn {
     font-size: var(--font-11_5);
     color: var(--danger-text);
 }
+
+.ui-mode-switch {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+}
+
+.ui-mode-switch form {
+    margin: 0;
+}
+
+.ui-mode-switch-label {
+    color: var(--text-muted);
+    font-size: var(--font-11_5);
+}
