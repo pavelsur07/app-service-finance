@@ -109,10 +109,17 @@ final class UiModeControllerTest extends WebTestCaseBase
         self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
     }
 
-    public function testLegacyCookieSelectsAppButtonForAdmin(): void
+    public function testLegacyCookieSelectsAppButtonForUser(): void
     {
         $client = static::createClient();
-        $this->loginAdmin($client);
+        $this->resetDb();
+        $user = UserBuilder::aUser()
+            ->withEmail('ui-mode-legacy-cookie-user@example.test')
+            ->withRoles(['ROLE_USER'])
+            ->build();
+        $this->em()->persist($user);
+        $this->em()->flush();
+        $client->loginUser($user);
         $client->getCookieJar()->set(new BrowserCookie('ui_theme', 'vf'));
 
         $crawler = $client->request('GET', '/company/');
@@ -124,12 +131,13 @@ final class UiModeControllerTest extends WebTestCaseBase
         );
     }
 
-    public function testNonAdminCannotSwitchMode(): void
+    public function testUserCanSwitchMode(): void
     {
         $client = static::createClient();
         $this->resetDb();
         $user = UserBuilder::aUser()
             ->withEmail('ui-mode-user@example.test')
+            ->withRoles(['ROLE_USER'])
             ->build();
         $this->em()->persist($user);
         $this->em()->flush();
@@ -140,7 +148,24 @@ final class UiModeControllerTest extends WebTestCaseBase
             'mode' => UiModeResolver::APP,
         ]);
 
-        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+        self::assertResponseRedirects('/', Response::HTTP_SEE_OTHER);
+        self::assertSame(
+            UiModeResolver::APP,
+            $this->uiModeCookie($client->getResponse()->headers->getCookies())->getValue(),
+        );
+    }
+
+    public function testAnonymousUserCannotSwitchMode(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $client->request('POST', '/settings/ui-mode', [
+            'mode' => UiModeResolver::APP,
+        ]);
+
+        self::assertResponseRedirects('/login');
+        self::assertNull($this->findUiModeCookie($client->getResponse()->headers->getCookies()));
     }
 
     /**

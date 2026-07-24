@@ -17,7 +17,7 @@ final class HomeUiModeTest extends WebTestCaseBase
     public function testDashboardUsesLegacyModeByDefault(): void
     {
         $client = static::createClient();
-        $this->loginWithCompany($client, true);
+        $this->loginWithCompany($client, false);
 
         $client->request('GET', '/');
 
@@ -28,10 +28,10 @@ final class HomeUiModeTest extends WebTestCaseBase
         self::assertSelectorNotExists('[data-dashboard-mode="app"]');
     }
 
-    public function testAdminCookieRendersAppDashboardWithoutTablerAssets(): void
+    public function testUserCookieRendersAppDashboardWithoutTablerAssets(): void
     {
         $client = static::createClient();
-        $this->loginWithCompany($client, true);
+        $this->loginWithCompany($client, false);
         $client->getCookieJar()->set(new Cookie(UiModeResolver::COOKIE_NAME, UiModeResolver::APP));
 
         $client->request('GET', '/');
@@ -50,23 +50,23 @@ final class HomeUiModeTest extends WebTestCaseBase
         self::assertSelectorNotExists('#react-dashboard-started');
     }
 
-    public function testNonAdminForgedCookieStillRendersLegacyDashboard(): void
+    public function testAdminCookieStillRendersAppDashboard(): void
     {
         $client = static::createClient();
-        $this->loginWithCompany($client, false);
+        $this->loginWithCompany($client, true);
         $client->getCookieJar()->set(new Cookie(UiModeResolver::COOKIE_NAME, UiModeResolver::APP));
 
         $client->request('GET', '/');
 
         self::assertResponseIsSuccessful();
-        self::assertSelectorExists('html[data-ui-mode="legacy"]');
-        self::assertSelectorNotExists('[data-dashboard-mode="app"]');
+        self::assertSelectorExists('html[data-ui-mode="app"]');
+        self::assertSelectorExists('[data-dashboard-mode="app"]');
     }
 
     public function testSwitchChangesDashboardModeWithoutChangingUrl(): void
     {
         $client = static::createClient();
-        $this->loginWithCompany($client, true);
+        $this->loginWithCompany($client, false);
         $crawler = $client->request('GET', '/');
         $client->setServerParameter('HTTP_REFERER', 'http://localhost/');
 
@@ -86,7 +86,7 @@ final class HomeUiModeTest extends WebTestCaseBase
     public function testNonMigratedRouteRemainsLegacyInAppMode(): void
     {
         $client = static::createClient();
-        $this->loginWithCompany($client, true);
+        $this->loginWithCompany($client, false);
         $client->getCookieJar()->set(new Cookie(UiModeResolver::COOKIE_NAME, UiModeResolver::APP));
 
         $client->request('GET', '/dashboard');

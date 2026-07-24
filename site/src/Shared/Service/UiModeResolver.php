@@ -32,7 +32,7 @@ final class UiModeResolver
 
     public function resolve(Request $request): string
     {
-        if (!$this->authorizationChecker->isGranted('ROLE_ADMIN')) {
+        if (!$this->authorizationChecker->isGranted('ROLE_USER')) {
             return self::LEGACY;
         }
 

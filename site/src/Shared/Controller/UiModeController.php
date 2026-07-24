@@ -19,7 +19,7 @@ final class UiModeController extends AbstractController
     private const CSRF_TOKEN_ID = 'ui_mode_switch';
 
     #[Route('/settings/ui-mode', name: 'app_ui_mode_switch', methods: ['POST'])]
-    #[IsGranted('ROLE_ADMIN')]
+    #[IsGranted('ROLE_USER')]
     public function __invoke(Request $request, UiModeResolver $resolver): RedirectResponse
     {
         if (!$this->isCsrfTokenValid(self::CSRF_TOKEN_ID, $request->request->getString('_token'))) {

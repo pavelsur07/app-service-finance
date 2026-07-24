@@ -12,7 +12,8 @@ unnecessary infrastructure.
 - Existing templates stay in place; no bulk move of the 112 legacy templates.
 - Existing `base.html.twig` remains a compatibility entry for legacy pages.
 - A route/controller opts into the app UI only when an app template exists.
-- Initial rollout remains restricted to `ROLE_ADMIN`.
+- The pilot initially shipped for `ROLE_ADMIN`; Stage 4 expands it to
+  authenticated `ROLE_USER` after the owner Release Gate decision.
 - Admin and authentication layouts remain app-only and are not switchable.
 - No database migration, new dependency, iframe, microfrontend, or production action.
 
@@ -145,9 +146,50 @@ Reviewer focus:
 - Observable parity, tenant/auth behavior, asset isolation, responsive shell,
   accessible switch behavior, safe fallback to legacy, and unnecessary duplication.
 
+## Stage 4: Authenticated-user rollout
+
+Risk: HIGH-LOCAL
+owner_gate: yes
+release_candidate: yes
+independently_deployable: yes
+stage_base_commit: `ba47d3753bd81cf853042b892c85d9242e1c6292`
+
+Definition of Done:
+
+- Every authenticated `ROLE_USER` can see and submit the UI mode switch wherever
+  the existing header exposes it; the legacy header remains desktop-only.
+- A valid `ui_mode=app` cookie selects the app dashboard for `ROLE_USER`.
+- Anonymous requests cannot write or activate app mode.
+- Existing admin behavior, CSRF validation, redirect protection, cookie
+  attributes, and legacy fallback remain unchanged.
+- No UI assets, financial behavior, database schema, or production state changes.
+
+Work items:
+
+- 4.1 — Change the centralized read, write, and presentation access checks to
+  `ROLE_USER`.
+- 4.2 — Update unit and functional regression coverage for ordinary users,
+  administrators, and anonymous requests.
+- 4.3 — Update the canonical rollout decision and complete both review gates.
+
+Stage checks:
+
+- Targeted UI mode unit and functional tests
+- Targeted PHP CS Fixer and Twig lint
+- `git diff --check`
+- Internal independent review from Stage base
+- External read-only Claude Code review to `REVIEW_GREEN`
+
+Reviewer focus:
+
+- Authorization consistency across resolver, endpoint, and Twig; anonymous
+  fallback; CSRF and redirect protections; unchanged asset isolation.
+
 ## Release and production gates
 
-- Stage 3 is the Release Gate: owner decides whether to broaden the switch from
-  `ROLE_ADMIN` to `ROLE_USER` and whether the Draft PR should become Ready.
+- Stage 3 Release Gate decision: broaden the switch from `ROLE_ADMIN` to
+  `ROLE_USER`; keeping or changing Draft status remains a separate owner decision.
+- Stage 4 returns to the Release Gate after the authenticated-user rollout is
+  checked, reviewed, committed, pushed, and reflected in the Draft PR.
 - Merge, release, deployment, production cache changes, and production validation
   are separate Production Gate actions and are not authorized by this task.

@@ -49,7 +49,7 @@ final class UiModeResolverTest extends TestCase
         self::assertSame(UiModeResolver::LEGACY, $resolver->current());
     }
 
-    public function testNonAdminCannotEnableAppModeWithForgedCookie(): void
+    public function testAnonymousRequestCannotEnableAppModeWithForgedCookie(): void
     {
         $resolver = $this->resolver(false);
 
@@ -59,10 +59,10 @@ final class UiModeResolverTest extends TestCase
         );
     }
 
-    private function resolver(bool $isAdmin = true): UiModeResolver
+    private function resolver(bool $isUser = true): UiModeResolver
     {
         $authorizationChecker = $this->createMock(AuthorizationCheckerInterface::class);
-        $authorizationChecker->method('isGranted')->with('ROLE_ADMIN')->willReturn($isAdmin);
+        $authorizationChecker->method('isGranted')->with('ROLE_USER')->willReturn($isUser);
 
         return new UiModeResolver(new RequestStack(), $authorizationChecker);
     }

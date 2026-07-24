@@ -1,4 +1,4 @@
-{% if is_granted('ROLE_ADMIN') %}
+{% if is_granted('ROLE_USER') %}
     {% set current_mode = ui_mode() %}
     {% set is_app_variant = variant|default('legacy') == 'app' %}
     <div class="ui-mode-switch" role="group" aria-label="Выбор интерфейса">
