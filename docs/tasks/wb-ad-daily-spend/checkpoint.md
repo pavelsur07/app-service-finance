@@ -1,8 +1,8 @@
 # Checkpoint
 
 Current phase: Implementation
-Current Stage: Stage 2
-Stage base commit: to be recorded after the Stage 1 commit
+Current Stage: Stage 3
+Stage base commit: to be recorded after the Stage 2 commit
 
 ## Completed
 
@@ -19,10 +19,26 @@ Stage base commit: to be recorded after the Stage 1 commit
 - Full MarketplaceAds unit suite is green: 316 tests / 1956 assertions.
 - Stage 1 internal review is green.
 - Stage 1 external review is `REVIEW_GREEN`.
+- Stage 2 work items implemented:
+  - exact `/upd` campaign aggregation and `nms`-only allocation;
+  - deterministic rounding residue and explicit unallocated entries;
+  - preservation of unknown WB `nmId` in totals without listing lines;
+  - company/marketplace/source-key idempotency and local migration;
+  - current `/fullstats` query names corrected to `beginDate` / `endDate`.
+- Stage 2 checks completed:
+  - MarketplaceAds unit: 321 tests / 2025 assertions, green;
+  - targeted repository/projection integration: 20 tests / 61 assertions, green;
+  - full MarketplaceAds integration: 169 tests / 681 assertions, green;
+  - container lint and Doctrine mapping validation: green.
+- Full test-schema sync remains red from pre-existing repository drift; the
+  current migration was executed directly in the isolated test DB and its
+  integration tests are green.
+- Stage 2 internal review is green.
+- Stage 2 external review is `REVIEW_GREEN` after the safe MINOR fix cycle.
 
 ## Current Definition of Done
 
-See Stage 2 in `plan.md`.
+See Stage 3 in `plan.md`.
 
 ## Notes
 

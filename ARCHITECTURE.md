@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.54 / 2026-07-13
+> Версия: 1.64 / 2026-07-24
 
 ---
 
@@ -967,6 +967,15 @@ countCompletedChunks(string $jobId, string $companyId): int
 // Загрузка с IDOR-проверкой
 findByIdAndCompany(string $id, string $companyId): ?AdRawDocument
 
+// Идемпотентный lookup дневного импорта. source_key уникален в пределах
+// (company_id, marketplace); NULL сохраняет возможность нескольких Ozon raw
+// за один день.
+findBySourceKey(
+    string $companyId,
+    string $marketplace,
+    string $sourceKey,
+): ?AdRawDocument
+
 // Идемпотентный переход DRAFT → FAILED через raw DBAL (минуя UoW).
 // @return int 1 — успех, 0 — уже FAILED / не наш
 markFailedWithReason(string $documentId, string $companyId, string $reason): int
@@ -1352,9 +1361,9 @@ on state=OK:
 `OzonAdClient::requestStatisticsOnly()` остаются в коде как dead-but-preserved
 до отдельного cleanup-PR в ~2 недели после стабилизации step 5 / rate-limit fix.
 
-### `AdRawDocument.raw_payload` — две поддерживаемые формы
+### `AdRawDocument.raw_payload` — поддерживаемые формы
 
-`OzonAdRawDataParser` принимает обе формы и возвращает одинаковый список `AdRawEntry`:
+`OzonAdRawDataParser` принимает две формы и возвращает одинаковый список `AdRawEntry`:
 
 - **flat** (legacy — `LoadAdDataCommand`, `ReprocessAdDataCommand`,
   pre-step-4 writers, raw-документы, уже сохранённые в БД до шага 4):
@@ -1370,6 +1379,28 @@ on state=OK:
 `campaign_id` / `campaign_name` пробрасываются из родительского объекта
 в каждую row перед общей агрегацией — downstream-код (`ProcessAdRawDocumentAction`)
 не знает, какая форма была на входе.
+
+`WildberriesAdRawDataParser` принимает только версионированный дневной payload:
+
+```json
+{
+  "schema": "wb-ad-daily-spend-v1",
+  "expenses": [{"advertId": "1", "updSum": "100.00", "campName": "Campaign"}],
+  "statistics": [{"advertId": "1", "days": [{"apps": [{"nms": [{"nmId": "2", "sum": "90.00"}]}]}]}]
+}
+```
+
+Финансовый источник — `expenses[].updSum` из `GET /adv/v1/upd`.
+`statistics[].days[].apps[].nms[].sum` из `GET /adv/v3/fullstats` используется
+только как вес распределения по `nmId`; campaign/day/app totals не суммируются,
+чтобы не задвоить аналитику. Расчёт выполняется без `float`; остаток копеек
+добавляется SKU с максимальным весом. Если положительных весов нет, вся сумма
+сохраняется как `parentSku=__unallocated__` без `AdDocumentLine`.
+
+Для WB неизвестный в каталоге `nmId` всё равно создаёт `AdDocument`, поэтому
+полный рекламный расход остаётся в totals. `AdDocumentLine` не создаётся, а
+`AdRawDocument` остаётся в `DRAFT` до исправления маппинга. Намеренный
+`__unallocated__` считается успешно обработанным и не требует листинга.
 
 ---
 
@@ -2406,6 +2437,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.64 | 2026-07-24 | MarketplaceAds: WB `/upd` actual expense распределяется по `fullstats` nmId-весам без float; raw `sourceKey` обеспечивает идемпотентность company/connection/day и сохраняет unallocated/unmapped суммы в totals |
 | 1.62 | 2026-07-18 | Finance: Stage 7.7.3 переключает новые `pl_daily_totals` записи на Project×ЦФО aggregation key с partial expression unique indexes и безопасным merge при удалении P&L категории |
 | 1.63 | 2026-07-18 | Finance: Stage 7.7.4 подключает P&L read-side к Project×ЦФО через optional `responsibilityCenterId` фильтр в preview/UI/JSON без перерасчёта истории |
 | 1.61 | 2026-07-18 | Cash/Company: Stage 7.6.4 подключает file/1C/bank import writers к system Project×ЦФО pair для новых транзакций без изменения overwrite/preview/batch semantics |

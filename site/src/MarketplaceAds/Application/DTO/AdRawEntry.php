@@ -6,6 +6,8 @@ namespace App\MarketplaceAds\Application\DTO;
 
 final readonly class AdRawEntry
 {
+    public const UNALLOCATED_PARENT_SKU = '__unallocated__';
+
     public function __construct(
         public string $campaignId,
         public string $campaignName,

@@ -18,6 +18,7 @@ final class AdRawDocumentBuilder
     private MarketplaceType $marketplace = MarketplaceType::WILDBERRIES;
     private \DateTimeImmutable $reportDate;
     private string $rawPayload = self::DEFAULT_RAW_PAYLOAD;
+    private ?string $sourceKey = null;
     private bool $processed = false;
     private bool $failed = false;
     private string $processingError = 'Test error';
@@ -72,6 +73,14 @@ final class AdRawDocumentBuilder
         return $clone;
     }
 
+    public function withSourceKey(string $sourceKey): self
+    {
+        $clone = clone $this;
+        $clone->sourceKey = $sourceKey;
+
+        return $clone;
+    }
+
     public function asProcessed(): self
     {
         $clone = clone $this;
@@ -104,6 +113,7 @@ final class AdRawDocumentBuilder
             marketplace: $this->marketplace,
             reportDate: $this->reportDate,
             rawPayload: $this->rawPayload,
+            sourceKey: $this->sourceKey,
         );
 
         // Конструктор генерирует UUID v7, но Builder обязан выдавать детерминированный ID

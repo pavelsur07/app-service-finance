@@ -132,6 +132,16 @@ final class AdRawDocumentTest extends TestCase
         self::assertNull($doc->getStoragePath());
         self::assertNull($doc->getFileHash());
         self::assertNull($doc->getFileSizeBytes());
+        self::assertNull($doc->getSourceKey());
+    }
+
+    public function testSourceKeyIsStoredForIdempotentImports(): void
+    {
+        $doc = AdRawDocumentBuilder::aRawDocument()
+            ->withSourceKey('wb-ad-spend:connection-1:2026-07-20')
+            ->build();
+
+        self::assertSame('wb-ad-spend:connection-1:2026-07-20', $doc->getSourceKey());
     }
 
     public function testSetFileStorageSetsAllThreeFieldsAtomically(): void

@@ -129,6 +129,18 @@ class AdRawDocumentRepository extends ServiceEntityRepository implements AdRawDo
         ]);
     }
 
+    public function findBySourceKey(
+        string $companyId,
+        string $marketplace,
+        string $sourceKey,
+    ): ?AdRawDocument {
+        return $this->findOneBy([
+            'companyId' => $companyId,
+            'marketplace' => $marketplace,
+            'sourceKey' => $sourceKey,
+        ]);
+    }
+
     /**
      * Идемпотентный lookup по метке `batch_id=<uuid>\nfilename=<name>\n`
      * в префиксе `raw_payload` (Task-12-test).

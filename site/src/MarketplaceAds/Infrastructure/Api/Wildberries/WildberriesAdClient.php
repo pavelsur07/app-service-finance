@@ -140,8 +140,8 @@ final readonly class WildberriesAdClient implements AdPlatformClientInterface
             path: self::FULL_STATS_PATH,
             query: [
                 'ids' => implode(',', $campaignIds),
-                'begin' => $day,
-                'end' => $day,
+                'beginDate' => $day,
+                'endDate' => $day,
             ],
             operation: 'fullstats',
             date: $day,

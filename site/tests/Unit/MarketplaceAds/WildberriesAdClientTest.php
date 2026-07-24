@@ -94,7 +94,7 @@ final class WildberriesAdClientTest extends TestCase
         );
 
         self::assertSame(
-            'https://advert-api.wildberries.ru/adv/v3/fullstats?ids=2%2C1&begin=2026-07-20&end=2026-07-20',
+            'https://advert-api.wildberries.ru/adv/v3/fullstats?ids=2%2C1&beginDate=2026-07-20&endDate=2026-07-20',
             $capturedUrl,
         );
         self::assertSame('1.25', $rows[0]['sum']);
