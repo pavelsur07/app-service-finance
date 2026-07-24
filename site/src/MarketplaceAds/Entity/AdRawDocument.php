@@ -138,8 +138,12 @@ class AdRawDocument
 
     public function updatePayload(string $rawPayload): void
     {
+        Assert::notEmpty($rawPayload);
+
         $this->rawPayload = $rawPayload;
         $this->status = AdRawDocumentStatus::DRAFT;
+        $this->processingError = null;
+        $this->loadedAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
     }
 

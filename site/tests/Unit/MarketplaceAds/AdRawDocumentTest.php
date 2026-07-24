@@ -75,6 +75,16 @@ final class AdRawDocumentTest extends TestCase
         self::assertSame($newPayload, $doc->getRawPayload());
     }
 
+    public function testUpdatePayloadClearsPreviousProcessingError(): void
+    {
+        $doc = AdRawDocumentBuilder::aRawDocument()->asFailed('old error')->build();
+
+        $doc->updatePayload('{"rows":[]}');
+
+        self::assertSame(AdRawDocumentStatus::DRAFT, $doc->getStatus());
+        self::assertNull($doc->getProcessingError());
+    }
+
     public function testMarkFailedFromDraftSetsStatusAndReason(): void
     {
         $doc = AdRawDocumentBuilder::aRawDocument()->build();

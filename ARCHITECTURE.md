@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.64 / 2026-07-24
+> Версия: 1.65 / 2026-07-24
 
 ---
 
@@ -1402,6 +1402,29 @@ on state=OK:
 `AdRawDocument` остаётся в `DRAFT` до исправления маппинга. Намеренный
 `__unallocated__` считается успешно обработанным и не требует листинга.
 
+### Wildberries daily ad spend orchestration
+
+`app:marketplace-ads:wb-daily-spend` is a locked, cron-driven command. By
+default it loads yesterday in `Europe/Moscow`; `--date=Y-m-d` supports an
+idempotent completed-day rerun, with optional company/connection UUID filters.
+
+For every active WB SELLER connection:
+
+```text
+WildberriesAdClient
+  -> GET /adv/v1/upd
+  -> GET /adv/v3/fullstats (campaign IDs from upd, chunks <= 50, 20 s spacing)
+  -> AdRawDocument(sourceKey=wb-ad-spend:<connectionId>:<date>)
+  -> ProcessAdRawDocumentAction
+  -> AdDocument + attributed AdDocumentLine
+```
+
+The raw response is flushed before projection. A parser/projection failure
+therefore leaves recoverable `DRAFT` bronze data. One connection failure does
+not stop sibling connections; the command returns a non-zero exit code if any
+connection failed. Live reruns, migration application, and cron activation are
+Production Gate actions.
+
 ---
 
 ## Query — MarketplaceAds
@@ -1995,7 +2018,7 @@ $money->amountMinor(): int;  $money->currency(): string
 | `marketplace.data_source` | Источники данных для закрытия месяца |
 | `app.notification.sender` | Каналы отправки уведомлений |
 | `marketplace_ads.raw_data_parser` | Парсеры raw-данных рекламных отчётов (Ozon, WB) |
-| `marketplace_ads.platform_client` | API-клиенты рекламных площадок. `OzonAdClient` реализован для работы с Ozon Performance API (OAuth2, async-репорты, CSV). `WildberriesAdClient` — TODO-stub |
+| `marketplace_ads.platform_client` | API-клиенты рекламных площадок. `OzonAdClient` работает с Ozon Performance API (OAuth2, async-репорты, CSV). `WildberriesAdClient` читает текущие `/adv/v1/upd` и `/adv/v3/fullstats` с точным JSON-number boundary |
 
 ---
 
@@ -2437,6 +2460,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.65 | 2026-07-24 | MarketplaceAds: locked WB daily ad-spend command, idempotent company/connection/day raw upsert, 06:15 MSK cron, per-connection isolation and operational totals |
 | 1.64 | 2026-07-24 | MarketplaceAds: WB `/upd` actual expense распределяется по `fullstats` nmId-весам без float; raw `sourceKey` обеспечивает идемпотентность company/connection/day и сохраняет unallocated/unmapped суммы в totals |
 | 1.62 | 2026-07-18 | Finance: Stage 7.7.3 переключает новые `pl_daily_totals` записи на Project×ЦФО aggregation key с partial expression unique indexes и безопасным merge при удалении P&L категории |
 | 1.63 | 2026-07-18 | Finance: Stage 7.7.4 подключает P&L read-side к Project×ЦФО через optional `responsibilityCenterId` фильтр в preview/UI/JSON без перерасчёта истории |

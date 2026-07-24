@@ -1,8 +1,8 @@
 # Checkpoint
 
-Current phase: Implementation
-Current Stage: Stage 3
-Stage base commit: to be recorded after the Stage 2 commit
+Current phase: Final Release Gate
+Current Stage: Stage 3 complete
+Stage base commit: `b21a8e99802bffbd8744ba4e03d6ed7c404e6292`
 
 ## Completed
 
@@ -35,6 +35,18 @@ Stage base commit: to be recorded after the Stage 2 commit
   integration tests are green.
 - Stage 2 internal review is green.
 - Stage 2 external review is `REVIEW_GREEN` after the safe MINOR fix cycle.
+- Stage 3 work items implemented:
+  - idempotent day-load Action that persists raw before projection;
+  - locked CLI with Moscow D-1 default, completed-date rerun and UUID filters;
+  - per-connection failure isolation and financial completion summaries;
+  - 06:15 MSK daily cron and operations runbook;
+  - raw reruns clear stale processing errors and refresh loaded-at time.
+- Stage 3 checks completed:
+  - MarketplaceAds unit: 332 tests / 2105 assertions, green;
+  - full MarketplaceAds integration: 169 tests / 681 assertions, green;
+  - command registration/help, container lint and Doctrine mapping: green.
+- Stage 3 internal review is green.
+- Stage 3 external review is `REVIEW_GREEN`.
 
 ## Current Definition of Done
 

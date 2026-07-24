@@ -70,6 +70,11 @@
 # COMPLETED, 0-OK → FAILED, mix → PARTIAL_SUCCESS.
 * * * * * php bin/console app:marketplace-ads:finalizer --no-interaction --quiet
 
+# Wildberries advertising actual expense for the completed previous day.
+# /adv/v1/upd is the financial source; /adv/v3/fullstats supplies nmId weights.
+# Scheduler container uses TZ=Europe/Moscow, so this starts at 06:15 MSK.
+15 6 * * * cd /app && php bin/console app:marketplace-ads:wb-daily-spend --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # 10-е число каждого месяца в 6:00 Загрузка отчётов о реализации Ozon
 0 6 5 * * php bin/console app:marketplace:ozon-realization-sync --env=prod
 
