@@ -102,8 +102,10 @@ final class WbAdDailySpendCommand extends Command
                         ++$reviewRequired;
                     }
 
+                    // `total` is retained as a compatibility alias for the
+                    // explicit `/upd`-derived `source` field.
                     $output->writeln(sprintf(
-                        'company=%s connection=%s status=%s campaigns=%d sku=%d attributed=%s unallocated=%s total=%s',
+                        'company=%s connection=%s status=%s campaigns=%d sku=%d attributed=%s unallocated=%s persisted_unallocated=%s total=%s source=%s documents=%s lines=%s without_lines=%s unmapped=%s unmapped_count=%d reconciled=%s',
                         $currentCompanyId,
                         $currentConnectionId,
                         $result->status->value,
@@ -111,7 +113,15 @@ final class WbAdDailySpendCommand extends Command
                         $result->skuCount,
                         $result->attributedTotal,
                         $result->unallocatedTotal,
+                        $result->persistedUnallocatedTotal,
                         $result->actualTotal,
+                        $result->actualTotal,
+                        $result->documentTotal,
+                        $result->lineTotal,
+                        $result->withoutLineTotal,
+                        $result->unmappedTotal,
+                        $result->unmappedCount,
+                        $result->reconciled ? 'yes' : 'no',
                     ));
                 } catch (\Throwable $exception) {
                     ++$failed;

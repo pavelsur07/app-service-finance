@@ -67,10 +67,19 @@ Each successful connection logs:
 - company ID, connection ID, date, and raw document ID;
 - raw status;
 - campaign and SKU counts;
-- attributed, unallocated, and actual totals;
+- `/upd` source, `AdDocument`, `AdDocumentLine`, without-line, intentional
+  unallocated, and real unmapped totals;
+- real unmapped document count and exact reconciliation status;
 - duration.
 
 No token or response body is logged.
+
+The stdout summary keeps `total` as a compatibility alias for `source` and
+prints these reconciliation fields:
+`persisted_unallocated`, `documents`, `lines`, `without_lines`, `unmapped`,
+`unmapped_count`, and `reconciled`. A successful line always has
+`reconciled=yes`; mismatches fail the connection before a success line is
+printed.
 
 Recommended alerts/checks:
 
@@ -79,7 +88,33 @@ Recommended alerts/checks:
 - a WB raw document remains `DRAFT` because one or more `nmId` values are
   unmapped;
 - unallocated amount or ratio increases materially;
-- the logged invariant `attributed + unallocated = actual` does not hold.
+- any persisted reconciliation invariant does not hold:
+
+  ```text
+  source = AdDocument
+  AdDocument = AdDocumentLine + without-line
+  without-line = __unallocated__ + unmapped-nmId
+  source __unallocated__ = persisted __unallocated__
+  ```
+
+An `__unallocated__` document carrying a listing line intentionally breaks
+reconciliation; the projection never creates such a line, so this is a
+fail-closed corruption check.
+
+Use `event=wb_ad_spend_reconciliation_failed` as the stable log-query marker
+for a persisted reconciliation failure. Stage 2 alert routing uses the normal
+application logger separately.
+
+A reconciliation mismatch resets the raw document to `DRAFT`, fails the
+affected connection, and makes the command exit non-zero. Intentional
+`__unallocated__` remains visible in `without_lines`, but does not require
+review; only a real unmapped `nmId` contributes to the unmapped amount/count.
+An entry with an empty `campaignName` is skipped by projection and therefore
+also causes the source/document invariant to fail instead of being accepted as
+a partial success.
+The inconsistent projection rows are retained for auditability and remain
+queryable until the next idempotent rerun replaces them; the `DRAFT` raw status
+is the operational marker that they require recovery.
 
 ## Recovery
 

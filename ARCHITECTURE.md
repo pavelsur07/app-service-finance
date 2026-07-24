@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.65 / 2026-07-24
+> Версия: 1.66 / 2026-07-24
 
 ---
 
@@ -1425,12 +1425,39 @@ not stop sibling connections; the command returns a non-zero exit code if any
 connection failed. Live reruns, migration application, and cron activation are
 Production Gate actions.
 
+After projection, `WbAdSpendReconciliationQuery` compares the `/upd`-derived
+source total with persisted `AdDocument` and `AdDocumentLine` aggregates. It
+also separates intentional `__unallocated__` expense from real `nmId`
+documents without a line. A mismatch resets the raw document to `DRAFT` and
+fails that connection; all comparisons use `Money` in RUB minor units.
+
 ---
 
 ## Query — MarketplaceAds
 
 > Read-model агрегаты на DBAL (минуя ORM hydration). Используются напрямую из
 > Controllers и не через Facade — это внутренний read-слой модуля.
+
+### `WbAdSpendReconciliationQuery` (`src/MarketplaceAds/Infrastructure/Query/WbAdSpendReconciliationQuery.php`)
+
+```php
+// Tenant-scoped persisted reconciliation for one WB raw document.
+// Returns Money totals for AdDocument, AdDocumentLine, all documents without
+// lines, intentional __unallocated__, and real unmapped nmId, plus unmapped count.
+get(string $companyId, string $rawDocumentId): WbAdSpendReconciliation
+```
+
+Exact invariants:
+
+```text
+/upd source total = AdDocument total
+AdDocument total = AdDocumentLine total + documents-without-lines total
+documents-without-lines total = __unallocated__ total + unmapped-nmId total
+/upd-derived __unallocated__ total = persisted __unallocated__ total
+```
+
+An `__unallocated__` document with any `AdDocumentLine` fails reconciliation
+by design. The normal projection never creates such a line.
 
 ### `AdEfficiencyQuery` (`src/MarketplaceAds/Infrastructure/Query/AdEfficiencyQuery.php`)
 ```php

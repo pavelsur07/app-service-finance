@@ -8,12 +8,16 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAds\Application\LoadWbAdSpendDayAction;
 use App\MarketplaceAds\Application\ProcessAdRawDocumentAction;
 use App\MarketplaceAds\Enum\AdRawDocumentStatus;
+use App\MarketplaceAds\Exception\WbAdSpendReconciliationException;
 use App\MarketplaceAds\Infrastructure\Api\Wildberries\WildberriesAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Wildberries\WildberriesAdRawDataParser;
+use App\MarketplaceAds\Infrastructure\Query\WbAdSpendReconciliationQuery;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
 use App\Tests\Builders\MarketplaceAds\AdRawDocumentBuilder;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
 final class LoadWbAdSpendDayActionTest extends TestCase
@@ -71,6 +75,7 @@ final class LoadWbAdSpendDayActionTest extends TestCase
             new WildberriesAdRawDataParser(),
             $repository,
             $processAction,
+            $this->reconciliationQuery('15.25', '10.00', '5.25', '5.25'),
             $entityManager,
             new NullLogger(),
         ))(self::COMPANY_ID, self::CONNECTION_ID, new \DateTimeImmutable('2026-07-20T18:00:00+03:00'));
@@ -81,7 +86,14 @@ final class LoadWbAdSpendDayActionTest extends TestCase
         self::assertSame(1, $result->skuCount);
         self::assertSame('10.00', $result->attributedTotal);
         self::assertSame('5.25', $result->unallocatedTotal);
+        self::assertSame('5.25', $result->persistedUnallocatedTotal);
         self::assertSame('15.25', $result->actualTotal);
+        self::assertSame('15.25', $result->documentTotal);
+        self::assertSame('10.00', $result->lineTotal);
+        self::assertSame('5.25', $result->withoutLineTotal);
+        self::assertSame('0.00', $result->unmappedTotal);
+        self::assertSame(0, $result->unmappedCount);
+        self::assertTrue($result->reconciled);
     }
 
     public function testRerunUpdatesExistingFailedRawAndClearsStaleError(): void
@@ -118,6 +130,7 @@ final class LoadWbAdSpendDayActionTest extends TestCase
             new WildberriesAdRawDataParser(),
             $repository,
             $processAction,
+            $this->reconciliationQuery('15.25', '10.00', '5.25', '5.25'),
             $entityManager,
             new NullLogger(),
         ))(self::COMPANY_ID, self::CONNECTION_ID, new \DateTimeImmutable('2026-07-20'));
@@ -148,12 +161,16 @@ final class LoadWbAdSpendDayActionTest extends TestCase
         $processAction
             ->method('__invoke')
             ->willThrowException(new \RuntimeException('projection failed'));
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::never())->method('fetchAssociative');
+        $reconciliationQuery = new WbAdSpendReconciliationQuery($connection);
 
         $action = new LoadWbAdSpendDayAction(
             $client,
             new WildberriesAdRawDataParser(),
             $repository,
             $processAction,
+            $reconciliationQuery,
             $entityManager,
             new NullLogger(),
         );
@@ -198,6 +215,7 @@ final class LoadWbAdSpendDayActionTest extends TestCase
             new WildberriesAdRawDataParser(),
             $repository,
             $processAction,
+            $this->reconciliationQuery('0.00', '0.00', '0.00', '0.00'),
             $entityManager,
             new NullLogger(),
         ))(self::COMPANY_ID, self::CONNECTION_ID, new \DateTimeImmutable('2026-07-20'));
@@ -206,6 +224,134 @@ final class LoadWbAdSpendDayActionTest extends TestCase
         self::assertSame(0, $result->campaignCount);
         self::assertSame(0, $result->skuCount);
         self::assertSame('0.00', $result->actualTotal);
+        self::assertTrue($result->reconciled);
+    }
+
+    public function testMismatchResetsRawToDraftAndThrows(): void
+    {
+        $client = $this->createMock(WildberriesAdClient::class);
+        $client->method('fetchAdStatisticsForConnection')->willReturn($this->payload());
+
+        $saved = null;
+        $repository = $this->createMock(AdRawDocumentRepository::class);
+        $repository->method('findBySourceKey')->willReturn(null);
+        $repository
+            ->method('save')
+            ->willReturnCallback(static function ($document) use (&$saved): void {
+                $saved = $document;
+            });
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::exactly(2))->method('flush');
+
+        $processAction = $this->createMock(ProcessAdRawDocumentAction::class);
+        $processAction
+            ->method('__invoke')
+            ->willReturnCallback(static function () use (&$saved): void {
+                $saved->markAsProcessed();
+            });
+
+        $action = new LoadWbAdSpendDayAction(
+            $client,
+            new WildberriesAdRawDataParser(),
+            $repository,
+            $processAction,
+            $this->reconciliationQuery('15.24', '10.00', '5.24', '5.24'),
+            $entityManager,
+            new NullLogger(),
+        );
+
+        try {
+            $action(self::COMPANY_ID, self::CONNECTION_ID, new \DateTimeImmutable('2026-07-20'));
+            self::fail('Expected reconciliation failure.');
+        } catch (WbAdSpendReconciliationException) {
+            self::assertSame(AdRawDocumentStatus::DRAFT, $saved->getStatus());
+        }
+    }
+
+    public function testMismatchOnAlreadyDraftRawStillLogsAndThrowsReconciliationException(): void
+    {
+        $client = $this->createMock(WildberriesAdClient::class);
+        $client->method('fetchAdStatisticsForConnection')->willReturn($this->payload());
+
+        $saved = null;
+        $repository = $this->createMock(AdRawDocumentRepository::class);
+        $repository->method('findBySourceKey')->willReturn(null);
+        $repository
+            ->method('save')
+            ->willReturnCallback(static function ($document) use (&$saved): void {
+                $saved = $document;
+            });
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::once())->method('flush');
+
+        $processAction = $this->createMock(ProcessAdRawDocumentAction::class);
+        $processAction->method('__invoke');
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger
+            ->expects(self::once())
+            ->method('error')
+            ->with(
+                'WB daily ad spend reconciliation failed.',
+                self::callback(static fn (array $context): bool => 'wb_ad_spend_reconciliation_failed' === ($context['event'] ?? null)
+                    && '5.25' === ($context['sourceUnallocatedTotal'] ?? null)
+                    && '5.24' === ($context['persistedUnallocatedTotal'] ?? null)),
+            );
+
+        $action = new LoadWbAdSpendDayAction(
+            $client,
+            new WildberriesAdRawDataParser(),
+            $repository,
+            $processAction,
+            $this->reconciliationQuery('15.25', '10.00', '5.25', '5.24', '0.01', 1),
+            $entityManager,
+            $logger,
+        );
+
+        try {
+            $action(self::COMPANY_ID, self::CONNECTION_ID, new \DateTimeImmutable('2026-07-20'));
+            self::fail('Expected reconciliation failure.');
+        } catch (WbAdSpendReconciliationException) {
+            self::assertSame(AdRawDocumentStatus::DRAFT, $saved->getStatus());
+        }
+    }
+
+    public function testExposesReconciledUnmappedSpend(): void
+    {
+        $client = $this->createMock(WildberriesAdClient::class);
+        $client->method('fetchAdStatisticsForConnection')->willReturn($this->payload());
+
+        $saved = null;
+        $repository = $this->createMock(AdRawDocumentRepository::class);
+        $repository->method('findBySourceKey')->willReturn(null);
+        $repository
+            ->method('save')
+            ->willReturnCallback(static function ($document) use (&$saved): void {
+                $saved = $document;
+            });
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::once())->method('flush');
+
+        $processAction = $this->createMock(ProcessAdRawDocumentAction::class);
+        $processAction->method('__invoke');
+
+        $result = (new LoadWbAdSpendDayAction(
+            $client,
+            new WildberriesAdRawDataParser(),
+            $repository,
+            $processAction,
+            $this->reconciliationQuery('15.25', '8.00', '7.25', '5.25', '2.00', 1),
+            $entityManager,
+            new NullLogger(),
+        ))(self::COMPANY_ID, self::CONNECTION_ID, new \DateTimeImmutable('2026-07-20'));
+
+        self::assertSame(AdRawDocumentStatus::DRAFT, $result->status);
+        self::assertSame('2.00', $result->unmappedTotal);
+        self::assertSame(1, $result->unmappedCount);
+        self::assertTrue($result->reconciled);
     }
 
     private function payload(): string
@@ -230,5 +376,26 @@ final class LoadWbAdSpendDayActionTest extends TestCase
                 ]],
             ]],
         ], \JSON_THROW_ON_ERROR);
+    }
+
+    private function reconciliationQuery(
+        string $documentTotal,
+        string $lineTotal,
+        string $withoutLineTotal,
+        string $unallocatedTotal,
+        string $unmappedTotal = '0.00',
+        int $unmappedCount = 0,
+    ): WbAdSpendReconciliationQuery {
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchAssociative')->willReturn([
+            'document_total' => $documentTotal,
+            'line_total' => $lineTotal,
+            'without_line_total' => $withoutLineTotal,
+            'unallocated_total' => $unallocatedTotal,
+            'unmapped_total' => $unmappedTotal,
+            'unmapped_count' => (string) $unmappedCount,
+        ]);
+
+        return new WbAdSpendReconciliationQuery($connection);
     }
 }

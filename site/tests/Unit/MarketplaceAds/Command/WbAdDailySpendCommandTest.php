@@ -54,6 +54,10 @@ final class WbAdDailySpendCommandTest extends TestCase
             'WB ad spend date=2026-07-21 loaded=2 review_required=0 failed=0',
             $tester->getDisplay(),
         );
+        self::assertStringContainsString(
+            'total=11.00 source=11.00 documents=11.00 lines=10.00 without_lines=1.00 unmapped=0.00 unmapped_count=0 reconciled=yes',
+            $tester->getDisplay(),
+        );
     }
 
     public function testExplicitDateAndConnectionFilterLoadOnlySelectedConnection(): void
@@ -68,7 +72,7 @@ final class WbAdDailySpendCommandTest extends TestCase
                 self::CONNECTION_2,
                 self::callback(static fn (\DateTimeImmutable $date): bool => '2026-07-10' === $date->format('Y-m-d')),
             )
-            ->willReturn($this->loadResult(AdRawDocumentStatus::DRAFT));
+            ->willReturn($this->loadResult(AdRawDocumentStatus::DRAFT, '2.00', 1));
 
         $tester = $this->tester($facade, $action);
         $exitCode = $tester->execute([
@@ -79,6 +83,7 @@ final class WbAdDailySpendCommandTest extends TestCase
 
         self::assertSame(Command::SUCCESS, $exitCode);
         self::assertStringContainsString('review_required=1', $tester->getDisplay());
+        self::assertStringContainsString('unmapped=2.00 unmapped_count=1', $tester->getDisplay());
     }
 
     public function testContinuesAfterConnectionFailureAndReturnsFailure(): void
@@ -219,8 +224,11 @@ final class WbAdDailySpendCommandTest extends TestCase
         ];
     }
 
-    private function loadResult(AdRawDocumentStatus $status): WbAdSpendLoadResult
-    {
+    private function loadResult(
+        AdRawDocumentStatus $status,
+        string $unmappedTotal = '0.00',
+        int $unmappedCount = 0,
+    ): WbAdSpendLoadResult {
         return new WbAdSpendLoadResult(
             rawDocumentId: '33333333-3333-3333-3333-333333333333',
             status: $status,
@@ -228,7 +236,14 @@ final class WbAdDailySpendCommandTest extends TestCase
             skuCount: 3,
             attributedTotal: '10.00',
             unallocatedTotal: '1.00',
+            persistedUnallocatedTotal: '1.00',
             actualTotal: '11.00',
+            documentTotal: '11.00',
+            lineTotal: bcsub('10.00', $unmappedTotal, 2),
+            withoutLineTotal: bcadd('1.00', $unmappedTotal, 2),
+            unmappedTotal: $unmappedTotal,
+            unmappedCount: $unmappedCount,
+            reconciled: true,
         );
     }
 }
