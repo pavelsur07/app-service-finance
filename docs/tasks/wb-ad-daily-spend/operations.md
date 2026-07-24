@@ -159,3 +159,82 @@ Manual recovery:
 WB may revise recent history. The initial production scope remains D-1 only;
 rolling 7-day refresh and month-close refresh should be added as a separately
 approved operational policy after observed correction rates justify them.
+
+## Production CLI image acceptance
+
+The production CLI runtime intentionally comments out only
+`docker-php-ext-opcache.ini`'s dynamic-load entry. Workers and scheduler
+commands do not need opcache; the PHP-FPM image and its opcache configuration
+are unchanged.
+
+The image build and local acceptance checks are:
+
+```bash
+cd site
+
+docker build \
+  --file docker/production/php-cli/Dockerfile \
+  --tag app-service-finance/site-php-cli:wb-ad-hardening \
+  .
+
+docker run --rm --entrypoint php \
+  app-service-finance/site-php-cli:wb-ad-hardening -v
+docker run --rm --entrypoint php \
+  app-service-finance/site-php-cli:wb-ad-hardening -m
+docker run --rm --entrypoint php \
+  app-service-finance/site-php-cli:wb-ad-hardening \
+  bin/console --env=prod app:marketplace-ads:wb-daily-spend \
+  --help --no-interaction
+docker run --rm \
+  app-service-finance/site-php-cli:wb-ad-hardening php -v
+docker run --rm --entrypoint supercronic \
+  app-service-finance/site-php-cli:wb-ad-hardening -version
+```
+
+All PHP commands must finish without `Failed loading Zend extension
+'opcache'` on stderr. The Symfony help command does not call WB or mutate
+application data. The command without `--entrypoint` also validates the real
+runtime entrypoint and its switch to the non-root `app` user.
+
+For a machine-verifiable warning check:
+
+```bash
+set -euo pipefail
+
+assert_clean_php() {
+  local output
+  output="$(docker run --rm "$@" 2>&1)"
+  printf '%s\n' "$output"
+  if grep -Fq "Failed loading Zend extension" <<<"$output"; then
+    return 1
+  fi
+}
+
+assert_clean_php --entrypoint php \
+  app-service-finance/site-php-cli:wb-ad-hardening -v
+assert_clean_php --entrypoint php \
+  app-service-finance/site-php-cli:wb-ad-hardening -m
+assert_clean_php --entrypoint php \
+  app-service-finance/site-php-cli:wb-ad-hardening \
+  bin/console --env=prod app:marketplace-ads:wb-daily-spend \
+  --help --no-interaction
+assert_clean_php \
+  app-service-finance/site-php-cli:wb-ad-hardening php -v
+```
+
+After a separately authorized deployment, the owner/DevOps operator may run
+acceptance on the application host against the deployed scheduler container:
+
+```bash
+docker exec -w /app scheduler php -v
+docker exec -w /app scheduler php -m
+docker exec -w /app scheduler \
+  php bin/console --env=prod app:marketplace-ads:wb-daily-spend \
+  --help --no-interaction
+```
+
+Even these read-only production checks require an explicit production-check
+request. Codex must not run the raw `docker exec` block; if separately
+authorized, it uses only the production wrappers allowed by `AGENTS.md`. A
+dated load or rerun is a separate mutating Production Gate action and is not
+part of image acceptance.

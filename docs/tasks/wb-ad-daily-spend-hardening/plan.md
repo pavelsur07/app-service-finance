@@ -184,7 +184,7 @@ Risk: HIGH-LOCAL
 owner_gate: yes
 release_candidate: yes
 independently_deployable: yes
-stage_base_commit: `<record after Stage 2>`
+stage_base_commit: `597c5514bba6832ab81d4cea4de9fbe62c907dae`
 
 Definition of Done:
 
@@ -244,8 +244,9 @@ execution:
 1. Merge the approved PR and allow the automatic production deployment/image
    rollout.
 2. No Doctrine migration is expected for this task.
-3. With a separate explicit production-check request, verify image/container
-   health and the absence of the opcache warning using restricted wrappers.
+3. With a separate explicit production-check request, Codex verifies
+   container health through `codex-docker-ps`; the owner/DevOps operator
+   checks the opcache warning on the host as documented in `operations.md`.
 4. With separate approval, rerun only `2026-07-23` for company
    `3f4d87cc-a967-43a7-9b5e-8a9113c0a910`.
 5. Accept only if the output shows exact reconciliation. The preferred result

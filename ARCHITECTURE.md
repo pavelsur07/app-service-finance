@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.67 / 2026-07-24
+> Версия: 1.68 / 2026-07-24
 
 ---
 
@@ -2459,6 +2459,12 @@ paths:
 | `app:marketplace:wb-financial-reports:orchestrate --refresh-days-back=14` | `20 * * * *` | Hourly safe planner: current-month daily/retry/missing/empty recovery, then rolling refresh of the last 14 days; max one task per connection per run |
 | `app:ingestion:ozon-performance:daily-load --window=month-to-date` | `07:25 daily` | Планирование Ozon Performance ingestion с начала месяца до вчерашнего дня; HTTP-загрузка выполняется `ingest_fetch` worker'ом |
 
+The production PHP CLI image used by workers and the scheduler disables only
+the dynamic-load entry for `opcache.so`, which is not needed in this runtime
+and cannot resolve `zend_jit_status` on the current Alpine/musl build. The
+image build fails if the entry is not disabled or the startup warning remains.
+The production PHP-FPM image and its opcache configuration are unchanged.
+
 **Правила для новых cron-команд:**
 - Класс в `src/{Module}/Command/`, `final class`, `#[AsCommand]`
 - `LockableTrait` обязателен если команда может идти дольше интервала запуска
@@ -2501,6 +2507,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.68 | 2026-07-24 | Infrastructure: production PHP CLI disables the broken Alpine/musl opcache dynamic load; production PHP-FPM remains unchanged |
 | 1.67 | 2026-07-24 | MarketplaceAds: one-shot WB catalog recovery from persisted unmapped nmId, bounded 429/5xx retry, and one aggregated normal-channel alert for unresolved review |
 | 1.66 | 2026-07-24 | MarketplaceAds: persisted `/upd` → `AdDocument` → `AdDocumentLine` reconciliation with intentional-unallocated and real-unmapped totals |
 | 1.65 | 2026-07-24 | MarketplaceAds: locked WB daily ad-spend command, idempotent company/connection/day raw upsert, 06:15 MSK cron, per-connection isolation and operational totals |

@@ -1,10 +1,10 @@
 ## Current checkpoint
 
-**Phase:** Stage 2
+**Phase:** Stage 3
 **Status:** complete, pending commit
-**Stage base commit:** `26cb5ff0b3faa36340bc6b259accfd7fcf0f9e06`
-**Current Work item:** Stage gate
-**Owner gate:** no
+**Stage base commit:** `597c5514bba6832ab81d4cea4de9fbe62c907dae`
+**Current Work item:** 3.4 complete
+**Owner gate:** yes
 
 ### Completed
 
@@ -32,6 +32,17 @@
 - Work item 2.5: recovery, refresh failure, unresolved IDs, retry limits,
   delay parsing, no-retry 4xx, and bounded multi-connection alert regression
   coverage added.
+- Work item 3.1: the production CLI runtime comments out only the broken
+  opcache dynamic-load entry, following the existing development pattern;
+  PHP-FPM is untouched.
+- Work item 3.2: the production CLI image built successfully; `php -v`,
+  `php -m`, Symfony command help, the real entrypoint, and `supercronic
+  -version` completed without the opcache startup warning.
+- Work item 3.3: operations and architecture documentation now describe the
+  CLI-only runtime decision, local image acceptance, production acceptance,
+  and the separate Production Gate for live checks and loads.
+- Work item 3.4: internal review and three external review iterations are
+  green; Stage Report and final handoff are prepared.
 
 ### Current diff / affected files
 
@@ -44,6 +55,10 @@
 - `site/src/MarketplaceAds/Application/LoadWbAdSpendDayAction.php`
 - `site/src/MarketplaceAds/Command/WbAdDailySpendCommand.php`
 - focused unit/integration tests and architecture/operations documentation.
+- `site/docker/production/php-cli/Dockerfile` — CLI-only opcache startup fix
+  with a fail-closed build assertion.
+- `docs/tasks/wb-ad-daily-spend/operations.md` and `ARCHITECTURE.md` —
+  acceptance procedure and shared CLI runtime contract.
 
 ### Checks and baseline
 
@@ -62,6 +77,17 @@
   `git diff --check`: green.
 - Production evidence is recorded in `plan.md`; no production action was run
   during implementation.
+- Stage 3 production CLI image build: green.
+- Stage 3 final image smoke (`php -v`, `php -m`, Symfony help, real
+  entrypoint, `supercronic -version`): green, no opcache warning.
+- Stage 3 MarketplaceAds unit: 346 tests / 2203 assertions, green.
+- Stage 3 MarketplaceAds integration: 173 tests / 697 assertions, green.
+- Task-scoped PHP CS Fixer (11 PHP files), PHP lint, Symfony container lint,
+  and `git diff --check`: green.
+- `make site-test` remains blocked before PHPUnit by the pre-existing
+  `bot_links.updated_at` test-schema drift in `Version20250219120000`.
+- `make site-cs-check` reports 585 pre-existing repository-wide formatter
+  violations; all task-owned PHP files pass the same formatter.
 
 ### Review status
 
@@ -75,14 +101,20 @@
   findings confirmed and fixed.
 - Stage 2 external confirmation review: `REVIEW_GREEN`; final documentation
   and nullable-status MINOR fixes also received `REVIEW_GREEN`.
+- Stage 2 committed and pushed as `597c5514`; Draft PR #2233 updated.
+- Stage 3 internal review: green; production PHP-FPM and shared configuration
+  are unchanged.
+- Stage 3 external review: three iterations, final `REVIEW_GREEN`; all safe
+  in-scope MINOR findings were fixed.
 
 ### Exact next action
 
-- Commit and push Stage 2, update Draft PR #2233, then begin Stage 3.
+- Commit and push task-owned Stage 3 files, update Draft PR #2233, then run the
+  final whole-task Release Gate review from the exact task base.
 
 ### Files to inspect first on resume
 
 - `docs/tasks/wb-ad-daily-spend-hardening/plan.md`
-- `site/src/MarketplaceAds/Application/LoadWbAdSpendDayAction.php`
-- `site/src/MarketplaceAds/Infrastructure/Query/`
-- `site/tests/Integration/MarketplaceAds/`
+- `site/docker/production/php-cli/Dockerfile`
+- `docs/tasks/wb-ad-daily-spend/operations.md`
+- `ARCHITECTURE.md`

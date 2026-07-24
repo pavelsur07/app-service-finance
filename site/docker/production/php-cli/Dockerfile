@@ -57,6 +57,17 @@ RUN mv $PHP_INI_DIR/php.ini-production $PHP_INI_DIR/php.ini
 COPY ./docker/common/php/conf.d /usr/local/etc/php/conf.d
 COPY ./docker/production/php/conf.d /usr/local/etc/php/conf.d
 
+# opcache.so on Alpine/musl cannot resolve zend_jit_status in the CLI image.
+# CLI workers do not need opcache, so disable only its dynamic-load entry.
+RUN sed -i 's/^zend_extension=opcache/;zend_extension=opcache/' \
+        /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini \
+    && grep -q '^;zend_extension=opcache' \
+        /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini \
+    && php_version_output="$(php -v 2>&1)" \
+    && printf '%s\n' "$php_version_output" \
+    && ! printf '%s\n' "$php_version_output" \
+        | grep -Fq 'Failed loading Zend extension'
+
 COPY ./docker/common/wait-for-it.sh /usr/local/bin/wait-for-it
 RUN chmod 555 /usr/local/bin/wait-for-it
 
