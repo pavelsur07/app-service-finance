@@ -5,250 +5,103 @@
 @import url('../../ui-kit/patterns/all.css');
 @import url('../../ui-kit/components/states.css'); /* behavior layer, cascade-last (owner=code, мимо all.css) */
 
-/*:root {
-    color-scheme: light;
-    --tblr-font-sans-serif: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --tblr-body-bg: #f5f7fb;
-    --tblr-body-color: #232e3c;
-    --tblr-bg-surface: #ffffff;
-    --tblr-border-color: #d9e2ef;
-    --tblr-primary: #206bc4;
-    --tblr-secondary: #656d77;
-    --tblr-muted: #66738f;
-    --tblr-page-gap: 0;
-}*/
-/*
-body {
-    background-color: var(--tblr-body-bg);
-    color: var(--tblr-body-color);
-    font-family: var(--tblr-font-sans-serif, "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
-    scrollbar-gutter: stable;
+/* UI Kit ↔ application bridge */
+a.t-pg-btn {
+    text-decoration: none;
 }
 
-.page {
-    --tblr-page-gap: 0;
-    gap: 0;
-    width: 100%;
+.form-field .invalid-feedback,
+.mdl .invalid-feedback {
+    /* Bootstrap validation markup inside UI Kit forms/modals. */
+    display: block;
+    font-size: var(--font-11_5);
+    color: var(--danger-text);
 }
 
-.page-wrapper {
-    margin-left: 0;
-    padding-left: 0;
+.ui-mode-switch {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
 }
 
-.navbar-vertical {
+.ui-mode-switch form {
     margin: 0;
 }
 
-.page-body .container {
-    padding: 1rem;
+.ui-mode-switch-label {
+    color: var(--text-muted);
+    font-size: var(--font-11_5);
 }
 
-@media (min-width: 768px) {
-    .page-body .container {
-        padding: 2rem;
-    }
-}
-
-@media (min-width: 1200px) {
-    .page-body .container {
-        padding: 3rem;
-    }
-}
-
-!*
- * Fallback styles for dropdown menus in the sidebar. When Tabler's CSS
- * is unavailable, ensure that the dropdown menu can still be toggled
- * via the "show" class added by our JavaScript.
- *!
-.navbar-vertical .dropdown-menu {
-    display: none;
-}
-
-.navbar-vertical .dropdown-menu.show {
+/* Customer app shell: admin/auth layouts keep their own composition. */
+.app-customer .app-header-brand a {
     display: block;
+    text-decoration: none;
 }
 
-!* Компактная таблица для платёжного календаря *!
-.table-compact tbody tr > * {
-    padding-top: .35rem;
-    padding-bottom: .35rem;
-}
-
-.table-compact .badge {
-    font-size: .75rem;
-}
-
-.nowrap {
-    white-space: nowrap;
-}
-
-.text-truncate {
-    max-width: 320px;
+.app-customer .app-company {
+    max-width: 240px;
     overflow: hidden;
+    color: var(--text-secondary);
+    font-size: var(--font-12_5);
+    font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-@media (max-width: 992px) {
-    .table-compact tbody tr > * {
-        padding-top: .3rem;
-        padding-bottom: .3rem;
+.app-customer .app-dashboard .wz-row > .kpi {
+    min-width: 220px;
+}
+
+.app-customer .app-mobile-logout {
+    display: none;
+}
+
+@media (max-width: 900px) {
+    .app-customer .app-company,
+    .app-customer .crumbs {
+        display: none;
     }
 
-    .text-truncate {
-        max-width: 200px;
+    .app-customer .app-header-brand {
+        width: auto;
+        padding-inline: var(--s-4);
+        border-right: 0;
     }
-}*/
 
-/* Убираем лишние отступы между sidebar, header и page-wrapper */
-.page {
-    --tblr-page-gap: 0;
-    gap: 0;
+    .app-customer .app-header-brand img {
+        max-width: 120px;
+    }
+
+    .app-customer .app-header-body {
+        padding-inline: var(--s-4);
+    }
 }
 
-.page-wrapper {
-    margin-left: 0;
-    padding-left: 0;
+@media (max-width: 760px) {
+    .app-customer .app-sidebar {
+        display: none;
+    }
+
+    .app-customer .app-workzone {
+        padding: var(--s-4);
+    }
+
+    .app-customer .ui-mode-switch-label {
+        display: none;
+    }
+
+    .app-customer .app-mobile-logout {
+        display: inline-flex;
+    }
 }
 
-.navbar-vertical {
-    margin: 0;
-}
+@media (max-width: 420px) {
+    .app-customer .app-header-brand img {
+        max-width: 80px;
+    }
 
-/* Резервируем место под скроллбар, чтобы layout не прыгал */
-html {
-    scrollbar-gutter: stable;
-}
-
-/* Улучшаем контрастность модалок с эффектом blur, чтобы данные оставались читаемыми */
-.modal.modal-blur .modal-content {
-    background-color: var(--tblr-bg-surface);
-    color: var(--tblr-body-color);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-}
-
-.modal.modal-blur .modal-header,
-.modal.modal-blur .modal-body,
-.modal.modal-blur .modal-footer {
-    color: inherit;
-}
-
-/* ProjectDirection Picker (Tabler) */
-.pd-tree-wrap {
-    height: 340px;                /* фиксированная высота области дерева */
-    max-height: 340px;
-    overflow: auto;               /* скролл внутри */
-    border: 1px solid var(--tblr-border-color, #d9e2ef);
-    border-radius: .5rem;
-    padding: .25rem;
-    background: var(--tblr-bg-surface, #fff);
-}
-
-.pd-node { padding-left: .25rem; }
-.pd-row { padding: .15rem .35rem; border-radius: .35rem; }
-.pd-row:hover { background: rgba(10,21,72,.05); }
-
-.pd-kind { width: 18px; display: inline-flex; justify-content: center; }
-.pd-spacer { width: 32px; display: inline-block; }
-
-.pd-toggle.btn { height: 24px; width: 24px; padding: 0; }
-
-.pd-name { font-size: .875rem; line-height: 1.15rem; }
-
-.pd-row-selected { background: rgba(10,21,72,.08); }
-.pd-selected { font-weight: 600; }
-
-.pd-children { margin-left: 14px; border-left: 1px dashed rgba(10,21,72,.15); padding-left: 10px; }
-
-:root {
-    --vf-brand: #0A1548;
-    --vf-brand-05: rgba(10, 21, 72, .05);
-}
-
-.nav-item.active > a {
-    background: var(--vf-brand-05);
-    color: var(--vf-brand);
-    border-left: 2px solid var(--vf-brand);
-}
-
-.nav-item a:hover {
-    background: var(--vf-brand-05);
-    color: var(--vf-brand);
-}
-
-.nav-section-title {
-    font-size: .75rem;
-    letter-spacing: .04em;
-    color: #8a94a6;
-    text-transform: uppercase;
-    padding: .5rem 1rem;
-}
-
-.nav-link-icon i {
-    font-size: 1.5em;
-    line-height: 1;
-}
-
-aside.navbar .navbar-brand {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    padding-inline: .75rem;
-    margin-bottom: 0;
-}
-
-.navbar-brand img {
-    height: 40px;
-    width: auto;
-}
-
-.vf-sidebar {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow: hidden;
-}
-
-.vf-sidebar-body {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
-}
-
-.vf-sidebar-footer {
-    flex: 0 0 auto;
-}
-
-.vf-sidebar-company-name {
-    word-break: break-word;
-}
-
-/* В layout-fluid-vertical основной контент должен расти по высоте и прокручиваться
-   вместе со страницей, иначе динамически добавленные блоки формы могут оказаться
-   ниже viewport без доступной прокрутки. */
-body.layout-fluid-vertical {
-    overflow-y: auto;
-}
-
-body.layout-fluid-vertical .page,
-body.layout-fluid-vertical .page-wrapper {
-    min-height: 100vh;
-    height: auto;
-}
-
-/* ===== UI Kit ↔ app bridge (owner=code) ===== */
-
-/* .t-pg-btn в ките сверстан как <button>; пагинация рендерит ссылки —
-   гасим UA-подчёркивание для паритета. */
-a.t-pg-btn { text-decoration: none; }
-
-/* Symfony form_errors() (тема bootstrap_5_layout) внутри полей UI Kit:
-   bootstrap CSS не грузится, поэтому .invalid-feedback стилизуем здесь. */
-.form-field .invalid-feedback,
-.mdl .invalid-feedback {
-    display: block;
-    font-size: var(--font-11_5);
-    color: var(--danger-text);
+    .app-customer .app-header-body {
+        padding-right: var(--s-2);
+    }
 }

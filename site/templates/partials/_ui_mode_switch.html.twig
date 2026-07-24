@@ -1,0 +1,19 @@
+{% if is_granted('ROLE_USER') %}
+    {% set current_mode = ui_mode() %}
+    {% set is_app_variant = variant|default('legacy') == 'app' %}
+    <div class="ui-mode-switch" role="group" aria-label="Выбор интерфейса">
+        <span class="ui-mode-switch-label">Интерфейс:</span>
+        {% for mode, label in {legacy: 'Старый', app: 'Новый'} %}
+            {% set is_current = current_mode == mode %}
+            <form method="post" action="{{ path('app_ui_mode_switch') }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('ui_mode_switch') }}">
+                <input type="hidden" name="mode" value="{{ mode }}">
+                <button type="submit"
+                        class="btn btn-sm {{ is_current ? 'btn-primary' : (is_app_variant ? 'btn-secondary' : 'btn-outline-primary') }}"
+                        aria-pressed="{{ is_current ? 'true' : 'false' }}">
+                    {{ label }}
+                </button>
+            </form>
+        {% endfor %}
+    </div>
+{% endif %}

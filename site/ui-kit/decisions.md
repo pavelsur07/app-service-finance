@@ -239,27 +239,31 @@
 
 ---
 
-## UI Theme Switch
+## UI Mode Switch
 
 ### Naming convention
-- Cookie: `ui_theme` (values: `tabler` | `vf`)
-- HTML attribute: `data-ui` on `<html>`
-- Twig function: `vf_mode()` → `bool`
-- CSS prefix: `vf-` (все компоненты UI Kit)
-- Body class (vf): `uikit-base`
-- Body class (tabler): `layout-fluid layout-fluid-vertical`
+- Cookie: `ui_mode` (values: `legacy` | `app`)
+- HTML attribute: `data-ui-mode` on `<html>`
+- Twig function: `ui_mode()` → `legacy` | `app`
+- Body class (app): `uikit-base`
+- Body class (legacy): `layout-fluid layout-fluid-vertical`
 
 ### Architecture
-- `base.html.twig` always loads Tabler CSS/JS (shell markup compatibility)
-- VF design tokens and custom classes load unconditionally (no collision with Tabler)
-- Manrope font loads additionally in VF mode
-- Body class: `layout-fluid layout-fluid-vertical` always + `uikit-base` added in VF mode
-- `data-ui` attribute on `<html>` for future per-page CSS hooks during migration
+- `base.html.twig` сохраняет совместимость и расширяет `_layout/legacy.html.twig`.
+- Legacy layout загружает только Tabler и entrypoint `legacy_app`.
+- App layout загружает только UI Kit и entrypoint `app`.
+- Customer app shell собирается в `templates/app/_shell/` из UI Kit
+  `app-header`, `app-shell` и `sidebar`.
+- На этапе пилота только `/` имеет отдельный app-шаблон; остальные customer
+  routes продолжают рендерить legacy layout.
+- Общие бизнес-данные и маршруты не дублируются; контроллер выбирает готовый
+  шаблон для поддерживаемых app-экранов.
 
 ### Rules
-- `admin/base.html.twig` и `security/base_auth.html.twig` — VF-only, не переключаются.
-- Новые экраны пишутся только на VF.
+- `admin/base.html.twig` и `security/base_auth.html.twig` — app-only, не переключаются.
+- Новые экраны пишутся только на UI Kit.
 - Legacy страницы мигрируются по модулям.
-- Не используй `uikit_active()` — правильное имя `vf_mode()`.
-- Cookie `ui_theme` читается серверсайд через `RequestStack` в Twig.
-- Переключатель доступен только `ROLE_ADMIN` (контроллер + Twig extension).
+- Cookie читается через `UiModeResolver`; прямое чтение в Twig/контроллерах запрещено.
+- Старый `ui_theme=vf` читается для авторизованных пользователей только в
+  течение окна совместимости одной версии и в этом окне выбирает app-режим.
+- Переключатель и app-режим доступны всем авторизованным пользователям (`ROLE_USER`).

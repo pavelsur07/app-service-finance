@@ -9,6 +9,7 @@ use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Report\Cashflow\CashflowReportBuilder;
 use App\Report\Cashflow\CashflowReportParams;
 use App\Shared\Service\ActiveCompanyService;
+use App\Shared\Service\UiModeResolver;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -22,6 +23,7 @@ class HomeController extends AbstractController
         private readonly MoneyAccountDailyBalanceRepository $dailyBalanceRepository,
         private readonly CashflowReportBuilder $cashflowReportBuilder,
         private readonly MoneyAccountRepository $moneyAccountRepository,
+        private readonly UiModeResolver $uiModeResolver,
     ) {
     }
 
@@ -101,7 +103,12 @@ class HomeController extends AbstractController
             $accumulate($node);
         }
 
-        return $this->render('home/index.html.twig', [
+        $template = UiModeResolver::APP === $this->uiModeResolver->current()
+            ? 'app/home/index.html.twig'
+            : 'home/index.html.twig';
+
+        return $this->render($template, [
+            'activeCompany' => $company,
             'kpi' => [
                 'todayBalance' => $todayBalance,
                 'inflow30' => $inflow30,
