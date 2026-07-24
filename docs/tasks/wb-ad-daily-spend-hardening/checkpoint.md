@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 1
+**Phase:** Stage 2
 **Status:** complete, pending commit
-**Stage base commit:** `44b28304d27c5e1025e8c29230d75b928a36681f`
+**Stage base commit:** `26cb5ff0b3faa36340bc6b259accfd7fcf0f9e06`
 **Current Work item:** Stage gate
 **Owner gate:** no
 
@@ -20,6 +20,18 @@
   fails the connection.
 - Work item 1.4: command output, architecture and operations documentation,
   and regression coverage completed.
+- Stage 1 committed and pushed as `26cb5ff0`.
+- Draft PR #2233 created against `master`.
+- Work items 2.1–2.2: persisted-unmapped-driven catalog refresh and one
+  same-raw reprojection implemented with explicit recovery result fields.
+- Work item 2.3: each Promotion API request has three total attempts for
+  429/5xx, strict integer/RFC 7231 `Retry-After`, bounded waits, and
+  structured retry/abandon logs.
+- Work item 2.4: one bounded aggregated normal-channel application alert is
+  emitted when `review_required > 0`.
+- Work item 2.5: recovery, refresh failure, unresolved IDs, retry limits,
+  delay parsing, no-retry 4xx, and bounded multi-connection alert regression
+  coverage added.
 
 ### Current diff / affected files
 
@@ -41,6 +53,11 @@
   green.
 - Full MarketplaceAds unit suite: 335 tests / 2128 assertions, green.
 - Full MarketplaceAds integration suite: 173 tests / 697 assertions, green.
+- Stage 2 focused action/client/command/catalog tests: 38 tests / 245
+  assertions, green after the external-review fixes.
+- Stage 2 MarketplaceAds unit suite: 346 tests / 2203 assertions, green after
+  the external-review fixes.
+- Stage 2 MarketplaceAds integration suite: 173 tests / 697 assertions, green.
 - Symfony container lint, task-scoped PHP CS Fixer, PHP syntax lint, and
   `git diff --check`: green.
 - Production evidence is recorded in `plan.md`; no production action was run
@@ -52,11 +69,16 @@
 - External Claude review: `REVIEW_GREEN`; its final safe MINOR findings were
   resolved by consolidating all four invariants in the DTO contract and adding
   same-company/raw-document isolation plus fail-closed unallocated-line tests.
-- unresolved findings: none
+- Stage 1 unresolved findings: none.
+- Stage 2 internal review: green after strict RFC 7231 parsing.
+- Stage 2 external review iteration 1: one IMPORTANT and four safe MINOR
+  findings confirmed and fixed.
+- Stage 2 external confirmation review: `REVIEW_GREEN`; final documentation
+  and nullable-status MINOR fixes also received `REVIEW_GREEN`.
 
 ### Exact next action
 
-- Commit and push Stage 1, update the Draft PR, then begin Stage 2.
+- Commit and push Stage 2, update Draft PR #2233, then begin Stage 3.
 
 ### Files to inspect first on resume
 

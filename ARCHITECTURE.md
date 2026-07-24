@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.66 / 2026-07-24
+> Версия: 1.67 / 2026-07-24
 
 ---
 
@@ -1416,6 +1416,9 @@ WildberriesAdClient
   -> GET /adv/v3/fullstats (campaign IDs from upd, chunks <= 50, 20 s spacing)
   -> AdRawDocument(sourceKey=wb-ad-spend:<connectionId>:<date>)
   -> ProcessAdRawDocumentAction
+  -> when persisted unmappedCount > 0:
+       MarketplaceFacade::refreshWbListingCatalog once
+       -> ProcessAdRawDocumentAction once for the same raw document
   -> AdDocument + attributed AdDocumentLine
 ```
 
@@ -1424,6 +1427,17 @@ therefore leaves recoverable `DRAFT` bronze data. One connection failure does
 not stop sibling connections; the command returns a non-zero exit code if any
 connection failed. Live reruns, migration application, and cron activation are
 Production Gate actions.
+
+Catalog recovery is driven by the persisted reconciliation result, not by a
+generic `DRAFT` status. It never refetches `/upd` or `/fullstats`. A failed
+catalog refresh preserves the first projection; a successful refresh performs
+exactly one idempotent reprojection and exposes its outcome in the load result.
+
+Each individual Promotion API request has at most three total attempts for
+HTTP 429/5xx. `Retry-After` supports integer seconds and HTTP-date; absent or
+invalid values use a 2/4-second backoff. A supplied delay above 120 seconds
+fails immediately instead of blocking cron. Authentication and other 4xx
+responses are not retried.
 
 After projection, `WbAdSpendReconciliationQuery` compares the `/upd`-derived
 source total with persisted `AdDocument` and `AdDocumentLine` aggregates. It
@@ -2487,6 +2501,8 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.67 | 2026-07-24 | MarketplaceAds: one-shot WB catalog recovery from persisted unmapped nmId, bounded 429/5xx retry, and one aggregated normal-channel alert for unresolved review |
+| 1.66 | 2026-07-24 | MarketplaceAds: persisted `/upd` → `AdDocument` → `AdDocumentLine` reconciliation with intentional-unallocated and real-unmapped totals |
 | 1.65 | 2026-07-24 | MarketplaceAds: locked WB daily ad-spend command, idempotent company/connection/day raw upsert, 06:15 MSK cron, per-connection isolation and operational totals |
 | 1.64 | 2026-07-24 | MarketplaceAds: WB `/upd` actual expense распределяется по `fullstats` nmId-весам без float; raw `sourceKey` обеспечивает идемпотентность company/connection/day и сохраняет unallocated/unmapped суммы в totals |
 | 1.62 | 2026-07-18 | Finance: Stage 7.7.3 переключает новые `pl_daily_totals` записи на Project×ЦФО aggregation key с partial expression unique indexes и безопасным merge при удалении P&L категории |

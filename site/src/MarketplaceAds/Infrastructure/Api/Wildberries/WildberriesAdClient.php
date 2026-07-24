@@ -32,6 +32,9 @@ final readonly class WildberriesAdClient implements AdPlatformClientInterface
     private const EXPENSES_PATH = '/adv/v1/upd';
     private const FULL_STATS_PATH = '/adv/v3/fullstats';
     private const REQUEST_TIMEOUT_SECONDS = 60;
+    private const MAX_REQUEST_ATTEMPTS = 3;
+    private const MAX_RETRY_WAIT_SECONDS = 120;
+    private const BASE_RETRY_DELAY_SECONDS = 2;
     private const DEFAULT_RETRY_AFTER_SECONDS = 20;
 
     public function __construct(
@@ -161,40 +164,78 @@ final readonly class WildberriesAdClient implements AdPlatformClientInterface
         ?int $campaignCount,
     ): array {
         $token = $this->token($companyId, $connectionId);
-        $startedAt = microtime(true);
-        $statusCode = null;
-        $headers = [];
+        for ($attempt = 1; $attempt <= self::MAX_REQUEST_ATTEMPTS; ++$attempt) {
+            $startedAt = microtime(true);
+            $statusCode = null;
+            $headers = [];
 
-        try {
-            $response = $this->httpClient->request('GET', self::BASE_URL.$path, [
-                'headers' => ['Authorization' => $token],
-                'query' => $query,
-                'timeout' => self::REQUEST_TIMEOUT_SECONDS,
-            ]);
-            $statusCode = $response->getStatusCode();
-            $headers = $response->getHeaders(false);
-            $body = $response->getContent(false);
-        } catch (TransportExceptionInterface $exception) {
-            throw new WildberriesAdTransientException('WB Promotion API transport error.', previous: $exception);
-        } finally {
-            $this->logger->info('WB Promotion API request finished.', [
-                'companyId' => $companyId,
-                'connectionId' => $connectionId,
-                'operation' => $operation,
-                'date' => $date,
-                'campaignCount' => $campaignCount,
-                'statusCode' => $statusCode,
-                'durationMs' => (int) ((microtime(true) - $startedAt) * 1000),
-            ]);
+            try {
+                $response = $this->httpClient->request('GET', self::BASE_URL.$path, [
+                    'headers' => ['Authorization' => $token],
+                    'query' => $query,
+                    'timeout' => self::REQUEST_TIMEOUT_SECONDS,
+                ]);
+                $statusCode = $response->getStatusCode();
+                $headers = $response->getHeaders(false);
+                $body = $response->getContent(false);
+            } catch (TransportExceptionInterface $exception) {
+                throw new WildberriesAdTransientException('WB Promotion API transport error.', previous: $exception);
+            } finally {
+                $this->logger->info('WB Promotion API request finished.', [
+                    'companyId' => $companyId,
+                    'connectionId' => $connectionId,
+                    'operation' => $operation,
+                    'date' => $date,
+                    'campaignCount' => $campaignCount,
+                    'attempt' => $attempt,
+                    'statusCode' => $statusCode,
+                    'durationMs' => (int) ((microtime(true) - $startedAt) * 1000),
+                ]);
+            }
+
+            if ($this->isRetryableStatus($statusCode) && $attempt < self::MAX_REQUEST_ATTEMPTS) {
+                $delaySeconds = $this->retryDelaySeconds($headers, $attempt);
+                if ($delaySeconds <= self::MAX_RETRY_WAIT_SECONDS) {
+                    $this->logger->warning('WB Promotion API request retry scheduled.', [
+                        'event' => 'wb_ad_spend_request_retry',
+                        'companyId' => $companyId,
+                        'connectionId' => $connectionId,
+                        'operation' => $operation,
+                        'date' => $date,
+                        'campaignCount' => $campaignCount,
+                        'attempt' => $attempt,
+                        'nextAttempt' => $attempt + 1,
+                        'statusCode' => $statusCode,
+                        'delaySeconds' => $delaySeconds,
+                    ]);
+                    $this->clock->sleep($delaySeconds);
+
+                    continue;
+                }
+                $this->logger->warning('WB Promotion API request retry abandoned.', [
+                    'event' => 'wb_ad_spend_request_retry_abandoned',
+                    'companyId' => $companyId,
+                    'connectionId' => $connectionId,
+                    'operation' => $operation,
+                    'date' => $date,
+                    'campaignCount' => $campaignCount,
+                    'attempt' => $attempt,
+                    'statusCode' => $statusCode,
+                    'delaySeconds' => $delaySeconds,
+                    'maxDelaySeconds' => self::MAX_RETRY_WAIT_SECONDS,
+                ]);
+            }
+
+            $this->classifyStatus($statusCode, $headers);
+
+            try {
+                return $this->jsonDecoder->decodeObjectList($body);
+            } catch (\JsonException|\UnexpectedValueException $exception) {
+                throw new WildberriesAdTransientException('WB Promotion API returned an invalid JSON list.', previous: $exception);
+            }
         }
 
-        $this->classifyStatus($statusCode, $headers);
-
-        try {
-            return $this->jsonDecoder->decodeObjectList($body);
-        } catch (\JsonException|\UnexpectedValueException $exception) {
-            throw new WildberriesAdTransientException('WB Promotion API returned an invalid JSON list.', previous: $exception);
-        }
+        throw new \LogicException('WB Promotion API request loop finished unexpectedly.');
     }
 
     private function token(string $companyId, ?string $connectionId): string
@@ -237,11 +278,57 @@ final readonly class WildberriesAdClient implements AdPlatformClientInterface
      */
     private function retryAfterSeconds(array $headers): int
     {
-        $value = trim((string) ($headers['retry-after'][0] ?? ''));
+        $retryAfterSeconds = $this->explicitRetryAfterSeconds($headers);
 
-        return ctype_digit($value) && (int) $value > 0
-            ? (int) $value
-            : self::DEFAULT_RETRY_AFTER_SECONDS;
+        return null === $retryAfterSeconds || $retryAfterSeconds <= 0
+            ? self::DEFAULT_RETRY_AFTER_SECONDS
+            : $retryAfterSeconds;
+    }
+
+    /**
+     * @param array<string, list<string>> $headers
+     */
+    private function retryDelaySeconds(array $headers, int $attempt): int
+    {
+        return $this->explicitRetryAfterSeconds($headers)
+            ?? min(self::BASE_RETRY_DELAY_SECONDS * (2 ** ($attempt - 1)), self::MAX_RETRY_WAIT_SECONDS);
+    }
+
+    /**
+     * @param array<string, list<string>> $headers
+     */
+    private function explicitRetryAfterSeconds(array $headers): ?int
+    {
+        $value = '';
+        foreach ($headers as $name => $values) {
+            if ('retry-after' === strtolower($name)) {
+                $value = trim((string) ($values[0] ?? ''));
+                break;
+            }
+        }
+        if (ctype_digit($value)) {
+            return (int) $value;
+        }
+        if ('' === $value) {
+            return null;
+        }
+
+        $retryAt = \DateTimeImmutable::createFromFormat(
+            '!'.\DateTimeInterface::RFC7231,
+            $value,
+            new \DateTimeZone('GMT'),
+        );
+        $errors = \DateTimeImmutable::getLastErrors();
+        if (false === $retryAt || (false !== $errors && ($errors['warning_count'] > 0 || $errors['error_count'] > 0))) {
+            return null;
+        }
+
+        return max(0, $retryAt->getTimestamp() - $this->clock->now()->getTimestamp());
+    }
+
+    private function isRetryableStatus(?int $statusCode): bool
+    {
+        return null !== $statusCode && (429 === $statusCode || $statusCode >= 500);
     }
 
     /**

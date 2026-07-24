@@ -23,6 +23,9 @@ final readonly class WbAdSpendLoadResult
         public string $unmappedTotal,
         public int $unmappedCount,
         public bool $reconciled,
+        public bool $catalogRefreshAttempted = false,
+        public bool $catalogRefreshed = false,
+        public int $projectionRetryCount = 0,
     ) {
     }
 }
