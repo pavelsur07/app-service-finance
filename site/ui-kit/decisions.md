@@ -236,3 +236,30 @@
 - ❌ Не помещай родительские категории в выбор — только листья (leaf) кликабельны в TreePicker.
 - ❌ Не делай отдельных drawer'ов на 640px. Стандарт — 680.
 - ❌ Не регенери и не перезаписывай `components/states.css` при uikit-update — это code-owned behavior layer, его позиция в каскаде (последним, через `app.css`) фиксирована.
+
+---
+
+## UI Theme Switch
+
+### Naming convention
+- Cookie: `ui_theme` (values: `tabler` | `vf`)
+- HTML attribute: `data-ui` on `<html>`
+- Twig function: `vf_mode()` → `bool`
+- CSS prefix: `vf-` (все компоненты UI Kit)
+- Body class (vf): `uikit-base`
+- Body class (tabler): `layout-fluid layout-fluid-vertical`
+
+### Architecture
+- `base.html.twig` always loads Tabler CSS/JS (shell markup compatibility)
+- VF design tokens and custom classes load unconditionally (no collision with Tabler)
+- Manrope font loads additionally in VF mode
+- Body class: `layout-fluid layout-fluid-vertical` always + `uikit-base` added in VF mode
+- `data-ui` attribute on `<html>` for future per-page CSS hooks during migration
+
+### Rules
+- `admin/base.html.twig` и `security/base_auth.html.twig` — VF-only, не переключаются.
+- Новые экраны пишутся только на VF.
+- Legacy страницы мигрируются по модулям.
+- Не используй `uikit_active()` — правильное имя `vf_mode()`.
+- Cookie `ui_theme` читается серверсайд через `RequestStack` в Twig.
+- Переключатель доступен только `ROLE_ADMIN` (контроллер + Twig extension).
