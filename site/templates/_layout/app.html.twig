@@ -1,22 +1,19 @@
 <!DOCTYPE html>
-<html lang="RU">
+<html lang="ru" data-ui-mode="app">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}Welcome!{% endblock %}</title>
+    <title>{% block title %}Ваш Финдир{% endblock %}</title>
     <link rel="icon" type="image/svg+xml" href="{{ asset('static/favicon.svg') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
-    {% block stylesheets %}
-        {# Подключаем CSS, который Vite собрал для точки входа 'app' #}
-        {{ vite_entry_link_tags('app') }}
-    {% endblock %}
+    {{ vite_entry_link_tags('app') }}
+    {% block stylesheets %}{% endblock %}
 </head>
 <body class="uikit-base">
-{% block body %}{% endblock %}
-{% block javascripts %}
+    {% block body %}{% endblock %}
     {{ vite_entry_script_tags('app') }}
-{% endblock %}
+    {% block javascripts %}{% endblock %}
 </body>
 </html>

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ru" data-ui-mode="legacy">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Сервис{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{{ asset('static/favicon.svg') }}">
+
+    {% block styles %}
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.2.0/dist/css/tabler.min.css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.39.0/tabler-icons.min.css">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+        {{ vite_entry_link_tags('design_tokens') }}
+        {{ vite_entry_link_tags('vf_custom_classes') }}
+        {{ vite_entry_link_tags('legacy_app') }}
+        {% block stylesheets %}{% endblock %}
+    {% endblock %}
+    {% block importmap %}
+        {{ vite_entry_script_tags('legacy_app') }}
+    {% endblock %}
+</head>
+<body class="layout-fluid layout-fluid-vertical">
+    <div class="page">
+        <aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="light">
+            <div class="container-fluid">
+                {% include '@Partials/_sidebar.html.twig' %}
+            </div>
+        </aside>
+
+        <div class="page-wrapper">
+            <header class="navbar navbar-expand-md d-none d-lg-flex d-print-none">
+                <div class="container-fluid">
+                    <h1 class="navbar-brand">Сервис</h1>
+                    {% include '@Partials/_active_company_widget.html.twig' %}
+                    {% block ui_mode_switch %}{% endblock %}
+                </div>
+            </header>
+
+            <div class="page-body">
+                <div class="container-fluid">
+                    <div class="content-max mx-auto">
+                        {% block breadcrumbs %}{% endblock %}
+                        {{ include('@Partials/_flash.html.twig') }}
+                        {% block content %}{% block body %}{% endblock %}{% endblock %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% block scripts %}
+        <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.2.0/dist/js/tabler.min.js"></script>
+        <script>window.bootstrap = window.bootstrap || (window.tabler && window.tabler.bootstrap);</script>
+        {% block javascripts %}{% endblock %}
+    {% endblock %}
+</body>
+</html>
