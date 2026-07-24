@@ -29,6 +29,63 @@ final class AdRawDocumentRepositoryTest extends IntegrationTestCase
         $this->repository = self::getContainer()->get(AdRawDocumentRepository::class);
     }
 
+    public function testFindBySourceKeyIsScopedByCompanyAndMarketplace(): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+        $this->seedCompany(self::OTHER_COMPANY_ID, self::OTHER_OWNER_ID, 'b@example.test');
+        $sourceKey = 'wb-ad-spend:connection-1:2026-07-20';
+
+        $wildberries = AdRawDocumentBuilder::aRawDocument()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->withMarketplace(MarketplaceType::WILDBERRIES)
+            ->withSourceKey($sourceKey)
+            ->build();
+        $otherCompany = AdRawDocumentBuilder::aRawDocument()
+            ->withCompanyId(self::OTHER_COMPANY_ID)
+            ->withIndex(2)
+            ->withMarketplace(MarketplaceType::WILDBERRIES)
+            ->withSourceKey($sourceKey)
+            ->build();
+        $ozon = AdRawDocumentBuilder::aRawDocument()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(3)
+            ->withMarketplace(MarketplaceType::OZON)
+            ->withSourceKey($sourceKey)
+            ->build();
+
+        foreach ([$wildberries, $otherCompany, $ozon] as $document) {
+            $this->repository->save($document);
+        }
+        $this->em->flush();
+        $this->em->clear();
+
+        self::assertSame(
+            $wildberries->getId(),
+            $this->repository->findBySourceKey(
+                self::COMPANY_ID,
+                MarketplaceType::WILDBERRIES->value,
+                $sourceKey,
+            )?->getId(),
+        );
+        self::assertSame(
+            $otherCompany->getId(),
+            $this->repository->findBySourceKey(
+                self::OTHER_COMPANY_ID,
+                MarketplaceType::WILDBERRIES->value,
+                $sourceKey,
+            )?->getId(),
+        );
+        self::assertSame(
+            $ozon->getId(),
+            $this->repository->findBySourceKey(
+                self::COMPANY_ID,
+                MarketplaceType::OZON->value,
+                $sourceKey,
+            )?->getId(),
+        );
+    }
+
     public function testMarkFailedWithReasonFirstCallReturnOneAndPersistsFailed(): void
     {
         $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');

@@ -64,6 +64,105 @@ final class ProcessAdRawDocumentActionTest extends IntegrationTestCase
         self::assertSame('100.00', $sumCost);
     }
 
+    public function testProcessesWbAttributedAndIntentionalUnallocatedExpenseWithoutLosingTotal(): void
+    {
+        $company = $this->seedCompany();
+        $this->seedListing(
+            $company,
+            '123456',
+            'UNKNOWN',
+            '55555555-5555-5555-5555-000000000050',
+            MarketplaceType::WILDBERRIES,
+        );
+        $this->em->flush();
+
+        $rawDocumentId = $this->seedWbRawDocument(
+            expenses: [
+                ['advertId' => '10', 'updSum' => '10.00', 'campName' => 'Attributed'],
+                ['advertId' => '20', 'updSum' => '5.25', 'campName' => 'Unallocated'],
+            ],
+            statistics: [[
+                'advertId' => '10',
+                'days' => [[
+                    'apps' => [[
+                        'nms' => [[
+                            'nmId' => '123456',
+                            'sum' => '9.50',
+                            'views' => '100',
+                            'clicks' => '5',
+                        ]],
+                    ]],
+                ]],
+            ]],
+        );
+
+        ($this->action())(self::COMPANY_ID, $rawDocumentId);
+        $this->em->clear();
+
+        $rawDocument = $this->em->getRepository(AdRawDocument::class)->find($rawDocumentId);
+        self::assertSame(AdRawDocumentStatus::PROCESSED, $rawDocument->getStatus());
+
+        /** @var AdDocument[] $documents */
+        $documents = $this->em->getRepository(AdDocument::class)->findBy(
+            ['adRawDocumentId' => $rawDocumentId],
+            ['campaignId' => 'ASC'],
+        );
+        self::assertCount(2, $documents);
+        self::assertSame('123456', $documents[0]->getParentSku());
+        self::assertSame('10.00', $documents[0]->getTotalCost());
+        self::assertSame('__unallocated__', $documents[1]->getParentSku());
+        self::assertSame('5.25', $documents[1]->getTotalCost());
+        self::assertSame(
+            '15.25',
+            bcadd($documents[0]->getTotalCost(), $documents[1]->getTotalCost(), 2),
+        );
+
+        self::assertCount(
+            1,
+            $this->em->getRepository(AdDocumentLine::class)->findAll(),
+            'Intentional unallocated expense must not create a listing line.',
+        );
+    }
+
+    public function testPreservesWbUnknownNmIdInTotalsAndLeavesRawDraftForMapping(): void
+    {
+        $this->seedCompany();
+        $this->em->flush();
+
+        $rawDocumentId = $this->seedWbRawDocument(
+            expenses: [['advertId' => '30', 'updSum' => '8.40', 'campName' => 'Unknown SKU']],
+            statistics: [[
+                'advertId' => '30',
+                'days' => [[
+                    'apps' => [[
+                        'nms' => [[
+                            'nmId' => '999999',
+                            'sum' => '8.00',
+                            'views' => '80',
+                            'clicks' => '4',
+                        ]],
+                    ]],
+                ]],
+            ]],
+        );
+
+        ($this->action())(self::COMPANY_ID, $rawDocumentId);
+        $this->em->clear();
+
+        $rawDocument = $this->em->getRepository(AdRawDocument::class)->find($rawDocumentId);
+        self::assertSame(AdRawDocumentStatus::DRAFT, $rawDocument->getStatus());
+
+        /** @var AdDocument[] $documents */
+        $documents = $this->em->getRepository(AdDocument::class)->findBy(['adRawDocumentId' => $rawDocumentId]);
+        self::assertCount(1, $documents);
+        self::assertSame('999999', $documents[0]->getParentSku());
+        self::assertSame('8.40', $documents[0]->getTotalCost());
+        self::assertSame(
+            [],
+            $this->em->getRepository(AdDocumentLine::class)->findBy(['adDocument' => $documents[0]->getId()]),
+        );
+    }
+
     public function testSkipsUnknownSkuAndLeavesRawDocumentInDraft(): void
     {
         $company = $this->seedCompany();
@@ -246,9 +345,14 @@ final class ProcessAdRawDocumentActionTest extends IntegrationTestCase
         return $company;
     }
 
-    private function seedListing(Company $company, string $parentSku, string $size, string $listingId): MarketplaceListing
-    {
-        $listing = new MarketplaceListing($listingId, $company, null, MarketplaceType::OZON);
+    private function seedListing(
+        Company $company,
+        string $parentSku,
+        string $size,
+        string $listingId,
+        MarketplaceType $marketplace = MarketplaceType::OZON,
+    ): MarketplaceListing {
+        $listing = new MarketplaceListing($listingId, $company, null, $marketplace);
         $listing->setMarketplaceSku($parentSku);
         $listing->setSize($size);
         $listing->setPrice('0.00');
@@ -268,6 +372,31 @@ final class ProcessAdRawDocumentActionTest extends IntegrationTestCase
         $rawDocument = new AdRawDocument(
             companyId: self::COMPANY_ID,
             marketplace: MarketplaceType::OZON,
+            reportDate: new \DateTimeImmutable('2026-04-10'),
+            rawPayload: $payload,
+        );
+
+        $this->em->persist($rawDocument);
+        $this->em->flush();
+
+        return $rawDocument->getId();
+    }
+
+    /**
+     * @param list<array<string, mixed>> $expenses
+     * @param list<array<string, mixed>> $statistics
+     */
+    private function seedWbRawDocument(array $expenses, array $statistics): string
+    {
+        $payload = json_encode([
+            'schema' => 'wb-ad-daily-spend-v1',
+            'expenses' => $expenses,
+            'statistics' => $statistics,
+        ], \JSON_THROW_ON_ERROR);
+
+        $rawDocument = new AdRawDocument(
+            companyId: self::COMPANY_ID,
+            marketplace: MarketplaceType::WILDBERRIES,
             reportDate: new \DateTimeImmutable('2026-04-10'),
             rawPayload: $payload,
         );

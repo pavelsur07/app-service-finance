@@ -75,6 +75,16 @@ final class AdRawDocumentTest extends TestCase
         self::assertSame($newPayload, $doc->getRawPayload());
     }
 
+    public function testUpdatePayloadClearsPreviousProcessingError(): void
+    {
+        $doc = AdRawDocumentBuilder::aRawDocument()->asFailed('old error')->build();
+
+        $doc->updatePayload('{"rows":[]}');
+
+        self::assertSame(AdRawDocumentStatus::DRAFT, $doc->getStatus());
+        self::assertNull($doc->getProcessingError());
+    }
+
     public function testMarkFailedFromDraftSetsStatusAndReason(): void
     {
         $doc = AdRawDocumentBuilder::aRawDocument()->build();
@@ -105,8 +115,8 @@ final class AdRawDocumentTest extends TestCase
         $builder = AdRawDocumentBuilder::aRawDocument();
         $doc = match ($terminal) {
             AdRawDocumentStatus::PROCESSED => $builder->asProcessed()->build(),
-            AdRawDocumentStatus::FAILED    => $builder->asFailed()->build(),
-            default                        => throw new \LogicException('unexpected'),
+            AdRawDocumentStatus::FAILED => $builder->asFailed()->build(),
+            default => throw new \LogicException('unexpected'),
         };
 
         $this->expectException(\DomainException::class);
@@ -121,7 +131,7 @@ final class AdRawDocumentTest extends TestCase
     {
         return [
             'already PROCESSED' => [AdRawDocumentStatus::PROCESSED],
-            'already FAILED'    => [AdRawDocumentStatus::FAILED],
+            'already FAILED' => [AdRawDocumentStatus::FAILED],
         ];
     }
 
@@ -132,6 +142,16 @@ final class AdRawDocumentTest extends TestCase
         self::assertNull($doc->getStoragePath());
         self::assertNull($doc->getFileHash());
         self::assertNull($doc->getFileSizeBytes());
+        self::assertNull($doc->getSourceKey());
+    }
+
+    public function testSourceKeyIsStoredForIdempotentImports(): void
+    {
+        $doc = AdRawDocumentBuilder::aRawDocument()
+            ->withSourceKey('wb-ad-spend:connection-1:2026-07-20')
+            ->build();
+
+        self::assertSame('wb-ad-spend:connection-1:2026-07-20', $doc->getSourceKey());
     }
 
     public function testSetFileStorageSetsAllThreeFieldsAtomically(): void

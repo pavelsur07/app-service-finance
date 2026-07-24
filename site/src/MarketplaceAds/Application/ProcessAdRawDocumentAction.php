@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAds\Application;
 
+use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAds\Application\DTO\AdRawEntry;
 use App\MarketplaceAds\Domain\Service\AdCostDistributor;
 use App\MarketplaceAds\Domain\Service\ListingSalesProviderInterface;
@@ -25,6 +26,9 @@ use Doctrine\ORM\EntityManagerInterface;
  * - идемпотентность: повторный запуск удаляет ранее созданные AdDocument и создаёт заново;
  * - частичный успех: если часть SKU не найдена, остальные записи обрабатываются,
  *   raw-документ остаётся в DRAFT для ручного разбора;
+ * - WB: сумма неизвестного nmId сохраняется в AdDocument без строки листинга,
+ *   чтобы campaign totals сходились с фактическим /upd;
+ * - WB __unallocated__: сохраняется без строки листинга и не считается ошибкой маппинга;
  * - статус PROCESSED ставится только при полной обработке без пропусков;
  * - bulk-fetch листингов и продаж: два запроса на весь документ вместо N+1.
  */
@@ -68,7 +72,8 @@ final readonly class ProcessAdRawDocumentAction
         // их тоже исключаем из предзагрузки, чтобы не тянуть лишние данные.
         $validEntries = array_values(array_filter(
             $entries,
-            static fn (AdRawEntry $e) => '' !== $e->campaignName,
+            static fn (AdRawEntry $e) => '' !== $e->campaignName
+                && AdRawEntry::UNALLOCATED_PARENT_SKU !== $e->parentSku,
         ));
 
         $parentSkus = array_values(array_unique(array_map(
@@ -141,13 +146,46 @@ final readonly class ProcessAdRawDocumentAction
                     continue;
                 }
 
+                $adDocument = new AdDocument(
+                    companyId: $companyId,
+                    marketplace: $marketplace,
+                    reportDate: $reportDate,
+                    campaignId: $entry->campaignId,
+                    campaignName: $entry->campaignName,
+                    parentSku: $entry->parentSku,
+                    totalCost: $entry->cost,
+                    totalImpressions: $entry->impressions,
+                    totalClicks: $entry->clicks,
+                    adRawDocumentId: $adRawDocumentId,
+                );
+
+                if (
+                    MarketplaceType::WILDBERRIES === $marketplace
+                    && AdRawEntry::UNALLOCATED_PARENT_SKU === $entry->parentSku
+                ) {
+                    $this->entityManager->persist($adDocument);
+                    ++$processedCount;
+
+                    continue;
+                }
+
                 $listings = $listingsByParentSku[$entry->parentSku] ?? [];
 
                 if ([] === $listings) {
                     $hasErrors = true;
                     ++$skippedEntries;
+                    if (MarketplaceType::WILDBERRIES === $marketplace) {
+                        // WB expense was already reconciled to /upd. Keep it in
+                        // campaign totals even while its nmId is not mapped to
+                        // an internal listing; the missing line remains visible
+                        // through DRAFT status and the warning below.
+                        $this->entityManager->persist($adDocument);
+                        ++$processedCount;
+                    }
                     $this->logger->warning(
-                        'AdRawEntry пропущена: листинги по parentSku не найдены',
+                        MarketplaceType::WILDBERRIES === $marketplace
+                            ? 'WB AdRawEntry сохранена без строки листинга: nmId не найден'
+                            : 'AdRawEntry пропущена: листинги по parentSku не найдены',
                         [
                             'adRawDocumentId' => $adRawDocumentId,
                             'companyId' => $companyId,
@@ -167,18 +205,6 @@ final readonly class ProcessAdRawDocumentAction
                     totalClicks: $entry->clicks,
                 );
 
-                $adDocument = new AdDocument(
-                    companyId: $companyId,
-                    marketplace: $marketplace,
-                    reportDate: $reportDate,
-                    campaignId: $entry->campaignId,
-                    campaignName: $entry->campaignName,
-                    parentSku: $entry->parentSku,
-                    totalCost: $entry->cost,
-                    totalImpressions: $entry->impressions,
-                    totalClicks: $entry->clicks,
-                    adRawDocumentId: $adRawDocumentId,
-                );
                 $this->entityManager->persist($adDocument);
 
                 foreach ($distribution as $line) {

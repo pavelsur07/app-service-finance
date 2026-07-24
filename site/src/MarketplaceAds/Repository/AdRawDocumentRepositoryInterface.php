@@ -15,6 +15,15 @@ interface AdRawDocumentRepositoryInterface
     public function findByIdAndCompany(string $id, string $companyId): ?AdRawDocument;
 
     /**
+     * Finds an idempotent source document within the owning company.
+     */
+    public function findBySourceKey(
+        string $companyId,
+        string $marketplace,
+        string $sourceKey,
+    ): ?AdRawDocument;
+
+    /**
      * Помечает документ FAILED через raw DBAL UPDATE минуя UoW.
      *
      * Идемпотентно: повторный вызов на уже FAILED документе вернёт 0;

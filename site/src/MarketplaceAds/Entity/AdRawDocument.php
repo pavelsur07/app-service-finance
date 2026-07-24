@@ -13,6 +13,10 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: AdRawDocumentRepository::class)]
 #[ORM\Table(name: 'marketplace_ad_raw_documents')]
+#[ORM\UniqueConstraint(
+    name: 'uq_ad_raw_document_company_marketplace_source',
+    columns: ['company_id', 'marketplace', 'source_key'],
+)]
 #[ORM\Index(columns: ['company_id'], name: 'idx_ad_raw_document_company')]
 #[ORM\Index(columns: ['company_id', 'marketplace'], name: 'idx_ad_raw_document_company_marketplace')]
 // UNIQUE (company_id, marketplace, report_date) снят в Version20260424120000:
@@ -40,6 +44,9 @@ class AdRawDocument
 
     #[ORM\Column(type: 'text')]
     private string $rawPayload;
+
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    private ?string $sourceKey;
 
     #[ORM\Column(type: 'string', length: 20, enumType: AdRawDocumentStatus::class, options: ['default' => 'draft'])]
     private AdRawDocumentStatus $status;
@@ -69,16 +76,22 @@ class AdRawDocument
         MarketplaceType $marketplace,
         \DateTimeImmutable $reportDate,
         string $rawPayload,
+        ?string $sourceKey = null,
     ) {
         $this->id = Uuid::uuid7()->toString();
         Assert::uuid($this->id);
         Assert::uuid($companyId);
         Assert::notEmpty($rawPayload);
+        if (null !== $sourceKey) {
+            Assert::notEmpty($sourceKey);
+            Assert::maxLength($sourceKey, 255);
+        }
 
         $this->companyId = $companyId;
         $this->marketplace = $marketplace;
         $this->reportDate = $reportDate;
         $this->rawPayload = $rawPayload;
+        $this->sourceKey = $sourceKey;
         $this->status = AdRawDocumentStatus::DRAFT;
         $this->loadedAt = new \DateTimeImmutable();
         $this->createdAt = new \DateTimeImmutable();
@@ -112,10 +125,7 @@ class AdRawDocument
     public function markFailed(string $reason): void
     {
         if ($this->status->isTerminal()) {
-            throw new \DomainException(sprintf(
-                'Нельзя пометить документ как ошибочный в статусе %s.',
-                $this->status->value,
-            ));
+            throw new \DomainException(sprintf('Нельзя пометить документ как ошибочный в статусе %s.', $this->status->value));
         }
 
         $this->status = AdRawDocumentStatus::FAILED;
@@ -125,8 +135,12 @@ class AdRawDocument
 
     public function updatePayload(string $rawPayload): void
     {
+        Assert::notEmpty($rawPayload);
+
         $this->rawPayload = $rawPayload;
         $this->status = AdRawDocumentStatus::DRAFT;
+        $this->processingError = null;
+        $this->loadedAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
     }
 
@@ -168,6 +182,11 @@ class AdRawDocument
     public function getRawPayload(): string
     {
         return $this->rawPayload;
+    }
+
+    public function getSourceKey(): ?string
+    {
+        return $this->sourceKey;
     }
 
     public function getStatus(): AdRawDocumentStatus

@@ -7,9 +7,8 @@ namespace App\Tests\Unit\MarketplaceAds;
 use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAds\Application\DTO\AdRawEntry;
 use App\MarketplaceAds\Infrastructure\Api\Wildberries\WildberriesAdRawDataParser;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\AbstractLogger;
-use Psr\Log\LoggerInterface;
 
 final class WildberriesAdRawDataParserTest extends TestCase
 {
@@ -20,209 +19,318 @@ final class WildberriesAdRawDataParserTest extends TestCase
         $this->parser = new WildberriesAdRawDataParser();
     }
 
-    private function createTestLogger(): LoggerInterface
-    {
-        return new class extends AbstractLogger {
-            /** @var array<int, array{level: string, message: string, context: array<string, mixed>}> */
-            public array $records = [];
-
-            public function log($level, \Stringable|string $message, array $context = []): void
-            {
-                $this->records[] = ['level' => (string) $level, 'message' => (string) $message, 'context' => $context];
-            }
-        };
-    }
-
-    public function testSupportsWildberriesMarketplace(): void
+    public function testSupportsOnlyWildberries(): void
     {
         self::assertTrue($this->parser->supports(MarketplaceType::WILDBERRIES->value));
         self::assertFalse($this->parser->supports(MarketplaceType::OZON->value));
-        self::assertFalse($this->parser->supports('unknown'));
     }
 
-    public function testParsesSingleAdvert(): void
+    public function testAllocatesAggregatedActualExpenseByNestedSkuWeights(): void
     {
-        $json = json_encode([
-            'adverts' => [
-                ['advertId' => 123, 'advertName' => 'Кампания 1', 'nmId' => 456,
-                 'sum' => 150.50, 'views' => 1000, 'clicks' => 50],
+        $entries = $this->parser->parse($this->payload(
+            expenses: [
+                ['advertId' => '123', 'updSum' => '100.01', 'campName' => 'Campaign'],
+                ['advertId' => '123', 'updSum' => '49.99', 'campName' => 'Campaign'],
             ],
-        ], JSON_THROW_ON_ERROR);
+            statistics: [[
+                'advertId' => '123',
+                'sum' => '9999.99',
+                'days' => [[
+                    'date' => '2026-07-20',
+                    'sum' => '8888.88',
+                    'apps' => [
+                        [
+                            'appType' => '1',
+                            'sum' => '7777.77',
+                            'nms' => [
+                                ['nmId' => '456', 'sum' => '10.00', 'views' => '100', 'clicks' => '5'],
+                                ['nmId' => '789', 'sum' => '20.00', 'views' => '200', 'clicks' => '10'],
+                            ],
+                        ],
+                        [
+                            'appType' => '32',
+                            'sum' => '6666.66',
+                            'nms' => [
+                                ['nmId' => '456', 'sum' => '20.00', 'views' => '50', 'clicks' => '3'],
+                            ],
+                        ],
+                    ],
+                ]],
+            ]],
+        ));
 
-        $result = $this->parser->parse($json);
-
-        self::assertCount(1, $result);
-        self::assertInstanceOf(AdRawEntry::class, $result[0]);
-        self::assertSame('123', $result[0]->campaignId);
-        self::assertSame('Кампания 1', $result[0]->campaignName);
-        self::assertSame('456', $result[0]->parentSku);
-        self::assertSame('150.50', $result[0]->cost);
-        self::assertSame(1000, $result[0]->impressions);
-        self::assertSame(50, $result[0]->clicks);
+        self::assertCount(2, $entries);
+        self::assertEntry($entries[0], '123', 'Campaign', '456', '90.00', 150, 8);
+        self::assertEntry($entries[1], '123', 'Campaign', '789', '60.00', 200, 10);
+        self::assertSame(
+            '150.00',
+            bcadd($entries[0]->cost, $entries[1]->cost, 2),
+            'Only nm-level sums are weights; campaign/day/app totals must not be double-counted.',
+        );
     }
 
-    public function testAggregatesDuplicateAdvertNmIdPairs(): void
+    public function testAddsRoundingResidueToSkuWithLargestWeight(): void
     {
-        // Один nmId (456) в одной кампании (123) встречается дважды — разные группы объявлений.
-        $json = json_encode([
-            'adverts' => [
-                ['advertId' => 123, 'advertName' => 'К1', 'nmId' => 456,
-                 'sum' => 100.25, 'views' => 500, 'clicks' => 20],
-                ['advertId' => 123, 'advertName' => 'К1', 'nmId' => 456,
-                 'sum' => 50.75, 'views' => 300, 'clicks' => 15],
-                ['advertId' => 123, 'advertName' => 'К1', 'nmId' => 999,
-                 'sum' => 25.00, 'views' => 100, 'clicks' => 5],
-            ],
-        ], JSON_THROW_ON_ERROR);
+        $entries = $this->parser->parse($this->payload(
+            expenses: [['advertId' => '1', 'updSum' => '10.01', 'campName' => 'A']],
+            statistics: [[
+                'advertId' => '1',
+                'days' => [[
+                    'apps' => [[
+                        'nms' => [
+                            ['nmId' => '10', 'sum' => '1.00', 'views' => '1', 'clicks' => '0'],
+                            ['nmId' => '20', 'sum' => '2.00', 'views' => '1', 'clicks' => '0'],
+                        ],
+                    ]],
+                ]],
+            ]],
+        ));
 
-        $result = $this->parser->parse($json);
-
-        self::assertCount(2, $result);
-
-        self::assertSame('123', $result[0]->campaignId);
-        self::assertSame('456', $result[0]->parentSku);
-        self::assertSame('151.00', $result[0]->cost);
-        self::assertSame(800, $result[0]->impressions);
-        self::assertSame(35, $result[0]->clicks);
-
-        self::assertSame('123', $result[1]->campaignId);
-        self::assertSame('999', $result[1]->parentSku);
-        self::assertSame('25.00', $result[1]->cost);
+        self::assertSame('3.33', $entries[0]->cost);
+        self::assertSame('6.68', $entries[1]->cost);
+        self::assertSame('10.01', bcadd($entries[0]->cost, $entries[1]->cost, 2));
     }
 
-    public function testSeparatesDifferentAdverts(): void
+    public function testEqualWeightResidueUsesLowestNaturalNmIdDeterministically(): void
     {
-        $json = json_encode([
-            'adverts' => [
-                ['advertId' => 111, 'advertName' => 'A', 'nmId' => 456,
-                 'sum' => 10.00, 'views' => 100, 'clicks' => 1],
-                ['advertId' => 222, 'advertName' => 'B', 'nmId' => 456,
-                 'sum' => 20.00, 'views' => 200, 'clicks' => 2],
-            ],
-        ], JSON_THROW_ON_ERROR);
+        $entries = $this->parser->parse($this->payload(
+            expenses: [['advertId' => '1', 'updSum' => '0.01', 'campName' => 'A']],
+            statistics: [[
+                'advertId' => '1',
+                'days' => [[
+                    'apps' => [[
+                        'nms' => [
+                            ['nmId' => '20', 'sum' => '1', 'views' => '0', 'clicks' => '0'],
+                            ['nmId' => '3', 'sum' => '1', 'views' => '0', 'clicks' => '0'],
+                        ],
+                    ]],
+                ]],
+            ]],
+        ));
 
-        $result = $this->parser->parse($json);
-
-        self::assertCount(2, $result);
-        self::assertSame('111', $result[0]->campaignId);
-        self::assertSame('222', $result[1]->campaignId);
+        self::assertSame('3', $entries[0]->parentSku);
+        self::assertSame('0.01', $entries[0]->cost);
+        self::assertSame('20', $entries[1]->parentSku);
+        self::assertSame('0.00', $entries[1]->cost);
     }
 
-    public function testEmptyAdvertsReturnsEmptyArray(): void
+    public function testAllocatedSkuAmountsAlwaysEqualActualCampaignExpense(): void
     {
-        self::assertSame([], $this->parser->parse('{"adverts": []}'));
-        self::assertSame([], $this->parser->parse('{}'));
-    }
+        for ($scenario = 1; $scenario <= 50; ++$scenario) {
+            $actualMinor = $scenario * 37 + 1;
+            $nms = [];
+            for ($sku = 1; $sku <= 7; ++$sku) {
+                $nms[] = [
+                    'nmId' => (string) (1000 + $sku),
+                    'sum' => (string) (($scenario + $sku) % 11 + 1),
+                    'views' => (string) $sku,
+                    'clicks' => '0',
+                ];
+            }
 
-    public function testCostIsFormattedString(): void
-    {
-        $json = json_encode([
-            'adverts' => [
-                ['advertId' => 1, 'advertName' => 'A', 'nmId' => 2,
-                 'sum' => 1.005, 'views' => 1, 'clicks' => 0],
-            ],
-        ], JSON_THROW_ON_ERROR);
+            $entries = $this->parser->parse($this->payload(
+                expenses: [[
+                    'advertId' => (string) $scenario,
+                    'updSum' => sprintf('%d.%02d', intdiv($actualMinor, 100), $actualMinor % 100),
+                    'campName' => 'Invariant',
+                ]],
+                statistics: [[
+                    'advertId' => (string) $scenario,
+                    'days' => [['apps' => [['nms' => $nms]]]],
+                ]],
+            ));
 
-        $result = $this->parser->parse($json);
+            $sum = '0.00';
+            foreach ($entries as $entry) {
+                $sum = bcadd($sum, $entry->cost, 2);
+            }
 
-        self::assertIsString($result[0]->cost);
-        self::assertMatchesRegularExpression('/^\d+\.\d{2}$/', $result[0]->cost);
+            self::assertSame(
+                sprintf('%d.%02d', intdiv($actualMinor, 100), $actualMinor % 100),
+                $sum,
+                'Allocation invariant failed for scenario '.$scenario,
+            );
+        }
     }
 
     /**
-     * Регрессия на кумулятивную ошибку округления: округление ДО агрегации
-     * дало бы 0.01 + 0.01 + 0.01 = 0.03. Правильный ответ — 0.005 × 3 = 0.015 → 0.02 (HALF-UP).
+     * @param list<array<string, mixed>> $statistics
      */
-    public function testAggregationPreservesPrecision(): void
+    #[DataProvider('missingWeightsProvider')]
+    public function testPreservesActualAsUnallocatedWhenPositiveWeightsAreUnavailable(array $statistics): void
     {
-        $json = json_encode([
-            'adverts' => [
-                ['advertId' => 1, 'advertName' => 'A', 'nmId' => 2,
-                 'sum' => 0.005, 'views' => 1, 'clicks' => 0],
-                ['advertId' => 1, 'advertName' => 'A', 'nmId' => 2,
-                 'sum' => 0.005, 'views' => 1, 'clicks' => 0],
-                ['advertId' => 1, 'advertName' => 'A', 'nmId' => 2,
-                 'sum' => 0.005, 'views' => 1, 'clicks' => 0],
-            ],
-        ], JSON_THROW_ON_ERROR);
+        $entries = $this->parser->parse($this->payload(
+            expenses: [['advertId' => '55', 'updSum' => '42.37', 'campName' => 'No weights']],
+            statistics: $statistics,
+        ));
 
-        $result = $this->parser->parse($json);
-
-        self::assertCount(1, $result);
-        self::assertSame('0.02', $result[0]->cost);
+        self::assertCount(1, $entries);
+        self::assertEntry(
+            $entries[0],
+            '55',
+            'No weights',
+            AdRawEntry::UNALLOCATED_PARENT_SKU,
+            '42.37',
+            0,
+            0,
+        );
     }
 
-    public function testSkipsRowsWithMissingRequiredFields(): void
+    /**
+     * @return iterable<string, array{list<array<string, mixed>>}>
+     */
+    public static function missingWeightsProvider(): iterable
     {
-        $json = json_encode([
-            'adverts' => [
-                ['advertId' => 1, 'advertName' => 'A', 'nmId' => 2,
-                 'sum' => 10.00, 'views' => 100, 'clicks' => 5],
-                ['advertName' => 'no id', 'nmId' => 3,
-                 'sum' => 5.00, 'views' => 50, 'clicks' => 1],
-                ['advertId' => 2, 'advertName' => 'no nmId',
-                 'sum' => 5.00, 'views' => 50, 'clicks' => 1],
-            ],
-        ], JSON_THROW_ON_ERROR);
-
-        $result = $this->parser->parse($json);
-
-        self::assertCount(1, $result);
-        self::assertSame('1', $result[0]->campaignId);
+        yield 'no campaign stats' => [[]];
+        yield 'empty days' => [[['advertId' => '55', 'days' => []]]];
+        yield 'zero nm sum' => [[[
+            'advertId' => '55',
+            'days' => [[
+                'apps' => [[
+                    'nms' => [['nmId' => '99', 'sum' => '0.00', 'views' => '10', 'clicks' => '1']],
+                ]],
+            ]],
+        ]]];
     }
 
-    public function testThrowsOnMalformedJson(): void
+    public function testIgnoresStatisticsForCampaignWithoutActualExpense(): void
     {
-        $this->expectException(\JsonException::class);
-        $this->parser->parse('not a json');
+        $entries = $this->parser->parse($this->payload(
+            expenses: [['advertId' => '1', 'updSum' => '1.00', 'campName' => 'Actual']],
+            statistics: [[
+                'advertId' => '999',
+                'days' => [[
+                    'apps' => [[
+                        'nms' => [['nmId' => '123', 'sum' => '100', 'views' => '1', 'clicks' => '1']],
+                    ]],
+                ]],
+            ]],
+        ));
+
+        self::assertCount(1, $entries);
+        self::assertSame(AdRawEntry::UNALLOCATED_PARENT_SKU, $entries[0]->parentSku);
+        self::assertSame('1.00', $entries[0]->cost);
     }
 
-    public function testLogsWarningForEachSkippedRowAndSummary(): void
+    public function testAggregatesBeforeMoneyRoundingAndSupportsSignedCorrections(): void
     {
-        $logger = $this->createTestLogger();
-        $parser = new WildberriesAdRawDataParser($logger);
-
-        $json = json_encode([
-            'adverts' => [
-                ['advertId' => 1, 'advertName' => 'A', 'nmId' => 2,
-                 'sum' => 10.00, 'views' => 100, 'clicks' => 5],
-                ['advertName' => 'no id', 'nmId' => 3,
-                 'sum' => 5.00, 'views' => 50, 'clicks' => 1],
-                ['advertId' => 2, 'advertName' => 'no nmId',
-                 'sum' => 5.00, 'views' => 50, 'clicks' => 1],
-                'not-an-array',
+        $entries = $this->parser->parse($this->payload(
+            expenses: [
+                ['advertId' => '1', 'updSum' => '-1.005', 'campName' => 'Correction'],
+                ['advertId' => '1', 'updSum' => '-1.005', 'campName' => 'Correction'],
             ],
-        ], JSON_THROW_ON_ERROR);
+            statistics: [[
+                'advertId' => '1',
+                'days' => [[
+                    'apps' => [[
+                        'nms' => [['nmId' => '10', 'sum' => '1', 'views' => '2', 'clicks' => '1']],
+                    ]],
+                ]],
+            ]],
+        ));
 
-        $parser->parse($json);
-
-        $warnings = array_filter($logger->records, static fn(array $r) => $r['level'] === 'warning');
-        self::assertCount(2, $warnings, 'Each skipped row with missing fields must emit a warning');
-
-        $summaries = array_filter($logger->records, static fn(array $r) => $r['level'] === 'info');
-        self::assertCount(1, $summaries, 'Exactly one summary info-log must be emitted when rows were skipped');
-
-        $summary = array_values($summaries)[0];
-        self::assertSame(4, $summary['context']['total_rows']);
-        self::assertSame(1, $summary['context']['skipped_non_array']);
-        self::assertSame(2, $summary['context']['skipped_missing_fields']);
-        self::assertSame(1, $summary['context']['aggregated_entries']);
+        self::assertSame('-2.01', $entries[0]->cost);
     }
 
-    public function testDoesNotLogWhenAllRowsAreValid(): void
+    public function testUsesDeterministicCampaignNameFallback(): void
     {
-        $logger = $this->createTestLogger();
-        $parser = new WildberriesAdRawDataParser($logger);
+        $entries = $this->parser->parse($this->payload(
+            expenses: [['advertId' => '77', 'updSum' => '1.00', 'campName' => '']],
+            statistics: [],
+        ));
 
-        $json = json_encode([
-            'adverts' => [
-                ['advertId' => 1, 'advertName' => 'A', 'nmId' => 2,
-                 'sum' => 10.00, 'views' => 100, 'clicks' => 5],
-            ],
-        ], JSON_THROW_ON_ERROR);
+        self::assertSame('WB campaign 77', $entries[0]->campaignName);
+    }
 
-        $parser->parse($json);
+    public function testEmptyExpenseListProducesNoEntries(): void
+    {
+        self::assertSame([], $this->parser->parse($this->payload([], [])));
+    }
 
-        self::assertSame([], $logger->records);
+    public function testZeroActualExpenseDoesNotCreateAProjectionEntry(): void
+    {
+        self::assertSame([], $this->parser->parse($this->payload(
+            expenses: [['advertId' => '1', 'updSum' => '0.00', 'campName' => 'Zero']],
+            statistics: [[
+                'advertId' => '1',
+                'days' => [['apps' => [['nms' => [[
+                    'nmId' => '999',
+                    'sum' => '1.00',
+                    'views' => '10',
+                    'clicks' => '1',
+                ]]]]]],
+            ]],
+        )));
+    }
+
+    public function testRejectsUnsupportedSchemaAndFloatMoney(): void
+    {
+        $invalidPayloads = [
+            '{"schema":"other","expenses":[],"statistics":[]}',
+            '{"schema":"wb-ad-daily-spend-v1","expenses":[{"advertId":"1","updSum":10.5}],"statistics":[]}',
+            '{"schema":"wb-ad-daily-spend-v1","expenses":[{"advertId":"1","updSum":"1.1234567890123"}],"statistics":[]}',
+        ];
+
+        foreach ($invalidPayloads as $payload) {
+            try {
+                $this->parser->parse($payload);
+                self::fail('Expected invalid WB payload to be rejected.');
+            } catch (\UnexpectedValueException) {
+                self::addToAssertionCount(1);
+            }
+        }
+    }
+
+    public function testRejectsNegativeAnalyticsWeightAndInvalidCounters(): void
+    {
+        foreach ([
+            ['sum' => '-0.01', 'views' => '1', 'clicks' => '0'],
+            ['sum' => '1.00', 'views' => '-1', 'clicks' => '0'],
+        ] as $nm) {
+            $payload = $this->payload(
+                expenses: [['advertId' => '1', 'updSum' => '1.00', 'campName' => 'A']],
+                statistics: [[
+                    'advertId' => '1',
+                    'days' => [['apps' => [['nms' => [['nmId' => '2'] + $nm]]]]],
+                ]],
+            );
+
+            try {
+                $this->parser->parse($payload);
+                self::fail('Expected invalid analytics value to be rejected.');
+            } catch (\UnexpectedValueException) {
+                self::addToAssertionCount(1);
+            }
+        }
+    }
+
+    /**
+     * @param list<array<string, mixed>> $expenses
+     * @param list<array<string, mixed>> $statistics
+     */
+    private function payload(array $expenses, array $statistics): string
+    {
+        return json_encode([
+            'schema' => 'wb-ad-daily-spend-v1',
+            'expenses' => $expenses,
+            'statistics' => $statistics,
+        ], \JSON_THROW_ON_ERROR);
+    }
+
+    private static function assertEntry(
+        AdRawEntry $entry,
+        string $campaignId,
+        string $campaignName,
+        string $parentSku,
+        string $cost,
+        int $impressions,
+        int $clicks,
+    ): void {
+        self::assertSame($campaignId, $entry->campaignId);
+        self::assertSame($campaignName, $entry->campaignName);
+        self::assertSame($parentSku, $entry->parentSku);
+        self::assertSame($cost, $entry->cost);
+        self::assertSame($impressions, $entry->impressions);
+        self::assertSame($clicks, $entry->clicks);
     }
 }

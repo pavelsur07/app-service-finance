@@ -400,6 +400,9 @@ services:
     App\MarketplaceAds\Domain\Service\ListingSalesProviderInterface:
         '@App\MarketplaceAds\Infrastructure\ListingSalesProviderMarketplace'
 
+    App\MarketplaceAds\Application\LoadWbAdSpendDayActionInterface:
+        '@App\MarketplaceAds\Application\LoadWbAdSpendDayAction'
+
     # Парсеры raw-данных рекламных отчётов.
     #
     # OzonAdRawDataParser (JSON) остаётся зарегистрирован как обычный сервис,
@@ -426,6 +429,8 @@ services:
         tags: ['marketplace_ads.platform_client']
 
     App\MarketplaceAds\Infrastructure\Api\Wildberries\WildberriesAdClient:
+        arguments:
+            $logger: '@monolog.logger.marketplace_ads'
         tags: ['marketplace_ads.platform_client']
 
     # Обработка AdRawDocument → AdDocument + AdDocumentLine
