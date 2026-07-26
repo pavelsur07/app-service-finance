@@ -34,7 +34,6 @@
       </button>
       <div id="admin-sidebar-marketplace" class="sb-sub">
         <a class="sb-item {% if app.request.get('_route') == 'admin_marketplace_mapping_errors' %}is-active{% endif %}" href="{{ path('admin_marketplace_mapping_errors') }}"><span class="ico-dot"></span><span class="lbl">Неизвестные затраты</span></a>
-        <a class="sb-item {% if app.request.get('_route') starts with 'admin_marketplace_reprocess_' %}is-active{% endif %}" href="{{ path('admin_marketplace_reprocess_index') }}"><span class="ico-dot"></span><span class="lbl">Переобработка затрат</span></a>
       </div>
 
       <button class="sb-item {% if app.request.get('_route') starts with 'admin_ingestion_' %}is-active{% endif %}" type="button" data-admin-sidebar-toggle="ingestion" aria-expanded="true" aria-controls="admin-sidebar-ingestion">
