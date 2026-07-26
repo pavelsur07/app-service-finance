@@ -20,11 +20,6 @@
         <span class="lbl">Telegram · Боты</span>
       </a>
 
-      <a class="sb-item {% if app.request.get('_route') starts with 'admin_analytics_pl_recalc_' %}is-active{% endif %}" href="{{ path('admin_analytics_pl_recalc_form') }}">
-        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="5" r="2"></circle><circle cx="19" cy="12" r="2"></circle><circle cx="12" cy="19" r="2"></circle><path d="M7 12h5M12 7v5M14 13l4 4"></path></svg>
-        <span class="lbl">Analytics · PL Recalc</span>
-      </a>
-
       <a class="sb-item {% if app.request.get('_route') starts with 'admin_billing_' %}is-active{% endif %}" href="{{ path('admin_billing_index') }}">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14l3-2 3 2 3-2 3 2 3-2V8z"></path><path d="M8 9h6M8 13h6M8 17h4"></path></svg>
         <span class="lbl">Billing</span>
