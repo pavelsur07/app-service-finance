@@ -968,6 +968,7 @@ Docker process/status checks through `codex-docker-ps`.
 Messenger queue stats through `codex-console messenger:stats`.
 Marketplace category status through `codex-console app:ingestion:marketplace-categories:status`.
 Read-only Ozon preview/verification commands through `codex-console`.
+SMTP liveness through `codex-console app:mailer:healthcheck` — SMTP handshake with AUTH, sends no email and mutates no data. The command has no mutating mode and no flags. Note that a failure logs `error` and opens a GlitchTip issue, so a manual run against dead mail raises an alert.
 Read-only SQL through `codex-psql-ro`, which uses the read-only `codex_ro` database role.
 
 Production commands that mutate data, process queues, call external APIs, or can change application state require explicit owner approval immediately before execution:
