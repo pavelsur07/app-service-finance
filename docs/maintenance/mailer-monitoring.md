@@ -52,6 +52,10 @@ traefik. Поэтому мониторинг почты — отдельный �
 
 - URL в `GLITCHTIP_SCHEDULER_HEARTBEAT_URL` (блок `scheduler` в `docker-compose.prod.yml`).
   Пусто = выключено.
+- **Заводится как GitHub secret, не как host-env.** Деплой (`.github/workflows/deploy.yml`)
+  прокидывает переменные в ssh-сессию через `export` из `secrets.*`; неинтерактивный shell
+  профиль хоста не читает, поэтому переменная, положенная только в host-env, до compose не
+  доедет и heartbeat молча останется выключенным.
 - `wget`, а не `curl`: busybox гарантирован в alpine-образе, наличие `curl` в runtime-стадии
   `site/docker/production/php-cli/Dockerfile` — нет.
 
@@ -63,7 +67,8 @@ traefik. Поэтому мониторинг почты — отдельный �
 2. **Alert rule:** условие «an event's level equals error», порог **1 событие**, действие —
    email на внешний ящик. Порог 2 при часовом интервале не сработает никогда.
 3. **Heartbeat monitor:** тип Heartbeat, interval **2700 c (45 мин)** при кроне `*/30` —
-   запас на джиттер, иначе одно опоздание даёт ложный алерт.
+   запас на джиттер, иначе одно опоздание даёт ложный алерт. Полученный URL завести
+   GitHub secret'ом `GLITCHTIP_SCHEDULER_HEARTBEAT_URL` и передеплоить.
 
 ## Что делать при `Mailer healthcheck FAILED`
 
