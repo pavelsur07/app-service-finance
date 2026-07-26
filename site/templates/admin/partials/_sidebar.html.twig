@@ -45,13 +45,6 @@
       <div id="admin-sidebar-ingestion" class="sb-sub">
         <a class="sb-item {% if app.request.get('_route') starts with 'admin_ingestion_external_categories_' %}is-active{% endif %}" href="{{ path('admin_ingestion_external_categories_index') }}"><span class="ico-dot"></span><span class="lbl">Внешние категории</span></a>
       </div>
-
-      <div class="sb-group-title">Прочее</div>
-
-      <a class="sb-item {% if app.request.get('_route') starts with 'admin_demo' %}is-active{% endif %}" href="{{ path('admin_demo') }}">
-        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"></path><circle cx="10" cy="7" r="4"></circle></svg>
-        <span class="lbl">Demo</span>
-      </a>
     </div>
 
     <div class="sb-foot">
