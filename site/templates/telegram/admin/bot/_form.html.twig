@@ -1,0 +1,47 @@
+{{ form_start(form) }}
+<div class="card" style="max-width:640px;">
+  {% if form.vars.errors|length > 0 %}
+    <div class="alert alert--danger" role="alert" style="margin-bottom:var(--s-4);">
+      <div class="a-body">
+        <div class="a-text">{{ form_errors(form) }}</div>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="wz-form-grid">
+    <div class="form-field wz-span-all">
+      {{ form_label(form.token, 'Токен', { label_attr: { class: 'form-label' } }) }}
+      {{ form_widget(form.token, { attr: { class: 'input' ~ (form.token.vars.errors|length > 0 ? ' is-error') } }) }}
+      {{ form_errors(form.token) }}
+    </div>
+    <div class="form-field">
+      {{ form_label(form.username, 'Имя пользователя', { label_attr: { class: 'form-label' } }) }}
+      {{ form_widget(form.username, { attr: { class: 'input' ~ (form.username.vars.errors|length > 0 ? ' is-error') } }) }}
+      {{ form_errors(form.username) }}
+    </div>
+    <div class="form-field">
+      {{ form_label(form.webhookUrl, 'URL вебхука', { label_attr: { class: 'form-label' } }) }}
+      {{ form_widget(form.webhookUrl, { attr: { class: 'input' ~ (form.webhookUrl.vars.errors|length > 0 ? ' is-error') } }) }}
+      {{ form_errors(form.webhookUrl) }}
+    </div>
+    <div class="form-field wz-span-all">
+      <span class="form-label">Статус</span>
+      <label class="checkbox-label">
+        <input type="checkbox" class="checkbox"
+               id="{{ form.isActive.vars.id }}"
+               name="{{ form.isActive.vars.full_name }}"
+               value="1"
+               {% if form.isActive.vars.checked %}checked{% endif %}>
+        <span>Активен</span>
+      </label>
+    </div>
+  </div>
+
+  {{ form_widget(form._token) }}
+
+  <div class="wz-form-actions">
+    <button type="submit" class="btn btn-md btn-primary">Сохранить</button>
+    <a href="{{ path('admin_telegram_bot_index') }}" class="btn btn-md btn-secondary">Отмена</a>
+  </div>
+</div>
+{{ form_end(form, { render_rest: false }) }}
