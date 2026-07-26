@@ -124,3 +124,13 @@
 # Каждые 5 минут: синтетическая проверка живости объектного хранилища (write→read→delete).
 # Сбой → logger->error → GlitchTip. Успех печатает "OK (N ms)" в docker logs (heartbeat).
 */5 * * * * cd /app && php bin/console app:storage:healthcheck --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+
+# Раз в час: живость SMTP (connect→EHLO→STARTTLS→AUTH→QUIT, письмо не отправляется).
+# Сбой → logger->error → GlitchTip + exit 1. Успех печатает "OK (N ms)" в docker logs.
+# Минута 7 — свободный слот: :00/:05/:10/:15/:20/:25/:30/:40/:45 уже заняты.
+7 * * * * cd /app && php bin/console app:mailer:healthcheck --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+
+# Dead man's switch: пинг heartbeat-монитора GlitchTip. Молчание → монитор сам заводит issue.
+# Отдельно от почтовой пробы: ловит смерть supercronic/контейнера, т.е. немоту ВСЕХ кронов.
+# Пустой GLITCHTIP_SCHEDULER_HEARTBEAT_URL = выключено. wget, а не curl: busybox есть в alpine всегда.
+*/30 * * * * [ -n "$GLITCHTIP_SCHEDULER_HEARTBEAT_URL" ] && wget -qO /dev/null --timeout=10 "$GLITCHTIP_SCHEDULER_HEARTBEAT_URL" || true
