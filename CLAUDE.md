@@ -355,6 +355,7 @@ Read-only проверки можно выполнять после запрос
 - Messenger stats через `codex-console messenger:stats`.
 - Marketplace category status через `codex-console app:ingestion:marketplace-categories:status`.
 - Ozon preview/verification через `codex-console`.
+- Живость SMTP через `codex-console app:mailer:healthcheck` — SMTP handshake с AUTH, письмо не отправляется, данные не меняются. Мутирующего режима и флагов у команды нет. Учитывать: сбой пишет `error` и заводит issue в GlitchTip, поэтому ручной прогон при мёртвой почте создаёт алерт.
 - Read-only SQL через `codex-psql-ro` и роль БД `codex_ro`.
 
 Перед выполнением команд, которые меняют данные, обрабатывают очереди, вызывают внешние API или меняют состояние приложения, нужно явное подтверждение Владельца непосредственно перед запуском:
