@@ -38,6 +38,9 @@ final class CompanyPersistenceTest extends IntegrationTestCase
 
     public function testGetAllActiveCompanyIdsReadsExistingCompaniesTable(): void
     {
+        // Проверяем глобальный список без fixtures; DAMA откатит TRUNCATE и связанные CASCADE-изменения.
+        $this->connection->executeStatement('TRUNCATE companies CASCADE');
+
         $userA = UserBuilder::aUser()
             ->withId('22222222-2222-2222-2222-000000000301')
             ->withEmail('company-a@example.test')

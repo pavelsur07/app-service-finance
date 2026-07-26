@@ -21,6 +21,7 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
 {
     private const COMPANY_ID = '11111111-1111-1111-1111-a90000000001';
     private const OWNER_ID = '22222222-2222-2222-2222-a90000000001';
+    private const OZON_CONNECTION_ID = '33333333-3333-4333-8333-a90000000002';
     private const WB_CONNECTION_ID = '33333333-3333-4333-8333-a90000000001';
 
     public function testValidCsrfRequestsSnapshotAndRedirectsWithSuccessFlash(): void
@@ -29,7 +30,7 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
         $this->resetDb();
 
         [$owner, $company] = $this->seedOwnerAndCompany('inventory-request-ok@example.test');
-        $this->persistActiveOzonConnection($company->getId(), $company);
+        $this->persistActiveOzonConnection($company);
         $this->login($client, $owner, self::COMPANY_ID);
 
         $token = $this->fetchRequestToken($client);
@@ -53,7 +54,7 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
         $this->resetDb();
 
         [$owner, $company] = $this->seedOwnerAndCompany('inventory-request-csrf@example.test');
-        $this->persistActiveOzonConnection($company->getId(), $company);
+        $this->persistActiveOzonConnection($company);
         $this->login($client, $owner, self::COMPANY_ID);
 
         $client->request('POST', '/inventory/snapshots/request', ['_token' => 'invalid-token']);
@@ -92,7 +93,7 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
         $this->resetDb();
 
         [$owner, $company] = $this->seedOwnerAndCompany('inventory-request-already-running@example.test');
-        $this->persistActiveOzonConnection($company->getId(), $company);
+        $this->persistActiveOzonConnection($company);
         $this->persistActiveSession();
         $this->login($client, $owner, self::COMPANY_ID);
 
@@ -212,7 +213,9 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
         $crawler = $client->request('GET', '/inventory/snapshots');
         self::assertResponseIsSuccessful();
 
-        return (string) $crawler->filter('input[name="_token"]')->attr('value');
+        return (string) $crawler
+            ->filter('form[action="/inventory/snapshots/request"] input[name="_token"]')
+            ->attr('value');
     }
 
     private function fetchWbRequestToken(KernelBrowser $client): string
@@ -225,10 +228,10 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
             ->attr('value');
     }
 
-    private function persistActiveOzonConnection(string $connectionId, \App\Company\Entity\Company $company): void
+    private function persistActiveOzonConnection(\App\Company\Entity\Company $company): void
     {
         $connection = new MarketplaceConnection(
-            id: $connectionId,
+            id: self::OZON_CONNECTION_ID,
             company: $company,
             marketplace: MarketplaceType::OZON,
             connectionType: MarketplaceConnectionType::SELLER,
