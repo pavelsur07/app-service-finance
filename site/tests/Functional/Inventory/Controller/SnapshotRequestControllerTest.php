@@ -32,7 +32,7 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
         $this->persistActiveOzonConnection($company->getId(), $company);
         $this->login($client, $owner, self::COMPANY_ID);
 
-        $token = $this->fetchRequestToken($client);
+        $token = $this->fetchOzonRequestToken($client);
 
         $client->request('POST', '/inventory/snapshots/request', ['_token' => $token]);
 
@@ -74,7 +74,7 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
         [$owner] = $this->seedOwnerAndCompany('inventory-request-no-connection@example.test');
         $this->login($client, $owner, self::COMPANY_ID);
 
-        $token = $this->fetchRequestToken($client);
+        $token = $this->fetchOzonRequestToken($client);
 
         $client->request('POST', '/inventory/snapshots/request', ['_token' => $token]);
 
@@ -96,7 +96,7 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
         $this->persistActiveSession();
         $this->login($client, $owner, self::COMPANY_ID);
 
-        $token = $this->fetchRequestToken($client);
+        $token = $this->fetchOzonRequestToken($client);
 
         $client->request('POST', '/inventory/snapshots/request', ['_token' => $token]);
 
@@ -207,12 +207,15 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
         $this->setClientSessionValue($client, 'active_company_id', $companyId);
     }
 
-    private function fetchRequestToken(KernelBrowser $client): string
+    private function fetchOzonRequestToken(KernelBrowser $client): string
     {
         $crawler = $client->request('GET', '/inventory/snapshots');
         self::assertResponseIsSuccessful();
 
-        return (string) $crawler->filter('input[name="_token"]')->attr('value');
+        $tokenNode = $crawler->filter('form[action="/inventory/snapshots/request"] input[name="_token"]');
+        self::assertCount(1, $tokenNode);
+
+        return (string) $tokenNode->attr('value');
     }
 
     private function fetchWbRequestToken(KernelBrowser $client): string
@@ -220,9 +223,10 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
         $crawler = $client->request('GET', '/inventory/snapshots');
         self::assertResponseIsSuccessful();
 
-        return (string) $crawler
-            ->filter('form[action="/inventory/snapshots/request/wildberries"] input[name="_token"]')
-            ->attr('value');
+        $tokenNode = $crawler->filter('form[action="/inventory/snapshots/request/wildberries"] input[name="_token"]');
+        self::assertCount(1, $tokenNode);
+
+        return (string) $tokenNode->attr('value');
     }
 
     private function persistActiveOzonConnection(string $connectionId, \App\Company\Entity\Company $company): void
