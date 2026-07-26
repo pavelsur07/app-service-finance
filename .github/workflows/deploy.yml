@@ -200,6 +200,10 @@ jobs:
                     export HEALTH_CHECK_TOKEN="${{ secrets.HEALTH_CHECK_TOKEN }}"
                     export APP_OBJECT_STORAGE_S3_ACCESS_KEY="${{ secrets.APP_OBJECT_STORAGE_S3_ACCESS_KEY }}"
                     export APP_OBJECT_STORAGE_S3_SECRET_KEY="${{ secrets.APP_OBJECT_STORAGE_S3_SECRET_KEY }}"
+                    # Heartbeat-монитор GlitchTip для scheduler. Секрет не заведён → пусто →
+                    # строка крона выключает себя сама по [ -n "$..." ].
+                    # См. docs/maintenance/mailer-monitoring.md
+                    export GLITCHTIP_SCHEDULER_HEARTBEAT_URL="${{ secrets.GLITCHTIP_SCHEDULER_HEARTBEAT_URL }}"
 
                     echo "🚚 Скачивание свежих образов из GHCR"
                     docker compose -f docker-compose.prod.yml pull land site site-php-fpm site-php-cli
