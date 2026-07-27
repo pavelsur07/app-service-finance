@@ -16,7 +16,15 @@ final class DbReset
     {
         $connection = $em->getConnection();
         $schemaManager = $connection->createSchemaManager();
-        $tableNames = $schemaManager->listTableNames();
+        $tableNames = array_values(array_filter(
+            $schemaManager->listTableNames(),
+            // Служебная история должна переживать reset, иначе следующий прогон повторит все миграции.
+            static function (string $tableName): bool {
+                $parts = explode('.', $tableName);
+
+                return 'doctrine_migration_versions' !== trim($parts[array_key_last($parts)], '"');
+            },
+        ));
 
         if ([] === $tableNames) {
             return;
@@ -25,7 +33,10 @@ final class DbReset
         // listTableNames() возвращает зарезервированные имена уже в кавычках ("user") —
         // снимаем их перед повторным квотированием, иначе получится ""user"".
         $quotedTables = array_map(
-            static fn (string $t): string => $connection->quoteIdentifier(trim($t, '"')),
+            static fn (string $tableName): string => implode('.', array_map(
+                static fn (string $part): string => $connection->quoteIdentifier(trim($part, '"')),
+                explode('.', $tableName),
+            )),
             $tableNames,
         );
         $tableList = implode(', ', $quotedTables);

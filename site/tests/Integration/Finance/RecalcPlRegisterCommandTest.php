@@ -85,6 +85,9 @@ final class RecalcPlRegisterCommandTest extends IntegrationTestCase
 
     public function testEmptyDatabaseExitsCleanly(): void
     {
+        // Сценарий требует пустого списка компаний; DAMA откатит TRUNCATE и связанные CASCADE-изменения.
+        $this->connection->executeStatement('TRUNCATE companies CASCADE');
+
         $tester = $this->makeCommandTester();
         $exit = $tester->execute([
             '--from' => '2026-03-01',
