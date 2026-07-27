@@ -3,6 +3,7 @@
 namespace App\Cash\Controller\Transaction;
 
 use App\Cash\DTO\CashTransactionDTO;
+use App\Cash\DTO\CashTransactionFilters;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleApplyMode;
@@ -48,17 +49,7 @@ class CashTransactionController extends AbstractController
     ): Response {
         $company = $this->companyService->getActiveCompany();
 
-        $filters = [
-            'dateFrom' => $request->query->get('dateFrom'),
-            'dateTo' => $request->query->get('dateTo'),
-            'accountId' => $request->query->get('accountId'),
-            'categoryId' => $request->query->get('categoryId'),
-            'counterpartyId' => $request->query->get('counterpartyId'),
-            'direction' => $request->query->get('direction'),
-            'amountMin' => $request->query->get('amountMin'),
-            'amountMax' => $request->query->get('amountMax'),
-            'q' => $request->query->get('q'),
-        ];
+        $filters = CashTransactionFilters::fromQuery($request->query->all());
 
         $page = max(1, (int) $request->query->get('page', 1));
         $limit = 20;
