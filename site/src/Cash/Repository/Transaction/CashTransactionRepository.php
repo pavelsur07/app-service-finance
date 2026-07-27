@@ -9,6 +9,7 @@ use App\Cash\Enum\Transaction\CashflowFlowKind;
 use App\Company\Entity\Company;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\Query;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
 use Pagerfanta\Pagerfanta;
@@ -252,46 +253,91 @@ class CashTransactionRepository extends ServiceEntityRepository
         int $page,
         int $perPage,
     ): Pagerfanta {
+        $pager = new Pagerfanta(new QueryAdapter($this->createFilteredQueryBuilder($company, $filters)));
+        $pager->setMaxPerPage($perPage);
+        $pager->setAllowOutOfRangePages(true);
+        $pager->setCurrentPage($page);
+
+        return $pager;
+    }
+
+    /**
+     * Тот же набор фильтров, что и на экране, но без пагинации — для экспорта.
+     *
+     * Отдаём только нужные колонки: сущности не гидрируются, identity map не растёт,
+     * поэтому память не зависит от размера выгрузки.
+     *
+     * @param array<string, string|null> $filters
+     *
+     * @return iterable<array{
+     *     occurredAt: \DateTimeImmutable,
+     *     direction: CashDirection,
+     *     amount: string,
+     *     accountName: string,
+     *     categoryName: ?string,
+     *     description: ?string,
+     *     counterpartyName: ?string
+     * }>
+     */
+    public function iterateByCompanyWithFilters(Company $company, array $filters): iterable
+    {
+        return $this->createFilteredQueryBuilder($company, $filters)
+            ->select(
+                't.occurredAt AS occurredAt',
+                't.direction AS direction',
+                't.amount AS amount',
+                'moneyAccount.name AS accountName',
+                'cashflowCategory.name AS categoryName',
+                't.description AS description',
+                'counterparty.name AS counterpartyName',
+            )
+            ->innerJoin('t.moneyAccount', 'moneyAccount')
+            ->leftJoin('t.cashflowCategory', 'cashflowCategory')
+            ->leftJoin('t.counterparty', 'counterparty')
+            ->getQuery()
+            ->toIterable([], Query::HYDRATE_ARRAY);
+    }
+
+    /**
+     * @param array<string, string|null> $filters
+     */
+    private function createFilteredQueryBuilder(Company $company, array $filters): QueryBuilder
+    {
         $qb = $this->createQueryBuilder('t')
             ->andWhere('t.company = :company')
             ->andWhere('t.deletedAt IS NULL')
             ->setParameter('company', $company)
             ->orderBy('t.occurredAt', 'DESC');
 
-        if ($filters['dateFrom']) {
+        if ($filters['dateFrom'] ?? null) {
             $qb->andWhere('t.occurredAt >= :df')->setParameter('df', new \DateTimeImmutable($filters['dateFrom']));
         }
-        if ($filters['dateTo']) {
+        if ($filters['dateTo'] ?? null) {
             $qb->andWhere('t.occurredAt <= :dt')->setParameter('dt', new \DateTimeImmutable($filters['dateTo']));
         }
-        if ($filters['accountId']) {
+        if ($filters['accountId'] ?? null) {
             $qb->andWhere('t.moneyAccount = :acc')->setParameter('acc', $filters['accountId']);
         }
-        if ($filters['categoryId']) {
+        if ($filters['categoryId'] ?? null) {
             $qb->andWhere('t.cashflowCategory = :cat')->setParameter('cat', $filters['categoryId']);
         }
-        if ($filters['counterpartyId']) {
+        if ($filters['counterpartyId'] ?? null) {
             $qb->andWhere('t.counterparty = :cp')->setParameter('cp', $filters['counterpartyId']);
         }
-        if ($filters['direction']) {
+        if ($filters['direction'] ?? null) {
             $qb->andWhere('t.direction = :dir')->setParameter('dir', $filters['direction']);
         }
-        if ($filters['amountMin']) {
+        if ($filters['amountMin'] ?? null) {
             $qb->andWhere('t.amount >= :amin')->setParameter('amin', $filters['amountMin']);
         }
-        if ($filters['amountMax']) {
+        if ($filters['amountMax'] ?? null) {
             $qb->andWhere('t.amount <= :amax')->setParameter('amax', $filters['amountMax']);
         }
-        if ($filters['q']) {
+        if ($filters['q'] ?? null) {
             $qb->andWhere('t.description LIKE :q')->setParameter('q', '%'.$filters['q'].'%');
         }
 
-        $pager = new Pagerfanta(new QueryAdapter($qb));
-        $pager->setMaxPerPage($perPage);
-        $pager->setAllowOutOfRangePages(true);
-        $pager->setCurrentPage($page);
-
-        return $pager;
+        return $qb;
     }
 
     /**

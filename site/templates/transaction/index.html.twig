@@ -46,6 +46,12 @@
                 <i class="ti ti-filter"></i>
                 Фильтры
             </a>
+            <a href="{{ path('cash_transaction_export', app.request.query.all) }}"
+               class="btn btn-outline-secondary"
+               data-testid="btn-export-xls">
+                <i class="ti ti-download me-1"></i>
+                Экспорт XLS
+            </a>
             <a href="{{ path('cash_transaction_new', app.request.query.all) }}" class="btn btn-primary">Добавить</a>
             <a href="/cash/import/bank1c"
                class="btn btn-primary"
