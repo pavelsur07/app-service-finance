@@ -1,13 +1,18 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Импорт из файла{% endblock %}
+{% block title %}Импорт операций ДДС из файла XLS{% endblock %}
 
 {% block body %}
     <div class="page-header d-print-none">
         <div class="container-xl">
             <div class="row g-2 align-items-center">
                 <div class="col">
-                    <h2 class="page-title">Импорт операций ДДС из файла</h2>
+                    <h2 class="page-title">Импорт операций ДДС из файла XLS</h2>
+                </div>
+                <div class="col-auto ms-auto">
+                    <a href="{{ path('cash_file_import_template') }}"
+                       class="btn btn-outline-secondary"
+                       data-testid="btn-import-template">Шаблон</a>
                 </div>
             </div>
         </div>

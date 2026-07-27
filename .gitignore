@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # These are some examples of commonly ignored file patterns.
 # You should customize this list as applicable to your project.
 # Learn more about .gitignore:
@@ -49,11 +48,10 @@ Thumbs.db
 *.mov
 *.wmv
 
-=======
-###> symfony/framework-bundle ###
->>>>>>> Start
 /shopingo/
 
-.env.prod
-!/.env.prod
-!/.env.prod
+# Local Claude Code skills
+.claude/skills/
+
+# Черновые выгрузки банк-клиента и выписки: содержат номера счетов, ИНН, ФИО
+docs/temp/
