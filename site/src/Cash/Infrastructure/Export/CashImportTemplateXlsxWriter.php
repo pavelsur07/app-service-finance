@@ -31,12 +31,17 @@ final readonly class CashImportTemplateXlsxWriter
 
     /**
      * Строки-примеры показывают формат даты и то, что сумма идёт ровно в одну
-     * из колонок приход/расход. Пользователь удаляет их перед импортом.
+     * из колонок приход/расход. Живут на отдельном листе: импорт и превью
+     * читают только первый лист, поэтому забытые примеры не попадут в ДДС.
      */
     private const EXAMPLE_ROWS = [
-        ['01.02.2026', '125', 15000.0, null, 'ООО «Пример»', 'Пример: оплата от покупателя — удалите строку перед импортом'],
-        ['02.02.2026', '126', null, 4300.5, '', 'Пример: оплата поставщику — удалите строку перед импортом'],
+        ['01.02.2026', '125', 15000.0, null, 'ООО «Пример»', 'Пример: оплата от покупателя'],
+        ['02.02.2026', '126', null, 4300.5, '', 'Пример: оплата поставщику'],
     ];
+
+    private const SHEET_DATA = 'Операции ДДС';
+
+    private const SHEET_EXAMPLE = 'Пример заполнения';
 
     private const FORMAT_MONEY = '#,##0.00';
 
@@ -50,9 +55,11 @@ final readonly class CashImportTemplateXlsxWriter
         $writer->openToFile($outputPath);
 
         try {
-            $writer->getCurrentSheet()->setName('Операции ДДС');
+            $writer->getCurrentSheet()->setName(self::SHEET_DATA);
             $writer->addRow($this->buildHeaderRow());
 
+            $writer->addNewSheetAndMakeItCurrent()->setName(self::SHEET_EXAMPLE);
+            $writer->addRow($this->buildHeaderRow());
             foreach (self::EXAMPLE_ROWS as $row) {
                 $writer->addRow($this->buildExampleRow($row, $moneyStyle));
             }

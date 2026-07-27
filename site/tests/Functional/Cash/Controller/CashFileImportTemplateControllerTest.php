@@ -46,11 +46,20 @@ final class CashFileImportTemplateControllerTest extends WebTestCaseBase
         self::assertStringStartsWith('attachment', $disposition);
         self::assertStringContainsString('cash-import-template.xlsx', $disposition);
 
-        $rows = $this->readXlsxRows((string) $client->getInternalResponse()->getContent());
+        $sheets = $this->readXlsxSheets((string) $client->getInternalResponse()->getContent());
 
-        self::assertSame(CashImportTemplateXlsxWriter::HEADERS, $rows[0]);
+        $dataSheet = $sheets['Операции ДДС'] ?? null;
+        self::assertNotNull($dataSheet, 'Первым листом идёт лист для данных');
+        self::assertSame(CashImportTemplateXlsxWriter::HEADERS, $dataSheet[0]);
+        self::assertCount(
+            1,
+            $dataSheet,
+            'На импортируемом листе только шапка: импорт читает первый лист целиком, забытая строка-пример стала бы операцией ДДС',
+        );
 
-        $mapping = (new HeaderAutoMapper())->suggest($rows[0]);
+        self::assertCount(3, $sheets['Пример заполнения'] ?? [], 'Примеры живут на отдельном листе');
+
+        $mapping = (new HeaderAutoMapper())->suggest($dataSheet[0]);
         self::assertSame([
             'date' => 'Дата операции',
             'inflow' => 'Приход',
@@ -82,9 +91,9 @@ final class CashFileImportTemplateControllerTest extends WebTestCaseBase
     }
 
     /**
-     * @return list<list<mixed>> первая строка — шапка
+     * @return array<string, list<list<mixed>>> строки по имени листа
      */
-    private function readXlsxRows(string $content): array
+    private function readXlsxSheets(string $content): array
     {
         $path = tempnam(sys_get_temp_dir(), 'cash_import_template_test_');
         self::assertNotFalse($path);
@@ -94,8 +103,9 @@ final class CashFileImportTemplateControllerTest extends WebTestCaseBase
         $reader->open($path);
 
         try {
-            $rows = [];
+            $sheets = [];
             foreach ($reader->getSheetIterator() as $sheet) {
+                $rows = [];
                 foreach ($sheet->getRowIterator() as $row) {
                     $rows[] = array_map(
                         static fn ($cell) => $cell->getValue(),
@@ -103,13 +113,13 @@ final class CashFileImportTemplateControllerTest extends WebTestCaseBase
                     );
                 }
 
-                break; // только первый лист
+                $sheets[$sheet->getName()] = $rows;
             }
         } finally {
             $reader->close();
             unlink($path);
         }
 
-        return $rows;
+        return $sheets;
     }
 }
