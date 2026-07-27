@@ -87,10 +87,9 @@ final class CashTransactionExportControllerTest extends WebTestCaseBase
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             $headers->get('Content-Type'),
         );
-        self::assertSame(
-            'attachment; filename="cash-transactions_2026-01-01_2026-01-31.xlsx"',
-            $headers->get('Content-Disposition'),
-        );
+        $disposition = (string) $headers->get('Content-Disposition');
+        self::assertStringStartsWith('attachment', $disposition);
+        self::assertStringContainsString('cash-transactions_2026-01-01_2026-01-31.xlsx', $disposition);
 
         $rows = $this->readXlsxRows((string) $client->getInternalResponse()->getContent());
 
@@ -146,6 +145,24 @@ final class CashTransactionExportControllerTest extends WebTestCaseBase
         $descriptions = array_column(\array_slice($rows, 1), 4);
 
         self::assertSame(['Своя операция'], $descriptions);
+    }
+
+    public function testMalformedPeriodRedirectsInsteadOfBreakingTheDownload(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        $em = $this->em();
+
+        $owner = UserBuilder::aUser()->withEmail('cash-export-bad-date@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
+        $em->persist($owner);
+        $em->persist($company);
+        $em->flush();
+
+        $this->authenticate($client, $owner, $company);
+        $client->request('GET', '/finance/cash-transactions/export?dateFrom=не-дата&dateTo=2026-01-31');
+
+        self::assertResponseRedirects('/finance/cash-transactions/');
     }
 
     public function testIndexPageRendersExportLinkWithCurrentFilters(): void

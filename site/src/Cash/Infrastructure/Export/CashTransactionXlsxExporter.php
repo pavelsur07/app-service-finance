@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Cash\Infrastructure\Export;
 
-use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Company\Entity\Company;
@@ -56,10 +55,8 @@ final readonly class CashTransactionXlsxExporter
             $writer->getCurrentSheet()->setName('Операции ДДС');
             $writer->addRow($this->buildHeaderRow());
 
-            // ponytail: гидрируем сущности целиком — identity map растёт по ходу выгрузки.
-            // Для десятков тысяч строк переключить запрос на выборку нужных колонок (HYDRATE_ARRAY).
-            foreach ($this->transactionRepository->iterateByCompanyWithFilters($company, $filters) as $transaction) {
-                $writer->addRow($this->buildDataRow($transaction, $dateStyle, $moneyStyle));
+            foreach ($this->transactionRepository->iterateByCompanyWithFilters($company, $filters) as $row) {
+                $writer->addRow($this->buildDataRow($row, $dateStyle, $moneyStyle));
             }
         } finally {
             $writer->close();
@@ -81,23 +78,31 @@ final readonly class CashTransactionXlsxExporter
         ));
     }
 
-    private function buildDataRow(CashTransaction $transaction, Style $dateStyle, Style $moneyStyle): Row
+    /**
+     * @param array{
+     *     occurredAt: \DateTimeImmutable,
+     *     direction: CashDirection,
+     *     amount: string,
+     *     accountName: string,
+     *     categoryName: ?string,
+     *     description: ?string,
+     *     counterpartyName: ?string
+     * } $row
+     */
+    private function buildDataRow(array $row, Style $dateStyle, Style $moneyStyle): Row
     {
-        $amount = (float) $transaction->getAmount();
-        if (CashDirection::OUTFLOW === $transaction->getDirection()) {
+        $amount = (float) $row['amount'];
+        if (CashDirection::OUTFLOW === $row['direction']) {
             $amount = -$amount;
         }
 
-        $category = $transaction->getCashflowCategory();
-        $counterparty = $transaction->getCounterparty();
-
         return new Row([
-            Cell::fromValue($transaction->getOccurredAt(), $dateStyle),
-            Cell::fromValue($transaction->getMoneyAccount()->getName()),
+            Cell::fromValue($row['occurredAt'], $dateStyle),
+            Cell::fromValue($row['accountName']),
             Cell::fromValue($amount, $moneyStyle),
-            Cell::fromValue(null !== $category ? $category->getName() : ''),
-            Cell::fromValue($transaction->getDescription() ?? ''),
-            Cell::fromValue(null !== $counterparty ? $counterparty->getName() : ''),
+            Cell::fromValue($row['categoryName'] ?? ''),
+            Cell::fromValue($row['description'] ?? ''),
+            Cell::fromValue($row['counterpartyName'] ?? ''),
         ]);
     }
 }

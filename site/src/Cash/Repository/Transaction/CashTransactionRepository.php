@@ -264,23 +264,38 @@ class CashTransactionRepository extends ServiceEntityRepository
     /**
      * Тот же набор фильтров, что и на экране, но без пагинации — для экспорта.
      *
+     * Отдаём только нужные колонки: сущности не гидрируются, identity map не растёт,
+     * поэтому память не зависит от размера выгрузки.
+     *
      * @param array<string, string|null> $filters
      *
-     * @return iterable<CashTransaction>
+     * @return iterable<array{
+     *     occurredAt: \DateTimeImmutable,
+     *     direction: CashDirection,
+     *     amount: string,
+     *     accountName: string,
+     *     categoryName: ?string,
+     *     description: ?string,
+     *     counterpartyName: ?string
+     * }>
      */
     public function iterateByCompanyWithFilters(Company $company, array $filters): iterable
     {
-        $query = $this->createFilteredQueryBuilder($company, $filters)
+        return $this->createFilteredQueryBuilder($company, $filters)
+            ->select(
+                't.occurredAt AS occurredAt',
+                't.direction AS direction',
+                't.amount AS amount',
+                'moneyAccount.name AS accountName',
+                'cashflowCategory.name AS categoryName',
+                't.description AS description',
+                'counterparty.name AS counterpartyName',
+            )
             ->innerJoin('t.moneyAccount', 'moneyAccount')
-            ->addSelect('moneyAccount')
-            ->leftJoin('t.counterparty', 'counterparty')
-            ->addSelect('counterparty')
             ->leftJoin('t.cashflowCategory', 'cashflowCategory')
-            ->addSelect('cashflowCategory')
-            ->getQuery();
-        $query->setHint(Query::HINT_READ_ONLY, true);
-
-        return $query->toIterable();
+            ->leftJoin('t.counterparty', 'counterparty')
+            ->getQuery()
+            ->toIterable([], Query::HYDRATE_ARRAY);
     }
 
     /**
