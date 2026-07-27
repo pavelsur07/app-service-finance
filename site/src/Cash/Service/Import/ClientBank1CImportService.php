@@ -314,7 +314,7 @@ class ClientBank1CImportService
 
             $baseExternalId = $this->generateExternalId($row, $account);
             $occurrences[$baseExternalId] = ($occurrences[$baseExternalId] ?? -1) + 1;
-            $externalId = $this->applyOccurrence($baseExternalId, $occurrences[$baseExternalId]);
+            $externalId = $this->applyOccurrence($baseExternalId, $occurrences[$baseExternalId], $docType);
             $isTransfer = $this->shouldMarkAsTransfer($row, $account);
 
             $transaction = $this->cashTransactionRepository->findActiveByCompanyAccountExternalId(
@@ -725,10 +725,20 @@ class ClientBank1CImportService
      * Первое вхождение сохраняет прежний хэш без суффикса: иначе все ранее
      * загруженные выписки перестали бы дедуплицироваться и задвоились бы при
      * повторной загрузке.
+     *
+     * ponytail: только платёжный ордер — единственный тип, где повтор номера
+     * предусмотрен регламентом. Для остальных типов две одинаковые строки в одном
+     * файле по-прежнему считаем ошибкой выгрузки и схлопываем: там повтор номера
+     * означает задвоение, а не второе списание. Появятся потери по другому типу —
+     * добавить его сюда, подтвердив контрольными суммами выписки.
      */
-    private function applyOccurrence(string $externalId, int $occurrence): string
+    private function applyOccurrence(string $externalId, int $occurrence, ?string $docType): string
     {
         if (0 === $occurrence) {
+            return $externalId;
+        }
+
+        if ('платежный ордер' !== mb_strtolower(trim((string) $docType))) {
             return $externalId;
         }
 

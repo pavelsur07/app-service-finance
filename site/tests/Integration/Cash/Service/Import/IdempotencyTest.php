@@ -119,6 +119,33 @@ class IdempotencyTest extends ClientBank1CImportServiceTestCase
         self::assertContains($legacyExternalId, $externalIds, 'externalId ранее загруженной операции не должен меняться');
     }
 
+    /**
+     * Граница фикса: повтор номера предусмотрен регламентом только для платёжного
+     * ордера. У обычного платёжного поручения две одинаковые строки в одном файле —
+     * задвоение выгрузки, и схлопывать их надо как раньше.
+     */
+    public function testIdenticalOrdinaryPaymentsInOneFileAreStillDeduplicated(): void
+    {
+        $row = [
+            'docType' => 'Платежное поручение',
+            'docNumber' => '565',
+            'docDate' => '2026-06-15',
+            'amount' => 6960,
+            'payerAccount' => '40702810900000000001',
+            'receiverAccount' => '40817810352098093549',
+            'dateDebit' => '2026-06-15',
+            'dateCredit' => null,
+            'purpose' => 'Выплата заработной платы за июнь 2026г. НДС не облагается.',
+            'direction' => 'outflow',
+        ];
+
+        $summary = $this->service->import([$row, $row], $this->account, false);
+
+        self::assertSame(1, $summary['created']);
+        self::assertSame(1, $summary['duplicates']);
+        self::assertCount(1, $this->transactionRepository->findAll());
+    }
+
     public function testRepeatedImportCountsDuplicatesAndSupportsOverwrite(): void
     {
         $row = [
