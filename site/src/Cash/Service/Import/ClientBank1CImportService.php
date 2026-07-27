@@ -237,6 +237,9 @@ class ClientBank1CImportService
         $createdMinDate = null;
         $createdMaxDate = null;
 
+        /** @var array<string, int> $occurrences сколько раз базовый externalId уже встретился в этом файле */
+        $occurrences = [];
+
         $companyId = $company->getId();
         $accountId = $account->getId();
         $responsibilityPair = $this->responsibilityCenterResolver->resolveForCreate($companyId, null, null);
@@ -309,7 +312,9 @@ class ClientBank1CImportService
                 continue;
             }
 
-            $externalId = $this->generateExternalId($row, $account);
+            $baseExternalId = $this->generateExternalId($row, $account);
+            $occurrences[$baseExternalId] = ($occurrences[$baseExternalId] ?? -1) + 1;
+            $externalId = $this->applyOccurrence($baseExternalId, $occurrences[$baseExternalId], $docType);
             $isTransfer = $this->shouldMarkAsTransfer($row, $account);
 
             $transaction = $this->cashTransactionRepository->findActiveByCompanyAccountExternalId(
@@ -708,6 +713,36 @@ class ClientBank1CImportService
         ];
 
         return hash('sha256', implode('|', $parts));
+    }
+
+    /**
+     * Выписка 1С не содержит идентификатора операции, а платёжные ордера частичного
+     * исполнения по инкассо повторяют номер, дату, сумму и назначение исходного
+     * распоряжения — две реальные операции неотличимы по содержимому. Различаем их
+     * порядком появления в файле: он стабилен, поэтому повторный импорт того же
+     * файла по-прежнему схлопывается в те же externalId.
+     *
+     * Первое вхождение сохраняет прежний хэш без суффикса: иначе все ранее
+     * загруженные выписки перестали бы дедуплицироваться и задвоились бы при
+     * повторной загрузке.
+     *
+     * ponytail: только платёжный ордер — единственный тип, где повтор номера
+     * предусмотрен регламентом. Для остальных типов две одинаковые строки в одном
+     * файле по-прежнему считаем ошибкой выгрузки и схлопываем: там повтор номера
+     * означает задвоение, а не второе списание. Появятся потери по другому типу —
+     * добавить его сюда, подтвердив контрольными суммами выписки.
+     */
+    private function applyOccurrence(string $externalId, int $occurrence, ?string $docType): string
+    {
+        if (0 === $occurrence) {
+            return $externalId;
+        }
+
+        if ('платежный ордер' !== mb_strtolower(trim((string) $docType))) {
+            return $externalId;
+        }
+
+        return hash('sha256', $externalId.'|occurrence:'.$occurrence);
     }
 
     private function shouldMarkAsTransfer(array $row, MoneyAccount $account): bool
