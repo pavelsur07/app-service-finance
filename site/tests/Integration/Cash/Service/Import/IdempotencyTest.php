@@ -47,6 +47,78 @@ class IdempotencyTest extends ClientBank1CImportServiceTestCase
         self::assertCount(2, $this->transactionRepository->findAll());
     }
 
+    /**
+     * Регрессия: ФНС взыскивает по одному решению несколькими платёжными ордерами,
+     * и по правилам они несут номер исходного распоряжения — номер, дата, сумма,
+     * счета и назначение совпадают полностью. Раньше вторая такая строка файла
+     * схлопывалась в externalId первой и терялась: по июню 2026 так пропало
+     * списание на 24 000 ₽, из-за чего остаток по счёту разошёлся с выпиской.
+     */
+    public function testIdenticalPartialExecutionOrdersInOneFileAreBothImported(): void
+    {
+        $row = [
+            'docType' => 'Платежный ордер',
+            'docNumber' => '36341',
+            'docDate' => '2026-06-19',
+            'amount' => 24000,
+            'payerAccount' => '40702810900000000001',
+            'receiverAccount' => '03100643000000018500',
+            'dateDebit' => '2026-06-19',
+            'dateCredit' => null,
+            'purpose' => 'По решению о взыскании от 01.06.2026 № 18937 по ст.46 НК РФ',
+            'direction' => 'outflow',
+        ];
+        $rows = [$row, $row];
+
+        $firstSummary = $this->service->import($rows, $this->account, false);
+
+        self::assertSame(2, $firstSummary['created'], 'Оба ордера — реальные списания, второй не дубликат');
+        self::assertSame(0, $firstSummary['duplicates']);
+        self::assertSame(0, $firstSummary['errors']);
+        self::assertCount(2, $this->transactionRepository->findAll());
+
+        $secondSummary = $this->service->import($rows, $this->account, false);
+
+        self::assertSame(0, $secondSummary['created'], 'Повторная загрузка того же файла обязана остаться идемпотентной');
+        self::assertSame(2, $secondSummary['duplicates']);
+        self::assertCount(2, $this->transactionRepository->findAll());
+    }
+
+    /**
+     * Первое вхождение обязано сохранить прежний externalId, иначе уже загруженные
+     * выписки перестанут дедуплицироваться и задвоятся при повторной загрузке.
+     */
+    public function testAlreadyImportedRowStillDeduplicatesWhenFileGainsIdenticalSecondRow(): void
+    {
+        $row = [
+            'docType' => 'Платежный ордер',
+            'docNumber' => '36341',
+            'docDate' => '2026-06-19',
+            'amount' => 24000,
+            'payerAccount' => '40702810900000000001',
+            'receiverAccount' => '03100643000000018500',
+            'dateDebit' => '2026-06-19',
+            'dateCredit' => null,
+            'purpose' => 'По решению о взыскании от 01.06.2026 № 18937 по ст.46 НК РФ',
+            'direction' => 'outflow',
+        ];
+
+        $this->service->import([$row], $this->account, false);
+        $legacyExternalId = $this->transactionRepository->findAll()[0]->getExternalId();
+
+        $summary = $this->service->import([$row, $row], $this->account, false);
+
+        self::assertSame(1, $summary['created'], 'Добираем только недостающее второе списание');
+        self::assertSame(1, $summary['duplicates']);
+
+        $externalIds = array_map(
+            static fn ($transaction) => $transaction->getExternalId(),
+            $this->transactionRepository->findAll(),
+        );
+        self::assertCount(2, $externalIds);
+        self::assertContains($legacyExternalId, $externalIds, 'externalId ранее загруженной операции не должен меняться');
+    }
+
     public function testRepeatedImportCountsDuplicatesAndSupportsOverwrite(): void
     {
         $row = [
