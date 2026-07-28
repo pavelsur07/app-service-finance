@@ -3,6 +3,7 @@
     (current_route starts with 'marketplace_' and not (current_route starts with 'marketplace_analytics_') and not (current_route starts with 'marketplace_ads_'))
     or current_route starts with 'marketplace_analytics_'
     or current_route starts with 'marketplace_ads_'
+    or current_route starts with 'inventory_'
 %}
 <li class="nav-item dropdown {{ marketplace_menu_active ? 'show' : '' }}">
     <a class="nav-link dropdown-toggle {{ marketplace_menu_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ marketplace_menu_active ? 'true' : 'false' }}">
@@ -16,6 +17,7 @@
                 current_route starts with 'marketplace_'
                 and not (current_route starts with 'marketplace_analytics_')
                 and not (current_route starts with 'marketplace_ads_')
+                and not (current_route starts with 'marketplace_inventory_')
                 and current_route != 'marketplace_reconciliation'
                 and current_route != 'marketplace_listing_tags_manage'
             %}
@@ -30,8 +32,8 @@
             <a class="dropdown-item {{ mp_ads_active ? 'active' : '' }}" href="{{ path('marketplace_ads_efficiency_index') }}">
                 <span>Реклама</span>
             </a>
-            {% set mp_ads_active = current_route starts with 'inventory_' %}
-            <a class="dropdown-item {{ mp_ads_active ? 'active' : '' }}" href="{{ path('inventory_stocks_index') }}">
+            {% set mp_stocks_active = current_route starts with 'inventory_' or current_route starts with 'marketplace_inventory_' %}
+            <a class="dropdown-item {{ mp_stocks_active ? 'active' : '' }}" href="{{ path('inventory_stocks_index') }}">
                 <span>Товары и остатки</span>
             </a>
 
@@ -40,7 +42,7 @@
                 <span>Тэги</span>
             </a>
 
-            {% set mp_reconciliation_active = current_route == 'marketplace_efficiency' %}
+            {% set mp_reconciliation_active = current_route == 'marketplace_reconciliation' %}
             <a class="dropdown-item {{ mp_reconciliation_active ? 'active' : '' }}" href="{{ path('marketplace_reconciliation') }}">
                 <span>Сверка</span>
             </a>
