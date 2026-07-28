@@ -513,6 +513,10 @@ createOwnerAccount(string $email, string $plainPassword, string $companyName): C
 // Найти компанию по ID
 findById(string $companyId): ?Company
 
+// Глобально разрешить точное название без учёта регистра в единственный ID.
+// InvalidArgumentException — пустое название; DomainException — совпадений нет или несколько.
+resolveIdByName(string $name): string
+
 // ID всех активных компаний
 // @return list<string>
 getAllActiveCompanyIds(): array
@@ -2507,6 +2511,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.69 | 2026-07-28 | MCP/Company: read-only `company_find_by_name` глобально разрешает точное название компании без учёта регистра в единственный ID; отсутствие и дубли возвращаются как ожидаемая ошибка |
 | 1.68 | 2026-07-24 | Infrastructure: production PHP CLI disables the broken Alpine/musl opcache dynamic load; production PHP-FPM remains unchanged |
 | 1.67 | 2026-07-24 | MarketplaceAds: one-shot WB catalog recovery from persisted unmapped nmId, bounded 429/5xx retry, and one aggregated normal-channel alert for unresolved review |
 | 1.66 | 2026-07-24 | MarketplaceAds: persisted `/upd` → `AdDocument` → `AdDocumentLine` reconciliation with intentional-unallocated and real-unmapped totals |

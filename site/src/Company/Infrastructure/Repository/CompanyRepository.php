@@ -10,7 +10,7 @@ use Doctrine\Persistence\ManagerRegistry;
 
 class CompanyRepository extends ServiceEntityRepository
 {
-    public function __construct(ManagerRegistry $registry,  private readonly Connection $connection)
+    public function __construct(ManagerRegistry $registry, private readonly Connection $connection)
     {
         parent::__construct($registry, Company::class);
     }
@@ -25,7 +25,7 @@ class CompanyRepository extends ServiceEntityRepository
             ->getResult();
     }
 
-    function findById(string $companyId): ?Company
+    public function findById(string $companyId): ?Company
     {
         return $this->find($companyId);
     }
@@ -33,6 +33,28 @@ class CompanyRepository extends ServiceEntityRepository
     public function findOneByName(string $name): ?Company
     {
         return $this->findOneBy(['name' => $name]);
+    }
+
+    /**
+     * Глобальный поиск используется только справочным MCP-инструментом.
+     *
+     * @return list<string>
+     */
+    public function findIdsByExactName(string $name): array
+    {
+        $rows = $this->createQueryBuilder('c')
+            ->select('c.id AS id')
+            ->where('LOWER(c.name) = LOWER(:name)')
+            ->setParameter('name', $name)
+            ->orderBy('c.id', 'ASC')
+            ->setMaxResults(2)
+            ->getQuery()
+            ->getArrayResult();
+
+        return array_map(
+            static fn (array $row): string => (string) $row['id'],
+            $rows,
+        );
     }
 
     /**

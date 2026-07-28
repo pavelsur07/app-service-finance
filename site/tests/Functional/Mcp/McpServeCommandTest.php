@@ -32,7 +32,7 @@ final class McpServeCommandTest extends TestCase
         self::assertSame('vashfindir-cash', $responses[0]['result']['serverInfo']['name']);
 
         self::assertSame(
-            ['cash_autorules_list', 'cash_categories_tree', 'cash_transactions_list'],
+            ['cash_autorules_list', 'cash_categories_tree', 'cash_transactions_list', 'company_find_by_name'],
             $this->toolNames($responses[1]),
         );
     }
@@ -48,6 +48,7 @@ final class McpServeCommandTest extends TestCase
                 'cash_categories_tree',
                 'cash_category_upsert',
                 'cash_transactions_list',
+                'company_find_by_name',
             ],
             $this->toolNames($responses[0]),
         );

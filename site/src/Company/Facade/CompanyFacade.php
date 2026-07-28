@@ -30,6 +30,26 @@ final class CompanyFacade
     }
 
     /**
+     * Глобальный справочный поиск без ограничения по компании.
+     * Предназначен только для read-only MCP-инструмента company_find_by_name.
+     */
+    public function resolveIdByName(string $name): string
+    {
+        $name = trim($name);
+        if ('' === $name) {
+            throw new \InvalidArgumentException('Укажите название компании.');
+        }
+
+        $ids = $this->repository->findIdsByExactName($name);
+
+        return match (\count($ids)) {
+            0 => throw new \DomainException('Компания с таким названием не найдена.'),
+            1 => $ids[0],
+            default => throw new \DomainException('Найдено несколько компаний с таким названием.'),
+        };
+    }
+
+    /**
      * Создаёт пользователя-владельца, компанию и активного CompanyMember OWNER.
      */
     public function createOwnerAccount(string $email, string $plainPassword, string $companyName): Company
