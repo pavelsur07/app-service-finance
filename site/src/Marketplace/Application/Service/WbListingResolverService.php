@@ -177,7 +177,11 @@ final class WbListingResolverService
 
         // Откладываем вставку баркода до вызова flushBarcodes() после em->flush(),
         // чтобы FK (listing_id → marketplace_listings) был уже в БД.
-        if ($barcode !== null && $barcode !== '' && $size !== 'UNKNOWN') {
+        // Безразмерные листинги тоже получают баркод: сюда попадаем только когда
+        // resolve() не нашёл листинг ни по натуральному ключу, ни по chrtId, ни по
+        // самому баркоду — значит баркод свободен. Это же даёт следующим безразмерным
+        // строкам найти листинг по баркоду вместо создания дубля.
+        if ($barcode !== null && $barcode !== '') {
             $this->pendingBarcodes[] = [
                 'companyId' => $companyId,
                 'listingId' => $listing->getId(),
@@ -204,11 +208,16 @@ final class WbListingResolverService
         $this->pendingBarcodes = [];
     }
 
+    /**
+     * WB отдаёт безразмерный товар как ts_name="0" в отчётах и как ""
+     * в карточках каталога. Без общей нормализации на один nm_id
+     * заводится два листинга: size='0' и size='UNKNOWN'.
+     */
     private function normalizeWbSize(?string $tsName): string
     {
         $normalized = trim((string) $tsName);
 
-        return $normalized !== '' ? $normalized : 'UNKNOWN';
+        return $normalized !== '' && $normalized !== '0' ? $normalized : 'UNKNOWN';
     }
 
     private function bindVariantIdentity(

@@ -79,12 +79,45 @@ final class WbListingResolverServiceTest extends TestCase
         self::assertSame('9001', $listing->getMarketplaceVariantId());
     }
 
-    private function resolver(MarketplaceListingRepository $repository): WbListingResolverService
+    public function testZeroTsNameIsNormalizedToUnknownSize(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $repository = $this->createMock(MarketplaceListingRepository::class);
+        $repository->expects(self::once())
+            ->method('findByNmIdAndSize')
+            ->with($company, MarketplaceType::WILDBERRIES, '123', 'UNKNOWN')
+            ->willReturn(null);
+
+        $listing = $this->resolver($repository)->resolve($company, '123', '0');
+
+        self::assertSame('UNKNOWN', $listing->getSize());
+    }
+
+    public function testBarcodeIsStoredForSizelessListing(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $repository = $this->createMock(MarketplaceListingRepository::class);
+        $repository->method('findByNmIdAndSize')->willReturn(null);
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::once())
+            ->method('executeStatement')
+            ->with(
+                self::stringContains('INSERT INTO marketplace_listing_barcodes'),
+                self::callback(static fn (array $params): bool => '2000000000015' === $params['barcode']),
+            );
+
+        $resolver = $this->resolver($repository, $connection);
+        $resolver->resolve($company, '123', '0', barcode: '2000000000015');
+        $resolver->flushBarcodes();
+    }
+
+    private function resolver(MarketplaceListingRepository $repository, ?Connection $connection = null): WbListingResolverService
     {
         return new WbListingResolverService(
             $repository,
             $this->createMock(MarketplaceListingBarcodeRepository::class),
-            new WbBarcodeUpsertQuery($this->createMock(Connection::class)),
+            new WbBarcodeUpsertQuery($connection ?? $this->createMock(Connection::class)),
             $this->createMock(EntityManagerInterface::class),
         );
     }
