@@ -1,7 +1,7 @@
 ## Current checkpoint
 
 **Phase:** Release Gate
-**Status:** checking
+**Status:** stopped
 **Stage base commit:** `baf8a12b7e5570a8f0e0f846293d9a5316ae8b8a`
 **Current Work item:** none
 **Owner gate:** yes
@@ -16,6 +16,11 @@
   invariant, and CSV-injection coverage plus operating documentation.
 - Focused Work-item self-reviews and the integrated internal Stage review.
 - Stage Report prepared.
+- Executable Stage commit `cd8fb00672e0b4889093fa8271ea912b5ffa4e22`
+  pushed to `agent/wb-finance-deduction-breakdown`.
+- Draft PR #2253 created against `master`.
+- GitHub CI for the executable commit is green; deploy and production
+  migrations were skipped.
 
 ### Current diff / affected files
 
@@ -52,8 +57,8 @@
 
 ### Exact next action
 
-- Commit only task-owned files, push the task branch, create the Draft PR, wait
-  for CI status, then stop for the declared owner merge decision.
+- Push this documentation-only Release Gate finalization, verify terminal CI,
+  then wait for the owner decision to merge Draft PR #2253.
 
 ### Files to inspect first on resume
 

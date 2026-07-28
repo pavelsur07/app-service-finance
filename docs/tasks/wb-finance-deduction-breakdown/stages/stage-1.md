@@ -4,7 +4,7 @@
 **Owner gate:** yes
 **Release candidate:** yes
 **Independently deployable:** yes
-**Следующее действие:** commit, push, Draft PR, затем 🛑 STOP на Release Gate
+**Следующее действие:** 🛑 STOP на Release Gate, ждать решения Владельца по merge
 
 ### Scope Stage
 
@@ -94,3 +94,14 @@
 
 - Production-check, deploy, миграции, обработка очередей и другие production
   действия не выполнялись и этим Stage не разрешены.
+
+### Delivery
+
+- Executable Stage commit:
+  `cd8fb00672e0b4889093fa8271ea912b5ffa4e22`.
+- Branch: `agent/wb-finance-deduction-breakdown`.
+- Draft PR:
+  `https://github.com/pavelsur07/app-service-finance/pull/2253`.
+- GitHub CI для executable commit: detect changes, unit tests,
+  migrations-empty-db, API types sync и три image builds — green.
+- Deploy и production migrations — skipped.
