@@ -192,7 +192,13 @@
                                 </tr>
                             {% endif %}
                             <tr>
-                                <td class="fw-medium">{{ article.label }}</td>
+                                <td class="fw-medium">
+                                    {% if article.key == 'deduction' and report.deductions is not empty %}
+                                        <a href="#wb-deduction-breakdown">{{ article.label }}</a>
+                                    {% else %}
+                                        {{ article.label }}
+                                    {% endif %}
+                                </td>
                                 <td class="text-secondary"><code>{{ article.source }}</code></td>
                                 <td class="text-end text-nowrap">{{ report_ui.money(article.accrual_minor) }}</td>
                                 <td class="text-end text-nowrap">{{ report_ui.money(article.reversal_minor) }}</td>
@@ -223,6 +229,57 @@
                     </table>
                 </div>
             </div>
+
+            {% if report.deductions is not empty %}
+                <details id="wb-deduction-breakdown" class="card mb-3" open>
+                    <summary class="card-header cursor-pointer">
+                        <span class="d-block">
+                            <span class="card-title d-block mb-1">
+                                Расшифровка удержаний
+                                <span class="badge bg-secondary ms-1">{{ report.deductions|length }}</span>
+                            </span>
+                            <span class="text-secondary small d-block">
+                                Точное основание из raw-поля <code>bonusTypeName</code>.
+                                Собственная бухгалтерская классификация не применяется.
+                            </span>
+                        </span>
+                    </summary>
+                    <div class="table-responsive">
+                        <table class="table table-vcenter card-table">
+                            <thead>
+                            <tr>
+                                <th>Основание WB</th>
+                                <th>Период</th>
+                                <th class="text-end">Строк</th>
+                                <th class="text-end">reportId с номером</th>
+                                <th class="text-end">Удержано</th>
+                                <th class="text-end">Влияние</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for row in report.deductions %}
+                                <tr>
+                                    <td class="text-break">{{ row.reason }}</td>
+                                    <td class="text-secondary text-nowrap">
+                                        {% if row.date_from == row.date_to %}
+                                            {{ row.date_from|date('d.m.Y') }}
+                                        {% else %}
+                                            {{ row.date_from|date('d.m.Y') }} — {{ row.date_to|date('d.m.Y') }}
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">{{ row.row_count|number_format(0, ',', ' ') }}</td>
+                                    <td class="text-end">{{ row.report_count|number_format(0, ',', ' ') }}</td>
+                                    <td class="text-end text-nowrap">{{ report_ui.money(row.amount_minor) }}</td>
+                                    <td class="text-end text-nowrap text-danger fw-semibold">
+                                        {{ report_ui.money(-row.amount_minor) }}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
+            {% endif %}
 
             <div class="row row-cards mb-3">
                 <div class="col-xl-7">

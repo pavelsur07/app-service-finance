@@ -103,6 +103,8 @@ final class WbRawFinancialReportBuilderTest extends TestCase
                     'reportId' => 'other',
                     'rrdId' => 3002,
                     'retailAmount' => '999',
+                    'deduction' => '-99',
+                    'bonusTypeName' => 'Удержание другого отчёта',
                 ],
             ], recordsCount: 4)],
             new \DateTimeImmutable('2026-07-01'),
@@ -120,6 +122,7 @@ final class WbRawFinancialReportBuilderTest extends TestCase
         self::assertSame(1, $report['coverage']['status_counts']['missing']);
         self::assertSame(0, $this->article($report, 'commission')['net_minor']);
         self::assertSame(0, $report['summary']['payout_minor']);
+        self::assertSame([], $report['deductions']);
     }
 
     public function testMalformedExtremeQuantityDoesNotBreakReport(): void
@@ -179,6 +182,7 @@ final class WbRawFinancialReportBuilderTest extends TestCase
                 'deliveryService' => '-50',
                 'deliveryAmount' => 1,
                 'deduction' => '-5',
+                'bonusTypeName' => 'Списание за отзыв',
             ]])],
             new \DateTimeImmutable('2026-07-01'),
             new \DateTimeImmutable('2026-07-01'),
@@ -188,6 +192,59 @@ final class WbRawFinancialReportBuilderTest extends TestCase
         self::assertSame(5500, $report['summary']['wb_costs_minor']);
         self::assertSame(5000, $this->article($report, 'logistics_delivery')['accrual_minor']);
         self::assertSame(500, $this->article($report, 'deduction')['accrual_minor']);
+        self::assertSame('Списание за отзыв', $report['deductions'][0]['reason']);
+        self::assertSame(500, $report['deductions'][0]['amount_minor']);
+    }
+
+    public function testBreaksDeductionsDownByExactRawReason(): void
+    {
+        $report = (new WbRawFinancialReportBuilder())->build(
+            [
+                $this->document([
+                    [
+                        'reportId' => 801,
+                        'rrdId' => 6101,
+                        'deduction' => '-7.50',
+                        'bonusTypeName' => 'Списание за отзыв',
+                    ],
+                    [
+                        'reportId' => 802,
+                        'rrdId' => 6102,
+                        'deduction' => '2.50',
+                        'bonus_type_name' => 'Списание за отзыв',
+                    ],
+                    [
+                        'reportId' => 802,
+                        'rrdId' => 6103,
+                        'deduction' => '-3',
+                    ],
+                ]),
+                $this->document([[
+                    'reportId' => 801,
+                    'rrdId' => 6104,
+                    'deduction' => '-1.25',
+                    'bonusTypeName' => 'Списание за отзыв',
+                ]], businessDate: '2026-07-02'),
+            ],
+            new \DateTimeImmutable('2026-07-01'),
+            new \DateTimeImmutable('2026-07-02'),
+        );
+
+        self::assertCount(2, $report['deductions']);
+        self::assertSame([
+            'reason' => 'Списание за отзыв',
+            'date_from' => '2026-07-01',
+            'date_to' => '2026-07-02',
+            'row_count' => 3,
+            'amount_minor' => 1125,
+            'report_count' => 2,
+        ], $report['deductions'][0]);
+        self::assertSame('Без расшифровки WB', $report['deductions'][1]['reason']);
+        self::assertSame(300, $report['deductions'][1]['amount_minor']);
+        self::assertSame(
+            $this->article($report, 'deduction')['accrual_minor'],
+            array_sum(array_column($report['deductions'], 'amount_minor')),
+        );
     }
 
     public function testFlagsUnsupportedProductDocumentTypeWithoutAddingItToPayout(): void
@@ -264,10 +321,13 @@ final class WbRawFinancialReportBuilderTest extends TestCase
      *
      * @return array<string, mixed>
      */
-    private function document(array $rows, ?int $recordsCount = null): array
-    {
+    private function document(
+        array $rows,
+        ?int $recordsCount = null,
+        string $businessDate = '2026-07-01',
+    ): array {
         return [
-            'business_date' => '2026-07-01',
+            'business_date' => $businessDate,
             'status' => 'success',
             'records_count' => $recordsCount ?? count($rows),
             'raw_document_id' => '11111111-1111-4111-8111-111111111111',

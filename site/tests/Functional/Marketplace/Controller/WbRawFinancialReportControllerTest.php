@@ -46,6 +46,48 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
         self::assertStringContainsString('Транзакции системы не используются', $crawler->filter('body')->text());
     }
 
+    public function testRendersDeductionBreakdownFromRawReasons(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        [$user, $company] = $this->seedCompany(506);
+        $this->seedLoadedDay($company, new \DateTimeImmutable('2026-07-01'), [
+            [
+                'reportId' => 9101,
+                'rrdId' => 1101,
+                'sellerOperName' => 'Удержание',
+                'deduction' => '-7.50',
+                'bonusTypeName' => 'Списание за отзыв',
+            ],
+            [
+                'reportId' => 9102,
+                'rrdId' => 1102,
+                'sellerOperName' => 'Удержание',
+                'deduction' => '2.50',
+                'bonus_type_name' => 'Списание за отзыв',
+            ],
+            [
+                'reportId' => 9102,
+                'rrdId' => 1103,
+                'sellerOperName' => 'Удержание',
+                'deduction' => '-3',
+            ],
+        ]);
+        $client->loginUser($user);
+
+        $client->request(
+            'GET',
+            '/marketplace/wb-finance-report?date_from=2026-07-01&date_to=2026-07-01',
+        );
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('#wb-deduction-breakdown', 'Расшифровка удержаний');
+        self::assertSelectorTextContains('#wb-deduction-breakdown', 'Списание за отзыв');
+        self::assertSelectorTextContains('#wb-deduction-breakdown', 'Без расшифровки WB');
+        self::assertSelectorTextContains('#wb-deduction-breakdown', '10,00 RUB');
+        self::assertSelectorCount(2, '#wb-deduction-breakdown tbody tr');
+    }
+
     public function testDoesNotExposeRawRowsOfAnotherCompany(): void
     {
         $client = static::createClient();
@@ -62,6 +104,8 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
             'retailAmount' => '999999.99',
             'forPay' => '999999.99',
             'acquiringFee' => '0',
+            'deduction' => '-42',
+            'bonusTypeName' => 'Чужое удержание',
         ]]);
         $client->loginUser($user);
 
@@ -72,6 +116,7 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
 
         self::assertResponseIsSuccessful();
         self::assertStringNotContainsString('Чужая операция', (string) $client->getResponse()->getContent());
+        self::assertStringNotContainsString('Чужое удержание', (string) $client->getResponse()->getContent());
         self::assertStringNotContainsString('999999', (string) $client->getResponse()->getContent());
         self::assertSelectorTextContains('.alert-warning', 'нет строк по выбранным фильтрам');
     }
@@ -97,17 +142,26 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
         $client = static::createClient();
         $this->resetDb();
         [$user, $company] = $this->seedCompany(505);
-        $this->seedLoadedDay($company, new \DateTimeImmutable('2026-07-01'), [[
-            'reportId' => '=HYPERLINK("https://report.example.test")',
-            'rrdId' => 2001,
-            'docTypeName' => 'Продажа',
-            'sellerOperName' => '=HYPERLINK("https://example.test")',
-            'quantity' => 1,
-            'retailPriceWithDisc' => '100',
-            'retailAmount' => '90',
-            'forPay' => '75',
-            'acquiringFee' => '2',
-        ]]);
+        $this->seedLoadedDay($company, new \DateTimeImmutable('2026-07-01'), [
+            [
+                'reportId' => '=HYPERLINK("https://report.example.test")',
+                'rrdId' => 2001,
+                'docTypeName' => 'Продажа',
+                'sellerOperName' => '=HYPERLINK("https://example.test")',
+                'quantity' => 1,
+                'retailPriceWithDisc' => '100',
+                'retailAmount' => '90',
+                'forPay' => '75',
+                'acquiringFee' => '2',
+            ],
+            [
+                'reportId' => 9002,
+                'rrdId' => 2002,
+                'sellerOperName' => 'Удержание',
+                'deduction' => '-5',
+                'bonusTypeName' => '=1+1',
+            ],
+        ]);
         $client->loginUser($user);
 
         $client->request(
@@ -119,7 +173,9 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
         self::assertResponseHeaderSame('content-type', 'text/csv; charset=UTF-8');
         self::assertStringContainsString('attachment;', (string) $client->getResponse()->headers->get('content-disposition'));
         $content = (string) $client->getResponse()->getContent();
-        self::assertStringContainsString('"Расчётное перечисление";75.00', $content);
+        self::assertStringContainsString('"Расчётное перечисление";70.00', $content);
+        self::assertStringContainsString('"Основание удержания WB"', $content);
+        self::assertStringContainsString("'=1+1", $content);
         self::assertStringContainsString('\'=HYPERLINK', $content);
         self::assertStringContainsString('\'=HYPERLINK(""https://report.example.test"")', $content);
     }
