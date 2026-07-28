@@ -37,7 +37,7 @@ final class McpServeCommand extends Command
                 'company-id',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'UUID компании. Все инструменты работают только с её данными.',
+                'UUID компании. Все финансовые инструменты работают только с её данными.',
             )
             ->addOption(
                 'allow-write',
