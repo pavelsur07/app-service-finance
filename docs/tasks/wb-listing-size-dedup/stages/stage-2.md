@@ -41,8 +41,13 @@
 
 Тестовые данные из локальной БД удалены после проверки.
 
-### External Claude Code review
-- Result: N/A — см. Stage 1 (реализацию ведёт сам Claude Code). Выполнен внутренний review полного Stage diff.
+### External review
+- Reviewer: Codex CLI 0.145.0 (`codex exec -s read-only`) по полному diff `b1a49db2..HEAD`, включая миграцию.
+- Iterations: 2 (первый прогон упал на nested-песочнице, повтор — с диффом в промпте).
+- Result: REVIEW_GREEN. Отдельно подтверждено: покрыты все 14 зависимых таблиц, конфликты уникальных ключей разрешены корректно, рекламный расход сохранён, изоляция компаний не нарушена.
+- Confirmed findings fixed: нет находок BLOCKER/IMPORTANT.
+- Rejected findings with reason: нет.
+- Ограничение: у ревьюера не было доступа к прод-схеме и к шеллу, факты схемы и объёмы данных переданы в промпте.
 
 ### Команды для проверки
 - `docker compose run --rm site-php-cli php bin/console doctrine:migrations:migrate --no-interaction`

@@ -31,8 +31,12 @@
 - `testZeroTsNameIsNormalizedToUnknownSize` красный на старом коде (`'0'` вместо `'UNKNOWN'`).
 - `testBarcodeIsStoredForSizelessListing` красный при нормализации со старым условием записи баркода — проверено отдельным прогоном.
 
-### External Claude Code review
-- Result: N/A — внешний read-only review по `AGENTS.md` запускает Codex; в этой сессии реализацию ведёт сам Claude Code, отдельного независимого ревьюера нет. Выполнен внутренний review полного diff.
+### External review
+- Reviewer: Codex CLI 0.145.0 (`codex exec -s read-only`), роли зеркальные — реализацию вёл Claude Code, внешний read-only review выполнил Codex по полному diff `b1a49db2..HEAD`.
+- Iterations: 2 (первый прогон упал на nested-песочнице `bwrap: loopback: Failed RTM_NEWADDR`, повтор — с диффом и контекстом в промпте, без шелла у ревьюера).
+- Result: REVIEW_GREEN
+- Confirmed findings fixed: нет находок BLOCKER/IMPORTANT.
+- Rejected findings with reason: нет.
 
 ### Команды для проверки
 - `make site-test-unit` — 1629 тестов, green
