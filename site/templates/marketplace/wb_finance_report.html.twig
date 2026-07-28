@@ -1,0 +1,392 @@
+{% extends 'marketplace/layout.html.twig' %}
+
+{% macro money(minor) %}
+    {{ minor|format_minor_currency('RUB') }}
+{% endmacro %}
+
+{% import _self as report_ui %}
+
+{% block title %}Финансовый отчёт WB по загруженным данным{% endblock %}
+
+{% block tab_content %}
+    <div class="p-3 p-md-4">
+        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3">
+            <div>
+                <h3 class="card-title mb-1">Контроль финансового отчёта WB</h3>
+                <div class="text-secondary">
+                    Агрегация загруженных raw-строк. Транзакции системы не используются.
+                </div>
+            </div>
+            {% if report %}
+                <a
+                    class="btn btn-outline-primary"
+                    href="{{ path('marketplace_wb_finance_report_csv', filters) }}"
+                >
+                    Скачать CSV
+                </a>
+            {% endif %}
+        </div>
+
+        <form method="get" class="card card-body mb-3">
+            <div class="row g-3 align-items-end">
+                <div class="col-sm-6 col-lg-3">
+                    <label class="form-label" for="wb-report-date-from">Дата с</label>
+                    <input
+                        id="wb-report-date-from"
+                        type="date"
+                        name="date_from"
+                        class="form-control"
+                        value="{{ filters.date_from }}"
+                        required
+                    >
+                </div>
+                <div class="col-sm-6 col-lg-3">
+                    <label class="form-label" for="wb-report-date-to">Дата по</label>
+                    <input
+                        id="wb-report-date-to"
+                        type="date"
+                        name="date_to"
+                        class="form-control"
+                        value="{{ filters.date_to }}"
+                        required
+                    >
+                </div>
+                <div class="col-sm-6 col-lg-3">
+                    <label class="form-label" for="wb-report-id">reportId</label>
+                    <input
+                        id="wb-report-id"
+                        type="text"
+                        inputmode="numeric"
+                        name="report_id"
+                        class="form-control"
+                        value="{{ filters.report_id }}"
+                        maxlength="32"
+                        placeholder="Все отчёты"
+                    >
+                </div>
+                <div class="col-sm-6 col-lg-3 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary flex-fill">Сформировать</button>
+                    <a href="{{ path('marketplace_wb_finance_report') }}" class="btn btn-outline-secondary">Сбросить</a>
+                </div>
+            </div>
+            <div class="form-hint mt-2">Максимальный период — 93 календарных дня.</div>
+        </form>
+
+        {% if filter_error %}
+            <div class="alert alert-danger" role="alert">
+                <div class="fw-semibold">Не удалось сформировать отчёт</div>
+                <div>{{ filter_error }}</div>
+            </div>
+        {% endif %}
+
+        {% if report %}
+            <div class="alert alert-info mb-3" role="status">
+                <div class="d-flex">
+                        <div>
+                            <div class="fw-semibold">Источник: завершённые raw-документы WB</div>
+                            <div>
+                                В итог попадают только документы, связанные со статусами дневной загрузки.
+                                Частично загруженные staging-документы и финансовые транзакции не читаются.
+                            </div>
+                            {% if report.meta.last_sync_at %}
+                                <div class="mt-1">
+                                    Последняя загрузка:
+                                    {{ report.meta.last_sync_at|date('d.m.Y H:i', 'Europe/Moscow') }}
+                                </div>
+                            {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            {% if report.summary.row_count == 0 %}
+                <div class="alert alert-warning mb-3" role="status">
+                    В завершённых raw-документах нет строк по выбранным фильтрам.
+                    Проверьте покрытие загрузки ниже или измените период/reportId.
+                </div>
+            {% endif %}
+
+            <div class="row row-cards mb-3">
+                <div class="col-sm-6 col-xl">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <div class="text-secondary mb-1">Строк raw</div>
+                            <div class="h2 mb-0">{{ report.summary.row_count|number_format(0, ',', ' ') }}</div>
+                            <div class="text-secondary small">
+                                Загружено: {{ report.coverage.loaded_rows|number_format(0, ',', ' ') }},
+                                reportId: {{ report.summary.report_count }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-xl">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <div class="text-secondary mb-1">Продажи без СПП</div>
+                            <div class="h2 mb-0">{{ report_ui.money(report.summary.sale_without_spp_minor) }}</div>
+                            <div class="text-secondary small">Продажи минус возвраты</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-xl">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <div class="text-secondary mb-1">Расходы WB</div>
+                            <div class="h2 mb-0">{{ report_ui.money(report.summary.wb_costs_minor) }}</div>
+                            <div class="text-secondary small">Комиссия, эквайринг и удержания</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-xl">
+                    <div class="card h-100 border-primary">
+                        <div class="card-body">
+                            <div class="text-secondary mb-1">Расчётное перечисление</div>
+                            <div class="h2 mb-0 {{ report.summary.payout_minor < 0 ? 'text-danger' : 'text-primary' }}">
+                                {{ report_ui.money(report.summary.payout_minor) }}
+                            </div>
+                            <div class="text-secondary small">forPay + прочие начисления/удержания</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-xl">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <div class="text-secondary mb-1">Покрытие загрузки</div>
+                            <div class="h2 mb-0">
+                                {{ report.coverage.days_with_status }} / {{ report.coverage.expected_days }}
+                            </div>
+                            <div class="text-secondary small">
+                                дней со статусом
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header">
+                    <div>
+                        <h4 class="card-title mb-1">Расшифровка по статьям WB</h4>
+                        <div class="text-secondary small">
+                            «Влияние» показывает знак относительно расчётного перечисления продавцу.
+                        </div>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table">
+                        <thead>
+                        <tr>
+                            <th>Статья</th>
+                            <th>Источник / формула</th>
+                            <th class="text-end">Начислено</th>
+                            <th class="text-end">Возврат / сторно</th>
+                            <th class="text-end">Влияние</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% set current_group = null %}
+                        {% for article in report.articles %}
+                            {% if current_group != article.group %}
+                                {% set current_group = article.group %}
+                                <tr class="table-light">
+                                    <td colspan="5" class="fw-semibold">{{ current_group }}</td>
+                                </tr>
+                            {% endif %}
+                            <tr>
+                                <td class="fw-medium">{{ article.label }}</td>
+                                <td class="text-secondary"><code>{{ article.source }}</code></td>
+                                <td class="text-end text-nowrap">{{ report_ui.money(article.accrual_minor) }}</td>
+                                <td class="text-end text-nowrap">{{ report_ui.money(article.reversal_minor) }}</td>
+                                <td class="text-end text-nowrap fw-semibold {{ article.net_minor < 0 ? 'text-danger' : (article.net_minor > 0 ? 'text-success' : '') }}">
+                                    {{ report_ui.money(article.net_minor) }}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                        <tfoot>
+                        <tr>
+                            <th colspan="4" class="text-end">К перечислению за товар</th>
+                            <th class="text-end text-nowrap">{{ report_ui.money(report.summary.for_pay_minor) }}</th>
+                        </tr>
+                        <tr>
+                            <th colspan="4" class="text-end">Прочие начисления и удержания</th>
+                            <th class="text-end text-nowrap {{ report.summary.post_product_minor < 0 ? 'text-danger' : 'text-success' }}">
+                                {{ report_ui.money(report.summary.post_product_minor) }}
+                            </th>
+                        </tr>
+                        <tr>
+                            <th colspan="4" class="text-end">Расчётное перечисление</th>
+                            <th class="text-end text-nowrap fs-3 {{ report.summary.payout_minor < 0 ? 'text-danger' : 'text-primary' }}">
+                                {{ report_ui.money(report.summary.payout_minor) }}
+                            </th>
+                        </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <div class="row row-cards mb-3">
+                <div class="col-xl-7">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h4 class="card-title">Сводка по reportId</h4>
+                        </div>
+                        {% if report.reports is empty %}
+                            <div class="card-body text-center text-secondary py-5">
+                                Для выбранных фильтров нет строк с reportId.
+                            </div>
+                        {% else %}
+                            <div class="table-responsive">
+                                <table class="table table-vcenter card-table">
+                                    <thead>
+                                    <tr>
+                                        <th>reportId</th>
+                                        <th>Период raw</th>
+                                        <th class="text-end">Строк</th>
+                                        <th class="text-end">Расчётное перечисление</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for row in report.reports %}
+                                        <tr>
+                                            <td>
+                                                {% if row.report_id == 'Без reportId' %}
+                                                    <span class="text-warning">{{ row.report_id }}</span>
+                                                {% elseif row.report_id matches '/^[1-9][0-9]{0,31}$/' %}
+                                                    <a href="{{ path('marketplace_wb_finance_report', {
+                                                        date_from: filters.date_from,
+                                                        date_to: filters.date_to,
+                                                        report_id: row.report_id
+                                                    }) }}">{{ row.report_id }}</a>
+                                                {% else %}
+                                                    {{ row.report_id }}
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-secondary text-nowrap">
+                                                {{ row.date_from|date('d.m.Y') }} — {{ row.date_to|date('d.m.Y') }}
+                                            </td>
+                                            <td class="text-end">{{ row.row_count|number_format(0, ',', ' ') }}</td>
+                                            <td class="text-end text-nowrap fw-semibold {{ row.payout_minor < 0 ? 'text-danger' : '' }}">
+                                                {{ report_ui.money(row.payout_minor) }}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="col-xl-5">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <div class="d-flex align-items-center justify-content-between w-100">
+                                <h4 class="card-title">Качество данных</h4>
+                                <span class="badge bg-{{ report.quality.issue_count > 0 ? 'yellow' : 'green' }} text-{{ report.quality.issue_count > 0 ? 'dark' : 'white' }}">
+                                    {{ report.quality.issue_count > 0 ? report.quality.issue_count ~ ' замечаний' : 'Без замечаний' }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="list-group list-group-flush">
+                            {% for key, label in report.quality_labels %}
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>{{ label }}</span>
+                                    <span class="badge bg-{{ attribute(report.quality, key) > 0 ? 'yellow' : 'secondary' }} text-dark">
+                                        {{ attribute(report.quality, key) }}
+                                    </span>
+                                </div>
+                            {% endfor %}
+                        </div>
+                        <div class="card-footer text-secondary small">
+                            Не классифицированные поля не включаются в итог до фиксации их финансовой семантики.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <details class="card mb-3">
+                <summary class="card-header cursor-pointer">
+                    <span class="card-title">Операции WB ({{ report.operations|length }})</span>
+                </summary>
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table">
+                        <thead>
+                        <tr>
+                            <th>Операция</th>
+                            <th>Тип документа</th>
+                            <th class="text-end">Строк</th>
+                            <th class="text-end">reportId</th>
+                            <th class="text-end">Влияние</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for row in report.operations %}
+                            <tr>
+                                <td>{{ row.operation_name }}</td>
+                                <td class="text-secondary">{{ row.doc_type }}</td>
+                                <td class="text-end">{{ row.row_count|number_format(0, ',', ' ') }}</td>
+                                <td class="text-end">{{ row.report_count }}</td>
+                                <td class="text-end text-nowrap {{ row.payout_minor < 0 ? 'text-danger' : '' }}">
+                                    {{ report_ui.money(row.payout_minor) }}
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center text-secondary py-4">Операций нет.</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+
+            <details class="card" {{ report.coverage.days_with_status < report.coverage.expected_days ? 'open' : '' }}>
+                <summary class="card-header cursor-pointer">
+                    <span class="card-title">
+                        Покрытие загрузки: {{ report.coverage.days_with_status }} из {{ report.coverage.expected_days }} дней
+                    </span>
+                </summary>
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table">
+                        <thead>
+                        <tr>
+                            <th>Дата</th>
+                            <th>Статус</th>
+                            <th class="text-end">Строк по статусу</th>
+                            <th>Последнее обновление</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for day in report.coverage.days %}
+                            <tr>
+                                <td class="text-nowrap">{{ day.date|date('d.m.Y') }}</td>
+                                <td>
+                                    <span class="badge bg-{{ day.status_tone }}">{{ day.status_label }}</span>
+                                    {% if day.last_error_message %}
+                                        <div class="text-danger small mt-1">{{ day.last_error_message|slice(0, 160) }}</div>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">{{ day.records_count|number_format(0, ',', ' ') }}</td>
+                                <td class="text-secondary text-nowrap">
+                                    {{ day.updated_at ? day.updated_at|date('d.m.Y H:i', 'Europe/Moscow') : '—' }}
+                                </td>
+                                <td class="text-end">
+                                    {% if day.raw_document_id %}
+                                        <a
+                                            href="{{ path('marketplace_raw_view', {id: day.raw_document_id}) }}"
+                                            class="btn btn-sm btn-ghost-primary"
+                                            target="_blank"
+                                            rel="noopener"
+                                        >JSON</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        {% endif %}
+    </div>
+{% endblock %}

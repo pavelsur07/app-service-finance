@@ -2,6 +2,7 @@
 
 namespace App\Twig;
 
+use App\Shared\Domain\ValueObject\Money;
 use Symfony\Component\Intl\Currencies;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFilter;
@@ -15,6 +16,7 @@ class CurrencyFormatExtension extends AbstractExtension
     {
         return [
             new TwigFilter('format_currency', [$this, 'formatCurrency']),
+            new TwigFilter('format_minor_currency', [$this, 'formatMinorCurrency']),
         ];
     }
 
@@ -27,6 +29,23 @@ class CurrencyFormatExtension extends AbstractExtension
         $symbol = $this->getCurrencySymbol($currency);
 
         return trim(sprintf('%s %s', $formatted, $symbol));
+    }
+
+    public function formatMinorCurrency(int $amountMinor, string $currency): string
+    {
+        $currency = strtoupper($currency);
+        $decimal = Money::fromMinor($amountMinor, $currency)->toDecimalString();
+        $negative = str_starts_with($decimal, '-');
+        $unsigned = ltrim($decimal, '-');
+        [$whole, $fraction] = array_pad(explode('.', $unsigned, 2), 2, '');
+        $groupedWhole = preg_replace('/\B(?=(\d{3})+(?!\d))/', ' ', $whole) ?? $whole;
+        $formatted = ($negative ? '-' : '').$groupedWhole;
+
+        if ('' !== $fraction) {
+            $formatted .= ','.$fraction;
+        }
+
+        return trim(sprintf('%s %s', $formatted, $this->getCurrencySymbol($currency)));
     }
 
     private function formatNumber(float|int|string $amount, int $fractionDigits): string
