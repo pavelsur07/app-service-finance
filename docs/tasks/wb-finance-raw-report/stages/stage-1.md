@@ -89,7 +89,10 @@
 #### Checkpoint
 
 - `docs/tasks/wb-finance-raw-report/checkpoint.md` updated.
-- Exact next action: publish the checked Stage to the task Draft PR and request the owner Release Gate decision.
+- Implementation commit: `4d4bca145cae88f2c66a34d51391dd8f725844e7`.
+- Branch: `agent/wb-finance-raw-report`.
+- Draft PR: `https://github.com/pavelsur07/app-service-finance/pull/2252`.
+- Exact next action: request the owner Release Gate decision.
 
 #### Open questions
 

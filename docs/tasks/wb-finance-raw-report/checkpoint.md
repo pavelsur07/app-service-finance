@@ -1,7 +1,7 @@
 ## Current checkpoint
 
 **Phase:** Release Gate
-**Status:** checking
+**Status:** done
 **Stage base commit:** `b1a49db20b1f3d907b914703f3931cd39875787d`
 **Current Work item:** none
 **Owner gate:** yes
@@ -14,6 +14,9 @@
 - Work item 1.3: unit/functional coverage and report documentation.
 - Full relevant Stage checks and internal review-fix cycles.
 - External read-only review-fix cycles; final result: `REVIEW_GREEN`.
+- Implementation commit: `4d4bca145cae88f2c66a34d51391dd8f725844e7`.
+- Branch pushed: `agent/wb-finance-raw-report`.
+- Draft PR created: `https://github.com/pavelsur07/app-service-finance/pull/2252`.
 
 ### Current diff / affected files
 
@@ -51,7 +54,7 @@
 
 ### Exact next action
 
-- Commit and push the task-owned Stage diff, create/update the single Draft PR, then update this checkpoint with the publication result and stop at the declared owner Release Gate.
+- STOP at the declared Release Gate. Owner reviews Draft PR #2252 and decides whether it may be moved to Ready for review.
 
 ### Files to inspect first on resume
 
