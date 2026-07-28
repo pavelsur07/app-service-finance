@@ -1,0 +1,63 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Товары и остатки{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Товары и остатки</h2>
+                </div>
+                <div class="col-auto ms-auto">
+                    <a href="{{ path('inventory_snapshots_index') }}" class="btn btn-outline-secondary">К загрузкам</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-body">
+        <div class="container-xl">
+
+            {% for label, messages in app.flashes %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ label == 'error' ? 'danger' : label }} alert-dismissible mb-3" role="alert">
+                        <div class="d-flex">
+                            <div>{{ message }}</div>
+                        </div>
+                        <a class="btn-close" data-bs-dismiss="alert" aria-label="close"></a>
+                    </div>
+                {% endfor %}
+            {% endfor %}
+
+            <div class="card">
+                <div class="card-header">
+                    <ul class="nav nav-tabs card-header-tabs" data-bs-toggle="tabs">
+                        <li class="nav-item">
+                            <a href="{{ path('inventory_stocks_index') }}"
+                               class="nav-link {{ active_tab == 'stocks' ? 'active' : '' }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21v-13l9 -4l9 4v13" /><path d="M13 13h4v8h-10v-6h6" /><path d="M13 21v-9a1 1 0 0 0 -1 -1h-2a1 1 0 0 0 -1 1v3" /></svg>
+                                Остатки
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ path('marketplace_inventory_index') }}"
+                               class="nav-link {{ active_tab == 'inventory' ? 'active' : '' }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3l8 4.5v9l-8 4.5l-8 -4.5v-9z" /><path d="M12 12l8 -4.5" /><path d="M12 12v9" /><path d="M12 12l-8 -4.5" /></svg>
+                                Себестоимость
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="card-body p-0">
+                    {% block tab_content %}{% endblock %}
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    {% block modals %}{% endblock %}
+
+{% endblock %}
