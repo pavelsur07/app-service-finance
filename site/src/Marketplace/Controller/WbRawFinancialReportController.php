@@ -194,6 +194,30 @@ final class WbRawFinancialReportController extends AbstractController
             ]);
         }
 
+        if ([] !== $report['deductions']) {
+            $this->writeCsvRow($stream, []);
+            $this->writeCsvRow($stream, [
+                'Основание удержания WB',
+                'Дата с',
+                'Дата по',
+                'Строк',
+                'reportId с номером, шт.',
+                'Удержано',
+                'Влияние на перечисление',
+            ]);
+            foreach ($report['deductions'] as $row) {
+                $this->writeCsvRow($stream, [
+                    $this->spreadsheetSafe((string) $row['reason']),
+                    $row['date_from'],
+                    $row['date_to'],
+                    (string) $row['row_count'],
+                    (string) $row['report_count'],
+                    $this->decimal($row['amount_minor']),
+                    $this->decimal(-$row['amount_minor']),
+                ]);
+            }
+        }
+
         $this->writeCsvRow($stream, []);
         $this->writeCsvRow($stream, ['reportId', 'Дата с', 'Дата по', 'Строк', 'Расчётное перечисление']);
         foreach ($report['reports'] as $row) {

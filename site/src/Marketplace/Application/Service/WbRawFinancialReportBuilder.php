@@ -165,6 +165,7 @@ final class WbRawFinancialReportBuilder
     ): array {
         $quality = array_fill_keys(array_keys(self::QUALITY_LABELS), 0);
         $articles = $this->emptyArticles();
+        $deductions = [];
         $reports = [];
         $operations = [];
         $seenRrdIds = [];
@@ -264,6 +265,15 @@ final class WbRawFinancialReportBuilder
                 );
 
                 $groupReportId = '' === $currentReportId ? 'Без reportId' : $currentReportId;
+                if (0 !== $amounts['deduction']) {
+                    $this->addDeductionRow(
+                        $deductions,
+                        $this->string($row, 'bonusTypeName', 'bonus_type_name'),
+                        $groupReportId,
+                        $businessDate,
+                        $amounts['deduction'],
+                    );
+                }
                 $this->addReportRow($reports, $groupReportId, $businessDate, $rowPayoutMinor);
                 $this->addOperationRow(
                     $operations,
@@ -294,6 +304,21 @@ final class WbRawFinancialReportBuilder
         usort(
             $operationRows,
             static fn (array $left, array $right): int => abs($right['payout_minor']) <=> abs($left['payout_minor']),
+        );
+
+        $deductionRows = array_values($deductions);
+        foreach ($deductionRows as &$deductionRow) {
+            $deductionRow['report_count'] = count(array_filter(
+                array_keys($deductionRow['report_ids']),
+                static fn (int|string $id): bool => 'Без reportId' !== (string) $id,
+            ));
+            unset($deductionRow['report_ids']);
+        }
+        unset($deductionRow);
+        usort(
+            $deductionRows,
+            static fn (array $left, array $right): int => $right['amount_minor'] <=> $left['amount_minor']
+                ?: strnatcasecmp($left['reason'], $right['reason']),
         );
 
         $articleRows = array_values(array_filter(
@@ -346,7 +371,7 @@ final class WbRawFinancialReportBuilder
             ],
             'summary' => [
                 'row_count' => $rowCount,
-                'report_count' => count(array_filter(array_keys($reports), static fn (string $id): bool => 'Без reportId' !== $id)),
+                'report_count' => count(array_filter(array_keys($reports), static fn (int|string $id): bool => 'Без reportId' !== (string) $id)),
                 'sale_without_spp_minor' => $articles['sale_without_spp']['net_minor'],
                 'sale_with_spp_minor' => $articles['sale_with_spp']['net_minor'],
                 'wb_costs_minor' => $wbCostsMinor,
@@ -355,6 +380,7 @@ final class WbRawFinancialReportBuilder
                 'payout_minor' => $payoutMinor,
             ],
             'articles' => $articleRows,
+            'deductions' => $deductionRows,
             'reports' => $reportRows,
             'operations' => $operationRows,
             'quality_labels' => self::QUALITY_LABELS,
@@ -635,6 +661,39 @@ final class WbRawFinancialReportBuilder
         $operations[$key]['report_ids'][$reportId] = true;
         $operations[$key]['payout_minor'] = $this->sum($operations[$key]['payout_minor'], $payoutMinor);
         $operations[$key]['report_count'] = count($operations[$key]['report_ids']);
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $deductions
+     */
+    private function addDeductionRow(
+        array &$deductions,
+        string $reason,
+        string $reportId,
+        string $businessDate,
+        int $rawAmountMinor,
+    ): void {
+        if (0 === $rawAmountMinor) {
+            return;
+        }
+
+        $reason = '' === $reason ? 'Без расшифровки WB' : $reason;
+        $key = 'reason:'.$reason;
+        $deductions[$key] ??= [
+            'reason' => $reason,
+            'date_from' => $businessDate,
+            'date_to' => $businessDate,
+            'row_count' => 0,
+            'report_ids' => [],
+            'amount_minor' => 0,
+        ];
+
+        $amountMinor = abs($rawAmountMinor);
+        $deductions[$key]['date_from'] = min($deductions[$key]['date_from'], $businessDate);
+        $deductions[$key]['date_to'] = max($deductions[$key]['date_to'], $businessDate);
+        ++$deductions[$key]['row_count'];
+        $deductions[$key]['report_ids'][$reportId] = true;
+        $deductions[$key]['amount_minor'] = $this->sum($deductions[$key]['amount_minor'], $amountMinor);
     }
 
     /**
