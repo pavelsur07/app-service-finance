@@ -27,6 +27,7 @@ final class WbRawFinancialReportBuilder
         'invalid_money_values' => 'Некорректные денежные значения',
         'invalid_quantity_rows' => 'Некорректное количество',
         'excluded_product_rows' => 'Исключённые некорректные товарные строки',
+        'unidentified_product_rows' => 'Товарные строки без стабильного SKU',
         'unclassified_doc_type_rows' => 'Не классифицированный тип документа',
         'negative_commission_rows' => 'Отрицательная расчётная комиссия',
         'unclassified_money_rows' => 'Не классифицированные денежные поля',
@@ -168,6 +169,8 @@ final class WbRawFinancialReportBuilder
         $deductions = [];
         $reports = [];
         $operations = [];
+        $productSources = [];
+        $productSourceSequence = 0;
         $seenRrdIds = [];
         $rowCount = 0;
         $loadedRowCount = 0;
@@ -252,6 +255,11 @@ final class WbRawFinancialReportBuilder
 
                 $rowPayoutMinor = $this->collectProductArticles(
                     $articles,
+                    $productSources,
+                    $productSourceSequence,
+                    $row,
+                    $businessDate,
+                    $rrdId,
                     $amounts,
                     $invalidMoneyFields,
                     $docType,
@@ -336,6 +344,12 @@ final class WbRawFinancialReportBuilder
                 || in_array($article['key'], ['sale_without_spp', 'sale_with_spp', 'commission', 'acquiring', 'for_pay'], true),
         ));
 
+        $productSourceRows = array_values($productSources);
+        foreach ($productSourceRows as &$productSourceRow) {
+            $productSourceRow['barcodes'] = array_map('strval', array_keys($productSourceRow['barcodes']));
+        }
+        unset($productSourceRow);
+
         $postProductMinor = 0;
         foreach ($articles as $article) {
             if ('Прочие удержания и начисления' === $article['group']) {
@@ -392,6 +406,7 @@ final class WbRawFinancialReportBuilder
             ],
             'articles' => $articleRows,
             'deductions' => $deductionRows,
+            '_product_sources' => $productSourceRows,
             'reports' => $reportRows,
             'operations' => $operationRows,
             'quality_labels' => self::QUALITY_LABELS,
@@ -425,12 +440,19 @@ final class WbRawFinancialReportBuilder
 
     /**
      * @param array<string, array<string, int|string>> $articles
+     * @param array<string, array<string, mixed>> $productSources
+     * @param array<string, mixed> $row
      * @param array<string, int> $amounts
      * @param array<string, true> $invalidMoneyFields
      * @param array<string, int> $quality
      */
     private function collectProductArticles(
         array &$articles,
+        array &$productSources,
+        int &$productSourceSequence,
+        array $row,
+        string $businessDate,
+        string $rrdId,
         array $amounts,
         array $invalidMoneyFields,
         ?string $docType,
@@ -493,8 +515,147 @@ final class WbRawFinancialReportBuilder
         $this->addExpenseByDocumentType($articles['commission'], $commission, $isReturn);
         $this->addExpenseByDocumentType($articles['acquiring'], $acquiring, $isReturn);
         $this->addIncomeByDocumentType($articles['for_pay'], $forPay, $isReturn);
+        $this->addProductSourceRow(
+            $productSources,
+            $productSourceSequence,
+            $row,
+            $businessDate,
+            $rrdId,
+            $isReturn,
+            $quantity,
+            $gross,
+            $retailAmount,
+            $forPay,
+            $quality,
+        );
 
         return $isReturn ? -$forPay : $forPay;
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $products
+     * @param array<string, mixed> $row
+     * @param array<string, int> $quality
+     */
+    private function addProductSourceRow(
+        array &$products,
+        int &$sequence,
+        array $row,
+        string $businessDate,
+        string $rrdId,
+        bool $isReturn,
+        int $quantity,
+        int $grossMinor,
+        int $retailAmountMinor,
+        int $forPayMinor,
+        array &$quality,
+    ): void {
+        $nmId = $this->string($row, 'nmId', 'nm_id');
+        $size = $this->normalizeWbSize($this->string($row, 'techSize', 'ts_name'));
+        $barcode = $this->string($row, 'sku', 'barcode');
+        $supplierSku = $this->string($row, 'vendorCode', 'sa_name');
+        $brand = $this->string($row, 'brandName', 'brand_name');
+        $subject = $this->string($row, 'subjectName', 'subject_name');
+
+        if ('' !== $nmId && '0' !== $nmId) {
+            $key = 'nm:'.$nmId."\0".$size;
+        } elseif ('' !== $barcode) {
+            $key = 'barcode:'.$barcode;
+        } elseif ('' !== $supplierSku) {
+            $key = 'supplier:'.mb_strtolower($supplierSku)."\0".$size;
+        } else {
+            ++$quality['unidentified_product_rows'];
+            $key = '' !== $rrdId && '0' !== $rrdId ? 'rrd:'.$rrdId : 'row:'.++$sequence;
+        }
+        $products[$key] ??= [
+            'nm_id' => $nmId,
+            'size' => $size,
+            'supplier_sku' => $supplierSku,
+            'brand' => $brand,
+            'subject' => $subject,
+            'barcodes' => [],
+            'sold_quantity' => 0,
+            'returned_quantity' => 0,
+            'sales_without_spp_minor' => 0,
+            'returns_without_spp_minor' => 0,
+            'sales_with_spp_minor' => 0,
+            'returns_with_spp_minor' => 0,
+            'sales_for_pay_minor' => 0,
+            'returns_for_pay_minor' => 0,
+            '_cost_quantities' => [
+                'sale' => [],
+                'return' => [],
+            ],
+        ];
+
+        if ('' !== $barcode) {
+            $products[$key]['barcodes'][$barcode] = true;
+        }
+        foreach ([
+            'nm_id' => $nmId,
+            'supplier_sku' => $supplierSku,
+            'brand' => $brand,
+            'subject' => $subject,
+        ] as $field => $value) {
+            if ('' === $products[$key][$field] && '' !== $value) {
+                $products[$key][$field] = $value;
+            }
+        }
+        if ('UNKNOWN' === $products[$key]['size'] && 'UNKNOWN' !== $size) {
+            $products[$key]['size'] = $size;
+        }
+
+        $direction = $isReturn ? 'return' : 'sale';
+        $quantityField = $isReturn ? 'returned_quantity' : 'sold_quantity';
+        $grossField = $isReturn ? 'returns_without_spp_minor' : 'sales_without_spp_minor';
+        $retailField = $isReturn ? 'returns_with_spp_minor' : 'sales_with_spp_minor';
+        $forPayField = $isReturn ? 'returns_for_pay_minor' : 'sales_for_pay_minor';
+        $costDate = $this->productCostDate($row, $businessDate, $isReturn);
+
+        $products[$key][$quantityField] = $this->sumQuantity($products[$key][$quantityField], $quantity);
+        $products[$key][$grossField] = $this->sum($products[$key][$grossField], $grossMinor);
+        $products[$key][$retailField] = $this->sum($products[$key][$retailField], $retailAmountMinor);
+        $products[$key][$forPayField] = $this->sum($products[$key][$forPayField], $forPayMinor);
+        $products[$key]['_cost_quantities'][$direction][$costDate] = $this->sumQuantity(
+            $products[$key]['_cost_quantities'][$direction][$costDate] ?? 0,
+            $quantity,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private function productCostDate(array $row, string $businessDate, bool $isReturn): string
+    {
+        $keys = $isReturn
+            ? ['orderDt', 'order_dt', 'saleDt', 'sale_dt', 'rrDate', 'rr_dt']
+            : ['saleDt', 'sale_dt', 'rrDate', 'rr_dt'];
+
+        foreach ($keys as $key) {
+            $raw = $this->raw($row, $key);
+            if (!is_scalar($raw)) {
+                continue;
+            }
+
+            $candidate = substr(trim((string) $raw), 0, 10);
+            $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $candidate);
+            $errors = \DateTimeImmutable::getLastErrors();
+            if (
+                false !== $date
+                && (!is_array($errors) || (0 === $errors['warning_count'] && 0 === $errors['error_count']))
+            ) {
+                return $date->format('Y-m-d');
+            }
+        }
+
+        return $businessDate;
+    }
+
+    private function normalizeWbSize(string $size): string
+    {
+        $size = trim($size);
+
+        return '' !== $size && '0' !== $size ? $size : 'UNKNOWN';
     }
 
     /**
@@ -928,6 +1089,16 @@ final class WbRawFinancialReportBuilder
         return Money::fromMinor($leftMinor, self::CURRENCY)
             ->add(Money::fromMinor($rightMinor, self::CURRENCY))
             ->amountMinor();
+    }
+
+    private function sumQuantity(int $left, int $right): int
+    {
+        $sum = \bcadd((string) $left, (string) $right, 0);
+        if (\bccomp($sum, (string) \PHP_INT_MAX, 0) > 0) {
+            throw new \OverflowException('Product quantity exceeds the supported integer range.');
+        }
+
+        return (int) $sum;
     }
 
     private function decimalString(mixed $value): string
