@@ -168,7 +168,9 @@ final class InventoryImportControllerTest extends WebTestCaseBase
             trim($crawler->filter('select[name="identifier_type"] option[value="supplier_sku"]')->text()),
         );
         self::assertStringContainsString('Артикул продавца Wildberries / vendorCode', $client->getResponse()->getContent());
+        self::assertStringContainsString('регистр букв не учитывается', $client->getResponse()->getContent());
         self::assertStringContainsString('Одна цена будет применена ко всем размерам', $client->getResponse()->getContent());
+        self::assertStringContainsString('отличающиеся только регистром, будут пропущены с ошибкой', $client->getResponse()->getContent());
     }
 
     private function authenticatedClient(string $email): KernelBrowser
