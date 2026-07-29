@@ -52,8 +52,17 @@ final class InventoryImportController extends AbstractController
             return $this->redirectToRoute('marketplace_inventory_index');
         }
 
-        if ($marketplaceType !== MarketplaceType::OZON && $identifierType !== 'barcode') {
-            $this->addFlash('error', 'Для не-Ozon импорта разрешён только barcode.');
+        if ('marketplace_sku' === $identifierType && MarketplaceType::OZON !== $marketplaceType) {
+            $this->addFlash('error', 'Импорт по SKU маркетплейса доступен только для Ozon.');
+
+            return $this->redirectToRoute('marketplace_inventory_index');
+        }
+
+        if (
+            'supplier_sku' === $identifierType
+            && !in_array($marketplaceType, [MarketplaceType::OZON, MarketplaceType::WILDBERRIES], true)
+        ) {
+            $this->addFlash('error', 'Импорт по артикулу продавца доступен только для Ozon и Wildberries.');
 
             return $this->redirectToRoute('marketplace_inventory_index');
         }
