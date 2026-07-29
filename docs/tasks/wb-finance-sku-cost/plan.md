@@ -147,7 +147,7 @@ release_candidate: yes
 
 independently_deployable: yes
 
-stage_base_commit: фиксируется после завершения Stage 2
+stage_base_commit: `92cccfae0a9d00b7b6302178c4693c445a464bc9`
 
 Definition of Done:
 
