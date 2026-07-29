@@ -126,8 +126,8 @@ final class WbRawFinancialReportBuilder
             'group' => 'Прочие удержания и начисления',
         ],
         'deduction' => [
-            'label' => 'Удержания',
-            'source' => 'deduction',
+            'label' => 'Удержания и выплаты',
+            'source' => 'deduction: > 0 удержание, < 0 выплата',
             'group' => 'Прочие удержания и начисления',
         ],
         'warehouse_logistics' => [
@@ -308,6 +308,10 @@ final class WbRawFinancialReportBuilder
 
         $deductionRows = array_values($deductions);
         foreach ($deductionRows as &$deductionRow) {
+            $deductionRow['impact_minor'] = $this->sum(
+                $deductionRow['paid_minor'],
+                -$deductionRow['withheld_minor'],
+            );
             $deductionRow['report_count'] = count(array_filter(
                 array_keys($deductionRow['report_ids']),
                 static fn (int|string $id): bool => 'Без reportId' !== (string) $id,
@@ -315,9 +319,13 @@ final class WbRawFinancialReportBuilder
             unset($deductionRow['report_ids']);
         }
         unset($deductionRow);
+        // Gross turnover only defines presentation order; exported money totals
+        // remain the values accumulated through Money-safe sum().
         usort(
             $deductionRows,
-            static fn (array $left, array $right): int => $right['amount_minor'] <=> $left['amount_minor']
+            static fn (array $left, array $right): int => ($right['withheld_minor'] + $right['paid_minor'])
+                <=> ($left['withheld_minor'] + $left['paid_minor'])
+                ?: abs($right['impact_minor']) <=> abs($left['impact_minor'])
                 ?: strnatcasecmp($left['reason'], $right['reason']),
         );
 
@@ -378,6 +386,9 @@ final class WbRawFinancialReportBuilder
                 'for_pay_minor' => $articles['for_pay']['net_minor'],
                 'post_product_minor' => $postProductMinor,
                 'payout_minor' => $payoutMinor,
+                'deduction_withheld_minor' => $articles['deduction']['accrual_minor'],
+                'deduction_paid_minor' => $articles['deduction']['reversal_minor'],
+                'deduction_impact_minor' => $articles['deduction']['net_minor'],
             ],
             'articles' => $articleRows,
             'deductions' => $deductionRows,
@@ -512,9 +523,13 @@ final class WbRawFinancialReportBuilder
             );
         }
 
-        foreach (['storage', 'acceptance', 'penalty', 'deduction', 'warehouse_logistics'] as $key) {
+        foreach (['storage', 'acceptance', 'penalty', 'warehouse_logistics'] as $key) {
             $payoutMinor = $this->sum($payoutMinor, $this->addExpense($articles[$key], $amounts[$key]));
         }
+        $payoutMinor = $this->sum(
+            $payoutMinor,
+            $this->addDeduction($articles['deduction'], $amounts['deduction']),
+        );
 
         if ('возмещение за выдачу и возврат товаров на пвз' === mb_strtolower(trim($operationName))) {
             $payoutMinor = $this->sum(
@@ -594,6 +609,29 @@ final class WbRawFinancialReportBuilder
         $article['net_minor'] = $this->sum((int) $article['net_minor'], -$costMinor);
 
         return -$costMinor;
+    }
+
+    /**
+     * @param array<string, int|string> $article
+     */
+    private function addDeduction(array &$article, int $rawAmountMinor): int
+    {
+        if ($rawAmountMinor > 0) {
+            $article['accrual_minor'] = $this->sum((int) $article['accrual_minor'], $rawAmountMinor);
+            $article['net_minor'] = $this->sum((int) $article['net_minor'], -$rawAmountMinor);
+
+            return -$rawAmountMinor;
+        }
+
+        if ($rawAmountMinor < 0) {
+            $paymentMinor = abs($rawAmountMinor);
+            $article['reversal_minor'] = $this->sum((int) $article['reversal_minor'], $paymentMinor);
+            $article['net_minor'] = $this->sum((int) $article['net_minor'], $paymentMinor);
+
+            return $paymentMinor;
+        }
+
+        return 0;
     }
 
     /**
@@ -685,7 +723,8 @@ final class WbRawFinancialReportBuilder
             'date_to' => $businessDate,
             'row_count' => 0,
             'report_ids' => [],
-            'amount_minor' => 0,
+            'withheld_minor' => 0,
+            'paid_minor' => 0,
         ];
 
         $amountMinor = abs($rawAmountMinor);
@@ -693,7 +732,8 @@ final class WbRawFinancialReportBuilder
         $deductions[$key]['date_to'] = max($deductions[$key]['date_to'], $businessDate);
         ++$deductions[$key]['row_count'];
         $deductions[$key]['report_ids'][$reportId] = true;
-        $deductions[$key]['amount_minor'] = $this->sum($deductions[$key]['amount_minor'], $amountMinor);
+        $amountKey = $rawAmountMinor > 0 ? 'withheld_minor' : 'paid_minor';
+        $deductions[$key][$amountKey] = $this->sum($deductions[$key][$amountKey], $amountMinor);
     }
 
     /**

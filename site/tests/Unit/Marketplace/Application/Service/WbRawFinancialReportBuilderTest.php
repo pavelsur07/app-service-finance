@@ -172,7 +172,7 @@ final class WbRawFinancialReportBuilderTest extends TestCase
         self::assertSame(0, $report['quality']['excluded_product_rows']);
     }
 
-    public function testNormalizesNegativeRawCostFieldsAsExpenses(): void
+    public function testKeepsNegativeLogisticsAsExpenseAndTreatsNegativeDeductionAsPayment(): void
     {
         $report = (new WbRawFinancialReportBuilder())->build(
             [$this->document([[
@@ -188,16 +188,22 @@ final class WbRawFinancialReportBuilderTest extends TestCase
             new \DateTimeImmutable('2026-07-01'),
         );
 
-        self::assertSame(-5500, $report['summary']['payout_minor']);
-        self::assertSame(5500, $report['summary']['wb_costs_minor']);
+        self::assertSame(-4500, $report['summary']['payout_minor']);
+        self::assertSame(4500, $report['summary']['wb_costs_minor']);
         self::assertSame(5000, $this->article($report, 'logistics_delivery')['accrual_minor']);
-        self::assertSame(500, $this->article($report, 'deduction')['accrual_minor']);
+        self::assertSame(0, $this->article($report, 'deduction')['accrual_minor']);
+        self::assertSame(500, $this->article($report, 'deduction')['reversal_minor']);
+        self::assertSame(500, $this->article($report, 'deduction')['net_minor']);
         self::assertSame('Списание за отзыв', $report['deductions'][0]['reason']);
-        self::assertSame(500, $report['deductions'][0]['amount_minor']);
+        self::assertSame(0, $report['deductions'][0]['withheld_minor']);
+        self::assertSame(500, $report['deductions'][0]['paid_minor']);
+        self::assertSame(500, $report['deductions'][0]['impact_minor']);
     }
 
     public function testBreaksDeductionsDownByExactRawReason(): void
     {
+        $compensationReason = 'Добровольная выплата за товары, пострадавшие в результате '
+            .'обстоятельств непреодолимой силы, документ №123';
         $report = (new WbRawFinancialReportBuilder())->build(
             [
                 $this->document([
@@ -205,13 +211,13 @@ final class WbRawFinancialReportBuilderTest extends TestCase
                         'reportId' => 801,
                         'rrdId' => 6101,
                         'deduction' => '-7.50',
-                        'bonusTypeName' => 'Списание за отзыв',
+                        'bonusTypeName' => $compensationReason,
                     ],
                     [
                         'reportId' => 802,
                         'rrdId' => 6102,
                         'deduction' => '2.50',
-                        'bonus_type_name' => 'Списание за отзыв',
+                        'bonus_type_name' => $compensationReason,
                     ],
                     [
                         'reportId' => 802,
@@ -223,7 +229,7 @@ final class WbRawFinancialReportBuilderTest extends TestCase
                     'reportId' => 801,
                     'rrdId' => 6104,
                     'deduction' => '-1.25',
-                    'bonusTypeName' => 'Списание за отзыв',
+                    'bonusTypeName' => $compensationReason,
                 ]], businessDate: '2026-07-02'),
             ],
             new \DateTimeImmutable('2026-07-01'),
@@ -232,18 +238,35 @@ final class WbRawFinancialReportBuilderTest extends TestCase
 
         self::assertCount(2, $report['deductions']);
         self::assertSame([
-            'reason' => 'Списание за отзыв',
+            'reason' => $compensationReason,
             'date_from' => '2026-07-01',
             'date_to' => '2026-07-02',
             'row_count' => 3,
-            'amount_minor' => 1125,
+            'withheld_minor' => 250,
+            'paid_minor' => 875,
+            'impact_minor' => 625,
             'report_count' => 2,
         ], $report['deductions'][0]);
         self::assertSame('Без расшифровки WB', $report['deductions'][1]['reason']);
-        self::assertSame(300, $report['deductions'][1]['amount_minor']);
+        self::assertSame(0, $report['deductions'][1]['withheld_minor']);
+        self::assertSame(300, $report['deductions'][1]['paid_minor']);
+        self::assertSame(300, $report['deductions'][1]['impact_minor']);
+        self::assertSame(250, $this->article($report, 'deduction')['accrual_minor']);
+        self::assertSame(1175, $this->article($report, 'deduction')['reversal_minor']);
+        self::assertSame(925, $this->article($report, 'deduction')['net_minor']);
+        self::assertSame(925, $report['summary']['payout_minor']);
+        self::assertSame(-925, $report['summary']['wb_costs_minor']);
+        self::assertSame(250, $report['summary']['deduction_withheld_minor']);
+        self::assertSame(1175, $report['summary']['deduction_paid_minor']);
+        self::assertSame(925, $report['summary']['deduction_impact_minor']);
+        self::assertSame('801', $report['reports'][0]['report_id']);
+        self::assertSame(875, $report['reports'][0]['payout_minor']);
+        self::assertSame('802', $report['reports'][1]['report_id']);
+        self::assertSame(50, $report['reports'][1]['payout_minor']);
+        self::assertSame(925, $report['operations'][0]['payout_minor']);
         self::assertSame(
-            $this->article($report, 'deduction')['accrual_minor'],
-            array_sum(array_column($report['deductions'], 'amount_minor')),
+            $this->article($report, 'deduction')['net_minor'],
+            array_sum(array_column($report['deductions'], 'impact_minor')),
         );
     }
 

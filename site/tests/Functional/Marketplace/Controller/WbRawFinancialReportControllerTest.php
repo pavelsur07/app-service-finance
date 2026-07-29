@@ -75,16 +75,28 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
         ]);
         $client->loginUser($user);
 
-        $client->request(
+        $crawler = $client->request(
             'GET',
             '/marketplace/wb-finance-report?date_from=2026-07-01&date_to=2026-07-01',
         );
 
         self::assertResponseIsSuccessful();
-        self::assertSelectorTextContains('#wb-deduction-breakdown', 'Расшифровка удержаний');
+        self::assertSelectorTextContains('#wb-deduction-breakdown', 'Расшифровка удержаний и выплат');
+        self::assertSelectorTextContains('body', 'Расходы WB (нетто)');
+        self::assertSelectorTextContains('body', 'колонка «Возврат / сторно» показывает выплаты WB');
         self::assertSelectorTextContains('#wb-deduction-breakdown', 'Списание за отзыв');
+        self::assertSelectorTextContains('#wb-deduction-breakdown', 'Основание операции WB');
         self::assertSelectorTextContains('#wb-deduction-breakdown', 'Без расшифровки WB');
-        self::assertSelectorTextContains('#wb-deduction-breakdown', '10,00 RUB');
+        self::assertSelectorTextContains('#wb-deduction-breakdown', 'Удержано');
+        self::assertSelectorTextContains('#wb-deduction-breakdown', 'Выплачено WB');
+        self::assertStringContainsString(
+            '2,50 RUB 7,50 RUB 5,00 RUB',
+            $crawler->filter('#wb-deduction-breakdown tbody tr')->first()->text(null, true),
+        );
+        self::assertStringContainsString(
+            'Итого 2,50 RUB 10,50 RUB 8,00 RUB',
+            $crawler->filter('#wb-deduction-breakdown tfoot')->text(null, true),
+        );
         self::assertSelectorCount(2, '#wb-deduction-breakdown tbody tr');
     }
 
@@ -173,9 +185,12 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
         self::assertResponseHeaderSame('content-type', 'text/csv; charset=UTF-8');
         self::assertStringContainsString('attachment;', (string) $client->getResponse()->headers->get('content-disposition'));
         $content = (string) $client->getResponse()->getContent();
-        self::assertStringContainsString('"Расчётное перечисление";70.00', $content);
-        self::assertStringContainsString('"Основание удержания WB"', $content);
-        self::assertStringContainsString("'=1+1", $content);
+        self::assertStringContainsString('"Расчётное перечисление";80.00', $content);
+        self::assertStringContainsString('"Расходы WB (нетто)";20.00', $content);
+        self::assertStringContainsString('"Основание операции WB"', $content);
+        self::assertStringContainsString(';Удержано;"Выплачено WB";"Влияние на перечисление"', $content);
+        self::assertStringContainsString("'=1+1;2026-07-01;2026-07-01;1;1;0.00;5.00;5.00", $content);
+        self::assertStringContainsString('Итого;;;;;0.00;5.00;5.00', $content);
         self::assertStringContainsString('\'=HYPERLINK', $content);
         self::assertStringContainsString('\'=HYPERLINK(""https://report.example.test"")', $content);
     }
