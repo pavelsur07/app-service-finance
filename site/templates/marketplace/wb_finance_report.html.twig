@@ -4,6 +4,16 @@
     {{ minor|format_minor_currency('RUB') }}
 {% endmacro %}
 
+{% macro percent(value) %}
+    {% if value is null %}
+        —
+    {% elseif value == '0.0' %}
+        0,0%
+    {% else %}
+        {{ value|replace({'.': ','}) }}%
+    {% endif %}
+{% endmacro %}
+
 {% import _self as report_ui %}
 
 {% block title %}Финансовый отчёт WB по загруженным данным{% endblock %}
@@ -294,6 +304,341 @@
                     </div>
                 </details>
             {% endif %}
+
+            <div id="wb-product-costs" class="card mb-3">
+                <div class="card-header">
+                    <div>
+                        <h4 class="card-title mb-1">Товары и себестоимость</h4>
+                        <div class="text-secondary small">
+                            Результат = товарное «К перечислению» − нетто-себестоимость.
+                            Это не чистая прибыль: логистика, хранение, штрафы и другие нетоварные расходы WB
+                            по SKU не распределяются.
+                        </div>
+                    </div>
+                </div>
+
+                {% if report.products is empty %}
+                    <div class="card-body text-center text-secondary py-5">
+                        Для выбранных фильтров нет товарных продаж или возвратов.
+                    </div>
+                {% else %}
+                    <div class="card-body border-bottom">
+                        <div class="row row-cards">
+                            <div class="col-sm-6 col-xl-4">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <div class="text-secondary mb-1">Варианты SKU</div>
+                                        <div class="h2 mb-0">{{ report.product_summary.sku_count|number_format(0, ',', ' ') }}</div>
+                                        <div class="text-secondary small">
+                                            Сопоставлено:
+                                            {{ report.product_summary.mapped_sku_count|number_format(0, ',', ' ') }},
+                                            без пары:
+                                            {{ report.product_summary.unmapped_sku_count|number_format(0, ',', ' ') }},
+                                            конфликтов:
+                                            {{ report.product_summary.conflict_sku_count|number_format(0, ',', ' ') }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 col-xl-4">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <div class="text-secondary mb-1">Товары, шт.</div>
+                                        <div class="h2 mb-0">{{ report.product_summary.net_quantity|number_format(0, ',', ' ') }}</div>
+                                        <div class="text-secondary small">
+                                            Продано: {{ report.product_summary.sold_quantity|number_format(0, ',', ' ') }},
+                                            возвращено: {{ report.product_summary.returned_quantity|number_format(0, ',', ' ') }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 col-xl-4">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <div class="text-secondary mb-1">Продажи без СПП (нетто)</div>
+                                        <div class="h2 mb-0">{{ report_ui.money(report.product_summary.net_sales_without_spp_minor) }}</div>
+                                        <div class="text-secondary small">
+                                            С СПП: {{ report_ui.money(report.product_summary.net_sales_with_spp_minor) }}
+                                        </div>
+                                        <div class="text-secondary small">
+                                            Сверка со статьями:
+                                            <span class="{{ report.product_summary.sales_reconciliation_minor != 0 ? 'text-danger' : '' }}">
+                                                {{ report_ui.money(report.product_summary.sales_reconciliation_minor) }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 col-xl-4">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <div class="text-secondary mb-1">К перечислению за товар (по SKU)</div>
+                                        <div class="h2 mb-0">{{ report_ui.money(report.product_summary.for_pay_minor) }}</div>
+                                        <div class="text-secondary small">
+                                            Не распределено по SKU:
+                                            {{ report_ui.money(report.product_summary.unallocated_for_pay_minor) }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 col-xl-4">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <div class="text-secondary mb-1">Нетто-себестоимость</div>
+                                        <div class="h2 mb-0">{{ report_ui.money(report.product_summary.net_cost_minor) }}</div>
+                                        <div class="text-secondary small">
+                                            Покрытие:
+                                            {{ report_ui.percent(report.product_summary.cost_coverage_percent) }};
+                                            без цены:
+                                            {{ report.product_summary.missing_cost_quantity|number_format(0, ',', ' ') }} шт.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 col-xl-4">
+                                <div class="card h-100 {{ report.product_summary.result_minor is not null ? 'border-primary' : 'border-warning' }}">
+                                    <div class="card-body">
+                                        <div class="text-secondary mb-1">Результат до общих расходов WB</div>
+                                        {% if report.product_summary.result_minor is not null %}
+                                            <div class="h2 mb-0 {{ report.product_summary.result_minor < 0 ? 'text-danger' : (report.product_summary.result_minor > 0 ? 'text-primary' : '') }}">
+                                                {{ report_ui.money(report.product_summary.result_minor) }}
+                                            </div>
+                                            <div class="text-secondary small">
+                                                Рентабельность к продажам без СПП:
+                                                {{ report_ui.percent(report.product_summary.profitability_percent) }}
+                                            </div>
+                                        {% else %}
+                                            <div class="h2 mb-0 text-warning">—</div>
+                                            <div class="text-secondary small">
+                                                Рассчитано SKU:
+                                                {{ report.product_summary.complete_cost_sku_count|number_format(0, ',', ' ') }}
+                                                из {{ report.product_summary.sku_count|number_format(0, ',', ' ') }};
+                                                известная часть:
+                                                {{ report_ui.money(report.product_summary.known_result_minor) }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+
+                {% if report.product_summary.missing_cost_quantity > 0
+                    or report.product_summary.unmapped_sku_count > 0
+                    or report.product_summary.conflict_sku_count > 0
+                    or report.product_summary.fallback_cost_quantity > 0
+                    or report.product_summary.unallocated_for_pay_minor != 0
+                    or report.product_summary.sales_reconciliation_minor != 0 %}
+                    <div class="card-body border-top">
+                        <div class="d-flex flex-column gap-3">
+                        {% if report.product_summary.missing_cost_quantity > 0
+                            or report.product_summary.unmapped_sku_count > 0
+                            or report.product_summary.conflict_sku_count > 0 %}
+                            <div class="alert alert-warning mb-0" role="status">
+                                Общий результат недостоверен, пока не заполнена себестоимость для
+                                {{ report.product_summary.missing_cost_quantity|number_format(0, ',', ' ') }} шт.
+                                {% if report.product_summary.unmapped_sku_count > 0 %}
+                                    Не сопоставлено SKU:
+                                    {{ report.product_summary.unmapped_sku_count|number_format(0, ',', ' ') }}.
+                                {% endif %}
+                                {% if report.product_summary.conflict_sku_count > 0 %}
+                                    Конфликтов идентификаторов:
+                                    {{ report.product_summary.conflict_sku_count|number_format(0, ',', ' ') }}.
+                                {% endif %}
+                            </div>
+                        {% endif %}
+
+                        {% if report.product_summary.fallback_cost_quantity > 0 %}
+                            <div class="alert alert-info mb-0" role="status">
+                                Для
+                                {{ report.product_summary.fallback_cost_quantity|number_format(0, ',', ' ') }} шт.
+                                использована самая ранняя
+                                доступная себестоимость по правилу fallback.
+                            </div>
+                        {% endif %}
+
+                        {% if report.product_summary.unallocated_for_pay_minor != 0 %}
+                            <div class="alert alert-secondary mb-0" role="status">
+                                {{ report_ui.money(report.product_summary.unallocated_for_pay_minor) }}
+                                товарного «К перечислению» не распределено по SKU.
+                                Это корректировки без товарной строки, они сохранены в общих итогах отчёта.
+                            </div>
+                        {% endif %}
+
+                        {% if report.product_summary.sales_reconciliation_minor != 0 %}
+                            <div class="alert alert-danger mb-0" role="alert">
+                                Расхождение продаж между общими статьями и строками SKU:
+                                {{ report_ui.money(report.product_summary.sales_reconciliation_minor) }}.
+                                Проверьте исключённые и неклассифицированные raw-строки.
+                            </div>
+                        {% endif %}
+                        </div>
+                    </div>
+                {% endif %}
+
+                {% if report.products is not empty %}
+                    <div class="table-responsive">
+                        <table class="table table-vcenter card-table">
+                            <thead>
+                            <tr>
+                                <th>Товар / SKU</th>
+                                <th>Количество</th>
+                                <th class="text-end">Продажи</th>
+                                <th class="text-end">К перечислению по SKU</th>
+                                <th class="text-end">Себестоимость</th>
+                                <th>Покрытие</th>
+                                <th class="text-end">Результат</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for product in report.products %}
+                                <tr
+                                    data-sku-nm-id="{{ product.nm_id|e('html_attr') }}"
+                                    data-sku-barcode="{{ product.barcode|e('html_attr') }}"
+                                >
+                                    <td>
+                                        <div class="fw-semibold">{{ product.name }}</div>
+                                        <div class="text-secondary small">
+                                            Артикул:
+                                            {{ product.supplier_sku is not empty ? product.supplier_sku : '—' }}
+                                        </div>
+                                        <div class="text-secondary small">
+                                            nmId: {{ product.nm_id is not empty ? product.nm_id : '—' }};
+                                            размер: {{ product.size != 'UNKNOWN' ? product.size : '—' }};
+                                            barcode:
+                                            {{ product.barcodes is not empty ? product.barcodes|join(', ') : '—' }}
+                                        </div>
+                                        {% if product.mapping_status == 'mapped' %}
+                                            <span class="badge bg-success-lt mt-1">
+                                                {{ product_status_labels.mapping[product.mapping_status] ?? 'Неизвестно' }}
+                                            </span>
+                                        {% elseif product.mapping_status == 'conflict' %}
+                                            <span class="badge bg-danger-lt mt-1">
+                                                {{ product_status_labels.mapping[product.mapping_status] ?? 'Неизвестно' }}
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-warning-lt mt-1">
+                                                {{ product_status_labels.mapping[product.mapping_status] ?? 'Неизвестно' }}
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-nowrap">
+                                        <div>Продано: {{ product.sold_quantity|number_format(0, ',', ' ') }}</div>
+                                        <div>Возвращено: {{ product.returned_quantity|number_format(0, ',', ' ') }}</div>
+                                        <div class="fw-semibold">Нетто: {{ product.net_quantity|number_format(0, ',', ' ') }}</div>
+                                        <div class="text-secondary small">
+                                            Возвраты / продажи периода:
+                                            {{ report_ui.percent(product.return_rate_percent) }}
+                                        </div>
+                                    </td>
+                                    <td class="text-end text-nowrap">
+                                        <div class="text-secondary small">Без СПП</div>
+                                        <div>Продано: {{ report_ui.money(product.sales_without_spp_minor) }}</div>
+                                        <div>Возвраты: {{ report_ui.money(product.returns_without_spp_minor) }}</div>
+                                        <div class="fw-semibold">
+                                            Нетто: {{ report_ui.money(product.net_sales_without_spp_minor) }}
+                                        </div>
+                                        <div class="text-secondary small mt-1">С СПП</div>
+                                        <div>Продано: {{ report_ui.money(product.sales_with_spp_minor) }}</div>
+                                        <div>Возвраты: {{ report_ui.money(product.returns_with_spp_minor) }}</div>
+                                        <div class="fw-semibold">
+                                            Нетто: {{ report_ui.money(product.net_sales_with_spp_minor) }}
+                                        </div>
+                                    </td>
+                                    <td class="text-end text-nowrap">
+                                        <div>Продано: {{ report_ui.money(product.sales_for_pay_minor) }}</div>
+                                        <div>Возвраты: {{ report_ui.money(product.returns_for_pay_minor) }}</div>
+                                        <div class="fw-semibold">Нетто: {{ report_ui.money(product.for_pay_minor) }}</div>
+                                    </td>
+                                    <td class="text-end text-nowrap">
+                                        <div>Продано: {{ report_ui.money(product.sold_cost_minor) }}</div>
+                                        <div>Возвраты: {{ report_ui.money(product.returned_cost_minor) }}</div>
+                                        <div class="fw-semibold">Нетто: {{ report_ui.money(product.net_cost_minor) }}</div>
+                                    </td>
+                                    <td class="text-nowrap">
+                                        {% if product.cost_status == 'complete' %}
+                                            <span class="badge bg-success-lt">
+                                                {{ product_status_labels.cost[product.cost_status] ?? 'Неизвестно' }}
+                                            </span>
+                                        {% elseif product.cost_status == 'partial' %}
+                                            <span class="badge bg-warning-lt">
+                                                {{ product_status_labels.cost[product.cost_status] ?? 'Неизвестно' }}
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-danger-lt">
+                                                {{ product_status_labels.cost[product.cost_status] ?? 'Неизвестно' }}
+                                            </span>
+                                        {% endif %}
+                                        <div class="mt-1">
+                                            {{ report_ui.percent(product.cost_coverage_percent) }}
+                                            ({{ product.covered_cost_quantity|number_format(0, ',', ' ') }} из
+                                            {{ (product.sold_quantity + product.returned_quantity)|number_format(0, ',', ' ') }} шт.)
+                                        </div>
+                                        {% if product.missing_cost_quantity > 0 %}
+                                            <div class="text-danger small">
+                                                Без цены:
+                                                {{ product.missing_cost_quantity|number_format(0, ',', ' ') }} шт.
+                                            </div>
+                                        {% endif %}
+                                        {% if product.fallback_cost_quantity > 0 %}
+                                            <div class="text-warning small">
+                                                Ранняя цена:
+                                                {{ product.fallback_cost_quantity|number_format(0, ',', ' ') }} шт.
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end text-nowrap">
+                                        {% if product.result_minor is not null %}
+                                            <div class="fw-semibold {{ product.result_minor < 0 ? 'text-danger' : (product.result_minor > 0 ? 'text-success' : '') }}">
+                                                {{ report_ui.money(product.result_minor) }}
+                                            </div>
+                                            <div class="text-secondary small">
+                                                Рентабельность к продажам без СПП:
+                                                {{ report_ui.percent(product.profitability_percent) }}
+                                            </div>
+                                        {% else %}
+                                            <div class="fw-semibold text-warning">—</div>
+                                            <div class="text-secondary small">Нет полной себестоимости</div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                            <tfoot>
+                            <tr class="fw-semibold">
+                                <th>Итого</th>
+                                <th>
+                                    {{ report.product_summary.sold_quantity|number_format(0, ',', ' ') }} продано /
+                                    {{ report.product_summary.returned_quantity|number_format(0, ',', ' ') }} возвращено /
+                                    {{ report.product_summary.net_quantity|number_format(0, ',', ' ') }} нетто
+                                </th>
+                                <th class="text-end text-nowrap">
+                                    <div>Без СПП: {{ report_ui.money(report.product_summary.net_sales_without_spp_minor) }}</div>
+                                    <div>С СПП: {{ report_ui.money(report.product_summary.net_sales_with_spp_minor) }}</div>
+                                </th>
+                                <th class="text-end text-nowrap">
+                                    {{ report_ui.money(report.product_summary.for_pay_minor) }}
+                                </th>
+                                <th class="text-end text-nowrap">
+                                    {{ report_ui.money(report.product_summary.net_cost_minor) }}
+                                </th>
+                                <th>
+                                    {{ report_ui.percent(report.product_summary.cost_coverage_percent) }}
+                                </th>
+                                <th class="text-end text-nowrap">
+                                    {% if report.product_summary.result_minor is not null %}
+                                        {{ report_ui.money(report.product_summary.result_minor) }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </th>
+                            </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                {% endif %}
+            </div>
 
             <div class="row row-cards mb-3">
                 <div class="col-xl-7">
