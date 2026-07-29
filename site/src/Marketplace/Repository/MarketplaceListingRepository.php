@@ -112,15 +112,22 @@ class MarketplaceListingRepository extends ServiceEntityRepository
         string $companyId,
         MarketplaceType $marketplace,
         array $supplierSkus,
+        bool $caseInsensitive = false,
     ): array {
         if ([] === $supplierSkus) {
             return [];
         }
 
+        if ($caseInsensitive) {
+            $supplierSkus = array_map(mb_strtolower(...), $supplierSkus);
+        }
+
+        $supplierSkuExpression = $caseInsensitive ? 'LOWER(l.supplierSku)' : 'l.supplierSku';
+
         return $this->createQueryBuilder('l')
             ->where('IDENTITY(l.company) = :companyId')
             ->andWhere('l.marketplace = :marketplace')
-            ->andWhere('l.supplierSku IN (:supplierSkus)')
+            ->andWhere(sprintf('%s IN (:supplierSkus)', $supplierSkuExpression))
             ->setParameter('companyId', $companyId)
             ->setParameter('marketplace', $marketplace)
             ->setParameter('supplierSkus', array_values(array_unique($supplierSkus)))

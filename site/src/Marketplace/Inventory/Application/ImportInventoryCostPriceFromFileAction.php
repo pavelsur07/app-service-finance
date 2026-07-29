@@ -22,7 +22,8 @@ use Psr\Log\LoggerInterface;
  *   Колонка B: Себестоимость (число, например 850.00)
  *
  * Поиск всегда ограничен companyId + marketplace.
- * Для Wildberries supplier_sku цена применяется ко всем размерам артикула.
+ * Для Wildberries supplier_sku сопоставляется без учета регистра, а цена применяется ко всем размерам артикула.
+ * Несколько исходных написаний одного артикула в разном регистре считаются неоднозначностью.
  *
  * Строки с ненайденным идентификатором пропускаются и логируются.
  *
@@ -78,6 +79,7 @@ final class ImportInventoryCostPriceFromFileAction
                     'identifier_type' => $command->identifierType,
                     'identifier'  => $identifier,
                     'row'         => $rowNum,
+                    'reason'      => $resolveError,
                 ]);
                 $errors[] = sprintf(
                     'Строка %d: %s',
@@ -166,11 +168,27 @@ final class ImportInventoryCostPriceFromFileAction
 
         if ($identifierType === 'supplier_sku') {
             if (MarketplaceType::WILDBERRIES === $marketplace) {
-                $matches = $wbSupplierListings[$identifier] ?? [];
+                $matches = $wbSupplierListings[mb_strtolower($identifier)] ?? [];
 
-                return [] === $matches
-                    ? [[], sprintf('идентификатор %s не найден', $identifier)]
-                    : [$matches, null];
+                if ([] === $matches) {
+                    return [[], sprintf('идентификатор %s не найден', $identifier)];
+                }
+
+                $matchedSupplierSkus = array_values(array_unique(array_map(
+                    static fn (MarketplaceListing $listing): string => (string) $listing->getSupplierSku(),
+                    $matches,
+                )));
+                sort($matchedSupplierSkus, SORT_STRING);
+
+                if (count($matchedSupplierSkus) > 1) {
+                    return [[], sprintf(
+                        'неоднозначный артикул продавца "%s": найдено несколько вариантов регистра: %s',
+                        $identifier,
+                        implode(', ', $matchedSupplierSkus),
+                    )];
+                }
+
+                return [$matches, null];
             }
 
             $matches = $this->listingRepository->findAllByCompanyMarketplaceAndSupplierSku($companyId, $marketplace, $identifier);
@@ -230,7 +248,7 @@ final class ImportInventoryCostPriceFromFileAction
         foreach ($rows as $row) {
             $supplierSku = trim((string) ($row[0] ?? ''));
             if ('' !== $supplierSku) {
-                $supplierSkus[] = $supplierSku;
+                $supplierSkus[] = mb_strtolower($supplierSku);
             }
         }
 
@@ -240,10 +258,11 @@ final class ImportInventoryCostPriceFromFileAction
                 $command->companyId,
                 $command->marketplace,
                 $supplierSkuChunk,
+                caseInsensitive: true,
             ) as $listing) {
                 $supplierSku = $listing->getSupplierSku();
                 if (null !== $supplierSku) {
-                    $indexed[$supplierSku][] = $listing;
+                    $indexed[mb_strtolower($supplierSku)][] = $listing;
                 }
             }
         }

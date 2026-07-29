@@ -77,6 +77,70 @@ final class ImportInventoryCostPriceFromFileActionTest extends IntegrationTestCa
         self::assertArrayNotHasKey($otherCompany->getId(), $otherCompanyPrices);
     }
 
+    public function testWbSupplierSkuMatchingIgnoresCyrillicCase(): void
+    {
+        $company = $this->seedCompany(self::COMPANY_A_ID, 906);
+        $sizeS = $this->seedListing($company, MarketplaceType::WILDBERRIES, '10001', '101', 'S', 'рт-00000056');
+        $sizeM = $this->seedListing($company, MarketplaceType::WILDBERRIES, '10001', '102', 'M', 'рт-00000056');
+        $this->em->flush();
+
+        $file = $this->xlsx([['РТ-00000056', '850.00']]);
+
+        try {
+            $result = ($this->action)(new ImportInventoryCostPriceFromFileCommand(
+                companyId: self::COMPANY_A_ID,
+                absoluteFilePath: $file,
+                originalFilename: 'wb-costs.xlsx',
+                effectiveFrom: new \DateTimeImmutable('2026-07-29'),
+                marketplace: MarketplaceType::WILDBERRIES,
+                identifierType: 'supplier_sku',
+            ));
+        } finally {
+            unlink($file);
+        }
+
+        self::assertSame(1, $result['imported']);
+        self::assertSame(2, $result['updated_listings']);
+        self::assertSame(0, $result['skipped']);
+        self::assertSame([], $result['errors']);
+
+        $prices = $this->pricesByListing(self::COMPANY_A_ID);
+        self::assertSame('850.00', $prices[$sizeS->getId()] ?? null);
+        self::assertSame('850.00', $prices[$sizeM->getId()] ?? null);
+    }
+
+    public function testWbSupplierSkuMatchingFoldsStoredUppercaseCyrillic(): void
+    {
+        $company = $this->seedCompany(self::COMPANY_A_ID, 909);
+        $sizeS = $this->seedListing($company, MarketplaceType::WILDBERRIES, '10001', '101', 'S', 'РТ-00000056');
+        $sizeM = $this->seedListing($company, MarketplaceType::WILDBERRIES, '10001', '102', 'M', 'РТ-00000056');
+        $this->em->flush();
+
+        $file = $this->xlsx([['рт-00000056', '850.00']]);
+
+        try {
+            $result = ($this->action)(new ImportInventoryCostPriceFromFileCommand(
+                companyId: self::COMPANY_A_ID,
+                absoluteFilePath: $file,
+                originalFilename: 'wb-costs.xlsx',
+                effectiveFrom: new \DateTimeImmutable('2026-07-29'),
+                marketplace: MarketplaceType::WILDBERRIES,
+                identifierType: 'supplier_sku',
+            ));
+        } finally {
+            unlink($file);
+        }
+
+        self::assertSame(1, $result['imported']);
+        self::assertSame(2, $result['updated_listings']);
+        self::assertSame(0, $result['skipped']);
+        self::assertSame([], $result['errors']);
+
+        $prices = $this->pricesByListing(self::COMPANY_A_ID);
+        self::assertSame('850.00', $prices[$sizeS->getId()] ?? null);
+        self::assertSame('850.00', $prices[$sizeM->getId()] ?? null);
+    }
+
     public function testOzonSupplierSkuStillRejectsAmbiguousMatches(): void
     {
         $company = $this->seedCompany(self::COMPANY_A_ID, 903);
@@ -104,6 +168,69 @@ final class ImportInventoryCostPriceFromFileActionTest extends IntegrationTestCa
         self::assertSame(1, $result['skipped']);
         self::assertCount(1, $result['errors']);
         self::assertStringContainsString('неоднозначный supplier_sku "DUPLICATE"', $result['errors'][0]);
+        self::assertSame([], $this->pricesByListing(self::COMPANY_A_ID));
+    }
+
+    public function testOzonSupplierSkuMatchingRemainsCaseSensitive(): void
+    {
+        $company = $this->seedCompany(self::COMPANY_A_ID, 907);
+        $this->seedListing($company, MarketplaceType::OZON, '20001', null, 'UNKNOWN', 'article-001');
+        $this->em->flush();
+
+        $file = $this->xlsx([['ARTICLE-001', '100.00']]);
+
+        try {
+            $result = ($this->action)(new ImportInventoryCostPriceFromFileCommand(
+                companyId: self::COMPANY_A_ID,
+                absoluteFilePath: $file,
+                originalFilename: 'ozon-costs.xlsx',
+                effectiveFrom: new \DateTimeImmutable('2026-07-29'),
+                marketplace: MarketplaceType::OZON,
+                identifierType: 'supplier_sku',
+            ));
+        } finally {
+            unlink($file);
+        }
+
+        self::assertSame(0, $result['imported']);
+        self::assertSame(0, $result['updated_listings']);
+        self::assertSame(1, $result['skipped']);
+        self::assertSame(
+            ['Строка 1: идентификатор ARTICLE-001 не найден'],
+            $result['errors'],
+        );
+    }
+
+    public function testWbSupplierSkuRejectsCaseInsensitiveAmbiguity(): void
+    {
+        $company = $this->seedCompany(self::COMPANY_A_ID, 908);
+        $this->seedListing($company, MarketplaceType::WILDBERRIES, '10001', '101', 'S', 'ART-001');
+        $this->seedListing($company, MarketplaceType::WILDBERRIES, '10002', '102', 'M', 'art-001');
+        $this->em->flush();
+
+        $file = $this->xlsx([['Art-001', '100.00']]);
+
+        try {
+            $result = ($this->action)(new ImportInventoryCostPriceFromFileCommand(
+                companyId: self::COMPANY_A_ID,
+                absoluteFilePath: $file,
+                originalFilename: 'wb-costs.xlsx',
+                effectiveFrom: new \DateTimeImmutable('2026-07-29'),
+                marketplace: MarketplaceType::WILDBERRIES,
+                identifierType: 'supplier_sku',
+            ));
+        } finally {
+            unlink($file);
+        }
+
+        self::assertSame(0, $result['imported']);
+        self::assertSame(0, $result['updated_listings']);
+        self::assertSame(1, $result['skipped']);
+        self::assertCount(1, $result['errors']);
+        self::assertStringContainsString(
+            'неоднозначный артикул продавца "Art-001": найдено несколько вариантов регистра: ART-001, art-001',
+            $result['errors'][0],
+        );
         self::assertSame([], $this->pricesByListing(self::COMPANY_A_ID));
     }
 

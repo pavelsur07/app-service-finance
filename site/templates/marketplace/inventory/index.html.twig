@@ -429,7 +429,7 @@
 
                 supplierWarning.classList.toggle('d-none', identifierSelect.value !== 'supplier_sku');
                 if (isWildberries) {
-                    supplierWarningText.textContent = 'Артикул продавца Wildberries берется из vendorCode карточки. Одна цена будет применена ко всем размерам с этим артикулом. Если цены размеров отличаются, используйте импорт по баркоду.';
+                    supplierWarningText.textContent = 'Артикул продавца Wildberries берется из vendorCode карточки, регистр букв не учитывается. Одна цена будет применена ко всем размерам с этим артикулом. Артикулы, отличающиеся только регистром, будут пропущены с ошибкой — для них используйте импорт по баркоду.';
                 } else if (isOzon) {
                     supplierWarningText.textContent = 'Артикул продавца Ozon берется из offer_id. Перед загрузкой по артикулу продавца убедитесь, что выполнена синхронизация баркодов/артикулов Ozon.';
                 } else {
