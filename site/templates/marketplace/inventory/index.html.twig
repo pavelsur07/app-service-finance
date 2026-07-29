@@ -98,7 +98,10 @@
                                     пропущено {{ log.summary.barcodes_skipped ?? 0 }},
                                     не найдено в API: {{ log.summary.errors ?? 0 }}
                                 {% elseif log.jobType.value == 'cost_price_import' %}
-                                    импортировано {{ log.summary.imported ?? 0 }},
+                                    импортировано строк {{ log.summary.imported ?? 0 }},
+                                    {% if log.summary.updated_listings is defined %}
+                                        обновлено листингов {{ log.summary.updated_listings }},
+                                    {% endif %}
                                     пропущено {{ log.summary.skipped ?? 0 }},
                                     ошибок {{ log.summary.errors ?? 0 }}
                                     ({{ log.summary.file ?? '' }}, {{ log.summary.marketplace ?? '' }})
@@ -332,7 +335,7 @@
                             <select name="identifier_type" id="import-cost-identifier-type" class="form-select" required>
                                 <option value="barcode" selected>Баркод товара</option>
                                 <option value="marketplace_sku">SKU Ozon</option>
-                                <option value="supplier_sku">Артикул продавца Ozon</option>
+                                <option value="supplier_sku">Артикул продавца</option>
                             </select>
                         </div>
                         <div class="mb-3">
@@ -350,7 +353,7 @@
                             </div>
                         </div>
                         <div class="alert alert-warning mb-0 d-none" id="import-cost-supplier-warning">
-                            <div class="small">
+                            <div class="small" id="import-cost-supplier-warning-text">
                                 Артикул продавца Ozon берется из offer_id. Перед загрузкой по артикулу продавца убедитесь, что выполнена синхронизация баркодов/артикулов Ozon.
                             </div>
                         </div>
@@ -391,36 +394,47 @@
             var identifierSelect = document.getElementById('import-cost-identifier-type');
             var formatALabel = document.getElementById('import-cost-format-a');
             var supplierWarning = document.getElementById('import-cost-supplier-warning');
+            var supplierWarningText = document.getElementById('import-cost-supplier-warning-text');
 
-            if (!marketplaceSelect || !identifierSelect || !formatALabel || !supplierWarning) {
+            if (!marketplaceSelect || !identifierSelect || !formatALabel || !supplierWarning || !supplierWarningText) {
                 return;
             }
 
-            var ozonOnlyOptions = ['marketplace_sku', 'supplier_sku'];
-
             function updateState() {
                 var isOzon = marketplaceSelect.value === 'ozon';
+                var isWildberries = marketplaceSelect.value === 'wildberries';
 
                 Array.prototype.forEach.call(identifierSelect.options, function (option) {
-                    if (ozonOnlyOptions.indexOf(option.value) !== -1) {
+                    if (option.value === 'marketplace_sku') {
                         option.disabled = !isOzon;
                         option.hidden = !isOzon;
                     }
                 });
 
-                if (!isOzon && identifierSelect.value !== 'barcode') {
+                if (!isOzon && identifierSelect.value === 'marketplace_sku') {
                     identifierSelect.value = 'barcode';
                 }
 
                 if (identifierSelect.value === 'marketplace_sku') {
                     formatALabel.textContent = 'Колонка A — SKU Ozon';
                 } else if (identifierSelect.value === 'supplier_sku') {
-                    formatALabel.textContent = 'Колонка A — Артикул продавца Ozon / offer_id';
+                    formatALabel.textContent = isWildberries
+                        ? 'Колонка A — Артикул продавца Wildberries / vendorCode'
+                        : (isOzon
+                            ? 'Колонка A — Артикул продавца Ozon / offer_id'
+                            : 'Колонка A — Артикул продавца');
                 } else {
                     formatALabel.textContent = 'Колонка A — Баркод товара';
                 }
 
                 supplierWarning.classList.toggle('d-none', identifierSelect.value !== 'supplier_sku');
+                if (isWildberries) {
+                    supplierWarningText.textContent = 'Артикул продавца Wildberries берется из vendorCode карточки. Одна цена будет применена ко всем размерам с этим артикулом. Если цены размеров отличаются, используйте импорт по баркоду.';
+                } else if (isOzon) {
+                    supplierWarningText.textContent = 'Артикул продавца Ozon берется из offer_id. Перед загрузкой по артикулу продавца убедитесь, что выполнена синхронизация баркодов/артикулов Ozon.';
+                } else {
+                    supplierWarningText.textContent = 'Выберите маркетплейс, чтобы увидеть правила импорта по артикулу продавца.';
+                }
             }
 
             marketplaceSelect.addEventListener('change', updateState);

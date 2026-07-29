@@ -69,6 +69,7 @@ final class ImportInventoryCostPriceHandler
 
             $summary = [
                 'imported'  => $result['imported'],
+                'updated_listings' => $result['updated_listings'],
                 'skipped'   => $result['skipped'],
                 'errors'    => count($result['errors']),
                 'file'      => $message->originalFilename,
@@ -82,6 +83,7 @@ final class ImportInventoryCostPriceHandler
             $this->logger->info('[InventoryImport] Handler completed', [
                 'company_id' => $message->companyId,
                 'imported'   => $result['imported'],
+                'updated_listings' => $result['updated_listings'],
                 'skipped'    => $result['skipped'],
                 'errors'     => count($result['errors']),
             ]);
