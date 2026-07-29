@@ -1,9 +1,9 @@
 ## Current checkpoint
 
 **Phase:** Stage 2
-**Status:** planned
-**Stage base commit:** `cbc5775c7474e266486c07ea49bcedc09f97bd09`
-**Current Work item:** 2.1
+**Status:** complete
+**Stage base commit:** `e601ddb2b1b914e6c34ab621eed80a1d204e2fc1`
+**Current Work item:** 2.4 (complete)
 **Owner gate:** no
 
 ### Completed
@@ -22,13 +22,12 @@
 
 ### Current diff / affected files
 
-- `docs/tasks/wb-finance-sku-cost/TASK.md`
+- `site/src/Marketplace/Application/Service/WbRawFinancialReportProductEnricher.php`
+- `site/src/Marketplace/Infrastructure/Query/WbRawFinancialReportProductQuery.php`
+- `site/src/Marketplace/Controller/WbRawFinancialReportController.php`
+- `site/tests/Integration/Marketplace/Application/Service/WbRawFinancialReportProductEnricherTest.php`
 - `docs/tasks/wb-finance-sku-cost/plan.md`
 - `docs/tasks/wb-finance-sku-cost/checkpoint.md`
-- `site/src/Marketplace/Application/Service/WbRawFinancialReportBuilder.php`
-- `site/tests/Unit/Marketplace/Application/Service/WbRawFinancialReportBuilderTest.php`
-- `site/src/Marketplace/WB_API_V5_FIELDS.md`
-- `docs/tasks/wb-finance-sku-cost/stages/stage-1.md`
 
 ### Checks and baseline
 
@@ -43,17 +42,31 @@
 - `git diff --check` — clean.
 - `make site-cs-check` — pre-existing failure: 582/2153 files; task-owned
   PHP files pass the same fixer config.
+- Stage 2 targeted integration + functional:
+  `OK (8 tests, 111 assertions)`.
+- Marketplace bounded-context suite after review fixes:
+  `OK (786 tests, 5445 assertions)`.
+- Symfony container lint: green.
+- Stage 2 targeted PHP CS Fixer: green.
+- `git diff --check`: clean.
 
 ### Review status
 
 - iteration: 4
+- confirmed findings fixed:
+  - identifier lookup переведён на индексируемый `UNION` listing ids;
+  - Money parse exceptions больше не подавляются;
+  - barcode-only mapping и полный набор barcode покрыты тестом.
 - unresolved findings: none
+- external result: `REVIEW_GREEN`
 
 ### Exact next action
 
-- Commit/push Stage 1, создать Draft PR и зафиксировать base Stage 2.
+- Commit/push Stage 2, затем зафиксировать base Stage 3 и реализовать Twig
+  block.
 
 ### Files to inspect first on resume
 
-- `site/src/Marketplace/Application/Service/WbRawFinancialReportBuilder.php`
-- `site/tests/Unit/Marketplace/Application/Service/WbRawFinancialReportBuilderTest.php`
+- `site/src/Marketplace/Application/Service/WbRawFinancialReportProductEnricher.php`
+- `site/src/Marketplace/Infrastructure/Query/WbRawFinancialReportProductQuery.php`
+- `site/tests/Integration/Marketplace/Application/Service/WbRawFinancialReportProductEnricherTest.php`

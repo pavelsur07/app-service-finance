@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Controller;
 
 use App\Marketplace\Application\Service\WbRawFinancialReportBuilder;
+use App\Marketplace\Application\Service\WbRawFinancialReportProductEnricher;
 use App\Marketplace\Infrastructure\Query\WbRawFinancialReportQuery;
 use App\Shared\Domain\ValueObject\Money;
 use App\Shared\Service\ActiveCompanyService;
@@ -26,6 +27,7 @@ final class WbRawFinancialReportController extends AbstractController
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly WbRawFinancialReportQuery $reportQuery,
         private readonly WbRawFinancialReportBuilder $reportBuilder,
+        private readonly WbRawFinancialReportProductEnricher $productEnricher,
     ) {
     }
 
@@ -44,16 +46,17 @@ final class WbRawFinancialReportController extends AbstractController
         }
 
         $company = $this->activeCompanyService->getActiveCompany();
-        $report = $this->reportBuilder->build(
+        $companyId = (string) $company->getId();
+        $report = $this->productEnricher->enrich($companyId, $this->reportBuilder->build(
             $this->reportQuery->findByCompanyAndPeriod(
-                (string) $company->getId(),
+                $companyId,
                 $dateFrom,
                 $dateTo,
             ),
             $dateFrom,
             $dateTo,
             $reportId,
-        );
+        ));
 
         return $this->render('marketplace/wb_finance_report.html.twig', [
             'active_tab' => 'wb_finance_report',
@@ -79,16 +82,17 @@ final class WbRawFinancialReportController extends AbstractController
         }
 
         $company = $this->activeCompanyService->getActiveCompany();
-        $report = $this->reportBuilder->build(
+        $companyId = (string) $company->getId();
+        $report = $this->productEnricher->enrich($companyId, $this->reportBuilder->build(
             $this->reportQuery->findByCompanyAndPeriod(
-                (string) $company->getId(),
+                $companyId,
                 $dateFrom,
                 $dateTo,
             ),
             $dateFrom,
             $dateTo,
             $reportId,
-        );
+        ));
 
         $response = new Response($this->buildCsv($report), Response::HTTP_OK, [
             'Content-Type' => 'text/csv; charset=UTF-8',
