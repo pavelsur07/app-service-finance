@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Infrastructure\Query;
 
 use App\Marketplace\DTO\ListingReturnAggregateDTO;
-use DateTimeImmutable;
+use App\Marketplace\Enum\MarketplaceType;
 use Doctrine\DBAL\Connection;
 
 final readonly class ListingReturnAggregateQuery
@@ -21,16 +21,23 @@ final readonly class ListingReturnAggregateQuery
     public function executeByPeriod(
         string $companyId,
         ?string $marketplace,
-        DateTimeImmutable $from,
-        DateTimeImmutable $to,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
     ): array {
-        $mpFilter = $marketplace !== null ? 'AND r.marketplace = :marketplace' : '';
+        $mpFilter = null !== $marketplace ? 'AND r.marketplace = :marketplace' : '';
 
         $rows = $this->connection->fetchAllAssociative(
             <<<SQL
             SELECT
                 r.listing_id,
-                SUM(r.refund_amount) AS returns_total,
+                SUM(
+                    -- WB refund_amount stores the per-unit amount before SPP.
+                    -- Other marketplaces keep the existing refund_amount contract.
+                    CASE
+                        WHEN r.marketplace = :wbMarketplace THEN r.refund_amount * r.quantity
+                        ELSE r.refund_amount
+                    END
+                ) AS returns_total,
                 SUM(r.quantity)      AS returns_quantity
             FROM marketplace_returns r
             WHERE r.company_id = :companyId
@@ -40,18 +47,19 @@ final readonly class ListingReturnAggregateQuery
             GROUP BY r.listing_id
             SQL,
             array_filter([
-                'companyId'   => $companyId,
-                'periodFrom'  => $from->format('Y-m-d'),
-                'periodTo'    => $to->format('Y-m-d'),
+                'companyId' => $companyId,
+                'periodFrom' => $from->format('Y-m-d'),
+                'periodTo' => $to->format('Y-m-d'),
                 'marketplace' => $marketplace,
-            ], static fn ($v) => $v !== null),
+                'wbMarketplace' => MarketplaceType::WILDBERRIES->value,
+            ], static fn ($v) => null !== $v),
         );
 
         $result = [];
         foreach ($rows as $row) {
             $result[$row['listing_id']] = new ListingReturnAggregateDTO(
-                listingId:       $row['listing_id'],
-                returnsTotal:    (string) $row['returns_total'],
+                listingId: $row['listing_id'],
+                returnsTotal: (string) $row['returns_total'],
                 returnsQuantity: (int) $row['returns_quantity'],
             );
         }
