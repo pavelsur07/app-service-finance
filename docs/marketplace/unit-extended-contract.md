@@ -1,4 +1,30 @@
-# Unit Extended (`/api/marketplace-analytics/unit-extended`) — поля остатков
+# Unit Extended (`/api/marketplace-analytics/unit-extended`) — контракт полей
+
+## Выручка и возвраты
+
+Для Wildberries отчёт строит юнит-экономику от сумм до скидки постоянного
+покупателя (СПП):
+
+- `revenue = SUM(price_per_unit × quantity)` — продажи без СПП;
+- `returnsTotal = SUM(refund_amount × quantity)` — возвраты без СПП;
+- база дальнейшего расчёта прибыли — `revenue − returnsTotal`.
+
+Для Ozon и других маркетплейсов сохраняется прежний контракт:
+
+- `revenue = SUM(total_revenue)`;
+- `returnsTotal = SUM(refund_amount)`.
+
+Те же суммы используют виджет
+`/api/marketplace-analytics/unit-extended/widgets` (`WidgetSummaryQuery`) и
+XLSX-экспорт `/api/marketplace-analytics/unit-extended/export`.
+
+Это WB-специфичная семантика страницы Unit Extended. Отчёт эффективности
+рекламы `/marketplace-ads/efficiency` по-прежнему использует
+`marketplace_sales.total_revenue`, поэтому его WB-выручка и ДРР могут
+отличаться. Рекламные расходы за одинаковый период при этом остаются
+согласованными между отчётами.
+
+## Поля остатков
 
 Добавлены поля строки отчёта:
 

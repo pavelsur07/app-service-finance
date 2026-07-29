@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Infrastructure\Query;
 
 use App\Marketplace\DTO\ListingSalesAggregateDTO;
-use DateTimeImmutable;
+use App\Marketplace\Enum\MarketplaceType;
 use Doctrine\DBAL\Connection;
 
 final readonly class ListingSalesAggregateQuery
@@ -21,10 +21,10 @@ final readonly class ListingSalesAggregateQuery
     public function executeByPeriod(
         string $companyId,
         ?string $marketplace,
-        DateTimeImmutable $from,
-        DateTimeImmutable $to,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
     ): array {
-        $mpFilter = $marketplace !== null ? 'AND s.marketplace = :marketplace' : '';
+        $mpFilter = null !== $marketplace ? 'AND s.marketplace = :marketplace' : '';
 
         $rows = $this->connection->fetchAllAssociative(
             <<<SQL
@@ -34,7 +34,14 @@ final readonly class ListingSalesAggregateQuery
                 l.marketplace_sku     AS listing_sku,
                 l.marketplace         AS listing_marketplace,
                 l.supplier_sku        AS supplier_sku,
-                SUM(s.total_revenue)  AS revenue,
+                SUM(
+                    -- WB Unit Extended starts from seller revenue before SPP.
+                    -- Other marketplaces keep the existing total_revenue contract.
+                    CASE
+                        WHEN s.marketplace = :wbMarketplace THEN s.price_per_unit * s.quantity
+                        ELSE s.total_revenue
+                    END
+                ) AS revenue,
                 SUM(s.quantity)       AS quantity,
                 SUM(CASE WHEN s.cost_price IS NOT NULL THEN s.cost_price * s.quantity ELSE 0 END) AS cost_price_total,
                 SUM(CASE WHEN s.cost_price IS NOT NULL THEN s.quantity ELSE 0 END) AS cost_price_quantity
@@ -49,25 +56,26 @@ final readonly class ListingSalesAggregateQuery
             GROUP BY s.listing_id, l.name, l.marketplace_sku, l.marketplace, l.supplier_sku
             SQL,
             array_filter([
-                'companyId'   => $companyId,
-                'periodFrom'  => $from->format('Y-m-d'),
-                'periodTo'    => $to->format('Y-m-d'),
+                'companyId' => $companyId,
+                'periodFrom' => $from->format('Y-m-d'),
+                'periodTo' => $to->format('Y-m-d'),
                 'marketplace' => $marketplace,
-            ], static fn ($v) => $v !== null),
+                'wbMarketplace' => MarketplaceType::WILDBERRIES->value,
+            ], static fn ($v) => null !== $v),
         );
 
         $result = [];
         foreach ($rows as $row) {
             $result[$row['listing_id']] = new ListingSalesAggregateDTO(
-                listingId:         $row['listing_id'],
-                title:             $row['listing_title'],
-                sku:               $row['listing_sku'],
-                marketplace:       $row['listing_marketplace'],
-                revenue:           (string) $row['revenue'],
-                quantity:          (int) $row['quantity'],
-                costPriceTotal:    (string) $row['cost_price_total'],
+                listingId: $row['listing_id'],
+                title: $row['listing_title'],
+                sku: $row['listing_sku'],
+                marketplace: $row['listing_marketplace'],
+                revenue: (string) $row['revenue'],
+                quantity: (int) $row['quantity'],
+                costPriceTotal: (string) $row['cost_price_total'],
                 costPriceQuantity: (int) $row['cost_price_quantity'],
-                supplierSku:       $row['supplier_sku'] !== null ? (string) $row['supplier_sku'] : null,
+                supplierSku: null !== $row['supplier_sku'] ? (string) $row['supplier_sku'] : null,
             );
         }
 
