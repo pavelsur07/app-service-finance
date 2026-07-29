@@ -179,7 +179,7 @@ final class WbRawFinancialReportController extends AbstractController
         $this->writeCsvRow($stream, ['Строк raw', (string) $report['summary']['row_count']]);
         $this->writeCsvRow($stream, ['Продажи без СПП', $this->decimal($report['summary']['sale_without_spp_minor'])]);
         $this->writeCsvRow($stream, ['Продажи с СПП', $this->decimal($report['summary']['sale_with_spp_minor'])]);
-        $this->writeCsvRow($stream, ['Расходы WB', $this->decimal($report['summary']['wb_costs_minor'])]);
+        $this->writeCsvRow($stream, ['Расходы WB (нетто)', $this->decimal($report['summary']['wb_costs_minor'])]);
         $this->writeCsvRow($stream, ['Расчётное перечисление', $this->decimal($report['summary']['payout_minor'])]);
 
         $this->writeCsvRow($stream, []);
@@ -197,12 +197,13 @@ final class WbRawFinancialReportController extends AbstractController
         if ([] !== $report['deductions']) {
             $this->writeCsvRow($stream, []);
             $this->writeCsvRow($stream, [
-                'Основание удержания WB',
+                'Основание операции WB',
                 'Дата с',
                 'Дата по',
                 'Строк',
                 'reportId с номером, шт.',
                 'Удержано',
+                'Выплачено WB',
                 'Влияние на перечисление',
             ]);
             foreach ($report['deductions'] as $row) {
@@ -212,10 +213,21 @@ final class WbRawFinancialReportController extends AbstractController
                     $row['date_to'],
                     (string) $row['row_count'],
                     (string) $row['report_count'],
-                    $this->decimal($row['amount_minor']),
-                    $this->decimal(-$row['amount_minor']),
+                    $this->decimal($row['withheld_minor']),
+                    $this->decimal($row['paid_minor']),
+                    $this->decimal($row['impact_minor']),
                 ]);
             }
+            $this->writeCsvRow($stream, [
+                'Итого',
+                '',
+                '',
+                '',
+                '',
+                $this->decimal($report['summary']['deduction_withheld_minor']),
+                $this->decimal($report['summary']['deduction_paid_minor']),
+                $this->decimal($report['summary']['deduction_impact_minor']),
+            ]);
         }
 
         $this->writeCsvRow($stream, []);

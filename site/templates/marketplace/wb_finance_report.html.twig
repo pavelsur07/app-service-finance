@@ -130,9 +130,9 @@
                 <div class="col-sm-6 col-xl">
                     <div class="card h-100">
                         <div class="card-body">
-                            <div class="text-secondary mb-1">Расходы WB</div>
+                            <div class="text-secondary mb-1">Расходы WB (нетто)</div>
                             <div class="h2 mb-0">{{ report_ui.money(report.summary.wb_costs_minor) }}</div>
-                            <div class="text-secondary small">Комиссия, эквайринг и удержания</div>
+                            <div class="text-secondary small">Комиссия, эквайринг, удержания и выплаты</div>
                         </div>
                     </div>
                 </div>
@@ -168,6 +168,7 @@
                         <h4 class="card-title mb-1">Расшифровка по статьям WB</h4>
                         <div class="text-secondary small">
                             «Влияние» показывает знак относительно расчётного перечисления продавцу.
+                            Для статьи «Удержания и выплаты» колонка «Возврат / сторно» показывает выплаты WB.
                         </div>
                     </div>
                 </div>
@@ -235,12 +236,13 @@
                     <summary class="card-header cursor-pointer">
                         <span class="d-block">
                             <span class="card-title d-block mb-1">
-                                Расшифровка удержаний
+                                Расшифровка удержаний и выплат
                                 <span class="badge bg-secondary ms-1">{{ report.deductions|length }}</span>
                             </span>
                             <span class="text-secondary small d-block">
                                 Точное основание из raw-поля <code>bonusTypeName</code>.
-                                Собственная бухгалтерская классификация не применяется.
+                                <code>deduction &gt; 0</code> — удержание,
+                                <code>deduction &lt; 0</code> — выплата WB.
                             </span>
                         </span>
                     </summary>
@@ -248,11 +250,12 @@
                         <table class="table table-vcenter card-table">
                             <thead>
                             <tr>
-                                <th>Основание WB</th>
+                                <th>Основание операции WB</th>
                                 <th>Период</th>
                                 <th class="text-end">Строк</th>
                                 <th class="text-end">reportId с номером</th>
                                 <th class="text-end">Удержано</th>
+                                <th class="text-end">Выплачено WB</th>
                                 <th class="text-end">Влияние</th>
                             </tr>
                             </thead>
@@ -269,13 +272,24 @@
                                     </td>
                                     <td class="text-end">{{ row.row_count|number_format(0, ',', ' ') }}</td>
                                     <td class="text-end">{{ row.report_count|number_format(0, ',', ' ') }}</td>
-                                    <td class="text-end text-nowrap">{{ report_ui.money(row.amount_minor) }}</td>
-                                    <td class="text-end text-nowrap text-danger fw-semibold">
-                                        {{ report_ui.money(-row.amount_minor) }}
+                                    <td class="text-end text-nowrap">{{ report_ui.money(row.withheld_minor) }}</td>
+                                    <td class="text-end text-nowrap">{{ report_ui.money(row.paid_minor) }}</td>
+                                    <td class="text-end text-nowrap fw-semibold {{ row.impact_minor < 0 ? 'text-danger' : (row.impact_minor > 0 ? 'text-success' : '') }}">
+                                        {{ report_ui.money(row.impact_minor) }}
                                     </td>
                                 </tr>
                             {% endfor %}
                             </tbody>
+                            <tfoot>
+                            <tr class="fw-semibold">
+                                <th colspan="4" class="text-end">Итого</th>
+                                <th class="text-end text-nowrap">{{ report_ui.money(report.summary.deduction_withheld_minor) }}</th>
+                                <th class="text-end text-nowrap">{{ report_ui.money(report.summary.deduction_paid_minor) }}</th>
+                                <th class="text-end text-nowrap {{ report.summary.deduction_impact_minor < 0 ? 'text-danger' : (report.summary.deduction_impact_minor > 0 ? 'text-success' : '') }}">
+                                    {{ report_ui.money(report.summary.deduction_impact_minor) }}
+                                </th>
+                            </tr>
+                            </tfoot>
                         </table>
                     </div>
                 </details>
