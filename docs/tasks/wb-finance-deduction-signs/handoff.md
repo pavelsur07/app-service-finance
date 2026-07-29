@@ -29,7 +29,10 @@ Raw-отчёт WB различает операции по знаку исход
 ## Release Gate
 
 - Branch: `agent/wb-finance-deduction-signs`.
-- Draft PR: создаётся на шаге delivery.
+- Executable Stage commit:
+  `c20f90233a0850d2b3bd6415bda03948aebdceb9`.
+- Draft PR:
+  <https://github.com/pavelsur07/app-service-finance/pull/2254>.
 - Production-действия не выполнялись.
 - Требуется решение Владельца: перевести Draft PR в Ready и разрешить merge в
   `master`.

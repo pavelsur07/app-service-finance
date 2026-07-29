@@ -1,7 +1,7 @@
 ## Current checkpoint
 
 **Phase:** Release Gate
-**Status:** ready for delivery
+**Status:** stopped at Release Gate
 **Stage base commit:** `933090be2be22aa802172dee1990a20570e82416`
 **Current Work item:** complete
 **Owner gate:** yes
@@ -63,6 +63,11 @@
 - External review: пять итераций завершились `REVIEW_GREEN`; все
   подтверждённые in-scope MINOR исправлены.
 - Stage Report и handoff подготовлены.
+- Executable Stage commit:
+  `c20f90233a0850d2b3bd6415bda03948aebdceb9`.
+- Branch `agent/wb-finance-deduction-signs` отправлена non-force push.
+- Создан Draft PR #2254:
+  <https://github.com/pavelsur07/app-service-finance/pull/2254>.
 
 ### Current diff / affected files
 
@@ -108,8 +113,8 @@
 
 ### Exact next action
 
-- Создать task-owned commit, выполнить non-force push и открыть Draft PR в
-  `master`, затем остановиться на Release Gate.
+- Остановиться на Release Gate и ждать решения Владельца о переводе Draft PR
+  #2254 в Ready и merge в `master`.
 
 ### Files to inspect first on resume
 

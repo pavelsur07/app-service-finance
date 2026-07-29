@@ -91,5 +91,8 @@ production-действия не выполнялись и этим Stage не �
 ## Delivery
 
 - Branch: `agent/wb-finance-deduction-signs`.
-- Commit и Draft PR создаются после фиксации этого Stage Report.
+- Executable Stage commit:
+  `c20f90233a0850d2b3bd6415bda03948aebdceb9`.
+- Draft PR:
+  <https://github.com/pavelsur07/app-service-finance/pull/2254>.
 - Следующее действие: Release Gate — решение Владельца о Ready и merge.
