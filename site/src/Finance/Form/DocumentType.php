@@ -6,13 +6,12 @@ namespace App\Finance\Form;
 
 use App\Company\Application\DTO\FinancialResponsibilityCenterDTO;
 use App\Company\Entity\Company;
-use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
+use App\Company\Form\Type\CounterpartyPickerType;
 use App\Finance\Entity\Document;
 use App\Finance\Enum\DocumentType as DocumentTypeEnum;
 use App\Shared\Form\Type\ProjectDirectionPickerType;
-use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\CollectionType;
@@ -33,7 +32,7 @@ class DocumentType extends AbstractType
     {
         /** @var Document|null $document */
         $document = $builder->getData();
-        /** @var Company|null $company */
+        /** @var Company $company */
         $company = $options['company'];
         $currentResponsibilityCenterId = $document instanceof Document
             ? $document->getResponsibilityCenterId()
@@ -56,13 +55,12 @@ class DocumentType extends AbstractType
                 'choice_value' => 'value',
                 'label' => 'Тип документа',
             ])
-            ->add('counterparty', EntityType::class, [
-                'class' => Counterparty::class,
-                'choices' => $options['counterparties'],
-                'choice_label' => 'name',
+            ->add('counterparty', CounterpartyPickerType::class, [
+                'company_id' => (string) $options['company']->getId(),
+                'keep_id' => $builder->getData()?->getCounterparty()?->getId(),
+                'value_type' => 'entity',
                 'placeholder' => '—',
-                'required' => false,
-                'label' => 'Контрагент',
+                'search_url' => '/api/counterparties/search',
                 'attr' => [
                     'data-document-counterparty' => 'true',
                 ],
@@ -98,7 +96,6 @@ class DocumentType extends AbstractType
                 'entry_type' => DocumentOperationType::class,
                 'entry_options' => [
                     'categories' => $options['categories'],
-                    'counterparties' => $options['counterparties'],
                     'project_directions' => $options['project_directions'],
                     'company' => $company,
                     'extra_responsibility_center_ids' => $extraResponsibilityCenterIds,
@@ -115,11 +112,10 @@ class DocumentType extends AbstractType
         $resolver->setDefaults([
             'data_class' => Document::class,
             'categories' => [],
-            'counterparties' => [],
             'project_directions' => [],
-            'company' => null,
         ]);
-        $resolver->setAllowedTypes('company', [Company::class, 'null']);
+        $resolver->setRequired('company');
+        $resolver->setAllowedTypes('company', Company::class);
     }
 
     /**

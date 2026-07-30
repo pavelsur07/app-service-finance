@@ -532,9 +532,31 @@ findCounterpartyByIdAndCompany(string $counterpartyId, string $companyId): ?Coun
 
 ### Справочник контрагентов (`Company`)
 
-`CounterpartyFacade` **не существует**: соседние модули (`Cash`, `Finance`, `Deals`)
-обращаются к `CounterpartyRepository` напрямую — известный долг, вынесен в отдельную
-задачу. Здесь описано то, что есть в коде.
+`CounterpartyFacade` (`src/Company/Facade/CounterpartyFacade.php`) — единственная точка
+доступа соседних модулей к справочнику **для форм**:
+
+```php
+// Варианты выбора как DTO: Entity чужого модуля в формы не попадает.
+// Архивные не предлагаются, но уже выбранный архивный остаётся (keepId).
+// @return list<CounterpartyChoiceDTO>  id, name, inn, kpp, isArchived, label()
+getSelectable(string $companyId, ?string $keepId = null): array
+
+// Контрагент строго в рамках компании — для форм, которым нужна сама сущность.
+findEntityByIdAndCompany(string $counterpartyId, string $companyId): ?Counterparty
+```
+
+Выбор контрагента в формах — только через `CounterpartyPickerType`
+(`src/Company/Form/Type/CounterpartyPickerType.php`): `company_id` обязателен и
+проверяется как UUID, поэтому tenant-фильтр нельзя забыть; `choices` — полный
+company-scoped список, он же no-JS fallback и граница допустимых значений при submit;
+`value_type: 'entity'` подключает `CounterpartyEntityTransformer` (id ↔ Entity) для
+форм, привязанных к сущности. Разметка — `templates/form/counterparty_picker_theme.html.twig`,
+поиск — `assets/counterparty_picker.js` через `GET /api/counterparties/search`.
+`EntityType` с `Counterparty` в проекте больше не используется.
+
+Вне форм `CounterpartyRepository` пока импортируется напрямую из `DealManager`,
+`CreatePLDocumentAction`, `FinanceFacade`, `ScoreCompanyCounterpartiesAction` — остаток
+долга, отдельная задача.
 
 Название контрагента разделено на три роли и записывается только целиком:
 
@@ -588,6 +610,8 @@ findInvalidInnRows(?string $companyId = null): array
 
 // src/Company/Repository/CounterpartyRepository.php
 findSelectableByCompany(string $companyId, ?string $keepId = null): array // архивные скрыты, выбранное остаётся
+findOneByIdAndCompany(string $id, string $companyId): ?Counterparty
+findOneByNormalizedName(string $companyId, string $nameCore, ?string $legalFormHint): ?Counterparty
 findOneByInn(string $companyId, string $inn, ?string $exceptId = null): ?Counterparty
 findAllForBackfill(): iterable
 ```

@@ -6,8 +6,8 @@ use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
-use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
+use App\Company\Form\Type\CounterpartyPickerType;
 use App\Shared\Form\Type\ProjectDirectionPickerType;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
@@ -83,18 +83,17 @@ class CashTransactionAutoRuleType extends AbstractType
                 'label' => 'ЦФО',
                 'help' => 'Для выбранного проекта укажите совместимый ЦФО.',
             ])
-            ->add('counterparty', EntityType::class, [
-                'class' => Counterparty::class,
-                'choices' => $options['counterparties'],
-                'choice_label' => static fn (Counterparty $item) => $item->getName(),
+            ->add('counterparty', CounterpartyPickerType::class, [
+                'company_id' => $options['company_id'],
+                'keep_id' => $builder->getData()?->getCounterparty()?->getId(),
+                'value_type' => 'entity',
                 'placeholder' => 'Не выбран',
-                'required' => false,
-                'label' => 'Контрагент',
+                'search_url' => '/api/counterparties/search',
             ])
             ->add('conditions', CollectionType::class, [
                 'entry_type' => CashTransactionAutoRuleConditionType::class,
                 'entry_options' => [
-                    'counterparties' => $options['counterparties'],
+                    'company_id' => $options['company_id'],
                     'moneyAccounts' => $options['moneyAccounts'],
                 ],
                 'allow_add' => true,
@@ -106,10 +105,11 @@ class CashTransactionAutoRuleType extends AbstractType
 
     public function configureOptions(OptionsResolver $resolver): void
     {
+        $resolver->setRequired('company_id');
+        $resolver->setAllowedTypes('company_id', 'string');
         $resolver->setDefaults([
             'data_class' => CashTransactionAutoRule::class,
             'categories' => [],
-            'counterparties' => [],
             'moneyAccounts' => [],
             'projectDirections' => [],
             'responsibilityCenterChoices' => [],

@@ -6,7 +6,7 @@ use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashTransactionAutoRuleCondition;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
-use App\Company\Entity\Counterparty;
+use App\Company\Form\Type\CounterpartyPickerType;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\EnumType;
@@ -53,12 +53,11 @@ class CashTransactionAutoRuleConditionType extends AbstractType
                     };
                 },
             ])
-            ->add('counterparty', EntityType::class, [
-                'class' => Counterparty::class,
-                'choices' => $options['counterparties'],
-                'choice_label' => 'name',
-                'required' => false,
-                'label' => 'Контрагент',
+            ->add('counterparty', CounterpartyPickerType::class, [
+                'company_id' => $options['company_id'],
+                'keep_id' => $builder->getData()?->getCounterparty()?->getId(),
+                'value_type' => 'entity',
+                'search_url' => '/api/counterparties/search',
                 'row_attr' => ['class' => 'condition-counterparty-row'],
             ])
             ->add('moneyAccount', EntityType::class, [
@@ -87,9 +86,10 @@ class CashTransactionAutoRuleConditionType extends AbstractType
 
     public function configureOptions(OptionsResolver $resolver): void
     {
+        $resolver->setRequired('company_id');
+        $resolver->setAllowedTypes('company_id', 'string');
         $resolver->setDefaults([
             'data_class' => CashTransactionAutoRuleCondition::class,
-            'counterparties' => [],
             'moneyAccounts' => [],
         ]);
     }

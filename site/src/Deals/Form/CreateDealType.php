@@ -5,12 +5,10 @@ declare(strict_types=1);
 namespace App\Deals\Form;
 
 use App\Company\Entity\Company;
+use App\Company\Form\Type\CounterpartyPickerType;
 use App\Deals\DTO\CreateDealFormData;
 use App\Deals\Enum\DealChannel;
 use App\Deals\Enum\DealType;
-use App\Company\Entity\Counterparty;
-use Doctrine\ORM\EntityRepository;
-use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
@@ -22,8 +20,9 @@ final class CreateDealType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        /** @var Company|null $company */
+        /** @var Company $company */
         $company = $options['company'];
+        $companyId = (string) $company->getId();
 
         $builder
             ->add('recognizedAt', DateType::class, [
@@ -42,23 +41,11 @@ final class CreateDealType extends AbstractType
                 'label' => 'Канал',
                 'choices' => $this->buildChannelChoices(),
             ])
-            ->add('counterpartyId', EntityType::class, [
-                'class' => Counterparty::class,
-                'label' => 'Контрагент',
-                'required' => false,
-                'placeholder' => 'Без контрагента',
-                'choice_label' => static fn (Counterparty $counterparty): string => (string) $counterparty->getName(),
-                'query_builder' => static function (EntityRepository $repository) use ($company) {
-                    $qb = $repository->createQueryBuilder('counterparty')
-                        ->orderBy('counterparty.name', 'ASC');
-
-                    if ($company) {
-                        $qb->andWhere('counterparty.company = :company')
-                            ->setParameter('company', $company);
-                    }
-
-                    return $qb;
-                },
+            ->add('counterpartyId', CounterpartyPickerType::class, [
+                'company_id' => $companyId,
+                'keep_id' => $builder->getData()?->counterpartyId?->getId(),
+                'value_type' => 'entity',
+                'search_url' => '/api/counterparties/search',
             ]);
     }
 
@@ -66,9 +53,11 @@ final class CreateDealType extends AbstractType
     {
         $resolver->setDefaults([
             'data_class' => CreateDealFormData::class,
-            'company' => null,
         ]);
-        $resolver->setAllowedTypes('company', [Company::class, 'null']);
+        // company обязателен: раньше опция по умолчанию была null, и tenant-фильтр
+        // стоял под условием — забытая опция открывала справочник всех компаний.
+        $resolver->setRequired('company');
+        $resolver->setAllowedTypes('company', Company::class);
     }
 
     /**

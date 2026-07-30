@@ -93,9 +93,6 @@ final class CompanyFacade
             return null;
         }
 
-        return $this->counterpartyRepository->findOneBy([
-            'id' => $counterpartyId,
-            'company' => $companyId,
-        ]);
+        return $this->counterpartyRepository->findOneByIdAndCompany($counterpartyId, $companyId);
     }
 }

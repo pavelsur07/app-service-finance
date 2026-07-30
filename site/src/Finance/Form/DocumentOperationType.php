@@ -6,9 +6,9 @@ namespace App\Finance\Form;
 
 use App\Company\Application\DTO\FinancialResponsibilityCenterDTO;
 use App\Company\Entity\Company;
-use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
+use App\Company\Form\Type\CounterpartyPickerType;
 use App\Finance\Entity\DocumentOperation;
 use App\Finance\Entity\PLCategory;
 use App\Shared\Form\Type\ProjectDirectionPickerType;
@@ -30,7 +30,7 @@ class DocumentOperationType extends AbstractType
     {
         /** @var DocumentOperation|null $operation */
         $operation = $builder->getData();
-        /** @var Company|null $company */
+        /** @var Company $company */
         $company = $options['company'];
         $currentResponsibilityCenterId = $operation instanceof DocumentOperation
             ? $operation->getResponsibilityCenterId()
@@ -51,12 +51,11 @@ class DocumentOperationType extends AbstractType
             ->add('amount', NumberType::class, [
                 'label' => 'Сумма',
             ])
-            ->add('counterparty', EntityType::class, [
-                'class' => Counterparty::class,
-                'choices' => $options['counterparties'],
-                'choice_label' => 'name',
-                'required' => false,
-                'label' => 'Контрагент',
+            ->add('counterparty', CounterpartyPickerType::class, [
+                'company_id' => (string) $options['company']->getId(),
+                'keep_id' => $builder->getData()?->getCounterparty()?->getId(),
+                'value_type' => 'entity',
+                'search_url' => '/api/counterparties/search',
                 'attr' => [
                     'data-operation-counterparty' => 'true',
                 ],
@@ -94,12 +93,11 @@ class DocumentOperationType extends AbstractType
         $resolver->setDefaults([
             'data_class' => DocumentOperation::class,
             'categories' => [],
-            'counterparties' => [],
             'project_directions' => [],
-            'company' => null,
             'extra_responsibility_center_ids' => [],
         ]);
-        $resolver->setAllowedTypes('company', [Company::class, 'null']);
+        $resolver->setRequired('company');
+        $resolver->setAllowedTypes('company', Company::class);
         $resolver->setAllowedTypes('extra_responsibility_center_ids', ['array']);
     }
 
