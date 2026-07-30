@@ -58,7 +58,7 @@ class CashTransactionAutoRuleConditionType extends AbstractType
                 'keep_id' => $builder->getData()?->getCounterparty()?->getId(),
                 'value_type' => 'entity',
                 'search_url' => '/api/counterparties/search',
-                'row_attr' => ['class' => 'condition-counterparty-row'],
+                'row_attr' => ['class' => 'condition-counterparty-row flex-fill'],
             ])
             ->add('moneyAccount', EntityType::class, [
                 'class' => MoneyAccount::class,
@@ -70,17 +70,17 @@ class CashTransactionAutoRuleConditionType extends AbstractType
                 ),
                 'required' => false,
                 'label' => 'Денежный счёт',
-                'row_attr' => ['class' => 'condition-money-account-row'],
+                'row_attr' => ['class' => 'condition-money-account-row flex-fill'],
             ])
             ->add('value', TextType::class, [
                 'required' => false,
                 'label' => 'Значение',
-                'row_attr' => ['class' => 'condition-value-row'],
+                'row_attr' => ['class' => 'condition-value-row flex-fill'],
             ])
             ->add('valueTo', TextType::class, [
                 'required' => false,
                 'label' => 'Значение до',
-                'row_attr' => ['class' => 'condition-value-to-row'],
+                'row_attr' => ['class' => 'condition-value-to-row flex-fill'],
             ]);
     }
 

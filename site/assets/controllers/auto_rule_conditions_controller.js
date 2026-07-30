@@ -31,16 +31,13 @@ export default class extends Controller {
   }
 
   add() {
-    const item = document.createElement('div');
-    const form = this.prototypeValue.replace(/__name__/g, this.indexValue);
+    const template = document.createElement('template');
+    template.innerHTML = this.prototypeValue.replace(/__name__/g, this.indexValue).trim();
+    const item = template.content.firstElementChild;
 
-    item.className = 'card mb-2';
-    item.dataset.autoRuleCondition = '';
-    item.innerHTML = `<div class="card-body">
-      <h3 data-condition-title></h3>
-      ${form}
-      <button type="button" class="btn btn-sm btn-danger" data-action="auto-rule-conditions#remove" data-remove-condition>Удалить</button>
-    </div>`;
+    if (!item) {
+      return;
+    }
 
     this.indexValue += 1;
     this.collectionTarget.appendChild(item);
@@ -80,6 +77,7 @@ export default class extends Controller {
     const field = item.querySelector('[id$="_field"]');
     const operator = item.querySelector('[id$="_operator"]');
     const operatorRow = item.querySelector('.condition-operator-row');
+    const operatorCell = item.querySelector('.condition-operator-cell');
     const counterpartyRow = item.querySelector('.condition-counterparty-row');
     const moneyAccountRow = item.querySelector('.condition-money-account-row');
     const valueRow = item.querySelector('.condition-value-row');
@@ -105,7 +103,13 @@ export default class extends Controller {
     const isMoneyAccount = 'MONEY_ACCOUNT' === field.value;
     const usesRange = ['DATE', 'AMOUNT'].includes(field.value) && 'BETWEEN' === operator.value;
 
-    operatorRow.hidden = 1 === allowed.length;
+    const hideOperator = 1 === allowed.length;
+    operatorRow.hidden = hideOperator;
+    if (operatorCell) {
+      // Скрываем всю колонку, а не только поле: иначе на её месте остаётся дыра,
+      // а значение не растягивается.
+      operatorCell.hidden = hideOperator;
+    }
     this.toggleRow(counterpartyRow, isCounterparty, !isCounterparty);
     this.toggleRow(moneyAccountRow, isMoneyAccount, !isMoneyAccount);
     this.toggleRow(valueRow, !isCounterparty && !isMoneyAccount, isCounterparty || isMoneyAccount);
@@ -152,7 +156,8 @@ export default class extends Controller {
       const title = item.querySelector('[data-condition-title]');
       const remove = item.querySelector('[data-remove-condition]');
       if (title) {
-        title.textContent = `Условие ${number}`;
+        title.textContent = String(number);
+        title.setAttribute('aria-label', `Условие ${number}`);
       }
       if (remove) {
         remove.setAttribute('aria-label', `Удалить условие ${number}`);
