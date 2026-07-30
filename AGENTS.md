@@ -109,8 +109,15 @@ Production Gate
 Continuous autonomous execution
 After receiving a sufficiently clear task or completing Phase 0 without a STOP condition, continue through implementation, verification, review, fixes, commit, push, and Draft PR without requesting additional owner confirmation.
 
-At the start of a new or resumed work session, re-read the current repository copies of the root and applicable nested `AGENTS.md` files and the relevant `CLAUDE.md`. Do not rely on copies cached in conversation history or loaded before those files were updated.
-Before a stage review or commit in a long-running session, check whether these instruction files changed and re-read them when they did.
+At the start of the first work session for a logical task, read the current
+repository copies of the root and applicable nested `AGENTS.md` files and the
+relevant `CLAUDE.md`. Record their content hashes.
+A follow-up owner message, context compaction, automatic continuation, or
+resume of the same logical task does not by itself require re-reading unchanged
+instructions. Recompute the hashes before a Stage review or commit and after a
+branch switch, pull, merge, rebase, or fast-forward. Re-read only the files
+whose hashes changed. If the previous hashes are unavailable or cannot be
+trusted, re-read the applicable files.
 
 The required autonomous sequence is:
 1. Record the Stage base commit and its Definition of Done.
@@ -201,8 +208,57 @@ The Definition of Done must state:
 Do not start implementation of a large stage until its Definition of Done is clear enough to verify objectively.
 For small tasks, the Definition of Done may be a short internal checklist.
 
+Fast Path
+Fast Path is the lightweight workflow for work whose result is easy to verify
+and cannot change executable business behavior. Classify the task before
+acting; Fast Path is allowed only when all applicable conditions below are met.
+
+Eligible work:
+- read-only inspection, explanation, status, or diagnostics that does not
+  require a production check;
+- explicitly requested post-merge Git housekeeping after verifying the exact
+  target is merged, such as deleting its local and remote task branch;
+- documentation, comments, formatting, or prose-only UI copy with no change to
+  code paths, template control flow, variables, configuration, contracts, or
+  generated artifacts;
+- a local, reversible operation with an exact target and an immediately
+  verifiable result.
+
+Fast Path is forbidden for:
+- financial formulas, signs, periods, mappings, accounting semantics, or data
+  reconciliation behavior;
+- application logic, database schema or migrations, persistent data, public
+  API/contracts, authentication, authorization, permissions, or security;
+- dependencies, executable configuration, CI/CD, infrastructure, Messenger,
+  workers, schedulers, integrations, or live external side effects;
+- production or staging access/actions, merge, release, deployment, or any
+  other existing Release Gate or Production Gate action;
+- ambiguous, broad, difficult-to-reverse, or cross-module changes.
+
+Fast Path sequence:
+1. State that Fast Path applies and name the qualifying reason.
+2. Inspect the exact target and the current working tree.
+3. Perform the minimal read or change.
+4. Run the narrowest useful verification and focused self-review.
+5. Report the outcome and any untouched unrelated working-tree files.
+
+Fast Path does not require Phase 0, a Stage plan, checkpoint, Stage Report,
+handoff, full test suite, or external reviewer. Record external review as
+`N/A — Fast Path, no executable behavior change` when a delivery record is
+needed. Read-only work and Git housekeeping do not require a task branch or PR.
+Documentation changes intended for repository delivery still use a focused
+task branch, commit, push, and Draft PR unless the owner explicitly requests a
+different allowed delivery path.
+
+If any exclusion is discovered, leave Fast Path before making the excluded
+change and continue under the normal Small task or Large task workflow. Fast
+Path never overrides destructive-action checks, owner gates, Release Gates, or
+Production Gates.
+
 Small tasks
-Treat a small isolated task as one implicit top-level Stage. It receives one complete review gate at task completion, not a review gate for every edit.
+Tasks that qualify for Fast Path use the workflow above. Treat any other small
+isolated task as one implicit top-level Stage. It receives one complete review
+gate at task completion, not a review gate for every edit.
 For small, isolated, low-risk tasks:
 - inspect the relevant files,
 - make the minimal focused change,
