@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Tests\Integration\MarketplaceAnalytics;
 
 use App\Company\Entity\Company;
+use App\Marketplace\Entity\MarketplaceCost;
+use App\Marketplace\Entity\MarketplaceCostCategory;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceReturn;
+use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAnalytics\Infrastructure\Query\UnitExtendedQuery;
 use App\MarketplaceAnalytics\Infrastructure\Query\WidgetSummaryQuery;
@@ -137,6 +140,124 @@ final class UnitExtendedWbGrossAmountsTest extends IntegrationTestCase
         self::assertSame(4000.0, $itemsBySku['OZON-MIXED']['returnsTotal']);
         self::assertSame(17000.0, $result['totals']['revenue']);
         self::assertSame(4000.0, $result['totals']['returnsTotal']);
+    }
+
+    /**
+     * WB deduction rows may arrive without nm_id/barcode. They cannot be
+     * allocated to a SKU row, but must still be income in the report summary.
+     */
+    public function testWbVoluntaryPaymentWithoutSkuIsIncomeInSummaryAndProfit(): void
+    {
+        $company = CompanyBuilder::aCompany()->withIndex(833)->build();
+        $this->em->persist($company->getUser());
+        $this->em->persist($company);
+
+        $listing = $this->listing($company, 8331, 'WB-COMPENSATION');
+        $this->em->persist($listing);
+        $this->persistSale($company, $listing, 'WB-COMPENSATION-SALE', '1000.00', '1000.00', 1);
+
+        $category = (new MarketplaceCostCategory(
+            Uuid::uuid4()->toString(),
+            $company,
+            MarketplaceType::WILDBERRIES,
+        ))
+            ->setCode('wb_dobrovolnaya_vyplata_za_tovary')
+            ->setName('Добровольная выплата за товары');
+        $cost = (new MarketplaceCost(
+            Uuid::uuid4()->toString(),
+            $company,
+            MarketplaceType::WILDBERRIES,
+            $category,
+        ))
+            ->setAmount('49155.00')
+            ->setCostDate(new \DateTimeImmutable('2026-07-15'))
+            ->setOperationType(MarketplaceCostOperationType::STORNO);
+
+        $this->em->persist($category);
+        $this->em->persist($cost);
+        $this->em->flush();
+
+        $result = $this->query->execute(
+            (string) $company->getId(),
+            MarketplaceType::WILDBERRIES->value,
+            self::PERIOD_FROM,
+            self::PERIOD_TO,
+            limit: 100,
+        );
+
+        self::assertSame(0.0, $result['items'][0]['otherCosts']);
+        self::assertSame(1000.0, $result['items'][0]['profit']);
+        self::assertSame(0.0, $result['totals']['totalCosts']);
+        self::assertSame(1000.0, $result['totals']['profit']);
+
+        $widgetSummary = $this->widgetSummaryQuery->getSummary(
+            (string) $company->getId(),
+            MarketplaceType::WILDBERRIES->value,
+            new \DateTimeImmutable(self::PERIOD_FROM),
+            new \DateTimeImmutable(self::PERIOD_TO),
+        );
+
+        $compensation = null;
+        foreach ($widgetSummary['widgetGroups'] as $group) {
+            foreach ($group['categories'] as $categoryRow) {
+                if ('wb_dobrovolnaya_vyplata_za_tovary' === $categoryRow['code']) {
+                    $compensation = $categoryRow;
+                }
+            }
+        }
+
+        self::assertNotNull($compensation);
+        self::assertSame(0.0, $compensation['costsAmount']);
+        self::assertSame(49155.0, $compensation['stornoAmount']);
+        self::assertSame(49155.0, $compensation['netAmount']);
+        self::assertSame(49155.0, $widgetSummary['totalCosts']);
+        self::assertSame(50155.0, $widgetSummary['profit']);
+    }
+
+    public function testWbVoluntaryPaymentAttachedToSkuIncreasesSkuAndTotalProfit(): void
+    {
+        $company = CompanyBuilder::aCompany()->withIndex(836)->build();
+        $this->em->persist($company->getUser());
+        $this->em->persist($company);
+
+        $listing = $this->listing($company, 8361, 'WB-COMPENSATION-SKU');
+        $this->em->persist($listing);
+        $this->persistSale($company, $listing, 'WB-COMPENSATION-SKU-SALE', '1000.00', '1000.00', 1);
+
+        $category = (new MarketplaceCostCategory(
+            Uuid::uuid4()->toString(),
+            $company,
+            MarketplaceType::WILDBERRIES,
+        ))
+            ->setCode('wb_dobrovolnaya_vyplata_za_tovary')
+            ->setName('Добровольная выплата за товары');
+        $cost = (new MarketplaceCost(
+            Uuid::uuid4()->toString(),
+            $company,
+            MarketplaceType::WILDBERRIES,
+            $category,
+        ))
+            ->setListing($listing)
+            ->setAmount('49155.00')
+            ->setCostDate(new \DateTimeImmutable('2026-07-15'))
+            ->setOperationType(MarketplaceCostOperationType::STORNO);
+
+        $this->em->persist($category);
+        $this->em->persist($cost);
+        $this->em->flush();
+
+        $result = $this->query->execute(
+            (string) $company->getId(),
+            MarketplaceType::WILDBERRIES->value,
+            self::PERIOD_FROM,
+            self::PERIOD_TO,
+            limit: 100,
+        );
+
+        self::assertSame(-49155.0, $result['items'][0]['otherCosts']);
+        self::assertSame(50155.0, $result['items'][0]['profit']);
+        self::assertSame(-49155.0, $result['totals']['otherCosts']);
+        self::assertSame(50155.0, $result['totals']['profit']);
     }
 
     private function listing(

@@ -538,19 +538,37 @@ final class WbCostsRawProcessorTest extends TestCase
         self::assertEqualsWithDelta(12.30, (float) $entries[0]['amount'], 0.001);
     }
 
-    public function testWbDeductionCalculatorEmitsPositiveAmount(): void
+    public function testWbDeductionCalculatorPreservesSignThroughOperationType(): void
     {
-        $entries = (new WbDeductionCalculator(new SlugifyService()))->calculate(
+        $calculator = new WbDeductionCalculator(new SlugifyService());
+
+        $compensationEntries = $calculator->calculate(
             $this->supplierOpItem('Удержание', [
                 'deduction' => -77.00,
+                'bonus_type_name' => 'Добровольная выплата за товары, документ №123',
+            ]),
+            null,
+        );
+
+        self::assertCount(1, $compensationEntries);
+        self::assertSame('wb_dobrovolnaya_vyplata_za_tovary', $compensationEntries[0]['category_code']);
+        self::assertSame('Добровольная выплата за товары', $compensationEntries[0]['category_name']);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $compensationEntries[0]['operation_type']);
+        self::assertGreaterThan(0, (float) $compensationEntries[0]['amount']);
+        self::assertEqualsWithDelta(77.00, (float) $compensationEntries[0]['amount'], 0.001);
+
+        $chargeEntries = $calculator->calculate(
+            $this->supplierOpItem('Удержание', [
+                'deduction' => 25.00,
                 'bonus_type_name' => 'Списание за отзыв',
             ]),
             null,
         );
 
-        self::assertCount(1, $entries);
-        self::assertGreaterThan(0, (float) $entries[0]['amount']);
-        self::assertEqualsWithDelta(77.00, (float) $entries[0]['amount'], 0.001);
+        self::assertCount(1, $chargeEntries);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $chargeEntries[0]['operation_type']);
+        self::assertGreaterThan(0, (float) $chargeEntries[0]['amount']);
+        self::assertEqualsWithDelta(25.00, (float) $chargeEntries[0]['amount'], 0.001);
     }
 
     public function testWbLoyaltyDiscountCalculatorEmitsPositiveAmount(): void
