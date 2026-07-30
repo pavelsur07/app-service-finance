@@ -296,3 +296,59 @@ body.layout-fluid-vertical .page-wrapper {
     color: var(--tblr-secondary, #656d77);
     font-size: .75rem;
 }
+
+
+/* Counterparty Picker: список подсказок рендерится в body, поэтому ему нужен свой
+   слой выше модалки Bootstrap (1055) и оффканваса (1045). Точечный z-index на
+   кнопках формы не помогает: внутри модалки дефект возвращается. */
+.cp-results {
+    position: fixed;
+    z-index: 1080;
+    overflow-y: auto;
+    background: var(--tblr-bg-surface, #fff);
+    border-radius: .5rem;
+}
+
+.cp-results[hidden] {
+    display: none;
+}
+
+.cp-results .cp-option {
+    display: block;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+}
+
+.cp-results .cp-mark {
+    padding: 0;
+    background: rgba(var(--tblr-primary-rgb, 32 107 196), .18);
+    color: inherit;
+}
+
+.cp-results .cp-loading::after {
+    content: '';
+    display: inline-block;
+    width: .75rem;
+    height: .75rem;
+    margin-left: .5rem;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: cp-spin .6s linear infinite;
+    vertical-align: -.1rem;
+}
+
+@keyframes cp-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Признак выбранной сущности: заполненное поле с галочкой, а не свободный текст. */
+.cp-selected-mark {
+    display: none;
+    color: var(--tblr-success, #2fb344);
+}
+
+.cp-has-selection .cp-selected-mark {
+    display: flex;
+}

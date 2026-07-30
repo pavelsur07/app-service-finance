@@ -59,12 +59,12 @@
                     data-cp-input
                     aria-label="Поиск контрагента"
                 />
+                <span class="input-group-text cp-selected-mark" title="Контрагент выбран"><i class="ti ti-check"></i></span>
                 <button class="btn btn-outline-secondary" type="button" data-cp-clear aria-label="Очистить выбор"
                     {% if currentValue is empty %}disabled{% endif %}>
                     <i class="ti ti-x"></i>
                 </button>
             </div>
-            <div class="cp-results list-group position-absolute w-auto shadow d-none" data-cp-results role="listbox"></div>
             {% if allowCreate %}
                 <div class="form-text">
                     Не нашли? <a href="{{ path('counterparty_new') }}" target="_blank" rel="noopener">Создать контрагента</a>
