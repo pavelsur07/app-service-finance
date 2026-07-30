@@ -530,16 +530,72 @@ getCompaniesByIds(array $companyIds): array
 findCounterpartyByIdAndCompany(string $counterpartyId, string $companyId): ?Counterparty
 ```
 
-### `CounterpartyFacade` (`src/Company/Facade/CounterpartyFacade.php`)
-```php
-// Список контрагентов для ChoiceType в формах
-// @return list<array{id: string, name: string}>
-getChoicesForCompany(string $companyId): array
+### Справочник контрагентов (`Company`)
 
-// Имена по списку ID — для отображения в таблицах
-// @return array<string, string>  uuid => 'ООО Ромашка'
-getNamesByIds(array $ids): array
+`CounterpartyFacade` **не существует**: соседние модули (`Cash`, `Finance`, `Deals`)
+обращаются к `CounterpartyRepository` напрямую — известный долг, вынесен в отдельную
+задачу. Здесь описано то, что есть в коде.
+
+Название контрагента разделено на три роли и записывается только целиком:
+
+```php
+// src/Company/Domain/ValueObject/CounterpartyName.php — immutable VO
+// display        — как ввёл пользователь: 'ООО "Ромашка"'
+// legalFormHint  — разобранная ОПФ: 'ООО' | null. АРТЕФАКТ РАЗБОРА СТРОКИ,
+//                  не правовой статус: не показывать пользователю, не ветвить
+//                  бизнес-логику. Статус — CounterpartyType и длина ИНН.
+// core           — нормализованное название для поиска и сравнения: 'РОМАШКА'
+//
+// Конструктор приватный: создать VO можно только нормализатором.
+
+// src/Company/Domain/Service/CounterpartyNameNormalizer.php
+// Чистый детерминированный сервис, единственная точка нормализации.
+normalize(string $rawName): CounterpartyName
+
+// Entity Counterparty: name/legalFormHint/nameCore пишутся только вместе
+rename(CounterpartyName $name): void          // + touch updatedAt
+refreshNormalizedName(CounterpartyName $name) // backfill: updatedAt не меняется
+assignTaxIds(?string $inn, ?string $kpp)      // КПП без ИНН — исключение
+hasInconsistentLegalFormHint(): bool          // 'ИП' + 10-значный ИНН = ошибка парсера
+clearLegalFormHint(): void
+belongsToCompany(string $companyId): bool     // IDOR-guard
+archive(): void / restore(): void
+// setName/setInn/setCompany/setIsArchived/setUpdatedAt удалены намеренно
+
+// src/Company/Application/SaveCounterpartyAction.php
+// Создание и изменение записи справочника (нормализация, проверка ИНН,
+// сброс несогласованной подсказки ОПФ с логом warning).
+__invoke(Company $company, CounterpartyFormData $data, ?Counterparty $counterparty = null): Counterparty
+
+// src/Company/Application/BackfillCounterpartyNamesAction.php
+// Идемпотентный пересчёт производных полей; updatedAt не трогает.
+// CLI: app:counterparty:backfill-names [--dry-run] [--company-id] [--similarity]
+__invoke(bool $dryRun): CounterpartyBackfillResult
+
+// src/Company/Infrastructure/Query/CounterpartySearchQuery.php — DBAL, скаляры
+// Цифры → префикс по inn; иначе nameCore префикс + similarity(nameCore) > 0.3.
+// Всегда company_id и is_archived = false, LIMIT 20.
+search(string $companyId, string $query, int $limit = 20): array
+
+// src/Company/Infrastructure/Query/CounterpartyDuplicateCandidatesQuery.php
+// Только отчёт, ничего не меняет. ОПФ обязана совпадать: ООО и АО с одним
+// названием — разные юрлица.
+findSimilarNamePairs(float $threshold = 0.6, ?string $companyId = null): array
+findSameInnGroups(?string $companyId = null): array
+findInvalidInnRows(?string $companyId = null): array
+
+// src/Company/Repository/CounterpartyRepository.php
+findSelectableByCompany(string $companyId, ?string $keepId = null): array // архивные скрыты, выбранное остаётся
+findOneByInn(string $companyId, string $inn, ?string $exceptId = null): ?Counterparty
+findAllForBackfill(): iterable
 ```
+
+Публичный endpoint: `GET /api/counterparties/search?q=` — автокомплит,
+companyId только из сессии, ответ `[{id, name, inn, kpp, type}]` без пагинации.
+`legalFormHint` в ответе намеренно отсутствует.
+
+`name_core` в БД пока nullable: `SET NOT NULL` — contract-миграцией после
+backfill на PROD (`docs/tasks/counterparty-name-normalization/plan.md`).
 
 ### `FinancialResponsibilityCenterFacade` (`src/Company/Facade/FinancialResponsibilityCenterFacade.php`)
 

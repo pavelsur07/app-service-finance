@@ -11,6 +11,7 @@ use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Import\ClientBank1CImportService;
 use App\Cash\Service\Import\ImportLogger;
+use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Entity\Company;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
@@ -93,6 +94,7 @@ final class ClientBank1CImportServiceSoftDeleteTest extends IntegrationTestCase
 
         $this->service = new ClientBank1CImportService(
             new StubActiveCompanyService($this->company),
+            new CounterpartyNameNormalizer(),
             $counterpartyRepository,
             $this->transactionRepository,
             new ImportLogger($this->entityManager),

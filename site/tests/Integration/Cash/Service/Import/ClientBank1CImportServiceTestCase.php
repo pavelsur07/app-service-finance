@@ -9,6 +9,7 @@ use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Import\ClientBank1CImportService;
 use App\Cash\Service\Import\ImportLogger;
+use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Entity\Company;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
@@ -77,6 +78,7 @@ abstract class ClientBank1CImportServiceTestCase extends IntegrationTestCase
 
         $this->service = new ClientBank1CImportService(
             $activeCompanyService,
+            new CounterpartyNameNormalizer(),
             $this->counterpartyRepository,
             $this->transactionRepository,
             new ImportLogger($this->em),

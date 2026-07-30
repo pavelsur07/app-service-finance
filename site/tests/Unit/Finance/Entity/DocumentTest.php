@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Finance\Entity;
 
+use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\User;
@@ -24,7 +25,7 @@ final class DocumentTest extends TestCase
     public function testCounterpartyCanBeAssignedAndCleared(): void
     {
         $document = $this->createDocument();
-        $counterparty = new Counterparty(Uuid::uuid4()->toString(), $document->getCompany(), 'Test', CounterpartyType::LEGAL_ENTITY);
+        $counterparty = new Counterparty(Uuid::uuid4()->toString(), $document->getCompany(), (new CounterpartyNameNormalizer())->normalize('Test'), CounterpartyType::LEGAL_ENTITY);
 
         $document->setCounterparty($counterparty);
 

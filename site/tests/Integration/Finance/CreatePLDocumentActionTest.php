@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Finance;
 
+use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\FinancialResponsibilityCenter;
@@ -175,7 +176,7 @@ final class CreatePLDocumentActionTest extends IntegrationTestCase
         $counterparty = new Counterparty(
             sprintf('44444444-4444-4444-4444-%012d', (int) $suffix),
             $company,
-            sprintf('Counterparty %s', $suffix),
+            (new CounterpartyNameNormalizer())->normalize(sprintf('Counterparty %s', $suffix)),
             CounterpartyType::LEGAL_ENTITY,
         );
 

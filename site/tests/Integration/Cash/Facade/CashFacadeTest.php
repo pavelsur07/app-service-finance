@@ -10,6 +10,7 @@ use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Facade\CashFacade;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
+use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
@@ -42,7 +43,7 @@ final class CashFacadeTest extends IntegrationTestCase
         $account->setOpeningBalance('0');
         $account->setOpeningBalanceDate(new \DateTimeImmutable('2024-01-01'));
 
-        $counterparty = new Counterparty(Uuid::uuid4()->toString(), $company, 'Client', CounterpartyType::LEGAL_ENTITY);
+        $counterparty = new Counterparty(Uuid::uuid4()->toString(), $company, (new CounterpartyNameNormalizer())->normalize('Client'), CounterpartyType::LEGAL_ENTITY);
         $systemPair = $this->persistSystemPair($company);
 
         $this->em->persist($user);

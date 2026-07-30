@@ -10,6 +10,7 @@ use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Service\Transaction\CashTransactionService;
+use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
@@ -59,7 +60,7 @@ final class CashTransactionServiceTest extends IntegrationTestCase
         $counterparty = new Counterparty(
             Uuid::uuid4()->toString(),
             $company,
-            'Client',
+            (new CounterpartyNameNormalizer())->normalize('Client'),
             CounterpartyType::LEGAL_ENTITY
         );
         $systemPair = $this->persistSystemPair($company);

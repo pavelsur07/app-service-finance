@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace App\Company\Controller;
 
+use App\Company\Application\DTO\CounterpartyFormData;
+use App\Company\Application\SaveCounterpartyAction;
+use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Company\Enum\CounterpartyType as CounterpartyTypeEnum;
+use App\Company\Exception\CounterpartyInnAlreadyExistsException;
 use App\Company\Form\CounterpartyType;
 use App\Company\Repository\CounterpartyRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
-use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
+use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -42,29 +46,17 @@ class CounterpartyController extends AbstractController
     }
 
     #[Route('/new', name: 'counterparty_new', methods: ['GET', 'POST'])]
-    public function new(Request $request, EntityManagerInterface $em, ActiveCompanyService $companyService, CounterpartyRepository $repo): Response
+    public function new(Request $request, SaveCounterpartyAction $save, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
-        $counterparty = new Counterparty(Uuid::uuid4()->toString(), $company, '', CounterpartyTypeEnum::LEGAL_ENTITY);
 
-        $form = $this->createForm(CounterpartyType::class, $counterparty);
+        $form = $this->createForm(CounterpartyType::class, new CounterpartyFormData());
         $form->handleRequest($request);
 
-        if ($form->isSubmitted() && $form->isValid()) {
-            if ($counterparty->getInn()) {
-                $existing = $repo->findOneBy(['company' => $company, 'inn' => $counterparty->getInn()]);
-                if ($existing) {
-                    $form->get('inn')->addError(new FormError('Контрагент с таким ИНН уже существует'));
-                }
-            }
+        if ($form->isSubmitted() && $form->isValid() && $this->trySave($form, $save, $company, null)) {
+            $this->addFlash('success', 'Контрагент добавлен');
 
-            if ($form->isValid()) {
-                $em->persist($counterparty);
-                $em->flush();
-                $this->addFlash('success', 'Контрагент добавлен');
-
-                return $this->redirectToRoute('counterparty_index');
-            }
+            return $this->redirectToRoute('counterparty_index');
         }
 
         return $this->render('counterparty/new.html.twig', [
@@ -73,32 +65,24 @@ class CounterpartyController extends AbstractController
     }
 
     #[Route('/{id}/edit', name: 'counterparty_edit', methods: ['GET', 'POST'])]
-    public function edit(string $id, Request $request, CounterpartyRepository $repo, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
+    public function edit(string $id, Request $request, CounterpartyRepository $repo, SaveCounterpartyAction $save, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
-        $counterparty = $repo->find($id);
-        if (!$counterparty || $counterparty->getCompany() !== $company) {
-            throw $this->createNotFoundException();
-        }
+        $counterparty = $this->findForCompany($repo, $id, $company->getId());
 
-        $form = $this->createForm(CounterpartyType::class, $counterparty);
+        $data = new CounterpartyFormData();
+        $data->name = $counterparty->getName();
+        $data->inn = $counterparty->getInn();
+        $data->kpp = $counterparty->getKpp();
+        $data->type = $counterparty->getType();
+
+        $form = $this->createForm(CounterpartyType::class, $data);
         $form->handleRequest($request);
 
-        if ($form->isSubmitted() && $form->isValid()) {
-            if ($counterparty->getInn()) {
-                $existing = $repo->findOneBy(['company' => $company, 'inn' => $counterparty->getInn()]);
-                if ($existing && $existing->getId() !== $counterparty->getId()) {
-                    $form->get('inn')->addError(new FormError('Контрагент с таким ИНН уже существует'));
-                }
-            }
+        if ($form->isSubmitted() && $form->isValid() && $this->trySave($form, $save, $company, $counterparty)) {
+            $this->addFlash('success', 'Контрагент обновлён');
 
-            if ($form->isValid()) {
-                $counterparty->setUpdatedAt(new \DateTimeImmutable());
-                $em->flush();
-                $this->addFlash('success', 'Контрагент обновлён');
-
-                return $this->redirectToRoute('counterparty_index');
-            }
+            return $this->redirectToRoute('counterparty_index');
         }
 
         return $this->render('counterparty/edit.html.twig', [
@@ -111,14 +95,10 @@ class CounterpartyController extends AbstractController
     public function archive(string $id, Request $request, CounterpartyRepository $repo, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
-        $counterparty = $repo->find($id);
-        if (!$counterparty || $counterparty->getCompany() !== $company) {
-            throw $this->createNotFoundException();
-        }
+        $counterparty = $this->findForCompany($repo, $id, $company->getId());
 
         if ($this->isCsrfTokenValid('archive'.$counterparty->getId(), $request->request->get('_token'))) {
-            $counterparty->setIsArchived(true);
-            $counterparty->setUpdatedAt(new \DateTimeImmutable());
+            $counterparty->archive();
             $em->flush();
             $this->addFlash('success', 'Контрагент архивирован');
         }
@@ -130,18 +110,40 @@ class CounterpartyController extends AbstractController
     public function unarchive(string $id, Request $request, CounterpartyRepository $repo, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
-        $counterparty = $repo->find($id);
-        if (!$counterparty || $counterparty->getCompany() !== $company) {
-            throw $this->createNotFoundException();
-        }
+        $counterparty = $this->findForCompany($repo, $id, $company->getId());
 
         if ($this->isCsrfTokenValid('unarchive'.$counterparty->getId(), $request->request->get('_token'))) {
-            $counterparty->setIsArchived(false);
-            $counterparty->setUpdatedAt(new \DateTimeImmutable());
+            $counterparty->restore();
             $em->flush();
             $this->addFlash('success', 'Контрагент восстановлён');
         }
 
         return $this->redirectToRoute('counterparty_index');
+    }
+
+    private function findForCompany(CounterpartyRepository $repo, string $id, string $companyId): Counterparty
+    {
+        $counterparty = $repo->find($id);
+        if (!$counterparty instanceof Counterparty || !$counterparty->belongsToCompany($companyId)) {
+            throw $this->createNotFoundException();
+        }
+
+        return $counterparty;
+    }
+
+    private function trySave(FormInterface $form, SaveCounterpartyAction $save, Company $company, ?Counterparty $counterparty): bool
+    {
+        /** @var CounterpartyFormData $data */
+        $data = $form->getData();
+
+        try {
+            $save($company, $data, $counterparty);
+
+            return true;
+        } catch (CounterpartyInnAlreadyExistsException $e) {
+            $form->get('inn')->addError(new FormError($e->getMessage()));
+
+            return false;
+        }
     }
 }

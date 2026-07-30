@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Finance\Controller;
 
+use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\FinancialResponsibilityCenter;
@@ -35,7 +36,7 @@ final class DocumentCopyControllerTest extends WebTestCaseBase
 
         $user = $this->createUser($hasher, 'copy@example.com');
         $company = $this->createCompany($user, 'Copy Co');
-        $counterparty = new Counterparty(Uuid::uuid4()->toString(), $company, 'Client', CounterpartyType::LEGAL_ENTITY);
+        $counterparty = new Counterparty(Uuid::uuid4()->toString(), $company, (new CounterpartyNameNormalizer())->normalize('Client'), CounterpartyType::LEGAL_ENTITY);
         $systemProject = new ProjectDirection(
             Uuid::uuid4()->toString(),
             $company,

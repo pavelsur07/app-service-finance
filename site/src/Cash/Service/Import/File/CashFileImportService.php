@@ -8,6 +8,7 @@ use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Import\ImportLogger;
+use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
@@ -30,6 +31,7 @@ final class CashFileImportService
 
     public function __construct(
         private readonly CashFileRowNormalizer $rowNormalizer,
+        private readonly CounterpartyNameNormalizer $counterpartyNameNormalizer,
         private readonly CounterpartyRepository $counterpartyRepository,
         private readonly CashTransactionRepository $cashTransactionRepository,
         private readonly ImportLogger $importLogger,
@@ -364,7 +366,7 @@ final class CashFileImportService
         $counterparty = new Counterparty(
             Uuid::uuid4()->toString(),
             $company,
-            $trimmedName,
+            $this->counterpartyNameNormalizer->normalize($trimmedName),
             CounterpartyType::LEGAL_ENTITY
         );
         $this->entityManager->persist($counterparty);

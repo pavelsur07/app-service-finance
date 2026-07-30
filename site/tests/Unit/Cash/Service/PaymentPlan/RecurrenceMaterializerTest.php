@@ -14,6 +14,7 @@ use App\Cash\Repository\PaymentPlan\PaymentRecurrenceRuleRepository;
 use App\Cash\Service\PaymentPlan\PaymentPlanService;
 use App\Cash\Service\PaymentPlan\PaymentRecurrenceService;
 use App\Cash\Service\PaymentPlan\RecurrenceMaterializer;
+use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\User;
@@ -42,7 +43,7 @@ final class RecurrenceMaterializerTest extends TestCase
         $plan->setStatus(PaymentPlanStatusEnum::PLANNED);
 
         $account = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Счёт', 'RUB');
-        $counterparty = new Counterparty(Uuid::uuid4()->toString(), $company, 'Контрагент', CounterpartyType::LEGAL_ENTITY);
+        $counterparty = new Counterparty(Uuid::uuid4()->toString(), $company, (new CounterpartyNameNormalizer())->normalize('Контрагент'), CounterpartyType::LEGAL_ENTITY);
         $plan->setMoneyAccount($account);
         $plan->setCounterparty($counterparty);
 

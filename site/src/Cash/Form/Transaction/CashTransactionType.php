@@ -44,6 +44,9 @@ class CashTransactionType extends AbstractType
         $currentResponsibilityCenterId = $data instanceof CashTransactionDTO
             ? $data->responsibilityCenterId
             : null;
+        $currentCounterpartyId = $data instanceof CashTransactionDTO
+            ? $data->counterpartyId
+            : null;
 
         $builder
             ->add('occurredAt', DateType::class, ['widget' => 'single_text'])
@@ -86,7 +89,7 @@ class CashTransactionType extends AbstractType
             ])
             ->add('counterparty', ChoiceType::class, [
                 'required' => false,
-                'choices' => $company ? $this->counterpartyRepo->findBy(['company' => $company], ['name' => 'ASC']) : [],
+                'choices' => $company ? $this->counterpartyRepo->findSelectableByCompany((string) $company->getId(), $currentCounterpartyId) : [],
                 'choice_label' => 'name',
                 'choice_value' => 'id',
                 'mapped' => false,

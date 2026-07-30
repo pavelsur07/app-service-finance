@@ -21,6 +21,62 @@ class CounterpartyRepository extends ServiceEntityRepository
     }
 
     /**
+     * Все контрагенты для пересчёта производных полей (CLI backfill, все компании).
+     *
+     * @return iterable<Counterparty>
+     */
+    public function findAllForBackfill(): iterable
+    {
+        return $this->createQueryBuilder('c')
+            ->orderBy('c.id', 'ASC')
+            ->getQuery()
+            ->toIterable();
+    }
+
+    /**
+     * Список для выбора в формах: архивные не предлагаются, но уже выбранное
+     * значение остаётся в списке — иначе правка старой операции молча потеряет
+     * ссылку на архивного контрагента.
+     *
+     * @return list<Counterparty>
+     */
+    public function findSelectableByCompany(string $companyId, ?string $keepId = null): array
+    {
+        $qb = $this->createQueryBuilder('c')
+            ->andWhere('c.company = :companyId')
+            ->setParameter('companyId', $companyId)
+            ->orderBy('c.name', 'ASC');
+
+        if (null === $keepId) {
+            $qb->andWhere('c.isArchived = false');
+        } else {
+            $qb->andWhere($qb->expr()->orX('c.isArchived = false', 'c.id = :keepId'))
+                ->setParameter('keepId', $keepId);
+        }
+
+        /** @var list<Counterparty> $result */
+        $result = $qb->getQuery()->getResult();
+
+        return $result;
+    }
+
+    public function findOneByInn(string $companyId, string $inn, ?string $exceptId = null): ?Counterparty
+    {
+        $qb = $this->createQueryBuilder('c')
+            ->andWhere('c.company = :companyId')
+            ->setParameter('companyId', $companyId)
+            ->andWhere('c.inn = :inn')
+            ->setParameter('inn', $inn)
+            ->setMaxResults(1);
+
+        if (null !== $exceptId) {
+            $qb->andWhere('c.id != :exceptId')->setParameter('exceptId', $exceptId);
+        }
+
+        return $qb->getQuery()->getOneOrNullResult();
+    }
+
+    /**
      * @return Counterparty[]
      */
     public function findByFilters(Company $company, ?CounterpartyType $type, ?string $q, bool $showArchived, array $sort = ['name' => 'ASC']): array
