@@ -5,6 +5,7 @@ namespace App\Cash\Controller\Transaction;
 use App\Cash\Application\DTO\CashTransactionAutoRulePreviewFilter;
 use App\Cash\Application\SaveCashTransactionAutoRuleAction;
 use App\Cash\Application\Service\AutoRuleDispatchGuard;
+use App\Cash\Application\Service\CashTransactionAutoRulePrefiller;
 use App\Cash\Application\Service\CashTransactionAutoRuleTargetValidator;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
@@ -136,6 +137,8 @@ class CashTransactionAutoRuleController extends AbstractController
         FinancialResponsibilityCenterFacade $responsibilityCenterFacade,
         CashTransactionAutoRuleTargetValidator $targetValidator,
         AuditContextProvider $auditContextProvider,
+        CashTransactionRepository $txRepo,
+        CashTransactionAutoRulePrefiller $prefiller,
     ): Response {
         $company = $companyService->getActiveCompany();
         $companyId = (string) $company->getId();
@@ -151,6 +154,24 @@ class CashTransactionAutoRuleController extends AbstractController
             CashTransactionAutoRuleOperationType::ANY,
             createdByUserId: $auditContextProvider->getActorUserId(),
         );
+
+        // Операция-источник нужна и при повторном рендере после невалидного POST:
+        // именно тогда пользователь правит условие и смотрит на назначение платежа.
+        $sourceTransaction = null;
+        $fromTransactionId = trim((string) $request->query->get('fromTransaction', ''));
+        if ('' !== $fromTransactionId) {
+            $sourceTransaction = Uuid::isValid($fromTransactionId)
+                ? $txRepo->findOneByIdAndCompanyId($fromTransactionId, $companyId)
+                : null;
+
+            if (null === $sourceTransaction) {
+                throw $this->createNotFoundException('Операция не найдена.');
+            }
+
+            if ($request->isMethod('GET')) {
+                $prefiller->prefill($rule, $sourceTransaction, $categories);
+            }
+        }
 
         $form = $this->createForm(CashTransactionAutoRuleType::class, $rule, [
             'categories' => $categories,
@@ -177,6 +198,7 @@ class CashTransactionAutoRuleController extends AbstractController
 
         return $this->render('cash_transaction_auto_rule/new.html.twig', [
             'form' => $form->createView(),
+            'sourceTransaction' => $sourceTransaction,
         ]);
     }
 
