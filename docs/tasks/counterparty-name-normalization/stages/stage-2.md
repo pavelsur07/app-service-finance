@@ -21,7 +21,8 @@
   это ожидаемое доменное условие, алерт в GlitchTip не нужен.
 - Один проход и один `flush()` (Lite, D1: 317 строк на PROD). Messenger-батч,
   батчи по 500 и `clear()` не вводились.
-- Команда `app:counterparty:backfill-names [--dry-run] [--company-id] [--similarity]`.
+- Команда `app:counterparty:backfill-names [--dry-run] [--report-company-id] [--similarity]`;
+  `--report-company-id` скоупит только отчёт, пересчёт всегда идёт по всем компаниям.
 - `CounterpartyDuplicateCandidatesQuery` — только отчёт, ничего не меняет:
   - пары с `similarity(name_core) > 0.6` **при совпадающей ОПФ**;
   - группы с одинаковым ИНН внутри компании;

@@ -556,8 +556,10 @@ normalize(string $rawName): CounterpartyName
 rename(CounterpartyName $name): void          // + touch updatedAt
 refreshNormalizedName(CounterpartyName $name) // backfill: updatedAt не меняется
 assignTaxIds(?string $inn, ?string $kpp)      // КПП без ИНН — исключение
-hasInconsistentLegalFormHint(): bool          // 'ИП' + 10-значный ИНН = ошибка парсера
-clearLegalFormHint(): void
+hasInconsistentLegalFormHint(): bool          // диагностика: 'ИП' + 10-значный ИНН
+effectiveLegalFormHint(CounterpartyName): ?string  // подсказка после кросс-проверки по ИНН
+// assignTaxIds() сам сбрасывает 'ИП' при 10-значном ИНН — инвариант держится
+// во всех путях записи, включая импорт 1С
 belongsToCompany(string $companyId): bool     // IDOR-guard
 archive(): void / restore(): void
 // setName/setInn/setCompany/setIsArchived/setUpdatedAt удалены намеренно
@@ -569,7 +571,7 @@ __invoke(Company $company, CounterpartyFormData $data, ?Counterparty $counterpar
 
 // src/Company/Application/BackfillCounterpartyNamesAction.php
 // Идемпотентный пересчёт производных полей; updatedAt не трогает.
-// CLI: app:counterparty:backfill-names [--dry-run] [--company-id] [--similarity]
+// CLI: app:counterparty:backfill-names [--dry-run] [--report-company-id] [--similarity]
 __invoke(bool $dryRun): CounterpartyBackfillResult
 
 // src/Company/Infrastructure/Query/CounterpartySearchQuery.php — DBAL, скаляры

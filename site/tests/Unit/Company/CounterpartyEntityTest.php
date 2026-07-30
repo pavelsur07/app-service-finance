@@ -182,16 +182,48 @@ final class CounterpartyEntityTest extends TestCase
         self::assertFalse($counterparty->belongsToCompany('99999999-9999-9999-9999-999999999999'));
     }
 
-    public function testInconsistentLegalFormHintForLegalEntityInn(): void
+    /**
+     * Разобранный «ИП» при 10-значном ИНН — ошибка парсера названия, и её чинит
+     * сама сущность: любой путь записи проходит через assignTaxIds().
+     */
+    public function testInconsistentLegalFormHintIsDroppedOnTaxIdAssignment(): void
     {
-        // Given: разобранный «ИП» при 10-значном ИНН — ошибка парсера названия
+        // Given
         $counterparty = CounterpartyBuilder::aCounterparty()
             ->withName('ИП Кулешова Анастасия Владимировна')
             ->withInn('7707083893')
             ->build();
 
         // Then
+        self::assertNull($counterparty->getLegalFormHint());
+        self::assertFalse($counterparty->hasInconsistentLegalFormHint());
+        self::assertSame('ИП Кулешова Анастасия Владимировна', $counterparty->getName());
+        self::assertSame('КУЛЕШОВА АНАСТАСИЯ ВЛАДИМИРОВНА', $counterparty->getNameCore());
+    }
+
+    /**
+     * Переходное состояние: переименовали, ИНН ещё не переприсвоили.
+     */
+    public function testInconsistentLegalFormHintIsVisibleBetweenRenameAndTaxIds(): void
+    {
+        // Given
+        $counterparty = CounterpartyBuilder::aCounterparty()
+            ->withName('ООО "Ромашка"')
+            ->withInn('7707083893')
+            ->build();
+
+        // When
+        $counterparty->rename($this->normalizer->normalize('ИП Кулешова Анастасия Владимировна'));
+
+        // Then
         self::assertTrue($counterparty->hasInconsistentLegalFormHint());
+
+        // When: любой последующий assignTaxIds приводит поле в согласованное состояние
+        $counterparty->assignTaxIds('7707083893', null);
+
+        // Then
+        self::assertFalse($counterparty->hasInconsistentLegalFormHint());
+        self::assertNull($counterparty->getLegalFormHint());
     }
 
     public function testConsistentLegalFormHintForTwelveDigitInn(): void
@@ -204,23 +236,6 @@ final class CounterpartyEntityTest extends TestCase
 
         // Then
         self::assertFalse($counterparty->hasInconsistentLegalFormHint());
-    }
-
-    public function testClearLegalFormHintKeepsName(): void
-    {
-        // Given
-        $counterparty = CounterpartyBuilder::aCounterparty()
-            ->withName('ИП Кулешова Анастасия Владимировна')
-            ->withInn('7707083893')
-            ->build();
-
-        // When
-        $counterparty->clearLegalFormHint();
-
-        // Then
-        self::assertNull($counterparty->getLegalFormHint());
-        self::assertSame('ИП Кулешова Анастасия Владимировна', $counterparty->getName());
-        self::assertSame('КУЛЕШОВА АНАСТАСИЯ ВЛАДИМИРОВНА', $counterparty->getNameCore());
     }
 
     public function testSetTypeGetTypeRoundtrip(): void

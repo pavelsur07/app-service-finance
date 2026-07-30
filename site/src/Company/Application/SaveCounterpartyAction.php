@@ -55,14 +55,14 @@ final class SaveCounterpartyAction
 
         $counterparty->assignTaxIds($inn, $kpp);
 
-        if ($counterparty->hasInconsistentLegalFormHint()) {
-            // Ожидаемое условие: ошибка разбора названия, не инцидент.
+        if (null !== $name->legalFormHint && $counterparty->getLegalFormHint() !== $name->legalFormHint) {
+            // Сущность сбросила подсказку кросс-проверкой по ИНН. Ожидаемое условие:
+            // ошибка разбора названия, не инцидент, поэтому warning, а не error.
             $this->logger->warning('Counterparty legal form hint conflicts with INN length, hint dropped.', [
                 'counterpartyId' => $counterparty->getId(),
                 'companyId' => $company->getId(),
-                'legalFormHint' => $counterparty->getLegalFormHint(),
+                'droppedLegalFormHint' => $name->legalFormHint,
             ]);
-            $counterparty->clearLegalFormHint();
         }
 
         $this->em->flush();

@@ -143,6 +143,38 @@ final class CounterpartySearchQueryTest extends IntegrationTestCase
         self::assertSame('ООО "Ромашка"', $names[0]);
     }
 
+    /**
+     * `%` из пользовательского ввода — литерал, а не подстановочный знак: иначе
+     * запрос «р%» вытаскивает весь справочник.
+     */
+    public function testLikeWildcardFromUserInputIsEscaped(): void
+    {
+        // Given
+        $this->persistCounterparty(1, 'ООО "Ромашка"', '7707083893');
+        $this->persistCounterparty(2, 'ООО "Ромашка Плюс"', '7707083894');
+        $this->em->flush();
+
+        // When
+        $names = $this->searchNames('р%');
+
+        // Then
+        self::assertNotContains('ООО "Ромашка"', $names);
+        self::assertNotContains('ООО "Ромашка Плюс"', $names);
+    }
+
+    public function testUnderscoreFromUserInputIsEscaped(): void
+    {
+        // Given
+        $this->persistCounterparty(1, 'ООО "Ро"', '7707083893');
+        $this->em->flush();
+
+        // When
+        $names = $this->searchNames('р_');
+
+        // Then
+        self::assertNotContains('ООО "Ро"', $names);
+    }
+
     public function testShortQueryReturnsNothing(): void
     {
         // Given

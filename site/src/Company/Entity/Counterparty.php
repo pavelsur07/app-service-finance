@@ -154,21 +154,12 @@ class Counterparty
     }
 
     /**
-     * ИНН из 10 знаков = юрлицо, поэтому разобранный «ИП» означает ошибку парсера
-     * названия. Вызывается после установки названия и ИНН.
+     * Диагностика переходного состояния: название переименовано, ИНН ещё не
+     * переприсвоен. `assignTaxIds()` приводит поле в согласованное состояние сам.
      */
     public function hasInconsistentLegalFormHint(): bool
     {
         return $this->isInconsistentLegalFormHint($this->legalFormHint);
-    }
-
-    /**
-     * Сбрасывает подсказку ОПФ, не затрагивая название: «исправлять» name нельзя.
-     */
-    public function clearLegalFormHint(): void
-    {
-        $this->legalFormHint = null;
-        $this->touch();
     }
 
     public function getInn(): ?string
@@ -194,6 +185,13 @@ class Counterparty
 
         $this->inn = $inn;
         $this->kpp = $kpp;
+
+        // Инвариант чинится здесь, а не в Action: контрагента создаёт ещё и импорт
+        // 1С, и там «ИП» при 10-значном ИНН иначе доезжал бы до БД.
+        if ($this->isInconsistentLegalFormHint($this->legalFormHint)) {
+            $this->legalFormHint = null;
+        }
+
         $this->touch();
     }
 
