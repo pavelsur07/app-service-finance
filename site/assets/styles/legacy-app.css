@@ -352,3 +352,27 @@ body.layout-fluid-vertical .page-wrapper {
 .cp-has-selection .cp-selected-mark {
     display: flex;
 }
+
+
+/* Автоправила: условие — одна строка. Отступы form_row внутри строки убираем, иначе
+   каждое поле добавляет mb-3 и строка расплывается по вертикали. */
+.condition-row .mb-3 {
+    margin-bottom: 0;
+}
+
+.condition-row:hover {
+    background: rgba(10, 21, 72, .02);
+}
+
+.condition-ordinal {
+    min-width: 1.75rem;
+    text-align: center;
+}
+
+.condition-head .condition-ordinal-head {
+    min-width: 2.75rem;
+}
+
+.condition-head .condition-actions-head {
+    min-width: 2.5rem;
+}

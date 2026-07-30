@@ -1,0 +1,52 @@
+{# Одно условие — одна строка: Поле операции / Оператор / Значение / удалить.
+
+   Партиал используется и в цикле существующих условий, и как прototype для JS,
+   поэтому добавленное условие выглядит так же, как загруженное с сервера.
+
+   Классы condition-*-row обязательны: по ним контроллер auto-rule-conditions
+   показывает и скрывает ячейки. Скрытая ячейка — `hidden`, то есть display: none,
+   поэтому в flex-строке она не оставляет дыру, а `.col` рядом занимает её место.
+   Именно поэтому «Значение» лежит в `.col`, а не в фиксированной колонке: когда
+   оператор скрыт (для поля допустим один оператор), значение растягивается само,
+   без переключения классов из JS. #}
+<div class="condition-row border-top py-2" data-auto-rule-condition>
+    <div class="row g-2 align-items-end">
+        <div class="col-12 col-md-auto d-flex align-items-center">
+            <span class="badge bg-secondary-lt condition-ordinal" data-condition-title></span>
+        </div>
+
+        <div class="col-12 col-md-3">
+            {{ form_row(condition.field, {'label_attr': {'class': 'form-label d-md-none'}}) }}
+        </div>
+
+        <div class="col-12 col-md-2 condition-operator-cell">
+            {{ form_row(condition.operator, {'label_attr': {'class': 'form-label d-md-none'}}) }}
+        </div>
+
+        {# Полиморфная ячейка значения: пикер контрагента, счёт, текст или диапазон.
+           Видимой всегда остаётся ровно одна из вложенных строк. #}
+        <div class="col-12 col-md">
+            {# form_row каждого поля сам является flex-элементом (класс flex-fill задан
+               в row_attr): контроллер ставит hidden именно на него, поэтому скрытое
+               поле не занимает места. Дополнительная обёртка это ломала бы. #}
+            <div class="d-flex gap-2 condition-value-cell">
+                {{ form_row(condition.counterparty, {'label_attr': {'class': 'form-label d-md-none'}}) }}
+                {{ form_row(condition.moneyAccount, {'label_attr': {'class': 'form-label d-md-none'}}) }}
+                {{ form_row(condition.value, {'label_attr': {'class': 'form-label d-md-none'}}) }}
+                {{ form_row(condition.valueTo, {'label_attr': {'class': 'form-label d-md-none'}}) }}
+            </div>
+        </div>
+
+        <div class="col-12 col-md-auto">
+            <button
+                type="button"
+                class="btn btn-icon btn-ghost-danger"
+                data-action="auto-rule-conditions#remove"
+                data-remove-condition
+                aria-label="Удалить условие"
+                title="Удалить условие"
+            ><i class="ti ti-trash"></i></button>
+        </div>
+    </div>
+    {{ form_rest(condition) }}
+</div>

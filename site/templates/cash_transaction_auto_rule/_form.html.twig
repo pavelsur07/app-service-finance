@@ -40,26 +40,26 @@
                 class="mb-3"
                 data-controller="auto-rule-conditions"
                 data-auto-rule-conditions-index-value="{{ form.conditions|length > 0 ? form.conditions|last.vars.name + 1 : 0 }}"
-                data-auto-rule-conditions-prototype-value="{{ form_widget(form.conditions.vars.prototype)|e('html_attr') }}"
+                data-auto-rule-conditions-prototype-value="{{ include('cash_transaction_auto_rule/_condition_row.html.twig', {condition: form.conditions.vars.prototype})|e('html_attr') }}"
             >
                 <legend class="form-label">Условия</legend>
                 <p class="text-muted small">Операция должна одновременно соответствовать всем условиям.</p>
                 {{ form_errors(form.conditions) }}
+
+                {# Метки один раз шапкой: в повторяющихся строках подпись у каждого поля
+                   превращается в шум. На мобильном шапка скрыта, а метки полей
+                   показываются (d-md-none в партиале). #}
+                <div class="row g-2 d-none d-md-flex text-muted small condition-head">
+                    <div class="col-md-auto condition-ordinal-head">&nbsp;</div>
+                    <div class="col-md-3">Поле операции</div>
+                    <div class="col-md-2">Оператор</div>
+                    <div class="col-md">Значение</div>
+                    <div class="col-md-auto condition-actions-head">&nbsp;</div>
+                </div>
+
                 <div data-auto-rule-conditions-target="collection">
                     {% for condition in form.conditions %}
-                        <div class="card mb-2" data-auto-rule-condition>
-                            <div class="card-body">
-                                <h3 data-condition-title>Условие {{ loop.index }}</h3>
-                                {{ form_widget(condition) }}
-                                <button
-                                    type="button"
-                                    class="btn btn-sm btn-danger"
-                                    data-action="auto-rule-conditions#remove"
-                                    data-remove-condition
-                                    aria-label="Удалить условие {{ loop.index }}"
-                                >Удалить</button>
-                            </div>
-                        </div>
+                        {{ include('cash_transaction_auto_rule/_condition_row.html.twig', {condition: condition}) }}
                     {% endfor %}
                 </div>
                 <button
