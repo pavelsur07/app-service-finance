@@ -12,7 +12,7 @@ use App\Company\Application\DTO\FinancialResponsibilityCenterDTO;
 use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
-use App\Company\Repository\CounterpartyRepository;
+use App\Company\Form\Type\CounterpartyPickerType;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Shared\Form\Type\ProjectDirectionPickerType;
 use Symfony\Component\Form\AbstractType;
@@ -30,7 +30,6 @@ class CashTransactionType extends AbstractType
     public function __construct(
         private MoneyAccountRepository $accountRepo,
         private CashflowCategoryRepository $categoryRepo,
-        private CounterpartyRepository $counterpartyRepo,
         private ProjectDirectionRepository $projectDirectionRepo,
         private FinancialResponsibilityCenterFacade $responsibilityCenterFacade,
     ) {
@@ -38,7 +37,7 @@ class CashTransactionType extends AbstractType
 
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        /** @var Company|null $company */
+        /** @var Company $company */
         $company = $options['company'];
         $data = $builder->getData();
         $currentResponsibilityCenterId = $data instanceof CashTransactionDTO
@@ -51,7 +50,7 @@ class CashTransactionType extends AbstractType
         $builder
             ->add('occurredAt', DateType::class, ['widget' => 'single_text'])
             ->add('moneyAccount', ChoiceType::class, [
-                'choices' => $company ? $this->accountRepo->findBy(['company' => $company]) : [],
+                'choices' => $this->accountRepo->findBy(['company' => $company]),
                 'choice_label' => static fn (MoneyAccount $a) => $a->getName(),
                 'choice_value' => 'id',
                 'choice_attr' => static fn (MoneyAccount $a) => ['data-currency' => $a->getCurrency()],
@@ -68,7 +67,7 @@ class CashTransactionType extends AbstractType
             ])
             ->add('cashflowCategory', ChoiceType::class, [
                 'required' => false,
-                'choices' => $company ? $this->categoryRepo->findTreeByCompany($company) : [],
+                'choices' => $this->categoryRepo->findTreeByCompany($company),
                 'choice_label' => static fn (CashflowCategory $c) => str_repeat("\u{a0}", $c->getLevel() - 1).$c->getName(),
                 'choice_value' => 'id',
                 'choice_attr' => static fn (CashflowCategory $c) => !$c->getChildren()->isEmpty() ? ['disabled' => 'disabled'] : [],
@@ -76,7 +75,7 @@ class CashTransactionType extends AbstractType
             ])
             ->add('projectDirection', ProjectDirectionPickerType::class, [
                 'required' => false,
-                'choices' => $company ? $this->projectDirectionRepo->findTreeByCompany($company) : [],
+                'choices' => $this->projectDirectionRepo->findTreeByCompany($company),
                 'choice_label' => static fn (ProjectDirection $projectDirection) => str_repeat("\u{a0}", $projectDirection->getLevel() - 1).$projectDirection->getName(),
                 'choice_attr' => static fn (ProjectDirection $projectDirection) => !$projectDirection->getChildren()->isEmpty() ? ['disabled' => 'disabled'] : [],
                 'mapped' => false,
@@ -87,12 +86,10 @@ class CashTransactionType extends AbstractType
                 'placeholder' => 'Не выбран',
                 'label' => 'ЦФО',
             ])
-            ->add('counterparty', ChoiceType::class, [
-                'required' => false,
-                'choices' => $company ? $this->counterpartyRepo->findSelectableByCompany((string) $company->getId(), $currentCounterpartyId) : [],
-                'choice_label' => 'name',
-                'choice_value' => 'id',
-                'mapped' => false,
+            ->add('counterpartyId', CounterpartyPickerType::class, [
+                'company_id' => (string) $company->getId(),
+                'keep_id' => $currentCounterpartyId,
+                'search_url' => '/api/counterparties/search',
             ])
             ->add('description', TextareaType::class, ['required' => false]);
 
@@ -102,15 +99,13 @@ class CashTransactionType extends AbstractType
             $form = $event->getForm();
             $account = $form->get('moneyAccount')->getData();
 
-            $data->companyId = $company?->getId();
+            $data->companyId = $company->getId();
             $data->moneyAccountId = $account?->getId();
             $data->currency = $account?->getCurrency();
 
             $cat = $form->get('cashflowCategory')->getData();
-            $cp = $form->get('counterparty')->getData();
             $projectDirection = $form->get('projectDirection')->getData();
             $data->cashflowCategoryId = $cat?->getId();
-            $data->counterpartyId = $cp?->getId();
             $data->projectDirectionId = $projectDirection?->getId();
         }, 1);
     }
@@ -148,8 +143,10 @@ class CashTransactionType extends AbstractType
     {
         $resolver->setDefaults([
             'data_class' => CashTransactionDTO::class,
-            'company' => null,
         ]);
-        $resolver->setAllowedTypes('company', [Company::class, 'null']);
+        // company обязателен: виджет контрагента требует валидный company_id,
+        // а пустая строка раньше молча давала пустой список.
+        $resolver->setRequired('company');
+        $resolver->setAllowedTypes('company', Company::class);
     }
 }

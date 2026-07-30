@@ -6,7 +6,6 @@ namespace App\Finance\Controller;
 
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Company\Entity\Company;
-use App\Company\Repository\CounterpartyRepository;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Finance\Application\Service\FinanceDocumentResponsibilityCenterNormalizer;
 use App\Finance\Application\Service\PlNatureResolver;
@@ -65,18 +64,16 @@ class DocumentController extends AbstractController
     }
 
     #[Route('/new', name: 'document_new', methods: ['GET', 'POST'])]
-    public function new(Request $request, DocumentRepository $repo, PLCategoryRepository $catRepo, CounterpartyRepository $cpRepo, ProjectDirectionRepository $projectDirectionRepo, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
+    public function new(Request $request, DocumentRepository $repo, PLCategoryRepository $catRepo, ProjectDirectionRepository $projectDirectionRepo, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
         $document = new Document(Uuid::uuid4()->toString(), $company);
         $document->setStatus(DocumentStatus::ACTIVE);
 
         $categories = $catRepo->findTreeByCompany($company);
-        $counterparties = $cpRepo->findBy(['company' => $company]);
         $projectDirections = $projectDirectionRepo->findByCompany($company);
         $form = $this->createForm(DocumentType::class, $document, [
             'categories' => $categories,
-            'counterparties' => $counterparties,
             'project_directions' => $projectDirections,
             'company' => $company,
         ]);
@@ -110,7 +107,6 @@ class DocumentController extends AbstractController
         Request $request,
         Document $document,
         PLCategoryRepository $catRepo,
-        CounterpartyRepository $cpRepo,
         ProjectDirectionRepository $projectDirectionRepo,
         EntityManagerInterface $em,
         ActiveCompanyService $companyService,
@@ -123,11 +119,9 @@ class DocumentController extends AbstractController
         $copy = $this->duplicateDocument($document, $company);
 
         $categories = $catRepo->findTreeByCompany($company);
-        $counterparties = $cpRepo->findBy(['company' => $company]);
         $projectDirections = $projectDirectionRepo->findByCompany($company);
         $form = $this->createForm(DocumentType::class, $copy, [
             'categories' => $categories,
-            'counterparties' => $counterparties,
             'project_directions' => $projectDirections,
             'company' => $company,
         ]);
@@ -188,7 +182,7 @@ class DocumentController extends AbstractController
     }
 
     #[Route('/{id}/edit', name: 'document_edit', methods: ['GET', 'POST'])]
-    public function edit(Request $request, Document $document, PLCategoryRepository $catRepo, CounterpartyRepository $cpRepo, ProjectDirectionRepository $projectDirectionRepo, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
+    public function edit(Request $request, Document $document, PLCategoryRepository $catRepo, ProjectDirectionRepository $projectDirectionRepo, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
         if ($document->getCompany() !== $company) {
@@ -196,13 +190,11 @@ class DocumentController extends AbstractController
         }
 
         $categories = $catRepo->findTreeByCompany($company);
-        $counterparties = $cpRepo->findBy(['company' => $company]);
         $projectDirections = $projectDirectionRepo->findByCompany($company);
         $initialResponsibilityCenterSnapshot = $this->responsibilityCenterNormalizer->snapshotDocument($document);
         $initialOperationResponsibilityCenterSnapshots = $this->responsibilityCenterNormalizer->snapshotOperations($document);
         $form = $this->createForm(DocumentType::class, $document, [
             'categories' => $categories,
-            'counterparties' => $counterparties,
             'project_directions' => $projectDirections,
             'company' => $company,
         ]);

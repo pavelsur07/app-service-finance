@@ -300,7 +300,6 @@ class CashTransactionController extends AbstractController
 
         $form->get('moneyAccount')->setData($tx->getMoneyAccount());
         $form->get('cashflowCategory')->setData($tx->getCashflowCategory());
-        $form->get('counterparty')->setData($tx->getCounterparty());
         $form->get('projectDirection')->setData($tx->getProjectDirection());
 
         $form->handleRequest($request);

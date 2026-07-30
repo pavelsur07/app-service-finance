@@ -19,7 +19,6 @@ use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
 use App\Company\Application\DTO\FinancialResponsibilityCenterDTO;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
-use App\Company\Repository\CounterpartyRepository;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Shared\Audit\AuditContextProvider;
 use App\Shared\Entity\AuditLog;
@@ -132,7 +131,6 @@ class CashTransactionAutoRuleController extends AbstractController
         SaveCashTransactionAutoRuleAction $save,
         ActiveCompanyService $companyService,
         CashflowCategoryRepository $categoryRepo,
-        CounterpartyRepository $counterpartyRepo,
         MoneyAccountRepository $moneyAccountRepo,
         ProjectDirectionRepository $projectDirectionRepo,
         FinancialResponsibilityCenterFacade $responsibilityCenterFacade,
@@ -142,7 +140,6 @@ class CashTransactionAutoRuleController extends AbstractController
         $company = $companyService->getActiveCompany();
         $companyId = (string) $company->getId();
         $categories = $categoryRepo->findTreeByCompany($company);
-        $counterparties = $counterpartyRepo->findBy(['company' => $company]);
         $moneyAccounts = $moneyAccountRepo->findBy(['company' => $company], ['name' => 'ASC']);
         $projectDirections = $projectDirectionRepo->findBy(['company' => $company], ['name' => 'ASC']);
 
@@ -157,7 +154,7 @@ class CashTransactionAutoRuleController extends AbstractController
 
         $form = $this->createForm(CashTransactionAutoRuleType::class, $rule, [
             'categories' => $categories,
-            'counterparties' => $counterparties,
+            'company_id' => $companyId,
             'moneyAccounts' => $moneyAccounts,
             'projectDirections' => $projectDirections,
             'responsibilityCenterChoices' => $this->getResponsibilityCenterChoices(
@@ -191,7 +188,6 @@ class CashTransactionAutoRuleController extends AbstractController
         SaveCashTransactionAutoRuleAction $save,
         ActiveCompanyService $companyService,
         CashflowCategoryRepository $categoryRepo,
-        CounterpartyRepository $counterpartyRepo,
         MoneyAccountRepository $moneyAccountRepo,
         ProjectDirectionRepository $projectDirectionRepo,
         FinancialResponsibilityCenterFacade $responsibilityCenterFacade,
@@ -206,14 +202,13 @@ class CashTransactionAutoRuleController extends AbstractController
         }
 
         $categories = $categoryRepo->findTreeByCompany($company);
-        $counterparties = $counterpartyRepo->findBy(['company' => $company]);
         $moneyAccounts = $moneyAccountRepo->findBy(['company' => $company], ['name' => 'ASC']);
         $projectDirections = $projectDirectionRepo->findBy(['company' => $company], ['name' => 'ASC']);
         $currentProjectDirectionId = $rule->getProjectDirection()?->getId();
         $currentResponsibilityCenterId = $rule->getResponsibilityCenterId();
         $form = $this->createForm(CashTransactionAutoRuleType::class, $rule, [
             'categories' => $categories,
-            'counterparties' => $counterparties,
+            'company_id' => $companyId,
             'moneyAccounts' => $moneyAccounts,
             'projectDirections' => $projectDirections,
             'responsibilityCenterChoices' => $this->getResponsibilityCenterChoices(

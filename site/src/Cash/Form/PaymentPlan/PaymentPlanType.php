@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Cash\Form\PaymentPlan;
 
+use App\Cash\DTO\PaymentPlanDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
-use App\Company\Entity\Company;
-use App\Cash\DTO\PaymentPlanDTO;
-use App\Company\Entity\Counterparty;
 use App\Cash\Enum\PaymentPlan\PaymentPlanStatus;
+use App\Company\Entity\Company;
+use App\Company\Form\Type\CounterpartyPickerType;
 use Doctrine\ORM\EntityRepository;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
@@ -25,7 +25,7 @@ final class PaymentPlanType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        /** @var Company|null $company */
+        /** @var Company $company */
         $company = $options['company'];
 
         $builder
@@ -73,23 +73,11 @@ final class PaymentPlanType extends AbstractType
                     return $qb;
                 },
             ])
-            ->add('counterparty', EntityType::class, [
-                'class' => Counterparty::class,
-                'label' => 'Контрагент',
-                'required' => false,
-                'placeholder' => 'Без контрагента',
-                'choice_label' => static fn (Counterparty $counterparty): string => (string) $counterparty->getName(),
-                'query_builder' => static function (EntityRepository $repository) use ($company) {
-                    $qb = $repository->createQueryBuilder('counterparty')
-                        ->orderBy('counterparty.name', 'ASC');
-
-                    if ($company) {
-                        $qb->andWhere('counterparty.company = :company')
-                            ->setParameter('company', $company);
-                    }
-
-                    return $qb;
-                },
+            ->add('counterparty', CounterpartyPickerType::class, [
+                'company_id' => (string) $company->getId(),
+                'keep_id' => $builder->getData()?->counterparty?->getId(),
+                'value_type' => 'entity',
+                'search_url' => '/api/counterparties/search',
             ])
             ->add('status', ChoiceType::class, [
                 'label' => 'Статус',
@@ -125,9 +113,11 @@ final class PaymentPlanType extends AbstractType
     {
         $resolver->setDefaults([
             'data_class' => PaymentPlanDTO::class,
-            'company' => null,
         ]);
-        $resolver->setAllowedTypes('company', [Company::class, 'null']);
+        // company обязателен: см. комментарий в CreateDealType — tenant-фильтр
+        // не должен зависеть от того, передали опцию или нет.
+        $resolver->setRequired('company');
+        $resolver->setAllowedTypes('company', Company::class);
     }
 
     /**

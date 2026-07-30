@@ -90,6 +90,21 @@ class CounterpartyRepository extends ServiceEntityRepository
         return $qb->getQuery()->getOneOrNullResult();
     }
 
+    /**
+     * Один контрагент строго в рамках компании.
+     */
+    public function findOneByIdAndCompany(string $id, string $companyId): ?Counterparty
+    {
+        return $this->createQueryBuilder('c')
+            ->andWhere('c.id = :id')
+            ->setParameter('id', $id)
+            ->andWhere('c.company = :companyId')
+            ->setParameter('companyId', $companyId)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     public function findOneByInn(string $companyId, string $inn, ?string $exceptId = null): ?Counterparty
     {
         $qb = $this->createQueryBuilder('c')

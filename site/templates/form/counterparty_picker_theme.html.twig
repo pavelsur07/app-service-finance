@@ -1,0 +1,75 @@
+{# Reusable Counterparty picker widget (Tabler/Bootstrap 5) #}
+
+{% block counterparty_picker_widget %}
+    {% set fieldId = form.vars.id %}
+    {% set fieldName = form.vars.full_name %}
+    {% set currentValue = form.vars.value %}
+    {% set attr = form.vars.attr|default({}) %}
+    {% set attrClass = attr.class|default('') %}
+    {% set placeholder = form.vars.placeholder|default(null) %}
+    {% set searchUrl = form.vars.search_url|default(null) %}
+    {% set allowCreate = form.vars.allow_create|default(false) %}
+
+    {% set currentLabel = '' %}
+    {% for choice in form.vars.choices %}
+        {% if choice.value == currentValue %}
+            {% set currentLabel = choice.label %}
+        {% endif %}
+    {% endfor %}
+
+    <div class="cp-picker"
+         data-cp-picker
+         data-cp-field-id="{{ fieldId }}"
+         {% if searchUrl %}data-cp-search-url="{{ searchUrl }}"{% endif %}
+    >
+        {# Настоящий <select> остаётся в DOM: он же работает без JS, он же граница
+           допустимых значений при submit, и существующие скрипты читают .value. #}
+        <select
+            id="{{ fieldId }}"
+            name="{{ fieldName }}"
+            class="form-select {{ attrClass }}"
+            data-cp-select
+            {% if form.vars.required %}required="required"{% endif %}
+            {% if form.vars.disabled %}disabled="disabled"{% endif %}
+            {% for key, value in attr %}{% if key != 'class' %}{{ key }}="{{ value }}"{% endif %}{% endfor %}
+        >
+            {% if placeholder is not null %}
+                <option value="" {% if currentValue is empty %}selected="selected"{% endif %}>{{ placeholder }}</option>
+            {% endif %}
+
+            {% for choice in form.vars.choices %}
+                <option
+                    value="{{ choice.value }}"
+                    {% if choice.value == currentValue %}selected="selected"{% endif %}
+                    {% for key, value in choice.attr %}{{ key }}="{{ value }}"{% endfor %}
+                >{{ choice.label }}</option>
+            {% endfor %}
+        </select>
+
+        {# Поле поиска появляется только при работающем JS: контроллер снимает d-none
+           и скрывает <select>, поэтому без JS страница остаётся рабочей. #}
+        <div class="cp-search d-none" data-cp-search-wrap>
+            <div class="input-group">
+                <input
+                    type="text"
+                    class="form-control"
+                    value="{{ currentLabel }}"
+                    placeholder="Название или ИНН"
+                    autocomplete="off"
+                    data-cp-input
+                    aria-label="Поиск контрагента"
+                />
+                <button class="btn btn-outline-secondary" type="button" data-cp-clear aria-label="Очистить выбор"
+                    {% if currentValue is empty %}disabled{% endif %}>
+                    <i class="ti ti-x"></i>
+                </button>
+            </div>
+            <div class="cp-results list-group position-absolute w-auto shadow d-none" data-cp-results role="listbox"></div>
+            {% if allowCreate %}
+                <div class="form-text">
+                    Не нашли? <a href="{{ path('counterparty_new') }}" target="_blank" rel="noopener">Создать контрагента</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}
