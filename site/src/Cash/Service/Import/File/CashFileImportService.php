@@ -350,20 +350,22 @@ final class CashFileImportService
             throw new \RuntimeException('Counterparty name is empty.');
         }
 
-        // Ключ поиска и сохраняемое значение обязаны совпадать: сущность хранит
-        // нормализованное отображение, поэтому искать надо по нему же, иначе строка
-        // с двойным пробелом создаёт нового контрагента на каждом прогоне.
+        // Матчинг идёт по нормализованному ключу, а не по строке из файла: иначе
+        // «ООО "Ромашка"» и «"Ромашка" ООО» из разных выписок создают двух
+        // контрагентов. ОПФ входит в ключ, чтобы ООО и АО с одним названием
+        // остались разными юрлицами.
         $normalizedName = $this->counterpartyNameNormalizer->normalize($trimmedName);
 
-        $cacheKey = $companyId.':'.mb_strtolower($normalizedName->display);
+        $cacheKey = $companyId.':'.$normalizedName->core.':'.($normalizedName->legalFormHint ?? '');
         if (isset($this->counterpartyCache[$cacheKey])) {
             return $this->counterpartyCache[$cacheKey];
         }
 
-        $existing = $this->counterpartyRepository->findOneBy([
-            'company' => $company,
-            'name' => $normalizedName->display,
-        ]);
+        $existing = $this->counterpartyRepository->findOneByNormalizedName(
+            $companyId,
+            $normalizedName->core,
+            $normalizedName->legalFormHint,
+        );
         if ($existing instanceof Counterparty) {
             return $this->counterpartyCache[$cacheKey] = $existing;
         }

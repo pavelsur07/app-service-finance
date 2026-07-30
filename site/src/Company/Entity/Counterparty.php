@@ -40,12 +40,11 @@ class Counterparty
     private ?string $legalFormHint = null;
 
     /**
-     * Нормализованное название для поиска и сравнения. Логически обязательно, но
-     * остаётся nullable до backfill существующих строк: типизированное `string`
-     * упало бы на гидрации ещё не пересчитанной записи.
+     * Нормализованное название для поиска и сравнения. Обязательно: backfill
+     * существующих строк выполнен, contract-миграция закрыла колонку NOT NULL.
      */
-    #[ORM\Column(length: 255, nullable: true)]
-    private ?string $nameCore = null;
+    #[ORM\Column(length: 255)]
+    private string $nameCore;
 
     #[ORM\Column(length: 12, nullable: true)]
     #[Assert\Regex(pattern: '/^\d{10}(\d{2})?$/')]
@@ -148,7 +147,7 @@ class Counterparty
         return $this->legalFormHint;
     }
 
-    public function getNameCore(): ?string
+    public function getNameCore(): string
     {
         return $this->nameCore;
     }
