@@ -13,5 +13,37 @@
 {% endblock %}
 
 {% block body %}
+    {% if sourceTransaction %}
+        {# Карточка-источник: пользователь пришёл из разбора и должен видеть, из чего
+           собрано правило — прежде всего назначение платежа, из которого он выбирает
+           устойчивый фрагмент вместо всей строки с номером счёта и датой. #}
+        <div class="container-xl mt-3">
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title mb-2">Операция-источник</h3>
+                    <dl class="row mb-0 small">
+                        <dt class="col-sm-3">Дата</dt>
+                        <dd class="col-sm-9">{{ sourceTransaction.occurredAt|date('d.m.Y') }}</dd>
+
+                        <dt class="col-sm-3">Счёт</dt>
+                        <dd class="col-sm-9">{{ sourceTransaction.moneyAccount.name }}</dd>
+
+                        <dt class="col-sm-3">Сумма</dt>
+                        <dd class="col-sm-9">
+                            <span class="text-{{ sourceTransaction.direction.value == 'INFLOW' ? 'success' : 'danger' }}">
+                                {{ sourceTransaction.direction.value == 'INFLOW' ? '+' : '−' }}{{ sourceTransaction.amount|number_format(2, ',', ' ') }} {{ sourceTransaction.currency }}
+                            </span>
+                        </dd>
+
+                        <dt class="col-sm-3">Контрагент</dt>
+                        <dd class="col-sm-9">{{ sourceTransaction.counterparty ? sourceTransaction.counterparty.name : 'Не распознан' }}</dd>
+
+                        <dt class="col-sm-3">Назначение</dt>
+                        <dd class="col-sm-9">{{ sourceTransaction.description ?: '—' }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    {% endif %}
     {% include 'cash_transaction_auto_rule/_form.html.twig' with {pageTitle: 'Новое автоправило'} %}
 {% endblock %}

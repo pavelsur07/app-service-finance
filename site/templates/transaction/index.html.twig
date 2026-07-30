@@ -178,6 +178,11 @@
                                         <i class="ti ti-settings-automation me-2"></i> Автоправило
                                         </button>
 
+                                        <a class="dropdown-item"
+                                           href="{{ path('cash_transaction_auto_rule_new', {fromTransaction: tx.id}) }}">
+                                        <i class="ti ti-wand me-2"></i> Создать правило из операции
+                                        </a>
+
                                         {% if not tx.isTransfer %}
                                           {% set createFromDisabled = tx.isHasViolatedDocument or tx.remainingAmount <= 0 %}
                                           <button type="button"
