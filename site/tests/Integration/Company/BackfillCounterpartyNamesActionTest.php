@@ -14,6 +14,8 @@ use App\Tests\Support\Kernel\IntegrationTestCase;
 
 final class BackfillCounterpartyNamesActionTest extends IntegrationTestCase
 {
+    private const STALE_CORE = 'УСТАРЕВШЕЕ ЗНАЧЕНИЕ';
+
     private BackfillCounterpartyNamesAction $backfill;
     private Company $company;
 
@@ -59,7 +61,7 @@ final class BackfillCounterpartyNamesActionTest extends IntegrationTestCase
         // Then
         self::assertSame(1, $result->updated);
         self::assertSame([
-            'name_core' => null,
+            'name_core' => self::STALE_CORE,
             'legal_form_hint' => null,
         ], $this->fetchDerived($id));
     }
@@ -131,8 +133,8 @@ final class BackfillCounterpartyNamesActionTest extends IntegrationTestCase
         $id = $counterparty->getId();
 
         $this->connection->executeStatement(
-            'UPDATE "counterparty" SET name_core = NULL, legal_form_hint = NULL WHERE id = :id',
-            ['id' => $id],
+            'UPDATE "counterparty" SET name_core = :staleCore, legal_form_hint = :hint WHERE id = :id',
+            ['staleCore' => self::STALE_CORE, 'hint' => 'ИП', 'id' => $id],
         );
         $this->em->clear();
 
@@ -158,12 +160,14 @@ final class BackfillCounterpartyNamesActionTest extends IntegrationTestCase
         // Then
         self::assertSame([$id], $result->skipped);
         self::assertSame(0, $result->updated);
-        self::assertNull($this->fetchDerived($id)['name_core']);
+        self::assertSame(self::STALE_CORE, $this->fetchDerived($id)['name_core']);
     }
 
     /**
-     * Строка создаётся через сущность, затем производные поля обнуляются SQL —
-     * так выглядят записи, существовавшие до expand-миграции.
+     * Строка создаётся через сущность, затем производные поля портятся SQL — так
+     * выглядит запись, которую нужно пересчитать: после contract-миграции
+     * name_core уже NOT NULL, поэтому «непересчитанное» состояние — устаревшее
+     * значение, а не NULL.
      */
     private function persistLegacyRow(string $name): string
     {
@@ -180,8 +184,8 @@ final class BackfillCounterpartyNamesActionTest extends IntegrationTestCase
         $id = $counterparty->getId();
 
         $this->connection->executeStatement(
-            'UPDATE "counterparty" SET name = :name, name_core = NULL, legal_form_hint = NULL WHERE id = :id',
-            ['name' => $name, 'id' => $id],
+            'UPDATE "counterparty" SET name = :name, name_core = :staleCore, legal_form_hint = NULL WHERE id = :id',
+            ['name' => $name, 'staleCore' => self::STALE_CORE, 'id' => $id],
         );
         $this->em->clear();
 
@@ -215,16 +219,18 @@ final class BackfillCounterpartyNamesActionTest extends IntegrationTestCase
         return $row;
     }
 
-    public function testCounterpartyEntityStaysLoadableWithNullDerivedFields(): void
+    public function testStaleRowIsRecalculatedOnHydration(): void
     {
-        // Given: гидрация строки, ещё не прошедшей backfill, не должна падать
+        // Given
         $id = $this->persistLegacyRow('ООО "Ромашка"');
 
         // When
+        ($this->backfill)(false);
+        $this->em->clear();
         $counterparty = $this->em->find(Counterparty::class, $id);
 
         // Then
         self::assertInstanceOf(Counterparty::class, $counterparty);
-        self::assertNull($counterparty->getNameCore());
+        self::assertSame('РОМАШКА', $counterparty->getNameCore());
     }
 }

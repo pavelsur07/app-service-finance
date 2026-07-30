@@ -63,6 +63,33 @@ class CounterpartyRepository extends ServiceEntityRepository
         return $result;
     }
 
+    /**
+     * Поиск по нормализованному ключу названия.
+     *
+     * ОПФ входит в ключ: «ООО "Балтийский лизинг"» и «АО "Балтийский лизинг"» —
+     * разные юрлица с разными ИНН, и склеивать их нельзя (замер PROD 30.07.2026).
+     * Условие по ОПФ строится ветвлением, а не через `:hint IS NULL`: PostgreSQL
+     * не выводит тип параметра, использованного только в IS NULL.
+     */
+    public function findOneByNormalizedName(string $companyId, string $nameCore, ?string $legalFormHint): ?Counterparty
+    {
+        $qb = $this->createQueryBuilder('c')
+            ->andWhere('c.company = :companyId')
+            ->setParameter('companyId', $companyId)
+            ->andWhere('c.nameCore = :nameCore')
+            ->setParameter('nameCore', $nameCore)
+            ->orderBy('c.createdAt', 'ASC')
+            ->setMaxResults(1);
+
+        if (null === $legalFormHint) {
+            $qb->andWhere('c.legalFormHint IS NULL');
+        } else {
+            $qb->andWhere('c.legalFormHint = :legalFormHint')->setParameter('legalFormHint', $legalFormHint);
+        }
+
+        return $qb->getQuery()->getOneOrNullResult();
+    }
+
     public function findOneByInn(string $companyId, string $inn, ?string $exceptId = null): ?Counterparty
     {
         $qb = $this->createQueryBuilder('c')
