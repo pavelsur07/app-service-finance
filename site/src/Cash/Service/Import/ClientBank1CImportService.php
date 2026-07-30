@@ -9,6 +9,7 @@ use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
+use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
@@ -29,6 +30,7 @@ class ClientBank1CImportService
 
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
+        private readonly CounterpartyNameNormalizer $counterpartyNameNormalizer,
         private readonly CounterpartyRepository $counterpartyRepository,
         private readonly CashTransactionRepository $cashTransactionRepository,
         private readonly ImportLogger $importLogger,
@@ -616,10 +618,10 @@ class ClientBank1CImportService
         $counterparty = new Counterparty(
             Uuid::uuid4()->toString(),
             $company,
-            $name,
+            $this->counterpartyNameNormalizer->normalize($name),
             $this->determineCounterpartyType($inn),
         );
-        $counterparty->setInn($inn);
+        $counterparty->assignTaxIds($inn, null);
         $this->entityManager->persist($counterparty);
 
         return $this->cpCache[$key] = $counterparty;

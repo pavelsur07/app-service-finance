@@ -4,12 +4,13 @@ namespace App\DataFixtures;
 
 use App\Balance\Service\BalanceStructureSeeder;
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Service\Accounts\AccountBalanceService;
+use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Entity\Company;
+use App\Company\Entity\Counterparty;
 use App\Company\Entity\User;
 use App\Company\Enum\CounterpartyType;
-use App\Company\Entity\Counterparty;
-use App\Cash\Enum\Accounts\MoneyAccountType;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;
 use Ramsey\Uuid\Nonstandard\Uuid;
@@ -25,6 +26,7 @@ class AppFixtures extends Fixture
 
     public function __construct(
         private UserPasswordHasherInterface $passwordHasher,
+        private CounterpartyNameNormalizer $counterpartyNameNormalizer,
         private AccountBalanceService $accountBalanceService,
         private BalanceStructureSeeder $balanceStructureSeeder,
     ) {
@@ -83,10 +85,10 @@ class AppFixtures extends Fixture
             $cp = new Counterparty(
                 id: Uuid::uuid4()->toString(),
                 company: $company,
-                name: $name,
+                name: $this->counterpartyNameNormalizer->normalize($name),
                 type: $type
             );
-            $cp->setInn($inn);
+            $cp->assignTaxIds($inn, null);
             $manager->persist($cp);
         }
 

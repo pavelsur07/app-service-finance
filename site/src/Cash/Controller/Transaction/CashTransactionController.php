@@ -293,6 +293,8 @@ class CashTransactionController extends AbstractController
         $dto->direction = $tx->getDirection();
         $dto->description = $tx->getDescription();
         $dto->responsibilityCenterId = $tx->getResponsibilityCenterId();
+        // Архивный контрагент остаётся в списке выбора, пока он выбран у операции.
+        $dto->counterpartyId = $tx->getCounterparty()?->getId();
 
         $form = $this->createForm(CashTransactionType::class, $dto, ['company' => $company]);
 

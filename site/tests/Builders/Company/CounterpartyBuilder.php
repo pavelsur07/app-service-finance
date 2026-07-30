@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Builders\Company;
 
+use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Entity\Company;
-use App\Company\Enum\CounterpartyType;
 use App\Company\Entity\Counterparty;
+use App\Company\Enum\CounterpartyType;
 use Webmozart\Assert\Assert;
 
 final class CounterpartyBuilder
@@ -22,6 +23,7 @@ final class CounterpartyBuilder
     private Company $company;
     private string $name;
     private ?string $inn;
+    private ?string $kpp;
     private CounterpartyType $type;
     private \DateTimeImmutable $updatedAt;
     private bool $isArchived;
@@ -32,6 +34,7 @@ final class CounterpartyBuilder
         $this->company = CompanyBuilder::aCompany()->build();
         $this->name = self::DEFAULT_NAME;
         $this->inn = self::DEFAULT_INN;
+        $this->kpp = null;
         $this->type = self::DEFAULT_TYPE;
         $this->updatedAt = new \DateTimeImmutable(self::DEFAULT_UPDATED_AT);
         $this->isArchived = self::DEFAULT_IS_ARCHIVED;
@@ -96,6 +99,18 @@ final class CounterpartyBuilder
         return $clone;
     }
 
+    public function withKpp(?string $kpp): self
+    {
+        if (null !== $kpp && 1 !== preg_match('/^\\d{9}$/', $kpp)) {
+            throw new \InvalidArgumentException('Kpp must contain 9 digits.');
+        }
+
+        $clone = clone $this;
+        $clone->kpp = $kpp;
+
+        return $clone;
+    }
+
     public function withType(CounterpartyType $type): self
     {
         $clone = clone $this;
@@ -122,10 +137,22 @@ final class CounterpartyBuilder
 
     public function build(): Counterparty
     {
-        $counterparty = new Counterparty($this->id, $this->company, $this->name, $this->type);
-        $counterparty->setInn($this->inn);
-        $counterparty->setUpdatedAt($this->updatedAt);
-        $counterparty->setIsArchived($this->isArchived);
+        $counterparty = new Counterparty(
+            $this->id,
+            $this->company,
+            (new CounterpartyNameNormalizer())->normalize($this->name),
+            $this->type,
+        );
+        $counterparty->assignTaxIds($this->inn, $this->kpp);
+
+        if ($this->isArchived) {
+            $counterparty->archive();
+        }
+
+        // updatedAt закрыт для записи в сущности: в тестах он выставляется через
+        // рефлексию, чтобы не открывать сеттер, который и был источником рассинхрона.
+        $updatedAt = new \ReflectionProperty(Counterparty::class, 'updatedAt');
+        $updatedAt->setValue($counterparty, $this->updatedAt);
 
         return $counterparty;
     }

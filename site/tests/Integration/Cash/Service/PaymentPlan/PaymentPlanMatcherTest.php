@@ -13,6 +13,7 @@ use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Repository\PaymentPlan\PaymentPlanMatchRepository;
 use App\Cash\Service\PaymentPlan\PaymentPlanMatcher;
+use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Company\Enum\CounterpartyType;
@@ -73,7 +74,7 @@ final class PaymentPlanMatcherTest extends IntegrationTestCase
         $categoryA = new CashflowCategory(Uuid::uuid4()->toString(), $companyA);
         $categoryA->setName('A Category');
 
-        $counterpartyA = new Counterparty(Uuid::uuid4()->toString(), $companyA, 'A Counterparty', CounterpartyType::LEGAL_ENTITY);
+        $counterpartyA = new Counterparty(Uuid::uuid4()->toString(), $companyA, (new CounterpartyNameNormalizer())->normalize('A Counterparty'), CounterpartyType::LEGAL_ENTITY);
 
         $this->em->persist($accountA);
         $this->em->persist($categoryA);
@@ -83,7 +84,7 @@ final class PaymentPlanMatcherTest extends IntegrationTestCase
         $categoryB = new CashflowCategory(Uuid::uuid4()->toString(), $companyB);
         $categoryB->setName('B Category');
 
-        $counterpartyB = new Counterparty(Uuid::uuid4()->toString(), $companyB, 'B Counterparty', CounterpartyType::LEGAL_ENTITY);
+        $counterpartyB = new Counterparty(Uuid::uuid4()->toString(), $companyB, (new CounterpartyNameNormalizer())->normalize('B Counterparty'), CounterpartyType::LEGAL_ENTITY);
 
         $this->em->persist($categoryB);
         $this->em->persist($counterpartyB);

@@ -4,28 +4,33 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Company;
 
+use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Entity\Company;
-use App\Company\Enum\CounterpartyType;
 use App\Company\Entity\Counterparty;
+use App\Company\Enum\CounterpartyType;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\CounterpartyBuilder;
 use PHPUnit\Framework\TestCase;
 
 final class CounterpartyEntityTest extends TestCase
 {
+    private CounterpartyNameNormalizer $normalizer;
+
+    protected function setUp(): void
+    {
+        $this->normalizer = new CounterpartyNameNormalizer();
+    }
+
     public function testConstructorInvalidUuidThrows(): void
     {
         // Given
-        $id = 'not-uuid';
         $company = CompanyBuilder::aCompany()->build();
-        $name = 'Counterparty 1';
-        $type = CounterpartyType::LEGAL_ENTITY;
 
         // Then
         $this->expectException(\InvalidArgumentException::class);
 
         // When
-        new Counterparty($id, $company, $name, $type);
+        new Counterparty('not-uuid', $company, $this->normalizer->normalize('Counterparty 1'), CounterpartyType::LEGAL_ENTITY);
     }
 
     public function testBuilderBuildsValidEntity(): void
@@ -34,7 +39,6 @@ final class CounterpartyEntityTest extends TestCase
         $counterparty = CounterpartyBuilder::aCounterparty()->build();
 
         // Then
-        self::assertIsString($counterparty->getId());
         self::assertNotSame('', $counterparty->getId());
         self::assertInstanceOf(Company::class, $counterparty->getCompany());
         self::assertSame(CounterpartyBuilder::DEFAULT_NAME, $counterparty->getName());
@@ -43,42 +47,195 @@ final class CounterpartyEntityTest extends TestCase
         self::assertSame(CounterpartyBuilder::DEFAULT_IS_ARCHIVED, $counterparty->isArchived());
     }
 
-    public function testSetNameGetNameRoundtrip(): void
+    public function testConstructorFillsDerivedNameFields(): void
     {
         // Given
-        $counterparty = CounterpartyBuilder::aCounterparty()->build();
+        $company = CompanyBuilder::aCompany()->build();
 
         // When
-        $counterparty->setName('ООО Тест');
+        $counterparty = new Counterparty(
+            '11111111-1111-1111-1111-111111111111',
+            $company,
+            $this->normalizer->normalize('ООО "Ромашка"'),
+            CounterpartyType::LEGAL_ENTITY,
+        );
 
         // Then
-        self::assertSame('ООО Тест', $counterparty->getName());
+        self::assertSame('ООО "Ромашка"', $counterparty->getName());
+        self::assertSame('РОМАШКА', $counterparty->getNameCore());
+        self::assertSame('ООО', $counterparty->getLegalFormHint());
     }
 
-    public function testSetInnNullableRoundtrip(): void
+    public function testRenameKeepsDerivedFieldsConsistent(): void
     {
         // Given
         $counterparty = CounterpartyBuilder::aCounterparty()->build();
 
         // When
-        $counterparty->setInn(null);
-        $counterparty->setInn('7707083893');
+        $counterparty->rename($this->normalizer->normalize('"Ромашка" ООО'));
+
+        // Then
+        self::assertSame('"Ромашка" ООО', $counterparty->getName());
+        self::assertSame('РОМАШКА', $counterparty->getNameCore());
+        self::assertSame('ООО', $counterparty->getLegalFormHint());
+    }
+
+    public function testRenameTouchesUpdatedAt(): void
+    {
+        // Given
+        $counterparty = CounterpartyBuilder::aCounterparty()
+            ->withUpdatedAt(new \DateTimeImmutable('2020-01-01 00:00:00'))
+            ->build();
+
+        // When
+        $counterparty->rename($this->normalizer->normalize('ООО Тест'));
+
+        // Then
+        self::assertGreaterThan(new \DateTimeImmutable('2020-01-02 00:00:00'), $counterparty->getUpdatedAt());
+    }
+
+    public function testRefreshNormalizedNameKeepsUpdatedAtUntouched(): void
+    {
+        // Given
+        $updatedAt = new \DateTimeImmutable('2020-01-01 00:00:00');
+        $counterparty = CounterpartyBuilder::aCounterparty()
+            ->withName('ООО "Ромашка"')
+            ->withUpdatedAt($updatedAt)
+            ->build();
+
+        // When
+        $counterparty->refreshNormalizedName($this->normalizer->normalize('ООО "Ромашка"'));
+
+        // Then
+        self::assertSame('РОМАШКА', $counterparty->getNameCore());
+        self::assertSame($updatedAt->getTimestamp(), $counterparty->getUpdatedAt()->getTimestamp());
+    }
+
+    public function testRefreshNormalizedNameCannotRename(): void
+    {
+        // Given
+        $counterparty = CounterpartyBuilder::aCounterparty()->withName('ООО "Ромашка"')->build();
+
+        // Then
+        $this->expectException(\InvalidArgumentException::class);
+
+        // When
+        $counterparty->refreshNormalizedName($this->normalizer->normalize('ООО "Василёк"'));
+    }
+
+    public function testAssignTaxIdsRoundtrip(): void
+    {
+        // Given
+        $counterparty = CounterpartyBuilder::aCounterparty()->build();
+
+        // When
+        $counterparty->assignTaxIds('7707083893', '770701001');
 
         // Then
         self::assertSame('7707083893', $counterparty->getInn());
+        self::assertSame('770701001', $counterparty->getKpp());
+        self::assertTrue($counterparty->hasTaxId());
     }
 
-    public function testSetCompanyChangesReference(): void
+    public function testAssignTaxIdsAllowsClearingBoth(): void
     {
         // Given
         $counterparty = CounterpartyBuilder::aCounterparty()->build();
-        $company2 = CompanyBuilder::aCompany()->build();
 
         // When
-        $counterparty->setCompany($company2);
+        $counterparty->assignTaxIds(null, null);
 
         // Then
-        self::assertSame($company2, $counterparty->getCompany());
+        self::assertNull($counterparty->getInn());
+        self::assertNull($counterparty->getKpp());
+        self::assertFalse($counterparty->hasTaxId());
+    }
+
+    public function testKppWithoutInnThrows(): void
+    {
+        // Given
+        $counterparty = CounterpartyBuilder::aCounterparty()->build();
+
+        // Then
+        $this->expectException(\InvalidArgumentException::class);
+
+        // When
+        $counterparty->assignTaxIds(null, '770101001');
+    }
+
+    public function testBelongsToCompanyPositive(): void
+    {
+        // Given
+        $company = CompanyBuilder::aCompany()->build();
+        $counterparty = CounterpartyBuilder::aCounterparty()->withCompany($company)->build();
+
+        // Then
+        self::assertTrue($counterparty->belongsToCompany($company->getId()));
+    }
+
+    public function testBelongsToCompanyNegative(): void
+    {
+        // Given
+        $counterparty = CounterpartyBuilder::aCounterparty()->build();
+
+        // Then
+        self::assertFalse($counterparty->belongsToCompany('99999999-9999-9999-9999-999999999999'));
+    }
+
+    /**
+     * Разобранный «ИП» при 10-значном ИНН — ошибка парсера названия, и её чинит
+     * сама сущность: любой путь записи проходит через assignTaxIds().
+     */
+    public function testInconsistentLegalFormHintIsDroppedOnTaxIdAssignment(): void
+    {
+        // Given
+        $counterparty = CounterpartyBuilder::aCounterparty()
+            ->withName('ИП Кулешова Анастасия Владимировна')
+            ->withInn('7707083893')
+            ->build();
+
+        // Then
+        self::assertNull($counterparty->getLegalFormHint());
+        self::assertFalse($counterparty->hasInconsistentLegalFormHint());
+        self::assertSame('ИП Кулешова Анастасия Владимировна', $counterparty->getName());
+        self::assertSame('КУЛЕШОВА АНАСТАСИЯ ВЛАДИМИРОВНА', $counterparty->getNameCore());
+    }
+
+    /**
+     * Переходное состояние: переименовали, ИНН ещё не переприсвоили.
+     */
+    public function testInconsistentLegalFormHintIsVisibleBetweenRenameAndTaxIds(): void
+    {
+        // Given
+        $counterparty = CounterpartyBuilder::aCounterparty()
+            ->withName('ООО "Ромашка"')
+            ->withInn('7707083893')
+            ->build();
+
+        // When
+        $counterparty->rename($this->normalizer->normalize('ИП Кулешова Анастасия Владимировна'));
+
+        // Then
+        self::assertTrue($counterparty->hasInconsistentLegalFormHint());
+
+        // When: любой последующий assignTaxIds приводит поле в согласованное состояние
+        $counterparty->assignTaxIds('7707083893', null);
+
+        // Then
+        self::assertFalse($counterparty->hasInconsistentLegalFormHint());
+        self::assertNull($counterparty->getLegalFormHint());
+    }
+
+    public function testConsistentLegalFormHintForTwelveDigitInn(): void
+    {
+        // Given
+        $counterparty = CounterpartyBuilder::aCounterparty()
+            ->withName('ИП Кулешова Анастасия Владимировна')
+            ->withInn('503200000010')
+            ->build();
+
+        // Then
+        self::assertFalse($counterparty->hasInconsistentLegalFormHint());
     }
 
     public function testSetTypeGetTypeRoundtrip(): void
@@ -93,30 +250,34 @@ final class CounterpartyEntityTest extends TestCase
         self::assertSame(CounterpartyType::NATURAL_PERSON, $counterparty->getType());
     }
 
-    public function testArchiveFlagRoundtrip(): void
+    public function testArchiveAndRestore(): void
     {
         // Given
         $counterparty = CounterpartyBuilder::aCounterparty()->build();
 
         // When
-        $counterparty->setIsArchived(true);
+        $counterparty->archive();
 
         // Then
         self::assertTrue($counterparty->isArchived());
-    }
-
-    public function testUpdatedAtRoundtrip(): void
-    {
-        // Given
-        $counterparty = CounterpartyBuilder::aCounterparty()->build();
-        $updatedAt = new \DateTimeImmutable('2026-01-01 10:00:00');
 
         // When
-        $counterparty->setUpdatedAt($updatedAt);
+        $counterparty->restore();
 
         // Then
-        self::assertSame($updatedAt, $counterparty->getUpdatedAt());
+        self::assertFalse($counterparty->isArchived());
     }
 
-    // В сущности нет валидации name/inn через Assert в сеттерах, поэтому тесты на ошибки не нужны.
+    /**
+     * Смена компании закрыта навсегда: это вектор IDOR, а не удобство.
+     */
+    public function testCompanyCannotBeChanged(): void
+    {
+        // Then
+        self::assertFalse(method_exists(Counterparty::class, 'setCompany'));
+        self::assertFalse(method_exists(Counterparty::class, 'setName'));
+        self::assertFalse(method_exists(Counterparty::class, 'setInn'));
+        self::assertFalse(method_exists(Counterparty::class, 'setIsArchived'));
+        self::assertFalse(method_exists(Counterparty::class, 'setUpdatedAt'));
+    }
 }

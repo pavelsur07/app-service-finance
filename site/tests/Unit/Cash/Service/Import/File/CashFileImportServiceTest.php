@@ -15,6 +15,7 @@ use App\Cash\Service\Import\File\CashFileImportService;
 use App\Cash\Service\Import\File\CashFileRowNormalizer;
 use App\Cash\Service\Import\ImportLogger;
 use App\Company\Application\DTO\FinancialResponsibilityCenterProjectDTO;
+use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Entity\User;
@@ -32,6 +33,7 @@ final class CashFileImportServiceTest extends TestCase
     {
         $service = new CashFileImportService(
             $this->createMock(CashFileRowNormalizer::class),
+            new CounterpartyNameNormalizer(),
             $this->createMock(CounterpartyRepository::class),
             $this->createMock(CashTransactionRepository::class),
             new ImportLogger($this->createMock(EntityManagerInterface::class)),
@@ -118,6 +120,7 @@ final class CashFileImportServiceTest extends TestCase
 
         $service = new CashFileImportService(
             new CashFileRowNormalizer(),
+            new CounterpartyNameNormalizer(),
             $this->createMock(CounterpartyRepository::class),
             $transactionRepository,
             new ImportLogger($entityManager),
