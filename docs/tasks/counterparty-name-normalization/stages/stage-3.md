@@ -60,15 +60,29 @@
 - [x] ARCHITECTURE.md обновлён (VO, нормализатор, Query, endpoint, отсутствие фасада)
 
 ### External Claude Code review
-- Прогон 1 (`--max-turns 40`, полный diff Stage 1–3 от `89d0e536`): завершился
-  `Error: Reached max turns (40)` — по `AGENTS.md` это **не** зелёный review и не
-  owner gate, а recoverable reviewer-configuration failure.
-- Прогон 2 (`--max-turns 80`, narrowed prompt с точным перечнем изменённых файлов):
-  запущен, на момент коммита ещё выполняется.
-- **Статус на момент коммита: `REVIEW_GREEN` не получен.** Коммит, push и Draft PR
-  сделаны по явному указанию Владельца в чате (приоритет 1 по `AGENTS.md`).
-  Findings прогона 2 будут разобраны и исправлены отдельными коммитами в этой же
-  ветке до перевода PR в Ready.
+- Прогон 1 (`--max-turns 40`): `Error: Reached max turns (40)` — по `AGENTS.md`
+  recoverable reviewer-configuration failure, не зелёный review и не owner gate.
+- Прогон 2 (`--max-turns 80`, narrowed prompt): 4 IMPORTANT, 5 MINOR, 3 FOLLOW-UP.
+  `REVIEW_GREEN` не выдан.
+- Первый коммит `50b3a33f` и Draft PR #2262 сделаны по прямому указанию Владельца
+  до получения `REVIEW_GREEN`; findings исправлены следующим коммитом.
+
+#### Подтверждённые findings и исправления
+
+| # | Finding | Вердикт | Исправление |
+|---|---|---|---|
+| IMPORTANT 1 | `normalize()` бросал исключение на входе из одних кавычек/точек (`..`, `""`) → 500 на `/api/counterparties/search`, 500 на форме, аборт всего импорта на одной мусорной ячейке | подтверждён | Нормализатор сделан total для непустого ввода: последний фолбэк `core = upper(display)`. Unit-провайдер на `""`, `«»`, `..`, `. .`, `''` |
+| IMPORTANT 2 | `CashFileImportService` искал контрагента по сырому `trim($name)`, а сохранял схлопнутое `display` → название с двойным пробелом создавало нового контрагента на каждом прогоне (моя регрессия) | подтверждён | Нормализация один раз, `display` используется и как ключ кэша, и как условие поиска, и как сохраняемое значение |
+| IMPORTANT 3 | Backfill пересчитывал подсказку только из названия и возвращал `ИП`, сброшенный при сохранении по 10-значному ИНН → инвариант держался до следующего прогона, ключ Stage 4 (`nameCore`, `legalFormHint`) стал бы недостоверным | подтверждён | Правило «ИП + 10-значный ИНН = ошибка парсера» сведено в один приватный предикат Entity; `refreshNormalizedName()` и `hasInconsistentLegalFormHint()` используют его. Регрессионный integration-тест + проверка идемпотентности |
+| IMPORTANT 4 | `SaveCounterpartyAction` без тестов при том, что это крупнейшее поведенческое изменение Stage 1 | подтверждён | `tests/Integration/Company/SaveCounterpartyActionTest.php` — 11 тестов: создание, обновление, дубль ИНН, `$exceptId` на edit, тот же ИНН в другой компании, сброс подсказки, схлопывание пробелов, пустые ИНН/КПП |
+| MINOR | `LIKE` без экранирования `%`/`_` | подтверждён | `addcslashes($core, '%_\')`; backslash — escape-символ LIKE по умолчанию в PostgreSQL, отдельная `ESCAPE`-клауза не нужна |
+| MINOR | `--company-id` скоупил только отчёт, но читался как скоуп пересчёта | подтверждён | Переименован в `--report-company-id` с явным описанием |
+| MINOR | docblock обещал `similarity: float` / `rows: int`, драйвер отдаёт строки | подтверждён | Приведение типов в самом Query |
+| MINOR | `searchByInn` возвращал сырые строки DBAL, `searchByName` — маппленные | подтверждён | Общий `toItems()` для обоих маршрутов |
+| MINOR | архивные исключены из похожести названий, но не из групп по ИНН | принят как намеренное | Задокументировано в docblock: архивный дубль всё равно занимает ИНН |
+| FOLLOW-UP | кросс-компанийные CLI-методы без `companyId` | принят | Явные предупреждения в docblock `findAllForBackfill()` и `CounterpartyDuplicateCandidatesQuery` |
+| FOLLOW-UP | `LIMIT :limit` полагался на вывод типа PostgreSQL | принят | Биндинг `ParameterType::INTEGER` |
+| FOLLOW-UP | `Cash` импортирует `Domain/Service` модуля `Company` | принят, без действий | Долг зафиксирован в `stage-1.md`, чинится вместе с `CounterpartyFacade` |
 
 ### Команды для проверки
 - `make site-test`

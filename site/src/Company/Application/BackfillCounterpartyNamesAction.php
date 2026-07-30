@@ -46,8 +46,11 @@ final class BackfillCounterpartyNamesAction
                 continue;
             }
 
+            // Сравниваем с подсказкой после кросс-проверки по ИНН, иначе backfill
+            // будет возвращать подсказку, сброшенную при сохранении, и считать это
+            // изменением на каждом прогоне.
             $isUpToDate = $name->core === $counterparty->getNameCore()
-                && $name->legalFormHint === $counterparty->getLegalFormHint();
+                && $counterparty->effectiveLegalFormHint($name) === $counterparty->getLegalFormHint();
 
             if ($isUpToDate) {
                 ++$result->unchanged;

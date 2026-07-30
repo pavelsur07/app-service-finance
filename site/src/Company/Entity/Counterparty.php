@@ -128,7 +128,19 @@ class Counterparty
             throw new \InvalidArgumentException('Пересчёт производных полей не может менять название.');
         }
 
-        $this->applyDerivedName($name);
+        $this->nameCore = $name->core;
+        $this->legalFormHint = $this->effectiveLegalFormHint($name);
+    }
+
+    /**
+     * Подсказка ОПФ, которую даст это название с учётом кросс-проверки по ИНН.
+     *
+     * Нужна backfill'у, чтобы он не возвращал подсказку, осознанно сброшенную при
+     * сохранении: правило «ИП + 10-значный ИНН = ошибка парсера» одно на весь модуль.
+     */
+    public function effectiveLegalFormHint(CounterpartyName $name): ?string
+    {
+        return $this->isInconsistentLegalFormHint($name->legalFormHint) ? null : $name->legalFormHint;
     }
 
     public function getLegalFormHint(): ?string
@@ -147,9 +159,7 @@ class Counterparty
      */
     public function hasInconsistentLegalFormHint(): bool
     {
-        return 'ИП' === $this->legalFormHint
-            && null !== $this->inn
-            && 10 === strlen($this->inn);
+        return $this->isInconsistentLegalFormHint($this->legalFormHint);
     }
 
     /**
@@ -277,6 +287,17 @@ class Counterparty
     {
         $this->legalFormHint = $name->legalFormHint;
         $this->nameCore = $name->core;
+    }
+
+    /**
+     * Единственное определение правила: ИНН из 10 знаков = юрлицо, поэтому
+     * разобранный «ИП» означает ошибку разбора названия, а не статус контрагента.
+     */
+    private function isInconsistentLegalFormHint(?string $hint): bool
+    {
+        return 'ИП' === $hint
+            && null !== $this->inn
+            && 10 === strlen($this->inn);
     }
 
     private function touch(): void

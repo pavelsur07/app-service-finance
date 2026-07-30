@@ -6,6 +6,7 @@ namespace App\Company\Infrastructure\Query;
 
 use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\ParameterType;
 
 /**
  * Поиск контрагента по ИНН или названию для автокомплита.
@@ -57,15 +58,18 @@ final class CounterpartySearchQuery
             LIMIT :limit
             SQL;
 
-        /** @var list<array{id: string, name: string, inn: ?string, kpp: ?string, type: string}> $rows */
-        $rows = $this->connection->executeQuery($sql, [
-            'companyId' => $companyId,
-            'prefix' => $query.'%',
-            'query' => $query,
-            'limit' => $limit,
-        ])->fetchAllAssociative();
+        $rows = $this->connection->executeQuery(
+            $sql,
+            [
+                'companyId' => $companyId,
+                'prefix' => $query.'%',
+                'query' => $query,
+                'limit' => $limit,
+            ],
+            ['limit' => ParameterType::INTEGER],
+        )->fetchAllAssociative();
 
-        return $rows;
+        return $this->toItems($rows);
     }
 
     /**
@@ -93,14 +97,33 @@ final class CounterpartySearchQuery
             LIMIT :limit
             SQL;
 
-        $rows = $this->connection->executeQuery($sql, [
-            'companyId' => $companyId,
-            'core' => $core,
-            'prefix' => $core.'%',
-            'threshold' => self::SIMILARITY_THRESHOLD,
-            'limit' => $limit,
-        ])->fetchAllAssociative();
+        $rows = $this->connection->executeQuery(
+            $sql,
+            [
+                'companyId' => $companyId,
+                'core' => $core,
+                // `%` и `_` из пользовательского ввода экранируются: иначе запрос
+                // с процентом матчит несопоставимо шире, чем ожидает пользователь.
+                'prefix' => addcslashes($core, '%_\\').'%',
+                'threshold' => self::SIMILARITY_THRESHOLD,
+                'limit' => $limit,
+            ],
+            ['limit' => ParameterType::INTEGER],
+        )->fetchAllAssociative();
 
+        return $this->toItems($rows);
+    }
+
+    /**
+     * Оба маршрута возвращают одну и ту же форму строки: драйвер отдаёт всё строками,
+     * а `rank` во внешний контракт не попадает.
+     *
+     * @param list<array<string, mixed>> $rows
+     *
+     * @return list<array{id: string, name: string, inn: ?string, kpp: ?string, type: string}>
+     */
+    private function toItems(array $rows): array
+    {
         return array_map(
             static fn (array $row): array => [
                 'id' => (string) $row['id'],

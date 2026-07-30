@@ -350,14 +350,19 @@ final class CashFileImportService
             throw new \RuntimeException('Counterparty name is empty.');
         }
 
-        $cacheKey = $companyId.':'.mb_strtolower($trimmedName);
+        // Ключ поиска и сохраняемое значение обязаны совпадать: сущность хранит
+        // нормализованное отображение, поэтому искать надо по нему же, иначе строка
+        // с двойным пробелом создаёт нового контрагента на каждом прогоне.
+        $normalizedName = $this->counterpartyNameNormalizer->normalize($trimmedName);
+
+        $cacheKey = $companyId.':'.mb_strtolower($normalizedName->display);
         if (isset($this->counterpartyCache[$cacheKey])) {
             return $this->counterpartyCache[$cacheKey];
         }
 
         $existing = $this->counterpartyRepository->findOneBy([
             'company' => $company,
-            'name' => $trimmedName,
+            'name' => $normalizedName->display,
         ]);
         if ($existing instanceof Counterparty) {
             return $this->counterpartyCache[$cacheKey] = $existing;
@@ -366,7 +371,7 @@ final class CashFileImportService
         $counterparty = new Counterparty(
             Uuid::uuid4()->toString(),
             $company,
-            $this->counterpartyNameNormalizer->normalize($trimmedName),
+            $normalizedName,
             CounterpartyType::LEGAL_ENTITY
         );
         $this->entityManager->persist($counterparty);

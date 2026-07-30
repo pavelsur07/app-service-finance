@@ -212,6 +212,33 @@ final class CounterpartyNameNormalizerTest extends TestCase
         self::assertSame($once->legalFormHint, $twice->legalFormHint);
     }
 
+    /**
+     * @return iterable<string, array{0: string}>
+     */
+    public static function punctuationOnlyProvider(): iterable
+    {
+        yield 'кавычки' => ['""'];
+        yield 'ёлочки' => ['«»'];
+        yield 'точки' => ['..'];
+        yield 'точка с пробелом' => ['. .'];
+        yield 'апострофы' => ["''"];
+    }
+
+    /**
+     * Нормализатор total для непустого ввода: он вызывается из поиска, формы и
+     * импорта, где исключение означало бы 500 и аборт импорта.
+     */
+    #[DataProvider('punctuationOnlyProvider')]
+    public function testPunctuationOnlyInputDoesNotThrow(string $rawName): void
+    {
+        // When
+        $name = $this->normalizer->normalize($rawName);
+
+        // Then
+        self::assertNotSame('', $name->core);
+        self::assertNull($name->legalFormHint);
+    }
+
     public function testEmptyNameThrows(): void
     {
         // Then

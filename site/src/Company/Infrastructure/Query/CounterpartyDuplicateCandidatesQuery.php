@@ -9,6 +9,9 @@ use Doctrine\DBAL\Connection;
 /**
  * Отчёт по кандидатам-дублям справочника. Только чтение: решение о слиянии
  * принимает человек, автоматических правок здесь нет.
+ *
+ * ВНИМАНИЕ: методы кросс-компанийные по умолчанию — это CLI-отчёт. Для вызова из
+ * HTTP-контекста companyId обязателен (иначе IDOR).
  */
 final class CounterpartyDuplicateCandidatesQuery
 {
@@ -61,14 +64,21 @@ final class CounterpartyDuplicateCandidatesQuery
 
         $sql .= "\n            ORDER BY similarity DESC, a.company_id";
 
-        /** @var list<array{company_id: string, left_id: string, left_name: string, left_inn: ?string, right_id: string, right_name: string, right_inn: ?string, legal_form_hint: ?string, similarity: float}> $rows */
         $rows = $this->connection->executeQuery($sql, $parameters)->fetchAllAssociative();
 
-        return $rows;
+        // pdo_pgsql отдаёт real строкой — приводим здесь, чтобы контракт метода был честным.
+        return array_map(
+            static fn (array $row): array => ['similarity' => (float) $row['similarity']] + $row,
+            $rows,
+        );
     }
 
     /**
      * Группы с одинаковым ИНН внутри компании — самый надёжный признак дубля.
+     *
+     * Архивные строки здесь учитываются намеренно: архивный дубль всё равно занимает
+     * ИНН и попадёт в будущий UNIQUE-индекс, в отличие от похожести названий, где
+     * архив только шумит.
      *
      * @return list<array{company_id: string, inn: string, rows: int, names: string}>
      */
@@ -92,10 +102,12 @@ final class CounterpartyDuplicateCandidatesQuery
 
         $sql .= "\n            GROUP BY company_id, inn\n            HAVING count(*) > 1\n            ORDER BY count(*) DESC";
 
-        /** @var list<array{company_id: string, inn: string, rows: int, names: string}> $rows */
         $rows = $this->connection->executeQuery($sql, $parameters)->fetchAllAssociative();
 
-        return $rows;
+        return array_map(
+            static fn (array $row): array => ['rows' => (int) $row['rows']] + $row,
+            $rows,
+        );
     }
 
     /**

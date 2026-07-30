@@ -113,6 +113,40 @@ final class BackfillCounterpartyNamesActionTest extends IntegrationTestCase
         self::assertSame('ООО   "Ромашка"', $this->fetchRow($id)['name']);
     }
 
+    /**
+     * Подсказка «ИП» при 10-значном ИНН сброшена при сохранении. Backfill не должен
+     * её возвращать — иначе инвариант держится только до следующего прогона.
+     */
+    public function testInconsistentLegalFormHintIsNotRestored(): void
+    {
+        // Given
+        $counterparty = CounterpartyBuilder::aCounterparty()
+            ->withId('33333333-3333-3333-3333-000000000003')
+            ->withCompany($this->company)
+            ->withName('ИП Кулешова Анастасия Владимировна')
+            ->withInn('7707083893')
+            ->build();
+        $this->em->persist($counterparty);
+        $this->em->flush();
+        $id = $counterparty->getId();
+
+        $this->connection->executeStatement(
+            'UPDATE "counterparty" SET name_core = NULL, legal_form_hint = NULL WHERE id = :id',
+            ['id' => $id],
+        );
+        $this->em->clear();
+
+        // When
+        ($this->backfill)(false);
+
+        // Then
+        self::assertSame('КУЛЕШОВА АНАСТАСИЯ ВЛАДИМИРОВНА', $this->fetchDerived($id)['name_core']);
+        self::assertNull($this->fetchDerived($id)['legal_form_hint']);
+
+        // And: повторный прогон не считает это изменением
+        self::assertSame(0, ($this->backfill)(false)->updated);
+    }
+
     public function testEmptyNameIsSkippedNotFailed(): void
     {
         // Given: мусорная строка из легаси-данных

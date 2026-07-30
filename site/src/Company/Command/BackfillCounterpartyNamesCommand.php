@@ -30,7 +30,7 @@ final class BackfillCounterpartyNamesCommand extends Command
     {
         $this
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Только показать, что изменилось бы, без записи в БД')
-            ->addOption('company-id', null, InputOption::VALUE_REQUIRED, 'Ограничить отчёт по дублям одной компанией')
+            ->addOption('report-company-id', null, InputOption::VALUE_REQUIRED, 'Ограничить ОТЧЁТ одной компанией; сам пересчёт всегда идёт по всем компаниям')
             ->addOption('similarity', null, InputOption::VALUE_REQUIRED, 'Порог похожести названий для отчёта', '0.6');
     }
 
@@ -38,7 +38,7 @@ final class BackfillCounterpartyNamesCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
         $dryRun = (bool) $input->getOption('dry-run');
-        $companyId = $input->getOption('company-id');
+        $companyId = $input->getOption('report-company-id');
         $companyId = is_string($companyId) && '' !== $companyId ? $companyId : null;
         $threshold = (float) $input->getOption('similarity');
 

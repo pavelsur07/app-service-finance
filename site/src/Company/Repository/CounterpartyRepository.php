@@ -23,6 +23,9 @@ class CounterpartyRepository extends ServiceEntityRepository
     /**
      * Все контрагенты для пересчёта производных полей (CLI backfill, все компании).
      *
+     * Намеренно без companyId — единственный кросс-компанийный метод репозитория.
+     * Из HTTP-контекста вызывать нельзя: это обход изоляции по компании.
+     *
      * @return iterable<Counterparty>
      */
     public function findAllForBackfill(): iterable

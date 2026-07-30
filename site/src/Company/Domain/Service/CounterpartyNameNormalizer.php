@@ -67,6 +67,15 @@ final class CounterpartyNameNormalizer
             $legalFormHint = null;
         }
 
+        if ('' === $core) {
+            // Вход из одних кавычек, точек или пробелов («..», «""»). Нормализатор
+            // обязан оставаться total для непустого ввода: он вызывается из поиска,
+            // формы и импорта, и исключение здесь означало бы 500 на обычном вводе
+            // и аборт импорта на одной мусорной ячейке.
+            $core = $upper;
+            $legalFormHint = null;
+        }
+
         return CounterpartyName::fromNormalizedParts($display, $legalFormHint, $core);
     }
 
