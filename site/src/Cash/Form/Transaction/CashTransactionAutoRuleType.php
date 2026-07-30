@@ -26,6 +26,9 @@ class CashTransactionAutoRuleType extends AbstractType
         $builder
             ->add('name', TextType::class, [
                 'label' => 'Название автоправила',
+                // Без явного empty_data пустое поле приходит как null, а setName()
+                // принимает только string: пользователь получал 500 вместо NotBlank.
+                'empty_data' => '',
             ])
             ->add('priority', IntegerType::class, [
                 'label' => 'Приоритет',
