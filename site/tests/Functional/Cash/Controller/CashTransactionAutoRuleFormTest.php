@@ -95,4 +95,41 @@ final class CashTransactionAutoRuleFormTest extends WebTestCaseBase
         self::assertStringContainsString('condition-value-cell', $prototype);
         self::assertStringContainsString('data-remove-condition', $prototype);
     }
+
+    /**
+     * Пустое название — ошибка валидации, а не 500: TextType отдаёт null, а
+     * CashTransactionAutoRule::setName() принимает только string.
+     */
+    public function testEmptyNameIsValidationErrorNotServerError(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $user = UserBuilder::aUser()->withIndex(1)->asCompanyOwner()->build();
+        $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+        $category = CashflowCategoryBuilder::aCashflowCategory()
+            ->withId('44444444-4444-4444-4444-444444444402')
+            ->withCompany($company)
+            ->withName('Аренда')
+            ->build();
+
+        foreach ([$user, $company, $category] as $entity) {
+            $this->em()->persist($entity);
+        }
+        $this->em()->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+
+        $crawler = $client->request('GET', '/cash-transaction-auto-rules/new');
+        $client->submit($crawler->selectButton('Сохранить')->form(), [
+            'cash_transaction_auto_rule[name]' => '',
+        ]);
+
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString(
+            'Укажите название автоправила.',
+            (string) $client->getResponse()->getContent(),
+        );
+    }
 }
