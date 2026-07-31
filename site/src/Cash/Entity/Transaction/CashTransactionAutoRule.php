@@ -198,14 +198,29 @@ class CashTransactionAutoRule
 
     public function setIsActive(bool $isActive): self
     {
-        if ($isActive === $this->isActive) {
-            return $this;
+        if ($isActive) {
+            $this->enable();
+        } else {
+            $this->disable();
         }
 
-        Assert::false($isActive, 'Отключенное автоправило нельзя активировать повторно.');
-        $this->disable();
-
         return $this;
+    }
+
+    public function enable(?string $actorUserId = null): bool
+    {
+        if ($this->isActive) {
+            return false;
+        }
+
+        $this->assertActorUserId($actorUserId);
+        $now = new \DateTimeImmutable();
+        $this->isActive = true;
+        $this->disabledAt = null;
+        $this->disabledByUserId = null;
+        $this->recordUpdate($actorUserId, $now);
+
+        return true;
     }
 
     public function disable(?string $actorUserId = null): bool

@@ -468,6 +468,29 @@ class CashTransactionAutoRuleController extends AbstractController
         return $this->redirectToRoute('cash_transaction_auto_rule_index');
     }
 
+    #[Route('/{id}/enable', name: 'cash_transaction_auto_rule_enable', methods: ['POST'])]
+    public function enable(
+        string $id,
+        Request $request,
+        CashTransactionAutoRuleRepository $repo,
+        EntityManagerInterface $em,
+        ActiveCompanyService $companyService,
+        AuditContextProvider $auditContextProvider,
+    ): Response {
+        $company = $companyService->getActiveCompany();
+        $rule = $repo->findOneByIdAndCompanyId($id, (string) $company->getId());
+        if (!$rule) {
+            throw $this->createNotFoundException();
+        }
+
+        if ($this->isCsrfTokenValid('enable'.$rule->getId(), $request->request->get('_token'))
+            && $rule->enable($auditContextProvider->getActorUserId())) {
+            $em->flush();
+        }
+
+        return $this->redirectToRoute('cash_transaction_auto_rule_index');
+    }
+
     #[Route('/{id}/delete', name: 'cash_transaction_auto_rule_delete', methods: ['POST'])]
     public function delete(
         string $id,

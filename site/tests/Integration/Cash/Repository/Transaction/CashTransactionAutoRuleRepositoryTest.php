@@ -28,12 +28,15 @@ final class CashTransactionAutoRuleRepositoryTest extends IntegrationTestCase
         $company = CompanyBuilder::aCompany()->withOwner($user)->build();
         $category = CashflowCategoryBuilder::aCashflowCategory()->withCompany($company)->build();
 
+        $createdAt = new \DateTimeImmutable('2026-01-01 10:00:00');
+
         $lowPriority = $this->createRule(
             '33333333-3333-3333-3333-333333333301',
             $company,
             $category,
             'Low priority',
             10,
+            $createdAt->modify('+1 second'),
         );
         $highPriority = $this->createRule(
             '33333333-3333-3333-3333-333333333302',
@@ -41,6 +44,7 @@ final class CashTransactionAutoRuleRepositoryTest extends IntegrationTestCase
             $category,
             'High priority',
             200,
+            $createdAt,
         );
         $samePriority = $this->createRule(
             '33333333-3333-3333-3333-333333333304',
@@ -48,6 +52,7 @@ final class CashTransactionAutoRuleRepositoryTest extends IntegrationTestCase
             $category,
             'Same priority',
             200,
+            $createdAt->modify('+2 seconds'),
         );
         $inactive = $this->createRule(
             '33333333-3333-3333-3333-333333333303',
@@ -55,6 +60,7 @@ final class CashTransactionAutoRuleRepositoryTest extends IntegrationTestCase
             $category,
             'Inactive',
             999,
+            $createdAt->modify('+3 seconds'),
         )->setIsActive(false);
 
         $this->em->persist($user);
@@ -73,8 +79,9 @@ final class CashTransactionAutoRuleRepositoryTest extends IntegrationTestCase
             ['High priority', 'Same priority', 'Low priority'],
             array_map(static fn (CashTransactionAutoRule $rule): string => $rule->getName(), $repository->findActiveByCompany($company)),
         );
+        // Список страницы правил идёт в порядке создания: позже создано — ниже.
         self::assertSame(
-            ['Inactive', 'High priority', 'Same priority', 'Low priority'],
+            ['High priority', 'Low priority', 'Same priority', 'Inactive'],
             array_map(static fn (CashTransactionAutoRule $rule): string => $rule->getName(), $repository->findByCompany($company)),
         );
         self::assertSame(
@@ -136,8 +143,9 @@ final class CashTransactionAutoRuleRepositoryTest extends IntegrationTestCase
         CashflowCategory $category,
         string $name,
         int $priority,
+        ?\DateTimeImmutable $createdAt = null,
     ): CashTransactionAutoRule {
-        return (new CashTransactionAutoRule(
+        $rule = (new CashTransactionAutoRule(
             $id,
             $company,
             $name,
@@ -145,5 +153,14 @@ final class CashTransactionAutoRuleRepositoryTest extends IntegrationTestCase
             CashTransactionAutoRuleOperationType::ANY,
             $category,
         ))->setPriority($priority);
+
+        // createdAt проставляется конструктором, сеттера у него нет: без подмены все
+        // правила теста создались бы в одну секунду и порядок доказывал бы только id.
+        if (null !== $createdAt) {
+            $property = new \ReflectionProperty(CashTransactionAutoRule::class, 'createdAt');
+            $property->setValue($rule, $createdAt);
+        }
+
+        return $rule;
     }
 }
