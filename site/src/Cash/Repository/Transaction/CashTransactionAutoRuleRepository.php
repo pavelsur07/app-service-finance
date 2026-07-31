@@ -4,12 +4,16 @@ namespace App\Cash\Repository\Transaction;
 
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
+use App\Cash\Entity\Transaction\CashTransactionAutoRuleCondition;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
+use Pagerfanta\Doctrine\ORM\QueryAdapter;
+use Pagerfanta\Pagerfanta;
 
 /**
  * @extends ServiceEntityRepository<CashTransactionAutoRule>
@@ -33,6 +37,8 @@ class CashTransactionAutoRuleRepository extends ServiceEntityRepository
     }
 
     /**
+     * Полный список правил компании без пагинации — для фасада и MCP-инструмента.
+     *
      * @return CashTransactionAutoRule[]
      */
     public function findByCompany(
@@ -41,6 +47,59 @@ class CashTransactionAutoRuleRepository extends ServiceEntityRepository
         ?CashTransactionAutoRuleOperationType $operationType = null,
         ?CashflowCategory $category = null,
     ): array {
+        return $this->createFilteredQueryBuilder($company, $action, $operationType, $category)
+            ->getQuery()
+            ->getResult();
+    }
+
+    public function countByCompany(Company $company): int
+    {
+        return (int) $this->createQueryBuilder('r')
+            ->select('COUNT(r.id)')
+            ->andWhere('r.company = :company')
+            ->setParameter('company', $company)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /**
+     * @return Pagerfanta<CashTransactionAutoRule>
+     */
+    public function paginateByCompany(
+        Company $company,
+        ?CashTransactionAutoRuleAction $action,
+        ?CashTransactionAutoRuleOperationType $operationType,
+        ?CashflowCategory $category,
+        ?string $search,
+        ?bool $isActive,
+        int $page,
+        int $perPage,
+    ): Pagerfanta {
+        $pager = new Pagerfanta(new QueryAdapter($this->createFilteredQueryBuilder(
+            $company,
+            $action,
+            $operationType,
+            $category,
+            $search,
+            $isActive,
+        )));
+        $pager->setMaxPerPage($perPage);
+        $pager->setAllowOutOfRangePages(true);
+        // Страница за пределами диапазона прижимается к последней: иначе ?page=999
+        // показывал бы «ничего не найдено» рядом с ненулевым счётчиком.
+        $pager->setCurrentPage(min(max(1, $page), max(1, $pager->getNbPages())));
+
+        return $pager;
+    }
+
+    private function createFilteredQueryBuilder(
+        Company $company,
+        ?CashTransactionAutoRuleAction $action = null,
+        ?CashTransactionAutoRuleOperationType $operationType = null,
+        ?CashflowCategory $category = null,
+        ?string $search = null,
+        ?bool $isActive = null,
+    ): QueryBuilder {
         // Список показывается в порядке появления правил: чем позже создано, тем ниже.
         // На порядок применения это не влияет — там priority, см. findActiveByCompany().
         // created_at хранится с точностью до секунды, поэтому у правил одной секунды
@@ -64,7 +123,33 @@ class CashTransactionAutoRuleRepository extends ServiceEntityRepository
             $qb->andWhere('r.cashflowCategory = :category')->setParameter('category', $category);
         }
 
-        return $qb->getQuery()->getResult();
+        if (null !== $isActive) {
+            $qb->andWhere('r.isActive = :isActive')->setParameter('isActive', $isActive);
+        }
+
+        $search = null === $search ? '' : trim($search);
+        if ('' !== $search) {
+            // Условия проверяются подзапросом, а не join'ом: у правила с тремя
+            // подходящими условиями join размножил бы строку и сломал бы счётчик
+            // пагинации. Служебные символы LIKE экранируются, иначе запрос «100%»
+            // нашёл бы вообще всё.
+            $conditionMatch = $this->getEntityManager()->createQueryBuilder()
+                ->select('1')
+                ->from(CashTransactionAutoRuleCondition::class, 'c')
+                ->leftJoin('c.counterparty', 'ccp')
+                ->where('c.autoRule = r')
+                ->andWhere('LOWER(c.value) LIKE :search OR LOWER(ccp.name) LIKE :search');
+
+            $qb->leftJoin('r.counterparty', 'cp')
+                ->andWhere($qb->expr()->orX(
+                    'LOWER(r.name) LIKE :search',
+                    'LOWER(cp.name) LIKE :search',
+                    $qb->expr()->exists($conditionMatch->getDQL()),
+                ))
+                ->setParameter('search', '%'.mb_strtolower(addcslashes($search, '%_\\'), 'UTF-8').'%');
+        }
+
+        return $qb;
     }
 
     /**

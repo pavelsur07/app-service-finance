@@ -43,6 +43,11 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[Route('/cash-transaction-auto-rules')]
 class CashTransactionAutoRuleController extends AbstractController
 {
+    private const LIST_PER_PAGE = 50;
+    private const STATUS_ACTIVE = 'active';
+    private const STATUS_DISABLED = 'disabled';
+    private const STATUS_ALL = 'all';
+
     #[Route('/', name: 'cash_transaction_auto_rule_index', methods: ['GET'])]
     public function index(
         Request $request,
@@ -72,7 +77,32 @@ class CashTransactionAutoRuleController extends AbstractController
             }
         }
 
-        $items = $repo->findByCompany($company, $actionFilter, $operationTypeFilter, $categoryFilter);
+        // По умолчанию показываются только активные правила: отключённые — архив,
+        // в рабочем списке они только шумят.
+        $statusValue = (string) $request->query->get('status', self::STATUS_ACTIVE);
+        if (!in_array($statusValue, [self::STATUS_ACTIVE, self::STATUS_DISABLED, self::STATUS_ALL], true)) {
+            $statusValue = self::STATUS_ACTIVE;
+        }
+        $isActiveFilter = match ($statusValue) {
+            self::STATUS_ACTIVE => true,
+            self::STATUS_DISABLED => false,
+            default => null,
+        };
+
+        $searchValue = trim((string) $request->query->get('q', ''));
+
+        $pager = $repo->paginateByCompany(
+            $company,
+            $actionFilter,
+            $operationTypeFilter,
+            $categoryFilter,
+            '' === $searchValue ? null : $searchValue,
+            $isActiveFilter,
+            max(1, (int) $request->query->get('page', 1)),
+            self::LIST_PER_PAGE,
+        );
+        $items = iterator_to_array($pager->getCurrentPageResults());
+        $hasAnyRule = $repo->countByCompany($company) > 0;
 
         $actionOptions = array_map(
             static fn (CashTransactionAutoRuleAction $action) => [
@@ -111,10 +141,17 @@ class CashTransactionAutoRuleController extends AbstractController
 
         return $this->render('cash_transaction_auto_rule/index.html.twig', [
             'items' => $items,
+            'pager' => $pager,
+            'hasAnyRule' => $hasAnyRule,
             'categories' => $categories,
             'actionOptions' => $actionOptions,
             'operationOptions' => $operationOptions,
             'categoryOptions' => $categoryOptions,
+            'statusOptions' => [
+                ['value' => self::STATUS_ACTIVE, 'label' => 'Активные'],
+                ['value' => self::STATUS_DISABLED, 'label' => 'Отключённые'],
+                ['value' => self::STATUS_ALL, 'label' => 'Все'],
+            ],
             'responsibilityCenterLabels' => array_flip($this->getResponsibilityCenterChoices(
                 $responsibilityCenterFacade,
                 $companyId,
@@ -123,6 +160,8 @@ class CashTransactionAutoRuleController extends AbstractController
                 'category' => $categoryValue,
                 'action' => $actionValue,
                 'operationType' => $operationTypeValue,
+                'status' => $statusValue,
+                'q' => $searchValue,
             ],
         ]);
     }

@@ -74,7 +74,7 @@ final class CashTransactionAutoRuleActionsMenuTest extends WebTestCaseBase
         $rule->disable();
         $this->em()->flush();
 
-        $crawler = $this->openIndex($client, $user, $company);
+        $crawler = $this->openIndex($client, $user, $company, '?status=disabled');
 
         $labels = array_map(
             static fn (string $text): string => trim($text),
@@ -93,7 +93,7 @@ final class CashTransactionAutoRuleActionsMenuTest extends WebTestCaseBase
         $this->em()->flush();
         $ruleId = (string) $rule->getId();
 
-        $crawler = $this->openIndex($client, $user, $company);
+        $crawler = $this->openIndex($client, $user, $company, '?status=disabled');
         $client->submit($crawler->filter('td .dropdown-menu form')->form());
 
         self::assertResponseRedirects('/cash-transaction-auto-rules/');
@@ -177,7 +177,7 @@ final class CashTransactionAutoRuleActionsMenuTest extends WebTestCaseBase
         $this->em()->flush();
         $ruleId = (string) $rule->getId();
 
-        $crawler = $this->openIndex($client, $user, $company);
+        $crawler = $this->openIndex($client, $user, $company, '?status=disabled');
         $client->submit($crawler->filter('#delete-modal-'.$ruleId.' form')->form());
 
         $this->em()->clear();
@@ -273,12 +273,20 @@ final class CashTransactionAutoRuleActionsMenuTest extends WebTestCaseBase
         return [$user, $company, $rule];
     }
 
-    private function openIndex(KernelBrowser $client, User $user, Company $company): \Symfony\Component\DomCrawler\Crawler
-    {
+    /**
+     * Список по умолчанию показывает только активные правила, поэтому сценарии с
+     * отключённым правилом открывают его через фильтр статуса.
+     */
+    private function openIndex(
+        KernelBrowser $client,
+        User $user,
+        Company $company,
+        string $query = '',
+    ): \Symfony\Component\DomCrawler\Crawler {
         $client->loginUser($user);
         $this->setClientSessionValue($client, 'active_company_id', $company->getId());
 
-        $crawler = $client->request('GET', '/cash-transaction-auto-rules/');
+        $crawler = $client->request('GET', '/cash-transaction-auto-rules/'.$query);
         self::assertResponseIsSuccessful();
 
         return $crawler;
