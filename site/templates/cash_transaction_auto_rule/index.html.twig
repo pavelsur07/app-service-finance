@@ -10,6 +10,25 @@
                 </div>
                 <div class="col-auto ms-auto d-print-none">
                     <div class="btn-list">
+                        {# Поиск отдельной GET-формой: остальные фильтры переезжают
+                           скрытыми полями, иначе строка поиска сбрасывала бы их. #}
+                        <form method="get" class="d-flex" role="search">
+                            {# Сравнение с пустой строкой, а не проверка на truthy:
+                               значение «0» в Twig ложно и молча потерялось бы. #}
+                            {% for name, value in filters %}
+                                {% if name != 'q' and value is not null and value != '' %}
+                                    <input type="hidden" name="{{ name }}" value="{{ value }}">
+                                {% endif %}
+                            {% endfor %}
+                            <input type="search"
+                                   name="q"
+                                   value="{{ filters.q }}"
+                                   class="form-control"
+                                   style="min-width: 16rem;"
+                                   placeholder="Название, контрагент, условие"
+                                   aria-label="Поиск правил">
+                            <button type="submit" class="btn btn-outline-secondary ms-2">Найти</button>
+                        </form>
                         <a href="{{ path('cash_transaction_auto_rule_candidates') }}" class="btn btn-outline-primary">
                             Кандидаты правил
                         </a>
@@ -151,10 +170,31 @@
                             </td>
                         </tr>
                     {% else %}
-                        <tr><td colspan="9" class="text-center">Нет данных</td></tr>
+                        {# «Правил ещё нет» и «под фильтры ничего не подошло» — разные
+                           состояния: одинаковый текст толкает завести дубль правила. #}
+                        <tr>
+                            <td colspan="9" class="text-center text-muted">
+                                {% if hasAnyRule %}
+                                    По заданным условиям ничего не найдено.
+                                    {# Именно «показать все», а не «сбросить»: сброс вернёт
+                                       фильтр по умолчанию «активные», и компания, у которой
+                                       все правила отключены, снова увидит пустой список. #}
+                                    <a href="{{ path('cash_transaction_auto_rule_index', {status: 'all'}) }}">Показать все правила</a>
+                                {% else %}
+                                    Автоправил пока нет.
+                                    <a href="{{ path('cash_transaction_auto_rule_new') }}">Создать первое</a>
+                                {% endif %}
+                            </td>
+                        </tr>
                     {% endfor %}
                     </tbody>
                 </table>
+            </div>
+            <div class="card-footer d-flex align-items-center">
+                <span class="text-muted">Найдено правил: {{ pager.nbResults }}</span>
+                <div class="ms-auto">
+                    {% include 'partials/_pagerfanta.html.twig' with {pager: pager} %}
+                </div>
             </div>
         </div>
     </div>
@@ -165,7 +205,18 @@
         </div>
         <div class="offcanvas-body">
             <form method="get" class="d-flex flex-column gap-4">
+                {% if filters.q != '' %}
+                    <input type="hidden" name="q" value="{{ filters.q }}">
+                {% endif %}
                 <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label" for="filter-status">Статус</label>
+                        <select id="filter-status" name="status" class="form-select">
+                            {% for status in statusOptions %}
+                                <option value="{{ status.value }}" {{ filters.status == status.value ? 'selected' : '' }}>{{ status.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                     <div class="col-12">
                         <label class="form-label" for="filter-category">Категория ДДС</label>
                         <select id="filter-category" name="category" class="form-select">
