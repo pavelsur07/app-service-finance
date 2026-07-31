@@ -41,10 +41,14 @@ class CashTransactionAutoRuleRepository extends ServiceEntityRepository
         ?CashTransactionAutoRuleOperationType $operationType = null,
         ?CashflowCategory $category = null,
     ): array {
+        // Список показывается в порядке появления правил: чем позже создано, тем ниже.
+        // На порядок применения это не влияет — там priority, см. findActiveByCompany().
+        // created_at хранится с точностью до секунды, поэтому у правил одной секунды
+        // порядок доопределяется по id.
         $qb = $this->createQueryBuilder('r')
             ->andWhere('r.company = :company')
             ->setParameter('company', $company)
-            ->orderBy('r.priority', 'DESC')
+            ->orderBy('r.createdAt', 'ASC')
             ->addOrderBy('r.id', 'ASC');
 
         if ($action) {

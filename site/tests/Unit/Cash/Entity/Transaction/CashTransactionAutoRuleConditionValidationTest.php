@@ -278,7 +278,7 @@ final class CashTransactionAutoRuleConditionValidationTest extends TestCase
         $rule->setCompany(CompanyBuilder::aCompany()->withIndex(2)->build());
     }
 
-    public function testRuleCanOnlyBeDisabledOnceAndRecordsActor(): void
+    public function testRuleTogglesActivityOnceAtATimeAndRecordsActor(): void
     {
         $company = CompanyBuilder::aCompany()->build();
         $actorUserId = Uuid::uuid4()->toString();
@@ -302,8 +302,15 @@ final class CashTransactionAutoRuleConditionValidationTest extends TestCase
         self::assertFalse($rule->disable($actorUserId));
         self::assertSame(1, $rule->getRevision());
 
-        $this->expectException(\InvalidArgumentException::class);
-        $rule->setIsActive(true);
+        // Отключение обратимо: правило можно включить и следы отключения снимаются.
+        self::assertTrue($rule->enable($actorUserId));
+        self::assertTrue($rule->isActive());
+        self::assertNull($rule->getDisabledAt());
+        self::assertNull($rule->getDisabledByUserId());
+        self::assertFalse($rule->enable($actorUserId));
+
+        self::assertFalse($rule->setIsActive(false)->isActive());
+        self::assertTrue($rule->setIsActive(true)->isActive());
     }
 
     /** @return list<string> */

@@ -109,6 +109,14 @@
                                                     data-bs-target="#disable-modal-{{ item.id }}">
                                                 <i class="ti ti-ban me-2"></i> Отключить
                                             </button>
+                                        {% else %}
+                                            {# Включение обратимо, поэтому подтверждения не требует. #}
+                                            <form method="post" action="{{ path('cash_transaction_auto_rule_enable', {id: item.id}) }}">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('enable' ~ item.id) }}">
+                                                <button type="submit" class="dropdown-item">
+                                                    <i class="ti ti-player-play me-2"></i> Включить
+                                                </button>
+                                            </form>
                                         {% endif %}
 
                                         <div class="dropdown-divider"></div>

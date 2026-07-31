@@ -80,9 +80,48 @@ final class CashTransactionAutoRuleActionsMenuTest extends WebTestCaseBase
             static fn (string $text): string => trim($text),
             $crawler->filter('td .dropdown-menu .dropdown-item')->extract(['_text']),
         );
-        self::assertSame(['Проверка', 'Редактирование', 'Удалить'], $labels);
+        self::assertSame(['Проверка', 'Редактирование', 'Включить', 'Удалить'], $labels);
         self::assertCount(0, $crawler->filter('#disable-modal-'.$rule->getId()));
         self::assertCount(1, $crawler->filter('#delete-modal-'.$rule->getId()));
+    }
+
+    public function testDisabledRuleCanBeEnabledBack(): void
+    {
+        $client = static::createClient();
+        [$user, $company, $rule] = $this->fixtures();
+        $rule->disable();
+        $this->em()->flush();
+        $ruleId = (string) $rule->getId();
+
+        $crawler = $this->openIndex($client, $user, $company);
+        $client->submit($crawler->filter('td .dropdown-menu form')->form());
+
+        self::assertResponseRedirects('/cash-transaction-auto-rules/');
+        $this->em()->clear();
+
+        $stored = $this->em()->find(CashTransactionAutoRule::class, $ruleId);
+        self::assertNotNull($stored);
+        self::assertTrue($stored->isActive());
+        self::assertNull($stored->getDisabledAt());
+    }
+
+    public function testEnableWithoutValidTokenKeepsRuleDisabled(): void
+    {
+        $client = static::createClient();
+        [$user, $company, $rule] = $this->fixtures();
+        $rule->disable();
+        $this->em()->flush();
+        $ruleId = (string) $rule->getId();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+        $client->request('POST', sprintf('/cash-transaction-auto-rules/%s/enable', $ruleId), [
+            '_token' => 'wrong',
+        ]);
+
+        self::assertResponseRedirects('/cash-transaction-auto-rules/');
+        $this->em()->clear();
+        self::assertFalse($this->em()->find(CashTransactionAutoRule::class, $ruleId)->isActive());
     }
 
     public function testDeleteRemovesRuleWithConditionsAndWritesAudit(): void
