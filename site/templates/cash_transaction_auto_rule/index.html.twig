@@ -26,8 +26,16 @@
             </div>
         </div>
     </div>
+    {# Карточка обрезает выпадающее меню последних строк, как это уже было в списке
+       операций ДДС — там лечится тем же overflow. #}
+    <style>
+        .auto-rule-list,
+        .auto-rule-list .card-body {
+            overflow: visible;
+        }
+    </style>
     <div class="container-xl mt-3">
-        <div class="card">
+        <div class="card auto-rule-list">
             <div class="card-body">
                 <table class="table">
                     <thead>
@@ -77,14 +85,61 @@
                                 {% endif %}
                             </td>
                             <td class="text-end">
-                                <a href="{{ path('cash_transaction_auto_rule_check', {id: item.id}) }}" class="btn btn-sm btn-secondary">пров.</a>
-                                <a href="{{ path('cash_transaction_auto_rule_edit', {id: item.id}) }}" class="btn btn-sm btn-warning">✏️</a>
+                                <div class="dropdown position-static {{ loop.last ? 'dropup' : '' }}">
+                                    <button class="btn btn-link p-0 text-muted" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Действия">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path stroke="none" d="M0 0h24v24H0z"/>
+                                            <circle cx="5" cy="12" r="1"/>
+                                            <circle cx="12" cy="12" r="1"/>
+                                            <circle cx="19" cy="12" r="1"/>
+                                        </svg>
+                                    </button>
+
+                                    <div class="dropdown-menu dropdown-menu-end shadow-sm">
+                                        <a class="dropdown-item" href="{{ path('cash_transaction_auto_rule_check', {id: item.id}) }}">
+                                            <i class="ti ti-list-search me-2"></i> Проверка
+                                        </a>
+                                        <a class="dropdown-item" href="{{ path('cash_transaction_auto_rule_edit', {id: item.id}) }}">
+                                            <i class="ti ti-pencil me-2"></i> Редактирование
+                                        </a>
+                                        {% if item.active %}
+                                            <button type="button"
+                                                    class="dropdown-item"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#disable-modal-{{ item.id }}">
+                                                <i class="ti ti-ban me-2"></i> Отключить
+                                            </button>
+                                        {% endif %}
+
+                                        <div class="dropdown-divider"></div>
+
+                                        <button type="button"
+                                                class="dropdown-item text-danger"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#delete-modal-{{ item.id }}">
+                                            <i class="ti ti-trash me-2"></i> Удалить
+                                        </button>
+                                    </div>
+                                </div>
+
                                 {% if item.active %}
-                                    <form method="post" action="{{ path('cash_transaction_auto_rule_delete', {id: item.id}) }}" style="display:inline;" onsubmit="return confirm('Отключить правило? Отменить это действие нельзя.');">
-                                        <input type="hidden" name="_token" value="{{ csrf_token('disable' ~ item.id) }}">
-                                        <button class="btn btn-sm btn-danger">Отключить</button>
-                                    </form>
+                                    {{ include('cash_transaction_auto_rule/_confirm_modal.html.twig', {
+                                        modalId: 'disable-modal-' ~ item.id,
+                                        body: 'Отключить правило «' ~ item.name ~ '»? Включить его обратно нельзя.',
+                                        actionPath: path('cash_transaction_auto_rule_disable', {id: item.id}),
+                                        token: csrf_token('disable' ~ item.id),
+                                        submitLabel: 'Отключить',
+                                        submitClass: 'btn-warning',
+                                    }) }}
                                 {% endif %}
+                                {{ include('cash_transaction_auto_rule/_confirm_modal.html.twig', {
+                                    modalId: 'delete-modal-' ~ item.id,
+                                    body: 'Удалить правило «' ~ item.name ~ '» безвозвратно? Вместе с ним удалятся его условия.',
+                                    actionPath: path('cash_transaction_auto_rule_delete', {id: item.id}),
+                                    token: csrf_token('delete' ~ item.id),
+                                    submitLabel: 'Удалить',
+                                    submitClass: 'btn-danger',
+                                }) }}
                             </td>
                         </tr>
                     {% else %}

@@ -2,6 +2,7 @@
 
 namespace App\Cash\Controller\Transaction;
 
+use App\Cash\Application\DeleteCashTransactionAutoRuleAction;
 use App\Cash\Application\DTO\CashTransactionAutoRulePreviewFilter;
 use App\Cash\Application\SaveCashTransactionAutoRuleAction;
 use App\Cash\Application\Service\AutoRuleDispatchGuard;
@@ -444,8 +445,8 @@ class CashTransactionAutoRuleController extends AbstractController
         ], 200);
     }
 
-    #[Route('/{id}/delete', name: 'cash_transaction_auto_rule_delete', methods: ['POST'])]
-    public function delete(
+    #[Route('/{id}/disable', name: 'cash_transaction_auto_rule_disable', methods: ['POST'])]
+    public function disable(
         string $id,
         Request $request,
         CashTransactionAutoRuleRepository $repo,
@@ -462,6 +463,28 @@ class CashTransactionAutoRuleController extends AbstractController
         if ($this->isCsrfTokenValid('disable'.$rule->getId(), $request->request->get('_token'))
             && $rule->disable($auditContextProvider->getActorUserId())) {
             $em->flush();
+        }
+
+        return $this->redirectToRoute('cash_transaction_auto_rule_index');
+    }
+
+    #[Route('/{id}/delete', name: 'cash_transaction_auto_rule_delete', methods: ['POST'])]
+    public function delete(
+        string $id,
+        Request $request,
+        CashTransactionAutoRuleRepository $repo,
+        DeleteCashTransactionAutoRuleAction $delete,
+        ActiveCompanyService $companyService,
+        AuditContextProvider $auditContextProvider,
+    ): Response {
+        $company = $companyService->getActiveCompany();
+        $rule = $repo->findOneByIdAndCompanyId($id, (string) $company->getId());
+        if (!$rule) {
+            throw $this->createNotFoundException();
+        }
+
+        if ($this->isCsrfTokenValid('delete'.$rule->getId(), $request->request->get('_token'))) {
+            $delete($rule, $auditContextProvider->getActorUserId());
         }
 
         return $this->redirectToRoute('cash_transaction_auto_rule_index');
