@@ -1731,9 +1731,11 @@ Telegram создаёт ДДС-транзакции только через це
 ```php
 enum AuditLogAction: string
 {
-    case Create = 'create';
-    case Update = 'update';
-    case Delete = 'delete';
+    case CREATE = 'CREATE';
+    case UPDATE = 'UPDATE';
+    case SOFT_DELETE = 'SOFT_DELETE';
+    case DELETE = 'DELETE';
+    case RESTORE = 'RESTORE';
 }
 ```
 

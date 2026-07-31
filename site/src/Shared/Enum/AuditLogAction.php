@@ -9,5 +9,6 @@ enum AuditLogAction: string
     case CREATE = 'CREATE';
     case UPDATE = 'UPDATE';
     case SOFT_DELETE = 'SOFT_DELETE';
+    case DELETE = 'DELETE';
     case RESTORE = 'RESTORE';
 }
