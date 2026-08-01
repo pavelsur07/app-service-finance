@@ -21,6 +21,7 @@ use App\Cash\MessageHandler\ApplyAutoRulesForTransactionHandler;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Category\CashflowSystemCategoryService;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
+use App\Cash\Service\Transaction\CashTransactionSplitSynchronizer;
 use App\Company\Entity\Company;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
@@ -63,6 +64,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             $this->em,
             self::getContainer()->get(CashTransactionRepository::class),
             $autoRuleService,
+            self::getContainer()->get(CashTransactionSplitSynchronizer::class),
             self::getContainer()->get(CashflowSystemCategoryService::class),
             self::getContainer()->get(AutoRuleDispatchGuard::class),
             self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class),
@@ -104,6 +106,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             $this->em,
             self::getContainer()->get(CashTransactionRepository::class),
             $autoRuleService,
+            self::getContainer()->get(CashTransactionSplitSynchronizer::class),
             self::getContainer()->get(CashflowSystemCategoryService::class),
             self::getContainer()->get(AutoRuleDispatchGuard::class),
             self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class),
@@ -146,6 +149,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             $this->em,
             $transactionRepository,
             $autoRuleService,
+            self::getContainer()->get(CashTransactionSplitSynchronizer::class),
             $cashflowSystemCategoryService,
             self::getContainer()->get(AutoRuleDispatchGuard::class),
             self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class),
@@ -238,6 +242,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             $this->em,
             self::getContainer()->get(CashTransactionRepository::class),
             self::getContainer()->get(CashTransactionAutoRuleService::class),
+            self::getContainer()->get(CashTransactionSplitSynchronizer::class),
             self::getContainer()->get(CashflowSystemCategoryService::class),
             self::getContainer()->get(AutoRuleDispatchGuard::class),
             self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class),
@@ -322,6 +327,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             $this->em,
             self::getContainer()->get(CashTransactionRepository::class),
             self::getContainer()->get(CashTransactionAutoRuleService::class),
+            self::getContainer()->get(CashTransactionSplitSynchronizer::class),
             self::getContainer()->get(CashflowSystemCategoryService::class),
             self::getContainer()->get(AutoRuleDispatchGuard::class),
             self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class),
@@ -374,6 +380,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             $this->em,
             self::getContainer()->get(CashTransactionRepository::class),
             self::getContainer()->get(CashTransactionAutoRuleService::class),
+            self::getContainer()->get(CashTransactionSplitSynchronizer::class),
             self::getContainer()->get(CashflowSystemCategoryService::class),
             self::getContainer()->get(AutoRuleDispatchGuard::class),
             self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class),
@@ -456,6 +463,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             $this->em,
             self::getContainer()->get(CashTransactionRepository::class),
             self::getContainer()->get(CashTransactionAutoRuleService::class),
+            self::getContainer()->get(CashTransactionSplitSynchronizer::class),
             self::getContainer()->get(CashflowSystemCategoryService::class),
             self::getContainer()->get(AutoRuleDispatchGuard::class),
             self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class),
@@ -533,6 +541,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             $this->em,
             self::getContainer()->get(CashTransactionRepository::class),
             self::getContainer()->get(CashTransactionAutoRuleService::class),
+            self::getContainer()->get(CashTransactionSplitSynchronizer::class),
             self::getContainer()->get(CashflowSystemCategoryService::class),
             self::getContainer()->get(AutoRuleDispatchGuard::class),
             self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class),

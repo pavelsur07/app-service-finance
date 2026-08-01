@@ -51,6 +51,10 @@ class CashTransaction
     #[ORM\OneToMany(mappedBy: 'cashTransaction', targetEntity: Document::class)]
     private Collection $documents;
 
+    /** @var Collection<int, CashTransactionSplit> */
+    #[ORM\OneToMany(mappedBy: 'cashTransaction', targetEntity: CashTransactionSplit::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
+    private Collection $splits;
+
     #[ORM\Column(enumType: CashDirection::class)]
     private CashDirection $direction;
 
@@ -138,6 +142,157 @@ class CashTransaction
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
         $this->documents = new ArrayCollection();
+        $this->splits = new ArrayCollection();
+    }
+
+    /**
+     * Наружу отдаётся снимок, а не живая коллекция: иначе инварианты набора
+     * обходятся вызовом getSplits()->add() мимо replaceSplits().
+     *
+     * @return Collection<int, CashTransactionSplit>
+     */
+    public function getSplits(): Collection
+    {
+        return new ArrayCollection($this->splits->toArray());
+    }
+
+    /**
+     * Страховка от мутации дочерней строки в обход replaceSplits().
+     *
+     * Вызывается из PrePersist и PreUpdate самой строки — только для строк, которые
+     * действительно пишутся, поэтому в массовых сценариях коллекция владельца уже
+     * загружена и лишних запросов нет. Неинициализированную коллекцию приходится
+     * загрузить: строку могли достать через репозиторий после EntityManager::clear(),
+     * и ранний выход по «не загружено» как раз и открывал обход.
+     */
+    public function assertSplitsBalanced(): void
+    {
+        if ($this->splits->isEmpty()) {
+            return;
+        }
+
+        if (0 !== bccomp($this->getSplitsTotal(), $this->amount, 2)) {
+            throw new \DomainException(sprintf('Сумма строк разбивки (%s) не равна сумме транзакции (%s). Состав меняют только через replaceSplits().', $this->getSplitsTotal(), $this->amount));
+        }
+    }
+
+    public function getSplitsTotal(): string
+    {
+        $total = '0';
+        foreach ($this->splits as $split) {
+            $total = bcadd($total, $split->getAmount(), 2);
+        }
+
+        return $total;
+    }
+
+    /**
+     * Заменяет состав строк разбивки целиком.
+     *
+     * Единственная точка, где проверяются инварианты набора: сумма строк равна сумме
+     * транзакции, категории не повторяются, а мультиразбивка не заходит в категории,
+     * из которых создаются документы ОПиУ (см. решение D1 в плане задачи).
+     *
+     * @param list<CashTransactionSplit> $splits
+     */
+    public function replaceSplits(array $splits): self
+    {
+        Assert::allIsInstanceOf($splits, CashTransactionSplit::class);
+
+        if ([] === $splits) {
+            throw new \DomainException('Разбивка транзакции ДДС не может быть пустой.');
+        }
+
+        $categoryIds = [];
+        foreach ($splits as $split) {
+            if ($split->getCashTransaction() !== $this) {
+                throw new \DomainException('Строка разбивки принадлежит другой транзакции.');
+            }
+
+            $categoryId = (string) $split->getCashflowCategory()->getId();
+            if (isset($categoryIds[$categoryId])) {
+                throw new \DomainException('Категория ДДС повторяется в разбивке.');
+            }
+            $categoryIds[$categoryId] = true;
+        }
+
+        $total = '0';
+        foreach ($splits as $split) {
+            $total = bcadd($total, $split->getAmount(), 2);
+        }
+
+        if (0 !== bccomp($total, $this->amount, 2)) {
+            throw new \DomainException(sprintf('Сумма строк разбивки (%s) не равна сумме транзакции (%s).', $total, $this->amount));
+        }
+
+        if (count($splits) > 1) {
+            foreach ($splits as $split) {
+                if ($split->getCashflowCategory()->isAllowPlDocument()) {
+                    throw new \DomainException(sprintf('Категория «%s» участвует в документах ОПиУ, разбивать транзакцию по ней нельзя.', $split->getCashflowCategory()->getName()));
+                }
+            }
+        }
+
+        // Строки с той же категорией переиспользуются: пара DELETE+INSERT по одному
+        // ключу (transaction, category) в одном flush падает на уникальном индексе,
+        // потому что Doctrine выполняет вставку раньше удаления.
+        $existingByCategory = [];
+        foreach ($this->splits as $existing) {
+            $existingByCategory[(string) $existing->getCashflowCategory()->getId()] = $existing;
+        }
+
+        $result = [];
+        foreach ($splits as $split) {
+            $categoryId = (string) $split->getCashflowCategory()->getId();
+            $existing = $existingByCategory[$categoryId] ?? null;
+
+            // source сохраняется, пока категория та же: происхождение описывает именно
+            // категоризацию, а не сумму. Иначе правка суммы человеком помечала бы
+            // авто-категорию как ручную, а правило, изменившее только ЦФО, — наоборот.
+            $result[] = null !== $existing
+                ? $existing->changeAmount($split->getAmount())
+                : $split;
+        }
+
+        $this->splits->clear();
+        foreach ($result as $split) {
+            $this->splits->add($split);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Убирает все строки разбивки. Допустимо только когда категория не задана:
+     * строки зеркалят колонку, включая её пустое состояние.
+     */
+    public function clearSplits(): self
+    {
+        if (null !== $this->cashflowCategory) {
+            throw new \DomainException('Нельзя убрать разбивку у транзакции с заданной категорией ДДС.');
+        }
+
+        $this->splits->clear();
+
+        return $this;
+    }
+
+    /**
+     * Состав строк для aggregate-аудита, отсортированный, чтобы диff не шумел
+     * на изменении порядка.
+     *
+     * @return list<array{category: string, categoryName: string, amount: string, source: string}>
+     */
+    public function splitsAuditSnapshot(): array
+    {
+        $rows = [];
+        foreach ($this->splits as $split) {
+            $rows[] = $split->toAuditRow();
+        }
+
+        usort($rows, static fn (array $a, array $b): int => $a['category'] <=> $b['category']);
+
+        return $rows;
     }
 
     public function getId(): ?string

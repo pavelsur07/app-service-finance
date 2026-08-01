@@ -13,12 +13,14 @@ use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
+use App\Cash\Enum\Transaction\CashTransactionSplitSource;
 use App\Cash\Form\Transaction\CashTransactionAutoRuleType;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
+use App\Cash\Service\Transaction\CashTransactionSplitSynchronizer;
 use App\Company\Application\DTO\FinancialResponsibilityCenterDTO;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Company\Repository\ProjectDirectionRepository;
@@ -411,6 +413,7 @@ class CashTransactionAutoRuleController extends AbstractController
         EntityManagerInterface $entityManager,
         AutoRuleDispatchGuard $dispatchGuard,
         AuditContextProvider $auditContextProvider,
+        CashTransactionSplitSynchronizer $splitSynchronizer,
     ): Response {
         $csrfToken = new CsrfToken(
             'apply-auto-rule'.$transactionId,
@@ -471,7 +474,10 @@ class CashTransactionAutoRuleController extends AbstractController
                 $auditContextProvider->getActorUserId(),
             ));
             $dispatchGuard->suppress(
-                static fn () => $entityManager->flush(),
+                static function () use ($splitSynchronizer, $t, $entityManager): void {
+                    $splitSynchronizer->sync($t, CashTransactionSplitSource::AUTO);
+                    $entityManager->flush();
+                },
                 $applicationPlan,
             );
         }

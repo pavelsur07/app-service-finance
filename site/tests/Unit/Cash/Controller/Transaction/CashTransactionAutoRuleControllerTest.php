@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Cash\Controller\Transaction;
 use App\Cash\Application\DTO\CashTransactionAutoRuleApplicationPlan;
 use App\Cash\Application\DTO\CashTransactionAutoRuleMatchResult;
 use App\Cash\Application\Service\AutoRuleDispatchGuard;
+use App\Cash\Application\Service\CashTransactionAutoRuleProvenanceResolver;
 use App\Cash\Controller\Transaction\CashTransactionAutoRuleController;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
@@ -14,14 +15,17 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
+use App\Cash\Service\Transaction\CashTransactionSplitSynchronizer;
 use App\Shared\Audit\AuditContextProvider;
 use App\Shared\Entity\AuditLog;
+use App\Shared\Repository\AuditLogRepository;
 use App\Shared\Service\ActiveCompanyService;
 use App\Tests\Builders\Cash\CashflowCategoryBuilder;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Security\Csrf\CsrfToken;
@@ -77,6 +81,7 @@ final class CashTransactionAutoRuleControllerTest extends TestCase
             $entityManager,
             new AutoRuleDispatchGuard(),
             $auditContextProvider,
+            new CashTransactionSplitSynchronizer($entityManager, $auditContextProvider, new AutoRuleDispatchGuard(), new CashTransactionAutoRuleProvenanceResolver($this->createMock(AuditLogRepository::class), new NullLogger())),
         );
 
         self::assertSame([
@@ -174,6 +179,7 @@ final class CashTransactionAutoRuleControllerTest extends TestCase
             $entityManager,
             $dispatchGuard,
             $auditContextProvider,
+            new CashTransactionSplitSynchronizer($entityManager, $auditContextProvider, new AutoRuleDispatchGuard(), new CashTransactionAutoRuleProvenanceResolver($this->createMock(AuditLogRepository::class), new NullLogger())),
         );
 
         self::assertTrue(json_decode((string) $response->getContent(), true)['changed']);
@@ -207,6 +213,7 @@ final class CashTransactionAutoRuleControllerTest extends TestCase
             $entityManager,
             new AutoRuleDispatchGuard(),
             $auditContextProvider,
+            new CashTransactionSplitSynchronizer($entityManager, $auditContextProvider, new AutoRuleDispatchGuard(), new CashTransactionAutoRuleProvenanceResolver($this->createMock(AuditLogRepository::class), new NullLogger())),
         );
 
         self::assertSame(403, $response->getStatusCode());

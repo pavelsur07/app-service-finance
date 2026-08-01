@@ -85,6 +85,7 @@
 | `AuditLog` | Shared | `string $companyId` ✅ |
 | `FinancialResponsibilityCenter` | Company | `string $companyId` ✅ |
 | `FinancialResponsibilityCenterProject` | Company | `string $companyId` + same-company pair guard ✅ |
+| `CashTransactionSplit` | Cash | `string $companyId` ✅ |
 | `CashTransaction`, `MoneyAccount` и др. | Cash | `Company $company` (legacy) |
 | `Deal`, `ChargeType` | Deals | `Company $company` (legacy) |
 | `PLCategory`, `Document` и др. | legacy `src/Entity/` | `Company $company` (legacy) |
@@ -728,6 +729,16 @@ updatePLRegisterForDocument(string $documentId): void
 - Range messages propagate one correlation UUID to every child transaction message and safe structured log. Optional message fields plus native-serialization wakeup keep payloads queued before this contract backward-compatible.
 - `AutoRuleDispatchGuard` carries the application plan during that flush so the generic transaction audit subscriber does not duplicate the explicit provenance record.
 - `app:cash-auto-rules:assign-general-cfo` is a manual transition command for Stage 7.9.2. It is read-only by default and targets only active `PROJECT_GENERAL` rules without a ЦФО. `--execute` requires an existing approving user UUID and the exact candidate count from dry-run, validates every company's active `PROJECT_GENERAL × CFO_GENERAL` pair before changing any rule, and commits all assignments atomically through Doctrine so rule revision and actor metadata are preserved. It never applies rules to transactions or processes history.
+
+### Cash: разбивка транзакции ДДС по категориям (`cash_transaction_split`)
+
+- `CashTransactionSplit` — строка разбивки: транзакция, `string $companyId`, категория ДДС, положительная сумма и `CashTransactionSplitSource` (`manual` / `auto` / `import`). Уникальна пара (транзакция, категория); удаление транзакции каскадно удаляет строки.
+- `CashTransaction::replaceSplits()` — единственная точка проверки инвариантов набора: состав непустой, сумма строк строго равна сумме транзакции, категории не повторяются, все строки принадлежат этой транзакции. При количестве строк больше одной запрещены категории с `allowPlDocument = true` — документы ОПиУ строятся из одной категории транзакции, и мультиразбивка их семантику не поддерживает. Строки с совпадающей категорией переиспользуются, а не пересоздаются: пара DELETE+INSERT по одному ключу в одном flush падает на уникальном индексе.
+- `CashTransactionSplitSynchronizer` — dual-write на переходный период: строки повторяют `cash_transaction.cashflow_category_id` один в один, включая её пустое состояние (нет категории → нет строк). Вызывается из ручного создания и редактирования (`CashTransactionService`), воркера автоправил и ручного применения правила в контроллере. Синхронизация безусловна: защита ручной категоризации от автоправил живёт на уровне колонки (режимы `SAFE` и `REPLACE_AUTO_ASSIGNED` плюс провенанс из `AuditLog`), и дублировать её на уровне строк нельзя — ранний выход оставил бы колонку и строки рассинхронизированными.
+- Происхождение строк описывает колонка `source`, а не аудит: `CashTransactionAutoRuleProvenanceResolver` восстанавливает провенанс скалярного поля из истории `AuditLog` и на коллекции не работает. На поле `splits` резолвер не расширяется. `source` меняется только вместе с категорией: правка суммы его не трогает, иначе редактирование суммы человеком помечало бы авто-категорию как ручную.
+- Суммы строк валидируются на точность до двух знаков: bcmath со scale 2 усекает лишнее, а `NUMERIC(18,2)` округляет, поэтому без проверки «1.999» прошло бы инвариант как «1.99» и легло бы в БД как «2.00».
+- Изменение состава строк пишет один aggregate-`AuditLog` на `CashTransaction` с `diff['splits'] = [before, after]`. Не аудируется только состав новой транзакции — он покрыт её CREATE-записью; первое назначение категории существующей транзакции (например пришедшей импортом) аудируется, потому что дифф скалярной колонки не содержит `source`. Во время работы автоправил запись подавляется, потому что план правила пишет собственный аудит.
+- `app:cash:backfill-transaction-splits` переносит колонку в строки: батчами, идемпотентно (берёт только транзакции без строк), `source` определяется существующим провенанс-резолвером. Без `--execute` только считает объём. `app:cash:verify-transaction-splits` сверяет построчно — состав, суммы, company/категорию, orphan-строки — и печатает своё покрытие; ненулевой exit code при любом расхождении.
 
 ### `CashFacade` (`src/Cash/Facade/CashFacade.php`)
 ```php
