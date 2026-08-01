@@ -9,7 +9,9 @@ use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Message\ApplyAutoRulesForTransaction;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Category\CashflowSystemCategoryService;
+use App\Cash\Enum\Transaction\CashTransactionSplitSource;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
+use App\Cash\Service\Transaction\CashTransactionSplitSynchronizer;
 use App\Shared\Entity\AuditLog;
 use App\Shared\Enum\AuditLogAction;
 use Doctrine\ORM\EntityManagerInterface;
@@ -24,6 +26,7 @@ final class ApplyAutoRulesForTransactionHandler
         private readonly EntityManagerInterface $entityManager,
         private readonly CashTransactionRepository $transactionRepository,
         private readonly CashTransactionAutoRuleService $autoRuleService,
+        private readonly CashTransactionSplitSynchronizer $splitSynchronizer,
         private readonly CashflowSystemCategoryService $cashflowSystemCategoryService,
         private readonly AutoRuleDispatchGuard $dispatchGuard,
         private readonly CashTransactionAutoRuleProvenanceResolver $provenanceResolver,
@@ -120,7 +123,12 @@ final class ApplyAutoRulesForTransactionHandler
 
         if ($changed) {
             $this->dispatchGuard->suppress(
-                fn () => $this->entityManager->flush(),
+                function () use ($transaction): void {
+                    // Строки зеркалят колонку в том же flush: иначе между записью категории
+                    // и появлением строки остаётся окно, в котором они расходятся.
+                    $this->splitSynchronizer->sync($transaction, CashTransactionSplitSource::AUTO);
+                    $this->entityManager->flush();
+                },
                 $applicationPlan,
             );
         }

@@ -10,6 +10,7 @@ use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Enum\Transaction\CashTransactionSplitSource;
 use App\Cash\Exception\CurrencyMismatchException;
 use App\Cash\Exception\FinancePeriodLockedException;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
@@ -34,6 +35,7 @@ class CashTransactionService
         private VatCalculator $vatCalculator,
         private SnapshotCacheInvalidator $snapshotCacheInvalidator,
         private CashTransactionResponsibilityCenterResolver $responsibilityCenterResolver,
+        private CashTransactionSplitSynchronizer $splitSynchronizer,
     ) {
     }
 
@@ -136,6 +138,8 @@ class CashTransactionService
 
         $this->applyVat($tx, $company, $dto->direction, $dto->amount);
 
+        $this->splitSynchronizer->sync($tx, CashTransactionSplitSource::MANUAL);
+
         // Сохраняем
         $this->em->persist($tx);
         $this->em->flush(); // ← flush перед пересчётом обязателен
@@ -209,6 +213,8 @@ class CashTransactionService
             ->setResponsibilityCenterId($responsibilityCenterId);
 
         $this->applyVat($tx, $company, $dto->direction, $dto->amount);
+
+        $this->splitSynchronizer->sync($tx, CashTransactionSplitSource::MANUAL);
 
         // Сохраняем изменения
         $this->em->flush(); // ← flush перед пересчётом обязателен
