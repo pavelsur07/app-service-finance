@@ -15,6 +15,7 @@ use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
@@ -101,6 +102,81 @@ final class VerifyCashTransactionSplitsCommandTest extends IntegrationTestCase
 
         // Усечённый префикс при этом остаётся — иначе находку нечем локализовать.
         self::assertStringContainsString(substr((string) $company->getId(), 0, 8), $output);
+    }
+
+    /**
+     * Проверяются оба кода системной «Не распределено»: на проде у одной компании остался
+     * legacy-код, и потеря его из списка исключений вернула бы вечно красный гейт.
+     */
+    #[DataProvider('unallocatedCodeProvider')]
+    public function testUnallocatedSplitsAreExcludedFromProvenanceCheck(string $systemCode): void
+    {
+        $company = $this->company();
+
+        // Так транзакция попадает в «Не распределено» на проде: fallback воркера правилом
+        // не является и следа autoRules в аудите не оставляет, поэтому провенанс-резолвер
+        // назовёт категорию ручной, а строка при этом помечена auto. Гейт от этого краснеть
+        // не должен — категория и есть очередь на разбор.
+        $unallocated = $this->category($company, 'Не распределено');
+
+        // Каждый код ставится тем же путём, каким он появился в реальности: актуальный —
+        // через markAsSystem(), legacy — обычным сеттером, потому что он предшествует
+        // списку зарезервированных и markAsSystem() его не примет.
+        if (CashflowCategory::isSystemCode($systemCode)) {
+            $unallocated->markAsSystem($systemCode);
+        } else {
+            $unallocated->setSystemCode($systemCode);
+        }
+        $this->em->flush();
+
+        $transaction = $this->transaction($company, '1000.00', $unallocated);
+        $transaction->replaceSplits([
+            new CashTransactionSplit($transaction, $unallocated, '1000.00', CashTransactionSplitSource::AUTO),
+        ]);
+        $this->em->flush();
+
+        $tester = $this->runCommand();
+        $output = $tester->getDisplay();
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode(), 'Нераспределённая строка не должна валить сверку.');
+        self::assertStringContainsString('пропущено нераспределённых — 1', $output);
+        self::assertStringContainsString('Провенанс source проверен у 0 строк из 0', $output);
+    }
+
+    public function testSkippedCountIsLimitedToExpandPhaseScope(): void
+    {
+        $company = $this->company();
+
+        $unallocated = $this->category($company, 'Не распределено');
+        $unallocated->markAsSystem(CashflowCategory::CODE_UNALLOCATED);
+        $this->em->flush();
+
+        // В области сверки: одна строка на транзакцию.
+        $single = $this->transaction($company, '1000.00', $unallocated);
+        $single->replaceSplits([
+            new CashTransactionSplit($single, $unallocated, '1000.00', CashTransactionSplitSource::AUTO),
+        ]);
+
+        // Вне области: мультиразбивка, где одна из строк тоже нераспределённая. Она не
+        // участвует в сверке провенанса, поэтому и в счётчик пропущенных попадать не должна.
+        // Прежний запрос считал по всей таблице и показал бы здесь 2 вместо 1.
+        $multi = $this->transaction($company, '1000.00', $unallocated);
+        $multi->replaceSplits([
+            new CashTransactionSplit($multi, $unallocated, '600.00', CashTransactionSplitSource::AUTO),
+            new CashTransactionSplit($multi, $this->category($company, 'Аренда'), '400.00', CashTransactionSplitSource::MANUAL),
+        ]);
+        $this->em->flush();
+
+        $output = $this->runCommand()->getDisplay();
+
+        self::assertStringContainsString('пропущено нераспределённых — 1', $output);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function unallocatedCodeProvider(): iterable
+    {
+        yield 'актуальный код' => [CashflowCategory::CODE_UNALLOCATED];
+        yield 'legacy-код с прода' => [CashflowCategory::SYSTEM_UNALLOCATED];
     }
 
     private function runCommand(): CommandTester
