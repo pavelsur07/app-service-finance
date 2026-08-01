@@ -63,13 +63,11 @@ class CashTransactionSplit
             'Категория ДДС принадлежит другой компании.',
         );
 
-        self::assertMoney($amount);
-
         $this->id = $id;
         $this->cashTransaction = $cashTransaction;
         $this->companyId = $companyId;
         $this->cashflowCategory = $cashflowCategory;
-        $this->amount = $amount;
+        $this->amount = self::canonicalMoney($amount);
         $this->source = $source;
     }
 
@@ -125,22 +123,25 @@ class CashTransactionSplit
      */
     public function changeAmount(string $amount): self
     {
-        self::assertMoney($amount);
-
-        $this->amount = $amount;
+        $this->amount = self::canonicalMoney($amount);
 
         return $this;
     }
 
     /**
-     * Сумма обязана быть положительной и укладываться ровно в два знака.
+     * Проверяет сумму и приводит её к тому же виду, в котором её хранит БД.
      *
      * Формат проверяется регулярным выражением, а не сравнением с округлённым
      * значением: bcmath со scale 2 усекает лишние знаки, а PostgreSQL NUMERIC(18,2)
      * их округляет, поэтому «1.999» прошло бы инвариант как «1.99», а в БД легло бы
      * как «2.00». Сравнение на фиксированном scale ту же дыру оставляет для «1.0000001».
+     *
+     * Канонизация не косметическая. Из Postgres сумма приходит как «50000.00», а из формы —
+     * как «50000». Снимок состава для аудита сравнивается построчно, поэтому без приведения
+     * каждое редактирование транзакции выглядело бы как изменение разбивки и писало бы
+     * запись в историю о несуществующем изменении — на каждую правку, бесконечно.
      */
-    private static function assertMoney(string $amount): void
+    private static function canonicalMoney(string $amount): string
     {
         if (1 !== preg_match('/^\d+(\.\d{1,2})?$/', $amount)) {
             throw new \DomainException(sprintf('Сумма строки разбивки «%s» должна быть положительным числом не более чем с двумя знаками после запятой.', $amount));
@@ -149,6 +150,8 @@ class CashTransactionSplit
         if (1 !== bccomp($amount, '0', 2)) {
             throw new \DomainException('Сумма строки разбивки должна быть больше нуля.');
         }
+
+        return bcadd($amount, '0', 2);
     }
 
     /**

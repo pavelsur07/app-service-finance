@@ -290,6 +290,48 @@ final class CashTransactionSplitSynchronizerTest extends IntegrationTestCase
         self::assertSame(1, $this->countSplitAuditLogs($transaction));
     }
 
+    public function testRepeatedEditWithoutCompositionChangeIsNotAudited(): void
+    {
+        [$company, $transaction] = $this->transaction('50000.00');
+        $transaction->setCashflowCategory($this->category($company, 'Аренда'));
+        $this->synchronizer->sync($transaction, CashTransactionSplitSource::AUTO);
+        $this->em->flush();
+
+        $before = $this->countSplitAuditLogs($transaction);
+
+        // Из формы сумма приходит без дробной части, из Postgres — с ней. Без канонизации
+        // строковое сравнение снимков считало бы это изменением на каждой правке.
+        //
+        // Между правками EntityManager очищается: каждое редактирование в бою это отдельный
+        // запрос, который перечитывает «50000.00» из БД и получает «50000» из формы. Без
+        // перезагрузки вторая правка работала бы с уже испорченным значением в памяти и
+        // дефект воспроизводился бы слабее, чем он есть на самом деле.
+        $id = (string) $transaction->getId();
+
+        for ($edit = 0; $edit < 2; ++$edit) {
+            $this->em->clear();
+
+            $reloaded = $this->em->find(CashTransaction::class, $id);
+            self::assertInstanceOf(CashTransaction::class, $reloaded);
+            self::assertSame('50000.00', $reloaded->getSplits()->first()->getAmount());
+
+            $reloaded->setAmount('50000');
+            $this->synchronizer->sync($reloaded, CashTransactionSplitSource::MANUAL);
+            $this->em->flush();
+        }
+
+        $this->em->clear();
+        $final = $this->em->find(CashTransaction::class, $id);
+        self::assertInstanceOf(CashTransaction::class, $final);
+
+        self::assertSame(
+            $before,
+            $this->countSplitAuditLogs($final),
+            'Редактирование, не менявшее состав разбивки, не должно писать в историю.',
+        );
+        self::assertSame('50000.00', $final->getSplits()->first()->getAmount());
+    }
+
     public function testNewTransactionCompositionIsNotAudited(): void
     {
         $owner = UserBuilder::aUser()->withId(Uuid::uuid4()->toString())->build();
