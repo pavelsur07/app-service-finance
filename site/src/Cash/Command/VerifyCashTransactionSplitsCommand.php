@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Cash\Command;
 
 use App\Cash\Application\Service\CashTransactionAutoRuleProvenanceResolver;
+use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashTransactionSplitSource;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -93,6 +95,15 @@ final class VerifyCashTransactionSplitsCommand extends Command
 
     private const SOURCE_BATCH = 500;
     private const MISMATCH_SAMPLE = 5;
+
+    /**
+     * Оба кода системной «Не распределено»: у одной компании на проде остался legacy-код,
+     * и CashflowCategoryRepository::findSystemUnallocatedByCompany() знает оба.
+     */
+    private const UNALLOCATED_CODES = [
+        CashflowCategory::CODE_UNALLOCATED,
+        CashflowCategory::SYSTEM_UNALLOCATED,
+    ];
 
     public function __construct(
         private readonly Connection $connection,
@@ -199,6 +210,15 @@ final class VerifyCashTransactionSplitsCommand extends Command
      * Это не тавтология относительно backfill: сохранённое значение писал другой код
      * в другой момент времени, поэтому расхождение ловит ошибку writer'а и дрейф данных.
      * Проверяются только строки expand-фазы — по одной на транзакцию.
+     *
+     * Системная «Не распределено» из сверки исключена намеренно. Провенанс-резолвер
+     * считает авто-назначением только работу именованного правила с id и ревизией,
+     * а в эту категорию транзакция попадает через fallback воркера, который правилом
+     * не является и следа autoRules в аудите не оставляет. Из-за этого одна и та же
+     * ситуация получала разные значения: backfill размечал историю как manual, а новые
+     * транзакции приходили с auto — и гейт краснел бы вечно, наращивая счётчик с каждой
+     * новой нераспределённой транзакцией. Сама категория и есть очередь на ручной разбор:
+     * пока разбор не сделан, провенанс классификации не несёт информации.
      */
     private function countSourceMismatches(SymfonyStyle $io): int
     {
@@ -206,7 +226,24 @@ final class VerifyCashTransactionSplitsCommand extends Command
             'SELECT s.cash_transaction_id AS transaction_id, s.source
              FROM cash_transaction_split s
              JOIN (SELECT cash_transaction_id FROM cash_transaction_split GROUP BY 1 HAVING count(*) = 1) one
-               ON one.cash_transaction_id = s.cash_transaction_id',
+               ON one.cash_transaction_id = s.cash_transaction_id
+             JOIN "cashflow_categories" c ON c.id = s.cashflow_category_id
+             WHERE c.system_code IS NULL OR c.system_code NOT IN (:unallocatedCodes)',
+            ['unallocatedCodes' => self::UNALLOCATED_CODES],
+            ['unallocatedCodes' => ArrayParameterType::STRING],
+        );
+
+        // Пропущенные считаются по той же области, что и проверенные — только строки
+        // expand-фазы. Иначе нераспределённая строка внутри мультиразбивки раздувала бы
+        // счётчик пропусков, хотя в проверку она и не входила, и покрытие врало бы.
+        $skipped = (int) $this->connection->fetchOne(
+            'SELECT count(*) FROM cash_transaction_split s
+             JOIN (SELECT cash_transaction_id FROM cash_transaction_split GROUP BY 1 HAVING count(*) = 1) one
+               ON one.cash_transaction_id = s.cash_transaction_id
+             JOIN "cashflow_categories" c ON c.id = s.cashflow_category_id
+             WHERE c.system_code IN (:unallocatedCodes)',
+            ['unallocatedCodes' => self::UNALLOCATED_CODES],
+            ['unallocatedCodes' => ArrayParameterType::STRING],
         );
 
         $checked = 0;
@@ -246,7 +283,12 @@ final class VerifyCashTransactionSplitsCommand extends Command
             $this->entityManager->clear();
         }
 
-        $io->writeln(sprintf('Провенанс source проверен у %d строк из %d.', $checked, count($rows)));
+        $io->writeln(sprintf(
+            'Провенанс source проверен у %d строк из %d; пропущено нераспределённых — %d.',
+            $checked,
+            count($rows),
+            $skipped,
+        ));
 
         return $mismatched;
     }
