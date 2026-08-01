@@ -1025,12 +1025,14 @@ Messenger queue stats through `codex-console messenger:stats`.
 Marketplace category status through `codex-console app:ingestion:marketplace-categories:status`.
 Read-only Ozon preview/verification commands through `codex-console`.
 SMTP liveness through `codex-console app:mailer:healthcheck` — SMTP handshake with AUTH, sends no email and mutates no data. The command has no mutating mode and no flags. Note that a failure logs `error` and opens a GlitchTip issue, so a manual run against dead mail raises an alert.
+Cashflow split reconciliation through `codex-console app:cash:verify-transaction-splits` — read-only, returns a non-zero exit code on any mismatch. The wrapper rejects every argument for this command.
 Read-only SQL through `codex-psql-ro`, which uses the read-only `codex_ro` database role.
 
 Production commands that mutate data, process queues, call external APIs, or can change application state require explicit owner approval immediately before execution:
 `messenger:consume`.
 `app:daily-balance:recalc` for owner-approved daily-balance backfill.
 Any command with `--execute`.
+`app:cash:backfill-transaction-splits --execute` moves the cashflow category into split rows. The wrapper accepts only an empty argument list or exactly `--execute` for this command and rejects any other flag. Without `--execute` the command is read-only and only counts pending work. Run it in a quiet window with workers stopped, after backing up `cash_transaction`, and reconcile the result with `app:cash:verify-transaction-splits`.
 Any repair, prune, backfill, rebuild, refresh, or maintenance operation.
 Any SQL write operation (`INSERT`, `UPDATE`, `DELETE`, DDL, or migrations).
 Any change to production Docker, workers, scheduler, queues, secrets, config, or deployment state.
