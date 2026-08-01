@@ -92,6 +92,7 @@ final class VerifyCashTransactionSplitsCommand extends Command
     ];
 
     private const SOURCE_BATCH = 500;
+    private const MISMATCH_SAMPLE = 5;
 
     public function __construct(
         private readonly Connection $connection,
@@ -109,9 +110,11 @@ final class VerifyCashTransactionSplitsCommand extends Command
 
         $rows = [];
         $failed = false;
+        $counts = [];
 
         foreach (self::CHECKS as $key => $check) {
             $count = (int) $this->connection->fetchOne($check['sql']);
+            $counts[$key] = $count;
             $failed = $failed || $count > 0;
             $rows[] = [$key, $check['title'], $count, 0 === $count ? 'OK' : 'FAIL'];
         }
@@ -126,16 +129,23 @@ final class VerifyCashTransactionSplitsCommand extends Command
             $io->writeln('source строк совпадает с провенансом категории.');
         }
 
-        $totalsMismatch = $this->fetchTotalsMismatch();
-        if ([] !== $totalsMismatch) {
-            $failed = true;
-            $io->section('Расхождение итогов по company + category + direction + currency');
-            $io->table(
-                ['company_id', 'category_id', 'direction', 'currency', 'по колонке', 'по строкам'],
-                $totalsMismatch,
-            );
+        // До завершения backfill сверка итогов не несёт информации: она гарантированно
+        // покажет расхождение по каждой категории, у которой ещё нет строк. Печатать
+        // сотни строк с идентификаторами и оборотами при заведомо известном результате —
+        // только шум и лишний вынос production-данных в логи.
+        if ($counts['missing_splits'] > 0) {
+            $io->writeln(sprintf(
+                'Сверка итогов пропущена: перенос не завершён, транзакций без строк — %d.',
+                $counts['missing_splits'],
+            ));
         } else {
-            $io->writeln('Итоги по company + category + direction + currency сходятся.');
+            $totalsMismatch = $this->fetchTotalsMismatch();
+            if ([] !== $totalsMismatch) {
+                $failed = true;
+                $this->printTotalsMismatch($io, $totalsMismatch);
+            } else {
+                $io->writeln('Итоги по company + category + direction + currency сходятся.');
+            }
         }
 
         if ($failed) {
@@ -147,6 +157,40 @@ final class VerifyCashTransactionSplitsCommand extends Command
         $io->success('Сверка пройдена.');
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Печатает расхождение итогов без денег и без полных идентификаторов.
+     *
+     * Вывод команды попадает в логи и в отчёты, поэтому обороты и полные ID компаний
+     * и категорий в него не идут: для диагностики хватает усечённого идентификатора,
+     * чтобы найти строку руками, а полные данные достаются отдельным SQL под контролем.
+     *
+     * @param list<array{0: string, 1: string, 2: string, 3: string, 4: string, 5: string}> $mismatch
+     */
+    private function printTotalsMismatch(SymfonyStyle $io, array $mismatch): void
+    {
+        $io->section('Расхождение итогов по company + category + direction + currency');
+        $io->writeln(sprintf('Групп с расхождением: %d.', count($mismatch)));
+
+        $io->table(
+            ['company', 'category', 'direction', 'currency'],
+            array_map(
+                static fn (array $row): array => [
+                    substr($row[0], 0, 8),
+                    substr($row[1], 0, 8),
+                    $row[2],
+                    $row[3],
+                ],
+                array_slice($mismatch, 0, self::MISMATCH_SAMPLE),
+            ),
+        );
+
+        if (count($mismatch) > self::MISMATCH_SAMPLE) {
+            $io->writeln(sprintf('Показаны первые %d из %d.', self::MISMATCH_SAMPLE, count($mismatch)));
+        }
+
+        $io->writeln('Суммы намеренно не выводятся. Детали — отдельным read-only SQL по идентификаторам выше.');
     }
 
     /**
