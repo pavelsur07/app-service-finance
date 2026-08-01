@@ -223,16 +223,12 @@ final class NormalizeInventorySnapshotActionTest extends IntegrationTestCase
             page: 1,
             perPage: 30,
             source: MarketplaceType::WILDBERRIES,
-            snapshotSessionId: $session->getId(),
-            snapshotAt: null,
-            search: null,
-            mappingStatus: null,
-            status: StockStatus::Available,
+            snapshotDate: $session->getStartedAt(),
         );
         $reportRows = iterator_to_array($reportPager->getCurrentPageResults());
-        self::assertCount(2, $reportRows);
-        self::assertSame('Коледино', $reportRows[0]['location_name']);
-        self::assertSame(StockStatus::Available->value, $reportRows[0]['status']);
+        self::assertCount(6, $reportRows);
+        self::assertSame(['Коледино'], array_values(array_unique(array_column($reportRows, 'location_name'))));
+        self::assertContains(StockStatus::Available->value, array_column($reportRows, 'status'));
 
         $locations = $this->em->getRepository(Location::class)->findBy([
             'companyId' => $company->getId(),

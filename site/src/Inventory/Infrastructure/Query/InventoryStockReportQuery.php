@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace App\Inventory\Infrastructure\Query;
 
-use App\Inventory\Enum\StockSnapshotMappingStatus;
-use App\Inventory\Enum\StockStatus;
 use App\Marketplace\Enum\MarketplaceType;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Query\QueryBuilder;
+use Doctrine\DBAL\Types\Types;
 use Pagerfanta\Doctrine\DBAL\QueryAdapter;
 use Pagerfanta\Pagerfanta;
 use Webmozart\Assert\Assert;
@@ -22,24 +21,35 @@ final class InventoryStockReportQuery
     ) {
     }
 
-    public function findLatestSnapshotSessionId(string $companyId, MarketplaceType $source): ?string
+    /**
+     * Остатки «на дату»: ближайший день со снимком не позже запрошенной даты.
+     * null — снимков по источнику на эту дату и раньше нет.
+     */
+    public function findEffectiveSnapshotDate(string $companyId, MarketplaceType $source, \DateTimeImmutable $date): ?\DateTimeImmutable
     {
         Assert::uuid($companyId);
 
+        // ORDER BY + LIMIT 1, а не MAX(): планировщик идёт обратным сканом по
+        // idx_inventory_stock_company_source_date и останавливается на первой подходящей строке.
         $value = $this->connection->createQueryBuilder()
-            ->select('s.snapshot_session_id')
+            ->select('s.snapshot_date')
             ->from('inventory_stock_snapshots', 's')
             ->where('s.company_id = :companyId')
             ->andWhere('s.source = :source')
+            ->andWhere('s.snapshot_date <= :date')
             ->setParameter('companyId', $companyId)
             ->setParameter('source', $source->value)
-            ->orderBy('s.snapshot_at', 'DESC')
-            ->addOrderBy('s.id', 'DESC')
+            ->setParameter('date', $date, Types::DATE_IMMUTABLE)
+            ->orderBy('s.snapshot_date', 'DESC')
             ->setMaxResults(1)
             ->executeQuery()
             ->fetchOne();
 
-        return $value !== false ? (string) $value : null;
+        if (false === $value || null === $value) {
+            return null;
+        }
+
+        return new \DateTimeImmutable((string) $value);
     }
 
     public function getPage(
@@ -47,21 +57,9 @@ final class InventoryStockReportQuery
         int $page,
         int $perPage,
         MarketplaceType $source,
-        ?string $snapshotSessionId,
-        ?\DateTimeImmutable $snapshotAt,
-        ?string $search,
-        ?StockSnapshotMappingStatus $mappingStatus,
-        ?StockStatus $status,
+        \DateTimeImmutable $snapshotDate,
     ): Pagerfanta {
-        $qb = $this->buildQueryBuilder(
-            companyId: $companyId,
-            source: $source,
-            snapshotSessionId: $snapshotSessionId,
-            snapshotAt: $snapshotAt,
-            search: $search,
-            mappingStatus: $mappingStatus,
-            status: $status,
-        );
+        $qb = $this->buildQueryBuilder($companyId, $source, $snapshotDate);
 
         return Pagerfanta::createForCurrentPageWithMaxPerPage(
             new QueryAdapter($qb, static function (QueryBuilder $countQb): void {
@@ -78,15 +76,11 @@ final class InventoryStockReportQuery
     private function buildQueryBuilder(
         string $companyId,
         MarketplaceType $source,
-        ?string $snapshotSessionId,
-        ?\DateTimeImmutable $snapshotAt,
-        ?string $search,
-        ?StockSnapshotMappingStatus $mappingStatus,
-        ?StockStatus $status,
+        \DateTimeImmutable $snapshotDate,
     ): QueryBuilder {
         Assert::uuid($companyId);
 
-        $qb = $this->connection->createQueryBuilder()
+        return $this->connection->createQueryBuilder()
             ->select(
                 's.id',
                 's.snapshot_session_id',
@@ -106,37 +100,11 @@ final class InventoryStockReportQuery
             ->innerJoin('s', 'inventory_locations', 'l', 'l.id = s.location_id AND l.company_id = s.company_id')
             ->where('s.company_id = :companyId')
             ->andWhere('s.source = :source')
+            ->andWhere('s.snapshot_date = :snapshotDate')
             ->setParameter('companyId', $companyId)
             ->setParameter('source', $source->value)
+            ->setParameter('snapshotDate', $snapshotDate, Types::DATE_IMMUTABLE)
             ->orderBy('s.snapshot_at', 'DESC')
             ->addOrderBy('s.id', 'DESC');
-
-        if ($snapshotSessionId !== null) {
-            Assert::uuid($snapshotSessionId);
-            $qb->andWhere('s.snapshot_session_id = :snapshotSessionId')
-                ->setParameter('snapshotSessionId', $snapshotSessionId);
-        }
-
-        if ($snapshotAt !== null) {
-            $qb->andWhere('s.snapshot_at = :snapshotAt')
-                ->setParameter('snapshotAt', $snapshotAt, \Doctrine\DBAL\Types\Types::DATETIME_IMMUTABLE);
-        }
-
-        if ($search !== null && '' !== trim($search)) {
-            $qb->andWhere('(LOWER(s.source_sku) LIKE :search OR LOWER(s.source_offer_id) LIKE :search)')
-                ->setParameter('search', '%'.mb_strtolower(trim($search)).'%');
-        }
-
-        if ($mappingStatus !== null) {
-            $qb->andWhere('s.mapping_status = :mappingStatus')
-                ->setParameter('mappingStatus', $mappingStatus->value);
-        }
-
-        if (null !== $status) {
-            $qb->andWhere('s.status = :status')
-                ->setParameter('status', $status->value);
-        }
-
-        return $qb;
     }
 }

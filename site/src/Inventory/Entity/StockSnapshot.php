@@ -18,6 +18,7 @@ use Webmozart\Assert\Assert;
 #[ORM\UniqueConstraint(name: 'uniq_inventory_stock_snapshot_day_item', columns: ['company_id', 'snapshot_date', 'source', 'source_sku', 'fulfillment_type', 'location_id', 'status'])]
 #[ORM\Index(columns: ['company_id', 'snapshot_date'], name: 'idx_inventory_stock_company_date')]
 #[ORM\Index(columns: ['company_id', 'source', 'snapshot_at'], name: 'idx_inventory_stock_company_source_snapshot_at')]
+#[ORM\Index(columns: ['company_id', 'source', 'snapshot_date'], name: 'idx_inventory_stock_company_source_date')]
 #[ORM\Index(columns: ['company_id', 'product_id', 'snapshot_date'], name: 'idx_inventory_stock_company_product_date')]
 #[ORM\Index(columns: ['company_id', 'listing_id', 'snapshot_date'], name: 'idx_inventory_stock_company_listing_date')]
 #[ORM\Index(columns: ['company_id', 'location_id', 'snapshot_date'], name: 'idx_inventory_stock_company_location_date')]

@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Inventory\Controller;
 
-use App\Inventory\Enum\StockSnapshotMappingStatus;
-use App\Inventory\Enum\StockStatus;
 use App\Inventory\Infrastructure\Query\InventoryStockReportQuery;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Shared\Service\ActiveCompanyService;
@@ -13,12 +11,14 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
-use Ramsey\Uuid\Uuid;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_USER')]
 final class StockReportController extends AbstractController
 {
+    /** Источники, для которых нормализуются остатки (см. NormalizeInventorySnapshotAction). */
+    private const SOURCES = [MarketplaceType::OZON, MarketplaceType::WILDBERRIES];
+
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly InventoryStockReportQuery $stockReportQuery,
@@ -30,55 +30,46 @@ final class StockReportController extends AbstractController
     {
         $companyId = (string) $this->activeCompanyService->getActiveCompany()->getId();
 
-        $source = MarketplaceType::tryFrom((string) $request->query->get('source', MarketplaceType::OZON->value)) ?? MarketplaceType::OZON;
-        $snapshotSessionId = $request->query->getString('snapshotSessionId');
-        $snapshotSessionId = '' !== $snapshotSessionId && Uuid::isValid($snapshotSessionId) ? $snapshotSessionId : null;
+        $source = $this->parseSource($request->query->all()['source'] ?? null);
+        $date = $this->parseDate($request->query->all()['date'] ?? null) ?? new \DateTimeImmutable('today');
 
-        $snapshotAt = $request->query->getString('snapshotAt');
-        $snapshotAtDt = null;
-        if ('' !== $snapshotAt) {
-            try {
-                $snapshotAtDt = new \DateTimeImmutable($snapshotAt);
-            } catch (\Throwable) {
-                $snapshotAtDt = null;
-            }
-        }
+        $effectiveDate = $this->stockReportQuery->findEffectiveSnapshotDate($companyId, $source, $date);
 
-        $mappingStatusValue = $request->query->getString('mappingStatus');
-        $mappingStatus = '' !== $mappingStatusValue ? StockSnapshotMappingStatus::tryFrom($mappingStatusValue) : null;
-        $statusValue = $request->query->getString('status');
-        $status = '' !== $statusValue ? StockStatus::tryFrom($statusValue) : null;
-
-        if ($snapshotSessionId === null && $snapshotAtDt === null) {
-            $snapshotSessionId = $this->stockReportQuery->findLatestSnapshotSessionId($companyId, $source);
-        }
-
-        $page = max(1, $request->query->getInt('page', 1));
         $pager = $this->stockReportQuery->getPage(
             companyId: $companyId,
-            page: $page,
+            page: max(1, $request->query->getInt('page', 1)),
             perPage: InventoryStockReportQuery::PER_PAGE,
             source: $source,
-            snapshotSessionId: $snapshotSessionId,
-            snapshotAt: $snapshotAtDt,
-            search: $request->query->getString('search'),
-            mappingStatus: $mappingStatus,
-            status: $status,
+            snapshotDate: $effectiveDate ?? $date,
         );
 
         return $this->render('inventory/stocks/index.html.twig', [
             'pager' => $pager,
             'source' => $source,
-            'sources' => MarketplaceType::cases(),
-            'mappingStatuses' => StockSnapshotMappingStatus::cases(),
-            'stockStatuses' => StockStatus::cases(),
-            'filters' => [
-                'snapshotSessionId' => $snapshotSessionId,
-                'snapshotAt' => $snapshotAt,
-                'search' => $request->query->getString('search'),
-                'mappingStatus' => $mappingStatus?->value,
-                'status' => $status?->value,
-            ],
+            'sources' => self::SOURCES,
+            'date' => $date,
+            'effectiveDate' => $effectiveDate,
         ]);
+    }
+
+    private function parseSource(mixed $raw): MarketplaceType
+    {
+        $source = is_string($raw) ? MarketplaceType::tryFrom($raw) : null;
+
+        return null !== $source && in_array($source, self::SOURCES, true) ? $source : MarketplaceType::OZON;
+    }
+
+    private function parseDate(mixed $raw): ?\DateTimeImmutable
+    {
+        // Формат проверяется до парсера: createFromFormat() бросает ValueError на null-байт,
+        // а год 0000 PostgreSQL DATE не принимает и роняет запрос.
+        if (!is_string($raw) || 1 !== preg_match('/^\d{4}-\d{2}-\d{2}\z/', $raw) || str_starts_with($raw, '0000-')) {
+            return null;
+        }
+
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $raw);
+
+        // Обратное форматирование отсекает несуществующие дни вроде 2026-02-31.
+        return false !== $date && $date->format('Y-m-d') === $raw ? $date : null;
     }
 }

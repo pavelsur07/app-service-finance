@@ -1640,15 +1640,13 @@ buildQueryBuilder(
 
 - DBAL read-model для `GET /inventory/stocks`;
 - обязательный IDOR-фильтр `company_id = :companyId`;
-- `source` фильтруется через `MarketplaceType`;
-- `mappingStatus` фильтруется через `StockSnapshotMappingStatus`;
-- `status` фильтруется через `StockStatus`;
-- поддерживает фильтры:
-  - `snapshotSessionId`;
-  - `snapshotAt`;
-  - `source`;
-  - `search` по `sourceSku` / `sourceOfferId`;
-  - `mappingStatus`;
+- ровно два фильтра: `source` (через `MarketplaceType`) и `snapshotDate`;
+- `findEffectiveSnapshotDate(companyId, source, date): ?\DateTimeImmutable` —
+  `MAX(snapshot_date)` при `snapshot_date <= :date`, то есть семантика «остатки **на** дату»:
+  в день без синхронизации берётся ближайший предыдущий снимок. `null` — снимков на эту дату и раньше нет;
+- `getPage(companyId, page, perPage, source, snapshotDate)` — выборка одного дня
+  (`snapshot_date = :snapshotDate`); на день по источнику существует ровно один срез
+  за счёт уникального ключа `uniq_inventory_stock_snapshot_day_item` и `upsertDaySnapshot()`;
 - pagination через Pagerfanta;
 - `available_for_sale = quantity - reserved_quantity`;
 - склад читается через company-scoped join с `inventory_locations`;
