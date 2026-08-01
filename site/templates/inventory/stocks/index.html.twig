@@ -8,7 +8,7 @@
     <div class="card mb-3">
         <div class="card-body">
             <form method="get" class="row g-2">
-                <div class="col-md-2">
+                <div class="col-md-3">
                     <label class="form-label">Источник</label>
                     <select name="source" class="form-select">
                         {% for item in sources %}
@@ -17,39 +17,18 @@
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">Snapshot session ID</label>
-                    <input name="snapshotSessionId" value="{{ filters.snapshotSessionId }}" class="form-control" placeholder="UUID">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Snapshot date/time</label>
-                    <input name="snapshotAt" value="{{ filters.snapshotAt }}" class="form-control" placeholder="2026-05-10 12:00:00">
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label">Поиск SKU / Offer ID</label>
-                    <input name="search" value="{{ filters.search }}" class="form-control" placeholder="sku / offer">
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label">Mapping status</label>
-                    <select name="mappingStatus" class="form-select">
-                        <option value="">Все</option>
-                        {% for status in mappingStatuses %}
-                            <option value="{{ status.value }}" {{ filters.mappingStatus == status.value ? 'selected' : '' }}>{{ status.value }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label">Статус остатка</label>
-                    <select name="status" class="form-select">
-                        <option value="">Все</option>
-                        {% for status in stockStatuses %}
-                            <option value="{{ status.value }}" {{ filters.status == status.value ? 'selected' : '' }}>{{ status.value }}</option>
-                        {% endfor %}
-                    </select>
+                    <label class="form-label">Остатки на дату</label>
+                    <input type="date" name="date" value="{{ date|date('Y-m-d') }}" class="form-control">
                 </div>
                 <div class="col-12 d-flex gap-2">
                     <button class="btn btn-primary" type="submit">Применить</button>
                     <a class="btn btn-outline-secondary" href="{{ path('inventory_stocks_index') }}">Сбросить</a>
                 </div>
+                {% if effectiveDate and effectiveDate|date('Y-m-d') != date|date('Y-m-d') %}
+                    <div class="col-12 text-muted">
+                        На {{ date|date('d.m.Y') }} снимка нет — показан ближайший на {{ effectiveDate|date('d.m.Y') }}.
+                    </div>
+                {% endif %}
             </form>
         </div>
     </div>
@@ -96,7 +75,7 @@
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="11" class="text-center text-muted py-4">Нет нормализованных остатков по выбранным фильтрам.</td>
+                        <td colspan="11" class="text-center text-muted py-4">Нет остатков на выбранную дату.</td>
                     </tr>
                 {% endfor %}
                 </tbody>
