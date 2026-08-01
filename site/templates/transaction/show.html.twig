@@ -23,7 +23,7 @@
             <dt class="col-md-3">Статья</dt>
             <dd class="col-md-9">
                 {% set chain = [] %}
-                {% set c = tx.cashflowCategory %}
+                {% set c = tx.splits|length == 1 ? tx.splits|first.cashflowCategory : null %}
                 {% for i in 0..10 %}
                     {% if c %}
                         {% set chain = [c.name]|merge(chain) %}

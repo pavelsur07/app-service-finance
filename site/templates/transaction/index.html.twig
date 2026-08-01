@@ -126,9 +126,11 @@
                                 {% elseif tx.remainingAmount == 0 and tx.documents is not empty %}
                                     <i class="ti ti-file-check text-success"
                                        title="Документы ОПиУ созданы на всю сумму"></i>
+                                {# Документ ОПиУ строится из одной категории (решение D1),
+                                   поэтому предлагаем его только при единственной строке разбивки. #}
                                 {% elseif not tx.isTransfer
-                                             and tx.cashflowCategory
-                                             and tx.cashflowCategory.allowPlDocument
+                                             and tx.splits|length == 1
+                                             and tx.splits|first.cashflowCategory.allowPlDocument
                                              and tx.remainingAmount > 0 %}
                                     <i class="ti ti-file-plus"
                                        title="Можно создать документ ОПиУ"></i>
@@ -138,7 +140,7 @@
                             </td>
                             <td class="text-end text-nowrap" style="min-width: 12rem;"><span class="text-{{ tx.direction.value == 'INFLOW' ? 'success' : 'danger' }}">{{ tx.direction.value == 'INFLOW' ? '+' : '-' }}{{ tx.amount|number_format(2, ',', ' ') }} {{ tx.currency }}</span></td>
                             <td>
-                                {{ tx.cashflowCategory ? tx.cashflowCategory.name : '' }}
+                                {% for s in tx.splits %}{{ s.cashflowCategory.name }}{% if not loop.last %}, {% endif %}{% endfor %}
                                 {% if tx.projectDirection %}
                                     <div class="text-muted small">{{ tx.projectDirection.name }}</div>
                                 {% endif %}

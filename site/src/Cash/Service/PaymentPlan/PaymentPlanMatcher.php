@@ -5,9 +5,9 @@ namespace App\Cash\Service\PaymentPlan;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\PaymentPlan\PaymentPlanMatch;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Cash\Repository\PaymentPlan\PaymentPlanMatchRepository;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
-use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
@@ -54,7 +54,15 @@ final class PaymentPlanMatcher
         $candidates = $qb->getQuery()->getResult();
 
         $txAmount = abs((float) $transaction->getAmount());
-        $txCategory = $transaction->getCashflowCategory();
+        // Решение D2: мультиразбивка исключена из автомэтча. PaymentPlanMatch уникален
+        // по transaction_id, поэтому сопоставить план со строкой нельзя без смены модели,
+        // а сопоставлять со всей транзакцией, разнесённой по разным статьям, бессмысленно.
+        $splits = $transaction->getSplits();
+        if ($splits->count() > 1) {
+            return null;
+        }
+
+        $txCategory = $splits->isEmpty() ? null : $splits->first()->getCashflowCategory();
         $txCounterparty = $transaction->getCounterparty();
 
         $best = null;

@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Tests\Builders\Cash;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
-use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Entity\Transaction\CashTransactionSplit;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Enum\Transaction\CashTransactionSplitSource;
 use App\Company\Entity\Company;
 use App\Tests\Builders\Company\CompanyBuilder;
 use Ramsey\Uuid\Uuid;
@@ -131,7 +133,22 @@ final class CashTransactionBuilder
         $tx->setIsTransfer($this->isTransfer);
         $tx->setCashflowCategory($this->cashflowCategory);
 
-        if ($this->allocatedAmount !== '0.00') {
+        // Строка разбивки зеркалит колонку — так же, как это делает
+        // CashTransactionSplitSynchronizer на каждом пути записи в бою. Без неё билдер
+        // создавал бы состояние, которого в проде не существует, и читатели строк
+        // видели бы пустоту.
+        if (null !== $this->cashflowCategory) {
+            $tx->replaceSplits([
+                new CashTransactionSplit(
+                    $tx,
+                    $this->cashflowCategory,
+                    $this->amount,
+                    CashTransactionSplitSource::MANUAL,
+                ),
+            ]);
+        }
+
+        if ('0.00' !== $this->allocatedAmount) {
             $prop = new \ReflectionProperty(CashTransaction::class, 'allocatedAmount');
             $prop->setAccessible(true);
             $prop->setValue($tx, $this->allocatedAmount);

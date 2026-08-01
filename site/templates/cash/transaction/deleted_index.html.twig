@@ -45,7 +45,7 @@
                     </td>
                     <td>
                         <div>{{ tx.moneyAccount ? tx.moneyAccount.name : '—' }}</div>
-                        <div class="text-muted small">{{ tx.cashflowCategory ? tx.cashflowCategory.name : '—' }}</div>
+                        <div class="text-muted small">{% if tx.splits is empty %}—{% else %}{% for s in tx.splits %}{{ s.cashflowCategory.name }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}</div>
                     </td>
                     <td class="text-end">
                         <form method="post" action="{{ path('cash_transaction_restore', {id: tx.id}) }}">

@@ -38,7 +38,7 @@ final readonly class CashTransactionAutoRuleCandidateQuery
                 SELECT
                     tx.direction,
                     tx.occurred_at,
-                    tx.cashflow_category_id,
+                    split.cashflow_category_id,
                     tx.counterparty_id,
                     tx.money_account_id,
                     tx.currency,
@@ -49,11 +49,20 @@ final readonly class CashTransactionAutoRuleCandidateQuery
                     counterparty.is_archived AS counterparty_is_archived,
                     money_account.name AS money_account_name
                 FROM cash_transaction tx
+                -- Кандидат в правило обязан иметь ровно одну категорию: правило проставляет
+                -- одну, и транзакция, разнесённая по нескольким статьям, чистой выборкой
+                -- быть не может. HAVING отсекает мультиразбивку, INNER — транзакции без строк.
+                INNER JOIN LATERAL (
+                    SELECT (min(s.cashflow_category_id::text))::uuid AS cashflow_category_id
+                    FROM cash_transaction_split s
+                    WHERE s.cash_transaction_id = tx.id
+                    HAVING count(*) = 1
+                ) split ON true
                 INNER JOIN money_account
                     ON money_account.id = tx.money_account_id
                     AND money_account.company_id = :companyId
                 INNER JOIN cashflow_categories category
-                    ON category.id = tx.cashflow_category_id
+                    ON category.id = split.cashflow_category_id
                     AND category.company_id = :companyId
                     AND category.status = 'active'
                     AND category.system_code IS DISTINCT FROM 'CF_UNALLOC'

@@ -16,6 +16,7 @@ use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Entity\Transaction\CashTransactionAutoRuleCondition;
+use App\Cash\Entity\Transaction\CashTransactionSplit;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
@@ -319,10 +320,24 @@ final readonly class CashFacade
                 'id' => $transaction->getCounterparty()->getId(),
                 'name' => $transaction->getCounterparty()->getName(),
             ],
-            'category' => null === $transaction->getCashflowCategory() ? null : [
-                'id' => $transaction->getCashflowCategory()->getId(),
-                'name' => $transaction->getCashflowCategory()->getName(),
-            ],
+            // Контракт расширен: транзакция может относиться к нескольким категориям,
+            // поэтому появился массив splits с суммой каждой строки. Поле category
+            // сохранено для обратной совместимости и заполняется, только когда строка
+            // одна — иначе оно молча врало бы одной категорией из нескольких.
+            'category' => 1 === $transaction->getSplits()->count()
+                ? [
+                    'id' => $transaction->getSplits()->first()->getCashflowCategory()->getId(),
+                    'name' => $transaction->getSplits()->first()->getCashflowCategory()->getName(),
+                ]
+                : null,
+            'splits' => array_map(
+                static fn (CashTransactionSplit $split): array => [
+                    'categoryId' => $split->getCashflowCategory()->getId(),
+                    'categoryName' => $split->getCashflowCategory()->getName(),
+                    'amount' => $split->getAmount(),
+                ],
+                $transaction->getSplits()->toArray(),
+            ),
         ];
     }
 
