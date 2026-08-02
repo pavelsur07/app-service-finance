@@ -111,6 +111,35 @@ final class CashTransactionSplitsControllerTest extends WebTestCaseBase
         self::assertGreaterThan(2, $nextIndex, 'Счётчик по длине выдал бы занятый индекс.');
     }
 
+    public function testSplitEntryPointIsVisibleOnCardAndList(): void
+    {
+        $client = static::createClient();
+        [$company, $user, $transaction] = $this->fixtures();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+
+        $expectedHref = sprintf('/finance/cash-transactions/%s/splits', $transaction->getId());
+
+        // Карточка: ссылка живёт среди действий в подвале, а не мелким текстом
+        // внутри строки «Статья», где её не находят.
+        $card = $client->request('GET', sprintf('/finance/cash-transactions/%s', $transaction->getId()));
+        self::assertResponseIsSuccessful();
+        self::assertGreaterThan(
+            0,
+            $card->filter(sprintf('.card-footer a[href="%s"]', $expectedHref))->count(),
+            'Вход в разбивку должен быть среди действий карточки.',
+        );
+
+        $list = $client->request('GET', '/finance/cash-transactions/');
+        self::assertResponseIsSuccessful();
+        self::assertGreaterThan(
+            0,
+            $list->filter(sprintf('a[href="%s"]', $expectedHref))->count(),
+            'Из списка тоже должен быть вход: пользователь чаще всего именно там.',
+        );
+    }
+
     public function testOtherCompanyTransactionIsNotReachable(): void
     {
         $client = static::createClient();

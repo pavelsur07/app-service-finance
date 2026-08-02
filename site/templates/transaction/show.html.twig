@@ -45,9 +45,6 @@
                         </div>
                     {% endfor %}
                 {% endif %}
-                <a href="{{ path('cash_transaction_splits', {id: tx.id}) }}" class="btn btn-link p-0 mt-1">
-                    {{ tx.splits|length > 1 ? 'Изменить разбивку' : 'Разбить по статьям' }}
-                </a>
             </dd>
             <dt class="col-md-3">Контрагент</dt><dd class="col-md-9">{{ tx.counterparty ? tx.counterparty.name : '' }}</dd>
             <dt class="col-md-3">Описание</dt><dd class="col-md-9">{{ tx.description }}</dd>
@@ -60,6 +57,9 @@
                 <button type="submit" class="btn btn-primary me-2">Создать документ ОПиУ</button>
             </form>
         {% endif %}
+        <a href="{{ path('cash_transaction_splits', {id: tx.id}) }}" class="btn btn-outline-primary me-2">
+            {{ tx.splits|length > 1 ? 'Изменить разбивку' : 'Разбить по статьям' }}
+        </a>
         <a href="{{ path('cash_transaction_edit', {id: tx.id}) }}" class="btn btn-icon btn-warning" title="Редактировать" aria-label="Редактировать">
             <i class="ti ti-pencil"></i>
             <span class="visually-hidden">Редактировать</span>
