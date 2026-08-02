@@ -2,18 +2,30 @@
 
 namespace App\Cash\Service\Import\File;
 
+use App\Shared\Service\Storage\LegacyXlsConverter;
 use OpenSpout\Reader\CSV\Options as CsvOptions;
 use OpenSpout\Reader\CSV\Reader as CsvReader;
 use OpenSpout\Reader\ReaderInterface;
-use OpenSpout\Reader\XLS\Reader as XlsReader;
 use OpenSpout\Reader\XLSX\Reader as XlsxReader;
 
 class FileTabularReader
 {
+    public function __construct(private readonly LegacyXlsConverter $xlsConverter)
+    {
+    }
+
     /**
      * @return list<string|null>
      */
     public function readHeader(string $filePath): array
+    {
+        return $this->xlsConverter->withReadablePath($filePath, fn (string $path): array => $this->readHeaderFrom($path));
+    }
+
+    /**
+     * @return list<string|null>
+     */
+    private function readHeaderFrom(string $filePath): array
     {
         $reader = $this->openReaderByExtension($filePath);
         $opened = false;
@@ -41,6 +53,17 @@ class FileTabularReader
      * @return list<list<string|null>>
      */
     public function readSampleRows(string $filePath, int $limit = 20): array
+    {
+        return $this->xlsConverter->withReadablePath(
+            $filePath,
+            fn (string $path): array => $this->readSampleRowsFrom($path, $limit),
+        );
+    }
+
+    /**
+     * @return list<list<string|null>>
+     */
+    private function readSampleRowsFrom(string $filePath, int $limit): array
     {
         if ($limit <= 0) {
             return [];
@@ -74,11 +97,6 @@ class FileTabularReader
         return $rows;
     }
 
-    public function openReader(string $filePath): ReaderInterface
-    {
-        return $this->openReaderByExtension($filePath);
-    }
-
     private function openReaderByExtension(string $filePath): ReaderInterface
     {
         $extension = strtolower(pathinfo($filePath, \PATHINFO_EXTENSION));
@@ -86,7 +104,6 @@ class FileTabularReader
         return match ($extension) {
             'csv' => $this->openCsvReader($filePath),
             'xlsx' => new XlsxReader(),
-            'xls' => new XlsReader(),
             default => throw new \InvalidArgumentException(sprintf('Unsupported file extension: %s', $extension)),
         };
     }

@@ -21,7 +21,9 @@ use App\Company\Entity\ProjectDirection;
 use App\Company\Entity\User;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Company\Repository\CounterpartyRepository;
+use App\Shared\Service\Storage\LegacyXlsConverter;
 use App\Shared\Service\Storage\ObjectStorageInterface;
+use App\Shared\Service\Storage\TemporaryFileFactory;
 use App\Shared\Service\Storage\TemporaryLocalFile;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
@@ -41,6 +43,7 @@ final class CashFileImportServiceTest extends TestCase
             $this->createMock(AccountBalanceService::class),
             $objectStorage = $this->createMock(ObjectStorageInterface::class),
             new TemporaryLocalFile($objectStorage),
+            new LegacyXlsConverter(new TemporaryFileFactory(), \dirname(__DIR__, 6)),
             $this->createResolver(Uuid::uuid4()->toString(), Uuid::uuid4()->toString()),
         );
 
@@ -128,6 +131,7 @@ final class CashFileImportServiceTest extends TestCase
             $accountBalanceService,
             $objectStorage,
             new TemporaryLocalFile($objectStorage),
+            new LegacyXlsConverter(new TemporaryFileFactory(), \dirname(__DIR__, 6)),
             $this->createResolver($projectId, $centerId),
         );
 
