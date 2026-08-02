@@ -2314,7 +2314,8 @@ GET /inventory/stocks
 
 ## Inventory — Wildberries FBW stock normalization
 
-Ручной orchestration:
+Orchestration: ночной cron `app:inventory:wb-daily-sync` (04:15 MSK) и ручной запуск
+через `POST /inventory/snapshots/request/wildberries`. Обе точки входят в один Action.
 
 ```text
 RequestWbInventorySnapshotAction
@@ -2332,7 +2333,11 @@ NormalizeInventorySnapshotAction → StockSnapshot
 
 429, transport и 5xx до первой raw-страницы завершают сессию как `failed`,
 после сохранённых страниц — как `partial`; такие сессии не нормализуются.
-Повтор выполняется вручную новой сессией. Production cron для WB Inventory не включён.
+`failed`/`partial` терминальны, поэтому следующий ночной прогон заводит новую сессию.
+Сессия, застрявшая в `pending`/`in_progress` (например, при смерти воркера посреди
+выгрузки), наоборот блокирует все последующие: `findLatestActiveByCompanyAndSource()`
+не ограничен возрастом. Ручной сброс такой сессии — единственный выход; то же
+поведение у Ozon.
 Подключение должно использовать токен с доступом к Content API и Analytics API.
 Активные Product Cards сохраняются с `MarketplaceListing.isActive = true`, карточки
 из `/content/v2/get/cards/trash` — с `isActive = false`. Оба набора участвуют в
@@ -2569,6 +2574,7 @@ paths:
 | `app:marketplace-ads:ozon-poll-reports` | `*/2 * * * *` | Legacy Messenger-pipeline: per-UUID polling (оставлен до Task-11.9b) |
 | `app:marketplace:daily-sync` | `04:30 daily` | Диспатч загрузки данных по активным подключениям |
 | `app:inventory:ozon-daily-sync` | `04:05 daily` | Диспатч загрузки Ozon Inventory snapshot по активным Ozon SELLER подключениям |
+| `app:inventory:wb-daily-sync` | `04:15 daily` | Диспатч загрузки Wildberries Inventory snapshot по активным WB SELLER подключениям |
 | `app:marketplace:wb-financial-reports:sync --mode=daily` | `03:10 daily` | Ежедневное планирование WB financial sync за рабочий день (новая date-based команда) |
 | `app:marketplace:wb-financial-reports:orchestrate --refresh-days-back=14` | `20 * * * *` | Hourly safe planner: current-month daily/retry/missing/empty recovery, then rolling refresh of the last 14 days; max one task per connection per run |
 | `app:ingestion:ozon-performance:daily-load --window=month-to-date` | `07:25 daily` | Планирование Ozon Performance ingestion с начала месяца до вчерашнего дня; HTTP-загрузка выполняется `ingest_fetch` worker'ом |
