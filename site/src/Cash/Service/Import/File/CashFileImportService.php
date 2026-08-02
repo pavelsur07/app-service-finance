@@ -14,13 +14,13 @@ use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Enum\CounterpartyType;
 use App\Company\Repository\CounterpartyRepository;
+use App\Shared\Service\Storage\LegacyXlsConverter;
 use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Shared\Service\Storage\TemporaryLocalFile;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenSpout\Reader\CSV\Options as CsvOptions;
 use OpenSpout\Reader\CSV\Reader as CsvReader;
 use OpenSpout\Reader\ReaderInterface;
-use OpenSpout\Reader\XLS\Reader as XlsReader;
 use OpenSpout\Reader\XLSX\Reader as XlsxReader;
 use Ramsey\Uuid\Uuid;
 
@@ -39,6 +39,7 @@ final class CashFileImportService
         private readonly AccountBalanceService $accountBalanceService,
         private readonly ObjectStorageInterface $objectStorage,
         private readonly TemporaryLocalFile $temporaryLocalFile,
+        private readonly LegacyXlsConverter $xlsConverter,
         private readonly CashTransactionResponsibilityCenterResolver $responsibilityCenterResolver,
     ) {
     }
@@ -52,7 +53,12 @@ final class CashFileImportService
         // TemporaryLocalFile гарантированно удаляет её после.
         $this->temporaryLocalFile->with(
             $storageKey,
-            fn (string $filePath) => $this->readAndPersist($filePath, $job),
+            // Устаревший .xls конвертируется в .xlsx: ридера для него у OpenSpout нет,
+            // и раньше задача молча умирала в очереди фатальной ошибкой.
+            fn (string $filePath) => $this->xlsConverter->withReadablePath(
+                $filePath,
+                fn (string $readablePath) => $this->readAndPersist($readablePath, $job),
+            ),
         );
     }
 
@@ -289,7 +295,6 @@ final class CashFileImportService
                 return new CsvReader($options);
             })(),
             'xlsx' => new XlsxReader(),
-            'xls' => new XlsReader(),
             default => throw new \InvalidArgumentException(sprintf('Unsupported file extension: %s', $extension)),
         };
     }

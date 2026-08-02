@@ -10,7 +10,7 @@ use App\Marketplace\Inventory\Application\Command\ImportInventoryCostPriceFromFi
 use App\Marketplace\Inventory\Application\Command\SetInventoryCostPriceCommand;
 use App\Marketplace\Repository\MarketplaceListingBarcodeRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
-use OpenSpout\Reader\XLS\Reader as XlsReader;
+use App\Shared\Service\Storage\LegacyXlsConverter;
 use OpenSpout\Reader\XLSX\Reader as XlsxReader;
 use Psr\Log\LoggerInterface;
 
@@ -33,9 +33,10 @@ final class ImportInventoryCostPriceFromFileAction
 {
     public function __construct(
         private readonly MarketplaceListingBarcodeRepository $barcodeRepository,
-        private readonly SetInventoryCostPriceAction         $setAction,
-        private readonly MarketplaceListingRepository        $listingRepository,
-        private readonly LoggerInterface                     $logger,
+        private readonly SetInventoryCostPriceAction $setAction,
+        private readonly MarketplaceListingRepository $listingRepository,
+        private readonly LoggerInterface $logger,
+        private readonly LegacyXlsConverter $xlsConverter,
     ) {
     }
 
@@ -46,21 +47,21 @@ final class ImportInventoryCostPriceFromFileAction
 
         $imported = 0;
         $updatedListings = 0;
-        $skipped  = 0;
-        $errors   = [];
+        $skipped = 0;
+        $errors = [];
 
         foreach ($rows as $rowNum => $row) {
             $identifier = trim((string) ($row[0] ?? ''));
-            $price   = trim((string) ($row[1] ?? ''));
+            $price = trim((string) ($row[1] ?? ''));
 
-            if ($identifier === '' || $price === '') {
-                $skipped++;
+            if ('' === $identifier || '' === $price) {
+                ++$skipped;
                 continue;
             }
 
             if (!is_numeric($price) || (float) $price < 0) {
                 $errors[] = sprintf('Строка %d: некорректная цена "%s" для идентификатора %s', $rowNum, $price, $identifier);
-                $skipped++;
+                ++$skipped;
                 continue;
             }
 
@@ -74,19 +75,19 @@ final class ImportInventoryCostPriceFromFileAction
 
             if ([] === $listings) {
                 $this->logger->warning('[InventoryImport] Identifier could not be resolved', [
-                    'company_id'  => $command->companyId,
+                    'company_id' => $command->companyId,
                     'marketplace' => $command->marketplace->value,
                     'identifier_type' => $command->identifierType,
-                    'identifier'  => $identifier,
-                    'row'         => $rowNum,
-                    'reason'      => $resolveError,
+                    'identifier' => $identifier,
+                    'row' => $rowNum,
+                    'reason' => $resolveError,
                 ]);
                 $errors[] = sprintf(
                     'Строка %d: %s',
                     $rowNum,
                     $resolveError ?? sprintf('идентификатор %s не найден', $identifier),
                 );
-                $skipped++;
+                ++$skipped;
                 continue;
             }
 
@@ -94,15 +95,15 @@ final class ImportInventoryCostPriceFromFileAction
             foreach ($listings as $listing) {
                 try {
                     ($this->setAction)(new SetInventoryCostPriceCommand(
-                        companyId:     $command->companyId,
-                        listingId:     $listing->getId(),
+                        companyId: $command->companyId,
+                        listingId: $listing->getId(),
                         effectiveFrom: $command->effectiveFrom,
-                        priceAmount:   $price,
-                        currency:      'RUB',
-                        note:          'Импорт из файла: ' . $command->originalFilename,
+                        priceAmount: $price,
+                        currency: 'RUB',
+                        note: 'Импорт из файла: '.$command->originalFilename,
                     ));
 
-                    $updatedForRow++;
+                    ++$updatedForRow;
                 } catch (\DomainException $e) {
                     $errors[] = count($listings) > 1
                         ? sprintf(
@@ -123,28 +124,28 @@ final class ImportInventoryCostPriceFromFileAction
             }
 
             if ($updatedForRow > 0) {
-                $imported++;
+                ++$imported;
                 $updatedListings += $updatedForRow;
             } else {
-                $skipped++;
+                ++$skipped;
             }
         }
 
         $this->logger->info('[InventoryImport] Completed', [
-            'company_id'  => $command->companyId,
+            'company_id' => $command->companyId,
             'marketplace' => $command->marketplace->value,
             'identifier_type' => $command->identifierType,
-            'imported'    => $imported,
+            'imported' => $imported,
             'updated_listings' => $updatedListings,
-            'skipped'     => $skipped,
-            'errors'      => count($errors),
+            'skipped' => $skipped,
+            'errors' => count($errors),
         ]);
 
         return [
             'imported' => $imported,
             'updated_listings' => $updatedListings,
-            'skipped'  => $skipped,
-            'errors'   => $errors,
+            'skipped' => $skipped,
+            'errors' => $errors,
         ];
     }
 
@@ -160,13 +161,13 @@ final class ImportInventoryCostPriceFromFileAction
         string $identifierType,
         array $wbSupplierListings,
     ): array {
-        if ($identifierType === 'marketplace_sku') {
+        if ('marketplace_sku' === $identifierType) {
             $matches = $this->listingRepository->findAllByCompanyMarketplaceAndMarketplaceSku($companyId, $marketplace, $identifier);
 
             return $this->resolveSingleMatch($matches, $identifierType, $identifier);
         }
 
-        if ($identifierType === 'supplier_sku') {
+        if ('supplier_sku' === $identifierType) {
             if (MarketplaceType::WILDBERRIES === $marketplace) {
                 $matches = $wbSupplierListings[mb_strtolower($identifier)] ?? [];
 
@@ -203,7 +204,7 @@ final class ImportInventoryCostPriceFromFileAction
         );
 
         $listing = $barcodeEntity?->getListing();
-        if ($listing === null) {
+        if (null === $listing) {
             return [[], sprintf('идентификатор %s не найден', $identifier)];
         }
 
@@ -218,7 +219,7 @@ final class ImportInventoryCostPriceFromFileAction
     private function resolveSingleMatch(array $matches, string $identifierType, string $identifier): array
     {
         $count = count($matches);
-        if ($count === 0) {
+        if (0 === $count) {
             return [[], sprintf('идентификатор %s не найден', $identifier)];
         }
         if ($count > 1) {
@@ -279,29 +280,39 @@ final class ImportInventoryCostPriceFromFileAction
     private function parseFile(string $filePath, string $originalFilename): array
     {
         $ext = strtolower(pathinfo($originalFilename, PATHINFO_EXTENSION));
+        if (!in_array($ext, ['xls', 'xlsx'], true)) {
+            throw new \InvalidArgumentException(sprintf('Неподдерживаемый формат файла: %s. Ожидается xls или xlsx.', $ext));
+        }
 
-        $reader = match ($ext) {
-            'xlsx'  => new XlsxReader(),
-            'xls'   => new XlsReader(),
-            default => throw new \InvalidArgumentException(
-                sprintf('Неподдерживаемый формат файла: %s. Ожидается xls или xlsx.', $ext)
-            ),
-        };
+        // Формат берётся из имени оригинала: на диске файл может лежать без расширения,
+        // и по самому пути конвертер его не распознал бы.
+        return $this->xlsConverter->withReadablePath(
+            $filePath,
+            fn (string $readablePath): array => $this->parseXlsx($readablePath),
+            $ext,
+        );
+    }
 
+    /**
+     * @return array<int, array<int, mixed>>
+     */
+    private function parseXlsx(string $filePath): array
+    {
+        $reader = new XlsxReader();
         $reader->open($filePath);
 
-        $rows   = [];
+        $rows = [];
         $rowNum = 0;
 
         foreach ($reader->getSheetIterator() as $sheet) {
             foreach ($sheet->getRowIterator() as $row) {
                 $cells = $row->getCells();
-                $rowNum++;
+                ++$rowNum;
 
                 $firstCell = trim((string) ($cells[0]?->getValue() ?? ''));
 
                 $secondCell = trim((string) ($cells[1]?->getValue() ?? ''));
-                if ($rowNum === 1 && !is_numeric($firstCell) && !is_numeric($secondCell)) {
+                if (1 === $rowNum && !is_numeric($firstCell) && !is_numeric($secondCell)) {
                     continue;
                 }
 

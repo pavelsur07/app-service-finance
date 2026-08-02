@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Infrastructure;
 
 use App\Catalog\DTO\ParsedProductRow;
-use OpenSpout\Reader\XLS\Reader as XlsReader;
+use App\Shared\Service\Storage\LegacyXlsConverter;
 use OpenSpout\Reader\XLSX\Reader as XlsxReader;
 
 /**
@@ -20,13 +20,17 @@ use OpenSpout\Reader\XLSX\Reader as XlsxReader;
  */
 final class XlsProductRowParser
 {
+    public function __construct(private readonly LegacyXlsConverter $xlsConverter)
+    {
+    }
+
     private const HEADER_ROW = 1;
 
-    private const COL_NAME       = 0; // A
+    private const COL_NAME = 0; // A
     private const COL_VENDOR_SKU = 1; // B
-    private const COL_BARCODES   = 2; // C
-    private const COL_PRICE      = 3; // D
-    private const COL_CURRENCY   = 4; // E
+    private const COL_BARCODES = 2; // C
+    private const COL_PRICE = 3; // D
+    private const COL_CURRENCY = 4; // E
 
     /**
      * @return ParsedProductRow[]
@@ -40,26 +44,25 @@ final class XlsProductRowParser
         }
 
         $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        if (!in_array($extension, ['xls', 'xlsx'], true)) {
+            throw new \RuntimeException(sprintf('Unsupported file extension "%s". Allowed: xls, xlsx.', $extension));
+        }
 
-        return match ($extension) {
-            'xlsx'  => $this->parseWithReader(new XlsxReader(), $filePath),
-            'xls'   => $this->parseWithReader(new XlsReader(), $filePath),
-            default => throw new \RuntimeException(
-                sprintf('Unsupported file extension "%s". Allowed: xls, xlsx.', $extension)
-            ),
-        };
+        // Устаревший .xls сначала конвертируется: ридера для него у OpenSpout нет.
+        return $this->xlsConverter->withReadablePath(
+            $filePath,
+            fn (string $readablePath): array => $this->parseWithReader(new XlsxReader(), $readablePath),
+        );
     }
 
     /**
-     * @param XlsReader|XlsxReader $reader
-     *
      * @return ParsedProductRow[]
      */
-    private function parseWithReader(XlsReader|XlsxReader $reader, string $filePath): array
+    private function parseWithReader(XlsxReader $reader, string $filePath): array
     {
         $reader->open($filePath);
 
-        $rows      = [];
+        $rows = [];
         $rowNumber = 0;
 
         foreach ($reader->getSheetIterator() as $sheet) {
@@ -67,7 +70,7 @@ final class XlsProductRowParser
             foreach ($sheet->getRowIterator() as $row) {
                 ++$rowNumber;
 
-                if ($rowNumber === self::HEADER_ROW) {
+                if (self::HEADER_ROW === $rowNumber) {
                     continue;
                 }
 
@@ -81,12 +84,12 @@ final class XlsProductRowParser
                 }
 
                 $rows[] = new ParsedProductRow(
-                    rowNumber:  $rowNumber,
-                    name:       $name,
-                    vendorSku:  $this->cellString($cells, self::COL_VENDOR_SKU),
-                    barcodes:   $this->cellString($cells, self::COL_BARCODES),
+                    rowNumber: $rowNumber,
+                    name: $name,
+                    vendorSku: $this->cellString($cells, self::COL_VENDOR_SKU),
+                    barcodes: $this->cellString($cells, self::COL_BARCODES),
                     priceAmount: $this->cellNumericAsString($cells, self::COL_PRICE),
-                    currency:   $this->cellString($cells, self::COL_CURRENCY),
+                    currency: $this->cellString($cells, self::COL_CURRENCY),
                 );
             }
 
