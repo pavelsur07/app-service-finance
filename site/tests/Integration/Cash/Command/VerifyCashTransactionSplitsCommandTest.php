@@ -63,44 +63,76 @@ final class VerifyCashTransactionSplitsCommandTest extends IntegrationTestCase
         self::assertStringContainsString('Сверка пройдена', $tester->getDisplay());
     }
 
+    /**
+     * Оба кода системной «Не распределено»: на проде у одной компании остался legacy,
+     * и его потеря из проверки вернула бы вечно красный гейт именно там.
+     */
+    #[DataProvider('unallocatedCodeProvider')]
+    public function testMultiSplitDoesNotBreakTheGate(string $systemCode): void
+    {
+        $company = $this->company();
+        $unallocated = $this->category($company, 'Не распределено');
+        if (CashflowCategory::isSystemCode($systemCode)) {
+            $unallocated->markAsSystem($systemCode);
+        } else {
+            $unallocated->setSystemCode($systemCode);
+        }
+        $this->em->flush();
+
+        // Так выглядит операция после формы разбивки: несколько строк, колонка
+        // спроецирована в «Не распределено». До правки это делало гейт вечно красным.
+        $transaction = $this->transaction($company, '1000.00', $unallocated);
+        $transaction->replaceSplits([
+            new CashTransactionSplit($transaction, $this->category($company, 'Аренда'), '600.00', CashTransactionSplitSource::MANUAL),
+            new CashTransactionSplit($transaction, $this->category($company, 'Реклама'), '400.00', CashTransactionSplitSource::MANUAL),
+        ]);
+        $this->em->flush();
+
+        $tester = $this->runCommand();
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode(), 'Разбивка не должна валить сверку.');
+        self::assertStringContainsString('совпадает с суммой операций', $tester->getDisplay());
+    }
+
+    public function testMultiSplitWithRealCategoryInColumnIsRejected(): void
+    {
+        $company = $this->company();
+        $rent = $this->category($company, 'Аренда');
+
+        // Колонка указывает на настоящую статью, а строк несколько — состав, который
+        // код не создаёт: отчёт по колонке отнёс бы всю сумму на одну статью.
+        $transaction = $this->transaction($company, '1000.00', $rent);
+        $transaction->replaceSplits([
+            new CashTransactionSplit($transaction, $rent, '600.00', CashTransactionSplitSource::MANUAL),
+            new CashTransactionSplit($transaction, $this->category($company, 'Реклама'), '400.00', CashTransactionSplitSource::MANUAL),
+        ]);
+        $this->em->flush();
+
+        $tester = $this->runCommand();
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertStringContainsString('column_projection_mismatch', $tester->getDisplay());
+    }
+
     public function testTotalsMismatchIsReportedWithoutAmountsAndFullIds(): void
     {
         $company = $this->company();
 
-        // Три транзакции, каждая разбита на две категории: колонка знает только первую,
-        // поэтому расхождение получается по обеим — шесть групп, больше лимита выборки.
-        $categories = [];
-        for ($i = 0; $i < 3; ++$i) {
-            $primary = $this->category($company, sprintf('Первая %d', $i));
-            $secondary = $this->category($company, sprintf('Вторая %d', $i));
-            $categories[] = $primary;
-            $categories[] = $secondary;
-
-            $transaction = $this->transaction($company, '1000.00', $primary);
-            $transaction->replaceSplits([
-                new CashTransactionSplit($transaction, $primary, '600.00', CashTransactionSplitSource::MANUAL),
-                new CashTransactionSplit($transaction, $secondary, '400.00', CashTransactionSplitSource::MANUAL),
-            ]);
-        }
+        // Строки у операции без категории: сумма строк есть, а сама операция в разрез
+        // по категориям не попадает — итоги расходятся, и это надо показать без денег.
+        $orphan = $this->transaction($company, '1000.00', null);
+        $orphan->replaceSplits([
+            new CashTransactionSplit($orphan, $this->category($company, 'Аренда'), '1000.00', CashTransactionSplitSource::MANUAL),
+        ]);
         $this->em->flush();
 
         $tester = $this->runCommand();
         $output = $tester->getDisplay();
 
-        self::assertSame(Command::FAILURE, $tester->getStatusCode(), 'Расхождение итогов обязано валить exit code.');
-        self::assertStringContainsString('Групп с расхождением: 6', $output);
-        self::assertStringContainsString('Показаны первые 5 из 6', $output);
-
-        self::assertStringNotContainsString('600.00', $output, 'Суммы строк не должны выводиться.');
-        self::assertStringNotContainsString('400.00', $output, 'Суммы строк не должны выводиться.');
-        self::assertStringNotContainsString('1000.00', $output, 'Суммы транзакций не должны выводиться.');
-        self::assertStringNotContainsString((string) $company->getId(), $output, 'Полный ID компании не должен выводиться.');
-
-        foreach ($categories as $category) {
-            self::assertStringNotContainsString((string) $category->getId(), $output, 'Полный ID категории не должен выводиться.');
-        }
-
-        // Усечённый префикс при этом остаётся — иначе находку нечем локализовать.
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertStringContainsString('Групп с расхождением', $output);
+        self::assertStringNotContainsString('1000.00', $output, 'Суммы не должны выводиться.');
+        self::assertStringNotContainsString((string) $company->getId(), $output, 'Полный ID не должен выводиться.');
         self::assertStringContainsString(substr((string) $company->getId(), 0, 8), $output);
     }
 
@@ -213,7 +245,7 @@ final class VerifyCashTransactionSplitsCommandTest extends IntegrationTestCase
         return $category;
     }
 
-    private function transaction(Company $company, string $amount, CashflowCategory $category): CashTransaction
+    private function transaction(Company $company, string $amount, ?CashflowCategory $category): CashTransaction
     {
         // Счёт создаётся один на компанию: у money_account уникальны (company_id, name),
         // а билдер даёт всем одинаковое имя по умолчанию.

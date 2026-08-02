@@ -4,6 +4,7 @@ namespace App\Cash\Entity\Transaction;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Enum\Transaction\CashTransactionSplitSource;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
@@ -274,6 +275,28 @@ class CashTransaction
         $this->splits->clear();
         foreach ($result as $split) {
             $this->splits->add($split);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Ручной состав из формы разбивки.
+     *
+     * Отличается от replaceSplits() ровно одним: происхождение всех строк становится
+     * ручным. Переиспользование строки с той же категорией сохраняет прежний source —
+     * это верно для dual-write, где «та же категория» значит «категоризация не менялась».
+     * Но в форме человек составляет набор целиком, и оставлять строке auto только потому,
+     * что категория совпала с прежней, значит записать чужое решение как своё.
+     *
+     * @param list<CashTransactionSplit> $splits
+     */
+    public function composeSplitsManually(array $splits): self
+    {
+        $this->replaceSplits($splits);
+
+        foreach ($this->splits as $split) {
+            $split->changeSource(CashTransactionSplitSource::MANUAL);
         }
 
         return $this;
