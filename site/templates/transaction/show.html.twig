@@ -45,6 +45,9 @@
                         </div>
                     {% endfor %}
                 {% endif %}
+                <a href="{{ path('cash_transaction_splits', {id: tx.id}) }}" class="btn btn-link p-0 mt-1">
+                    {{ tx.splits|length > 1 ? 'Изменить разбивку' : 'Разбить по статьям' }}
+                </a>
             </dd>
             <dt class="col-md-3">Контрагент</dt><dd class="col-md-9">{{ tx.counterparty ? tx.counterparty.name : '' }}</dd>
             <dt class="col-md-3">Описание</dt><dd class="col-md-9">{{ tx.description }}</dd>

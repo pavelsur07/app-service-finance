@@ -1,0 +1,158 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Разбивка операции по статьям{% endblock %}
+
+{% block body %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h3 class="card-title mb-0">Разбивка по статьям ДДС</h3>
+        <a href="{{ path('cash_transaction_show', {id: transaction.id}) }}" class="btn btn-link">К операции</a>
+    </div>
+
+    <div class="card-body">
+        <dl class="row mb-4">
+            <dt class="col-md-3">Дата</dt>
+            <dd class="col-md-9">{{ transaction.occurredAt|date('d.m.Y') }}</dd>
+            <dt class="col-md-3">Сумма операции</dt>
+            <dd class="col-md-9">
+                <strong data-transaction-amount="{{ transaction.amount }}">
+                    {{ transaction.amount|number_format(2, ',', ' ') }} {{ transaction.currency }}
+                </strong>
+            </dd>
+            <dt class="col-md-3">Описание</dt>
+            <dd class="col-md-9">{{ transaction.description }}</dd>
+        </dl>
+
+        {{ form_start(form, {attr: {'data-splits-form': '1'}}) }}
+            {{ form_errors(form) }}
+
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Статья ДДС</th>
+                        <th class="text-end" style="width: 200px">Сумма</th>
+                        <th style="width: 60px"></th>
+                    </tr>
+                </thead>
+                {# Следующий индекс — максимальный существующий плюс один, а не количество
+                   строк. После неуспешного POST с удалённой средней строкой Symfony
+                   отрисует разреженные индексы (0, 2); счётчик по длине выдал бы 2, то есть
+                   занятый, и две строки схлопнулись бы в одну при следующей отправке. #}
+                {% set nextIndex = 0 %}
+                {% for rowName in form.rows|keys %}
+                    {% set nextIndex = max(nextIndex, rowName + 1) %}
+                {% endfor %}
+                <tbody data-splits-rows data-next-index="{{ nextIndex }}">
+                    {% for row in form.rows %}
+                        <tr data-split-row>
+                            <td>
+                                {{ form_widget(row.cashflowCategoryId, {attr: {class: 'form-select'}}) }}
+                                {{ form_errors(row.cashflowCategoryId) }}
+                            </td>
+                            <td>
+                                {{ form_widget(row.amount) }}
+                                {{ form_errors(row.amount) }}
+                            </td>
+                            <td class="text-end">
+                                <button type="button" class="btn btn-link text-danger p-0" data-remove-row>Удалить</button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td><button type="button" class="btn btn-link p-0" data-add-row>Добавить строку</button></td>
+                        <td class="text-end">
+                            <div>Итого строк: <strong data-splits-total>0,00</strong></div>
+                            {# Остаток — это не «Не распределено» в базе, а подсказка формы:
+                               сохранить можно только когда он равен нулю. #}
+                            <div class="text-muted small">Не распределено: <span data-splits-rest>0,00</span></div>
+                        </td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <div class="d-flex justify-content-between align-items-center">
+                <button type="button" class="btn btn-link p-0" data-fill-rest>Остаток — в последнюю строку</button>
+                <button type="submit" class="btn btn-primary">Сохранить разбивку</button>
+            </div>
+        {# Прототип хранится целой строкой таблицы: вставлять составной виджет в одну
+           ячейку значило бы получить статью и сумму в одном столбце. #}
+        <template data-split-prototype>
+            <tr data-split-row>
+                <td>{{ form_widget(form.rows.vars.prototype.cashflowCategoryId, {attr: {class: 'form-select'}}) }}</td>
+                <td>{{ form_widget(form.rows.vars.prototype.amount) }}</td>
+                <td class="text-end">
+                    <button type="button" class="btn btn-link text-danger p-0" data-remove-row>Удалить</button>
+                </td>
+            </tr>
+        </template>
+
+        {{ form_end(form) }}
+    </div>
+</div>
+
+<script>
+(function () {
+    const form = document.querySelector('[data-splits-form]');
+    if (!form) { return; }
+
+    const rows = form.querySelector('[data-splits-rows]');
+    const totalEl = form.querySelector('[data-splits-total]');
+    const restEl = form.querySelector('[data-splits-rest]');
+    const target = Math.round(parseFloat(document.querySelector('[data-transaction-amount]').dataset.transactionAmount) * 100);
+
+    // Считаем в копейках: сложение долей в float даёт 0.1 + 0.2 !== 0.3 ровно там,
+    // где расхождение в копейку блокирует сохранение.
+    const kopecks = (value) => {
+        const normalized = String(value || '').replace(',', '.').trim();
+        const parsed = parseFloat(normalized);
+        return Number.isFinite(parsed) ? Math.round(parsed * 100) : 0;
+    };
+    const format = (k) => (k / 100).toFixed(2).replace('.', ',');
+
+    function recalc() {
+        let sum = 0;
+        rows.querySelectorAll('.js-split-amount').forEach((input) => { sum += kopecks(input.value); });
+        totalEl.textContent = format(sum);
+        restEl.textContent = format(target - sum);
+        restEl.classList.toggle('text-danger', target - sum !== 0);
+    }
+
+    rows.addEventListener('input', recalc);
+
+    const prototype = document.querySelector('[data-split-prototype]');
+
+    form.querySelector('[data-add-row]').addEventListener('click', () => {
+        const index = parseInt(rows.dataset.nextIndex, 10);
+        rows.dataset.nextIndex = String(index + 1);
+
+        const html = prototype.innerHTML.replace(/__name__/g, String(index));
+        const holder = document.createElement('tbody');
+        holder.innerHTML = html.trim();
+        rows.appendChild(holder.querySelector('tr'));
+        recalc();
+    });
+
+    rows.addEventListener('click', (event) => {
+        if (!event.target.matches('[data-remove-row]')) { return; }
+        if (rows.querySelectorAll('[data-split-row]').length <= 1) { return; }
+        event.target.closest('[data-split-row]').remove();
+        recalc();
+    });
+
+    form.querySelector('[data-fill-rest]').addEventListener('click', () => {
+        const inputs = rows.querySelectorAll('.js-split-amount');
+        if (!inputs.length) { return; }
+        const last = inputs[inputs.length - 1];
+        let others = 0;
+        inputs.forEach((input, index) => { if (index < inputs.length - 1) { others += kopecks(input.value); } });
+        last.value = ((target - others) / 100).toFixed(2);
+        recalc();
+    });
+
+    recalc();
+})();
+</script>
+{% endblock %}
