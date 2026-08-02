@@ -745,6 +745,11 @@ updatePLRegisterForDocument(string $documentId): void
 - Транзакция без категории строк не имеет, поэтому все читатели используют `LEFT JOIN` и `COALESCE(split.amount, t.amount)` там, где такие транзакции обязаны учитываться. `INNER JOIN` молча выкинул бы их из ведомости, выгрузки и дашборда.
 - Потоковый экспорт (`iterateByCompanyWithFilters`) переведён с `toIterable()` на `getArrayResult()`: Doctrine запрещает итерировать запрос с join коллекции, а одна строка выгрузки на строку разбивки без такого join не получается. Потолок зафиксирован в коде.
 
+- Stage 4 разбивки ДДС: ручная разбивка сделана отдельным действием `/finance/cash-transactions/{id}/splits` (`CashTransactionSplitsController`), а не переделкой формы транзакции — обычная операция с одной статьёй пишется прежним путём. `SaveCashTransactionSplitsAction` собирает строки с `source = manual`, отдаёт проверку инвариантов агрегату, проецирует legacy-колонку и снимает устаревший `PaymentPlanMatch`.
+- При разбивке колонка `cash_transaction.cashflow_category_id` проецируется в системную «Не распределено», а не в `NULL`: суммы отчёта по колонке остаются верными, и точкой невозврата остаётся только `DROP COLUMN`.
+- Автоправила не трогают вручную разбитые операции: `CashTransactionAutoRuleService::getSkipReason()` возвращает `CashTransactionAutoRuleSkipReason::MANUAL_SPLIT`. Проверка стоит там же, где «удалено» и «закрытый период», а не в синхронизаторе строк — ранний выход в синхронизаторе оставил бы колонку и строки рассинхронизированными.
+- `CashflowCategoryRepository::findOneByIdAndCompanyId()` — выбор статьи из формы строго в пределах компании.
+
 ### `CashFacade` (`src/Cash/Facade/CashFacade.php`)
 ```php
 // Создать ДДС-транзакцию из внешнего модуля (идемпотентно для внешних источников)

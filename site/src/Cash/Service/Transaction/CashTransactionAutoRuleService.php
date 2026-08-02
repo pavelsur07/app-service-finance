@@ -777,6 +777,14 @@ class CashTransactionAutoRuleService
             return CashTransactionAutoRuleSkipReason::LOCKED_PERIOD;
         }
 
+        // Ручная разбивка по статьям — осознанное решение человека, и правило не вправе
+        // его переписать. Проверка стоит здесь, а не в синхронизаторе строк: там ранний
+        // выход оставил бы колонку и строки рассинхронизированными, потому что колонку
+        // правило успело бы поменять до него.
+        if ($transaction->getSplits()->count() > 1) {
+            return CashTransactionAutoRuleSkipReason::MANUAL_SPLIT;
+        }
+
         return null;
     }
 }

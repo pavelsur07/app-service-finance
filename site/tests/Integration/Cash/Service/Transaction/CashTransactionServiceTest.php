@@ -7,8 +7,10 @@ namespace App\Tests\Integration\Cash\Service\Transaction;
 use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Entity\Transaction\CashTransactionSplit;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Enum\Transaction\CashTransactionSplitSource;
 use App\Cash\Service\Transaction\CashTransactionService;
 use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Entity\Counterparty;
@@ -98,6 +100,31 @@ final class CashTransactionServiceTest extends IntegrationTestCase
         $this->assertSame('telegram:service:test', $tx->getExternalId());
         $this->assertSame('telegram:dedupe:test', $tx->getDedupeHash());
         $this->assertSame(['source' => 'telegram', 'message_id' => 12345], $tx->getRawData());
+
+        // Повторный импорт той же операции не должен пересоздавать разбивку: ручной
+        // разбор пользователя пережил бы иначе ровно один прогон импорта и исчез молча.
+        $tx->replaceSplits([
+            new CashTransactionSplit($tx, $category, '6', CashTransactionSplitSource::MANUAL),
+            new CashTransactionSplit($tx, $this->extraCategory($company), '4', CashTransactionSplitSource::MANUAL),
+        ]);
+        $this->em->flush();
+        $splitIds = array_map(
+            static fn (CashTransactionSplit $split): string => $split->getId(),
+            $tx->getSplits()->toArray(),
+        );
+
+        $repeated = $this->txService->add($dto);
+
+        $this->assertSame($tx->getId(), $repeated->getId(), 'Повторный импорт обязан вернуть ту же операцию.');
+        $this->assertCount(2, $repeated->getSplits(), 'Разбивка не должна схлопываться повторным импортом.');
+        $this->assertSame(
+            $splitIds,
+            array_map(
+                static fn (CashTransactionSplit $split): string => $split->getId(),
+                $repeated->getSplits()->toArray(),
+            ),
+            'Строки не должны пересоздаваться: это стёрло бы источник и историю.',
+        );
     }
 
     public function testAddWithoutImportFieldsKeepsBackwardCompatibility(): void
@@ -295,5 +322,15 @@ final class CashTransactionServiceTest extends IntegrationTestCase
         $this->em->persist(new FinancialResponsibilityCenterProject($company->getId(), $project, $center));
 
         return ['project' => $project, 'center' => $center];
+    }
+
+    private function extraCategory(\App\Company\Entity\Company $company): CashflowCategory
+    {
+        $category = new CashflowCategory(Uuid::uuid4()->toString(), $company);
+        $category->setName('Прочее '.substr(Uuid::uuid4()->toString(), 0, 8));
+        $this->em->persist($category);
+        $this->em->flush();
+
+        return $category;
     }
 }
