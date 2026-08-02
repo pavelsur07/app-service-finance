@@ -1033,6 +1033,7 @@ Production commands that mutate data, process queues, call external APIs, or can
 `app:daily-balance:recalc` for owner-approved daily-balance backfill.
 Any command with `--execute`.
 `app:cash:backfill-transaction-splits --execute` moves the cashflow category into split rows. The wrapper accepts only an empty argument list or exactly `--execute` for this command and rejects any other flag. Without `--execute` the command is read-only and only counts pending work. Run it in a quiet window with workers stopped, after backing up `cash_transaction`, and reconcile the result with `app:cash:verify-transaction-splits`.
+`messenger:failed:remove <id> [--force]` permanently deletes one message from the failed queue. The wrapper requires a numeric message id as the first argument and allows at most one extra flag, `--force`; `--all` is rejected, so the whole queue cannot be wiped through it. Inspect the target before deleting — the message class and error text are readable through `codex-psql-ro` from `messenger_messages`. Removal discards the job rather than completing it.
 Any repair, prune, backfill, rebuild, refresh, or maintenance operation.
 Any SQL write operation (`INSERT`, `UPDATE`, `DELETE`, DDL, or migrations).
 Any change to production Docker, workers, scheduler, queues, secrets, config, or deployment state.

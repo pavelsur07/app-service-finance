@@ -482,6 +482,7 @@ Read-only проверки можно выполнять после запрос
 - `messenger:consume`.
 - Любая команда с `--execute`.
 - `app:cash:backfill-transaction-splits --execute` — переносит категорию ДДС в строки разбивки. Wrapper допускает у неё только пустой список аргументов или ровно `--execute`, другие флаги отвергает. Без `--execute` команда read-only и только считает объём. Запускать в тихом окне с остановленными воркерами, после бэкапа `cash_transaction`, и сверять результат `app:cash:verify-transaction-splits`.
+- `messenger:failed:remove <id> [--force]` — безвозвратно удаляет сообщение из failed-очереди. Wrapper требует первым аргументом только числовой id и допускает единственный дополнительный флаг `--force`; `--all` отвергается, поэтому очередь целиком снести нельзя. До удаления посмотреть на цель: класс сообщения и текст ошибки читаются через `codex-psql-ro` из `messenger_messages`. Удаление выбрасывает задачу, а не выполняет её.
 - Repair, prune, backfill, rebuild, refresh, maintenance.
 - SQL write (`INSERT`, `UPDATE`, `DELETE`, DDL, migrations).
 - Изменения production Docker, workers, scheduler, queues, secrets, config, deploy.
