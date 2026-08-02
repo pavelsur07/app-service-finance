@@ -141,6 +141,11 @@
                             <td class="text-end text-nowrap" style="min-width: 12rem;"><span class="text-{{ tx.direction.value == 'INFLOW' ? 'success' : 'danger' }}">{{ tx.direction.value == 'INFLOW' ? '+' : '-' }}{{ tx.amount|number_format(2, ',', ' ') }} {{ tx.currency }}</span></td>
                             <td>
                                 {% for s in tx.splits %}{{ s.cashflowCategory.name }}{% if not loop.last %}, {% endif %}{% endfor %}
+                                <a href="{{ path('cash_transaction_splits', {id: tx.id}) }}"
+                                   class="d-block small text-muted"
+                                   title="Разнести операцию по нескольким статьям">
+                                    {{ tx.splits|length > 1 ? 'изменить разбивку' : 'разбить' }}
+                                </a>
                                 {% if tx.projectDirection %}
                                     <div class="text-muted small">{{ tx.projectDirection.name }}</div>
                                 {% endif %}
