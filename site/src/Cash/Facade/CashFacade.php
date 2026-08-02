@@ -304,6 +304,10 @@ final readonly class CashFacade
      */
     private function serializeTransaction(CashTransaction $transaction): array
     {
+        // getSplits() отдаёт снимок коллекции, поэтому берём его один раз.
+        $splits = $transaction->getSplits()->toArray();
+        $singleCategory = $transaction->getSingleSplitCategory();
+
         return [
             'id' => $transaction->getId(),
             'occurredAt' => $transaction->getOccurredAt()->format('Y-m-d'),
@@ -324,19 +328,17 @@ final readonly class CashFacade
             // поэтому появился массив splits с суммой каждой строки. Поле category
             // сохранено для обратной совместимости и заполняется, только когда строка
             // одна — иначе оно молча врало бы одной категорией из нескольких.
-            'category' => 1 === $transaction->getSplits()->count()
-                ? [
-                    'id' => $transaction->getSplits()->first()->getCashflowCategory()->getId(),
-                    'name' => $transaction->getSplits()->first()->getCashflowCategory()->getName(),
-                ]
-                : null,
+            'category' => null === $singleCategory ? null : [
+                'id' => $singleCategory->getId(),
+                'name' => $singleCategory->getName(),
+            ],
             'splits' => array_map(
                 static fn (CashTransactionSplit $split): array => [
                     'categoryId' => $split->getCashflowCategory()->getId(),
                     'categoryName' => $split->getCashflowCategory()->getName(),
                     'amount' => $split->getAmount(),
                 ],
-                $transaction->getSplits()->toArray(),
+                $splits,
             ),
         ];
     }

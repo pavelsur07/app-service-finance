@@ -281,7 +281,7 @@ class CashTransactionRepository extends ServiceEntityRepository
      */
     public function iterateByCompanyWithFilters(Company $company, array $filters): iterable
     {
-        return $this->createFilteredQueryBuilder($company, $filters)
+        $qb = $this->createFilteredQueryBuilder($company, $filters)
             ->select(
                 't.occurredAt AS occurredAt',
                 't.direction AS direction',
@@ -296,7 +296,16 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->innerJoin('t.moneyAccount', 'moneyAccount')
             ->leftJoin('t.splits', 'split')
             ->leftJoin('split.cashflowCategory', 'cashflowCategory')
-            ->leftJoin('t.counterparty', 'counterparty')
+            ->leftJoin('t.counterparty', 'counterparty');
+
+        if ($filters['categoryId'] ?? null) {
+            // Фильтр из createFilteredQueryBuilder отбирает транзакции, а здесь строки
+            // ещё и присоединены: без этого ограничения выгрузка по одной категории
+            // вернула бы и остальные строки разбитой транзакции.
+            $qb->andWhere('split.cashflowCategory = :cat');
+        }
+
+        return $qb
             ->getQuery()
             // toIterable() здесь недоступен: Doctrine запрещает итерировать запрос
             // с join коллекции, а одна строка выгрузки на строку разбивки (решение D4)
@@ -307,6 +316,38 @@ class CashTransactionRepository extends ServiceEntityRepository
             // сотни тысяч транзакций за период, метод надо переписать на DBAL
             // с iterateAssociative() и явным LEFT JOIN.
             ->getArrayResult();
+    }
+
+    /**
+     * Инициализирует коллекции строк разбивки для уже загруженной страницы списка.
+     *
+     * Шаблоны выводят категории из строк, а ленивая OneToMany дала бы по запросу
+     * на каждую транзакцию. Fetch-join прямо в пагинированный запрос делать нельзя:
+     * join коллекции вместе с LIMIT режет не транзакции, а строки. Поэтому второй
+     * шаг по идентификаторам уже полученной страницы — он подтягивает коллекции
+     * тех же управляемых сущностей одним запросом.
+     *
+     * @param list<CashTransaction> $transactions
+     */
+    public function warmSplits(array $transactions): void
+    {
+        $ids = array_values(array_filter(array_map(
+            static fn (CashTransaction $transaction): ?string => $transaction->getId(),
+            $transactions,
+        )));
+
+        if ([] === $ids) {
+            return;
+        }
+
+        $this->createQueryBuilder('t')
+            ->addSelect('warmSplit', 'warmCategory')
+            ->leftJoin('t.splits', 'warmSplit')
+            ->leftJoin('warmSplit.cashflowCategory', 'warmCategory')
+            ->where('t.id IN (:ids)')
+            ->setParameter('ids', $ids)
+            ->getQuery()
+            ->getResult();
     }
 
     /**

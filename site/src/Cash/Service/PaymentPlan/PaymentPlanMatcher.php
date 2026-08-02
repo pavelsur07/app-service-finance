@@ -62,7 +62,7 @@ final class PaymentPlanMatcher
             return null;
         }
 
-        $txCategory = $splits->isEmpty() ? null : $splits->first()->getCashflowCategory();
+        $txCategory = $transaction->getSingleSplitCategory();
         $txCounterparty = $transaction->getCounterparty();
 
         $best = null;

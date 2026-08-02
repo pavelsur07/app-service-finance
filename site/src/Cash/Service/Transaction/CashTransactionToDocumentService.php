@@ -4,7 +4,6 @@ namespace App\Cash\Service\Transaction;
 
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
-use App\Cash\Entity\Transaction\CashTransactionSplit;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Finance\Application\Service\PLRegisterUpdater;
@@ -75,7 +74,7 @@ class CashTransactionToDocumentService
         $operation->setProjectDirection($this->resolveProjectDirection($transaction));
         $operation->setResponsibilityCenterId($transaction->getResponsibilityCenterId());
 
-        $category = self::resolveSplitCategory($transaction);
+        $category = $transaction->getSingleSplitCategory();
         if ($category instanceof CashflowCategory) {
             $operation->setCategory($this->resolvePlCategoryForCashflowCategory($category));
         }
@@ -90,7 +89,7 @@ class CashTransactionToDocumentService
 
     private function createDocument(CashTransaction $transaction, float $amount): Document
     {
-        $category = self::resolveSplitCategory($transaction);
+        $category = $transaction->getSingleSplitCategory();
         if (!$category instanceof CashflowCategory) {
             throw new \DomainException('Для транзакции не задана категория ДДС.');
         }
@@ -142,17 +141,5 @@ class CashTransactionToDocumentService
         }
 
         return $defaultProject;
-    }
-
-    /**
-     * Категория берётся из единственной строки разбивки. Решение D1 запрещает разбивать
-     * транзакцию по категориям с allowPlDocument, поэтому здесь строка всегда одна и
-     * семантика та же, что была у скалярной колонки.
-     */
-    private static function resolveSplitCategory(CashTransaction $transaction): ?CashflowCategory
-    {
-        $split = $transaction->getSplits()->first();
-
-        return $split instanceof CashTransactionSplit ? $split->getCashflowCategory() : null;
     }
 }

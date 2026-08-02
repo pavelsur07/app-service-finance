@@ -84,5 +84,7 @@
 
 ## Следующее действие
 
-Закрыть Stage 3: внутренний review диффа от `9320fe4a`, внешнее ревью Codex,
-Stage Report, Draft PR. Stage 2 (Production Gate A) выполнен 2026-08-01.
+Stage 3 закрыт 2026-08-02: внутренний review (4 исправления), внешнее ревью Codex
+(2 итерации, `REVIEW_GREEN`), Stage Report, Draft PR. Дальше — Release Gate:
+Владелец сверяет на проде отчёт ДДС и ведомость за закрытый период. Stage 3
+не задеплоен, прод работает на Stage 1 + Stage 2.

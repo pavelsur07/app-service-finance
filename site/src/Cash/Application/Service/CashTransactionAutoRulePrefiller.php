@@ -39,8 +39,7 @@ final readonly class CashTransactionAutoRulePrefiller
         // форме статья молча отрисовалась бы пустым селектом.
         // Категория берётся из строк: у транзакции с разбивкой единственной категории нет,
         // и предзаполнять правило одной из нескольких было бы догадкой.
-        $splits = $transaction->getSplits();
-        $category = 1 === $splits->count() ? $splits->first()->getCashflowCategory() : null;
+        $category = $transaction->getSingleSplitCategory();
         if (null === $category
             || CashflowCategory::CODE_UNALLOCATED === $category->getSystemCode()
             || !in_array($category, $availableCategories, true)
