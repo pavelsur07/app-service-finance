@@ -129,6 +129,21 @@ class CashTransactionSplit
     }
 
     /**
+     * Происхождение меняется только когда состав осознанно собрал человек — это делает
+     * форма разбивки через CashTransaction::composeSplitsManually(). Путь dual-write сюда
+     * не приходит: replaceSplits() переиспользует строку с той же категорией и обязан
+     * сохранить её прежний source, иначе правка суммы переписывала бы происхождение.
+     *
+     * @internal вызывать только из CashTransaction::composeSplitsManually()
+     */
+    public function changeSource(CashTransactionSplitSource $source): self
+    {
+        $this->source = $source;
+
+        return $this;
+    }
+
+    /**
      * Проверяет сумму и приводит её к тому же виду, в котором её хранит БД.
      *
      * Формат проверяется регулярным выражением, а не сравнением с округлённым

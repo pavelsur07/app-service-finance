@@ -51,7 +51,7 @@ final class SaveCashTransactionSplitsAction
 
         // Инварианты набора проверяет агрегат: равенство суммы, уникальность категорий
         // и запрет мультиразбивки по категориям с документами ОПиУ (решение D1).
-        $transaction->replaceSplits($splits);
+        $transaction->composeSplitsManually($splits);
 
         $this->projectLegacyColumn($transaction);
         $this->dropStalePaymentPlanMatch($transaction);

@@ -24,8 +24,9 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * компенсирующие ошибки — недостача в одной транзакции и избыток в другой дают ноль.
  *
  * Команда рассчитана на окно dual-write, где строки обязаны повторять колонку один
- * в один. После появления мультиразбивки (Stage 4) проверку expand_phase_mismatch
- * нужно версионировать: там несколько строк на транзакцию станут нормой.
+ * в один. С появлением мультиразбивки (Stage 4) это перестало быть верным: проверки
+ * знают оба состояния — одна строка повторяет колонку, несколько строк проецируют её
+ * в системную «Не распределено».
  */
 #[AsCommand(
     name: 'app:cash:verify-transaction-splits',
@@ -73,15 +74,22 @@ final class VerifyCashTransactionSplitsCommand extends Command
             'sql' => 'SELECT count(*) FROM cash_transaction_split s
                       WHERE NOT EXISTS (SELECT 1 FROM cash_transaction t WHERE t.id = s.cash_transaction_id)',
         ],
-        'expand_phase_mismatch' => [
-            'title' => 'Строки не повторяют колонку один в один (ровно одна строка той же категории)',
+        'column_projection_mismatch' => [
+            'title' => 'Колонка не соответствует составу строк',
+            // Одна строка — колонка обязана указывать на ту же категорию.
+            // Несколько строк — колонка обязана быть системной «Не распределено»:
+            // именно так её проецирует форма разбивки, и это делает откат безопасным.
             'sql' => 'SELECT count(*) FROM (
                           SELECT s.cash_transaction_id, count(*) AS rows_count, min(s.cashflow_category_id::text) AS category
                           FROM cash_transaction_split s GROUP BY 1
                       ) g
                       JOIN cash_transaction t ON t.id = g.cash_transaction_id
+                      LEFT JOIN "cashflow_categories" col ON col.id = t.cashflow_category_id
                       WHERE t.cashflow_category_id IS NOT NULL
-                        AND (g.rows_count <> 1 OR g.category <> t.cashflow_category_id::text)',
+                        AND CASE
+                            WHEN g.rows_count = 1 THEN g.category <> t.cashflow_category_id::text
+                            ELSE col.system_code IS NULL OR col.system_code NOT IN (\'CF_UNALLOC\', \'UNALLOCATED\')
+                        END',
         ],
         'nonpositive_amount' => [
             'title' => 'Сумма строки не положительна',
@@ -155,7 +163,7 @@ final class VerifyCashTransactionSplitsCommand extends Command
                 $failed = true;
                 $this->printTotalsMismatch($io, $totalsMismatch);
             } else {
-                $io->writeln('Итоги по company + category + direction + currency сходятся.');
+                $io->writeln('Сумма строк совпадает с суммой операций по company + direction + currency.');
             }
         }
 
@@ -181,15 +189,14 @@ final class VerifyCashTransactionSplitsCommand extends Command
      */
     private function printTotalsMismatch(SymfonyStyle $io, array $mismatch): void
     {
-        $io->section('Расхождение итогов по company + category + direction + currency');
+        $io->section('Расхождение сумм строк и операций по company + direction + currency');
         $io->writeln(sprintf('Групп с расхождением: %d.', count($mismatch)));
 
         $io->table(
-            ['company', 'category', 'direction', 'currency'],
+            ['company', 'direction', 'currency'],
             array_map(
                 static fn (array $row): array => [
                     substr($row[0], 0, 8),
-                    substr($row[1], 0, 8),
                     $row[2],
                     $row[3],
                 ],
@@ -321,34 +328,38 @@ final class VerifyCashTransactionSplitsCommand extends Command
      */
     private function fetchTotalsMismatch(): array
     {
+        // Сравнение колонки со строками потеряло смысл после мультиразбивки: колонка
+        // намеренно проецируется в «Не распределено», и равенство по категориям ломается
+        // по построению. Цель проверки — доказать, что деньги не потерялись, поэтому
+        // сравниваем сумму строк с суммой самих операций в разрезе компании, направления
+        // и валюты. Категорийный разрез уже покрыт построчной проверкой amount_mismatch.
         $sql = <<<'SQL'
-            WITH by_column AS (
-                SELECT company_id, cashflow_category_id AS category_id, direction, currency, sum(amount) AS total
+            WITH by_transaction AS (
+                SELECT company_id, direction, currency, sum(amount) AS total
                 FROM cash_transaction
                 WHERE cashflow_category_id IS NOT NULL
-                GROUP BY 1, 2, 3, 4
+                GROUP BY 1, 2, 3
             ),
             by_splits AS (
-                SELECT s.company_id, s.cashflow_category_id AS category_id, t.direction, t.currency, sum(s.amount) AS total
+                SELECT s.company_id, t.direction, t.currency, sum(s.amount) AS total
                 FROM cash_transaction_split s
                 JOIN cash_transaction t ON t.id = s.cash_transaction_id
-                GROUP BY 1, 2, 3, 4
+                GROUP BY 1, 2, 3
             )
             SELECT
-                COALESCE(c.company_id::text, s.company_id::text)     AS company_id,
-                COALESCE(c.category_id::text, s.category_id::text)   AS category_id,
-                COALESCE(c.direction, s.direction)                   AS direction,
-                COALESCE(c.currency, s.currency)                     AS currency,
-                COALESCE(c.total, 0)::text                           AS column_total,
-                COALESCE(s.total, 0)::text                           AS splits_total
-            FROM by_column c
+                COALESCE(x.company_id::text, s.company_id::text) AS company_id,
+                '-'                                              AS category_id,
+                COALESCE(x.direction, s.direction)               AS direction,
+                COALESCE(x.currency, s.currency)                 AS currency,
+                COALESCE(x.total, 0)::text                       AS transaction_total,
+                COALESCE(s.total, 0)::text                       AS splits_total
+            FROM by_transaction x
             FULL JOIN by_splits s
-                ON  c.company_id = s.company_id
-                AND c.category_id = s.category_id
-                AND c.direction = s.direction
-                AND c.currency = s.currency
-            WHERE COALESCE(c.total, 0) <> COALESCE(s.total, 0)
-            ORDER BY 1, 2, 3, 4
+                ON  x.company_id = s.company_id
+                AND x.direction = s.direction
+                AND x.currency = s.currency
+            WHERE COALESCE(x.total, 0) <> COALESCE(s.total, 0)
+            ORDER BY 1, 3, 4
         SQL;
 
         return array_map(array_values(...), $this->connection->fetchAllAssociative($sql));

@@ -11,7 +11,9 @@ use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\PaymentPlan\PaymentPlanMatch;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Entity\Transaction\CashTransactionSplit;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Enum\Transaction\CashTransactionSplitSource;
 use App\Cash\Exception\FinancePeriodLockedException;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
 use App\Company\Entity\Company;
@@ -239,6 +241,35 @@ final class SaveCashTransactionSplitsActionTest extends IntegrationTestCase
         $this->em->flush();
 
         return $match;
+    }
+
+    public function testManualCompositionOverridesAutoSourceOnReusedCategory(): void
+    {
+        $company = $this->company();
+        $transaction = $this->transaction($company, '1000.00');
+        $rent = $this->category($company, 'Аренда');
+
+        // Категорию проставило правило.
+        $transaction->replaceSplits([
+            new CashTransactionSplit($transaction, $rent, '1000.00', CashTransactionSplitSource::AUTO),
+        ]);
+        $this->em->flush();
+
+        // Человек разбивает операцию и оставляет ту же статью одной из строк. Категория
+        // совпала, но выбрал её теперь он — оставить auto значило бы записать чужое
+        // решение как своё и вернуть строку под перезапись правилом после схлопывания.
+        $this->action()($transaction, $this->input([
+            [$rent->getId(), '600.00'],
+            [$this->category($company, 'Реклама')->getId(), '400.00'],
+        ]));
+
+        foreach ($transaction->getSplits() as $split) {
+            self::assertSame(
+                CashTransactionSplitSource::MANUAL,
+                $split->getSource(),
+                'Состав из формы целиком ручной.',
+            );
+        }
     }
 
     private function action(): SaveCashTransactionSplitsAction
