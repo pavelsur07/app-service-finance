@@ -29,6 +29,12 @@
 # Inventory Ozon snapshot: запуск в 04:05 MSK, команда только инициирует pipeline; HTTP-загрузка выполняется async worker'ом.
 5 4 * * * cd /app && php bin/console app:inventory:ozon-daily-sync --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# Inventory WB snapshot: 04:15 MSK, зеркало Ozon-команды. Тоже только диспатч;
+# handler дополнительно освежает каталог карточек (Content API) до чтения остатков,
+# поэтому слот отдельный от Ozon, чтобы две выгрузки не толкались в async_sync.
+# WB отдаёт остатки «на сейчас» — пропущенный день задним числом не восстановить.
+15 4 * * * cd /app && php bin/console app:inventory:wb-daily-sync --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Daily-sync: создаёт AdLoadJob за вчера для всех компаний с активным Ozon
 # Performance подключением. Дальше работу подхватывают cron-driven worker'ы
 # (scheduler → poller → finalizer → auto-extract), без ручных действий.

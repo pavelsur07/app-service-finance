@@ -28,6 +28,7 @@ DG\BypassFinals::allowPaths([
     '*/src/Ingestion/Repository/IngestRawRecordRepository.php',
     '*/src/Ingestion/Repository/FinancialTransactionRepository.php',
     '*/src/Cash/Service/Accounts/AccountBalanceService.php',
+    '*/src/Inventory/Application/RequestWbInventorySnapshotAction.php',
 ]);
 
 if (method_exists(Dotenv::class, 'bootEnv')) {
