@@ -57,6 +57,7 @@ class CashTransactionController extends AbstractController
         $pager = $txRepo->paginateByCompanyWithFilters($company, $filters, $page, $limit);
 
         $transactions = iterator_to_array($pager->getCurrentPageResults());
+        $txRepo->warmSplits($transactions);
 
         $accounts = $accountRepo->findBy(['company' => $company]);
         $categories = $categoryRepo->findTreeByCompany($company);
@@ -150,10 +151,12 @@ class CashTransactionController extends AbstractController
         $perPage = 50;
 
         $pager = $txRepo->paginateDeletedByCompany($companyId, $page, $perPage);
+        $transactions = iterator_to_array($pager->getCurrentPageResults());
+        $txRepo->warmSplits($transactions);
 
         return $this->render('cash/transaction/deleted_index.html.twig', [
             'pager' => $pager,
-            'transactions' => iterator_to_array($pager->getCurrentPageResults()),
+            'transactions' => $transactions,
         ]);
     }
 

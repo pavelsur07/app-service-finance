@@ -176,6 +176,23 @@ class CashTransaction
         }
     }
 
+    /**
+     * Категория транзакции, когда она однозначна.
+     *
+     * Возвращает null и при отсутствии строк, и при разбивке на несколько категорий:
+     * во втором случае единственной категории у транзакции просто нет, и выбирать
+     * одну из нескольких означало бы угадывать. Правило живёт здесь, а не в вызывающих
+     * местах, чтобы не разъехаться между ними.
+     */
+    public function getSingleSplitCategory(): ?CashflowCategory
+    {
+        if (1 !== $this->splits->count()) {
+            return null;
+        }
+
+        return $this->splits->first()->getCashflowCategory();
+    }
+
     public function getSplitsTotal(): string
     {
         $total = '0';

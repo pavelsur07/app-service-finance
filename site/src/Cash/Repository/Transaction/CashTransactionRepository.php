@@ -281,21 +281,73 @@ class CashTransactionRepository extends ServiceEntityRepository
      */
     public function iterateByCompanyWithFilters(Company $company, array $filters): iterable
     {
-        return $this->createFilteredQueryBuilder($company, $filters)
+        $qb = $this->createFilteredQueryBuilder($company, $filters)
             ->select(
                 't.occurredAt AS occurredAt',
                 't.direction AS direction',
-                't.amount AS amount',
+                // Решение D4: одна строка выгрузки на строку разбивки. Без COALESCE
+                // транзакция без категории ушла бы в файл с пустой суммой.
+                'COALESCE(split.amount, t.amount) AS amount',
                 'moneyAccount.name AS accountName',
                 'cashflowCategory.name AS categoryName',
                 't.description AS description',
                 'counterparty.name AS counterpartyName',
             )
             ->innerJoin('t.moneyAccount', 'moneyAccount')
-            ->leftJoin('t.cashflowCategory', 'cashflowCategory')
-            ->leftJoin('t.counterparty', 'counterparty')
+            ->leftJoin('t.splits', 'split')
+            ->leftJoin('split.cashflowCategory', 'cashflowCategory')
+            ->leftJoin('t.counterparty', 'counterparty');
+
+        if ($filters['categoryId'] ?? null) {
+            // Фильтр из createFilteredQueryBuilder отбирает транзакции, а здесь строки
+            // ещё и присоединены: без этого ограничения выгрузка по одной категории
+            // вернула бы и остальные строки разбитой транзакции.
+            $qb->andWhere('split.cashflowCategory = :cat');
+        }
+
+        return $qb
             ->getQuery()
-            ->toIterable([], Query::HYDRATE_ARRAY);
+            // toIterable() здесь недоступен: Doctrine запрещает итерировать запрос
+            // с join коллекции, а одна строка выгрузки на строку разбивки (решение D4)
+            // без такого join не получается.
+            //
+            // Потолок: весь результат держится в памяти. Для нынешних объёмов это
+            // единицы мегабайт на семь скалярных колонок. Если у компании появятся
+            // сотни тысяч транзакций за период, метод надо переписать на DBAL
+            // с iterateAssociative() и явным LEFT JOIN.
+            ->getArrayResult();
+    }
+
+    /**
+     * Инициализирует коллекции строк разбивки для уже загруженной страницы списка.
+     *
+     * Шаблоны выводят категории из строк, а ленивая OneToMany дала бы по запросу
+     * на каждую транзакцию. Fetch-join прямо в пагинированный запрос делать нельзя:
+     * join коллекции вместе с LIMIT режет не транзакции, а строки. Поэтому второй
+     * шаг по идентификаторам уже полученной страницы — он подтягивает коллекции
+     * тех же управляемых сущностей одним запросом.
+     *
+     * @param list<CashTransaction> $transactions
+     */
+    public function warmSplits(array $transactions): void
+    {
+        $ids = array_values(array_filter(array_map(
+            static fn (CashTransaction $transaction): ?string => $transaction->getId(),
+            $transactions,
+        )));
+
+        if ([] === $ids) {
+            return;
+        }
+
+        $this->createQueryBuilder('t')
+            ->addSelect('warmSplit', 'warmCategory')
+            ->leftJoin('t.splits', 'warmSplit')
+            ->leftJoin('warmSplit.cashflowCategory', 'warmCategory')
+            ->where('t.id IN (:ids)')
+            ->setParameter('ids', $ids)
+            ->getQuery()
+            ->getResult();
     }
 
     /**
@@ -319,7 +371,10 @@ class CashTransactionRepository extends ServiceEntityRepository
             $qb->andWhere('t.moneyAccount = :acc')->setParameter('acc', $filters['accountId']);
         }
         if ($filters['categoryId'] ?? null) {
-            $qb->andWhere('t.cashflowCategory = :cat')->setParameter('cat', $filters['categoryId']);
+            // Фильтр по строкам разбивки: транзакция попадает в выдачу, если её содержит
+            // хотя бы одна строка, и показывается суммой именно этой строки.
+            $qb->andWhere('EXISTS (SELECT 1 FROM App\\Cash\\Entity\\Transaction\\CashTransactionSplit fs WHERE fs.cashTransaction = t AND fs.cashflowCategory = :cat)')
+                ->setParameter('cat', $filters['categoryId']);
         }
         if ($filters['counterpartyId'] ?? null) {
             $qb->andWhere('t.counterparty = :cp')->setParameter('cp', $filters['counterpartyId']);
@@ -455,8 +510,9 @@ class CashTransactionRepository extends ServiceEntityRepository
     public function sumNetByFlowKindExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
         $rows = $this->createQueryBuilder('t')
-            ->select('category.flowKind as flowKind', 'COALESCE(SUM(t.amount), 0) as net')
-            ->leftJoin('t.cashflowCategory', 'category')
+            ->select('category.flowKind as flowKind', 'COALESCE(SUM(split.amount), 0) as net')
+            ->leftJoin('t.splits', 'split')
+            ->leftJoin('split.cashflowCategory', 'category')
             ->where('t.company = :company')
             ->andWhere('t.occurredAt BETWEEN :from AND :to')
             ->andWhere('t.isTransfer = :isTransfer')
@@ -518,14 +574,17 @@ class CashTransactionRepository extends ServiceEntityRepository
     public function sumOutflowByCategoryExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
         $rows = $this->createQueryBuilder('t')
-            ->select('IDENTITY(t.cashflowCategory) as categoryId', 'COALESCE(category.name, :uncategorized) as categoryName', 'ABS(COALESCE(SUM(t.amount), 0)) as sumAbs')
-            ->leftJoin('t.cashflowCategory', 'category')
+            // COALESCE по сумме обязателен: у транзакции без категории строк нет, и без него
+            // корзина «без категории» показывала бы ноль вместо реального оборота.
+            ->select('IDENTITY(split.cashflowCategory) as categoryId', 'COALESCE(category.name, :uncategorized) as categoryName', 'ABS(COALESCE(SUM(COALESCE(split.amount, t.amount)), 0)) as sumAbs')
+            ->leftJoin('t.splits', 'split')
+            ->leftJoin('split.cashflowCategory', 'category')
             ->where('t.company = :company')
             ->andWhere('t.direction = :outflow')
             ->andWhere('t.occurredAt BETWEEN :from AND :to')
             ->andWhere('t.isTransfer = :isTransfer')
             ->andWhere('t.deletedAt IS NULL')
-            ->groupBy('t.cashflowCategory', 'category.name')
+            ->groupBy('split.cashflowCategory', 'category.name')
             ->orderBy('sumAbs', 'DESC')
             ->setParameter('company', $company)
             ->setParameter('from', $from->setTime(0, 0))
@@ -584,8 +643,9 @@ class CashTransactionRepository extends ServiceEntityRepository
     public function sumCapexOutflowExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): float
     {
         $result = $this->createQueryBuilder('t')
-            ->select('COALESCE(SUM(t.amount), 0) as outflow')
-            ->leftJoin('t.cashflowCategory', 'category')
+            ->select('COALESCE(SUM(split.amount), 0) as outflow')
+            ->leftJoin('t.splits', 'split')
+            ->leftJoin('split.cashflowCategory', 'category')
             ->where('t.company = :company')
             ->andWhere('t.direction = :outflow')
             ->andWhere('t.occurredAt BETWEEN :from AND :to')
@@ -610,8 +670,9 @@ class CashTransactionRepository extends ServiceEntityRepository
     public function sumCapexOutflowByDayExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
         $rows = $this->createQueryBuilder('t')
-            ->select('t.occurredAt as date', 'COALESCE(SUM(t.amount), 0) as value')
-            ->leftJoin('t.cashflowCategory', 'category')
+            ->select('t.occurredAt as date', 'COALESCE(SUM(split.amount), 0) as value')
+            ->leftJoin('t.splits', 'split')
+            ->leftJoin('split.cashflowCategory', 'category')
             ->where('t.company = :company')
             ->andWhere('t.direction = :outflow')
             ->andWhere('t.occurredAt BETWEEN :from AND :to')

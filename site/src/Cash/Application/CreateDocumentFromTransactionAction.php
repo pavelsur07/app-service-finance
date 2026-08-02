@@ -28,7 +28,7 @@ final class CreateDocumentFromTransactionAction
             throw new \DomainException('Транзакция уже полностью разнесена.');
         }
 
-        $category = $tx->getCashflowCategory();
+        $category = $tx->getSingleSplitCategory();
         if (null !== $category && !$category->isAllowPlDocument()) {
             throw new \DomainException('Для этой категории ДДС создание документов ОПиУ запрещено.');
         }

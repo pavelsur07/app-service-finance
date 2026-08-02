@@ -313,7 +313,11 @@ class ReportTransactionsStatementController extends AbstractController
         $qb = $this->trxRepo->createQueryBuilder('t')
             ->leftJoin('t.counterparty', 'counterparty')
             ->addSelect('counterparty')
-            ->leftJoin('t.cashflowCategory', 'category')
+            // LEFT JOIN обязателен: транзакция без категории строк не имеет, и на INNER
+            // она молча пропала бы из ведомости.
+            ->leftJoin('t.splits', 'split')
+            ->addSelect('split')
+            ->leftJoin('split.cashflowCategory', 'category')
             ->addSelect('category')
             ->where('t.company = :company')
             ->andWhere('t.occurredAt BETWEEN :from AND :to')
@@ -330,7 +334,11 @@ class ReportTransactionsStatementController extends AbstractController
         }
 
         if ($categoryId) {
-            $qb->andWhere('IDENTITY(t.cashflowCategory) = :categoryId')
+            // Фильтр оставляет только совпавшие строки разбивки, поэтому коллекция
+            // гидрируется частично. Для read-only отчёта это и нужно: транзакция,
+            // разбитая на несколько категорий, показывается суммой выбранной строки,
+            // а не всей транзакции — иначе итог ведомости не сошёлся бы с отчётом ДДС.
+            $qb->andWhere('IDENTITY(split.cashflowCategory) = :categoryId')
                 ->setParameter('categoryId', $categoryId);
         }
 
@@ -368,25 +376,35 @@ class ReportTransactionsStatementController extends AbstractController
                 }
             }
 
-            $amount = (float) $transaction->getAmount();
-            if (CashDirection::OUTFLOW === $transaction->getDirection()) {
-                $amount = -abs($amount);
-            } else {
-                $amount = abs($amount);
+            $sign = CashDirection::OUTFLOW === $transaction->getDirection() ? -1 : 1;
+
+            $splits = $transaction->getSplits();
+            if ($splits->isEmpty()) {
+                // Категория не задана: строка остаётся в ведомости с полной суммой,
+                // как это было до перехода на разбивку.
+                $transactions[] = [
+                    'date' => $transaction->getOccurredAt(),
+                    'document' => $transaction->getExternalId(),
+                    'counterparty' => $counterpartyName,
+                    'description' => $description,
+                    'amount' => round($sign * abs((float) $transaction->getAmount()), 2),
+                ];
+
+                continue;
             }
 
-            $category = $transaction->getCashflowCategory();
-            if ($category) {
+            foreach ($splits as $split) {
+                $category = $split->getCashflowCategory();
                 $categories[$category->getId()] = $category->getName();
-            }
 
-            $transactions[] = [
-                'date' => $transaction->getOccurredAt(),
-                'document' => $transaction->getExternalId(),
-                'counterparty' => $counterpartyName,
-                'description' => $description,
-                'amount' => round($amount, 2),
-            ];
+                $transactions[] = [
+                    'date' => $transaction->getOccurredAt(),
+                    'document' => $transaction->getExternalId(),
+                    'counterparty' => $counterpartyName,
+                    'description' => $description,
+                    'amount' => round($sign * abs((float) $split->getAmount()), 2),
+                ];
+            }
         }
 
         asort($categories, \SORT_LOCALE_STRING);
@@ -404,8 +422,8 @@ class ReportTransactionsStatementController extends AbstractController
 
     /**
      * @param array<int, array{start: \DateTimeImmutable, end: \DateTimeImmutable, label_start: \DateTimeImmutable, label_end: \DateTimeImmutable}> $periods
-     * @param array<string, array<string, array{opening: float, closing: float}>> $balances
-     * @param list<array{date: \DateTimeImmutable, document: ?string, counterparty: ?string, description: ?string, amount: float}> $transactions
+     * @param array<string, array<string, array{opening: float, closing: float}>>                                                                   $balances
+     * @param list<array{date: \DateTimeImmutable, document: ?string, counterparty: ?string, description: ?string, amount: float}>                  $transactions
      *
      * @return array{
      *   summary: array{opening: float, income: float, expense: float, closing: float},

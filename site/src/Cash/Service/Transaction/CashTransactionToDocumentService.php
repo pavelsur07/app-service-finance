@@ -74,7 +74,7 @@ class CashTransactionToDocumentService
         $operation->setProjectDirection($this->resolveProjectDirection($transaction));
         $operation->setResponsibilityCenterId($transaction->getResponsibilityCenterId());
 
-        $category = $transaction->getCashflowCategory();
+        $category = $transaction->getSingleSplitCategory();
         if ($category instanceof CashflowCategory) {
             $operation->setCategory($this->resolvePlCategoryForCashflowCategory($category));
         }
@@ -89,7 +89,7 @@ class CashTransactionToDocumentService
 
     private function createDocument(CashTransaction $transaction, float $amount): Document
     {
-        $category = $transaction->getCashflowCategory();
+        $category = $transaction->getSingleSplitCategory();
         if (!$category instanceof CashflowCategory) {
             throw new \DomainException('Для транзакции не задана категория ДДС.');
         }

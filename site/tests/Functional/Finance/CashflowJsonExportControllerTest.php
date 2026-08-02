@@ -7,8 +7,10 @@ namespace App\Tests\Functional\Finance;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Entity\Transaction\CashTransactionSplit;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Enum\Transaction\CashTransactionSplitSource;
 use App\Company\Entity\Company;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\ProjectDirection;
@@ -261,6 +263,12 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
         $transaction->setCashflowCategory($category);
         $transaction->setProjectDirection($project);
         $transaction->setResponsibilityCenterId($responsibilityCenterId);
+
+        // Зеркальная строка разбивки — то же, что делает синхронизатор на каждом пути
+        // записи в бою; без неё отчёт, читающий строки, увидит пустоту.
+        $transaction->replaceSplits([
+            new CashTransactionSplit($transaction, $category, $amount, CashTransactionSplitSource::MANUAL),
+        ]);
 
         $em = $this->em();
         $em->persist($category);

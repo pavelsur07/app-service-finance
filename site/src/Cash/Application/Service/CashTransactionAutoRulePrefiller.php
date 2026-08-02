@@ -37,7 +37,9 @@ final readonly class CashTransactionAutoRulePrefiller
 
         // Заглушка «не распределено» как цель правила бесполезна, а недоступная в
         // форме статья молча отрисовалась бы пустым селектом.
-        $category = $transaction->getCashflowCategory();
+        // Категория берётся из строк: у транзакции с разбивкой единственной категории нет,
+        // и предзаполнять правило одной из нескольких было бы догадкой.
+        $category = $transaction->getSingleSplitCategory();
         if (null === $category
             || CashflowCategory::CODE_UNALLOCATED === $category->getSystemCode()
             || !in_array($category, $availableCategories, true)

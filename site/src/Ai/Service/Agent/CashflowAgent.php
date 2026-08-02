@@ -94,14 +94,15 @@ final class CashflowAgent implements AiAgentInterface
         $qb = $this->cashTransactionRepository->createQueryBuilder('transaction')
             ->select("COALESCE(category.name, 'Без категории') AS category")
             ->addSelect(sprintf(
-                "SUM(CASE WHEN transaction.direction = '%s' THEN transaction.amount ELSE 0 END) AS inflow",
+                "SUM(CASE WHEN transaction.direction = '%s' THEN COALESCE(split.amount, transaction.amount) ELSE 0 END) AS inflow",
                 CashDirection::INFLOW->value
             ))
             ->addSelect(sprintf(
-                "SUM(CASE WHEN transaction.direction = '%s' THEN transaction.amount ELSE 0 END) AS outflow",
+                "SUM(CASE WHEN transaction.direction = '%s' THEN COALESCE(split.amount, transaction.amount) ELSE 0 END) AS outflow",
                 CashDirection::OUTFLOW->value
             ))
-            ->leftJoin('transaction.cashflowCategory', 'category')
+            ->leftJoin('transaction.splits', 'split')
+            ->leftJoin('split.cashflowCategory', 'category')
             ->andWhere('transaction.company = :company')
             ->andWhere('transaction.occurredAt BETWEEN :from AND :to')
             ->setParameter('company', $company)

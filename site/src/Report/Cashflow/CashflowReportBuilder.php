@@ -189,15 +189,18 @@ final class CashflowReportBuilder
     ): QueryBuilder {
         return $this->transactionRepository->createQueryBuilder('t')
             ->select(
-                'IDENTITY(t.cashflowCategory) AS category',
+                'IDENTITY(split.cashflowCategory) AS category',
                 'IDENTITY(t.projectDirection) AS project_id',
                 'project.name AS project_name',
                 't.responsibilityCenterId AS responsibility_center_id',
                 't.direction',
-                't.amount',
+                'split.amount',
                 't.currency',
                 't.occurredAt',
             )
+            // LEFT JOIN, а не INNER: транзакция без категории строк не имеет и в отчёт
+            // не попадает по проверке категории ниже — ровно как раньше по пустой колонке.
+            ->leftJoin('t.splits', 'split')
             ->leftJoin('t.projectDirection', 'project')
             ->where('t.company = :company')
             ->andWhere('t.occurredAt BETWEEN :from AND :to')

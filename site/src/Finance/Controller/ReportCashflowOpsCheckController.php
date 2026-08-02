@@ -199,7 +199,7 @@ select
   t.amount::numeric(18,2)                         as amount_abs,
   case when t.direction = 'INFLOW' then t.amount else -t.amount end
                                                   as amount_signed,
-  cat.name                                        as category_name,
+  cat.category_names                              as category_name,
   t.import_source                                 as import_source,
   t.external_id                                   as external_id,
 
@@ -209,7 +209,7 @@ select
       or (t.direction = 'OUTFLOW' and t.amount < 0)
     then 1 else 0 end                             as flag_wrong_sign,
 
-  case when t.cashflow_category_id is null then 1 else 0 end
+  case when cat.category_count = 0 then 1 else 0 end
                                                   as flag_no_category,
 
   case
@@ -231,7 +231,17 @@ select
 
 from cash_transaction t
 left join money_account acc on acc.id = t.money_account_id
-left join cashflow_categories cat on cat.id = t.cashflow_category_id
+-- Категории берутся из строк разбивки и склеиваются в одну ячейку: отчёт ищет проблемы
+-- по транзакции, а оконные функции выше считают дубли по одной строке на транзакцию —
+-- размножение строк на каждую категорию сломало бы подсчёт.
+left join lateral (
+    select
+        count(*)                             as category_count,
+        string_agg(c.name, ', ' order by c.name) as category_names
+    from cash_transaction_split s
+    join cashflow_categories c on c.id = s.cashflow_category_id
+    where s.cash_transaction_id = t.id
+) cat on true
 where t.company_id = :company
   and t.deleted_at is null
   and t.occurred_at >= :from_ts

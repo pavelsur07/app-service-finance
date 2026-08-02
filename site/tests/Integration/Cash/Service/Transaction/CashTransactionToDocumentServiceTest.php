@@ -7,8 +7,10 @@ namespace App\Tests\Integration\Cash\Service\Transaction;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Entity\Transaction\CashTransactionSplit;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Enum\Transaction\CashTransactionSplitSource;
 use App\Cash\Service\Transaction\CashTransactionToDocumentService;
 use App\Company\Entity\Company;
 use App\Company\Entity\FinancialResponsibilityCenter;
@@ -55,6 +57,12 @@ final class CashTransactionToDocumentServiceTest extends IntegrationTestCase
             ->setCashflowCategory($cashflowCategory)
             ->setProjectDirection($project)
             ->setResponsibilityCenterId($center->getId());
+
+        // Зеркальная строка разбивки — то же, что делает синхронизатор на каждом пути
+        // записи; сервис читает категорию из неё, а не из колонки.
+        $tx->replaceSplits([
+            new CashTransactionSplit($tx, $cashflowCategory, $tx->getAmount(), CashTransactionSplitSource::MANUAL),
+        ]);
 
         foreach ([$account, $plCategory, $cashflowCategory, $project, $center, $tx] as $entity) {
             $this->em->persist($entity);
