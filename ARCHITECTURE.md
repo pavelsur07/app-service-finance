@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.68 / 2026-07-24
+> Версия: 1.70 / 2026-08-02
 
 ---
 
@@ -12,7 +12,7 @@
 |---|---|---|
 | `Cash` | Денежные счета, транзакции, банковский импорт, план платежей | `Company $company` (legacy) |
 | `Marketplace` | WB/Ozon: продажи, возвраты, расходы, закрытие месяца | смешанный |
-| `Catalog` | Товары, штрихкоды, закупочные цены | `string $companyId` ✅ |
+| `Catalog` | Товары, штрихкоды, закупочные цены | смешанный (`Product` ещё на `Company $company`) |
 | `Deals` | Сделки | `Company $company` (legacy) |
 | `Finance` | PnL-отчёты, кэшфлоу, фасады финансовой аналитики | `Company $company` (legacy) |
 | `Company` | Компании, пользователи, приглашения, тарифы | — (владелец) |
@@ -30,12 +30,17 @@
 | `Notification` | Каналы уведомлений (email и др.) | — |
 | `Shared` | Общий код: ActiveCompanyService, аудит, безопасность, storage | — |
 | `Admin` | Административная панель (отдельный firewall) | — |
+| `Mcp` | MCP-сервер: инструменты для LLM-агентов над Cash-данными | — |
+| `Report` | Построители отчётов (ДДС cashflow) | — |
 
-**Legacy-зона** (технический долг, новый код туда НЕ идёт):
+**Legacy-зона** (пуста после миграции, новый код туда НЕ идёт):
 `src/Entity/` · `src/Service/` · `src/Repository/` · `src/Controller/`
 
-Текущие legacy-сущности в `src/Entity/`:
-`Document` · `DocumentOperation` · `PLCategory` · `PLDailyTotal` · `PLMonthlySnapshot` · `ProjectDirection` · `Counterparty` · `ReportApiKey`
+Сущностей здесь больше нет — каталоги пусты (только `.gitignore`). Переехали:
+`Document`, `DocumentOperation`, `PLCategory`, `PLDailyTotal`, `PLMonthlySnapshot` → `Finance/Entity/`;
+`ProjectDirection`, `Counterparty`, `ReportApiKey` → `Company/Entity/`.
+
+Каталоги оставлены как guard-путь: класть сюда новые Entity/Service/Repository/Controller всё равно запрещено — используй `src/{Module}/`.
 
 ---
 
@@ -79,6 +84,7 @@
 | `ExternalCategoryMapping` | Ingestion | global mapping dictionary, no company filter |
 | `NormalizationIssue` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
 | `PLDirtyPeriod` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
+| `Product` | Catalog | `Company $company` (legacy) — ещё не мигрирован |
 | `ProductImport` | Catalog | `string $companyId` ✅ |
 | `ProductBarcode` | Catalog | `string $companyId` ✅ |
 | `ProductPurchasePrice` | Catalog | `string $companyId` ✅ |
@@ -88,7 +94,8 @@
 | `CashTransactionSplit` | Cash | `string $companyId` ✅ |
 | `CashTransaction`, `MoneyAccount` и др. | Cash | `Company $company` (legacy) |
 | `Deal`, `ChargeType` | Deals | `Company $company` (legacy) |
-| `PLCategory`, `Document` и др. | legacy `src/Entity/` | `Company $company` (legacy) |
+| `PLCategory`, `Document`, `DocumentOperation`, `PLDailyTotal`, `PLMonthlySnapshot` | Finance | `Company $company` (legacy) |
+| `ProjectDirection`, `Counterparty`, `ReportApiKey` | Company | `Company $company` (legacy) |
 
 ### Ingestion: tenant isolation
 
@@ -2614,6 +2621,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.70 | 2026-08-02 | Doc sync с кодом: legacy-зона (`src/Entity|Service|Repository|Controller`) отмечена пустой — сущности уже переехали в `Finance/Entity/` и `Company/Entity/`; `Catalog` перестал считаться полностью мигрированным (`Product` всё ещё на `Company $company`); в карту модулей добавлены `Mcp` и `Report` |
 | 1.69 | 2026-07-28 | MCP/Company: read-only `company_find_by_name` глобально разрешает точное название компании без учёта регистра в единственный ID; отсутствие и дубли возвращаются как ожидаемая ошибка |
 | 1.68 | 2026-07-24 | Infrastructure: production PHP CLI disables the broken Alpine/musl opcache dynamic load; production PHP-FPM remains unchanged |
 | 1.67 | 2026-07-24 | MarketplaceAds: one-shot WB catalog recovery from persisted unmapped nmId, bounded 429/5xx retry, and one aggregated normal-channel alert for unresolved review |
