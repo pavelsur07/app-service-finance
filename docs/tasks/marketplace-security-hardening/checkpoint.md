@@ -2,39 +2,32 @@
 
 ## Current checkpoint
 
-**Phase:** Stage 1 (H3 — POST+CSRF)
-**Status:** checking
-**Stage base commit:** 861d61169a772b75b82ae3496674ace0d6a2f1fb
-**Current Work item:** 1.5
+**Phase:** Stage 2 (H4 — tenant-сверка в Actions)
+**Status:** implementing
+**Stage base commit:** 787e49cc (Stage 1 commit)
+**Current Work item:** 2.1
 **Owner gate:** no (Stage 1–3); yes на Stage 4
 
 ### Completed
-- Ветка `task/marketplace-security-hardening` от master `861d6116`
-- 1.1 — plan.md + checkpoint
-- 1.2 — POST+CSRF в `MarketplaceSaleMappingController` (create/edit/toggle) + формы `pl_mappings.html.twig`
-- 1.3 — POST+CSRF в `MarketplaceController` (test/sync/sync-period) + `index.html.twig` (inline-формы, модалка sync-period method=post + data-token)
-- 1.4 — `MarketplaceMutationSecurityTest` 10/10 OK
+- Stage 1 (H3) — DONE: commit `787e49cc`, Draft PR #2291, REVIEW_GREEN (3 итерации), Stage Report `stages/stage-1.md`
+- Baseline: unit 1722 OK; functional Marketplace+Admin 119 OK
 
 ### Current diff / affected files
-- `site/src/Marketplace/Controller/MarketplaceSaleMappingController.php`
-- `site/src/Marketplace/Controller/MarketplaceController.php`
-- `site/templates/marketplace/pl_mappings.html.twig`
-- `site/templates/marketplace/index.html.twig`
-- `site/tests/Functional/Marketplace/Controller/MarketplaceMutationSecurityTest.php` (new)
+- (в работе) `ProcessOzonRealizationAction.php`, `ProcessMarketplaceRawDocumentAction.php` + integration-тесты
 
 ### Checks and baseline
-- baseline: unit 1722 OK, functional Marketplace 85 OK
-- targeted: новый security-тест 10/10 OK
-- lint:twig templates/marketplace — OK (22 файла)
-- functional Marketplace + unit — выполняются (фон)
+- Stage 1 final: unit 1722 OK, functional Marketplace+Admin 119 OK, lint:twig OK
 
 ### Review status
-- iteration: 1 (внутренний review diff — замечаний нет)
-- unresolved findings: none
+- Stage 1: REVIEW_GREEN
+- Stage 2: iteration 0
 
 ### Exact next action
-- Дождаться functional+unit, затем внешний Claude review → Stage Report → commit/push/Draft PR → Stage 2
+- 2.1: tenant-сверка в `ProcessOzonRealizationAction::__invoke` (после загрузки $rawDoc)
+- 2.2: tenant-сверка в `ProcessMarketplaceRawDocumentAction::__invoke` ($document vs $command->companyId)
+- 2.3: integration-тесты: чужой rawDoc → исключение
 
 ### Files to inspect first on resume
-- `docs/tasks/marketplace-security-hardening/plan.md`
-- diff `861d6116...HEAD` + рабочее дерево
+- `site/src/Marketplace/Application/ProcessOzonRealizationAction.php` (:65-85)
+- `site/src/Marketplace/Application/ProcessMarketplaceRawDocumentAction.php` (:50)
+- `site/tests/Integration/Marketplace/Application/`

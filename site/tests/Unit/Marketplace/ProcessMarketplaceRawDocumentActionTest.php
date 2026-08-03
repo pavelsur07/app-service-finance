@@ -62,6 +62,9 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $document = $this->createMock(MarketplaceRawDocument::class);
         $document->method('getRawData')->willReturn([['x' => 1]]);
         $document->method('getMarketplace')->willReturn(MarketplaceType::OZON);
+        $company = $this->createMock(Company::class);
+        $company->method('getId')->willReturn('company-1');
+        $document->method('getCompany')->willReturn($company);
 
         $repository = $this->createMock(MarketplaceRawDocumentRepository::class);
         $repository->method('find')->willReturn($document);
@@ -94,6 +97,9 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $document = $this->createMock(MarketplaceRawDocument::class);
         $document->method('getRawData')->willReturn([['x' => 1]]);
         $document->method('getMarketplace')->willReturn(MarketplaceType::OZON);
+        $company = $this->createMock(Company::class);
+        $company->method('getId')->willReturn('company-1');
+        $document->method('getCompany')->willReturn($company);
 
         $repository = $this->createMock(MarketplaceRawDocumentRepository::class);
         $repository->method('find')->willReturn($document);
@@ -138,6 +144,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $document->method('getRawData')->willReturn([['x' => 1]]);
         $document->method('getMarketplace')->willReturn(MarketplaceType::WILDBERRIES);
         $company = $this->createMock(Company::class);
+        $company->method('getId')->willReturn('company-1');
         $document->method('getCompany')->willReturn($company);
 
         $repository = $this->createMock(MarketplaceRawDocumentRepository::class);
@@ -182,6 +189,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $document->method('getRawData')->willReturn([['x' => 1]]);
         $document->method('getMarketplace')->willReturn(MarketplaceType::WILDBERRIES);
         $company = $this->createMock(Company::class);
+        $company->method('getId')->willReturn('company-1');
         $document->method('getCompany')->willReturn($company);
 
         $repository = $this->createMock(MarketplaceRawDocumentRepository::class);
@@ -225,6 +233,9 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $document = $this->createMock(MarketplaceRawDocument::class);
         $document->method('getRawData')->willReturn([]);
         $document->method('getMarketplace')->willReturn(MarketplaceType::OZON);
+        $company = $this->createMock(Company::class);
+        $company->method('getId')->willReturn('company-1');
+        $document->method('getCompany')->willReturn($company);
 
         $repository = $this->createMock(MarketplaceRawDocumentRepository::class);
         $repository->method('find')->willReturn($document);
