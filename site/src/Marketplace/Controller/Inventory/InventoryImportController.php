@@ -33,6 +33,10 @@ final class InventoryImportController extends AbstractController
         $company   = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
+        if (!$this->isCsrfTokenValid('marketplace_inventory_import_cost_price', (string) $request->request->get('_token', ''))) {
+            throw $this->createAccessDeniedException('Недействительный CSRF-токен');
+        }
+
         $file          = $request->files->get('cost_file');
         $effectiveFrom = (string) $request->request->get('effective_from', '');
         $marketplace   = (string) $request->request->get('marketplace', '');

@@ -90,6 +90,10 @@ final class MarketplaceSaleMappingController extends AbstractController
     {
         $company = $this->companyContext->getCompany();
 
+        if (!$this->isCsrfTokenValid('marketplace_pl_mappings_create', (string) $request->request->get('_token', ''))) {
+            throw $this->createAccessDeniedException('Недействительный CSRF-токен');
+        }
+
         $marketplaceValue = (string) $request->request->get('marketplace', '');
         $amountSourceValue = (string) $request->request->get('amount_source', '');
         $plCategoryId = (string) $request->request->get('pl_category_id', '');
@@ -169,6 +173,10 @@ final class MarketplaceSaleMappingController extends AbstractController
             throw $this->createNotFoundException();
         }
 
+        if (!$this->isCsrfTokenValid('marketplace_pl_mappings_edit' . $id, (string) $request->request->get('_token', ''))) {
+            throw $this->createAccessDeniedException('Недействительный CSRF-токен');
+        }
+
         $plCategoryId = (string) $request->request->get('pl_category_id', '');
         if ($plCategoryId === '') {
             $this->addFlash('error', 'Выберите категорию ОПиУ');
@@ -217,7 +225,7 @@ final class MarketplaceSaleMappingController extends AbstractController
         return $this->redirectBackToIndex($request);
     }
 
-    #[Route('/{id}/toggle', name: 'marketplace_pl_mappings_toggle')]
+    #[Route('/{id}/toggle', name: 'marketplace_pl_mappings_toggle', methods: ['POST'])]
     public function toggle(string $id, Request $request): Response
     {
         $company = $this->companyContext->getCompany();
@@ -225,6 +233,10 @@ final class MarketplaceSaleMappingController extends AbstractController
         $mapping = $this->mappingRepository->findByIdAndCompany($id, $company->getId());
         if (!$mapping) {
             throw $this->createNotFoundException();
+        }
+
+        if (!$this->isCsrfTokenValid('toggle' . $id, (string) $request->request->get('_token', ''))) {
+            throw $this->createAccessDeniedException('Недействительный CSRF-токен');
         }
 
         $newState = !$mapping->isActive();

@@ -34,6 +34,7 @@
             </div>
         {% else %}
             <form method="post" action="{{ path('marketplace_cost_pl_mapping_bulk_save') }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('marketplace_cost_pl_mapping_bulk_save') }}">
                 <input type="hidden" name="marketplace" value="{{ selected_marketplace ?? '' }}">
 
                 <div class="card">

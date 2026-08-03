@@ -13,6 +13,7 @@ use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -31,7 +32,7 @@ final class InventorySyncSingleBarcodeController extends AbstractController
     }
 
     #[Route('/{id}/sync-barcode', name: 'marketplace_inventory_sync_barcode_single', methods: ['POST'])]
-    public function __invoke(string $id): Response
+    public function __invoke(string $id, Request $request): Response
     {
         $company   = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
@@ -40,6 +41,10 @@ final class InventorySyncSingleBarcodeController extends AbstractController
 
         if ($listing === null) {
             throw $this->createNotFoundException('Листинг не найден.');
+        }
+
+        if (!$this->isCsrfTokenValid('marketplace_inventory_sync_barcode_single' . $id, (string) $request->request->get('_token', ''))) {
+            throw $this->createAccessDeniedException('Недействительный CSRF-токен');
         }
 
         if ($listing->getMarketplace() !== MarketplaceType::OZON) {

@@ -136,6 +136,7 @@
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
                 <form method="post" action="{{ path('marketplace_recalculate_sales_cost_price') }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('marketplace_recalculate_sales_cost_price') }}">
                     <input type="hidden" name="redirect_to" value="marketplace_returns_index">
                     <div class="modal-header">
                         <h5 class="modal-title">Пересчитать себестоимость</h5>

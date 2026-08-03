@@ -27,7 +27,7 @@ final class MonthPreliminaryRebuildControllerTest extends WebTestCaseBase
             [],
             [],
             ['CONTENT_TYPE' => 'application/json'],
-            json_encode(['marketplace' => 'ozon', 'year' => 2026, 'month' => 4]),
+            json_encode(['marketplace' => 'ozon', 'year' => 2026, 'month' => 4, '_token' => $this->csrfToken($client, 'marketplace_month_preliminary_rebuild')]),
         );
 
         self::assertResponseStatusCodeSame(Response::HTTP_ACCEPTED);
@@ -48,7 +48,7 @@ final class MonthPreliminaryRebuildControllerTest extends WebTestCaseBase
             [],
             [],
             ['CONTENT_TYPE' => 'application/json'],
-            json_encode(['marketplace' => 'ozon', 'year' => 2026, 'month' => 4]),
+            json_encode(['marketplace' => 'ozon', 'year' => 2026, 'month' => 4, '_token' => $this->csrfToken($client, 'marketplace_month_preliminary_rebuild')]),
         );
         self::assertResponseStatusCodeSame(Response::HTTP_ACCEPTED);
 
@@ -59,7 +59,7 @@ final class MonthPreliminaryRebuildControllerTest extends WebTestCaseBase
             [],
             [],
             ['CONTENT_TYPE' => 'application/json'],
-            json_encode(['marketplace' => 'ozon', 'year' => 2026, 'month' => 4]),
+            json_encode(['marketplace' => 'ozon', 'year' => 2026, 'month' => 4, '_token' => $this->csrfToken($client, 'marketplace_month_preliminary_rebuild')]),
         );
 
         self::assertResponseStatusCodeSame(Response::HTTP_TOO_MANY_REQUESTS);
@@ -79,7 +79,7 @@ final class MonthPreliminaryRebuildControllerTest extends WebTestCaseBase
             [],
             [],
             ['CONTENT_TYPE' => 'application/json'],
-            json_encode(['marketplace' => 'unknown', 'year' => 2026, 'month' => 4]),
+            json_encode(['marketplace' => 'unknown', 'year' => 2026, 'month' => 4, '_token' => $this->csrfToken($client, 'marketplace_month_preliminary_rebuild')]),
         );
 
         self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
@@ -97,7 +97,7 @@ final class MonthPreliminaryRebuildControllerTest extends WebTestCaseBase
             [],
             [],
             ['CONTENT_TYPE' => 'application/json'],
-            json_encode(['marketplace' => 'ozon', 'year' => 2026, 'month' => 13]),
+            json_encode(['marketplace' => 'ozon', 'year' => 2026, 'month' => 13, '_token' => $this->csrfToken($client, 'marketplace_month_preliminary_rebuild')]),
         );
 
         self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);

@@ -49,6 +49,13 @@ final class MonthPreliminaryRebuildController extends AbstractController
         $year        = (int)    ($payload['year']  ?? 0);
         $month       = (int)    ($payload['month'] ?? 0);
 
+        if (!$this->isCsrfTokenValid('marketplace_month_preliminary_rebuild', (string) ($payload['_token'] ?? ''))) {
+            return new JsonResponse(
+                ['error' => 'Недействительный CSRF-токен.'],
+                Response::HTTP_FORBIDDEN,
+            );
+        }
+
         if (MarketplaceType::tryFrom($marketplace) === null) {
             return new JsonResponse(
                 ['error' => 'Некорректный маркетплейс.'],

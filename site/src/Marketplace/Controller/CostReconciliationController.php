@@ -32,6 +32,11 @@ final class CostReconciliationController extends AbstractController
     {
         $company     = $this->companyService->getActiveCompany();
         $companyId   = (string) $company->getId();
+
+        if (!$this->isCsrfTokenValid('marketplace_month_close_reconcile', (string) $request->request->get('_token', ''))) {
+            throw $this->createAccessDeniedException('Недействительный CSRF-токен');
+        }
+
         $marketplace = (string) $request->request->get('marketplace', MarketplaceType::OZON->value);
         $year        = (int) $request->request->get('year');
         $month       = (int) $request->request->get('month');

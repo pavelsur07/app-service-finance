@@ -103,6 +103,10 @@ class MarketplaceController extends AbstractController
     {
         $company = $this->companyService->getActiveCompany();
 
+        if (!$this->isCsrfTokenValid('marketplace_connection_create', (string) $request->request->get('_token', ''))) {
+            throw $this->createAccessDeniedException('Недействительный CSRF-токен');
+        }
+
         $marketplace = MarketplaceType::from($request->request->get('marketplace'));
         $apiKey      = trim((string) $request->request->get('api_key', ''));
         $clientId    = trim((string) $request->request->get('client_id', ''));
@@ -196,8 +200,8 @@ class MarketplaceController extends AbstractController
         ]);
     }
 
-    #[Route('/connection/{id}/test', name: 'marketplace_connection_test')]
-    public function testConnection(string $id): Response
+    #[Route('/connection/{id}/test', name: 'marketplace_connection_test', methods: ['POST'])]
+    public function testConnection(string $id, Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
 
@@ -205,6 +209,10 @@ class MarketplaceController extends AbstractController
 
         if (!$connection || $connection->getCompany()->getId() !== $company->getId()) {
             throw $this->createNotFoundException('Подключение не найдено');
+        }
+
+        if (!$this->isCsrfTokenValid('test' . $id, (string) $request->request->get('_token', ''))) {
+            throw $this->createAccessDeniedException('Недействительный CSRF-токен');
         }
 
         if ($connection->getMarketplace() === MarketplaceType::OZON
@@ -248,14 +256,18 @@ class MarketplaceController extends AbstractController
         return $this->redirectToRoute('marketplace_index');
     }
 
-    #[Route('/connection/{id}/sync', name: 'marketplace_connection_sync')]
-    public function syncConnection(string $id): Response
+    #[Route('/connection/{id}/sync', name: 'marketplace_connection_sync', methods: ['POST'])]
+    public function syncConnection(string $id, Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
         $connection = $this->connectionRepository->find($id);
 
         if (!$connection || (string) $connection->getCompany()->getId() !== (string) $company->getId()) {
             throw $this->createNotFoundException('Подключение не найдено');
+        }
+
+        if (!$this->isCsrfTokenValid('sync' . $id, (string) $request->request->get('_token', ''))) {
+            throw $this->createAccessDeniedException('Недействительный CSRF-токен');
         }
 
         if (!$this->canRunManualSync($connection)) {
@@ -294,7 +306,7 @@ class MarketplaceController extends AbstractController
         return $this->redirectToRoute('marketplace_index');
     }
 
-    #[Route('/connection/{id}/sync-period', name: 'marketplace_connection_sync_period')]
+    #[Route('/connection/{id}/sync-period', name: 'marketplace_connection_sync_period', methods: ['POST'])]
     public function syncConnectionPeriod(string $id, Request $request): Response
     {
         $company    = $this->companyService->getActiveCompany();
@@ -304,14 +316,18 @@ class MarketplaceController extends AbstractController
             throw $this->createNotFoundException('Подключение не найдено');
         }
 
+        if (!$this->isCsrfTokenValid('sync_period' . $id, (string) $request->request->get('_token', ''))) {
+            throw $this->createAccessDeniedException('Недействительный CSRF-токен');
+        }
+
         if (!$this->canRunManualSync($connection)) {
             $this->addFlash('error', $this->manualSyncBlockedMessage($connection));
 
             return $this->redirectToRoute('marketplace_index');
         }
 
-        $dateFromStr = $request->query->get('date_from');
-        $dateToStr   = $request->query->get('date_to');
+        $dateFromStr = $request->request->get('date_from');
+        $dateToStr   = $request->request->get('date_to');
 
         if (!$dateFromStr || !$dateToStr) {
             $this->addFlash('error', 'Укажите период синхронизации');
@@ -367,7 +383,7 @@ class MarketplaceController extends AbstractController
     }
 
     #[Route('/connection/{id}/sync-realization', name: 'marketplace_connection_sync_realization', methods: ['POST'])]
-    public function syncRealization(string $id): Response
+    public function syncRealization(string $id, Request $request): Response
     {
         $company   = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
@@ -376,6 +392,10 @@ class MarketplaceController extends AbstractController
 
         if (!$connection || (string) $connection->getCompany()->getId() !== $companyId) {
             throw $this->createNotFoundException('Подключение не найдено');
+        }
+
+        if (!$this->isCsrfTokenValid('sync_realization' . $id, (string) $request->request->get('_token', ''))) {
+            throw $this->createAccessDeniedException('Недействительный CSRF-токен');
         }
 
         if ($connection->getMarketplace() !== MarketplaceType::OZON) {
@@ -436,9 +456,10 @@ class MarketplaceController extends AbstractController
         return $this->json($rawDoc->getRawData(), 200, [], ['json_encode_options' => JSON_PRETTY_PRINT]);
     }
 
-    #[Route('/raw/{id}/process-realization', name: 'marketplace_raw_process_realization')]
+    #[Route('/raw/{id}/process-realization', name: 'marketplace_raw_process_realization', methods: ['POST'])]
     public function processRealization(
         string $id,
+        Request $request,
         ProcessOzonRealizationAction $action,
     ): Response {
         $company = $this->companyService->getActiveCompany();
@@ -447,6 +468,10 @@ class MarketplaceController extends AbstractController
 
         if (!$rawDoc || (string) $rawDoc->getCompany()->getId() !== (string) $company->getId()) {
             throw $this->createNotFoundException();
+        }
+
+        if (!$this->isCsrfTokenValid('marketplace_raw_process_realization' . $id, (string) $request->request->get('_token', ''))) {
+            throw $this->createAccessDeniedException('Недействительный CSRF-токен');
         }
 
         if ($rawDoc->getDocumentType() !== 'realization') {
@@ -531,6 +556,10 @@ class MarketplaceController extends AbstractController
     public function reprocess(Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
+
+        if (!$this->isCsrfTokenValid('marketplace_reprocess', (string) $request->request->get('_token', ''))) {
+            throw $this->createAccessDeniedException('Недействительный CSRF-токен');
+        }
 
         $marketplace  = $request->request->get('marketplace', '');
         $periodFromStr = $request->request->get('period_from', '');
@@ -860,6 +889,10 @@ class MarketplaceController extends AbstractController
         }
 
         if ($request->isMethod('POST')) {
+            if (!$this->isCsrfTokenValid('marketplace_connection_edit' . $id, (string) $request->request->get('_token', ''))) {
+                throw $this->createAccessDeniedException('Недействительный CSRF-токен');
+            }
+
             $projectId = trim((string) $request->request->get('project_direction_id', '')) ?: null;
 
             $connection->setProjectDirectionId($projectId);

@@ -257,7 +257,7 @@ final class MarketplaceControllerCreateConnectionTest extends TestCase
             $messageBus,
             $this->createMock(WbInitialSyncStartDateResolver::class),
             $this->createMock(WbFinancialReportSyncPlannerInterface::class),
-        )->syncConnection($connection->getId());
+        )->syncConnection($connection->getId(), new Request());
 
         self::assertInstanceOf(RedirectResponse::class, $response);
     }
@@ -294,7 +294,7 @@ final class MarketplaceControllerCreateConnectionTest extends TestCase
             $this->createMock(WbInitialSyncStartDateResolver::class),
             $this->createMock(WbFinancialReportSyncPlannerInterface::class),
             $validator,
-        )->testConnection($connection->getId());
+        )->testConnection($connection->getId(), new Request());
 
         self::assertInstanceOf(RedirectResponse::class, $response);
         self::assertTrue($connection->isActive());
@@ -335,7 +335,7 @@ final class MarketplaceControllerCreateConnectionTest extends TestCase
             $this->createMock(WbInitialSyncStartDateResolver::class),
             $this->createMock(WbFinancialReportSyncPlannerInterface::class),
             $validator,
-        )->testConnection($connection->getId());
+        )->testConnection($connection->getId(), new Request());
 
         self::assertInstanceOf(RedirectResponse::class, $response);
         self::assertFalse($connection->isActive());
@@ -377,7 +377,7 @@ final class MarketplaceControllerCreateConnectionTest extends TestCase
             $this->createMock(WbInitialSyncStartDateResolver::class),
             $this->createMock(WbFinancialReportSyncPlannerInterface::class),
             $validator,
-        )->testConnection($connection->getId());
+        )->testConnection($connection->getId(), new Request());
 
         self::assertInstanceOf(RedirectResponse::class, $response);
         self::assertTrue($connection->isActive());
@@ -423,6 +423,11 @@ final class MarketplaceControllerCreateConnectionTest extends TestCase
         ) extends MarketplaceController {
             protected function addFlash(string $type, mixed $message): void
             {
+            }
+
+            protected function isCsrfTokenValid(string $id, ?string $token): bool
+            {
+                return true;
             }
 
             protected function redirectToRoute(string $route, array $parameters = [], int $status = 302): RedirectResponse

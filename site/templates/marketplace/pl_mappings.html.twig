@@ -161,10 +161,14 @@
                                     Редактировать
                                 </a>
 
-                                <a href="{{ path('marketplace_pl_mappings_toggle', {id: m.id, op: operationType, marketplace: marketplaceFilterValue}) }}"
-                                   class="btn btn-sm {{ m.isActive ? 'btn-ghost-warning' : 'btn-ghost-success' }}">
-                                    {{ m.isActive ? 'Выключить' : 'Включить' }}
-                                </a>
+                                <form method="post" action="{{ path('marketplace_pl_mappings_toggle', {id: m.id}) }}" style="display:inline">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('toggle' ~ m.id) }}">
+                                    <input type="hidden" name="redirect_op" value="{{ operationType }}">
+                                    <input type="hidden" name="redirect_marketplace" value="{{ marketplaceFilterValue }}">
+                                    <button type="submit" class="btn btn-sm {{ m.isActive ? 'btn-ghost-warning' : 'btn-ghost-success' }}">
+                                        {{ m.isActive ? 'Выключить' : 'Включить' }}
+                                    </button>
+                                </form>
                             </div>
                         </td>
                     </tr>
@@ -173,6 +177,7 @@
                         <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
                             <div class="modal-content">
                                 <form method="post" action="{{ path('marketplace_pl_mappings_edit', {id: m.id}) }}">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('marketplace_pl_mappings_edit' ~ m.id) }}">
                                     <input type="hidden" name="redirect_op" value="{{ operationType }}">
                                     <input type="hidden" name="redirect_marketplace" value="{{ marketplaceFilterValue }}">
 
@@ -260,6 +265,7 @@
         <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
             <div class="modal-content">
                 <form method="post" action="{{ path('marketplace_pl_mappings_create') }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('marketplace_pl_mappings_create') }}">
                     <input type="hidden" name="redirect_op" value="{{ operationType }}">
                     <input type="hidden" name="redirect_marketplace" value="{{ marketplaceFilterValue }}">
 

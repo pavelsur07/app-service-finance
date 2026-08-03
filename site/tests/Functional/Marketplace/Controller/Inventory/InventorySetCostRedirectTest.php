@@ -30,6 +30,7 @@ final class InventorySetCostRedirectTest extends WebTestCaseBase
             'POST',
             sprintf('/marketplace/inventory/%s/set-cost', $listing->getId()),
             [
+                '_token' => $this->csrfToken($client, 'marketplace_inventory_set_cost' . $listing->getId()),
                 'price_amount' => '850.00',
                 'effective_from' => '2026-04-15',
                 'note' => 'unit test',
@@ -53,6 +54,7 @@ final class InventorySetCostRedirectTest extends WebTestCaseBase
             'POST',
             sprintf('/marketplace/inventory/%s/set-cost', $listing->getId()),
             [
+                '_token' => $this->csrfToken($client, 'marketplace_inventory_set_cost' . $listing->getId()),
                 'price_amount' => '999.50',
                 'effective_from' => '2026-04-16',
             ],
@@ -75,6 +77,7 @@ final class InventorySetCostRedirectTest extends WebTestCaseBase
             'POST',
             sprintf('/marketplace/inventory/%s/set-cost', $listing->getId()),
             [
+                '_token' => $this->csrfToken($client, 'marketplace_inventory_set_cost' . $listing->getId()),
                 'price_amount' => '500.00',
                 'effective_from' => '2026-04-19',
             ],
@@ -104,6 +107,7 @@ final class InventorySetCostRedirectTest extends WebTestCaseBase
             'POST',
             sprintf('/marketplace/inventory/%s/set-cost', $listingId),
             [
+                '_token' => $this->csrfToken($client, 'marketplace_inventory_set_cost' . $listingId),
                 'price_amount' => '1234.56',
                 'effective_from' => '2026-04-17',
             ],
@@ -128,6 +132,7 @@ final class InventorySetCostRedirectTest extends WebTestCaseBase
             'POST',
             sprintf('/marketplace/inventory/%s/set-cost', $listingId),
             [
+                '_token' => $this->csrfToken($client, 'marketplace_inventory_set_cost' . $listingId),
                 'price_amount' => '777.00',
                 'effective_from' => '2026-04-18',
                 'return_to' => 'history',

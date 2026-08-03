@@ -30,6 +30,10 @@ class RecalculateSalesCostPriceController extends AbstractController
         $company   = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
+        if (!$this->isCsrfTokenValid('marketplace_recalculate_sales_cost_price', (string) $request->request->get('_token', ''))) {
+            throw $this->createAccessDeniedException('Недействительный CSRF-токен');
+        }
+
         $marketplace  = $request->request->get('marketplace');
         $dateFrom     = $request->request->get('date_from');
         $dateTo       = $request->request->get('date_to');

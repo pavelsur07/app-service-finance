@@ -105,6 +105,10 @@ final class InventoryController extends AbstractController
         $company   = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
+        if (!$this->isCsrfTokenValid('marketplace_inventory_set_cost' . $id, (string) $request->request->get('_token', ''))) {
+            throw $this->createAccessDeniedException('Недействительный CSRF-токен');
+        }
+
         $priceAmount   = (string) $request->request->get('price_amount', '');
         $effectiveFrom = (string) $request->request->get('effective_from', '');
         $note          = (string) $request->request->get('note', '') ?: null;
@@ -155,10 +159,14 @@ final class InventoryController extends AbstractController
     }
 
     #[Route('/sync-barcodes', name: 'marketplace_inventory_sync_barcodes', methods: ['POST'])]
-    public function syncBarcodes(): Response
+    public function syncBarcodes(Request $request): Response
     {
         $company   = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
+
+        if (!$this->isCsrfTokenValid('marketplace_inventory_sync_barcodes', (string) $request->request->get('_token', ''))) {
+            throw $this->createAccessDeniedException('Недействительный CSRF-токен');
+        }
 
         $this->messageBus->dispatch(new SyncOzonListingBarcodesMessage(
             companyId: $companyId,

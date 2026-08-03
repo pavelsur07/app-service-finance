@@ -49,6 +49,10 @@ final class CreatePerformanceConnectionController extends AbstractController
     {
         $company = $this->companyService->getActiveCompany();
 
+        if (!$this->isCsrfTokenValid('marketplace_connection_create', (string) $request->request->get('_token', ''))) {
+            throw $this->createAccessDeniedException('Недействительный CSRF-токен');
+        }
+
         $clientId     = trim((string) $request->request->get('client_id', ''));
         $clientSecret = trim((string) $request->request->get('client_secret', ''));
 
