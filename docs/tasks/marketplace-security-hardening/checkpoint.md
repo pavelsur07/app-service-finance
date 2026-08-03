@@ -2,33 +2,32 @@
 
 ## Current checkpoint
 
-**Phase:** Stage 3 (M5 пагинация + M10 транзакция тегов)
-**Status:** implementing
-**Stage base commit:** 2d30d0cd (Stage 2 commit)
-**Current Work item:** 3.1
-**Owner gate:** no (Stage 1–3); yes на Stage 4
+**Phase:** Release Gate (после Stage 4)
+**Status:** stopped — owner gate
+**Stage base commit:** c2e7e351 (Stage 4)
+**Current Work item:** none
+**Owner gate:** yes (Stage 4)
 
 ### Completed
-- Stage 1 (H3) — DONE: commit `787e49cc`, REVIEW_GREEN, `stages/stage-1.md`
-- Stage 2 (H4) — DONE: commit `2d30d0cd`, REVIEW_GREEN, `stages/stage-2.md`
-- Draft PR #2291 (2 коммита)
+- Stage 1 (H3) — `787e49cc`, REVIEW_GREEN
+- Stage 2 (H4) — `2d30d0cd`, REVIEW_GREEN
+- Stage 3 (M5/M10) — `c2e7e351`, REVIEW_GREEN
+- Stage 4 (H1 expand + backfill-команда) — `d43f7704`, REVIEW_GREEN
+- Draft PR #2291 (4 коммита), handoff.md
 
 ### Current diff / affected files
-- (в работе) `MarketplaceController::productsIndex`, `products.html.twig`, `AssignListingTagAction`
+- Рабочее дерево чистое, все изменения в ветке `task/marketplace-security-hardening`
 
 ### Checks and baseline
-- unit 1722 OK; integration+functional Marketplace 337 OK
+- unit 1722 OK; integration+functional 352 OK; lint:container/twig OK; миграция применена локально
 
 ### Review status
-- Stage 1, 2: REVIEW_GREEN
-- Stage 3: iteration 0
+- Все 4 Stage: REVIEW_GREEN
 
 ### Exact next action
-- 3.1: Pagerfanta в `productsIndex` (паттерн `MarketplaceSalesController`) + pager в `products.html.twig`
-- 3.2: `wrapInTransaction` в `AssignListingTagAction`
-- 3.3: тесты пагинации; ListingTagsApiTest зелёные
+- STOP: ждать решения владельца (handoff.md → «Требуемое решение владельца»):
+  1) ключ шифрования на проде, 2) wrapper для backfill-команды, 3) одобрение мержа PR #2291 + backfill --execute
 
 ### Files to inspect first on resume
-- `site/src/Marketplace/Controller/MarketplaceController.php` (productsIndex ~:650)
-- `site/src/Marketplace/Controller/MarketplaceSalesController.php` (паттерн Pagerfanta)
-- `site/src/Marketplace/Application/AssignListingTagAction.php`
+- `docs/tasks/marketplace-security-hardening/handoff.md`
+- `docs/tasks/marketplace-security-hardening/stages/stage-4.md`
