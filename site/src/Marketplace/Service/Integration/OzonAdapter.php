@@ -10,6 +10,7 @@ use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
+use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -30,6 +31,7 @@ class OzonAdapter implements MarketplaceAdapterInterface
         private readonly HttpClientInterface $httpClient,
         private readonly MarketplaceConnectionRepository $connectionRepository,
         private readonly LoggerInterface $logger,
+        private readonly ConnectionApiKeyCodec $connectionApiKeyCodec,
     ) {
     }
 
@@ -416,7 +418,7 @@ class OzonAdapter implements MarketplaceAdapterInterface
     {
         return [
             'Client-Id' => $connection->getClientId(),
-            'Api-Key' => $connection->getApiKey(),
+            'Api-Key' => $this->connectionApiKeyCodec->apiKeyFor($connection),
             'Content-Type' => 'application/json',
         ];
     }

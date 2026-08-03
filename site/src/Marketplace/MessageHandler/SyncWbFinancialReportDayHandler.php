@@ -26,6 +26,7 @@ use App\Marketplace\Message\ProcessDayReportMessage;
 use App\Marketplace\Message\SyncWbFinancialReportDayMessage;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Lock\LockFactory;
@@ -53,6 +54,7 @@ final class SyncWbFinancialReportDayHandler
         private readonly MessageBusInterface $messageBus,
         private readonly LoggerInterface $logger,
         private readonly ClockInterface $clock,
+        private readonly ConnectionApiKeyCodec $connectionApiKeyCodec,
         private readonly int $financeRetryDelaySeconds,
     ) {
     }
@@ -207,7 +209,7 @@ final class SyncWbFinancialReportDayHandler
             return;
         }
 
-        $apiKey = $connection->getApiKey();
+        $apiKey = $this->connectionApiKeyCodec->apiKeyFor($connection);
         $sellerRateLimitKey = $this->financeSalesReportClient->buildSalesReportsRateLimitKeyForSellerBucket($sellerBucketId);
         $retryAfter = $this->financeSalesReportClient->tryConsume($sellerRateLimitKey);
         if (null !== $retryAfter) {

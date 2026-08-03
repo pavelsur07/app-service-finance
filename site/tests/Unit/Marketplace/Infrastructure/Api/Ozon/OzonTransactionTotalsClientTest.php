@@ -20,8 +20,8 @@ final class OzonTransactionTotalsClientTest extends TestCase
     public function testThrowsAndSurfacesHttpStatusOnErrorResponse(): void
     {
         $dbal = $this->createMock(Connection::class);
-        $dbal->method('fetchAssociative')->willReturn(['api_key' => 'key', 'client_id' => 'client']);
-        $credentialsQuery = new MarketplaceCredentialsQuery($dbal);
+        $dbal->method('fetchAssociative')->willReturn(['api_key' => 'key', 'api_key_encrypted' => null, 'api_key_key_version' => null, 'client_id' => 'client']);
+        $credentialsQuery = new MarketplaceCredentialsQuery($dbal, new \App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec($this->createMock(\App\Shared\Security\Contract\FieldEncryptionServiceInterface::class)));
 
         $http = new MockHttpClient(new MockResponse('{"error":"boom"}', ['http_code' => 500]));
         $client = new OzonTransactionTotalsClient($http, $credentialsQuery);

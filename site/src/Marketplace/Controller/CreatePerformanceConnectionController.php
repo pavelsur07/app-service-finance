@@ -9,6 +9,7 @@ use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Exception\OzonPerformanceValidationException;
+use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -37,6 +38,7 @@ final class CreatePerformanceConnectionController extends AbstractController
         private readonly MarketplaceConnectionRepository $connectionRepository,
         private readonly OzonPerformanceConnectionValidator $validator,
         private readonly EntityManagerInterface $em,
+        private readonly ConnectionApiKeyCodec $connectionApiKeyCodec,
     ) {
     }
 
@@ -88,7 +90,7 @@ final class CreatePerformanceConnectionController extends AbstractController
             MarketplaceType::OZON,
             MarketplaceConnectionType::PERFORMANCE,
         );
-        $connection->setApiKey($clientSecret);
+        $this->connectionApiKeyCodec->applyApiKey($connection, $clientSecret);
         $connection->setClientId($clientId);
 
         $this->em->persist($connection);

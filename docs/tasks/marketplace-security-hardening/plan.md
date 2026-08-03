@@ -113,6 +113,14 @@ Work items:
 - 4.3.1 Отключение plaintext-записи + тесты.
 - 4.5 Stage Report + STOP на owner gate: провижининг ключа на проде, деплой, backfill-run.
 
+### Stage 4 — уточнение scope по ходу реализации (зафиксировано)
+Реализовано: 4.1 (миграция `Version20260803200103`: `api_key_encrypted` TEXT NULL + `api_key_key_version` VARCHAR(32) NULL; кодек `ConnectionApiKeyCodec` на `FieldEncryptionServiceInterface`; entity + 2 writer'а через `applyApiKey` — dual-write plaintext+encrypted; 6 readers + DBAL `MarketplaceCredentialsQuery` через `apiKeyFor`/decrypt с fallback на plaintext) и 4.2 (команда `app:marketplace:encrypt-connection-keys`, dry-run по умолчанию, `--execute`, идемпотентна).
+
+**4.3 (прекращение записи plaintext) и 4.4 (drop legacy-колонки) перенесены в отдельную contract-задачу.** Причина: один PR = один атомарный деплой; если бы 4.3 вошло в этот PR, деплой до backfill-прогона сразу прекратил бы plaintext-запись и сделал бы откат небезопасным для новых строк. Текущий PR полностью rollback-safe: plaintext пишется всегда, encrypted — дополнительно. Contract-задача стартует после подтверждения backfill на проде (owner gate).
+
+В contract-задачу также включить (FOLLOW-UP внешнего review Stage 4):
+- `site/templates/marketplace/index.html.twig:48` — маскированный вывод `connection.apiKey|slice(0, 20)` читает plaintext напрямую; перевести на `apiKeyFor` (после прекращения plaintext-записи новые строки иначе покажут пустую маску).
+
 Reviewer focus: секреты не логируются (в т.ч. в исключениях и команде); `MarketplaceCredentialsQuery` не возвращает plaintext наружу; Ozon Performance `client_secret` (те же поля) покрыт; rollback-совместимость 4.1 (старая версия кода читает plaintext, новая пишет оба → безопасно).
 
 ---

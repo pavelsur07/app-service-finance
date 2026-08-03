@@ -14,6 +14,7 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Api\Wildberries\WbFinanceSalesReportClient;
 use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
+use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -27,6 +28,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
         private readonly LoggerInterface $logger,
         private readonly WbSalesReportRowNormalizer $normalizer,
         private readonly WbFinanceSalesReportClient $salesReportClient,
+        private readonly ConnectionApiKeyCodec $connectionApiKeyCodec,
     ) {
     }
 
@@ -39,7 +41,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
         }
 
         return $this->salesReportClient->probeAccess(
-            $connection->getApiKey(),
+            $this->connectionApiKeyCodec->apiKeyFor($connection),
             $this->salesReportClient->resolveSalesReportsBucketId($connection),
         );
     }
@@ -60,7 +62,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
 
         return $this->salesReportClient->fetchDetailedForConnection(
             $connection->getId(),
-            $connection->getApiKey(),
+            $this->connectionApiKeyCodec->apiKeyFor($connection),
             $dateFrom,
             $dateTo,
             $this->salesReportClient->resolveSalesReportsBucketId($connection),
@@ -83,7 +85,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
 
         return $this->salesReportClient->hasAnyDataForConnection(
             $connection->getId(),
-            $connection->getApiKey(),
+            $this->connectionApiKeyCodec->apiKeyFor($connection),
             $dateFrom,
             $dateTo,
             $this->salesReportClient->resolveSalesReportsBucketId($connection),

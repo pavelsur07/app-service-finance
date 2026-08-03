@@ -18,6 +18,7 @@ use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Infrastructure\Api\Ozon\OzonCredentialValidationStatus;
 use App\Marketplace\Infrastructure\Query\OzonRealizationStatusQuery;
 use App\Marketplace\Infrastructure\Query\RawDocumentsListQuery;
+use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
 use App\Marketplace\Infrastructure\Query\WbFinanceSyncStatusListQuery;
 use App\Marketplace\Infrastructure\Api\Ozon\OzonSellerCredentialValidatorInterface;
 use App\Marketplace\Message\ReprocessCostsMessage;
@@ -60,6 +61,7 @@ class MarketplaceController extends AbstractController
         private readonly WbFinancialReportSyncPlannerInterface $wbFinancialReportSyncPlanner,
         private readonly WbFinanceSyncStatusListQuery     $wbFinanceSyncStatusListQuery,
         private readonly OzonSellerCredentialValidatorInterface $ozonCredentialValidator,
+        private readonly ConnectionApiKeyCodec            $connectionApiKeyCodec,
     ) {
     }
 
@@ -128,7 +130,7 @@ class MarketplaceController extends AbstractController
             $company,
             $marketplace
         );
-        $connection->setApiKey($apiKey);
+        $this->connectionApiKeyCodec->applyApiKey($connection, $apiKey);
 
         if ($clientId) {
             $connection->setClientId($clientId);
@@ -218,7 +220,7 @@ class MarketplaceController extends AbstractController
         if ($connection->getMarketplace() === MarketplaceType::OZON
             && $connection->getConnectionType() === MarketplaceConnectionType::SELLER
         ) {
-            $result = $this->ozonCredentialValidator->validate($connection->getClientId(), $connection->getApiKey());
+            $result = $this->ozonCredentialValidator->validate($connection->getClientId(), $this->connectionApiKeyCodec->apiKeyFor($connection));
 
             if ($result->isValid()) {
                 $connection->setIsActive(true);
@@ -719,7 +721,7 @@ class MarketplaceController extends AbstractController
         if ($connection->getMarketplace() === MarketplaceType::OZON
             && $connection->getConnectionType() === MarketplaceConnectionType::SELLER
         ) {
-            $result = $this->ozonCredentialValidator->validate($connection->getClientId(), $connection->getApiKey());
+            $result = $this->ozonCredentialValidator->validate($connection->getClientId(), $this->connectionApiKeyCodec->apiKeyFor($connection));
 
             if (!$result->isValid()) {
                 $connection->setIsActive(false);

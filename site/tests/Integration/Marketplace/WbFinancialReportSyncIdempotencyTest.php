@@ -374,6 +374,7 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
             $messageBus,
             self::getContainer()->get(LoggerInterface::class),
             self::getContainer()->get(ClockInterface::class),
+            self::getContainer()->get(\App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec::class),
             (int) self::getContainer()->getParameter('wb_finance.rate_limit_interval_seconds'),
         );
     }
