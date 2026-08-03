@@ -29,7 +29,6 @@ export default defineConfig({
                 admin_shell: "./assets/styles/pages/admin-shell.css",
                 vf_custom_classes: "./assets/styles/vf-custom-classes.css",
                 dashboard: "./assets/react/_legacy/dashboard_started.tsx", // Точка ./ обязательна!
-                marketplace_analytics_kpi: "./assets/react/_legacy/marketplace_analytics_kpi.tsx",
                 marketplace_analytics_page: "./assets/react/_legacy/marketplace-analytics-page.tsx",
                 reconciliation_page: "./assets/react/_legacy/reconciliation-page.tsx",
                 unit_extended_page: "./assets/react/_legacy/unit-extended-page.tsx",
