@@ -58,6 +58,57 @@ final class CashFileRowNormalizerTest extends TestCase
         self::assertSame($expected, $result['externalId']);
     }
 
+    public function testInflowOutflowTakesPriorityOverStaleAmountColumn(): void
+    {
+        $normalizer = new CashFileRowNormalizer();
+
+        $result = $normalizer->normalize(
+            [
+                'Date' => '2025-12-01',
+                'Amount' => 'not-a-number',
+                'Inflow' => null,
+                'Outflow' => '1200.50',
+            ],
+            [
+                'date' => 'Date',
+                'amount' => 'Amount',
+                'inflow' => 'Inflow',
+                'outflow' => 'Outflow',
+            ],
+            'RUB'
+        );
+
+        self::assertTrue($result['ok']);
+        self::assertSame(CashDirection::OUTFLOW, $result['direction']);
+        self::assertSame('1200.50', $result['amount']);
+    }
+
+    public function testInflowOutflowConfiguredButEmptyDoesNotFallBackToValidAmount(): void
+    {
+        $normalizer = new CashFileRowNormalizer();
+
+        $result = $normalizer->normalize(
+            [
+                'Date' => '2025-12-01',
+                'Amount' => '1000',
+                'Inflow' => null,
+                'Outflow' => null,
+            ],
+            [
+                'date' => 'Date',
+                'amount' => 'Amount',
+                'inflow' => 'Inflow',
+                'outflow' => 'Outflow',
+            ],
+            'RUB'
+        );
+
+        self::assertFalse($result['ok']);
+        self::assertNull($result['direction']);
+        self::assertNull($result['amount']);
+        self::assertContains('Не удалось определить сумму операции.', $result['errors']);
+    }
+
     public function testDateParsingSupportsKnownFormats(): void
     {
         $normalizer = new CashFileRowNormalizer();
