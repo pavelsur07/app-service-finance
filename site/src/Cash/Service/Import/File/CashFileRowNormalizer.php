@@ -73,6 +73,26 @@ class CashFileRowNormalizer
         $direction = null;
         $amount = null;
 
+        $inflowColumn = $mapping['inflow'] ?? null;
+        $outflowColumn = $mapping['outflow'] ?? null;
+
+        if (null !== $inflowColumn || null !== $outflowColumn) {
+            $inflowValue = $this->parseNumber($this->getMappedValue($rowByHeader, $inflowColumn));
+            $outflowValue = $this->parseNumber($this->getMappedValue($rowByHeader, $outflowColumn));
+
+            if (null !== $inflowValue && $inflowValue > 0) {
+                $direction = CashDirection::INFLOW;
+                $amount = $this->formatAmount($inflowValue);
+            } elseif (null !== $outflowValue && $outflowValue > 0) {
+                $direction = CashDirection::OUTFLOW;
+                $amount = $this->formatAmount($outflowValue);
+            } else {
+                $errors[] = 'Не удалось определить сумму операции.';
+            }
+
+            return [$direction, $amount, $errors];
+        }
+
         $amountColumn = $mapping['amount'] ?? null;
         if (null !== $amountColumn) {
             $amountValue = $this->parseNumber($this->getMappedValue($rowByHeader, $amountColumn));
@@ -86,18 +106,7 @@ class CashFileRowNormalizer
             return [$direction, $amount, $errors];
         }
 
-        $inflowValue = $this->parseNumber($this->getMappedValue($rowByHeader, $mapping['inflow'] ?? null));
-        $outflowValue = $this->parseNumber($this->getMappedValue($rowByHeader, $mapping['outflow'] ?? null));
-
-        if (null !== $inflowValue && $inflowValue > 0) {
-            $direction = CashDirection::INFLOW;
-            $amount = $this->formatAmount($inflowValue);
-        } elseif (null !== $outflowValue && $outflowValue > 0) {
-            $direction = CashDirection::OUTFLOW;
-            $amount = $this->formatAmount($outflowValue);
-        } else {
-            $errors[] = 'Не удалось определить сумму операции.';
-        }
+        $errors[] = 'Не удалось определить сумму операции.';
 
         return [$direction, $amount, $errors];
     }

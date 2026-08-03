@@ -206,47 +206,12 @@ class CashFileImportController extends AbstractController
             return $this->redirectToRoute('cash_file_import_upload');
         }
 
-        $dateColumn = $this->normalizeMappingColumn($request->request->get('date_column'));
-        $amountColumn = $this->normalizeMappingColumn($request->request->get('amount_column'));
-        $inflowColumn = $this->normalizeMappingColumn($request->request->get('inflow_column'));
-        $outflowColumn = $this->normalizeMappingColumn($request->request->get('outflow_column'));
-        $counterpartyColumn = $this->normalizeMappingColumn($request->request->get('counterparty_column'));
-        $descriptionColumn = $this->normalizeMappingColumn($request->request->get('description_column'));
-        $currencyColumn = $this->normalizeMappingColumn($request->request->get('currency_column'));
-        $docNumberColumn = $this->normalizeMappingColumn($request->request->get('doc_number_column'));
-
-        if (null === $dateColumn) {
-            $this->addFlash('error', 'Укажите колонку с датой операции.');
-
+        $mapping = $this->buildMappingFromRequest($request);
+        if (null === $mapping) {
             return $this->redirectToRoute('cash_file_import_mapping');
         }
 
-        $hasAmount = null !== $amountColumn;
-        $hasInflowOutflow = null !== $inflowColumn && null !== $outflowColumn;
-
-        if (!$hasAmount && !$hasInflowOutflow) {
-            $this->addFlash('error', 'Укажите колонку суммы или пары колонок приход/расход.');
-
-            return $this->redirectToRoute('cash_file_import_mapping');
-        }
-
-        if ($hasAmount) {
-            $inflowColumn = null;
-            $outflowColumn = null;
-        } else {
-            $amountColumn = null;
-        }
-
-        $importPayload['mapping'] = [
-            'date' => $dateColumn,
-            'amount' => $amountColumn,
-            'inflow' => $inflowColumn,
-            'outflow' => $outflowColumn,
-            'counterparty' => $counterpartyColumn,
-            'description' => $descriptionColumn,
-            'currency' => $currencyColumn,
-            'doc_number' => $docNumberColumn,
-        ];
+        $importPayload['mapping'] = $mapping;
 
         $session->set('cash_file_import', $importPayload);
 
@@ -326,47 +291,10 @@ class CashFileImportController extends AbstractController
             return $this->redirectToRoute('cash_file_import_mapping');
         }
 
-        $dateColumn = $this->normalizeMappingColumn($request->request->get('date_column'));
-        $amountColumn = $this->normalizeMappingColumn($request->request->get('amount_column'));
-        $inflowColumn = $this->normalizeMappingColumn($request->request->get('inflow_column'));
-        $outflowColumn = $this->normalizeMappingColumn($request->request->get('outflow_column'));
-        $counterpartyColumn = $this->normalizeMappingColumn($request->request->get('counterparty_column'));
-        $descriptionColumn = $this->normalizeMappingColumn($request->request->get('description_column'));
-        $currencyColumn = $this->normalizeMappingColumn($request->request->get('currency_column'));
-        $docNumberColumn = $this->normalizeMappingColumn($request->request->get('doc_number_column'));
-
-        if (null === $dateColumn) {
-            $this->addFlash('error', 'Укажите колонку с датой операции.');
-
+        $mapping = $this->buildMappingFromRequest($request);
+        if (null === $mapping) {
             return $this->redirectToRoute('cash_file_import_mapping');
         }
-
-        $hasAmount = null !== $amountColumn;
-        $hasInflowOutflow = null !== $inflowColumn && null !== $outflowColumn;
-
-        if (!$hasAmount && !$hasInflowOutflow) {
-            $this->addFlash('error', 'Укажите колонку суммы или пары колонок приход/расход.');
-
-            return $this->redirectToRoute('cash_file_import_mapping');
-        }
-
-        if ($hasAmount) {
-            $inflowColumn = null;
-            $outflowColumn = null;
-        } else {
-            $amountColumn = null;
-        }
-
-        $mapping = [
-            'date' => $dateColumn,
-            'amount' => $amountColumn,
-            'inflow' => $inflowColumn,
-            'outflow' => $outflowColumn,
-            'counterparty' => $counterpartyColumn,
-            'description' => $descriptionColumn,
-            'currency' => $currencyColumn,
-            'doc_number' => $docNumberColumn,
-        ];
 
         $options = [];
         if (isset($importPayload['options']) && is_array($importPayload['options'])) {
@@ -585,6 +513,58 @@ class CashFileImportController extends AbstractController
             'jobId' => $job->getId(),
             'importLogId' => $job->getImportLog()?->getId(),
         ]);
+    }
+
+    /**
+     * @return array{date: string, amount: ?string, inflow: ?string, outflow: ?string, counterparty: ?string, description: ?string, currency: ?string, doc_number: ?string}|null
+     */
+    private function buildMappingFromRequest(Request $request): ?array
+    {
+        $dateColumn = $this->normalizeMappingColumn($request->request->get('date_column'));
+        $amountColumn = $this->normalizeMappingColumn($request->request->get('amount_column'));
+        $inflowColumn = $this->normalizeMappingColumn($request->request->get('inflow_column'));
+        $outflowColumn = $this->normalizeMappingColumn($request->request->get('outflow_column'));
+        $counterpartyColumn = $this->normalizeMappingColumn($request->request->get('counterparty_column'));
+        $descriptionColumn = $this->normalizeMappingColumn($request->request->get('description_column'));
+        $currencyColumn = $this->normalizeMappingColumn($request->request->get('currency_column'));
+        $docNumberColumn = $this->normalizeMappingColumn($request->request->get('doc_number_column'));
+
+        if (null === $dateColumn) {
+            $this->addFlash('error', 'Укажите колонку с датой операции.');
+
+            return null;
+        }
+
+        $hasInflowOutflow = null !== $inflowColumn && null !== $outflowColumn;
+        $hasAmount = null !== $amountColumn;
+
+        if (!$hasAmount && !$hasInflowOutflow) {
+            $this->addFlash('error', 'Укажите колонку суммы или пары колонок приход/расход.');
+
+            return null;
+        }
+
+        // Раздельные колонки приход/расход в приоритете: иначе значение,
+        // оставшееся в поле "Сумма" от предыдущего рендера формы (например,
+        // после применения другого профиля), молча перекрывает корректно
+        // выбранные пользователем inflow/outflow.
+        if ($hasInflowOutflow) {
+            $amountColumn = null;
+        } else {
+            $inflowColumn = null;
+            $outflowColumn = null;
+        }
+
+        return [
+            'date' => $dateColumn,
+            'amount' => $amountColumn,
+            'inflow' => $inflowColumn,
+            'outflow' => $outflowColumn,
+            'counterparty' => $counterpartyColumn,
+            'description' => $descriptionColumn,
+            'currency' => $currencyColumn,
+            'doc_number' => $docNumberColumn,
+        ];
     }
 
     private function normalizeMappingColumn(mixed $value): ?string
