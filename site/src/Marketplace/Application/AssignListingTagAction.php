@@ -28,13 +28,17 @@ final class AssignListingTagAction
 
     public function __invoke(string $companyId, ListingTagPayload $payload): ListingTagAssignResult
     {
-        $tag = null !== $payload->tagId
-            ? $this->requireTag($companyId, $payload->tagId)
-            : $this->findOrCreate($companyId, (string) $payload->tagName);
+        // Транзакция на весь write-path: создание тега (flush) + вставка назначений (DBAL)
+        // атомарны — сбой между ними не оставляет тег-сироту без назначений.
+        return $this->em->wrapInTransaction(function () use ($companyId, $payload): ListingTagAssignResult {
+            $tag = null !== $payload->tagId
+                ? $this->requireTag($companyId, $payload->tagId)
+                : $this->findOrCreate($companyId, (string) $payload->tagName);
 
-        $assigned = $this->assignments->assign($companyId, $payload->listingIds, $tag->getId());
+            $assigned = $this->assignments->assign($companyId, $payload->listingIds, $tag->getId());
 
-        return new ListingTagAssignResult($tag->getId(), $tag->getName(), $assigned);
+            return new ListingTagAssignResult($tag->getId(), $tag->getName(), $assigned);
+        });
     }
 
     private function requireTag(string $companyId, string $tagId): MarketplaceListingTag

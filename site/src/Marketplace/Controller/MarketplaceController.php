@@ -669,21 +669,26 @@ class MarketplaceController extends AbstractController
     }
 
     #[Route('/products', name: 'marketplace_products_index')]
-    public function productsIndex(): Response
+    public function productsIndex(Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
+        $page    = max(1, $request->query->getInt('page', 1));
 
-        $listings = $this->em->getRepository(MarketplaceListing::class)
+        $qb = $this->em->getRepository(MarketplaceListing::class)
             ->createQueryBuilder('l')
             ->leftJoin('l.product', 'p')
             ->where('l.company = :company')
             ->setParameter('company', $company)
-            ->orderBy('l.createdAt', 'DESC')
-            ->getQuery()
-            ->getResult();
+            ->orderBy('l.createdAt', 'DESC');
+
+        $pagerfanta = Pagerfanta::createForCurrentPageWithMaxPerPage(
+            new QueryAdapter($qb),
+            $page,
+            50,
+        );
 
         return $this->render('marketplace/products.html.twig', [
-            'listings' => $listings,
+            'pager' => $pagerfanta,
         ]);
     }
 
