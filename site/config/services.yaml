@@ -349,10 +349,6 @@ services:
     App\Marketplace\Application\Source\RealizationReturnDataSource:
         tags: ['marketplace.data_source']
 
-    # CostPriceResolverInterface → InventoryCostPriceResolver (уже должен быть)
-    # App\Marketplace\Inventory\CostPriceResolverInterface:
-    #     class: App\Marketplace\Inventory\Application\InventoryCostPriceResolver
-
     # ---------- Notification  ------------ #
     App\Notification\Channel\:
         resource: '../src/Notification/Channel/'
