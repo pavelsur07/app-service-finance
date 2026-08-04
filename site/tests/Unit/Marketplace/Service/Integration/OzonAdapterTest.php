@@ -56,7 +56,7 @@ final class OzonAdapterTest extends TestCase
         $repo = $this->createMock(MarketplaceConnectionRepository::class);
         $repo->method('findByMarketplace')->willReturn($this->connection());
 
-        return new OzonAdapter($http, $repo, new NullLogger(), new \App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec($this->createMock(\App\Shared\Security\Contract\FieldEncryptionServiceInterface::class)));
+        return new OzonAdapter($http, $repo, new NullLogger(), new \App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec($this->createMock(\App\Shared\Security\Contract\FieldEncryptionServiceInterface::class), $this->createMock(\App\Shared\Security\Contract\SecretRotationServiceInterface::class)));
     }
 
     private function company(): Company

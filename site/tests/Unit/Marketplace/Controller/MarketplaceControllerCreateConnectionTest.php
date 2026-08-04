@@ -422,6 +422,7 @@ final class MarketplaceControllerCreateConnectionTest extends TestCase
             $ozonCredentialValidator,
             new \App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec(
                 $this->fieldEncryptionServiceStub(),
+                $this->createMock(\App\Shared\Security\Contract\SecretRotationServiceInterface::class),
             ),
         ) extends MarketplaceController {
             protected function addFlash(string $type, mixed $message): void
