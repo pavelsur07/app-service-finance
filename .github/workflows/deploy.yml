@@ -201,6 +201,8 @@ jobs:
                     export APP_OBJECT_STORAGE_S3_ACCESS_KEY="${{ secrets.APP_OBJECT_STORAGE_S3_ACCESS_KEY }}"
                     export APP_OBJECT_STORAGE_S3_SECRET_KEY="${{ secrets.APP_OBJECT_STORAGE_S3_SECRET_KEY }}"
                     export APP_ENCRYPTION_FALLBACK_KEY="${{ secrets.APP_ENCRYPTION_FALLBACK_KEY }}"
+                    export APP_ENCRYPTION_KEYS_JSON='${{ secrets.APP_ENCRYPTION_KEYS_JSON }}'
+                    export APP_ENCRYPTION_CURRENT_KEY_VERSION="${{ secrets.APP_ENCRYPTION_CURRENT_KEY_VERSION }}"
                     # Heartbeat-монитор GlitchTip для scheduler. Секрет не заведён → пусто →
                     # строка крона выключает себя сама по [ -n "$..." ].
                     # См. docs/maintenance/mailer-monitoring.md
@@ -281,6 +283,8 @@ jobs:
                     export APP_OBJECT_STORAGE_S3_ACCESS_KEY="${{ secrets.APP_OBJECT_STORAGE_S3_ACCESS_KEY }}"
                     export APP_OBJECT_STORAGE_S3_SECRET_KEY="${{ secrets.APP_OBJECT_STORAGE_S3_SECRET_KEY }}"
                     export APP_ENCRYPTION_FALLBACK_KEY="${{ secrets.APP_ENCRYPTION_FALLBACK_KEY }}"
+                    export APP_ENCRYPTION_KEYS_JSON='${{ secrets.APP_ENCRYPTION_KEYS_JSON }}'
+                    export APP_ENCRYPTION_CURRENT_KEY_VERSION="${{ secrets.APP_ENCRYPTION_CURRENT_KEY_VERSION }}"
 
                     docker compose -f docker-compose.prod.yml run --rm site-php-cli bin/console doctrine:migrations:migrate --no-interaction
                     echo "✅ Миграции применены"

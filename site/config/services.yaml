@@ -387,6 +387,7 @@ services:
             $keyFile: '%app.encryption.key_file%'
             $currentKeyVersion: '%app.encryption.current_key_version%'
             $fallbackKeyFromEnv: '%env(default::APP_ENCRYPTION_FALLBACK_KEY)%'
+            $keysJsonFromEnv: '%env(default::APP_ENCRYPTION_KEYS_JSON)%'
 
     App\Shared\Security\Contract\SecretKeyProviderInterface: '@App\Shared\Security\Service\FileBasedSecretKeyProvider'
     App\Shared\Security\Contract\FieldEncryptionServiceInterface: '@App\Shared\Security\Service\SodiumFieldEncryptionService'

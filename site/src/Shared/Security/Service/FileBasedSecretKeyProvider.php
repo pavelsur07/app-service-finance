@@ -13,6 +13,7 @@ final readonly class FileBasedSecretKeyProvider implements SecretKeyProviderInte
         private string $keyFile,
         private string $currentKeyVersion,
         private ?string $fallbackKeyFromEnv = null,
+        private ?string $keysJsonFromEnv = null,
     ) {
     }
 
@@ -40,11 +41,58 @@ final readonly class FileBasedSecretKeyProvider implements SecretKeyProviderInte
             return $keys[$keyVersion];
         }
 
+        $envKeys = $this->readKeysFromEnvJson();
+        if (array_key_exists($keyVersion, $envKeys)) {
+            return $envKeys[$keyVersion];
+        }
+
         if ($keyVersion === $this->currentKeyVersion && null !== $this->fallbackKeyFromEnv && '' !== trim($this->fallbackKeyFromEnv)) {
             return $this->fallbackKeyFromEnv;
         }
 
         throw new MissingEncryptionKeyException('Encryption key is not configured for requested version.');
+    }
+
+    /**
+     * Карта версий из APP_ENCRYPTION_KEYS_JSON (env-only ротация без key-файла).
+     * Пустое/невалидное значение — пустая карта (fallback на остальные источники),
+     * исключение не бросаем, чтобы не ронять приложение из-за опечатки в необязательной
+     * переменной; отсутствие нужной версии ловится в resolveKeyMaterial().
+     *
+     * @return array<string, string>
+     */
+    private function readKeysFromEnvJson(): array
+    {
+        if (null === $this->keysJsonFromEnv || '' === trim($this->keysJsonFromEnv)) {
+            return [];
+        }
+
+        try {
+            $decoded = json_decode($this->keysJsonFromEnv, true, 16, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return [];
+        }
+
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        $keys = [];
+        foreach ($decoded as $version => $material) {
+            if (!is_string($version) || !is_string($material)) {
+                continue;
+            }
+
+            $normalizedVersion = trim($version);
+            $normalizedMaterial = trim($material);
+            if ('' === $normalizedVersion || '' === $normalizedMaterial) {
+                continue;
+            }
+
+            $keys[$normalizedVersion] = $normalizedMaterial;
+        }
+
+        return $keys;
     }
 
     /**
