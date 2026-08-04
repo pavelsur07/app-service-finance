@@ -2,31 +2,25 @@
 
 ## Current checkpoint
 
-**Phase:** Stage 1 — финальное внешнее ревью (подтверждение)
-**Status:** reviewing
+**Phase:** Final Release Gate
+**Status:** done
 **Stage base commit:** 658a93ef7523f57d6685f2a4cadab307cb450738
 **Current Work item:** none
 **Owner gate:** no
 
 ### Completed
-- Реализация 1.1–1.6; 1.7 → FOLLOW-UP
-- External review: REVIEW_GREEN (ит.2), REVIEW_GREEN (ит.3), финальное подтверждение запущено
-- Все IMPORTANT/MINOR ит.1–3 исправлены (см. stages/stage-1.md)
-- Stage Report подготовлен: docs/tasks/change-password/stages/stage-1.md
+- Stage 1 полностью: реализация, проверки, internal review (3 ит.), external review (5 ит., REVIEW_GREEN)
+- Commits: `eacd5957` (фича + доки), `c95b1f1e` (handoff)
+- Push `task/change-password` → origin
+- Draft PR: https://github.com/pavelsur07/app-service-finance/pull/2297
+- Handoff: `docs/tasks/change-password/handoff.md`
 
-### Checks (финальные)
-- unit: OK (1759 tests, 9860 assertions)
-- functional Company: OK (26 tests, 162 assertions)
-- lint:container / lint:twig / lint:yaml — OK
+### Checks
+- unit: OK (1759 tests); functional Company: OK (26 tests); lint yaml/twig/container: OK
 
 ### Review status
-- internal: зелёный, 3 итерации
-- external: REVIEW_GREEN ×2 + финальное подтверждение в фоне
-- unresolved findings: none (FOLLOW-UP зафиксированы в stage-1.md)
+- external: REVIEW_GREEN (финальная итерация 4)
+- unresolved findings: none; FOLLOW-UP в handoff.md
 
 ### Exact next action
-- Дождаться финального REVIEW_GREEN → commit только task-owned файлы → push `task/change-password` → Draft PR → handoff.md → финальный отчёт
-
-### Files to inspect first on resume
-- `git status --short` (коммитить ТОЛЬКО файлы задачи — в дереве чужие изменения pl-category-import)
-- `docs/tasks/change-password/stages/stage-1.md`
+- Ждать owner review PR #2297. Мерж/deploy — только по явному указанию owner.
