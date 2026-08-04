@@ -75,6 +75,10 @@ services:
         arguments:
             $factory: '@?limiter.registration'
 
+    App\Shared\Service\RateLimiter\PasswordChangeRateLimiter:
+        arguments:
+            $factory: '@?limiter.password_change'
+
 
     App\Marketplace\Infrastructure\Redis\WbFinanceRedisCooldownStorage:
         arguments:
