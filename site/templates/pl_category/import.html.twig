@@ -1,0 +1,106 @@
+{% extends 'base.html.twig' %}
+{% block title %}Импорт категорий ОПиУ{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Импорт категорий ОПиУ из другой компании</h2>
+                </div>
+                <div class="col-auto ms-auto d-print-none">
+                    <div class="btn-list">
+                        <a href="{{ path('pl_category_index') }}" class="btn btn-outline-secondary">Назад к списку</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-xl mt-3">
+        <div class="card mb-3">
+            <div class="card-body">
+                {% if sources is empty %}
+                    <div class="alert alert-info mb-0">
+                        Нет других компаний, к которым у вас есть доступ.
+                    </div>
+                {% else %}
+                    <form method="get" action="{{ path('pl_category_import') }}" class="row g-2 align-items-end">
+                        <div class="col-auto">
+                            <label class="form-label" for="sourceCompanyId">Компания-источник</label>
+                            <select class="form-select" id="sourceCompanyId" name="sourceCompanyId">
+                                <option value="">— выберите компанию —</option>
+                                {% for source in sources %}
+                                    <option value="{{ source.id }}"{{ selectedSourceCompanyId == source.id ? ' selected' : '' }}>{{ source.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-primary">Показать предпросмотр</button>
+                        </div>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if preview is not null %}
+            <div class="card">
+                <div class="card-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-auto">
+                            <div class="text-secondary">Будет создано</div>
+                            <div class="h2 mb-0">{{ preview.created|length }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <div class="text-secondary">Будет обновлено</div>
+                            <div class="h2 mb-0">{{ preview.updated|length }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <div class="text-secondary">Без изменений</div>
+                            <div class="h2 mb-0">{{ preview.unchangedCount }}</div>
+                        </div>
+                    </div>
+
+                    {% if preview.created is empty and preview.updated is empty %}
+                        <div class="alert alert-secondary mb-3">Изменений нет — импортировать нечего.</div>
+                    {% else %}
+                        <div class="table-responsive mb-3">
+                            <table class="table table-vcenter card-table">
+                                <thead>
+                                    <tr>
+                                        <th>Действие</th>
+                                        <th>Путь</th>
+                                        <th>Код</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in preview.created %}
+                                        <tr>
+                                            <td><span class="badge bg-green-lt">Создать</span></td>
+                                            <td>{{ row.path }}</td>
+                                            <td>{{ row.code }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                    {% for row in preview.updated %}
+                                        <tr>
+                                            <td><span class="badge bg-blue-lt">Обновить</span></td>
+                                            <td>{{ row.path }}</td>
+                                            <td>{{ row.code }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% endif %}
+
+                    <form method="post" action="{{ path('pl_category_import_apply') }}">
+                        <input type="hidden" name="sourceCompanyId" value="{{ selectedSourceCompanyId }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token('pl-category-import' ~ targetCompanyId) }}">
+                        <button type="submit" class="btn btn-primary"{{ (preview.created is empty and preview.updated is empty) ? ' disabled' : '' }}>
+                            Импортировать
+                        </button>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

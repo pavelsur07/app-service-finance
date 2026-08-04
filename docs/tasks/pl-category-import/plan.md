@@ -69,73 +69,51 @@ Reviewer focus:
 - `CompanyFacade` не протекает Entity наружу модуля (DTO/scalar).
 - companyId/userId scoping — нет IDOR.
 
-## Stage 2: Controller + маршруты (публичный endpoint)
+## Stage 2: Controller + маршруты + UI (объединено с бывшим Stage 3)
 Risk: 🟠 HIGH-LOCAL
 owner_gate: no
 release_candidate: no
 independently_deployable: no
-stage_base_commit: <зафиксировать перед стартом Stage 2>
+stage_base_commit: 1a05a2d982332c81bde1369207e96a85988dfc27
+
+Изначально Controller и UI планировались отдельными Stage. По факту
+реализации объединены в один Stage: Controller, рендерящий несуществующий
+шаблон, нетестируем и недеплоируем сам по себе — Work items 2.x и бывшие 3.x
+делались и ревьюились одним диффом. Решение Владельца (в чате после Stage 1):
+экран импорта — легаси Tabler, как `index.html.twig`/`new.html.twig`/
+`edit.html.twig` этого же модуля, не UI Kit; выбор компании — обычный
+`<select>`, не EntityPicker.
 
 Definition of Done:
 - `GET /pl-categories/import` — список источников (без target-компании),
   опциональный dry-run preview по `sourceCompanyId`.
 - `POST /pl-categories/import/apply` — CSRF, реальный импорт, redirect+flash.
-- Доступ к source-компании валидируется на обоих маршрутах.
+- Доступ к source-компании валидируется на обоих маршрутах независимо.
+- `templates/pl_category/import.html.twig` — тот же Tabler-стиль, что и
+  соседние шаблоны модуля; ссылка-кнопка на новый экран с `index.html.twig`.
 - Functional-тесты зелёные.
 
 Work items:
 - 2.1 — `pl_category_import` (GET): список источников + dry-run preview.
 - 2.2 — `pl_category_import_apply` (POST): CSRF + apply + flash + redirect.
-- 2.3 — `PLCategoryImportControllerTest` (WebTestCaseBase): access-control,
-  preview-счётчики, apply, неверный CSRF, идемпотентный повторный импорт.
+- 2.3 — `import.html.twig` (Tabler-разметка) + ссылка с `index.html.twig`.
+- 2.4 — `PLCategoryImportControllerTest` (WebTestCaseBase): список
+  источников, access-control на GET и POST независимо, preview create+update,
+  неверный CSRF, apply создаёт+обновляет, идемпотентный повторный импорт.
 
 Stage checks:
-- `make site-test` (полный набор — новый функциональный тест затрагивает
-  security/routing).
-- `make site-cs-check` точечно.
+- `composer test:unit` / `composer test:functional` (полный набор — новый
+  функциональный тест затрагивает security/routing).
+- `php-cs-fixer --dry-run` точечно; `lint:twig` на новый/изменённый шаблон.
 
 Reviewer focus:
-- IDOR: нельзя импортировать из компании, к которой нет доступа.
+- IDOR: нельзя импортировать из компании, к которой нет доступа — на GET и
+  POST независимо.
 - CSRF на apply.
 - Target-компания всегда берётся из `ActiveCompanyService`, не из
   пользовательского ввода.
-
-## Stage 3: UI (легаси Tabler, тот же стиль, что остальные `pl_category/*`)
-Risk: 🟡 MEDIUM
-owner_gate: no
-release_candidate: no
-independently_deployable: no
-stage_base_commit: <зафиксировать перед стартом Stage 3>
-
-Решение Владельца (обновлено в чате после Stage 1): экран импорта — легаси
-на базе Tabler, как `index.html.twig`/`new.html.twig`/`edit.html.twig` этого
-же модуля (`page-header` + `.card > .card-body`, `.btn.btn-primary`,
-`badge bg-*-lt`), а не UI Kit. UI Kit для этого экрана не используем.
-
-Definition of Done:
-- `templates/pl_category/import.html.twig` — тот же Tabler-стиль, что и
-  соседние шаблоны модуля.
-- Ссылка-кнопка на новый экран с `pl_category/index.html.twig`.
-- Ручной smoke-test в браузере (dev-сервер).
-
-Work items:
-- 3.1 — `import.html.twig`: селектор источника (`<select>`) + форма dry-run
-  (GET), в Tabler-разметке модуля.
-- 3.2 — Блок preview (таблица создать/обновить, пустое состояние текстом) +
-  форма apply (POST, CSRF), Tabler `card`/`table`/`badge`.
-- 3.3 — Кнопка-ссылка на `pl_category/index.html.twig`.
-- 3.4 — Ручная проверка в браузере: 2 компании, дерево с/без code, preview,
-  apply, повторный импорт (0/0).
-
-Stage checks:
-- `make site-cs-check` точечно (twig не проверяется cs-fixer, но связанные
-  php-файлы — да).
-- Ручной smoke-test — обязателен (UI-задача).
-
-Reviewer focus:
 - Разметка/классы согласованы с существующими `pl_category/*` (не мешаем
   Tabler с UI Kit на одном экране).
-- Дерево/предпросмотр читаемы при глубокой вложенности (до 5 уровней).
 
 ## Definition of Done задачи целиком
 
