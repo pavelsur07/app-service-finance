@@ -88,6 +88,30 @@ class CompanyMemberRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    /**
+     * Активные членства пользователя во всех компаниях (кроме собственных —
+     * там членства нет, компания видна через Company.user).
+     *
+     * @return list<CompanyMember>
+     */
+    public function findActiveByUserId(string $userId): array
+    {
+        /** @var list<CompanyMember> $result */
+        $result = $this->createQueryBuilder('companyMember')
+            ->innerJoin('companyMember.company', 'company')
+            ->addSelect('company')
+            ->innerJoin('companyMember.user', 'user')
+            ->andWhere('user.id = :userId')
+            ->andWhere('companyMember.status = :status')
+            ->setParameter('userId', $userId)
+            ->setParameter('status', CompanyMember::STATUS_ACTIVE)
+            ->orderBy('company.name', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return $result;
+    }
+
     public function findFirstActiveCompanyForUser(User $user): ?Company
     {
         $companyMember = $this->createQueryBuilder('companyMember')

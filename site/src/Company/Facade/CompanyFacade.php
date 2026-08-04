@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Company\Facade;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\CompanyMember;
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\User;
 use App\Company\Infrastructure\Repository\CompanyRepository;
+use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Service\CompanyOwnerAccountCreator;
 use Ramsey\Uuid\Uuid;
@@ -21,6 +23,7 @@ final class CompanyFacade
         private readonly CompanyRepository $repository,
         private readonly CompanyOwnerAccountCreator $accountCreator,
         private readonly CounterpartyRepository $counterpartyRepository,
+        private readonly CompanyMemberRepository $companyMemberRepository,
     ) {
     }
 
@@ -94,5 +97,57 @@ final class CompanyFacade
         }
 
         return $this->counterpartyRepository->findOneByIdAndCompany($counterpartyId, $companyId);
+    }
+
+    /**
+     * Компании, доступные пользователю: которыми он владеет, либо в которых
+     * состоит активным участником. Используется для выбора компании при
+     * межкомпанийных операциях (например, импорт справочников).
+     *
+     * @return list<array{id: string, name: string}>
+     */
+    public function listAccessibleCompaniesForUser(string $userId): array
+    {
+        return array_map(
+            static fn (Company $company): array => [
+                'id' => (string) $company->getId(),
+                'name' => (string) $company->getName(),
+            ],
+            $this->accessibleCompaniesForUser($userId),
+        );
+    }
+
+    /**
+     * Владелец компании либо активный CompanyMember — единственные, у кого
+     * есть доступ к данным компании.
+     */
+    public function userHasAccess(string $companyId, string $userId): bool
+    {
+        foreach ($this->accessibleCompaniesForUser($userId) as $company) {
+            if ($company->getId() === $companyId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<Company>
+     */
+    private function accessibleCompaniesForUser(string $userId): array
+    {
+        $owned = $this->repository->findByUserId($userId);
+        $memberCompanies = array_map(
+            static fn (CompanyMember $member): Company => $member->getCompany(),
+            $this->companyMemberRepository->findActiveByUserId($userId),
+        );
+
+        $byId = [];
+        foreach ([...$owned, ...$memberCompanies] as $company) {
+            $byId[$company->getId()] = $company;
+        }
+
+        return array_values($byId);
     }
 }

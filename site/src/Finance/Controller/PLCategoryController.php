@@ -162,6 +162,7 @@ class PLCategoryController extends AbstractController
             'type' => $category->getType()->value,
             'format' => $category->getFormat()->value,
             'flow' => $category->getFlow()->value,
+            'expenseType' => $category->getExpenseType()->value,
             'weightInParent' => $category->getWeightInParent(),
             'isVisible' => $category->isVisible(),
             'formula' => $category->getFormula(),

@@ -6,6 +6,7 @@ namespace App\Tests\Builders\Finance;
 
 use App\Company\Entity\Company;
 use App\Finance\Entity\PLCategory;
+use App\Finance\Enum\PLExpenseType;
 use App\Finance\Enum\PLFlow;
 use App\Tests\Builders\Company\CompanyBuilder;
 use Ramsey\Uuid\Uuid;
@@ -16,6 +17,9 @@ final class PLCategoryBuilder
     private Company $company;
     private string $name;
     private PLFlow $flow;
+    private ?string $code = null;
+    private ?PLCategory $parent = null;
+    private PLExpenseType $expenseType = PLExpenseType::OTHER;
 
     private function __construct()
     {
@@ -62,11 +66,38 @@ final class PLCategoryBuilder
         return $clone;
     }
 
+    public function withCode(?string $code): self
+    {
+        $clone = clone $this;
+        $clone->code = $code;
+
+        return $clone;
+    }
+
+    public function withParent(?PLCategory $parent): self
+    {
+        $clone = clone $this;
+        $clone->parent = $parent;
+
+        return $clone;
+    }
+
+    public function withExpenseType(PLExpenseType $expenseType): self
+    {
+        $clone = clone $this;
+        $clone->expenseType = $expenseType;
+
+        return $clone;
+    }
+
     public function build(): PLCategory
     {
         $category = new PLCategory($this->id, $this->company);
         $category->setName($this->name);
         $category->setFlow($this->flow);
+        $category->setCode($this->code);
+        $category->setParent($this->parent);
+        $category->setExpenseType($this->expenseType);
 
         return $category;
     }
