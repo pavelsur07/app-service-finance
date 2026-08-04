@@ -6,6 +6,7 @@ namespace App\Marketplace\Infrastructure\Security;
 
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Shared\Security\Contract\FieldEncryptionServiceInterface;
+use App\Shared\Security\Contract\SecretRotationServiceInterface;
 use App\Shared\Security\ValueObject\EncryptedPayload;
 
 /**
@@ -22,6 +23,7 @@ final readonly class ConnectionApiKeyCodec
 {
     public function __construct(
         private FieldEncryptionServiceInterface $encryptionService,
+        private SecretRotationServiceInterface $rotationService,
     ) {
     }
 
@@ -68,6 +70,32 @@ final readonly class ConnectionApiKeyCodec
             keyVersion: $keyVersion,
             encryptedAt: new \DateTimeImmutable(),
         ));
+    }
+
+    /**
+     * Перешифровывает api_key активной версией ключа, если строка на старой версии.
+     * Plaintext-колонку не трогает. Возвращает true, если ротация выполнена.
+     */
+    public function rotateIfNeeded(MarketplaceConnection $connection): bool
+    {
+        if (!$connection->hasEncryptedApiKey()) {
+            return false;
+        }
+
+        $payload = new EncryptedPayload(
+            ciphertext: $connection->getApiKeyEncrypted(),
+            keyVersion: $connection->getApiKeyKeyVersion(),
+            encryptedAt: new \DateTimeImmutable(),
+        );
+
+        if (!$this->rotationService->requiresReencryption($payload)) {
+            return false;
+        }
+
+        $rotated = $this->rotationService->rotate($payload);
+        $connection->setEncryptedApiKey($rotated->ciphertext(), $rotated->keyVersion());
+
+        return true;
     }
 
     public function encrypt(string $plaintext): EncryptedPayload

@@ -93,7 +93,7 @@ final class RefreshWbListingCatalogActionTest extends TestCase
             $listingRepository,
             $barcodeQuery,
             new NullLogger(),
-            new \App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec($this->createMock(\App\Shared\Security\Contract\FieldEncryptionServiceInterface::class)),
+            new \App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec($this->createMock(\App\Shared\Security\Contract\FieldEncryptionServiceInterface::class), $this->createMock(\App\Shared\Security\Contract\SecretRotationServiceInterface::class)),
         );
 
         self::assertSame(1, $action($company->getId(), $connection->getId()));
@@ -135,7 +135,7 @@ final class RefreshWbListingCatalogActionTest extends TestCase
             $listingRepository,
             new WbBarcodeUpsertQuery($this->createMock(Connection::class)),
             new NullLogger(),
-            new \App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec($this->createMock(\App\Shared\Security\Contract\FieldEncryptionServiceInterface::class)),
+            new \App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec($this->createMock(\App\Shared\Security\Contract\FieldEncryptionServiceInterface::class), $this->createMock(\App\Shared\Security\Contract\SecretRotationServiceInterface::class)),
         );
 
         $this->expectException(\DomainException::class);
@@ -203,7 +203,7 @@ final class RefreshWbListingCatalogActionTest extends TestCase
             $listingRepository,
             new WbBarcodeUpsertQuery($this->createMock(Connection::class)),
             new NullLogger(),
-            new \App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec($this->createMock(\App\Shared\Security\Contract\FieldEncryptionServiceInterface::class)),
+            new \App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec($this->createMock(\App\Shared\Security\Contract\FieldEncryptionServiceInterface::class), $this->createMock(\App\Shared\Security\Contract\SecretRotationServiceInterface::class)),
         );
 
         $this->expectException(\RuntimeException::class);
