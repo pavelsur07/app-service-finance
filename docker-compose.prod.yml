@@ -23,6 +23,9 @@ x-php-env: &php-env
     SENTRY_DSN: ${SENTRY_DSN}
     # Релиз для GlitchTip — git sha из деплоя. Пусто = релиз-трекинг выключен (безопасно).
     SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+    # Ключ шифрования api_key подключений маркетплейсов (sodium secretbox, base64 32 байта).
+    # Пусто = encrypt-путь упадёт с MissingEncryptionKeyException при записи подключений.
+    APP_ENCRYPTION_FALLBACK_KEY: ${APP_ENCRYPTION_FALLBACK_KEY:-}
     HEALTH_CHECK_TOKEN: ${HEALTH_CHECK_TOKEN}
     APP_MAIL_FROM: "Ваш Финдир <support@vashfindir.ru>"
     APP_MAIL_REPLY_TO: "support@vashfindir.ru"
@@ -428,6 +431,8 @@ services:
             SENTRY_DSN: ${SENTRY_DSN}
             # Релиз для GlitchTip — git sha из деплоя. Пусто = релиз-трекинг выключен (безопасно).
             SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+            # Ключ шифрования api_key подключений маркетплейсов (чтение encrypted-строк cron-командами).
+            APP_ENCRYPTION_FALLBACK_KEY: ${APP_ENCRYPTION_FALLBACK_KEY:-}
             # Heartbeat-монитор GlitchTip (dead man's switch для supercronic).
             # Пусто = мониторинг молчания scheduler выключен.
             GLITCHTIP_SCHEDULER_HEARTBEAT_URL: ${GLITCHTIP_SCHEDULER_HEARTBEAT_URL:-}
