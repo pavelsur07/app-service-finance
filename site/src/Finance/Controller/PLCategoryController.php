@@ -2,6 +2,10 @@
 
 namespace App\Finance\Controller;
 
+use App\Company\Entity\User;
+use App\Company\Facade\CompanyFacade;
+use App\Finance\Application\Action\ImportPLCategoryTreeAction;
+use App\Finance\Application\Command\ImportPLCategoryTreeCommand;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Form\PLCategoryFormType;
 use App\Finance\Repository\PLCategoryRepository;
@@ -14,6 +18,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_USER')]
@@ -44,6 +49,100 @@ class PLCategoryController extends AbstractController
         return $this->json($data, Response::HTTP_OK, [], [
             'json_encode_options' => \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES,
         ]);
+    }
+
+    #[Route('/import', name: 'pl_category_import', methods: ['GET'])]
+    public function import(
+        Request $request,
+        ActiveCompanyService $companyService,
+        CompanyFacade $companyFacade,
+        ImportPLCategoryTreeAction $importAction,
+    ): Response {
+        $targetCompany = $companyService->getActiveCompany();
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            throw new AccessDeniedException();
+        }
+
+        $sources = array_values(array_filter(
+            $companyFacade->listAccessibleCompaniesForUser((string) $user->getId()),
+            static fn (array $c): bool => $c['id'] !== (string) $targetCompany->getId(),
+        ));
+
+        $sourceCompanyId = $request->query->get('sourceCompanyId');
+        $preview = null;
+
+        if (is_string($sourceCompanyId) && '' !== $sourceCompanyId) {
+            if (!$companyFacade->userHasAccess($sourceCompanyId, (string) $user->getId())) {
+                throw new AccessDeniedException();
+            }
+
+            try {
+                $preview = $importAction(new ImportPLCategoryTreeCommand(
+                    $sourceCompanyId,
+                    (string) $targetCompany->getId(),
+                    true,
+                ));
+            } catch (\DomainException $e) {
+                $this->addFlash('danger', $e->getMessage());
+            }
+        }
+
+        return $this->render('pl_category/import.html.twig', [
+            'sources' => $sources,
+            'selectedSourceCompanyId' => $sourceCompanyId,
+            'targetCompanyId' => (string) $targetCompany->getId(),
+            'preview' => $preview,
+        ]);
+    }
+
+    #[Route('/import/apply', name: 'pl_category_import_apply', methods: ['POST'])]
+    public function importApply(
+        Request $request,
+        ActiveCompanyService $companyService,
+        CompanyFacade $companyFacade,
+        ImportPLCategoryTreeAction $importAction,
+    ): Response {
+        $targetCompany = $companyService->getActiveCompany();
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            throw new AccessDeniedException();
+        }
+
+        $sourceCompanyId = $request->request->get('sourceCompanyId');
+        if (!is_string($sourceCompanyId) || '' === $sourceCompanyId) {
+            throw $this->createNotFoundException();
+        }
+
+        if (!$this->isCsrfTokenValid('pl-category-import'.(string) $targetCompany->getId(), $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException();
+        }
+
+        if (!$companyFacade->userHasAccess($sourceCompanyId, (string) $user->getId())) {
+            throw new AccessDeniedException();
+        }
+
+        try {
+            $result = $importAction(new ImportPLCategoryTreeCommand(
+                $sourceCompanyId,
+                (string) $targetCompany->getId(),
+                false,
+            ));
+        } catch (\DomainException $e) {
+            // Без sourceCompanyId в redirect: GET заново пересчитал бы тот же
+            // dry-run и добавил бы второй, дублирующий flash с той же ошибкой.
+            $this->addFlash('danger', $e->getMessage());
+
+            return $this->redirectToRoute('pl_category_import');
+        }
+
+        $this->addFlash('success', sprintf(
+            'Импорт завершён: создано %d, обновлено %d.',
+            \count($result->created),
+            \count($result->updated),
+        ));
+
+        return $this->redirectToRoute('pl_category_index');
     }
 
     #[Route('/new', name: 'pl_category_new', methods: ['GET', 'POST'])]
@@ -162,6 +261,7 @@ class PLCategoryController extends AbstractController
             'type' => $category->getType()->value,
             'format' => $category->getFormat()->value,
             'flow' => $category->getFlow()->value,
+            'expenseType' => $category->getExpenseType()->value,
             'weightInParent' => $category->getWeightInParent(),
             'isVisible' => $category->isVisible(),
             'formula' => $category->getFormula(),

@@ -536,6 +536,15 @@ getCompaniesByIds(array $companyIds): array
 
 // Контрагент строго в рамках компании — защита от обращения к чужим данным по id
 findCounterpartyByIdAndCompany(string $counterpartyId, string $companyId): ?Counterparty
+
+// Компании, доступные пользователю: которыми он владеет либо в которых
+// состоит активным CompanyMember. Для выбора компании при межкомпанийных
+// операциях (например, импорт справочников).
+// @return list<array{id: string, name: string}>
+listAccessibleCompaniesForUser(string $userId): array
+
+// Владелец компании либо активный CompanyMember — иначе доступа нет.
+userHasAccess(string $companyId, string $userId): bool
 ```
 
 ### Справочник контрагентов (`Company`)
@@ -2627,6 +2636,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.71 | 2026-08-04 | Company: `CompanyFacade::listAccessibleCompaniesForUser()` и `userHasAccess()` — доступ и список компаний пользователя (owned + активный CompanyMember), для межкомпанийных операций (Finance: импорт дерева ОПиУ между своими компаниями) |
 | 1.70 | 2026-08-02 | Doc sync с кодом: legacy-зона (`src/Entity|Service|Repository|Controller`) отмечена пустой — сущности уже переехали в `Finance/Entity/` и `Company/Entity/`; `Catalog` перестал считаться полностью мигрированным (`Product` всё ещё на `Company $company`); в карту модулей добавлены `Mcp` и `Report` |
 | 1.69 | 2026-07-28 | MCP/Company: read-only `company_find_by_name` глобально разрешает точное название компании без учёта регистра в единственный ID; отсутствие и дубли возвращаются как ожидаемая ошибка |
 | 1.68 | 2026-07-24 | Infrastructure: production PHP CLI disables the broken Alpine/musl opcache dynamic load; production PHP-FPM remains unchanged |

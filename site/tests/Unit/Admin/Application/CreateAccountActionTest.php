@@ -16,6 +16,7 @@ use App\Company\Entity\User;
 use App\Company\Facade\CompanyFacade;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Message\SendRegistrationEmailMessage;
+use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Service\CompanyOwnerAccountCreator;
 use Doctrine\ORM\EntityManagerInterface;
@@ -73,6 +74,7 @@ final class CreateAccountActionTest extends TestCase
             $this->createMock(CompanyRepository::class),
             $accountCreator,
             $this->createMock(CounterpartyRepository::class),
+            $this->createMock(CompanyMemberRepository::class),
         );
         $action = new CreateAccountAction($companyFacade);
 
