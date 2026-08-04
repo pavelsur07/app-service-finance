@@ -59,6 +59,7 @@ final class SyncWbFinancialReportDayHandlerLockTest extends TestCase
             $this->createMock(MessageBusInterface::class),
             $logger,
             new MockClock('2026-05-20T00:00:00+03:00'),
+            new \App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec($this->createMock(\App\Shared\Security\Contract\FieldEncryptionServiceInterface::class)),
             60,
         );
 

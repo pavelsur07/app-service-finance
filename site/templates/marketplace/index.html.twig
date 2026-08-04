@@ -81,14 +81,21 @@
                                     <div class="col-auto">
                                         <div class="btn-list">
                                             <a href="{{ path('marketplace_connection_edit', {id: connection.id}) }}" class="btn btn-sm btn-outline-secondary">Настройки</a>
-                                            <a href="{{ path('marketplace_connection_test', {id: connection.id}) }}" class="btn btn-sm btn-outline-info">Проверить</a>
+                                            <form method="post" action="{{ path('marketplace_connection_test', {id: connection.id}) }}" style="display:inline">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('test' ~ connection.id) }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-info">Проверить</button>
+                                            </form>
                                             {% if isSeller %}
                                                 {% if canManualSync %}
-                                                    <a href="{{ path('marketplace_connection_sync', {id: connection.id}) }}" class="btn btn-sm btn-primary">Синхронизировать</a>
+                                                    <form method="post" action="{{ path('marketplace_connection_sync', {id: connection.id}) }}" style="display:inline">
+                                                        <input type="hidden" name="_token" value="{{ csrf_token('sync' ~ connection.id) }}">
+                                                        <button type="submit" class="btn btn-sm btn-primary">Синхронизировать</button>
+                                                    </form>
                                                     <a href="#" class="btn btn-sm btn-outline-primary"
                                                        data-bs-toggle="modal"
                                                        data-bs-target="#modal-sync-period"
-                                                       data-connection-id="{{ connection.id }}">За период</a>
+                                                       data-connection-id="{{ connection.id }}"
+                                                       data-token="{{ csrf_token('sync_period' ~ connection.id) }}">За период</a>
                                                 {% else %}
                                                     <button type="button" class="btn btn-sm btn-primary" disabled>Синхронизировать</button>
                                                     <button type="button" class="btn btn-sm btn-outline-primary" disabled>За период</button>
@@ -100,7 +107,8 @@
                                                                 data-bs-toggle="modal"
                                                                 data-bs-target="#modal-sync-realization"
                                                                 data-connection-id="{{ connection.id }}"
-                                                                data-action="{{ path('marketplace_connection_sync_realization', {id: connection.id}) }}">
+                                                                data-action="{{ path('marketplace_connection_sync_realization', {id: connection.id}) }}"
+                                                                data-token="{{ csrf_token('sync_realization' ~ connection.id) }}">
                                                             Реализация
                                                         </button>
                                                     {% else %}
@@ -284,7 +292,8 @@
                                                     class="btn btn-sm btn-teal"
                                                     data-bs-toggle="modal"
                                                     data-bs-target="#modal-apply-realization"
-                                                    data-action="{{ path('marketplace_raw_process_realization', {id: doc.id}) }}">
+                                                    data-action="{{ path('marketplace_raw_process_realization', {id: doc.id}) }}"
+                                                    data-token="{{ csrf_token('marketplace_raw_process_realization' ~ doc.id) }}">
                                                 Применить выручку
                                             </button>
                                         {% endif %}
@@ -346,6 +355,7 @@
                       id="form-add-connection"
                       data-seller-action="{{ path('marketplace_connection_create') }}"
                       data-performance-action="{{ path('marketplace_connection_performance_create') }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('marketplace_connection_create') }}">
                     <div class="modal-header">
                         <h5 class="modal-title">Новое подключение</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -417,7 +427,8 @@
     <div class="modal modal-blur fade" id="modal-sync-period" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
-                <form method="get" id="form-sync-period" action="">
+                <form method="post" id="form-sync-period" action="">
+                    <input type="hidden" name="_token" id="sync-period-token" value="">
                     <div class="modal-header">
                         <h5 class="modal-title">Синхронизировать за период</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -463,6 +474,7 @@
                             </div>
                             <div class="col">
                                 <form method="post" id="form-sync-realization" action="">
+                                    <input type="hidden" name="_token" id="sync-realization-token" value="">
                                     <button type="submit" class="btn btn-teal w-100">Запустить</button>
                                 </form>
                             </div>
@@ -478,6 +490,7 @@
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
                 <form method="post" action="{{ path('marketplace_reprocess') }}" id="form-reprocess">
+                    <input type="hidden" name="_token" value="{{ csrf_token('marketplace_reprocess') }}">
                     <div class="modal-header">
                         <h5 class="modal-title">Переобработка данных за период</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -571,7 +584,10 @@
                                 <button type="button" class="btn w-100" data-bs-dismiss="modal">Отмена</button>
                             </div>
                             <div class="col">
-                                <a href="" id="btn-apply-realization" class="btn btn-teal w-100">Применить</a>
+                                <form method="post" action="" id="form-apply-realization">
+                                    <input type="hidden" name="_token" id="apply-realization-token" value="">
+                                    <button type="submit" class="btn btn-teal w-100">Применить</button>
+                                </form>
                             </div>
                         </div>
                     </div>
@@ -690,10 +706,11 @@
             applyMarketplace();
         })();
 
-        // Sync period modal — подставляем action с connectionId
+        // Sync period modal — подставляем action с connectionId и CSRF-токен
         document.getElementById('modal-sync-period').addEventListener('show.bs.modal', function (event) {
             var connectionId = event.relatedTarget.getAttribute('data-connection-id');
             document.getElementById('form-sync-period').action = '/marketplace/connection/' + connectionId + '/sync-period';
+            document.getElementById('sync-period-token').value = event.relatedTarget.getAttribute('data-token');
         });
 
         // Блокировка кнопки при отправке формы синхронизации за период
@@ -719,9 +736,10 @@
             if (modal) { modal.hide(); }
         });
 
-        // modal-sync-realization — подставляем action из data-action кнопки
+        // modal-sync-realization — подставляем action и CSRF-токен из data-атрибутов кнопки
         document.getElementById('modal-sync-realization').addEventListener('show.bs.modal', function (event) {
             document.getElementById('form-sync-realization').action = event.relatedTarget.getAttribute('data-action');
+            document.getElementById('sync-realization-token').value = event.relatedTarget.getAttribute('data-token');
         });
 
         // modal-delete-connection — подставляем action из data-action кнопки
@@ -730,9 +748,10 @@
             document.getElementById('delete-connection-token').value = event.relatedTarget.getAttribute('data-token');
         });
 
-        // modal-apply-realization — подставляем href из data-action кнопки
+        // modal-apply-realization — подставляем action и CSRF-токен из data-атрибутов кнопки
         document.getElementById('modal-apply-realization').addEventListener('show.bs.modal', function (event) {
-            document.getElementById('btn-apply-realization').href = event.relatedTarget.getAttribute('data-action');
+            document.getElementById('form-apply-realization').action = event.relatedTarget.getAttribute('data-action');
+            document.getElementById('apply-realization-token').value = event.relatedTarget.getAttribute('data-token');
         });
 
         // Пакетная обработка месяца — сброс кнопки при открытии модала

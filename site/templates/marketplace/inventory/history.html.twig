@@ -97,6 +97,7 @@
             <div class="modal-content">
                 <form method="post"
                       action="{{ path('marketplace_inventory_set_cost', {id: listing.listing_id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('marketplace_inventory_set_cost' ~ listing.listing_id) }}">
                     <input type="hidden" name="return_to" value="history">
                     <div class="modal-header">
                         <h5 class="modal-title">Новая себестоимость</h5>

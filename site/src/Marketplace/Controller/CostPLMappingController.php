@@ -70,6 +70,11 @@ final class CostPLMappingController extends AbstractController
     {
         $company   = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
+
+        if (!$this->isCsrfTokenValid('marketplace_cost_pl_mapping_bulk_save', (string) $request->request->get('_token', ''))) {
+            throw $this->createAccessDeniedException('Недействительный CSRF-токен');
+        }
+
         $marketplace = (string) $request->request->get('marketplace', '');
 
         $rows  = $request->request->all('mappings');

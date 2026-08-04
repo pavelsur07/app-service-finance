@@ -31,6 +31,7 @@ final class InventoryImportControllerTest extends WebTestCaseBase
                 'POST',
                 '/marketplace/inventory/import-cost-price',
                 [
+                    '_token' => $this->csrfToken($client, 'marketplace_inventory_import_cost_price'),
                     'effective_from' => '2026-07-29',
                     'marketplace' => 'wildberries',
                     'identifier_type' => 'supplier_sku',
@@ -82,6 +83,7 @@ final class InventoryImportControllerTest extends WebTestCaseBase
                 'POST',
                 '/marketplace/inventory/import-cost-price',
                 [
+                    '_token' => $this->csrfToken($client, 'marketplace_inventory_import_cost_price'),
                     'effective_from' => '2026-07-29',
                     'marketplace' => 'ozon',
                     'identifier_type' => 'supplier_sku',
@@ -132,6 +134,7 @@ final class InventoryImportControllerTest extends WebTestCaseBase
                 'POST',
                 '/marketplace/inventory/import-cost-price',
                 [
+                    '_token' => $this->csrfToken($client, 'marketplace_inventory_import_cost_price'),
                     'effective_from' => '2026-07-29',
                     'marketplace' => 'wildberries',
                     'identifier_type' => 'marketplace_sku',

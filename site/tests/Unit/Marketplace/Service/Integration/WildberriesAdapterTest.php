@@ -141,7 +141,7 @@ final class WildberriesAdapterTest extends TestCase
         $repo = $this->createMock(MarketplaceConnectionRepository::class);
         $repo->method('findByMarketplace')->willReturn($this->connection());
 
-        return new WildberriesAdapter($http, $repo, new NullLogger(), new WbSalesReportRowNormalizer(), new WbFinanceSalesReportClient($http, $this->createRateLimiter($storage)));
+        return new WildberriesAdapter($http, $repo, new NullLogger(), new WbSalesReportRowNormalizer(), new WbFinanceSalesReportClient($http, $this->createRateLimiter($storage)), new \App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec($this->createMock(\App\Shared\Security\Contract\FieldEncryptionServiceInterface::class)));
     }
 
     private function company(): Company

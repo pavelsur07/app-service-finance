@@ -14,6 +14,7 @@ use App\Marketplace\Infrastructure\Query\WbBarcodeUpsertQuery;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
 use Psr\Log\LoggerInterface;
 
 final readonly class RefreshWbListingCatalogAction
@@ -26,6 +27,7 @@ final readonly class RefreshWbListingCatalogAction
         private MarketplaceListingRepository $listingRepository,
         private WbBarcodeUpsertQuery $barcodeUpsertQuery,
         private LoggerInterface $logger,
+        private ConnectionApiKeyCodec $connectionApiKeyCodec,
     ) {
     }
 
@@ -39,8 +41,9 @@ final readonly class RefreshWbListingCatalogAction
         $connection = $this->connectionRepository->findByIdAndCompany($connectionId, $company);
         $this->assertUsableConnection($connection);
 
-        $activeCards = $this->client->fetchAll($connection->getApiKey());
-        $trashCards = $this->client->fetchAllTrash($connection->getApiKey());
+        $apiKey = $this->connectionApiKeyCodec->apiKeyFor($connection);
+        $activeCards = $this->client->fetchAll($apiKey);
+        $trashCards = $this->client->fetchAllTrash($apiKey);
         $variants = $this->normalizeVariants($activeCards, $trashCards);
 
         $synced = $this->em->wrapInTransaction(function () use ($company, $variants): int {

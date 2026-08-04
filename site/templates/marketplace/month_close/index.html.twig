@@ -127,6 +127,7 @@
                                                   action="{{ path('marketplace_month_close_reconcile') }}"
                                                   enctype="multipart/form-data"
                                                   onsubmit="handleReconcileSubmit(this)">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('marketplace_month_close_reconcile') }}">
                                                 <input type="hidden" name="marketplace" value="{{ marketplace }}">
                                                 <input type="hidden" name="year" value="{{ year }}">
                                                 <input type="hidden" name="month" value="{{ month }}">
@@ -146,6 +147,7 @@
                                                   action="{{ path('marketplace_month_close_reconcile') }}"
                                                   enctype="multipart/form-data"
                                                   onsubmit="handleReconcileSubmit(this)">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('marketplace_month_close_reconcile') }}">
                                                 <input type="hidden" name="marketplace" value="{{ marketplace }}">
                                                 <input type="hidden" name="year" value="{{ year }}">
                                                 <input type="hidden" name="month" value="{{ month }}">
@@ -171,6 +173,7 @@
                                 <div class="d-flex flex-wrap gap-2">
                                     <form method="post"
                                           action="{{ path('marketplace_month_close_reopen') }}">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('marketplace_month_close_reopen') }}">
                                         <input type="hidden" name="marketplace" value="{{ marketplace }}">
                                         <input type="hidden" name="year" value="{{ year }}">
                                         <input type="hidden" name="month" value="{{ month }}">
@@ -187,6 +190,7 @@
                                                 data-marketplace="{{ marketplace }}"
                                                 data-year="{{ year }}"
                                                 data-month="{{ month }}"
+                                                data-token="{{ csrf_token('marketplace_month_preliminary_rebuild') }}"
                                                 onclick="runPreliminaryRebuild(this)">
                                             Пересчитать сейчас
                                         </button>
@@ -200,6 +204,7 @@
                                         data-marketplace="{{ marketplace }}"
                                         data-year="{{ year }}"
                                         data-month="{{ month }}"
+                                        data-token="{{ csrf_token('marketplace_month_close_preflight') }}"
                                         onclick="runPreflight(this)">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 12l2 2l4 -4"/><path d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3"/></svg>
                                     Проверить готовность
@@ -211,6 +216,7 @@
                                     <form method="post"
                                           action="{{ path('marketplace_month_close_stage') }}"
                                           id="form-close-{{ stage.value }}">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('marketplace_month_close_stage') }}">
                                         <input type="hidden" name="marketplace" value="{{ marketplace }}">
                                         <input type="hidden" name="year" value="{{ year }}">
                                         <input type="hidden" name="month" value="{{ month }}">
@@ -229,6 +235,7 @@
                                                 data-marketplace="{{ marketplace }}"
                                                 data-year="{{ year }}"
                                                 data-month="{{ month }}"
+                                                data-token="{{ csrf_token('marketplace_month_preliminary_rebuild') }}"
                                                 onclick="runPreliminaryRebuild(this)">
                                             Пересчитать сейчас
                                         </button>
@@ -370,6 +377,7 @@
                     year: btn.dataset.year,
                     month: btn.dataset.month,
                     stage: stage,
+                    _token: btn.dataset.token,
                 })
             })
                 .then(r => r.json())
@@ -446,6 +454,7 @@
                     marketplace: btn.dataset.marketplace,
                     year: parseInt(btn.dataset.year, 10),
                     month: parseInt(btn.dataset.month, 10),
+                    _token: btn.dataset.token,
                 }),
             })
                 .then(async r => {

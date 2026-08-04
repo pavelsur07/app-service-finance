@@ -7,6 +7,7 @@ namespace App\Marketplace\Controller\Admin;
 use App\Marketplace\Repository\MappingErrorRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -26,12 +27,16 @@ final class MappingErrorResolveController extends AbstractController
     ) {
     }
 
-    public function __invoke(string $id): Response
+    public function __invoke(string $id, Request $request): Response
     {
         $error = $this->repository->find($id);
 
         if ($error === null) {
             throw $this->createNotFoundException('Ошибка маппинга не найдена.');
+        }
+
+        if (!$this->isCsrfTokenValid('admin_marketplace_mapping_error_resolve' . $id, (string) $request->request->get('_token', ''))) {
+            throw $this->createAccessDeniedException('Недействительный CSRF-токен');
         }
 
         $error->resolve();

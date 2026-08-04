@@ -55,6 +55,7 @@
             </button>
 
             <form method="post" action="{{ path('marketplace_inventory_sync_barcodes') }}" class="mb-0">
+                <input type="hidden" name="_token" value="{{ csrf_token('marketplace_inventory_sync_barcodes') }}">
                 <button type="submit" class="btn btn-sm btn-outline-secondary">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="24" height="24"
                          viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
@@ -200,6 +201,7 @@
                                     <span class="text-muted small">{{ row.barcode }}</span>
                                 {% elseif row.marketplace == 'ozon' %}
                                     <form method="post" action="{{ path('marketplace_inventory_sync_barcode_single', {id: row.listing_id}) }}" class="d-inline">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('marketplace_inventory_sync_barcode_single' ~ row.listing_id) }}">
                                         <button type="submit" class="btn btn-sm btn-ghost-secondary py-0 px-1" title="Получить баркод из Ozon API">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
@@ -238,6 +240,7 @@
                                             data-bs-toggle="modal"
                                             data-bs-target="#modal-set-cost"
                                             data-action="{{ path('marketplace_inventory_set_cost', {id: row.listing_id}) }}"
+                                            data-token="{{ csrf_token('marketplace_inventory_set_cost' ~ row.listing_id) }}"
                                             data-listing-name="{{ row.product_name ?? row.listing_name ?? row.marketplace_sku }} / {{ row.marketplace|upper }}">
                                         {{ row.cost_price is null ? 'Добавить' : 'Изменить' }}
                                     </button>
@@ -272,6 +275,7 @@
         <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
             <div class="modal-content">
                 <form method="post" id="form-set-cost" action="">
+                    <input type="hidden" name="_token" id="set-cost-token" value="">
                     <div class="modal-header">
                         <h5 class="modal-title">Себестоимость</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -312,6 +316,7 @@
                 <form method="post"
                       action="{{ path('marketplace_inventory_import_cost_price') }}"
                       enctype="multipart/form-data">
+                    <input type="hidden" name="_token" value="{{ csrf_token('marketplace_inventory_import_cost_price') }}">
                     <div class="modal-header">
                         <h5 class="modal-title">Загрузить себестоимость из файла</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -381,6 +386,7 @@
         document.getElementById('modal-set-cost').addEventListener('show.bs.modal', function (event) {
             var btn = event.relatedTarget;
             document.getElementById('form-set-cost').action = btn.getAttribute('data-action');
+            document.getElementById('set-cost-token').value = btn.getAttribute('data-token');
             document.getElementById('modal-set-cost-name').textContent = btn.getAttribute('data-listing-name');
         });
 

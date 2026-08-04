@@ -6,12 +6,15 @@ namespace App\Marketplace\Infrastructure\Query;
 
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
 use Doctrine\DBAL\Connection;
 
 final readonly class MarketplaceCredentialsQuery
 {
-    public function __construct(private Connection $connection)
-    {
+    public function __construct(
+        private Connection $connection,
+        private ConnectionApiKeyCodec $connectionApiKeyCodec,
+    ) {
     }
 
     /**
@@ -24,7 +27,7 @@ final readonly class MarketplaceCredentialsQuery
         ?string $connectionRef = null,
     ): ?array {
         $sql = <<<'SQL'
-            SELECT mc.api_key, mc.client_id
+            SELECT mc.api_key, mc.api_key_encrypted, mc.api_key_key_version, mc.client_id
             FROM marketplace_connections mc
             WHERE mc.company_id = :company_id
               AND mc.marketplace = :marketplace
@@ -48,8 +51,13 @@ final readonly class MarketplaceCredentialsQuery
             return null;
         }
 
+        // Encrypted-пара приоритетнее legacy plaintext (expand/contract, см. ConnectionApiKeyCodec).
+        $apiKey = null !== $row['api_key_encrypted'] && null !== $row['api_key_key_version']
+            ? $this->connectionApiKeyCodec->decrypt((string) $row['api_key_encrypted'], (string) $row['api_key_key_version'])
+            : (string) $row['api_key'];
+
         return [
-            'api_key' => (string) $row['api_key'],
+            'api_key' => $apiKey,
             'client_id' => null !== $row['client_id'] ? (string) $row['client_id'] : null,
         ];
     }

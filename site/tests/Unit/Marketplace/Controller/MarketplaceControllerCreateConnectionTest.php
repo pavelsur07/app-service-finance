@@ -257,7 +257,7 @@ final class MarketplaceControllerCreateConnectionTest extends TestCase
             $messageBus,
             $this->createMock(WbInitialSyncStartDateResolver::class),
             $this->createMock(WbFinancialReportSyncPlannerInterface::class),
-        )->syncConnection($connection->getId());
+        )->syncConnection($connection->getId(), new Request());
 
         self::assertInstanceOf(RedirectResponse::class, $response);
     }
@@ -294,7 +294,7 @@ final class MarketplaceControllerCreateConnectionTest extends TestCase
             $this->createMock(WbInitialSyncStartDateResolver::class),
             $this->createMock(WbFinancialReportSyncPlannerInterface::class),
             $validator,
-        )->testConnection($connection->getId());
+        )->testConnection($connection->getId(), new Request());
 
         self::assertInstanceOf(RedirectResponse::class, $response);
         self::assertTrue($connection->isActive());
@@ -335,7 +335,7 @@ final class MarketplaceControllerCreateConnectionTest extends TestCase
             $this->createMock(WbInitialSyncStartDateResolver::class),
             $this->createMock(WbFinancialReportSyncPlannerInterface::class),
             $validator,
-        )->testConnection($connection->getId());
+        )->testConnection($connection->getId(), new Request());
 
         self::assertInstanceOf(RedirectResponse::class, $response);
         self::assertFalse($connection->isActive());
@@ -377,7 +377,7 @@ final class MarketplaceControllerCreateConnectionTest extends TestCase
             $this->createMock(WbInitialSyncStartDateResolver::class),
             $this->createMock(WbFinancialReportSyncPlannerInterface::class),
             $validator,
-        )->testConnection($connection->getId());
+        )->testConnection($connection->getId(), new Request());
 
         self::assertInstanceOf(RedirectResponse::class, $response);
         self::assertTrue($connection->isActive());
@@ -420,9 +420,17 @@ final class MarketplaceControllerCreateConnectionTest extends TestCase
             $planner,
             self::uninitialized(WbFinanceSyncStatusListQuery::class),
             $ozonCredentialValidator,
+            new \App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec(
+                $this->fieldEncryptionServiceStub(),
+            ),
         ) extends MarketplaceController {
             protected function addFlash(string $type, mixed $message): void
             {
+            }
+
+            protected function isCsrfTokenValid(string $id, ?string $token): bool
+            {
+                return true;
             }
 
             protected function redirectToRoute(string $route, array $parameters = [], int $status = 302): RedirectResponse
@@ -430,6 +438,19 @@ final class MarketplaceControllerCreateConnectionTest extends TestCase
                 return new RedirectResponse('/'.$route, $status);
             }
         };
+    }
+
+    private function fieldEncryptionServiceStub(): \App\Shared\Security\Contract\FieldEncryptionServiceInterface
+    {
+        $service = $this->createMock(\App\Shared\Security\Contract\FieldEncryptionServiceInterface::class);
+        $service->method('encrypt')->willReturnCallback(static fn (string $plaintext): \App\Shared\Security\ValueObject\EncryptedPayload =>
+            new \App\Shared\Security\ValueObject\EncryptedPayload('encrypted:' . $plaintext, 'v1', new \DateTimeImmutable())
+        );
+        $service->method('decrypt')->willReturnCallback(static fn (\App\Shared\Security\ValueObject\EncryptedPayload $payload): string =>
+            str_starts_with($payload->ciphertext(), 'encrypted:') ? substr($payload->ciphertext(), 10) : $payload->ciphertext()
+        );
+
+        return $service;
     }
 
     /**

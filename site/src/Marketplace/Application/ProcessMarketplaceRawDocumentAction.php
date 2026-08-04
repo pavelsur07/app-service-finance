@@ -20,6 +20,7 @@ use App\Shared\Service\AppLogger;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 
 /**
  * Выполняет один step run для указанного raw document.
@@ -51,6 +52,13 @@ final readonly class ProcessMarketplaceRawDocumentAction
 
         if ($document === null) {
             throw new \RuntimeException(sprintf('Raw document not found: %s', $command->rawDocId));
+        }
+
+        // Defense-in-depth: документ обязан принадлежать компании из команды,
+        // даже если вызывающий код забыл проверить (IDOR-защита на уровне Action).
+        // Unrecoverable: tenant-mismatch детерминирован, ретраи бессмысленны.
+        if ((string) $document->getCompany()->getId() !== (string) $command->companyId) {
+            throw new UnrecoverableMessageHandlingException('Raw document does not belong to the given company.');
         }
 
         $kindToBucketKey = [

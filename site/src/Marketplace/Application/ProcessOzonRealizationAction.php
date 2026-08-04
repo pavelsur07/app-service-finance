@@ -68,6 +68,12 @@ final class ProcessOzonRealizationAction
             throw new \RuntimeException(sprintf('Raw document not found: %s', $rawDocId));
         }
 
+        // Defense-in-depth: документ обязан принадлежать переданной компании,
+        // даже если вызывающий код забыл проверить (IDOR-защита на уровне Action).
+        if ((string) $rawDoc->getCompany()->getId() !== (string) $companyId) {
+            throw new \RuntimeException('Raw document does not belong to the given company.');
+        }
+
         if ($rawDoc->getMarketplace() !== MarketplaceType::OZON) {
             throw new \InvalidArgumentException('ProcessOzonRealizationAction supports only Ozon.');
         }

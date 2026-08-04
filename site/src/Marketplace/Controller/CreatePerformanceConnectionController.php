@@ -9,6 +9,7 @@ use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Exception\OzonPerformanceValidationException;
+use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -37,6 +38,7 @@ final class CreatePerformanceConnectionController extends AbstractController
         private readonly MarketplaceConnectionRepository $connectionRepository,
         private readonly OzonPerformanceConnectionValidator $validator,
         private readonly EntityManagerInterface $em,
+        private readonly ConnectionApiKeyCodec $connectionApiKeyCodec,
     ) {
     }
 
@@ -48,6 +50,10 @@ final class CreatePerformanceConnectionController extends AbstractController
     public function __invoke(Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
+
+        if (!$this->isCsrfTokenValid('marketplace_connection_create', (string) $request->request->get('_token', ''))) {
+            throw $this->createAccessDeniedException('Недействительный CSRF-токен');
+        }
 
         $clientId     = trim((string) $request->request->get('client_id', ''));
         $clientSecret = trim((string) $request->request->get('client_secret', ''));
@@ -84,7 +90,7 @@ final class CreatePerformanceConnectionController extends AbstractController
             MarketplaceType::OZON,
             MarketplaceConnectionType::PERFORMANCE,
         );
-        $connection->setApiKey($clientSecret);
+        $this->connectionApiKeyCodec->applyApiKey($connection, $clientSecret);
         $connection->setClientId($clientId);
 
         $this->em->persist($connection);

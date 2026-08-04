@@ -17,6 +17,7 @@
         <div class="card">
             <div class="card-body">
                 <form method="POST" action="{{ path('marketplace_connection_edit', {id: connection.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('marketplace_connection_edit' ~ connection.id) }}">
 
                     <div class="mb-3">
                         <label class="form-label">Проект ОПиУ</label>

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Service\Integration;
 
 use App\Marketplace\Entity\MarketplaceConnection;
+use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -27,6 +28,7 @@ final class OzonRealizationFetcher
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly LoggerInterface $logger,
+        private readonly ConnectionApiKeyCodec $connectionApiKeyCodec,
     ) {
     }
 
@@ -103,7 +105,7 @@ final class OzonRealizationFetcher
     {
         return [
             'Client-Id'    => $connection->getClientId(),
-            'Api-Key'      => $connection->getApiKey(),
+            'Api-Key'      => $this->connectionApiKeyCodec->apiKeyFor($connection),
             'Content-Type' => 'application/json',
         ];
     }

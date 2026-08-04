@@ -65,6 +65,7 @@ final class RefreshWbListingCatalogActionTest extends IntegrationTestCase
             $listingRepository,
             $barcodeQuery,
             new NullLogger(),
+            self::getContainer()->get(\App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec::class),
         );
 
         self::assertSame(1, $action($company->getId(), $connection->getId()));
@@ -112,6 +113,7 @@ final class RefreshWbListingCatalogActionTest extends IntegrationTestCase
             $listingRepository,
             $barcodeQuery,
             new NullLogger(),
+            self::getContainer()->get(\App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec::class),
         );
 
         self::assertSame(1, $action($company->getId(), $connection->getId()));

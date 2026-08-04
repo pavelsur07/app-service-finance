@@ -168,6 +168,7 @@
                     {% endif %}
                     {% if not error.resolved_at %}
                       <form method="post" action="{{ path('admin_marketplace_mapping_error_resolve', {id: error.id}) }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token('admin_marketplace_mapping_error_resolve' ~ error.id) }}">
                         <button type="submit" class="btn btn-sm btn-primary"
                                 data-admin-confirm="Запись исчезнет из списка нерешённых. Продолжить?"
                                 data-admin-confirm-title="Отметить ошибку как решённую?"

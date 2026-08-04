@@ -32,7 +32,15 @@ class MarketplaceConnection
     private MarketplaceConnectionType $connectionType = MarketplaceConnectionType::SELLER;
 
     #[ORM\Column(type: 'text')]
-    private string $apiKey; // TODO: Encrypt in production
+    private string $apiKey;
+
+    /** Зашифрованное представление apiKey (sodium secretbox, base64), null до backfill/записи через кодек. */
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $apiKeyEncrypted = null;
+
+    /** Версия ключа шифрования (напр. 'v1'), null для legacy plaintext-строк. */
+    #[ORM\Column(type: 'string', length: 32, nullable: true)]
+    private ?string $apiKeyKeyVersion = null;
 
     #[ORM\Column(type: 'string', length: 100, nullable: true)]
     private ?string $clientId = null; // Client-Id для Ozon
@@ -101,6 +109,34 @@ class MarketplaceConnection
     public function setApiKey(string $apiKey): self
     {
         $this->apiKey = $apiKey;
+        $this->updatedAt = new \DateTimeImmutable();
+
+        return $this;
+    }
+
+    public function getApiKeyEncrypted(): ?string
+    {
+        return $this->apiKeyEncrypted;
+    }
+
+    public function getApiKeyKeyVersion(): ?string
+    {
+        return $this->apiKeyKeyVersion;
+    }
+
+    public function hasEncryptedApiKey(): bool
+    {
+        return null !== $this->apiKeyEncrypted && null !== $this->apiKeyKeyVersion;
+    }
+
+    /**
+     * Записывает encrypted-пару. Вызывать только через ConnectionApiKeyCodec —
+     * напрямую из контроллеров/адаптеров не использовать.
+     */
+    public function setEncryptedApiKey(string $ciphertext, string $keyVersion): self
+    {
+        $this->apiKeyEncrypted = $ciphertext;
+        $this->apiKeyKeyVersion = $keyVersion;
         $this->updatedAt = new \DateTimeImmutable();
 
         return $this;

@@ -84,6 +84,10 @@ final class MonthCloseController extends AbstractController
         $company   = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
+        if (!$this->isCsrfTokenValid('marketplace_month_close_preflight', (string) $request->request->get('_token', ''))) {
+            return $this->json(['error' => 'Недействительный CSRF-токен'], 403);
+        }
+
         $marketplace = (string) $request->request->get('marketplace', '');
         $year        = (int) $request->request->get('year', date('Y'));
         $month       = (int) $request->request->get('month', date('n'));
@@ -118,6 +122,10 @@ final class MonthCloseController extends AbstractController
         $company   = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
         $user      = $this->getUser();
+
+        if (!$this->isCsrfTokenValid('marketplace_month_close_stage', (string) $request->request->get('_token', ''))) {
+            throw $this->createAccessDeniedException('Недействительный CSRF-токен');
+        }
 
         $marketplace = (string) $request->request->get('marketplace', '');
         $year        = (int) $request->request->get('year', 0);
@@ -182,6 +190,10 @@ final class MonthCloseController extends AbstractController
     {
         $company   = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
+
+        if (!$this->isCsrfTokenValid('marketplace_month_close_reopen', (string) $request->request->get('_token', ''))) {
+            throw $this->createAccessDeniedException('Недействительный CSRF-токен');
+        }
 
         $marketplace = (string) $request->request->get('marketplace', '');
         $year        = (int) $request->request->get('year', 0);
