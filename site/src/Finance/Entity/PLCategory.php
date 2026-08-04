@@ -19,6 +19,7 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: PLCategoryRepository::class)]
 #[ORM\Table(name: 'pl_categories')]
+#[ORM\UniqueConstraint(name: 'uniq_plcat_company_code', columns: ['company_id', 'code'])]
 #[UniqueEntity(fields: ['company', 'code'], message: 'Код должен быть уникален в рамках компании.')]
 class PLCategory
 {
