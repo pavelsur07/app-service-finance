@@ -56,6 +56,7 @@ JS, выводивших JSON в `<pre>` для копипаста.
   `string $sourceCompanyId`.
 - `ImportPLCategoryTreeResult` — добавлено поле `$unresolvedFormulaCodes`
   (со значением по умолчанию, аддитивно).
+- `PLCategoryRepository::findFormulasByCompany()` — новый метод (аддитивно).
 - `PLCategoryController` получил конструктор с DI; методы `index`, `new`, `edit`
   больше не принимают `PLCategoryRepository` аргументом.
 - Новый маршрут `pl_category_import_upload` (`POST /pl-categories/import/upload`).
@@ -117,7 +118,7 @@ PostgreSQL `integer` для `calcOrder`/`sortOrder`, запрет нулевог
 docker compose run --rm -e COMPOSER_PROCESS_TIMEOUT=0 site-php-cli composer test
 ```
 
-3144 теста, зелёные (unit + integration + functional, полный набор проекта).
+3149 тестов, зелёные (unit + integration + functional, полный набор проекта).
 `php-cs-fixer` по всем изменённым файлам — чисто; baseline репозитория красный и
 к задаче не относится. `lint:twig` по `templates/pl_category` — чисто.
 

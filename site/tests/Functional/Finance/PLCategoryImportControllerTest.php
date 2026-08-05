@@ -641,7 +641,11 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         ], ['import_file' => $this->uploadFile($this->exportFile([$this->category('Расходы')]))]);
 
         self::assertResponseIsSuccessful();
-        self::assertStringContainsString('OLD', $crawler->filter('.alert-warning')->text());
+        $warning = $crawler->filter('.alert-warning')->text();
+        self::assertStringContainsString('OLD', $warning);
+        // Формулировка не должна привязывать находку к переносимым категориям:
+        // сломанная формула живёт у категории, которой в файле нет.
+        self::assertStringContainsString('формулы категорий, которых в источнике нет', $warning);
 
         $client->submitForm('Импортировать');
 
@@ -649,6 +653,7 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         $flashes = $client->getRequest()->getSession()->getFlashBag()->peek('warning');
         self::assertCount(1, $flashes);
         self::assertStringContainsString('OLD', $flashes[0]);
+        self::assertStringContainsString('формулы категорий, которых в файле не было', $flashes[0]);
     }
 
     /**
