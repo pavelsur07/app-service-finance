@@ -6,7 +6,7 @@
         <div class="container-xl">
             <div class="row g-2 align-items-center">
                 <div class="col">
-                    <h2 class="page-title">Импорт категорий ОПиУ из другой компании</h2>
+                    <h2 class="page-title">Импорт категорий ОПиУ</h2>
                 </div>
                 <div class="col-auto ms-auto d-print-none">
                     <div class="btn-list">
@@ -42,9 +42,44 @@
             </div>
         </div>
 
+        <div class="card mb-3">
+            <div class="card-body">
+                <h3 class="card-title">Из файла</h3>
+                <p class="text-secondary">
+                    Файл выгружается кнопкой «Выгрузить в файл» на экране категорий той компании,
+                    откуда переносим. Так дерево можно перенести и в другой аккаунт.
+                </p>
+                <form method="post" action="{{ path('pl_category_import_upload') }}" enctype="multipart/form-data" class="row g-2 align-items-end">
+                    <input type="hidden" name="_token" value="{{ csrf_token('pl-category-import-file' ~ targetCompanyId) }}">
+                    <div class="col-auto">
+                        <label class="form-label" for="import_file">Файл выгрузки (JSON)</label>
+                        <input type="file" class="form-control" id="import_file" name="import_file" accept="application/json,.json" required>
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-primary">Показать предпросмотр</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         {% if preview is not null %}
             <div class="card">
                 <div class="card-body">
+                    <h3 class="card-title">
+                        Предпросмотр
+                        {% if previewMode == 'file' %}— файл {{ uploadedFileName }}{% endif %}
+                    </h3>
+
+                    {% if preview.unresolvedFormulaCodes is not empty %}
+                        <div class="alert alert-warning">
+                            В формулах переносимых категорий встречаются обозначения, которых
+                            не будет в этой компании после импорта:
+                            <strong>{{ preview.unresolvedFormulaCodes|join(', ') }}</strong>.
+                            Формулы переносятся как есть — проверьте их вручную после импорта.
+                            Среди перечисленного могут быть имена функций, а не коды категорий.
+                        </div>
+                    {% endif %}
+
                     <div class="row g-3 mb-3">
                         <div class="col-auto">
                             <div class="text-secondary">Будет создано</div>
@@ -93,7 +128,12 @@
                     {% endif %}
 
                     <form method="post" action="{{ path('pl_category_import_apply') }}">
-                        <input type="hidden" name="sourceCompanyId" value="{{ selectedSourceCompanyId }}">
+                        {% if previewMode == 'file' %}
+                            <input type="hidden" name="mode" value="file">
+                            <input type="hidden" name="payload" value="{{ uploadedPayload }}">
+                        {% else %}
+                            <input type="hidden" name="sourceCompanyId" value="{{ selectedSourceCompanyId }}">
+                        {% endif %}
                         <input type="hidden" name="_token" value="{{ csrf_token('pl-category-import' ~ targetCompanyId) }}">
                         <button type="submit" class="btn btn-primary"{{ (preview.created is empty and preview.updated is empty) ? ' disabled' : '' }}>
                             Импортировать

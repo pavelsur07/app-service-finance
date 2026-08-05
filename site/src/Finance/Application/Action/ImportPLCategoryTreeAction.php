@@ -49,6 +49,10 @@ final class ImportPLCategoryTreeAction
         $plan = $this->resolveMatches($targetCompany, $command->sourceNodes);
         [$created, $updated, $unchangedCount] = $this->validateAndDiff($plan);
 
+        // Строго до мутаций: метод сравнивает старый code совпавшего узла с
+        // новым, а после applyFields() старого уже не существует.
+        $unresolvedFormulaCodes = $this->unresolvedFormulaCodes($targetCompany, $plan);
+
         // Мутации — только после того, как всё дерево прошло матчинг и
         // валидацию глубины. Порядок общий для create/update и совпадает с
         // исходным DFS pre-order (родитель раньше потомка), иначе setParent()
@@ -80,7 +84,96 @@ final class ImportPLCategoryTreeAction
             });
         }
 
-        return new ImportPLCategoryTreeResult($created, $updated, $unchangedCount);
+        return new ImportPLCategoryTreeResult($created, $updated, $unchangedCount, $unresolvedFormulaCodes);
+    }
+
+    /**
+     * Токены формул, которых не будет в целевой компании после импорта.
+     *
+     * Формулы ссылаются на категории по `code`, а коды живут в рамках компании:
+     * при переносе между аккаунтами формула легко приезжает к строке, на которую
+     * ей больше не на что ссылаться. Импорт это не блокирует (решение Владельца),
+     * но пользователь должен увидеть, что именно проверить руками.
+     *
+     * ponytail: токенизация регуляркой — парсера формул в проекте нет (`formula`
+     * у PLCategory пока только хранится). Поэтому среди токенов попадаются имена
+     * функций, о чём UI говорит прямо. Заменить на разбор, когда появится
+     * настоящий парсер.
+     *
+     * @param list<array{sourceNode: PLCategoryTreeNode, targetParent: ?PLCategory, existing: ?PLCategory, resolved: PLCategory, operation: string}> $plan
+     *
+     * @return list<string>
+     */
+    private function unresolvedFormulaCodes(Company $targetCompany, array $plan): array
+    {
+        $formulas = [];
+        $sourceCodes = [];
+        $releasedCodes = [];
+        foreach ($plan as $item) {
+            $node = $item['sourceNode'];
+
+            if (null !== $node->formula && '' !== trim($node->formula)) {
+                $formulas[] = $node->formula;
+            }
+
+            if (null !== $node->code) {
+                $sourceCodes[$node->code] = true;
+            }
+
+            // Импорт умеет и освобождать код: узел, совпавший по (parent, name),
+            // но пришедший из файла с другим кодом или вовсе без него, отдаёт
+            // своё прежнее значение. Без учёта этого предупреждение молчало бы
+            // ровно там, где ссылка и ломается.
+            $existingCode = $item['existing']?->getCode();
+            if (null !== $existingCode && $existingCode !== $node->code) {
+                $releasedCodes[$existingCode] = true;
+            }
+        }
+
+        if ([] === $formulas) {
+            return [];
+        }
+
+        // Коды целевой компании после импорта: текущие минус освобождаемые плюс
+        // приносимые (код, освобождённый одним узлом и занятый другим, остаётся).
+        $known = [];
+        foreach ($this->plCategoryRepository->findCodesByCompany($targetCompany) as $code) {
+            if (!isset($releasedCodes[$code])) {
+                $known[$code] = true;
+            }
+        }
+
+        $known += $sourceCodes;
+
+        // Известные коды вымарываются из формулы целиком до токенизации.
+        // Иначе не разделить два смысла дефиса: «NET-PROFIT» может быть кодом
+        // (code нормализуется только trim + upper, дефис в нём допустим), а
+        // «REVENUE-COGS» — вычитанием двух кодов. Границы токена в шаблоне не
+        // дают короткому коду съесть часть длинного имени.
+        $maskPatterns = [];
+        foreach (array_keys($known) as $code) {
+            $maskPatterns[] = '/(?<![\p{Lu}\p{N}_])'.preg_quote((string) $code, '/').'(?![\p{Lu}\p{N}_])/u';
+        }
+
+        $unresolved = [];
+        foreach ($formulas as $formula) {
+            $rest = [] !== $maskPatterns ? (string) preg_replace($maskPatterns, ' ', $formula) : $formula;
+
+            preg_match_all('/[\p{Lu}\p{N}_]{1,64}/u', $rest, $matches);
+            foreach ($matches[0] as $token) {
+                // Числа (включая 1E10) и голые разделители кодами быть не могут.
+                if (is_numeric($token) || 1 !== preg_match('/\p{Lu}/u', $token)) {
+                    continue;
+                }
+
+                $unresolved[$token] = true;
+            }
+        }
+
+        $unresolved = array_keys($unresolved);
+        sort($unresolved);
+
+        return $unresolved;
     }
 
     /**
@@ -251,11 +344,22 @@ final class ImportPLCategoryTreeAction
             ]);
         }
 
-        return $this->plCategoryRepository->findOneBy([
+        // Узел без кода опознаётся парой (родитель, имя). В целевой компании
+        // одноимённых потомков может оказаться несколько — схема это позволяет,
+        // если у них разные коды. Тогда findOneBy() вернул бы произвольного из
+        // них: импорт обновил бы случайную строку и освободил её код, а
+        // повторный прогон мог бы выбрать уже другую. Молча выбирать нельзя.
+        $candidates = $this->plCategoryRepository->findBy([
             'company' => $targetCompany,
             'parent' => $targetParent,
             'name' => $source->name,
         ]);
+
+        if (count($candidates) > 1) {
+            throw new \DomainException(sprintf('В целевой компании несколько категорий с названием "%s" у одного родителя. Задайте переносимой категории уникальный код или переименуйте лишние, иначе непонятно, какую из них обновлять.', $source->name));
+        }
+
+        return $candidates[0] ?? null;
     }
 
     private function fieldsDiffer(PLCategory $existing, PLCategoryTreeNode $source, ?PLCategory $targetParent): bool
