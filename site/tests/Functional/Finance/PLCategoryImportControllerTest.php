@@ -157,6 +157,47 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         self::assertCount(0, $this->em()->getRepository(PLCategory::class)->findBy(['company' => $target]));
     }
 
+    public function testApplyRejectsActiveCompanyAsItsOwnSource(): void
+    {
+        // Экран не показывает активную компанию в списке источников, но POST
+        // приходит напрямую: перенос компании в саму себя матчил бы каждый узел
+        // сам на себя. Проверка живёт в контроллере — Action про компанию-
+        // источник больше не знает.
+        $client = static::createClient();
+        $this->resetDb();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+        $category = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Расходы')->withCode('EXP')->build();
+
+        $em = $this->em();
+        foreach ([$user, $target, $category] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $target->getId());
+
+        $targetId = (string) $target->getId();
+        $client->request('POST', '/pl-categories/import/apply', [
+            'sourceCompanyId' => $targetId,
+            '_token' => $this->csrfToken($client, 'pl-category-import'.$targetId),
+        ]);
+
+        // Редирект на форму импорта (а не на список, как после успешного
+        // применения) плюс точный текст ошибки: без guard'а запрос ушёл бы в
+        // ветку успеха.
+        self::assertResponseRedirects('/pl-categories/import');
+        self::assertSame(
+            ['Источник и целевая компания совпадают.'],
+            $client->getRequest()->getSession()->getFlashBag()->peek('danger'),
+        );
+
+        $this->em()->clear();
+        self::assertCount(1, $this->em()->getRepository(PLCategory::class)->findBy(['company' => $target]));
+    }
+
     public function testApplyCreatesAndUpdatesTreeAndReimportIsIdempotent(): void
     {
         $client = static::createClient();

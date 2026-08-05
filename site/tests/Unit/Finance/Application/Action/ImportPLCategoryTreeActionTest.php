@@ -8,6 +8,8 @@ use App\Company\Entity\Company;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Finance\Application\Action\ImportPLCategoryTreeAction;
 use App\Finance\Application\Command\ImportPLCategoryTreeCommand;
+use App\Finance\Application\DTO\PLCategoryTreeNode;
+use App\Finance\Application\Service\PLCategoryTreeExporter;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\PLFlow;
 use App\Finance\Repository\PLCategoryRepository;
@@ -27,7 +29,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $child = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Маркетинг')->withParent($root)->build();
 
         $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
-        $plCategoryRepository->method('findTreeByCompany')->willReturn([$root, $child]);
+        $sourceNodes = $this->nodes([$root, $child]);
         $plCategoryRepository->method('findOneBy')->willReturn(null);
 
         $em = $this->createMock(EntityManagerInterface::class);
@@ -35,8 +37,8 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $em->expects(self::once())->method('flush');
         $em->expects(self::never())->method('remove');
 
-        $result = $this->action($source, $target, $plCategoryRepository, $em)(
-            new ImportPLCategoryTreeCommand((string) $source->getId(), (string) $target->getId(), false),
+        $result = $this->action($target, $plCategoryRepository, $em)(
+            new ImportPLCategoryTreeCommand($sourceNodes, (string) $target->getId(), false),
         );
 
         self::assertCount(2, $result->created);
@@ -57,7 +59,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
             ->withName('Старое имя')->withCode('EXP')->withFlow(PLFlow::INCOME)->build();
 
         $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
-        $plCategoryRepository->method('findTreeByCompany')->willReturn([$sourceRoot]);
+        $sourceNodes = $this->nodes([$sourceRoot]);
         $plCategoryRepository->method('findOneBy')->willReturnCallback(
             static fn (array $criteria): ?PLCategory => 'EXP' === ($criteria['code'] ?? null) ? $existingRoot : null,
         );
@@ -66,8 +68,8 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $em->expects(self::never())->method('persist');
         $em->expects(self::once())->method('flush');
 
-        $result = $this->action($source, $target, $plCategoryRepository, $em)(
-            new ImportPLCategoryTreeCommand((string) $source->getId(), (string) $target->getId(), false),
+        $result = $this->action($target, $plCategoryRepository, $em)(
+            new ImportPLCategoryTreeCommand($sourceNodes, (string) $target->getId(), false),
         );
 
         self::assertSame([], $result->created);
@@ -92,7 +94,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $existingChild->setIsVisible(false); // отличается от источника — должно обновиться
 
         $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
-        $plCategoryRepository->method('findTreeByCompany')->willReturn([$sourceRoot, $sourceChild]);
+        $sourceNodes = $this->nodes([$sourceRoot, $sourceChild]);
         $plCategoryRepository->method('findOneBy')->willReturnCallback(
             static function (array $criteria) use ($existingRoot, $existingChild): ?PLCategory {
                 if (array_key_exists('code', $criteria)) {
@@ -111,8 +113,8 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $em->expects(self::never())->method('persist');
         $em->expects(self::once())->method('flush');
 
-        $result = $this->action($source, $target, $plCategoryRepository, $em)(
-            new ImportPLCategoryTreeCommand((string) $source->getId(), (string) $target->getId(), false),
+        $result = $this->action($target, $plCategoryRepository, $em)(
+            new ImportPLCategoryTreeCommand($sourceNodes, (string) $target->getId(), false),
         );
 
         self::assertSame([], $result->created);
@@ -130,7 +132,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $root = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Расходы')->withCode('EXP')->build();
 
         $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
-        $plCategoryRepository->method('findTreeByCompany')->willReturn([$root]);
+        $sourceNodes = $this->nodes([$root]);
         $plCategoryRepository->method('findOneBy')->willReturn(null);
 
         $em = $this->createMock(EntityManagerInterface::class);
@@ -138,8 +140,8 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $em->expects(self::never())->method('flush');
         $em->expects(self::never())->method('remove');
 
-        $result = $this->action($source, $target, $plCategoryRepository, $em)(
-            new ImportPLCategoryTreeCommand((string) $source->getId(), (string) $target->getId(), true),
+        $result = $this->action($target, $plCategoryRepository, $em)(
+            new ImportPLCategoryTreeCommand($sourceNodes, (string) $target->getId(), true),
         );
 
         self::assertCount(1, $result->created);
@@ -156,7 +158,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
             ->withName('Старое имя')->withCode('EXP')->withFlow(PLFlow::INCOME)->build();
 
         $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
-        $plCategoryRepository->method('findTreeByCompany')->willReturn([$sourceRoot]);
+        $sourceNodes = $this->nodes([$sourceRoot]);
         $plCategoryRepository->method('findOneBy')->willReturnCallback(
             static fn (array $criteria): ?PLCategory => 'EXP' === ($criteria['code'] ?? null) ? $existingRoot : null,
         );
@@ -165,8 +167,8 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $em->expects(self::never())->method('persist');
         $em->expects(self::never())->method('flush');
 
-        $result = $this->action($source, $target, $plCategoryRepository, $em)(
-            new ImportPLCategoryTreeCommand((string) $source->getId(), (string) $target->getId(), true),
+        $result = $this->action($target, $plCategoryRepository, $em)(
+            new ImportPLCategoryTreeCommand($sourceNodes, (string) $target->getId(), true),
         );
 
         self::assertCount(1, $result->updated);
@@ -186,7 +188,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $persisted = [];
 
         $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
-        $plCategoryRepository->method('findTreeByCompany')->willReturn([$root, $child]);
+        $sourceNodes = $this->nodes([$root, $child]);
         $plCategoryRepository->method('findOneBy')->willReturnCallback(
             static function (array $criteria) use (&$persisted): ?PLCategory {
                 foreach ($persisted as $category) {
@@ -213,8 +215,8 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         });
         $em->expects(self::exactly(2))->method('flush');
 
-        $action = $this->action($source, $target, $plCategoryRepository, $em);
-        $command = new ImportPLCategoryTreeCommand((string) $source->getId(), (string) $target->getId(), false);
+        $action = $this->action($target, $plCategoryRepository, $em);
+        $command = new ImportPLCategoryTreeCommand($sourceNodes, (string) $target->getId(), false);
 
         $first = $action($command);
         self::assertCount(2, $first->created);
@@ -230,7 +232,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
     {
         $source = CompanyBuilder::aCompany()->withIndex(1)->build();
         $target = CompanyBuilder::aCompany()->withIndex(2)->build();
-        $plCategoryRepository = $this->repositoryForPreservedDepthScenario($source, $target);
+        [$sourceNodes, $plCategoryRepository] = $this->preservedDepthScenario($source, $target);
 
         $em = $this->createMock(EntityManagerInterface::class);
         $em->expects(self::never())->method('persist');
@@ -239,8 +241,8 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('Превышена максимальная вложенность (5 уровней) при переносе категории "X".');
 
-        $this->action($source, $target, $plCategoryRepository, $em)(
-            new ImportPLCategoryTreeCommand((string) $source->getId(), (string) $target->getId(), false),
+        $this->action($target, $plCategoryRepository, $em)(
+            new ImportPLCategoryTreeCommand($sourceNodes, (string) $target->getId(), false),
         );
     }
 
@@ -252,7 +254,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         // «живой» getLevel() совпавшего узла, который в dry-run не мутируется.
         $source = CompanyBuilder::aCompany()->withIndex(1)->build();
         $target = CompanyBuilder::aCompany()->withIndex(2)->build();
-        $plCategoryRepository = $this->repositoryForPreservedDepthScenario($source, $target);
+        [$sourceNodes, $plCategoryRepository] = $this->preservedDepthScenario($source, $target);
 
         $em = $this->createMock(EntityManagerInterface::class);
         $em->expects(self::never())->method('persist');
@@ -261,21 +263,21 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('Превышена максимальная вложенность (5 уровней) при переносе категории "X".');
 
-        $this->action($source, $target, $plCategoryRepository, $em)(
-            new ImportPLCategoryTreeCommand((string) $source->getId(), (string) $target->getId(), true),
+        $this->action($target, $plCategoryRepository, $em)(
+            new ImportPLCategoryTreeCommand($sourceNodes, (string) $target->getId(), true),
         );
     }
 
     public function testAllowsMovingExistingNodeToRootWithNewChildOnApply(): void
     {
-        [$source, $target, $plCategoryRepository] = $this->repositoryForRootMoveWithNewChildScenario();
+        [$sourceNodes, $target, $plCategoryRepository] = $this->rootMoveWithNewChildScenario();
 
         $em = $this->createMock(EntityManagerInterface::class);
         $em->expects(self::once())->method('persist');
         $em->expects(self::once())->method('flush');
 
-        $result = $this->action($source, $target, $plCategoryRepository, $em)(
-            new ImportPLCategoryTreeCommand((string) $source->getId(), (string) $target->getId(), false),
+        $result = $this->action($target, $plCategoryRepository, $em)(
+            new ImportPLCategoryTreeCommand($sourceNodes, (string) $target->getId(), false),
         );
 
         self::assertCount(1, $result->created);
@@ -290,14 +292,14 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         // перенос, который dry-run считал допустимым. Мутации теперь идут
         // одним проходом в исходном порядке дерева, а сама проверка глубины
         // вообще не смотрит на «живой» уровень сущностей.
-        [$source, $target, $plCategoryRepository] = $this->repositoryForRootMoveWithNewChildScenario();
+        [$sourceNodes, $target, $plCategoryRepository] = $this->rootMoveWithNewChildScenario();
 
         $em = $this->createMock(EntityManagerInterface::class);
         $em->expects(self::never())->method('persist');
         $em->expects(self::never())->method('flush');
 
-        $result = $this->action($source, $target, $plCategoryRepository, $em)(
-            new ImportPLCategoryTreeCommand((string) $source->getId(), (string) $target->getId(), true),
+        $result = $this->action($target, $plCategoryRepository, $em)(
+            new ImportPLCategoryTreeCommand($sourceNodes, (string) $target->getId(), true),
         );
 
         self::assertCount(1, $result->created);
@@ -332,7 +334,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $sourceB = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('B')->withCode('B_CODE')->build();
 
         $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
-        $plCategoryRepository->method('findTreeByCompany')->willReturn([...$sourceAncestors, $sourceA, $sourceB]);
+        $sourceNodes = $this->nodes([...$sourceAncestors, $sourceA, $sourceB]);
         $plCategoryRepository->method('findOneBy')->willReturnCallback(
             static fn (array $criteria): ?PLCategory => match ($criteria['code'] ?? null) {
                 'A_CODE' => $existingA,
@@ -345,8 +347,8 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $em->expects(self::exactly(4))->method('persist');
         $em->expects(self::once())->method('flush');
 
-        $result = $this->action($source, $target, $plCategoryRepository, $em)(
-            new ImportPLCategoryTreeCommand((string) $source->getId(), (string) $target->getId(), false),
+        $result = $this->action($target, $plCategoryRepository, $em)(
+            new ImportPLCategoryTreeCommand($sourceNodes, (string) $target->getId(), false),
         );
 
         self::assertCount(4, $result->created);
@@ -371,7 +373,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $sourceCollision = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Старое')->build();
 
         $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
-        $plCategoryRepository->method('findTreeByCompany')->willReturn([$sourceRenamed, $sourceCollision]);
+        $sourceNodes = $this->nodes([$sourceRenamed, $sourceCollision]);
         $plCategoryRepository->method('findOneBy')->willReturnCallback(
             static function (array $criteria) use ($existingC): ?PLCategory {
                 if (array_key_exists('code', $criteria)) {
@@ -386,8 +388,8 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $em->expects(self::once())->method('persist');
         $em->expects(self::once())->method('flush');
 
-        $result = $this->action($source, $target, $plCategoryRepository, $em)(
-            new ImportPLCategoryTreeCommand((string) $source->getId(), (string) $target->getId(), false),
+        $result = $this->action($target, $plCategoryRepository, $em)(
+            new ImportPLCategoryTreeCommand($sourceNodes, (string) $target->getId(), false),
         );
 
         self::assertCount(1, $result->created);
@@ -417,7 +419,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $sourceWithCode = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Новый узел')->withCode('C')->build();
 
         $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
-        $plCategoryRepository->method('findTreeByCompany')->willReturn([$sourceNoCode, $sourceWithCode]);
+        $sourceNodes = $this->nodes([$sourceNoCode, $sourceWithCode]);
         $plCategoryRepository->method('findOneBy')->willReturnCallback(
             static function (array $criteria) use ($existingC): ?PLCategory {
                 if (array_key_exists('code', $criteria)) {
@@ -440,8 +442,8 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         });
         $em->expects(self::once())->method('persist');
 
-        $this->action($source, $target, $plCategoryRepository, $em)(
-            new ImportPLCategoryTreeCommand((string) $source->getId(), (string) $target->getId(), false),
+        $this->action($target, $plCategoryRepository, $em)(
+            new ImportPLCategoryTreeCommand($sourceNodes, (string) $target->getId(), false),
         );
 
         self::assertSame(2, $flushCallCount);
@@ -465,7 +467,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $sourceWithCode = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Новый узел')->withCode('C')->build();
 
         $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
-        $plCategoryRepository->method('findTreeByCompany')->willReturn([$sourceNoCode, $sourceWithCode]);
+        $sourceNodes = $this->nodes([$sourceNoCode, $sourceWithCode]);
         $plCategoryRepository->method('findOneBy')->willReturnCallback(
             static function (array $criteria) use ($existingC): ?PLCategory {
                 if (array_key_exists('code', $criteria)) {
@@ -513,7 +515,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         );
 
         (new ImportPLCategoryTreeAction($companyRepository, $plCategoryRepository, $em))(
-            new ImportPLCategoryTreeCommand((string) $source->getId(), (string) $target->getId(), false),
+            new ImportPLCategoryTreeCommand($sourceNodes, (string) $target->getId(), false),
         );
 
         self::assertSame(1, $wrapInTransactionCalls);
@@ -521,25 +523,8 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         self::assertSame(0, $flushesOutsideTransaction);
     }
 
-    public function testRejectsSameSourceAndTargetCompany(): void
+    public function testRejectsWhenTargetCompanyNotFound(): void
     {
-        $company = CompanyBuilder::aCompany()->withIndex(1)->build();
-
-        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
-        $em = $this->createMock(EntityManagerInterface::class);
-        $em->expects(self::never())->method('flush');
-
-        $this->expectException(\DomainException::class);
-
-        $this->action($company, $company, $plCategoryRepository, $em)(
-            new ImportPLCategoryTreeCommand((string) $company->getId(), (string) $company->getId(), false),
-        );
-    }
-
-    public function testRejectsWhenSourceCompanyNotFound(): void
-    {
-        $target = CompanyBuilder::aCompany()->withIndex(2)->build();
-
         $companyRepository = $this->createMock(CompanyRepository::class);
         $companyRepository->method('findById')->willReturn(null);
 
@@ -550,27 +535,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $this->expectException(\DomainException::class);
 
         (new ImportPLCategoryTreeAction($companyRepository, $plCategoryRepository, $em))(
-            new ImportPLCategoryTreeCommand('11111111-1111-1111-1111-000000000009', (string) $target->getId(), false),
-        );
-    }
-
-    public function testRejectsWhenTargetCompanyNotFound(): void
-    {
-        $source = CompanyBuilder::aCompany()->withIndex(1)->build();
-
-        $companyRepository = $this->createMock(CompanyRepository::class);
-        $companyRepository->method('findById')->willReturnCallback(
-            static fn (string $id): ?Company => (string) $source->getId() === $id ? $source : null,
-        );
-
-        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
-        $em = $this->createMock(EntityManagerInterface::class);
-        $em->expects(self::never())->method('flush');
-
-        $this->expectException(\DomainException::class);
-
-        (new ImportPLCategoryTreeAction($companyRepository, $plCategoryRepository, $em))(
-            new ImportPLCategoryTreeCommand((string) $source->getId(), '11111111-1111-1111-1111-000000000009', false),
+            new ImportPLCategoryTreeCommand([], '11111111-1111-1111-1111-000000000009', false),
         );
     }
 
@@ -579,8 +544,10 @@ final class ImportPLCategoryTreeActionTest extends TestCase
      * Target: X уже существует на уровне 1 с сохранённой веткой X → Y → Z
      * (2 уровня потомков, отсутствующих в источнике) — перенос X на уровень 4
      * увёл бы Z на уровень 6.
+     *
+     * @return array{0: list<PLCategoryTreeNode>, 1: PLCategoryRepository}
      */
-    private function repositoryForPreservedDepthScenario(Company $source, Company $target): PLCategoryRepository
+    private function preservedDepthScenario(Company $source, Company $target): array
     {
         $sourceA = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('A')->build();
         $sourceB = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('B')->withParent($sourceA)->build();
@@ -592,12 +559,12 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Z')->withParent($existingY)->build();
 
         $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
-        $plCategoryRepository->method('findTreeByCompany')->willReturn([$sourceA, $sourceB, $sourceC, $sourceX]);
+        $sourceNodes = $this->nodes([$sourceA, $sourceB, $sourceC, $sourceX]);
         $plCategoryRepository->method('findOneBy')->willReturnCallback(
             static fn (array $criteria): ?PLCategory => 'DEEP' === ($criteria['code'] ?? null) ? $existingX : null,
         );
 
-        return $plCategoryRepository;
+        return [$sourceNodes, $plCategoryRepository];
     }
 
     /**
@@ -605,9 +572,9 @@ final class ImportPLCategoryTreeActionTest extends TestCase
      * Source: X переносится в корень и получает нового потомка Y — итоговое
      * дерево валидно (X уровень 1, Y уровень 2).
      *
-     * @return array{0: Company, 1: Company, 2: PLCategoryRepository}
+     * @return array{0: list<PLCategoryTreeNode>, 1: Company, 2: PLCategoryRepository}
      */
-    private function repositoryForRootMoveWithNewChildScenario(): array
+    private function rootMoveWithNewChildScenario(): array
     {
         $source = CompanyBuilder::aCompany()->withIndex(1)->build();
         $target = CompanyBuilder::aCompany()->withIndex(2)->build();
@@ -626,27 +593,36 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $sourceY = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Y')->withParent($sourceX)->build();
 
         $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
-        $plCategoryRepository->method('findTreeByCompany')->willReturn([$sourceX, $sourceY]);
+        $sourceNodes = $this->nodes([$sourceX, $sourceY]);
         $plCategoryRepository->method('findOneBy')->willReturnCallback(
             static fn (array $criteria): ?PLCategory => 'DEEP' === ($criteria['code'] ?? null) ? $existingX : null,
         );
 
-        return [$source, $target, $plCategoryRepository];
+        return [$sourceNodes, $target, $plCategoryRepository];
+    }
+
+    /**
+     * Источник строится настоящим PLCategoryTreeExporter, а не вручную: так
+     * тесты проверяют ровно ту пару «экспортёр + Action», которая работает в
+     * проде на переносе компания→компания.
+     *
+     * @param PLCategory[] $dfsTree
+     *
+     * @return list<PLCategoryTreeNode>
+     */
+    private function nodes(array $dfsTree): array
+    {
+        return (new PLCategoryTreeExporter())->fromEntities($dfsTree);
     }
 
     private function action(
-        Company $source,
         Company $target,
         PLCategoryRepository $plCategoryRepository,
         EntityManagerInterface $em,
     ): ImportPLCategoryTreeAction {
         $companyRepository = $this->createMock(CompanyRepository::class);
         $companyRepository->method('findById')->willReturnCallback(
-            static fn (string $id): ?Company => match ($id) {
-                (string) $source->getId() => $source,
-                (string) $target->getId() => $target,
-                default => null,
-            },
+            static fn (string $id): ?Company => (string) $target->getId() === $id ? $target : null,
         );
 
         // Мок EntityManagerInterface по умолчанию не вызывает переданный

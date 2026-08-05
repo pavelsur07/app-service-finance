@@ -9,13 +9,19 @@ use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Finance\Application\Command\ImportPLCategoryTreeCommand;
 use App\Finance\Application\DTO\ImportPLCategoryTreeResult;
 use App\Finance\Application\DTO\ImportPLCategoryTreeRow;
+use App\Finance\Application\DTO\PLCategoryTreeNode;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Repository\PLCategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 
 /**
- * Переносит дерево категорий ОПиУ из одной компании в другую.
+ * Переносит дерево категорий ОПиУ из источника в компанию.
+ *
+ * Источник — список PLCategoryTreeNode в DFS pre-order, а не компания: одно и то
+ * же дерево может прийти из другой компании этого же аккаунта или из файла,
+ * выгруженного в чужом аккаунте. Откуда именно — Action не знает и знать не
+ * должен.
  *
  * Матчинг узла: по code, если он задан у источника (code уникален в рамках
  * всей компании), иначе по (parent, name). Совпавшие узлы обновляются,
@@ -35,23 +41,12 @@ final class ImportPLCategoryTreeAction
 
     public function __invoke(ImportPLCategoryTreeCommand $command): ImportPLCategoryTreeResult
     {
-        $sourceCompany = $this->companyRepository->findById($command->sourceCompanyId);
-        if (!$sourceCompany instanceof Company) {
-            throw new \DomainException('Компания-источник не найдена.');
-        }
-
         $targetCompany = $this->companyRepository->findById($command->targetCompanyId);
         if (!$targetCompany instanceof Company) {
             throw new \DomainException('Целевая компания не найдена.');
         }
 
-        if ($sourceCompany->getId() === $targetCompany->getId()) {
-            throw new \DomainException('Источник и целевая компания совпадают.');
-        }
-
-        $sourceNodes = $this->plCategoryRepository->findTreeByCompany($sourceCompany);
-
-        $plan = $this->resolveMatches($targetCompany, $sourceNodes);
+        $plan = $this->resolveMatches($targetCompany, $command->sourceNodes);
         [$created, $updated, $unchangedCount] = $this->validateAndDiff($plan);
 
         // Мутации — только после того, как всё дерево прошло матчинг и
@@ -90,22 +85,19 @@ final class ImportPLCategoryTreeAction
 
     /**
      * `code` — стабильный идентификатор строки P&L, на который ссылаются
-     * формулы (см. комментарий у `PLCategory::$code`), поэтому уникальность
-     * code в рамках компании — прикладной инвариант независимо от того, что
-     * текущая схема `pl_categories` физически его не проверяет: индекс
-     * `uniq_plcat_company_code`, созданный в `Version20251001120000`, был
-     * удалён в `Version20251105174115::up()` и с тех пор не восстановлен
-     * (см. `down()` той же миграции — воссоздаёт его только при откате).
-     * Это отдельный, не связанный с импортом дефект схемы.
+     * формулы (см. комментарий у `PLCategory::$code`). Уникальность code в
+     * рамках компании обеспечена индексом `uniq_plcat_company_code`:
+     * он был создан в `Version20251001120000`, удалён в
+     * `Version20251105174115::up()` и восстановлен в `Version20260804120000`
+     * после разбора существовавших дублей.
      *
      * Метод защищает от временной коллизии двух PLCategory с одинаковым code
      * внутри одного flush(): Doctrine выполняет все insert раньше всех
      * update, поэтому если update освобождает code, который в этом же
      * проходе хочет занять новый (create) узел, insert увидел бы ещё не
-     * очищенное старое значение. Актуально уже сейчас на уровне приложения
-     * и станет обязательным, если индекс когда-нибудь восстановят.
+     * очищенное старое значение и упал бы на unique-индексе.
      *
-     * @param list<array{sourceNode: PLCategory, targetParent: ?PLCategory, existing: ?PLCategory, resolved: PLCategory, operation: string}> $plan
+     * @param list<array{sourceNode: PLCategoryTreeNode, targetParent: ?PLCategory, existing: ?PLCategory, resolved: PLCategory, operation: string}> $plan
      */
     private function releaseChangingCodes(array $plan): void
     {
@@ -121,7 +113,7 @@ final class ImportPLCategoryTreeAction
                 continue;
             }
 
-            $newCode = $item['sourceNode']->getCode();
+            $newCode = $item['sourceNode']->code;
 
             if (null !== $existing->getCode() && $existing->getCode() !== $newCode) {
                 $existing->setCode(null);
@@ -149,21 +141,21 @@ final class ImportPLCategoryTreeAction
      * забирает существующий узел, остальные создают новый — иначе один
      * source-узел молча потерялся бы, а результат зависел от порядка обхода.
      *
-     * @param PLCategory[] $sourceNodes
+     * @param list<PLCategoryTreeNode> $sourceNodes
      *
-     * @return list<array{sourceNode: PLCategory, targetParent: ?PLCategory, existing: ?PLCategory, resolved: PLCategory, operation: string}>
+     * @return list<array{sourceNode: PLCategoryTreeNode, targetParent: ?PLCategory, existing: ?PLCategory, resolved: PLCategory, operation: string}>
      */
     private function resolveMatches(Company $targetCompany, array $sourceNodes): array
     {
-        /** @var array<string, PLCategory> $resolvedBySourceId */
-        $resolvedBySourceId = [];
+        /** @var array<string, PLCategory> $resolvedBySourceKey */
+        $resolvedBySourceKey = [];
         /** @var array<string, true> $claimedTargetIds */
         $claimedTargetIds = [];
         $plan = [];
 
         foreach ($sourceNodes as $sourceNode) {
-            $sourceParent = $sourceNode->getParent();
-            $targetParent = null !== $sourceParent ? $resolvedBySourceId[$sourceParent->getId()] : null;
+            $sourceParent = $sourceNode->parent;
+            $targetParent = null !== $sourceParent ? $resolvedBySourceKey[$sourceParent->key] : null;
 
             $existing = $this->findExisting($targetCompany, $targetParent, $sourceNode);
             if (null !== $existing && isset($claimedTargetIds[$existing->getId()])) {
@@ -171,7 +163,7 @@ final class ImportPLCategoryTreeAction
             }
 
             $resolved = $existing ?? new PLCategory(Uuid::uuid7()->toString(), $targetCompany);
-            $resolvedBySourceId[$sourceNode->getId()] = $resolved;
+            $resolvedBySourceKey[$sourceNode->key] = $resolved;
 
             if (null !== $existing) {
                 $claimedTargetIds[$existing->getId()] = true;
@@ -192,7 +184,7 @@ final class ImportPLCategoryTreeAction
     /**
      * Фаза 2 — валидация глубины и diff, без мутаций.
      *
-     * @param list<array{sourceNode: PLCategory, targetParent: ?PLCategory, existing: ?PLCategory, resolved: PLCategory, operation: string}> &$plan
+     * @param list<array{sourceNode: PLCategoryTreeNode, targetParent: ?PLCategory, existing: ?PLCategory, resolved: PLCategory, operation: string}> &$plan
      *
      * @return array{0: ImportPLCategoryTreeRow[], 1: ImportPLCategoryTreeRow[], 2: int}
      */
@@ -206,17 +198,17 @@ final class ImportPLCategoryTreeAction
             }
         }
 
-        /** @var array<string, int> $targetLevelBySourceId */
-        $targetLevelBySourceId = [];
+        /** @var array<string, int> $targetLevelBySourceKey */
+        $targetLevelBySourceKey = [];
         $created = [];
         $updated = [];
         $unchangedCount = 0;
 
         foreach ($plan as $i => $item) {
             $sourceNode = $item['sourceNode'];
-            $sourceParent = $sourceNode->getParent();
-            $targetLevel = null !== $sourceParent ? $targetLevelBySourceId[$sourceParent->getId()] + 1 : 1;
-            $targetLevelBySourceId[$sourceNode->getId()] = $targetLevel;
+            $sourceParent = $sourceNode->parent;
+            $targetLevel = null !== $sourceParent ? $targetLevelBySourceKey[$sourceParent->key] + 1 : 1;
+            $targetLevelBySourceKey[$sourceNode->key] = $targetLevel;
 
             $existing = $item['existing'];
             // Существующие потомки target, отсутствующие в источнике, не
@@ -228,7 +220,7 @@ final class ImportPLCategoryTreeAction
             $preservedDepth = null !== $existing ? $this->preservedDescendantDepth($existing, $matchedTargetIds) : 0;
 
             if ($targetLevel + $preservedDepth > self::MAX_LEVEL) {
-                throw new \DomainException(sprintf('Превышена максимальная вложенность (5 уровней) при переносе категории "%s".', $sourceNode->getName()));
+                throw new \DomainException(sprintf('Превышена максимальная вложенность (5 уровней) при переносе категории "%s".', $sourceNode->name));
             }
 
             $path = $this->buildPath($sourceNode);
@@ -236,22 +228,22 @@ final class ImportPLCategoryTreeAction
             if (null !== $existing) {
                 if ($this->fieldsDiffer($existing, $sourceNode, $item['targetParent'])) {
                     $plan[$i]['operation'] = 'update';
-                    $updated[] = new ImportPLCategoryTreeRow($sourceNode->getName(), $sourceNode->getCode(), $path);
+                    $updated[] = new ImportPLCategoryTreeRow($sourceNode->name, $sourceNode->code, $path);
                 } else {
                     ++$unchangedCount;
                 }
             } else {
                 $plan[$i]['operation'] = 'create';
-                $created[] = new ImportPLCategoryTreeRow($sourceNode->getName(), $sourceNode->getCode(), $path);
+                $created[] = new ImportPLCategoryTreeRow($sourceNode->name, $sourceNode->code, $path);
             }
         }
 
         return [$created, $updated, $unchangedCount];
     }
 
-    private function findExisting(Company $targetCompany, ?PLCategory $targetParent, PLCategory $source): ?PLCategory
+    private function findExisting(Company $targetCompany, ?PLCategory $targetParent, PLCategoryTreeNode $source): ?PLCategory
     {
-        $code = $source->getCode();
+        $code = $source->code;
         if (null !== $code && '' !== $code) {
             return $this->plCategoryRepository->findOneBy([
                 'company' => $targetCompany,
@@ -262,40 +254,40 @@ final class ImportPLCategoryTreeAction
         return $this->plCategoryRepository->findOneBy([
             'company' => $targetCompany,
             'parent' => $targetParent,
-            'name' => $source->getName(),
+            'name' => $source->name,
         ]);
     }
 
-    private function fieldsDiffer(PLCategory $existing, PLCategory $source, ?PLCategory $targetParent): bool
+    private function fieldsDiffer(PLCategory $existing, PLCategoryTreeNode $source, ?PLCategory $targetParent): bool
     {
-        return $existing->getName() !== $source->getName()
-            || $existing->getCode() !== $source->getCode()
-            || $existing->getType() !== $source->getType()
-            || $existing->getFormat() !== $source->getFormat()
-            || $existing->getFlow() !== $source->getFlow()
-            || $existing->getExpenseType() !== $source->getExpenseType()
-            || $existing->getWeightInParent() !== $source->getWeightInParent()
-            || $existing->isVisible() !== $source->isVisible()
-            || $existing->getFormula() !== $source->getFormula()
-            || $existing->getCalcOrder() !== $source->getCalcOrder()
-            || $existing->getSortOrder() !== $source->getSortOrder()
+        return $existing->getName() !== $source->name
+            || $existing->getCode() !== $source->code
+            || $existing->getType() !== $source->type
+            || $existing->getFormat() !== $source->format
+            || $existing->getFlow() !== $source->flow
+            || $existing->getExpenseType() !== $source->expenseType
+            || $existing->getWeightInParent() !== $source->weightInParent
+            || $existing->isVisible() !== $source->isVisible
+            || $existing->getFormula() !== $source->formula
+            || $existing->getCalcOrder() !== $source->calcOrder
+            || $existing->getSortOrder() !== $source->sortOrder
             || $existing->getParent()?->getId() !== $targetParent?->getId();
     }
 
-    private function applyFields(PLCategory $target, PLCategory $source, ?PLCategory $targetParent): void
+    private function applyFields(PLCategory $target, PLCategoryTreeNode $source, ?PLCategory $targetParent): void
     {
-        $target->setName($source->getName());
+        $target->setName($source->name);
         $target->setParent($targetParent);
-        $target->setCode($source->getCode());
-        $target->setType($source->getType());
-        $target->setFormat($source->getFormat());
-        $target->setFlow($source->getFlow());
-        $target->setExpenseType($source->getExpenseType());
-        $target->setWeightInParent($source->getWeightInParent());
-        $target->setIsVisible($source->isVisible());
-        $target->setFormula($source->getFormula());
-        $target->setCalcOrder($source->getCalcOrder());
-        $target->setSortOrder($source->getSortOrder());
+        $target->setCode($source->code);
+        $target->setType($source->type);
+        $target->setFormat($source->format);
+        $target->setFlow($source->flow);
+        $target->setExpenseType($source->expenseType);
+        $target->setWeightInParent($source->weightInParent);
+        $target->setIsVisible($source->isVisible);
+        $target->setFormula($source->formula);
+        $target->setCalcOrder($source->calcOrder);
+        $target->setSortOrder($source->sortOrder);
     }
 
     /**
@@ -315,13 +307,13 @@ final class ImportPLCategoryTreeAction
         return $max;
     }
 
-    private function buildPath(PLCategory $sourceNode): string
+    private function buildPath(PLCategoryTreeNode $sourceNode): string
     {
         $names = [];
         $node = $sourceNode;
         while (null !== $node) {
-            array_unshift($names, $node->getName());
-            $node = $node->getParent();
+            array_unshift($names, $node->name);
+            $node = $node->parent;
         }
 
         return implode(' / ', $names);

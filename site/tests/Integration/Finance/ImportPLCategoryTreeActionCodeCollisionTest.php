@@ -7,6 +7,7 @@ namespace App\Tests\Integration\Finance;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Finance\Application\Action\ImportPLCategoryTreeAction;
 use App\Finance\Application\Command\ImportPLCategoryTreeCommand;
+use App\Finance\Application\Service\PLCategoryTreeExporter;
 use App\Finance\Repository\PLCategoryRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -18,14 +19,12 @@ use App\Tests\Support\Kernel\IntegrationTestCase;
  * итоговые значения code после apply корректны при коллизии code-матча и
  * (parent,name)-фолбэка на одну и ту же существующую строку.
  *
- * Индекс `uniq_plcat_company_code` (company_id, code), созданный в
- * `Version20251001120000`, на момент написания теста в схеме отсутствует —
- * удалён в `Version20251105174115::up()` и не восстановлен (см. ARCHITECTURE
- * changelog / Stage Report задачи pl-category-import). Поэтому этот тест НЕ
- * доказывает защиту от нарушения того индекса — только то, что итоговые
- * code после apply верны. Если индекс восстановят отдельной миграцией,
- * releaseChangingCodes() — это защита от временной коллизии внутри одного
- * flush(), актуальной именно тогда.
+ * Индекс `uniq_plcat_company_code` (company_id, code) создан в
+ * `Version20251001120000`, удалён в `Version20251105174115::up()` и
+ * восстановлен в `Version20260804120000`. Пока индекса не было, тест
+ * доказывал только корректность итоговых code; теперь он идёт по реальной
+ * схеме с индексом, поэтому падение releaseChangingCodes() проявится здесь
+ * нарушением unique-constraint, а не только неверными значениями.
  */
 final class ImportPLCategoryTreeActionCodeCollisionTest extends IntegrationTestCase
 {
@@ -76,8 +75,11 @@ final class ImportPLCategoryTreeActionCodeCollisionTest extends IntegrationTestC
 
         $action = new ImportPLCategoryTreeAction($companyRepository, $plCategoryRepository, $this->em);
 
+        $exporter = new PLCategoryTreeExporter();
+        $sourceNodes = $exporter->fromEntities($plCategoryRepository->findTreeByCompany($sourceCompany));
+
         $result = $action(new ImportPLCategoryTreeCommand(
-            (string) $sourceCompany->getId(),
+            $sourceNodes,
             (string) $targetCompany->getId(),
             false,
         ));
