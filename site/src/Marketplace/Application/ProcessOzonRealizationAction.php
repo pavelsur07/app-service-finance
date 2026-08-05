@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Application;
 
 use App\Company\Entity\Company;
+use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceOzonRealization;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
@@ -117,7 +118,12 @@ final class ProcessOzonRealizationAction
                 'period_to'   => $periodTo->format('Y-m-d'),
             ]);
 
-            return $this->reprocess($companyId, $rawDoc, $rows, $periodFrom, $periodTo);
+            // DELETE + пересоздание — атомарно. Без транзакции упавший process()
+            // оставляет период с уже закоммиченным DELETE: строки реализации и
+            // связи pl_document_id теряются безвозвратно.
+            return $this->em->wrapInTransaction(
+                fn (): array => $this->reprocess($companyId, $rawDoc, $rows, $periodFrom, $periodTo),
+            );
         }
 
         return $this->process($companyId, $rawDoc, $rows, $periodFrom, $periodTo);
@@ -145,11 +151,17 @@ final class ProcessOzonRealizationAction
             }
         }
 
-        $listingsCache = $this->listingRepository->findListingsBySkusIndexed(
+        // Кэшируем ID, а не сущности: батч-цикл делает em->clear(), после которого
+        // любая сохранённая сущность становится detached. По ID getReference()
+        // безопасен на любой итерации.
+        $listingIds = [];
+        foreach ($this->listingRepository->findListingsBySkusIndexed(
             $this->em->find(Company::class, $companyId),
             MarketplaceType::OZON,
             array_keys($allSkus),
-        );
+        ) as $listingSku => $listing) {
+            $listingIds[$listingSku] = $listing->getId();
+        }
 
         $created   = 0;
         $skipped   = 0;
@@ -172,6 +184,10 @@ final class ProcessOzonRealizationAction
                 $skipped++;
                 continue;
             }
+
+            $listing = isset($listingIds[$sku])
+                ? $this->em->getReference(MarketplaceListing::class, $listingIds[$sku])
+                : null;
 
             // Строка «только возврат»: delivery_commission = null, return_commission заполнен.
             // Пример: товар возвращён в периоде без продажи в этом же периоде.
@@ -204,7 +220,7 @@ final class ProcessOzonRealizationAction
                 );
                 $realization->setOfferId($offerId);
                 $realization->setName($name);
-                $realization->setListing($listingsCache[$sku] ?? null);
+                $realization->setListing($listing);
                 $realization->setReturnCommission($returnPrice, $returnQty);
 
                 $this->em->persist($realization);
@@ -212,9 +228,7 @@ final class ProcessOzonRealizationAction
                 $counter++;
 
                 if ($counter % $batchSize === 0) {
-                    $this->em->flush();
-                    $this->em->clear();
-                    $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
+                    $rawDoc = $this->flushBatch($rawDocId);
                 }
 
                 continue;
@@ -233,7 +247,7 @@ final class ProcessOzonRealizationAction
 
             $realization->setOfferId($offerId);
             $realization->setName($name);
-            $realization->setListing($listingsCache[$sku] ?? null);
+            $realization->setListing($listing);
 
             // Возврат
             $returnCommission = $row['return_commission'] ?? null;
@@ -249,20 +263,7 @@ final class ProcessOzonRealizationAction
             $counter++;
 
             if ($counter % $batchSize === 0) {
-                $this->em->flush();
-                $this->em->clear();
-
-                $company = $this->em->find(Company::class, $companyId);
-                $rawDoc  = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
-
-                foreach ($listingsCache as $k => $listing) {
-                    $listingsCache[$k] = $this->em->getReference(
-                        \App\Marketplace\Entity\MarketplaceListing::class,
-                        $listing->getId(),
-                    );
-                }
-
-                gc_collect_cycles();
+                $rawDoc = $this->flushBatch($rawDocId);
             }
         }
 
@@ -307,6 +308,9 @@ final class ProcessOzonRealizationAction
      *   2. Удалить все строки периода для данного raw_document_id
      *   3. Создать строки заново из JSON с правильными полями
      *   4. Восстановить pl_document_id по SKU
+     *
+     * Вызывается только из __invoke() внутри wrapInTransaction(): DELETE на шаге 2
+     * не должен пережить падение пересоздания на шаге 3.
      *
      * @return array{created: int, updated: int, skipped: int}
      */
@@ -383,6 +387,29 @@ final class ProcessOzonRealizationAction
         ]);
 
         return ['created' => 0, 'updated' => $result['created'], 'skipped' => $result['skipped']];
+    }
+
+    /**
+     * Сброс батча: flush + clear + переполучение raw-документа.
+     *
+     * Вызывается из ОБЕИХ веток цикла process(). Раньше блоки сброса были
+     * скопированы по веткам и разошлись: ветка «только возврат» не восстанавливала
+     * кэш листингов, поэтому следующая строка получала detached-прокси, а весь
+     * документ падал на финальном flush() с EntityNotFoundException.
+     */
+    private function flushBatch(string $rawDocId): MarketplaceRawDocument
+    {
+        $this->em->flush();
+        $this->em->clear();
+
+        gc_collect_cycles();
+
+        $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
+        if (!$rawDoc instanceof MarketplaceRawDocument) {
+            throw new \RuntimeException(sprintf('Raw document not found: %s', $rawDocId));
+        }
+
+        return $rawDoc;
     }
 
     private function updateRawDocStats(string $rawDocId, int $created, int $skipped): void

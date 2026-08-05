@@ -24,6 +24,7 @@ use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Shared\Service\ActiveCompanyService;
+use App\Shared\Service\AppLogger;
 use App\Tests\Builders\Company\CompanyBuilder;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
@@ -424,6 +425,7 @@ final class MarketplaceControllerCreateConnectionTest extends TestCase
                 $this->fieldEncryptionServiceStub(),
                 $this->createMock(\App\Shared\Security\Contract\SecretRotationServiceInterface::class),
             ),
+            new AppLogger($this->createMock(\Psr\Log\LoggerInterface::class)),
         ) extends MarketplaceController {
             protected function addFlash(string $type, mixed $message): void
             {
