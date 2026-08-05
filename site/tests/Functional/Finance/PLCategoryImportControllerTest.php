@@ -9,6 +9,7 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Finance\PLCategoryBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 final class PLCategoryImportControllerTest extends WebTestCaseBase
 {
@@ -157,6 +158,47 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         self::assertCount(0, $this->em()->getRepository(PLCategory::class)->findBy(['company' => $target]));
     }
 
+    public function testApplyRejectsActiveCompanyAsItsOwnSource(): void
+    {
+        // Экран не показывает активную компанию в списке источников, но POST
+        // приходит напрямую: перенос компании в саму себя матчил бы каждый узел
+        // сам на себя. Проверка живёт в контроллере — Action про компанию-
+        // источник больше не знает.
+        $client = static::createClient();
+        $this->resetDb();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+        $category = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Расходы')->withCode('EXP')->build();
+
+        $em = $this->em();
+        foreach ([$user, $target, $category] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $target->getId());
+
+        $targetId = (string) $target->getId();
+        $client->request('POST', '/pl-categories/import/apply', [
+            'sourceCompanyId' => $targetId,
+            '_token' => $this->csrfToken($client, 'pl-category-import'.$targetId),
+        ]);
+
+        // Редирект на форму импорта (а не на список, как после успешного
+        // применения) плюс точный текст ошибки: без guard'а запрос ушёл бы в
+        // ветку успеха.
+        self::assertResponseRedirects('/pl-categories/import');
+        self::assertSame(
+            ['Источник и целевая компания совпадают.'],
+            $client->getRequest()->getSession()->getFlashBag()->peek('danger'),
+        );
+
+        $this->em()->clear();
+        self::assertCount(1, $this->em()->getRepository(PLCategory::class)->findBy(['company' => $target]));
+    }
+
     public function testApplyCreatesAndUpdatesTreeAndReimportIsIdempotent(): void
     {
         $client = static::createClient();
@@ -209,5 +251,454 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         $this->em()->clear();
         $reimported = $this->em()->getRepository(PLCategory::class)->findBy(['company' => $target]);
         self::assertCount(2, $reimported);
+    }
+
+    public function testFileUploadShowsPreviewAndApplyImportsIntoActiveCompany(): void
+    {
+        // Сквозной сценарий задачи: файл выгружен в чужом аккаунте, у текущего
+        // пользователя нет к той компании никакого доступа — перенос всё равно
+        // обязан пройти.
+        $client = static::createClient();
+        $this->resetDb();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+        // Уже есть в целевой компании с тем же кодом, но другим именем.
+        $existingRoot = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Старое имя')->withCode('EXP')->build();
+        $existingRootId = (string) $existingRoot->getId();
+
+        $em = $this->em();
+        foreach ([$user, $target, $existingRoot] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $target->getId());
+
+        $targetId = (string) $target->getId();
+        $crawler = $client->request('POST', '/pl-categories/import/upload', [
+            '_token' => $this->csrfToken($client, 'pl-category-import-file'.$targetId),
+        ], ['import_file' => $this->uploadFile($this->exportFile([
+            $this->category('Расходы', ['code' => 'EXP', 'children' => [
+                $this->category('Реклама'),
+            ]]),
+        ]))]);
+
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('categories.json', $crawler->filter('.card-title')->last()->text());
+        self::assertSame('1', trim($crawler->filter('.h2')->eq(0)->text()), 'будет создано');
+        self::assertSame('1', trim($crawler->filter('.h2')->eq(1)->text()), 'будет обновлено');
+
+        $client->submitForm('Импортировать');
+
+        self::assertResponseRedirects('/pl-categories/');
+
+        $this->em()->clear();
+        $imported = $this->em()->getRepository(PLCategory::class)->findBy(['company' => $target]);
+        self::assertCount(2, $imported);
+
+        $updatedRoot = $this->em()->getRepository(PLCategory::class)->find($existingRootId);
+        self::assertInstanceOf(PLCategory::class, $updatedRoot);
+        self::assertSame('Расходы', $updatedRoot->getName());
+    }
+
+    public function testReuploadingSameFileIsIdempotent(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+
+        $em = $this->em();
+        foreach ([$user, $target] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $target->getId());
+
+        $targetId = (string) $target->getId();
+        $json = $this->exportFile([
+            $this->category('Расходы', ['code' => 'EXP', 'children' => [$this->category('Реклама')]]),
+        ]);
+
+        foreach ([1, 2] as $attempt) {
+            $crawler = $client->request('POST', '/pl-categories/import/upload', [
+                '_token' => $this->csrfToken($client, 'pl-category-import-file'.$targetId),
+            ], ['import_file' => $this->uploadFile($json)]);
+
+            self::assertResponseIsSuccessful();
+
+            if (2 === $attempt) {
+                // Второй заход: всё уже на месте, менять нечего.
+                self::assertSame('0', trim($crawler->filter('.h2')->eq(0)->text()), 'будет создано');
+                self::assertSame('0', trim($crawler->filter('.h2')->eq(1)->text()), 'будет обновлено');
+                self::assertSame('2', trim($crawler->filter('.h2')->eq(2)->text()), 'без изменений');
+            }
+
+            $client->submitForm('Импортировать');
+
+            self::assertResponseRedirects('/pl-categories/');
+        }
+
+        $this->em()->clear();
+        self::assertCount(2, $this->em()->getRepository(PLCategory::class)->findBy(['company' => $target]));
+    }
+
+    public function testUploadRequiresValidCsrfToken(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+
+        $em = $this->em();
+        foreach ([$user, $target] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $target->getId());
+
+        $client->request('POST', '/pl-categories/import/upload', [
+            '_token' => 'invalid-token',
+        ], ['import_file' => $this->uploadFile($this->exportFile([$this->category('Расходы')]))]);
+
+        self::assertResponseStatusCodeSame(403);
+        self::assertCount(0, $this->em()->getRepository(PLCategory::class)->findBy(['company' => $target]));
+    }
+
+    public function testBrokenFileIsRejectedWithMessageAndChangesNothing(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+
+        $em = $this->em();
+        foreach ([$user, $target] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $target->getId());
+
+        $targetId = (string) $target->getId();
+        $client->request('POST', '/pl-categories/import/upload', [
+            '_token' => $this->csrfToken($client, 'pl-category-import-file'.$targetId),
+        ], ['import_file' => $this->uploadFile($this->exportFile([$this->category('Расходы', ['flow' => 'WRONG'])]))]);
+
+        self::assertResponseRedirects('/pl-categories/import');
+        self::assertSame(
+            ['Недопустимое значение "WRONG" в поле "flow" категории "Расходы". Допустимые значения: INCOME, EXPENSE, NONE.'],
+            $client->getRequest()->getSession()->getFlashBag()->peek('danger'),
+        );
+
+        $this->em()->clear();
+        self::assertCount(0, $this->em()->getRepository(PLCategory::class)->findBy(['company' => $target]));
+    }
+
+    public function testApplyFromFileWithoutPreviewPayloadIsRejected(): void
+    {
+        // Применяется ровно то, что показано на странице предпросмотра.
+        // Запрос без payload применять нечему.
+        $client = static::createClient();
+        $this->resetDb();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+
+        $em = $this->em();
+        foreach ([$user, $target] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $target->getId());
+
+        $targetId = (string) $target->getId();
+        $client->request('POST', '/pl-categories/import/apply', [
+            'mode' => 'file',
+            '_token' => $this->csrfToken($client, 'pl-category-import'.$targetId),
+        ]);
+
+        self::assertResponseRedirects('/pl-categories/import');
+        self::assertSame(
+            ['Данные предпросмотра не получены — загрузите файл заново.'],
+            $client->getRequest()->getSession()->getFlashBag()->peek('danger'),
+        );
+
+        $this->em()->clear();
+        self::assertCount(0, $this->em()->getRepository(PLCategory::class)->findBy(['company' => $target]));
+    }
+
+    public function testPreviewWarnsAboutFormulaCodesMissingInTargetCompany(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+
+        $em = $this->em();
+        foreach ([$user, $target] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $target->getId());
+
+        $targetId = (string) $target->getId();
+        $crawler = $client->request('POST', '/pl-categories/import/upload', [
+            '_token' => $this->csrfToken($client, 'pl-category-import-file'.$targetId),
+        ], ['import_file' => $this->uploadFile($this->exportFile([
+            $this->category('Выручка', ['code' => 'REVENUE']),
+            $this->category('Маржа', ['code' => 'MARGIN', 'type' => 'KPI', 'formula' => 'REVENUE - OLD_METRIC']),
+        ]))]);
+
+        self::assertResponseIsSuccessful();
+        $warning = $crawler->filter('.alert-warning')->text();
+        self::assertStringContainsString('OLD_METRIC', $warning);
+        self::assertStringNotContainsString('REVENUE', $warning);
+    }
+
+    public function testAppliesExactlyThePreviewThatWasShownWhenTwoFilesArePreviewed(): void
+    {
+        // Две вкладки одной компании: в первой предпросмотрен файл A, во второй
+        // — B. Применение из первой вкладки обязано импортировать A. Общий на
+        // всю сессию слот подменил бы его файлом B, и пользователь получил бы
+        // в справочник ОПиУ не то, что видел на экране.
+        $client = static::createClient();
+        $this->resetDb();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+
+        $em = $this->em();
+        foreach ([$user, $target] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $target->getId());
+
+        $targetId = (string) $target->getId();
+
+        $tabA = $client->request('POST', '/pl-categories/import/upload', [
+            '_token' => $this->csrfToken($client, 'pl-category-import-file'.$targetId),
+        ], ['import_file' => $this->uploadFile($this->exportFile([$this->category('Из файла A', ['code' => 'AAA'])]))]);
+        self::assertResponseIsSuccessful();
+
+        $client->request('POST', '/pl-categories/import/upload', [
+            '_token' => $this->csrfToken($client, 'pl-category-import-file'.$targetId),
+        ], ['import_file' => $this->uploadFile($this->exportFile([$this->category('Из файла B', ['code' => 'BBB'])]))]);
+        self::assertResponseIsSuccessful();
+
+        $client->submit($tabA->selectButton('Импортировать')->form());
+
+        self::assertResponseRedirects('/pl-categories/');
+
+        $this->em()->clear();
+        $imported = $this->em()->getRepository(PLCategory::class)->findBy(['company' => $target]);
+        self::assertCount(1, $imported);
+        self::assertSame('Из файла A', $imported[0]->getName());
+    }
+
+    public function testApplyReportsUnresolvedFormulaCodesAfterImport(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+
+        $em = $this->em();
+        foreach ([$user, $target] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $target->getId());
+
+        $targetId = (string) $target->getId();
+        $client->request('POST', '/pl-categories/import/upload', [
+            '_token' => $this->csrfToken($client, 'pl-category-import-file'.$targetId),
+        ], ['import_file' => $this->uploadFile($this->exportFile([
+            $this->category('Маржа', ['code' => 'MARGIN', 'type' => 'KPI', 'formula' => 'OLD_METRIC * 2']),
+        ]))]);
+
+        $client->submitForm('Импортировать');
+
+        self::assertResponseRedirects('/pl-categories/');
+        $flashes = $client->getRequest()->getSession()->getFlashBag()->peek('warning');
+        self::assertCount(1, $flashes);
+        self::assertStringContainsString('OLD_METRIC', $flashes[0]);
+    }
+
+    public function testExportedFileFromOneAccountImportsIntoAnother(): void
+    {
+        // Приёмочный сценарий задачи целиком, без подделки содержимого файла:
+        // байты берутся из настоящего эндпоинта выгрузки одного пользователя и
+        // загружаются другим пользователем, у которого нет и не может быть
+        // доступа к компании-источнику.
+        $client = static::createClient();
+        $this->resetDb();
+
+        $sourceUser = UserBuilder::aUser()->asCompanyOwner()->build();
+        $sourceCompany = CompanyBuilder::aCompany()->withIndex(1)->withOwner($sourceUser)->withName('Компания А')->build();
+        $targetUser = UserBuilder::aUser()->withIndex(2)->asCompanyOwner()->build();
+        $targetCompany = CompanyBuilder::aCompany()->withIndex(2)->withOwner($targetUser)->withName('Компания Б')->build();
+
+        $root = PLCategoryBuilder::aPLCategory()->forCompany($sourceCompany)->withName('Расходы')->withCode('EXP')->build();
+        $root->setSortOrder(10);
+        $child = PLCategoryBuilder::aPLCategory()->forCompany($sourceCompany)->withName('Реклама')->withParent($root)->build();
+        $child->setWeightInParent('-0.2500');
+        $child->setIsVisible(false);
+        $child->setSortOrder(20);
+
+        $em = $this->em();
+        foreach ([$sourceUser, $sourceCompany, $targetUser, $targetCompany, $root, $child] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        // Аккаунт 1: выгрузка.
+        $client->loginUser($sourceUser);
+        $this->setClientSessionValue($client, 'active_company_id', $sourceCompany->getId());
+        $client->request('GET', '/pl-categories/export/json');
+        self::assertResponseIsSuccessful();
+        $downloaded = (string) $client->getResponse()->getContent();
+
+        // Аккаунт 2: загрузка ровно тех же байтов.
+        $client->loginUser($targetUser);
+        $this->setClientSessionValue($client, 'active_company_id', $targetCompany->getId());
+
+        $client->request('POST', '/pl-categories/import/upload', [
+            '_token' => $this->csrfToken($client, 'pl-category-import-file'.(string) $targetCompany->getId()),
+        ], ['import_file' => $this->uploadFile($downloaded)]);
+
+        self::assertResponseIsSuccessful();
+        $client->submitForm('Импортировать');
+        self::assertResponseRedirects('/pl-categories/');
+
+        $this->em()->clear();
+        $imported = $this->em()->getRepository(PLCategory::class)->findBy(['company' => $targetCompany], ['sortOrder' => 'ASC']);
+        self::assertCount(2, $imported);
+
+        self::assertSame('Расходы', $imported[0]->getName());
+        self::assertSame('EXP', $imported[0]->getCode());
+        self::assertNull($imported[0]->getParent());
+
+        self::assertSame('Реклама', $imported[1]->getName());
+        self::assertSame($imported[0]->getId(), $imported[1]->getParent()?->getId());
+        self::assertSame('-0.2500', $imported[1]->getWeightInParent());
+        self::assertFalse($imported[1]->isVisible());
+        self::assertSame(20, $imported[1]->getSortOrder());
+
+        // Дерево источника не тронуто.
+        self::assertCount(2, $this->em()->getRepository(PLCategory::class)->findBy(['company' => $sourceCompany]));
+    }
+
+    public function testWarnsWhenImportBreaksFormulaOfCategoryAbsentFromFile(): void
+    {
+        // Тот же сценарий, что в unit-тесте Action, но на реальной БД: сюда
+        // попадает настоящий запрос за формулами компании.
+        $client = static::createClient();
+        $this->resetDb();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+
+        // Категория с кодом OLD: импорт совпадёт с ней по имени и обнулит код.
+        $withCode = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Расходы')->withCode('OLD')->build();
+        // Категория с формулой на OLD — в переносимом файле её нет вовсе.
+        $withFormula = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Маржа')->withCode('MARGIN')->build();
+        $withFormula->setFormula('OLD * 2');
+
+        $em = $this->em();
+        foreach ([$user, $target, $withCode, $withFormula] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $target->getId());
+
+        $targetId = (string) $target->getId();
+        $crawler = $client->request('POST', '/pl-categories/import/upload', [
+            '_token' => $this->csrfToken($client, 'pl-category-import-file'.$targetId),
+        ], ['import_file' => $this->uploadFile($this->exportFile([$this->category('Расходы')]))]);
+
+        self::assertResponseIsSuccessful();
+        $warning = $crawler->filter('.alert-warning')->text();
+        self::assertStringContainsString('OLD', $warning);
+        // Формулировка не должна привязывать находку к переносимым категориям:
+        // сломанная формула живёт у категории, которой в файле нет.
+        self::assertStringContainsString('формулы категорий, которых в источнике нет', $warning);
+
+        $client->submitForm('Импортировать');
+
+        self::assertResponseRedirects('/pl-categories/');
+        $flashes = $client->getRequest()->getSession()->getFlashBag()->peek('warning');
+        self::assertCount(1, $flashes);
+        self::assertStringContainsString('OLD', $flashes[0]);
+        self::assertStringContainsString('формулы категорий, которых в файле не было', $flashes[0]);
+    }
+
+    /**
+     * Категория со всеми полями формата v1: неполный файл читатель отвергает,
+     * потому что импорт перезаписывает поля целиком.
+     *
+     * @param array<string, mixed> $overrides
+     *
+     * @return array<string, mixed>
+     */
+    private function category(string $name, array $overrides = []): array
+    {
+        return $overrides + [
+            'name' => $name,
+            'code' => null,
+            'type' => 'LEAF_INPUT',
+            'format' => 'MONEY',
+            'flow' => 'NONE',
+            'expenseType' => 'other',
+            'weightInParent' => '1.0000',
+            'isVisible' => true,
+            'formula' => null,
+            'calcOrder' => null,
+            'sortOrder' => 0,
+        ];
+    }
+
+    /**
+     * @param list<array<string, mixed>> $categories
+     */
+    private function exportFile(array $categories): string
+    {
+        return json_encode([
+            'version' => 1,
+            'exportedAt' => '2026-08-05T10:00:00+03:00',
+            'company' => 'Компания из другого аккаунта',
+            'categories' => $categories,
+        ], \JSON_THROW_ON_ERROR);
+    }
+
+    private function uploadFile(string $json): UploadedFile
+    {
+        $path = tempnam(sys_get_temp_dir(), 'pl-cat-').'.json';
+        file_put_contents($path, $json);
+
+        return new UploadedFile($path, 'pl-categories.json', 'application/json', null, true);
     }
 }
