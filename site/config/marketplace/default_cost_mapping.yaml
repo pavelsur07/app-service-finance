@@ -1,32 +1,147 @@
+# Базовый маппинг категорий затрат маркетплейса → категории ОПиУ.
+#
+# Источник истины — кабинет, настроенный вручную владельцем: коды и целевые
+# категории сверены с реальной настройкой, а не выведены из названий услуг.
+# Правила применяются только к недостающим маппингам; существующие настройки
+# компании автонастройка не перезаписывает (см. ApplyDefaultCostMappingAction).
+#
+# pl_code ссылается на pl_categories.code компании. Если категории с таким
+# кодом нет, preview помечает правило как MISSING_PL_CATEGORY и блокирует
+# применение целиком — набор применяется полностью либо никак.
+#
+# confidence:
+#   high   — подтверждено настроенным кабинетом либо однозначно по смыслу услуги
+#   medium — выведено по аналогии с соседними кодами того же семейства
+#   low    — гипотеза, требует подтверждения фин.методологией
+#
+# is_negative опускается: значение по умолчанию true (затрата уменьшает прибыль).
+# Отрицательная сумма в источнике сама даёт сторно — отдельного правила не нужно.
 version: 1
 marketplaces:
   ozon:
     cost_mappings:
+      # ── Комиссия маркетплейса ────────────────────────────────────────────
       - cost_code: ozon_sale_commission
         pl_code: COGS_MP_COMMISSION
         include_in_pl: true
-        is_negative: true
-        confidence: high
         note: "Комиссия Ozon за продажу"
+      - cost_code: ozon_brand_commission
+        pl_code: COGS_MP_COMMISSION
+        include_in_pl: true
+
+      # ── Логистика до клиента ─────────────────────────────────────────────
       - cost_code: ozon_logistic_direct
         pl_code: COGS_DELIVERY
         include_in_pl: true
       - cost_code: ozon_logistic_last_mile
         pl_code: COGS_DELIVERY
         include_in_pl: true
+      - cost_code: ozon_logistic_pickup
+        pl_code: COGS_DELIVERY
+        include_in_pl: true
+      - cost_code: ozon_delivery_to_handover_place
+        pl_code: COGS_DELIVERY
+        include_in_pl: true
+      - cost_code: ozon_fulfillment
+        pl_code: COGS_DELIVERY
+        include_in_pl: true
+      - cost_code: ozon_dropoff_pvz
+        pl_code: COGS_DELIVERY
+        include_in_pl: true
+      - cost_code: ozon_dropoff_sc
+        pl_code: COGS_DELIVERY
+        include_in_pl: true
+      - cost_code: ozon_dropoff_ff
+        pl_code: COGS_DELIVERY
+        include_in_pl: true
+        confidence: medium
+        note: "По аналогии с ozon_dropoff_pvz / ozon_dropoff_sc"
+      - cost_code: ozon_dropoff_ppz
+        pl_code: COGS_DELIVERY
+        include_in_pl: true
+        confidence: medium
+        note: "По аналогии с ozon_dropoff_pvz / ozon_dropoff_sc"
+      - cost_code: ozon_delivery
+        pl_code: COGS_DELIVERY
+        include_in_pl: true
+        confidence: medium
+      - cost_code: ozon_logistic_delivery
+        pl_code: COGS_DELIVERY
+        include_in_pl: true
+        confidence: medium
+      - cost_code: ozon_logistic_direct_trans
+        pl_code: COGS_DELIVERY
+        include_in_pl: true
+        confidence: medium
+        note: "Магистраль к покупателю — часть логистики до клиента"
+      - cost_code: ozon_logistic_direct_vdc
+        pl_code: COGS_DELIVERY
+        include_in_pl: true
+        confidence: medium
+      - cost_code: ozon_logistic_kgt
+        pl_code: COGS_DELIVERY
+        include_in_pl: true
+        confidence: medium
+
+      # ── Логистика возвратов ──────────────────────────────────────────────
       - cost_code: ozon_logistic_return
         pl_code: COGS_RETURNS_DELIVERY
-        include_in_pl: true
-      - cost_code: ozon_acquiring
-        pl_code: COGS_ACQUIRING
         include_in_pl: true
       - cost_code: ozon_return_pvz
         pl_code: COGS_RETURNS_DELIVERY
         include_in_pl: true
+      - cost_code: ozon_return_from_stock
+        pl_code: COGS_RETURNS_DELIVERY
+        include_in_pl: true
+      - cost_code: ozon_package_labor
+        pl_code: COGS_RETURNS_DELIVERY
+        include_in_pl: true
+      - cost_code: ozon_package_materials
+        pl_code: COGS_RETURNS_DELIVERY
+        include_in_pl: true
+      - cost_code: ozon_logistic_return_trans
+        pl_code: COGS_RETURNS_DELIVERY
+        include_in_pl: true
+        confidence: medium
+        note: "По аналогии с ozon_logistic_return"
+      - cost_code: ozon_return_delivery
+        pl_code: COGS_RETURNS_DELIVERY
+        include_in_pl: true
+        confidence: medium
+      - cost_code: ozon_return_after_delivery
+        pl_code: COGS_RETURNS_DELIVERY
+        include_in_pl: true
+        confidence: medium
+      - cost_code: ozon_return_not_delivered
+        pl_code: COGS_RETURNS_DELIVERY
+        include_in_pl: true
+        confidence: medium
+      - cost_code: ozon_return_partial
+        pl_code: COGS_RETURNS_DELIVERY
+        include_in_pl: true
+        confidence: medium
+
+      # ── Эквайринг и платёжные инструменты ────────────────────────────────
+      - cost_code: ozon_acquiring
+        pl_code: COGS_ACQUIRING
+        include_in_pl: true
+      - cost_code: ozon_installment
+        pl_code: COGS_ACQUIRING
+        include_in_pl: true
+        confidence: medium
+        note: "Плата за продажу в рассрочку — стоимость платёжного инструмента"
+
+      # ── Хранение ─────────────────────────────────────────────────────────
       - cost_code: ozon_storage
         pl_code: OPEX_WH_STORAGE
         include_in_pl: true
       - cost_code: ozon_storage_partner
+        pl_code: OPEX_WH_STORAGE
+        include_in_pl: true
+      - cost_code: ozon_warehouse_movement
+        pl_code: OPEX_WH_STORAGE
+        include_in_pl: true
+      - cost_code: ozon_additional_packaging_warehouse
         pl_code: OPEX_WH_STORAGE
         include_in_pl: true
       - cost_code: ozon_temporary_storage
@@ -34,25 +149,160 @@ marketplaces:
         include_in_pl: true
         confidence: medium
         note: "По аналогии с ozon_storage"
-      - cost_code: ozon_logistic_pickup
-        pl_code: COGS_DELIVERY
+      - cost_code: ozon_return_storage_pvz
+        pl_code: OPEX_WH_STORAGE
         include_in_pl: true
-      - cost_code: ozon_package_labor
+        confidence: medium
+        note: "Хранение возврата — складская услуга, не логистика"
+      - cost_code: ozon_return_storage_wh
+        pl_code: OPEX_WH_STORAGE
+        include_in_pl: true
+        confidence: medium
+        note: "Хранение возврата — складская услуга, не логистика"
+
+      # ── Приёмка и поставка ───────────────────────────────────────────────
+      - cost_code: ozon_logistic_inbound
+        pl_code: OPEX_WH_RECEIVING
+        include_in_pl: true
+      - cost_code: ozon_crossdocking
+        pl_code: OPEX_WH_RECEIVING
+        include_in_pl: true
+      - cost_code: ozon_dropoff_apvz
+        pl_code: OPEX_WH_RECEIVING
+        include_in_pl: true
+      - cost_code: ozon_supply_additional
+        pl_code: OPEX_WH_RECEIVING
+        include_in_pl: true
+      - cost_code: ozon_supply_shortage
+        pl_code: OPEX_WH_RECEIVING
+        include_in_pl: true
+      - cost_code: ozon_supply_surplus
+        pl_code: OPEX_WH_RECEIVING
+        include_in_pl: true
+      - cost_code: ozon_logistic_inbound_seller
+        pl_code: OPEX_WH_RECEIVING
+        include_in_pl: true
+        confidence: medium
+        note: "По аналогии с ozon_logistic_inbound"
+
+      # ── Штрафы ───────────────────────────────────────────────────────────
+      - cost_code: ozon_fines_prohibited_products
+        pl_code: OPEX_WH_PENALTIES
+        include_in_pl: true
+      - cost_code: ozon_fines_shipment_delay
+        pl_code: OPEX_WH_PENALTIES
+        include_in_pl: true
+      - cost_code: ozon_penalty_undeliverable
+        pl_code: OPEX_WH_PENALTIES
+        include_in_pl: true
+
+      # ── Компенсации ──────────────────────────────────────────────────────
+      - cost_code: ozon_compensation
+        pl_code: OPEX_WH_COMPENSATION
+        include_in_pl: true
+
+      # ── Прочие удержания и корректировки маркетплейса ────────────────────
+      - cost_code: ozon_other_service
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+      - cost_code: ozon_decompensation
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+      - cost_code: ozon_correction_point
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+      - cost_code: ozon_seller_correction
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+      - cost_code: ozon_service_correction
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+      - cost_code: ozon_premium_correction
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+      - cost_code: ozon_disposal
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+      - cost_code: ozon_ovh_processing
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+      - cost_code: ozon_service_fee_rfbs
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+      - cost_code: ozon_fines_shipment_delay_rated
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+      - cost_code: ozon_fines_cancellation
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+      - cost_code: ozon_fines_shipment_delay_rated_cancelled
         pl_code: OPEX_WH_MP_DEDUCTIONS
         include_in_pl: true
         confidence: medium
-        note: "Маппинг требует бизнес-подтверждения"
-      - cost_code: ozon_package_materials
+        note: "По аналогии с ozon_fines_shipment_delay_rated"
+      - cost_code: ozon_fines_incomplete
         pl_code: OPEX_WH_MP_DEDUCTIONS
         include_in_pl: true
         confidence: medium
-        note: "Маппинг требует бизнес-подтверждения"
-      - cost_code: ozon_additional_packaging_warehouse
+        note: "По аналогии с индексами ошибок Ozon"
+      - cost_code: ozon_fines_wrong_item
         pl_code: OPEX_WH_MP_DEDUCTIONS
         include_in_pl: true
         confidence: medium
-        note: "По аналогии с ozon_package_materials"
+        note: "По аналогии с индексами ошибок Ozon"
+      - cost_code: ozon_defect_rate_shipment_delay
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: medium
+        note: "По аналогии с индексами ошибок Ozon"
+      - cost_code: ozon_defect_rate_incomplete
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: medium
+        note: "По аналогии с индексами ошибок Ozon"
+      - cost_code: ozon_defect_rate_wrong_item
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: medium
+        note: "По аналогии с индексами ошибок Ozon"
+      - cost_code: ozon_defect_rate_cancellation
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: medium
+        note: "По аналогии с индексами ошибок Ozon"
+      - cost_code: ozon_original_label
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: medium
+        note: "По аналогии с операционными удержаниями Ozon"
+      - cost_code: ozon_charity
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: low
+        note: "Гипотеза до финальной сверки с фин.методологией"
+      - cost_code: ozon_partial_compensation_to_client
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: low
+        note: "Гипотеза: компенсация клиенту отнесена к удержаниям маркетплейса"
+
+      # ── Внутреннее продвижение ───────────────────────────────────────────
       - cost_code: ozon_cpc
+        pl_code: PROMO_INTERNAL
+        include_in_pl: true
+      - cost_code: ozon_marketing_action
+        pl_code: PROMO_INTERNAL
+        include_in_pl: true
+      - cost_code: ozon_premium_promotion
+        pl_code: PROMO_INTERNAL
+        include_in_pl: true
+      - cost_code: ozon_premium_cashback
+        pl_code: PROMO_INTERNAL
+        include_in_pl: true
+      - cost_code: ozon_seller_bonus
+        pl_code: PROMO_INTERNAL
+        include_in_pl: true
+      - cost_code: ozon_reviews
         pl_code: PROMO_INTERNAL
         include_in_pl: true
       - cost_code: ozon_site_advertising
@@ -70,98 +320,142 @@ marketplaces:
       - cost_code: ozon_marketing_services_subscription
         pl_code: PROMO_INTERNAL
         include_in_pl: true
-      - cost_code: ozon_delivery_to_handover_place
-        pl_code: COGS_DELIVERY
+      - cost_code: ozon_stars_membership
+        pl_code: PROMO_INTERNAL
         include_in_pl: true
-      - cost_code: ozon_supply_additional
-        pl_code: OPEX_WH_RECEIVING
+        confidence: medium
+        note: "Программа «Звёздные товары» — промо-инструмент площадки"
+
+      # ── Прочее ───────────────────────────────────────────────────────────
+      - cost_code: ozon_marking
+        pl_code: OVERHEAD_PROD_CERT
         include_in_pl: true
-      - cost_code: ozon_crossdocking
-        pl_code: OPEX_WH_RECEIVING
-        include_in_pl: true
+        note: "Обязательная маркировка — Честный знак"
       - cost_code: ozon_early_payment
         pl_code: OVERHEAD_ADMIN_BANK
         include_in_pl: true
-        confidence: low
-        note: "Гипотеза до финальной сверки с фин.методологией"
-      - cost_code: ozon_return_from_stock
-        pl_code: OPEX_WH_MP_DEDUCTIONS
-        include_in_pl: true
-      - cost_code: ozon_supply_shortage
-        pl_code: OPEX_WH_MP_DEDUCTIONS
-        include_in_pl: true
-        confidence: low
-        note: "Гипотеза до финальной сверки с фин.методологией"
-      - cost_code: ozon_fines_shipment_delay_rated
-        pl_code: OPEX_WH_MP_DEDUCTIONS
-        include_in_pl: true
-        confidence: low
-        note: "Гипотеза: штраф Ozon за просрочку отгрузки относится к удержаниям/штрафам маркетплейса до финальной сверки с фин.методологией"
-      - cost_code: ozon_fines_shipment_delay_rated_cancelled
-        pl_code: OPEX_WH_MP_DEDUCTIONS
-        include_in_pl: true
-        confidence: low
-        note: "По аналогии с ozon_fines_shipment_delay_rated"
-      - cost_code: ozon_fines_cancellation
-        pl_code: OPEX_WH_MP_DEDUCTIONS
-        include_in_pl: true
-        confidence: low
-        note: "Гипотеза: штраф Ozon за отмену относится к удержаниям/штрафам маркетплейса до финальной сверки с фин.методологией"
-      - cost_code: ozon_fines_incomplete
-        pl_code: OPEX_WH_MP_DEDUCTIONS
-        include_in_pl: true
-        confidence: low
-        note: "По аналогии со штрафами Ozon"
-      - cost_code: ozon_fines_wrong_item
-        pl_code: OPEX_WH_MP_DEDUCTIONS
-        include_in_pl: true
-        confidence: low
-        note: "По аналогии со штрафами Ozon"
-      - cost_code: ozon_defect_rate_shipment_delay
-        pl_code: OPEX_WH_MP_DEDUCTIONS
-        include_in_pl: true
-        confidence: low
-        note: "По аналогии со штрафами и индексами ошибок Ozon"
-      - cost_code: ozon_defect_rate_incomplete
-        pl_code: OPEX_WH_MP_DEDUCTIONS
-        include_in_pl: true
-        confidence: low
-        note: "По аналогии со штрафами и индексами ошибок Ozon"
-      - cost_code: ozon_defect_rate_wrong_item
-        pl_code: OPEX_WH_MP_DEDUCTIONS
-        include_in_pl: true
-        confidence: low
-        note: "По аналогии со штрафами и индексами ошибок Ozon"
-      - cost_code: ozon_defect_rate_cancellation
-        pl_code: OPEX_WH_MP_DEDUCTIONS
-        include_in_pl: true
-        confidence: low
-        note: "По аналогии со штрафами и индексами ошибок Ozon"
-      - cost_code: ozon_service_fee_rfbs
-        pl_code: COGS_DELIVERY
+        confidence: medium
+        note: "Плата за досрочную выплату — финансовая услуга"
+      - cost_code: ozon_flexible_payment
+        pl_code: OVERHEAD_ADMIN_BANK
         include_in_pl: true
         confidence: medium
-        note: "Гипотеза: RFBS service fee отнесён к доставочным/операционным расходам до финальной сверки с фин.методологией"
-      - cost_code: ozon_fines_shipment_delay
-        pl_code: OPEX_WH_MP_DEDUCTIONS
-        include_in_pl: true
-        confidence: low
-        note: "Гипотеза: штраф Ozon за просрочку отгрузки относится к удержаниям/штрафам маркетплейса до финальной сверки с фин.методологией"
-      - cost_code: ozon_original_label
-        pl_code: OPEX_WH_MP_DEDUCTIONS
+        note: "По аналогии с ozon_early_payment"
+      - cost_code: ozon_agency_fee
+        pl_code: PRODUCT_INFRA_FF_SERVICES
         include_in_pl: true
         confidence: medium
-        note: "По аналогии с операционными удержаниями Ozon"
-      - cost_code: ozon_charity
-        pl_code: OPEX_WH_MP_DEDUCTIONS
-        include_in_pl: true
-        confidence: low
-        note: "Гипотеза до финальной сверки с фин.методологией"
-      - cost_code: ozon_partial_compensation_to_client
-        pl_code: OPEX_WH_MP_DEDUCTIONS
-        include_in_pl: true
-        confidence: low
-        note: "Гипотеза: компенсация клиенту отнесена к удержаниям маркетплейса до финальной сверки с фин.методологией"
+        note: "Агентская услуга 3PL Global — фулфилмент-оператор"
 
   wildberries:
-    cost_mappings: []
+    cost_mappings:
+      # ── Комиссия маркетплейса ────────────────────────────────────────────
+      - cost_code: commission
+        pl_code: COGS_MP_COMMISSION
+        include_in_pl: true
+
+      # ── Логистика ────────────────────────────────────────────────────────
+      - cost_code: logistics_delivery
+        pl_code: COGS_DELIVERY
+        include_in_pl: true
+      - cost_code: logistics_correction
+        pl_code: COGS_DELIVERY
+        include_in_pl: true
+        note: "Коррекция логистики до покупателя"
+      - cost_code: logistics_return
+        pl_code: COGS_RETURNS_DELIVERY
+        include_in_pl: true
+      - cost_code: pvz_processing
+        pl_code: COGS_RETURNS_DELIVERY
+        include_in_pl: true
+
+      # ── Эквайринг ────────────────────────────────────────────────────────
+      - cost_code: acquiring
+        pl_code: COGS_ACQUIRING
+        include_in_pl: true
+
+      # ── Склад ────────────────────────────────────────────────────────────
+      - cost_code: storage
+        pl_code: OPEX_WH_STORAGE
+        include_in_pl: true
+      - cost_code: warehouse_logistics
+        pl_code: OPEX_WH_STORAGE
+        include_in_pl: true
+      - cost_code: product_processing
+        pl_code: OPEX_WH_RECEIVING
+        include_in_pl: true
+        note: "Платная приёмка WB (paidAcceptance), см. WbProductProcessingCalculator"
+
+      # ── Штрафы ───────────────────────────────────────────────────────────
+      - cost_code: penalty
+        pl_code: OPEX_WH_PENALTIES
+        include_in_pl: true
+
+      # ── Внутреннее продвижение ───────────────────────────────────────────
+      - cost_code: advertising
+        pl_code: PROMO_INTERNAL
+        include_in_pl: true
+      - cost_code: wb_okazanie_uslug_wb_prodvizhenie
+        pl_code: PROMO_INTERNAL
+        include_in_pl: true
+      - cost_code: wb_spisanie_za_otzyv
+        pl_code: PROMO_INTERNAL
+        include_in_pl: true
+      - cost_code: wb_loyalty_discount_compensation
+        pl_code: PROMO_INTERNAL
+        include_in_pl: true
+      - cost_code: wb_avans_za_uslugu_bally_za_otzyvy
+        pl_code: PROMO_INTERNAL
+        include_in_pl: true
+      - cost_code: wb_predostavlenie_uslug_po_podpiske_dzhem
+        pl_code: PROMO_INTERNAL
+        include_in_pl: true
+      - cost_code: wb_vozvrat_neispolzovannogo_ostatka_avansa_za_uslu
+        pl_code: PROMO_INTERNAL
+        include_in_pl: true
+        confidence: medium
+        note: "Возврат аванса по промо: отрицательная сумма в источнике даёт сторно"
+
+      # ── Утилизация товара по складу ──────────────────────────────────────
+      # WB называет удержание помесячно («… за апрель 2026»), код собирается
+      # слугификацией названия и режется до 50 символов (WbDeductionCalculator),
+      # поэтому от месяца остаётся ровно одна буква на 50-й позиции.
+      # Коллизии по построению: m = март и май, a = апрель и август,
+      # i = июнь и июль. Все варианты ведут в одну статью, поэтому коллизия
+      # на результат ОПиУ не влияет.
+      - cost_code: wb_otchet_ob_utilizirovannom_tovare_po_skladu_za_y
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        note: "Утилизация, январь"
+      - cost_code: wb_otchet_ob_utilizirovannom_tovare_po_skladu_za_f
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        note: "Утилизация, февраль"
+      - cost_code: wb_otchet_ob_utilizirovannom_tovare_po_skladu_za_m
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        note: "Утилизация, март и май"
+      - cost_code: wb_otchet_ob_utilizirovannom_tovare_po_skladu_za_a
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        note: "Утилизация, апрель и август"
+      - cost_code: wb_otchet_ob_utilizirovannom_tovare_po_skladu_za_i
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        note: "Утилизация, июнь и июль"
+      - cost_code: wb_otchet_ob_utilizirovannom_tovare_po_skladu_za_s
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        note: "Утилизация, сентябрь"
+      - cost_code: wb_otchet_ob_utilizirovannom_tovare_po_skladu_za_o
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        note: "Утилизация, октябрь"
+      - cost_code: wb_otchet_ob_utilizirovannom_tovare_po_skladu_za_n
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        note: "Утилизация, ноябрь"
+      - cost_code: wb_otchet_ob_utilizirovannom_tovare_po_skladu_za_d
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        note: "Утилизация, декабрь"

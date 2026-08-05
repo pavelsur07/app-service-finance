@@ -20,7 +20,7 @@ final class CostPLMappingDefaultSetupControllerTest extends WebTestCaseBase
 {
     private const NEW_OZON_COST_MAPPINGS = [
         'ozon_temporary_storage' => 'OPEX_WH_STORAGE',
-        'ozon_additional_packaging_warehouse' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_additional_packaging_warehouse' => 'OPEX_WH_STORAGE',
         'ozon_site_advertising' => 'PROMO_INTERNAL',
         'ozon_sending_push_notifications' => 'PROMO_INTERNAL',
         'ozon_pin_review' => 'PROMO_INTERNAL',
@@ -35,8 +35,8 @@ final class CostPLMappingDefaultSetupControllerTest extends WebTestCaseBase
         'ozon_defect_rate_incomplete' => 'OPEX_WH_MP_DEDUCTIONS',
         'ozon_defect_rate_wrong_item' => 'OPEX_WH_MP_DEDUCTIONS',
         'ozon_defect_rate_cancellation' => 'OPEX_WH_MP_DEDUCTIONS',
-        'ozon_service_fee_rfbs' => 'COGS_DELIVERY',
-        'ozon_fines_shipment_delay' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_service_fee_rfbs' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_fines_shipment_delay' => 'OPEX_WH_PENALTIES',
         'ozon_original_label' => 'OPEX_WH_MP_DEDUCTIONS',
         'ozon_charity' => 'OPEX_WH_MP_DEDUCTIONS',
         'ozon_partial_compensation_to_client' => 'OPEX_WH_MP_DEDUCTIONS',
@@ -206,8 +206,14 @@ final class CostPLMappingDefaultSetupControllerTest extends WebTestCaseBase
             $em->persist($cost);
         }
 
+        // Категории ОПиУ выводим из таблицы ожиданий, иначе смена целевой статьи
+        // в YAML даёт MISSING_PL_CATEGORY и блокирует apply вместо проверки маппинга.
         $plCodes = $withAllPlCodes
-            ? ['COGS_MP_COMMISSION', 'COGS_DELIVERY', 'OPEX_WH_MP_DEDUCTIONS', 'OPEX_WH_STORAGE', 'PROMO_INTERNAL']
+            ? array_values(array_unique([
+                'COGS_MP_COMMISSION',
+                'COGS_DELIVERY',
+                ...array_values(self::NEW_OZON_COST_MAPPINGS),
+            ]))
             : ['COGS_MP_COMMISSION'];
         foreach ($plCodes as $code) {
             $pl = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName($code)->build();

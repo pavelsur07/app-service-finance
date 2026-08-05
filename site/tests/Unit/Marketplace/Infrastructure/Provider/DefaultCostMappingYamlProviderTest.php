@@ -16,7 +16,7 @@ final class DefaultCostMappingYamlProviderTest extends TestCase
     private const FIXTURES_DIR = __DIR__ . '/../../../../Fixtures/Marketplace/Provider';
     private const NEW_OZON_COST_MAPPINGS = [
         'ozon_temporary_storage' => 'OPEX_WH_STORAGE',
-        'ozon_additional_packaging_warehouse' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_additional_packaging_warehouse' => 'OPEX_WH_STORAGE',
         'ozon_site_advertising' => 'PROMO_INTERNAL',
         'ozon_sending_push_notifications' => 'PROMO_INTERNAL',
         'ozon_pin_review' => 'PROMO_INTERNAL',
@@ -31,8 +31,8 @@ final class DefaultCostMappingYamlProviderTest extends TestCase
         'ozon_defect_rate_incomplete' => 'OPEX_WH_MP_DEDUCTIONS',
         'ozon_defect_rate_wrong_item' => 'OPEX_WH_MP_DEDUCTIONS',
         'ozon_defect_rate_cancellation' => 'OPEX_WH_MP_DEDUCTIONS',
-        'ozon_service_fee_rfbs' => 'COGS_DELIVERY',
-        'ozon_fines_shipment_delay' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_service_fee_rfbs' => 'OPEX_WH_MP_DEDUCTIONS',
+        'ozon_fines_shipment_delay' => 'OPEX_WH_PENALTIES',
         'ozon_original_label' => 'OPEX_WH_MP_DEDUCTIONS',
         'ozon_charity' => 'OPEX_WH_MP_DEDUCTIONS',
         'ozon_partial_compensation_to_client' => 'OPEX_WH_MP_DEDUCTIONS',
