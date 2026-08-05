@@ -11,6 +11,11 @@
 
 * Повысить пользователя до супер-админа: `docker compose exec -T site-php-cli php /app/bin/console security:promote user@example.com --super-admin`
 
+### Смена пароля
+
+* Залогиненный пользователь меняет пароль сам на странице `/profile/password`: нужно ввести текущий пароль, действует лимит 5 попыток / 15 минут на аккаунт (HTTP 429 при превышении), после смены регенерируется session id, все остальные сессии завершаются, на email приходит уведомление о смене.
+* Аварийный сброс пароля из консоли (генерирует временный пароль): `docker compose exec -T site-php-cli php /app/bin/console app:user:reset-password user@example.com`
+
 ## Тесты
 
 * Подготовка test-БД: `make site-test-prepare`
