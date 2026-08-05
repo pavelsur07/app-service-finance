@@ -29,6 +29,7 @@ use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Shared\Service\ActiveCompanyService;
+use App\Shared\Service\AppLogger;
 use Doctrine\ORM\EntityManagerInterface;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
 use Pagerfanta\Pagerfanta;
@@ -62,6 +63,7 @@ class MarketplaceController extends AbstractController
         private readonly WbFinanceSyncStatusListQuery     $wbFinanceSyncStatusListQuery,
         private readonly OzonSellerCredentialValidatorInterface $ozonCredentialValidator,
         private readonly ConnectionApiKeyCodec            $connectionApiKeyCodec,
+        private readonly AppLogger $appLogger,
     ) {
     }
 
@@ -482,8 +484,11 @@ class MarketplaceController extends AbstractController
             return $this->redirectToRoute('marketplace_index');
         }
 
+        $companyId = (string) $company->getId();
+        $rawDocId = (string) $rawDoc->getId();
+
         try {
-            $result = ($action)((string) $company->getId(), (string) $rawDoc->getId());
+            $result = ($action)($companyId, $rawDocId);
 
             // Различаем первичную обработку и переобработку (повторный запуск)
             if ($result['updated'] > 0) {
@@ -500,6 +505,13 @@ class MarketplaceController extends AbstractController
                 ));
             }
         } catch (\Exception $e) {
+            // Без этого лога отказ виден только флеш-сообщением: sentry.yaml
+            // отключает перехватчики исключений, в GlitchTip уходит только ERROR Monolog.
+            $this->appLogger->error('[OzonRealization] Ошибка обработки реализации', $e, [
+                'companyId' => $companyId,
+                'rawDocumentId' => $rawDocId,
+            ]);
+
             $this->addFlash('error', 'Ошибка обработки реализации: ' . $e->getMessage());
         }
 
@@ -599,6 +611,16 @@ class MarketplaceController extends AbstractController
                 $result['realization'],
             ));
         } catch (\Exception $e) {
+            // Переобработка идёт через тот же ProcessOzonRealizationAction,
+            // поэтому падает так же и так же молча — логируем наравне.
+            $this->appLogger->error('[Reprocess] Ошибка переобработки', $e, [
+                'companyId' => (string) $company->getId(),
+                'marketplace' => $marketplace,
+                'periodFrom' => $periodFrom->format('Y-m-d'),
+                'periodTo' => $periodTo->format('Y-m-d'),
+                'type' => $type,
+            ]);
+
             $this->addFlash('error', 'Ошибка переобработки: ' . $e->getMessage());
         }
 
