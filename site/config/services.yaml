@@ -447,3 +447,7 @@ services:
     App\Marketplace\Infrastructure\Provider\DefaultCostMappingYamlProvider:
         arguments:
             $configPath: "%kernel.project_dir%/config/marketplace/default_cost_mapping.yaml"
+
+    App\Marketplace\Infrastructure\Provider\DefaultSaleMappingYamlProvider:
+        arguments:
+            $configPath: "%kernel.project_dir%/config/marketplace/default_sale_mapping.yaml"

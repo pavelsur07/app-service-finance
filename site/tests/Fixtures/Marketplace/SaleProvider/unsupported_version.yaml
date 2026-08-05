@@ -1,0 +1,4 @@
+version: 2
+marketplaces:
+  ozon:
+    sale_mappings: []

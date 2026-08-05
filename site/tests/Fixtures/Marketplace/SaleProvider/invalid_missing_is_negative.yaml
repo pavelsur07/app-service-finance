@@ -1,0 +1,6 @@
+version: 1
+marketplaces:
+  ozon:
+    sale_mappings:
+      - amount_source: sale_gross
+        pl_code: REV_NOT_SPP
