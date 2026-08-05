@@ -130,7 +130,11 @@ final class ImportPLCategoryTreeAction
             }
         }
 
-        if ([] === $formulas) {
+        // Коды, которые импорт убирает совсем: освобождённые и никем из
+        // приносимых узлов не занятые обратно.
+        $lostCodes = array_diff_key($releasedCodes, $sourceCodes);
+
+        if ([] === $formulas && [] === $lostCodes) {
             return [];
         }
 
@@ -173,6 +177,33 @@ final class ImportPLCategoryTreeAction
                 }
 
                 $unresolved[$token] = true;
+            }
+        }
+
+        // Формулы категорий, которых в переносимом дереве нет, импорт не
+        // трогает — но может выбить у них ссылку, освободив код. Сами эти
+        // формулы остаются как есть, поэтому ищем в них только то, что импорт
+        // действительно убирает; прочие уже битые ссылки к переносу не
+        // относятся и в предупреждение не попадают.
+        if ([] !== $lostCodes) {
+            $managedIds = [];
+            foreach ($plan as $item) {
+                $existing = $item['existing'];
+                if (null !== $existing) {
+                    $managedIds[(string) $existing->getId()] = true;
+                }
+            }
+
+            foreach ($this->plCategoryRepository->findFormulasByCompany($targetCompany) as $categoryId => $formula) {
+                if (isset($managedIds[$categoryId])) {
+                    continue;
+                }
+
+                foreach (array_keys($lostCodes) as $lostCode) {
+                    if (1 === preg_match('/(?<![\p{Lu}\p{N}_])'.preg_quote((string) $lostCode, '/').'(?![\p{Lu}\p{N}_])/u', $formula)) {
+                        $unresolved[(string) $lostCode] = true;
+                    }
+                }
             }
         }
 

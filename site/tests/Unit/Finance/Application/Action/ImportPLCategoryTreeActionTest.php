@@ -676,6 +676,69 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         self::assertSame(['NET_PROFIT'], $result->unresolvedFormulaCodes);
     }
 
+    public function testWarnsWhenImportBreaksFormulaOfCategoryAbsentFromSource(): void
+    {
+        // Формула живёт у категории, которой в переносимом дереве нет: импорт
+        // её не трогает, но выбивает у неё ссылку, освободив код OLD. Во
+        // входящих узлах формул нет вообще — раньше предупреждение молчало
+        // ровно в том случае, ради которого оно и существует.
+        $source = CompanyBuilder::aCompany()->withIndex(1)->build();
+        $target = CompanyBuilder::aCompany()->withIndex(2)->build();
+
+        $existing = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Расходы')->withCode('OLD')->build();
+        $sourceRoot = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Расходы')->build();
+
+        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository->method('findOneBy')->willReturn(null);
+        $plCategoryRepository->method('findBy')->willReturnCallback(
+            static fn (array $criteria): array => 'Расходы' === ($criteria['name'] ?? null) ? [$existing] : [],
+        );
+        $plCategoryRepository->method('findCodesByCompany')->willReturn(['OLD']);
+        $plCategoryRepository->method('findFormulasByCompany')->willReturn([
+            '11111111-1111-1111-1111-000000000001' => 'OLD * 2',
+        ]);
+        $sourceNodes = $this->nodes([$sourceRoot]);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+
+        $result = $this->action($target, $plCategoryRepository, $em)(
+            new ImportPLCategoryTreeCommand($sourceNodes, (string) $target->getId(), true),
+        );
+
+        self::assertSame(['OLD'], $result->unresolvedFormulaCodes);
+    }
+
+    public function testDoesNotWarnAboutPreexistingBrokenReferencesInTargetFormulas(): void
+    {
+        // Импорт освобождает OLD, а в чужой формуле есть ещё и давно битый
+        // ALREADY_BROKEN. К переносу он отношения не имеет и в предупреждение
+        // попадать не должен — иначе оно превратится в шум.
+        $source = CompanyBuilder::aCompany()->withIndex(1)->build();
+        $target = CompanyBuilder::aCompany()->withIndex(2)->build();
+
+        $existing = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Расходы')->withCode('OLD')->build();
+        $sourceRoot = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Расходы')->build();
+
+        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository->method('findOneBy')->willReturn(null);
+        $plCategoryRepository->method('findBy')->willReturnCallback(
+            static fn (array $criteria): array => 'Расходы' === ($criteria['name'] ?? null) ? [$existing] : [],
+        );
+        $plCategoryRepository->method('findCodesByCompany')->willReturn(['OLD']);
+        $plCategoryRepository->method('findFormulasByCompany')->willReturn([
+            '11111111-1111-1111-1111-000000000001' => 'OLD + ALREADY_BROKEN',
+        ]);
+        $sourceNodes = $this->nodes([$sourceRoot]);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+
+        $result = $this->action($target, $plCategoryRepository, $em)(
+            new ImportPLCategoryTreeCommand($sourceNodes, (string) $target->getId(), true),
+        );
+
+        self::assertSame(['OLD'], $result->unresolvedFormulaCodes);
+    }
+
     public function testReportsNoFormulaWarningWhenSourceHasNoFormulas(): void
     {
         $source = CompanyBuilder::aCompany()->withIndex(1)->build();

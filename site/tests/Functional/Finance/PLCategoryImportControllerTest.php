@@ -610,6 +610,47 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         self::assertCount(2, $this->em()->getRepository(PLCategory::class)->findBy(['company' => $sourceCompany]));
     }
 
+    public function testWarnsWhenImportBreaksFormulaOfCategoryAbsentFromFile(): void
+    {
+        // Тот же сценарий, что в unit-тесте Action, но на реальной БД: сюда
+        // попадает настоящий запрос за формулами компании.
+        $client = static::createClient();
+        $this->resetDb();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+
+        // Категория с кодом OLD: импорт совпадёт с ней по имени и обнулит код.
+        $withCode = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Расходы')->withCode('OLD')->build();
+        // Категория с формулой на OLD — в переносимом файле её нет вовсе.
+        $withFormula = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Маржа')->withCode('MARGIN')->build();
+        $withFormula->setFormula('OLD * 2');
+
+        $em = $this->em();
+        foreach ([$user, $target, $withCode, $withFormula] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $target->getId());
+
+        $targetId = (string) $target->getId();
+        $crawler = $client->request('POST', '/pl-categories/import/upload', [
+            '_token' => $this->csrfToken($client, 'pl-category-import-file'.$targetId),
+        ], ['import_file' => $this->uploadFile($this->exportFile([$this->category('Расходы')]))]);
+
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('OLD', $crawler->filter('.alert-warning')->text());
+
+        $client->submitForm('Импортировать');
+
+        self::assertResponseRedirects('/pl-categories/');
+        $flashes = $client->getRequest()->getSession()->getFlashBag()->peek('warning');
+        self::assertCount(1, $flashes);
+        self::assertStringContainsString('OLD', $flashes[0]);
+    }
+
     /**
      * Категория со всеми полями формата v1: неполный файл читатель отвергает,
      * потому что импорт перезаписывает поля целиком.

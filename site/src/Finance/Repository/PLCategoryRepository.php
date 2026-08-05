@@ -54,7 +54,6 @@ class PLCategoryRepository extends ServiceEntityRepository
         }
     }
 
-
     /**
      * @return string[]
      */
@@ -71,6 +70,31 @@ class PLCategoryRepository extends ServiceEntityRepository
             ->getArrayResult();
 
         return array_map(static fn (array $row): string => (string) $row['code'], $rows);
+    }
+
+    /**
+     * Формулы категорий компании: id → формула. Нужны, чтобы увидеть ссылки,
+     * которые ломает импорт, у категорий, которых в переносимом дереве нет.
+     *
+     * @return array<string, string>
+     */
+    public function findFormulasByCompany(Company $company): array
+    {
+        $rows = $this->createQueryBuilder('c')
+            ->select('c.id AS id, c.formula AS formula')
+            ->andWhere('c.company = :company')
+            ->andWhere('c.formula IS NOT NULL')
+            ->andWhere("c.formula <> ''")
+            ->setParameter('company', $company)
+            ->getQuery()
+            ->getArrayResult();
+
+        $formulas = [];
+        foreach ($rows as $row) {
+            $formulas[(string) $row['id']] = (string) $row['formula'];
+        }
+
+        return $formulas;
     }
 
     public function getNextSortOrder(Company $company, ?PLCategory $parent): int
