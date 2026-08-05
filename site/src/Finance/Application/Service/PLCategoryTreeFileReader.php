@@ -32,6 +32,29 @@ final class PLCategoryTreeFileReader
     private const JSON_MAX_DEPTH = 64;
 
     /**
+     * Категория обязана нести весь набор полей формата v1. Терпимость к
+     * неполным файлам здесь означала бы тихую потерю настроек: узел файла
+     * матчится с существующей категорией по code, а импорт перезаписывает
+     * поля целиком — отсутствующий `flow` сбросил бы INCOME в NONE, а
+     * отсутствующий `weightInParent` превратил бы вес -0.5000 в 1.0000. В
+     * предпросмотре это выглядит как обычное «обновить». Экспорт всегда пишет
+     * все поля, поэтому строгость ничего не ломает, а недостающее поле
+     * называется в тексте ошибки.
+     */
+    private const REQUIRED_FIELDS = [
+        'code',
+        'type',
+        'format',
+        'flow',
+        'expenseType',
+        'weightInParent',
+        'isVisible',
+        'formula',
+        'calcOrder',
+        'sortOrder',
+    ];
+
+    /**
      * calcOrder и sortOrder ложатся в PostgreSQL integer. На 64-битном PHP
      * 2147483648 — валидный int, но в колонку не влезет: без этой проверки
      * граница доверия пропустила бы значение до Doctrine и вместо понятной
@@ -128,6 +151,13 @@ final class PLCategoryTreeFileReader
 
             $name = $this->readName($row, $parentPath, (int) $index + 1);
             $path = null !== $parent ? $parentPath.' / '.$name : $name;
+
+            foreach (self::REQUIRED_FIELDS as $field) {
+                if (!array_key_exists($field, $row)) {
+                    throw new \DomainException(sprintf('В категории "%s" нет поля "%s". Файл должен содержать полный набор полей выгрузки — иначе импорт молча заменит недостающие настройки значениями по умолчанию.', $path, $field));
+                }
+            }
+
             $code = $this->readCode($row, $path);
 
             // Узел без code опознаётся в целевой компании парой (родитель, имя).
@@ -153,15 +183,15 @@ final class PLCategoryTreeFileReader
                 parent: $parent,
                 name: $name,
                 code: $code,
-                type: $this->readEnum($row, 'type', PLCategoryType::class, PLCategoryType::LEAF_INPUT, $path),
-                format: $this->readEnum($row, 'format', PLValueFormat::class, PLValueFormat::MONEY, $path),
-                flow: $this->readEnum($row, 'flow', PLFlow::class, PLFlow::NONE, $path),
-                expenseType: $this->readEnum($row, 'expenseType', PLExpenseType::class, PLExpenseType::OTHER, $path),
+                type: $this->readEnum($row, 'type', PLCategoryType::class, $path),
+                format: $this->readEnum($row, 'format', PLValueFormat::class, $path),
+                flow: $this->readEnum($row, 'flow', PLFlow::class, $path),
+                expenseType: $this->readEnum($row, 'expenseType', PLExpenseType::class, $path),
                 weightInParent: $this->readWeight($row, $path),
-                isVisible: $this->readBool($row, 'isVisible', true, $path),
+                isVisible: $this->readBool($row, 'isVisible', $path),
                 formula: $this->readNullableString($row, 'formula', $path),
                 calcOrder: $this->readNullableInt($row, 'calcOrder', $path),
-                sortOrder: $this->readNullableInt($row, 'sortOrder', $path) ?? 0,
+                sortOrder: $this->readRequiredInt($row, 'sortOrder', $path),
             );
 
             $nodes[] = $node;
@@ -242,16 +272,12 @@ final class PLCategoryTreeFileReader
      *
      * @param array<mixed>    $row
      * @param class-string<T> $enumClass
-     * @param T               $default
      *
      * @return T
      */
-    private function readEnum(array $row, string $field, string $enumClass, \BackedEnum $default, string $path): \BackedEnum
+    private function readEnum(array $row, string $field, string $enumClass, string $path): \BackedEnum
     {
-        $value = $row[$field] ?? null;
-        if (null === $value) {
-            return $default;
-        }
+        $value = $row[$field];
 
         if (is_string($value)) {
             $parsed = $enumClass::tryFrom($value);
@@ -268,10 +294,7 @@ final class PLCategoryTreeFileReader
      */
     private function readWeight(array $row, string $path): string
     {
-        $value = $row['weightInParent'] ?? null;
-        if (null === $value) {
-            return '1.0000';
-        }
+        $value = $row['weightInParent'];
 
         if (!is_numeric($value)) {
             throw new \DomainException(sprintf('Вес категории "%s" должен быть числом.', $path));
@@ -301,12 +324,9 @@ final class PLCategoryTreeFileReader
     /**
      * @param array<mixed> $row
      */
-    private function readBool(array $row, string $field, bool $default, string $path): bool
+    private function readBool(array $row, string $field, string $path): bool
     {
-        $value = $row[$field] ?? null;
-        if (null === $value) {
-            return $default;
-        }
+        $value = $row[$field];
 
         if (!is_bool($value)) {
             throw new \DomainException(sprintf('Поле "%s" категории "%s" должно быть true или false.', $field, $path));
@@ -320,7 +340,7 @@ final class PLCategoryTreeFileReader
      */
     private function readNullableString(array $row, string $field, string $path): ?string
     {
-        $value = $row[$field] ?? null;
+        $value = $row[$field];
         if (null === $value) {
             return null;
         }
@@ -339,11 +359,24 @@ final class PLCategoryTreeFileReader
      */
     private function readNullableInt(array $row, string $field, string $path): ?int
     {
-        $value = $row[$field] ?? null;
+        $value = $row[$field];
         if (null === $value) {
             return null;
         }
 
+        return $this->assertInt32($value, $field, $path);
+    }
+
+    /**
+     * @param array<mixed> $row
+     */
+    private function readRequiredInt(array $row, string $field, string $path): int
+    {
+        return $this->assertInt32($row[$field], $field, $path);
+    }
+
+    private function assertInt32(mixed $value, string $field, string $path): int
+    {
         if (!is_int($value)) {
             throw new \DomainException(sprintf('Поле "%s" категории "%s" должно быть целым числом.', $field, $path));
         }

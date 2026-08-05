@@ -150,9 +150,15 @@ final class ImportPLCategoryTreeAction
         // (code нормализуется только trim + upper, дефис в нём допустим), а
         // «REVENUE-COGS» — вычитанием двух кодов. Границы токена в шаблоне не
         // дают короткому коду съесть часть длинного имени.
+        // Длинные коды маскируются первыми: дефис для границы токена
+        // прозрачен, поэтому известный «NET» иначе выел бы середину столь же
+        // известного «NET-PROFIT» и оставил ложный «PROFIT».
+        $knownCodes = array_keys($known);
+        usort($knownCodes, static fn (string $a, string $b): int => mb_strlen($b) <=> mb_strlen($a));
+
         $maskPatterns = [];
-        foreach (array_keys($known) as $code) {
-            $maskPatterns[] = '/(?<![\p{Lu}\p{N}_])'.preg_quote((string) $code, '/').'(?![\p{Lu}\p{N}_])/u';
+        foreach ($knownCodes as $code) {
+            $maskPatterns[] = '/(?<![\p{Lu}\p{N}_])'.preg_quote($code, '/').'(?![\p{Lu}\p{N}_])/u';
         }
 
         $unresolved = [];

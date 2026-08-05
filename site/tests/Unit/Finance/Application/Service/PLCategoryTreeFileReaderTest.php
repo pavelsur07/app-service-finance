@@ -67,22 +67,57 @@ final class PLCategoryTreeFileReaderTest extends TestCase
         self::assertSame($read[0], $read[1]->parent);
     }
 
-    public function testAppliesEntityDefaultsToHandWrittenMinimalFile(): void
+    public function testRejectsCategoryMissingAnyFieldOfTheFormat(): void
     {
-        $read = (new PLCategoryTreeFileReader())->read($this->file([['name' => 'Расходы']]));
+        // Неполная категория матчится с существующей по code, а импорт
+        // перезаписывает поля целиком: отсутствующий flow сбросил бы INCOME в
+        // NONE, а отсутствующий weightInParent превратил бы -0.5000 в 1.0000.
+        // В предпросмотре это выглядело бы обычным «обновить».
+        $full = $this->category('Расходы', ['code' => 'EXP']);
+
+        foreach (array_keys($full) as $field) {
+            if ('name' === $field) {
+                continue;
+            }
+
+            $partial = $full;
+            unset($partial[$field]);
+
+            try {
+                (new PLCategoryTreeFileReader())->read($this->file([$partial]));
+                self::fail(sprintf('Категория без поля "%s" должна отвергаться', $field));
+            } catch (\DomainException $e) {
+                self::assertStringContainsString(sprintf('нет поля "%s"', $field), $e->getMessage());
+            }
+        }
+    }
+
+    public function testRejectsNullInNonNullableField(): void
+    {
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessageMatches('/Недопустимое значение "NULL" в поле "flow"/');
+
+        (new PLCategoryTreeFileReader())->read($this->file([$this->category('Расходы', ['flow' => null])]));
+    }
+
+    public function testReadsFullCategory(): void
+    {
+        $read = (new PLCategoryTreeFileReader())->read($this->file([
+            $this->category('Расходы', ['code' => 'EXP', 'flow' => 'EXPENSE', 'sortOrder' => 10]),
+        ]));
 
         self::assertCount(1, $read);
         self::assertSame('Расходы', $read[0]->name);
-        self::assertNull($read[0]->code);
+        self::assertSame('EXP', $read[0]->code);
         self::assertSame(PLCategoryType::LEAF_INPUT, $read[0]->type);
         self::assertSame(PLValueFormat::MONEY, $read[0]->format);
-        self::assertSame(PLFlow::NONE, $read[0]->flow);
+        self::assertSame(PLFlow::EXPENSE, $read[0]->flow);
         self::assertSame(PLExpenseType::OTHER, $read[0]->expenseType);
         self::assertSame('1.0000', $read[0]->weightInParent);
         self::assertTrue($read[0]->isVisible);
         self::assertNull($read[0]->formula);
         self::assertNull($read[0]->calcOrder);
-        self::assertSame(0, $read[0]->sortOrder);
+        self::assertSame(10, $read[0]->sortOrder);
     }
 
     public function testNormalizesCodeExactlyLikeEntitySetter(): void
@@ -92,8 +127,8 @@ final class PLCategoryTreeFileReaderTest extends TestCase
         // другое — и повторный импорт того же файла перестанет быть
         // идемпотентным.
         $read = (new PLCategoryTreeFileReader())->read($this->file([
-            ['name' => 'Расходы', 'code' => '  exp  '],
-            ['name' => 'Прочее', 'code' => '   '],
+            $this->category('Расходы', ['code' => '  exp  ']),
+            $this->category('Прочее', ['code' => '   ']),
         ]));
 
         self::assertSame('EXP', $read[0]->code);
@@ -103,13 +138,13 @@ final class PLCategoryTreeFileReaderTest extends TestCase
     public function testReadsFlatDfsPreOrderWithParentLinks(): void
     {
         $read = (new PLCategoryTreeFileReader())->read($this->file([
-            ['name' => 'Расходы', 'children' => [
-                ['name' => 'Реклама', 'children' => [
-                    ['name' => 'Ozon'],
-                ]],
-                ['name' => 'Логистика'],
-            ]],
-            ['name' => 'Выручка'],
+            $this->category('Расходы', ['children' => [
+                $this->category('Реклама', ['children' => [
+                    $this->category('Ozon'),
+                ]]),
+                $this->category('Логистика'),
+            ]]),
+            $this->category('Выручка'),
         ]));
 
         self::assertSame(
@@ -127,7 +162,7 @@ final class PLCategoryTreeFileReaderTest extends TestCase
     {
         // Прежний эндпоинт выгрузки отдавал массив без конверта, и такие файлы
         // могли быть сохранены вручную.
-        $read = (new PLCategoryTreeFileReader())->read('[{"name":"Расходы","code":"EXP"}]');
+        $read = (new PLCategoryTreeFileReader())->read((string) json_encode([$this->category('Расходы', ['code' => 'EXP'])], \JSON_THROW_ON_ERROR));
 
         self::assertCount(1, $read);
         self::assertSame('EXP', $read[0]->code);
@@ -138,7 +173,7 @@ final class PLCategoryTreeFileReaderTest extends TestCase
         // id и level из чужого аккаунта не должны ни использоваться, ни ломать
         // чтение: старые выгрузки их содержали.
         $read = (new PLCategoryTreeFileReader())->read($this->file([
-            ['name' => 'Расходы', 'id' => '11111111-1111-1111-1111-000000000001', 'level' => 3, 'somethingNew' => 42],
+            $this->category('Расходы', ['id' => '11111111-1111-1111-1111-000000000001', 'level' => 3, 'somethingNew' => 42]),
         ]));
 
         self::assertCount(1, $read);
@@ -182,7 +217,7 @@ final class PLCategoryTreeFileReaderTest extends TestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessageMatches('/INCOME, EXPENSE, NONE/');
 
-        (new PLCategoryTreeFileReader())->read($this->file([['name' => 'Расходы', 'flow' => 'WRONG']]));
+        (new PLCategoryTreeFileReader())->read($this->file([$this->category('Расходы', ['flow' => 'WRONG'])]));
     }
 
     public function testRejectsDuplicateCodeAndNamesBothCategories(): void
@@ -193,16 +228,16 @@ final class PLCategoryTreeFileReaderTest extends TestCase
         $this->expectExceptionMessageMatches('/"Расходы".*"Выручка"/');
 
         (new PLCategoryTreeFileReader())->read($this->file([
-            ['name' => 'Расходы', 'code' => 'EXP'],
-            ['name' => 'Выручка', 'code' => 'exp'],
+            $this->category('Расходы', ['code' => 'EXP']),
+            $this->category('Выручка', ['code' => 'exp']),
         ]));
     }
 
     public function testRejectsTreeDeeperThanFiveLevels(): void
     {
-        $deepest = ['name' => 'Уровень 6'];
+        $deepest = $this->category('Уровень 6');
         for ($level = 5; $level >= 1; --$level) {
-            $deepest = ['name' => 'Уровень '.$level, 'children' => [$deepest]];
+            $deepest = $this->category('Уровень '.$level, ['children' => [$deepest]]);
         }
 
         $this->expectException(\DomainException::class);
@@ -213,9 +248,9 @@ final class PLCategoryTreeFileReaderTest extends TestCase
 
     public function testAcceptsExactlyFiveLevels(): void
     {
-        $node = ['name' => 'Уровень 5'];
+        $node = $this->category('Уровень 5');
         for ($level = 4; $level >= 1; --$level) {
-            $node = ['name' => 'Уровень '.$level, 'children' => [$node]];
+            $node = $this->category('Уровень '.$level, ['children' => [$node]]);
         }
 
         $read = (new PLCategoryTreeFileReader())->read($this->file([$node]));
@@ -228,7 +263,7 @@ final class PLCategoryTreeFileReaderTest extends TestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessageMatches('/не заполнено название/');
 
-        (new PLCategoryTreeFileReader())->read($this->file([['name' => '   ']]));
+        (new PLCategoryTreeFileReader())->read($this->file([$this->category('   ')]));
     }
 
     public function testRejectsTooLongName(): void
@@ -236,7 +271,7 @@ final class PLCategoryTreeFileReaderTest extends TestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessageMatches('/длиннее 255 символов/');
 
-        (new PLCategoryTreeFileReader())->read($this->file([['name' => str_repeat('я', 256)]]));
+        (new PLCategoryTreeFileReader())->read($this->file([$this->category(str_repeat('я', 256))]));
     }
 
     public function testRejectsNonNumericWeight(): void
@@ -244,7 +279,7 @@ final class PLCategoryTreeFileReaderTest extends TestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessageMatches('/Вес категории "Расходы"/');
 
-        (new PLCategoryTreeFileReader())->read($this->file([['name' => 'Расходы', 'weightInParent' => 'много']]));
+        (new PLCategoryTreeFileReader())->read($this->file([$this->category('Расходы', ['weightInParent' => 'много'])]));
     }
 
     public function testRejectsWeightOutsideColumnRange(): void
@@ -254,12 +289,12 @@ final class PLCategoryTreeFileReaderTest extends TestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessageMatches('/вне допустимого диапазона/');
 
-        (new PLCategoryTreeFileReader())->read($this->file([['name' => 'Расходы', 'weightInParent' => '1000000']]));
+        (new PLCategoryTreeFileReader())->read($this->file([$this->category('Расходы', ['weightInParent' => '1000000'])]));
     }
 
     public function testNormalizesWeightToFourDecimals(): void
     {
-        $read = (new PLCategoryTreeFileReader())->read($this->file([['name' => 'Расходы', 'weightInParent' => 0.5]]));
+        $read = (new PLCategoryTreeFileReader())->read($this->file([$this->category('Расходы', ['weightInParent' => 0.5])]));
 
         self::assertSame('0.5000', $read[0]->weightInParent);
     }
@@ -269,7 +304,7 @@ final class PLCategoryTreeFileReaderTest extends TestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessageMatches('/должно быть true или false/');
 
-        (new PLCategoryTreeFileReader())->read($this->file([['name' => 'Расходы', 'isVisible' => 'yes']]));
+        (new PLCategoryTreeFileReader())->read($this->file([$this->category('Расходы', ['isVisible' => 'yes'])]));
     }
 
     public function testRejectsNonIntegerSortOrder(): void
@@ -277,7 +312,7 @@ final class PLCategoryTreeFileReaderTest extends TestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessageMatches('/должно быть целым числом/');
 
-        (new PLCategoryTreeFileReader())->read($this->file([['name' => 'Расходы', 'sortOrder' => '10']]));
+        (new PLCategoryTreeFileReader())->read($this->file([$this->category('Расходы', ['sortOrder' => '10'])]));
     }
 
     public function testRejectsNonListChildren(): void
@@ -285,7 +320,7 @@ final class PLCategoryTreeFileReaderTest extends TestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessageMatches('/"children".*должно быть списком/');
 
-        (new PLCategoryTreeFileReader())->read($this->file([['name' => 'Расходы', 'children' => ['a' => ['name' => 'Реклама']]]]));
+        (new PLCategoryTreeFileReader())->read($this->file([$this->category('Расходы', ['children' => ['a' => $this->category('Реклама')]])]));
     }
 
     public function testRejectsOversizedFile(): void
@@ -300,7 +335,7 @@ final class PLCategoryTreeFileReaderTest extends TestCase
     {
         $rows = [];
         for ($i = 0; $i <= 1000; ++$i) {
-            $rows[] = ['name' => 'Категория '.$i];
+            $rows[] = $this->category('Категория '.$i);
         }
 
         $this->expectException(\DomainException::class);
@@ -315,9 +350,9 @@ final class PLCategoryTreeFileReaderTest extends TestCase
         $this->expectExceptionMessageMatches('/Расходы \/ Реклама/');
 
         (new PLCategoryTreeFileReader())->read($this->file([
-            ['name' => 'Расходы', 'children' => [
-                ['name' => 'Реклама', 'flow' => 'WRONG'],
-            ]],
+            $this->category('Расходы', ['children' => [
+                $this->category('Реклама', ['flow' => 'WRONG']),
+            ]]),
         ]));
     }
 
@@ -326,7 +361,7 @@ final class PLCategoryTreeFileReaderTest extends TestCase
         // PostgreSQL не хранит нулевой байт в varchar/text, а JSON его несёт.
         // Иначе гарантия «всё проверено до импорта» ломается ошибкой БД на
         // середине транзакции.
-        foreach ([['name' => "Рас\u{0}ходы"], ['name' => 'Расходы', 'code' => "E\u{0}XP"], ['name' => 'Расходы', 'formula' => "A\u{0}B"]] as $row) {
+        foreach ([$this->category("Рас\u{0}ходы"), $this->category('Расходы', ['code' => "E\u{0}XP"]), $this->category('Расходы', ['formula' => "A\u{0}B"])] as $row) {
             try {
                 (new PLCategoryTreeFileReader())->read($this->file([$row]));
                 self::fail('Нулевой байт должен отвергаться: '.json_encode($row));
@@ -342,7 +377,7 @@ final class PLCategoryTreeFileReaderTest extends TestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessageMatches('/"sortOrder".*вне допустимого диапазона/');
 
-        (new PLCategoryTreeFileReader())->read($this->file([['name' => 'Расходы', 'sortOrder' => 2147483648]]));
+        (new PLCategoryTreeFileReader())->read($this->file([$this->category('Расходы', ['sortOrder' => 2147483648])]));
     }
 
     public function testRejectsWeightThatOverflowsColumnOnlyAfterRounding(): void
@@ -352,7 +387,7 @@ final class PLCategoryTreeFileReaderTest extends TestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessageMatches('/вне допустимого диапазона/');
 
-        (new PLCategoryTreeFileReader())->read($this->file([['name' => 'Расходы', 'weightInParent' => '999999.99999']]));
+        (new PLCategoryTreeFileReader())->read($this->file([$this->category('Расходы', ['weightInParent' => '999999.99999'])]));
     }
 
     public function testRejectsInfiniteWeight(): void
@@ -362,7 +397,7 @@ final class PLCategoryTreeFileReaderTest extends TestCase
         // конечности бесконечность проскочила бы в decimal(10,4).
         foreach (['1e9999', '-1e9999'] as $value) {
             try {
-                (new PLCategoryTreeFileReader())->read($this->file([['name' => 'Расходы', 'weightInParent' => $value]]));
+                (new PLCategoryTreeFileReader())->read($this->file([$this->category('Расходы', ['weightInParent' => $value])]));
                 self::fail(sprintf('Вес %s должен отвергаться', $value));
             } catch (\DomainException $e) {
                 self::assertStringContainsString('вне допустимого диапазона', $e->getMessage());
@@ -375,8 +410,8 @@ final class PLCategoryTreeFileReaderTest extends TestCase
         // Границы PostgreSQL integer несимметричны. Отвергать -2147483648
         // означало бы не уметь импортировать собственную же выгрузку.
         $read = (new PLCategoryTreeFileReader())->read($this->file([
-            ['name' => 'Минимум', 'code' => 'MIN', 'sortOrder' => -2147483648, 'calcOrder' => -2147483648],
-            ['name' => 'Максимум', 'code' => 'MAX', 'sortOrder' => 2147483647, 'calcOrder' => 2147483647],
+            $this->category('Минимум', ['code' => 'MIN', 'sortOrder' => -2147483648, 'calcOrder' => -2147483648]),
+            $this->category('Максимум', ['code' => 'MAX', 'sortOrder' => 2147483647, 'calcOrder' => 2147483647]),
         ]));
 
         self::assertSame(-2147483648, $read[0]->sortOrder);
@@ -390,7 +425,7 @@ final class PLCategoryTreeFileReaderTest extends TestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessageMatches('/"sortOrder".*вне допустимого диапазона/');
 
-        (new PLCategoryTreeFileReader())->read($this->file([['name' => 'Расходы', 'sortOrder' => -2147483649]]));
+        (new PLCategoryTreeFileReader())->read($this->file([$this->category('Расходы', ['sortOrder' => -2147483649])]));
     }
 
     public function testRejectsAmbiguousSiblingsWithoutCode(): void
@@ -402,10 +437,10 @@ final class PLCategoryTreeFileReaderTest extends TestCase
         $this->expectExceptionMessageMatches('/встречается дважды среди соседних/');
 
         (new PLCategoryTreeFileReader())->read($this->file([
-            ['name' => 'Расходы', 'children' => [
-                ['name' => 'Реклама'],
-                ['name' => 'Реклама'],
-            ]],
+            $this->category('Расходы', ['children' => [
+                $this->category('Реклама'),
+                $this->category('Реклама'),
+            ]]),
         ]));
     }
 
@@ -415,16 +450,16 @@ final class PLCategoryTreeFileReaderTest extends TestCase
         $this->expectExceptionMessageMatches('/встречается дважды среди соседних/');
 
         (new PLCategoryTreeFileReader())->read($this->file([
-            ['name' => 'Реклама', 'code' => 'ADS'],
-            ['name' => 'Реклама'],
+            $this->category('Реклама', ['code' => 'ADS']),
+            $this->category('Реклама'),
         ]));
     }
 
     public function testAllowsSameNameUnderDifferentParents(): void
     {
         $read = (new PLCategoryTreeFileReader())->read($this->file([
-            ['name' => 'Расходы', 'children' => [['name' => 'Реклама']]],
-            ['name' => 'Выручка', 'children' => [['name' => 'Реклама']]],
+            $this->category('Расходы', ['children' => [$this->category('Реклама')]]),
+            $this->category('Выручка', ['children' => [$this->category('Реклама')]]),
         ]));
 
         self::assertCount(4, $read);
@@ -434,11 +469,36 @@ final class PLCategoryTreeFileReaderTest extends TestCase
     {
         // Оба узла опознаются по code, неоднозначности нет.
         $read = (new PLCategoryTreeFileReader())->read($this->file([
-            ['name' => 'Реклама', 'code' => 'ADS_OZON'],
-            ['name' => 'Реклама', 'code' => 'ADS_WB'],
+            $this->category('Реклама', ['code' => 'ADS_OZON']),
+            $this->category('Реклама', ['code' => 'ADS_WB']),
         ]));
 
         self::assertCount(2, $read);
+    }
+
+    /**
+     * Категория со всеми полями формата v1. Тесты правят только то, что
+     * проверяют, а не собирают файл вручную.
+     *
+     * @param array<string, mixed> $overrides
+     *
+     * @return array<string, mixed>
+     */
+    private function category(string $name, array $overrides = []): array
+    {
+        return $overrides + [
+            'name' => $name,
+            'code' => null,
+            'type' => 'LEAF_INPUT',
+            'format' => 'MONEY',
+            'flow' => 'NONE',
+            'expenseType' => 'other',
+            'weightInParent' => '1.0000',
+            'isVisible' => true,
+            'formula' => null,
+            'calcOrder' => null,
+            'sortOrder' => 0,
+        ];
     }
 
     /**

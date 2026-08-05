@@ -280,9 +280,9 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         $crawler = $client->request('POST', '/pl-categories/import/upload', [
             '_token' => $this->csrfToken($client, 'pl-category-import-file'.$targetId),
         ], ['import_file' => $this->uploadFile($this->exportFile([
-            ['name' => 'Расходы', 'code' => 'EXP', 'children' => [
-                ['name' => 'Реклама'],
-            ]],
+            $this->category('Расходы', ['code' => 'EXP', 'children' => [
+                $this->category('Реклама'),
+            ]]),
         ]))]);
 
         self::assertResponseIsSuccessful();
@@ -322,7 +322,7 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
 
         $targetId = (string) $target->getId();
         $json = $this->exportFile([
-            ['name' => 'Расходы', 'code' => 'EXP', 'children' => [['name' => 'Реклама']]],
+            $this->category('Расходы', ['code' => 'EXP', 'children' => [$this->category('Реклама')]]),
         ]);
 
         foreach ([1, 2] as $attempt) {
@@ -367,7 +367,7 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
 
         $client->request('POST', '/pl-categories/import/upload', [
             '_token' => 'invalid-token',
-        ], ['import_file' => $this->uploadFile($this->exportFile([['name' => 'Расходы']]))]);
+        ], ['import_file' => $this->uploadFile($this->exportFile([$this->category('Расходы')]))]);
 
         self::assertResponseStatusCodeSame(403);
         self::assertCount(0, $this->em()->getRepository(PLCategory::class)->findBy(['company' => $target]));
@@ -393,7 +393,7 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         $targetId = (string) $target->getId();
         $client->request('POST', '/pl-categories/import/upload', [
             '_token' => $this->csrfToken($client, 'pl-category-import-file'.$targetId),
-        ], ['import_file' => $this->uploadFile('{"version": 1, "categories": [{"name": "Расходы", "flow": "WRONG"}]}')]);
+        ], ['import_file' => $this->uploadFile($this->exportFile([$this->category('Расходы', ['flow' => 'WRONG'])]))]);
 
         self::assertResponseRedirects('/pl-categories/import');
         self::assertSame(
@@ -461,8 +461,8 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         $crawler = $client->request('POST', '/pl-categories/import/upload', [
             '_token' => $this->csrfToken($client, 'pl-category-import-file'.$targetId),
         ], ['import_file' => $this->uploadFile($this->exportFile([
-            ['name' => 'Выручка', 'code' => 'REVENUE'],
-            ['name' => 'Маржа', 'code' => 'MARGIN', 'type' => 'KPI', 'formula' => 'REVENUE - OLD_METRIC'],
+            $this->category('Выручка', ['code' => 'REVENUE']),
+            $this->category('Маржа', ['code' => 'MARGIN', 'type' => 'KPI', 'formula' => 'REVENUE - OLD_METRIC']),
         ]))]);
 
         self::assertResponseIsSuccessful();
@@ -496,12 +496,12 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
 
         $tabA = $client->request('POST', '/pl-categories/import/upload', [
             '_token' => $this->csrfToken($client, 'pl-category-import-file'.$targetId),
-        ], ['import_file' => $this->uploadFile($this->exportFile([['name' => 'Из файла A', 'code' => 'AAA']]))]);
+        ], ['import_file' => $this->uploadFile($this->exportFile([$this->category('Из файла A', ['code' => 'AAA'])]))]);
         self::assertResponseIsSuccessful();
 
         $client->request('POST', '/pl-categories/import/upload', [
             '_token' => $this->csrfToken($client, 'pl-category-import-file'.$targetId),
-        ], ['import_file' => $this->uploadFile($this->exportFile([['name' => 'Из файла B', 'code' => 'BBB']]))]);
+        ], ['import_file' => $this->uploadFile($this->exportFile([$this->category('Из файла B', ['code' => 'BBB'])]))]);
         self::assertResponseIsSuccessful();
 
         $client->submit($tabA->selectButton('Импортировать')->form());
@@ -535,7 +535,7 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         $client->request('POST', '/pl-categories/import/upload', [
             '_token' => $this->csrfToken($client, 'pl-category-import-file'.$targetId),
         ], ['import_file' => $this->uploadFile($this->exportFile([
-            ['name' => 'Маржа', 'code' => 'MARGIN', 'type' => 'KPI', 'formula' => 'OLD_METRIC * 2'],
+            $this->category('Маржа', ['code' => 'MARGIN', 'type' => 'KPI', 'formula' => 'OLD_METRIC * 2']),
         ]))]);
 
         $client->submitForm('Импортировать');
@@ -608,6 +608,31 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
 
         // Дерево источника не тронуто.
         self::assertCount(2, $this->em()->getRepository(PLCategory::class)->findBy(['company' => $sourceCompany]));
+    }
+
+    /**
+     * Категория со всеми полями формата v1: неполный файл читатель отвергает,
+     * потому что импорт перезаписывает поля целиком.
+     *
+     * @param array<string, mixed> $overrides
+     *
+     * @return array<string, mixed>
+     */
+    private function category(string $name, array $overrides = []): array
+    {
+        return $overrides + [
+            'name' => $name,
+            'code' => null,
+            'type' => 'LEAF_INPUT',
+            'format' => 'MONEY',
+            'flow' => 'NONE',
+            'expenseType' => 'other',
+            'weightInParent' => '1.0000',
+            'isVisible' => true,
+            'formula' => null,
+            'calcOrder' => null,
+            'sortOrder' => 0,
+        ];
     }
 
     /**
