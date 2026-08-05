@@ -229,7 +229,11 @@ final class PLCategoryTreeFileReader
             throw new \DomainException(sprintf('У категории №%d в "%s" не заполнено название.', $position, $parentPath));
         }
 
-        $name = trim($name);
+        // Имя сохраняется ровно как в файле: PLCategory::setName() его не
+        // нормализует, а экспорт пишет как есть. Обрезка пробелов здесь
+        // означала бы, что источник " Расходы" совпадёт с целевой категорией
+        // "Расходы" и молча перезапишет её настройки вместо создания
+        // отдельной строки. trim() — только для проверки на пустоту.
         $this->assertNoNullByte($name, 'название', $parentPath);
 
         if (mb_strlen($name) > self::MAX_NAME_LENGTH) {
@@ -351,7 +355,10 @@ final class PLCategoryTreeFileReader
 
         $this->assertNoNullByte($value, sprintf('поле "%s"', $field), $path);
 
-        return '' !== $value ? $value : null;
+        // Пустая строка сохраняется как есть: PLCategory::setFormula() её не
+        // превращает в null, и превращение здесь давало бы вечное «обновить»
+        // на первом импорте собственной же выгрузки.
+        return $value;
     }
 
     /**

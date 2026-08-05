@@ -120,6 +120,32 @@ final class PLCategoryTreeFileReaderTest extends TestCase
         self::assertSame(10, $read[0]->sortOrder);
     }
 
+    public function testKeepsNameExactlyAsInFileIncludingSurroundingSpaces(): void
+    {
+        // PLCategory::setName() имя не нормализует, экспорт пишет его как есть.
+        // Обрезка пробелов здесь означала бы, что источник " Расходы" совпадёт
+        // с целевой категорией "Расходы" по паре (родитель, имя) и молча
+        // перезапишет её настройки вместо создания отдельной строки.
+        $read = (new PLCategoryTreeFileReader())->read($this->file([
+            $this->category(' Расходы'),
+            $this->category('Выручка '),
+        ]));
+
+        self::assertSame(' Расходы', $read[0]->name);
+        self::assertSame('Выручка ', $read[1]->name);
+    }
+
+    public function testKeepsEmptyFormulaAsEmptyString(): void
+    {
+        // setFormula() пустую строку в null не превращает: иначе первый же
+        // импорт собственной выгрузки показывал бы «обновить» на ровном месте.
+        $read = (new PLCategoryTreeFileReader())->read($this->file([
+            $this->category('Расходы', ['formula' => '']),
+        ]));
+
+        self::assertSame('', $read[0]->formula);
+    }
+
     public function testNormalizesCodeExactlyLikeEntitySetter(): void
     {
         // PLCategory::setCode() делает trim + mb_strtoupper. Если читатель

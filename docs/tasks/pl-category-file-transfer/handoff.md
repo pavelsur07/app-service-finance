@@ -117,7 +117,7 @@ PostgreSQL `integer` для `calcOrder`/`sortOrder`, запрет нулевог
 docker compose run --rm -e COMPOSER_PROCESS_TIMEOUT=0 site-php-cli composer test
 ```
 
-3142 теста, зелёные (unit + integration + functional, полный набор проекта).
+3144 теста, зелёные (unit + integration + functional, полный набор проекта).
 `php-cs-fixer` по всем изменённым файлам — чисто; baseline репозитория красный и
 к задаче не относится. `lint:twig` по `templates/pl_category` — чисто.
 
