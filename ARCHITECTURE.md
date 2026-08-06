@@ -2446,7 +2446,7 @@ Payload (только scalar):
 - `FAILED` — retryable-ошибка; день может попасть в missing/retry-due планирование.
 - `FAILED_FINAL` — unrecoverable processing/API ошибка.
 - `AUTH_FAILED` — ошибка авторизации WB API.
-- `CONFLICT` — terminal-результат: in-flight raw блокирует запуск либо linked generated rows сохранены, а доступная часть raw-документа переобработана.
+- `CONFLICT` — terminal-результат: in-flight raw блокирует запуск (`WbRawDocumentRefreshConflictException`) либо legacy reconcile. Частичная переобработка с сохранёнными linked rows этот статус не выставляет.
 
 ### Modes
 
@@ -2461,9 +2461,10 @@ Payload (только scalar):
 - `forceRefresh=true` передаётся в `ProcessDayReportMessage`.
 - Перед reprocess WB `sales_report` удаляются только generated rows без связанного `document`.
 - Связанные с `document` rows текущего raw-документа сохраняются, а его незакреплённые generated rows пересоздаются.
-- Частичная переобработка завершается статусом `CONFLICT`; сообщение и warning содержат количество сохранённых linked rows текущего raw-документа.
-- Linked row чужого raw-документа с тем же external ID сохраняется и не создаёт конфликт для текущего raw-документа.
-- Автоматические режимы не планируют `CONFLICT` повторно; переобработка такого дня доступна только через ручной force-refresh.
+- Частичная переобработка — успех: шаг `succeeded`, документ `COMPLETED`, день `SUCCESS`. `ProcessMarketplaceRawDocumentAction` возвращает `ProcessRawDocumentResult{processedRows, preservedLinkedRows}`; при `preservedLinkedRows > 0` пишется warning, а сводка переобработки отдаёт `partial_steps` и `linked_rows_preserved` (flash в UI, warning в CLI).
+- Ошибкой частичная переобработка не считается: строки закрытого документа неизменяемы by design, повторный прогон дал бы тот же результат, поэтому гейт остаётся достижимо зелёным.
+- Linked row чужого raw-документа с тем же external ID сохраняется и не влияет на текущий raw-документ.
+- Автоматические режимы не планируют `CONFLICT` повторно; такой день (in-flight raw) доступен только через ручной force-refresh.
 
 ### Planner rules
 

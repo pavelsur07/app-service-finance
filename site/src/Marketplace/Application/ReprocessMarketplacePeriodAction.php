@@ -6,7 +6,6 @@ namespace App\Marketplace\Application;
 
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Exception\WbGeneratedRowsConflictException;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Psr\Log\LoggerInterface;
 
@@ -32,7 +31,7 @@ use Psr\Log\LoggerInterface;
  * это задача ReopenMonthStageAction при переоткрытии месяца.
  * Команда только переобрабатывает сырые данные.
  *
- * @return array{docs: int, sales: int, returns: int, costs: int, realization: int, conflicts: int, linked_rows_preserved: int}
+ * @return array{docs: int, sales: int, returns: int, costs: int, realization: int, partial_steps: int, linked_rows_preserved: int}
  */
 final class ReprocessMarketplacePeriodAction
 {
@@ -45,7 +44,7 @@ final class ReprocessMarketplacePeriodAction
     }
 
     /**
-     * @return array{docs: int, sales: int, returns: int, costs: int, realization: int, conflicts: int, linked_rows_preserved: int}
+     * @return array{docs: int, sales: int, returns: int, costs: int, realization: int, partial_steps: int, linked_rows_preserved: int}
      */
     public function __invoke(
         string $companyId,
@@ -71,7 +70,7 @@ final class ReprocessMarketplacePeriodAction
             $documentType,
         );
 
-        $stats = ['docs' => 0, 'sales' => 0, 'returns' => 0, 'costs' => 0, 'realization' => 0, 'conflicts' => 0, 'linked_rows_preserved' => 0];
+        $stats = ['docs' => 0, 'sales' => 0, 'returns' => 0, 'costs' => 0, 'realization' => 0, 'partial_steps' => 0, 'linked_rows_preserved' => 0];
 
         foreach ($rawDocs as $doc) {
             $docId   = $doc->getId();
@@ -97,18 +96,17 @@ final class ReprocessMarketplacePeriodAction
                         forceReprocess: $forceGeneratedRowsReplace || 'costs' === $kind,
                     );
 
-                    try {
-                        $stats[$kind] += ($this->processRawAction)($cmd);
-                    } catch (WbGeneratedRowsConflictException $e) {
-                        $stats[$kind] += $e->getProcessedRows();
-                        ++$stats['conflicts'];
-                        $stats['linked_rows_preserved'] += $e->getLinkedRows();
+                    $stepResult = ($this->processRawAction)($cmd);
+                    $stats[$kind] += $stepResult->processedRows;
+
+                    if ($stepResult->preservedLinkedRows > 0) {
+                        ++$stats['partial_steps'];
+                        $stats['linked_rows_preserved'] += $stepResult->preservedLinkedRows;
 
                         $this->logger->warning('[Reprocess] WB raw document was partially reprocessed', [
                             'doc_id' => $docId,
                             'step' => $kind,
-                            'linked_rows_preserved' => $e->getLinkedRows(),
-                            'reason' => $e->getMessage(),
+                            'linked_rows_preserved' => $stepResult->preservedLinkedRows,
                         ]);
                     }
                 }

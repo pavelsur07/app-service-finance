@@ -410,8 +410,12 @@ final class DebugReprocessPeriodController extends AbstractController
                         kind: $step,
                         forceReprocess: $step === 'costs',
                     );
-                    $count = ($this->processAction)($cmd);
-                    $result[$step] = ['status' => 'ok', 'processed' => $count];
+                    $stepResult = ($this->processAction)($cmd);
+                    $result[$step] = [
+                        'status' => 'ok',
+                        'processed' => $stepResult->processedRows,
+                        'preserved_linked_rows' => $stepResult->preservedLinkedRows,
+                    ];
                 } catch (\Throwable $e) {
                     $result[$step] = ['status' => 'error', 'message' => $e->getMessage()];
                     $this->logger->error('[DebugReprocessPeriod] Processor failed', [

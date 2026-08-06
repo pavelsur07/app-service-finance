@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Marketplace;
 
+use App\Company\Entity\Company;
+use App\Finance\Entity\Document;
 use App\Marketplace\Application\Service\WbFinanceRateLimiter;
 use App\Marketplace\Application\Service\WbFinancialReportPeriodResolver;
 use App\Marketplace\Application\Service\WbFinancialReportReconciliationService;
 use App\Marketplace\Application\Service\WbFinancialReportSyncPlanner;
 use App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdater;
-use App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdaterInterface;
 use App\Marketplace\Application\Service\WbGeneratedRowsSafeReplaceServiceInterface;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceFinancialReportSyncStatus;
@@ -26,7 +27,6 @@ use App\Marketplace\MessageHandler\ProcessRawDocumentStepMessageHandler;
 use App\Marketplace\MessageHandler\SyncWbFinancialReportDayHandler;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusRepository;
-use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusLookupInterface;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -212,6 +212,80 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
         self::assertSame('success', $this->statusValue($company->getId(), $connection->getId(), '2026-05-19'));
     }
 
+    /**
+     * Регрессия PROD 2026-08-06: force refresh дня, часть строк которого уже привязана
+     * к финансовому документу, помечал шаги sales/costs как failed, документ — failed,
+     * а день — conflict. Повторный прогон давал тот же результат, поэтому день был
+     * недостижимо красным. Теперь частичная переобработка — штатный успех.
+     */
+    public function testForceRefreshWithLinkedRowsKeepsDayGreenAndPreservesLinkedRows(): void
+    {
+        [$company, $connection] = $this->createCompanyAndConnection(311);
+
+        $firstPayload = '[{"rrdId":1,"doc_type_name":"Продажа","supplier_oper_name":"Продажа","srid":"SR-LINKED","nm_id":"400","quantity":1,"retail_price_withdisc_rub":100,"sale_dt":"2026-05-19 12:00:00","rr_dt":"2026-05-19 12:00:00"},'
+            .'{"rrdId":2,"doc_type_name":"Продажа","supplier_oper_name":"Продажа","srid":"SR-OPEN","nm_id":"400","quantity":1,"retail_price_withdisc_rub":200,"sale_dt":"2026-05-19 12:00:00","rr_dt":"2026-05-19 12:00:00"}]';
+        // Второй ответ WB отличается суммами: закрытая строка обязана сохранить старую,
+        // открытая — пересоздаться с новой.
+        $secondPayload = '[{"rrdId":1,"doc_type_name":"Продажа","supplier_oper_name":"Продажа","srid":"SR-LINKED","nm_id":"400","quantity":1,"retail_price_withdisc_rub":111,"sale_dt":"2026-05-19 12:00:00","rr_dt":"2026-05-19 12:00:00"},'
+            .'{"rrdId":2,"doc_type_name":"Продажа","supplier_oper_name":"Продажа","srid":"SR-OPEN","nm_id":"400","quantity":1,"retail_price_withdisc_rub":222,"sale_dt":"2026-05-19 12:00:00","rr_dt":"2026-05-19 12:00:00"}]';
+
+        // Лимитер по умолчанию отдаёт один токен: второму refresh нужен свой.
+        $this->swapWbClient([
+            new MockResponse($firstPayload, ['http_code' => 200]),
+            new MockResponse($secondPayload, ['http_code' => 200]),
+        ], rateLimit: 4);
+
+        $bus = $this->swapBusSpy();
+        $syncHandler = $this->syncHandler($bus);
+        $dayHandler = $this->processDayHandler($bus);
+        $stepHandler = self::getContainer()->get(ProcessRawDocumentStepMessageHandler::class);
+        $message = new SyncWbFinancialReportDayMessage($company->getId(), $connection->getId(), '2026-05-19', FinancialReportSyncMode::REFRESH_14D->value, true);
+
+        $syncHandler($message);
+        $this->runDispatchedPipeline($bus, $dayHandler, $stepHandler);
+
+
+        // Закрываем период: одна строка попадает в финансовый документ и становится неизменяемой.
+        $document = new Document(Uuid::uuid4()->toString(), $this->em->getReference(Company::class, $company->getId()));
+        $this->em->persist($document);
+        $this->em->flush();
+        $this->connection->executeStatement(
+            'UPDATE marketplace_sales SET document_id = :doc WHERE company_id = :c AND external_order_id = :e',
+            ['doc' => $document->getId(), 'c' => $company->getId(), 'e' => 'SR-LINKED'],
+        );
+        $this->em->clear();
+
+        $syncHandler($message);
+        $this->runDispatchedPipeline($bus, $dayHandler, $stepHandler);
+
+        self::assertSame('success', $this->statusValue($company->getId(), $connection->getId(), '2026-05-19'));
+
+        $rawRow = $this->connection->fetchAssociative(
+            'SELECT processing_status, failed_steps, succeeded_steps FROM marketplace_raw_documents WHERE company_id=:c AND period_from=:d AND marketplace=:m AND document_type=:t',
+            ['c' => $company->getId(), 'd' => '2026-05-19 00:00:00', 'm' => 'wildberries', 't' => 'sales_report'],
+        );
+        self::assertIsArray($rawRow);
+        self::assertSame('completed', $rawRow['processing_status']);
+        self::assertSame([], json_decode((string) $rawRow['failed_steps'], true, 512, JSON_THROW_ON_ERROR));
+        self::assertEqualsCanonicalizing(
+            ['sales', 'returns', 'costs'],
+            json_decode((string) $rawRow['succeeded_steps'], true, 512, JSON_THROW_ON_ERROR),
+        );
+
+
+        // Дублей нет, закрытая строка сохранила старую сумму, открытая пересоздана с новой.
+        self::assertSame(1, $this->countSales($company->getId(), 'SR-LINKED'));
+        self::assertSame(1, $this->countSales($company->getId(), 'SR-OPEN'));
+        self::assertSame(100.0, $this->salePricePerUnit($company->getId(), 'SR-LINKED'));
+        self::assertSame(222.0, $this->salePricePerUnit($company->getId(), 'SR-OPEN'));
+
+        // Красный гейт не создан: записей об ошибках у дня нет.
+        self::assertSame(0, (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM marketplace_financial_report_sync_errors WHERE company_id=:c AND business_date=:d',
+            ['c' => $company->getId(), 'd' => '2026-05-19'],
+        ));
+    }
+
     public function testClaimExistingBusinessDayUpdatesConnectionWithoutCreatingDuplicateStatus(): void
     {
         [$company, $oldConnection] = $this->createCompanyAndConnection(309);
@@ -326,9 +400,9 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
         return new MarketplaceFinancialReportSyncStatus(Uuid::uuid7()->toString(), $companyId, $connectionId, MarketplaceType::WILDBERRIES, 'sales_report', 'endpoint', new \DateTimeImmutable($date));
     }
 
-    private function swapWbClient(array $responses): void
+    private function swapWbClient(array $responses, int $rateLimit = 1): void
     {
-        self::getContainer()->set(WbFinanceSalesReportClient::class, new WbFinanceSalesReportClient(new MockHttpClient($responses), $this->createRateLimiter()));
+        self::getContainer()->set(WbFinanceSalesReportClient::class, new WbFinanceSalesReportClient(new MockHttpClient($responses), $this->createRateLimiter($rateLimit)));
     }
 
     private function countStatuses(string $companyId, string $connectionId, string $day): int
@@ -387,8 +461,6 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
             self::getContainer()->get(EntityManagerInterface::class),
             self::getContainer()->get(LoggerInterface::class),
             self::getContainer()->get(WbGeneratedRowsSafeReplaceServiceInterface::class),
-            self::getContainer()->get(MarketplaceFinancialReportSyncStatusLookupInterface::class),
-            self::getContainer()->get(WbFinancialReportSyncStatusUpdaterInterface::class),
         );
     }
 
@@ -424,6 +496,22 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
         $this->runDispatchedPipeline($bus, $processDayHandler, $stepHandler);
     }
 
+    private function countSales(string $companyId, string $externalOrderId): int
+    {
+        return (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM marketplace_sales WHERE company_id=:c AND marketplace=:m AND external_order_id=:e',
+            ['c' => $companyId, 'm' => 'wildberries', 'e' => $externalOrderId],
+        );
+    }
+
+    private function salePricePerUnit(string $companyId, string $externalOrderId): float
+    {
+        return (float) $this->connection->fetchOne(
+            'SELECT price_per_unit FROM marketplace_sales WHERE company_id=:c AND marketplace=:m AND external_order_id=:e',
+            ['c' => $companyId, 'm' => 'wildberries', 'e' => $externalOrderId],
+        );
+    }
+
     private function statusValue(string $companyId, string $connectionId, string $date): ?string
     {
         $value = $this->connection->fetchOne('SELECT status FROM marketplace_financial_report_sync_statuses WHERE company_id=:c AND connection_id=:n AND business_date=:d', ['c' => $companyId, 'n' => $connectionId, 'd' => $date.' 00:00:00']);
@@ -431,9 +519,9 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
         return false === $value ? null : (string) $value;
     }
 
-    private function createRateLimiter(): WbFinanceRateLimiter
+    private function createRateLimiter(int $limit = 1): WbFinanceRateLimiter
     {
-        return new WbFinanceRateLimiter(new RateLimiterFactory(['id' => 'wb_finance', 'policy' => 'token_bucket', 'limit' => 1, 'rate' => ['interval' => '61 seconds', 'amount' => 1]], new InMemoryStorage()), new MockClock('2026-01-01T00:00:00Z'));
+        return new WbFinanceRateLimiter(new RateLimiterFactory(['id' => 'wb_finance', 'policy' => 'token_bucket', 'limit' => $limit, 'rate' => ['interval' => '61 seconds', 'amount' => 1]], new InMemoryStorage()), new MockClock('2026-01-01T00:00:00Z'));
     }
 }
 

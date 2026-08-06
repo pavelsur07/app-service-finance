@@ -12,7 +12,6 @@ use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Exception\WbGeneratedRowsConflictException;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceRawDocumentBuilder;
@@ -132,7 +131,7 @@ final class WbRawForceReprocessRegressionTest extends IntegrationTestCase
         self::assertSame(900.0, $this->returnAmount($company->getId(), $rawDocId, 'SRID-RETURN-1'));
     }
 
-    public function testForceReprocessPreservesLinkedRowsAndRebuildsOpenRowsBeforeReportingConflict(): void
+    public function testForceReprocessPreservesLinkedRowsAndRebuildsOpenRows(): void
     {
         $company = CompanyBuilder::aCompany()->withIndex(403)->build();
         $this->em->persist($company->getUser());
@@ -239,7 +238,7 @@ final class WbRawForceReprocessRegressionTest extends IntegrationTestCase
         self::assertSame(1, $result['docs']);
         self::assertSame(3, $result['sales']);
         self::assertSame(3, $result['returns']);
-        self::assertSame(2, $result['conflicts']);
+        self::assertSame(2, $result['partial_steps']);
         self::assertSame(2, $result['linked_rows_preserved']);
 
         self::assertSame(1, $this->saleRowsCount($company->getId(), $rawDocId, 'SRID-SALE-LINKED'));
@@ -292,15 +291,14 @@ final class WbRawForceReprocessRegressionTest extends IntegrationTestCase
         $this->em->flush();
         $this->em->clear();
 
-        try {
-            self::getContainer()->get(ProcessMarketplaceRawDocumentAction::class)(
-                new ProcessMarketplaceRawDocumentCommand((string) $company->getId(), $rawDocId, 'returns', true),
-            );
-            self::fail('A linked current-raw return must stay visible when the refreshed payload has no returns.');
-        } catch (WbGeneratedRowsConflictException $e) {
-            self::assertSame(1, $e->getLinkedRows());
-            self::assertSame(0, $e->getProcessedRows());
-        }
+        $result = self::getContainer()->get(ProcessMarketplaceRawDocumentAction::class)(
+            new ProcessMarketplaceRawDocumentCommand((string) $company->getId(), $rawDocId, 'returns', true),
+        );
+
+        // Частичная переобработка — успех шага: linked row сохранён и посчитан,
+        // исключение не бросается, день не становится красным.
+        self::assertSame(1, $result->preservedLinkedRows);
+        self::assertSame(0, $result->processedRows);
 
         self::assertSame(1, $this->returnRowsCount($company->getId(), $rawDocId, 'SRID-RETURN-LINKED-EMPTY-PAYLOAD'));
         self::assertSame(700.0, $this->returnAmount($company->getId(), $rawDocId, 'SRID-RETURN-LINKED-EMPTY-PAYLOAD'));

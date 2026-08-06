@@ -9,7 +9,6 @@ use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
 use App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdaterInterface;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\PipelineStep;
-use App\Marketplace\Exception\WbGeneratedRowsConflictException;
 use App\Marketplace\Message\ProcessRawDocumentStepMessage;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -21,8 +20,8 @@ use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 /**
  * Выполняет один шаг обработки (sales/returns/costs) для одного RawDocument.
  * Обновляет processingStatus документа — succeeded или failed.
- * Ожидаемый конфликт закрытого периода фиксирует и подтверждает без retry;
- * остальные ошибки rethrow-ит, чтобы Messenger выполнил retry.
+ * Частичная переобработка (сохранены linked rows закрытого документа) — успех
+ * шага с warning; ошибки rethrow-ит, чтобы Messenger выполнил retry.
  */
 #[AsMessageHandler]
 final class ProcessRawDocumentStepMessageHandler
@@ -68,7 +67,7 @@ final class ProcessRawDocumentStepMessageHandler
         }
 
         try {
-            ($this->processAction)($cmd);
+            $result = ($this->processAction)($cmd);
             // Re-fetch: ProcessMarketplaceRawDocumentAction calls em->clear() after each batch,
             // which detaches $doc. Without re-fetch markStepSucceeded() would modify a ghost object.
             $doc = $this->repository->find($message->rawDocumentId);
@@ -77,20 +76,19 @@ final class ProcessRawDocumentStepMessageHandler
                     sprintf('MarketplaceRawDocument vanished after processing: %s', $message->rawDocumentId),
                 );
             }
-            $doc->markStepSucceeded($step);
-        } catch (\Throwable $e) {
-            $failureStateRecorded = $this->recordStepFailure($message->rawDocumentId, $step, $e, $this->buildSyncStatusContext($message));
-            if ($e instanceof WbGeneratedRowsConflictException && $failureStateRecorded) {
+
+            if ($result->preservedLinkedRows > 0) {
                 $this->logger->warning('WB raw document step partially reprocessed; linked rows were preserved', [
                     'company_id' => $message->companyId,
                     'raw_document_id' => $message->rawDocumentId,
                     'step' => $step->value,
-                    'linked_rows_preserved' => $e->getLinkedRows(),
-                    'reason' => $e->getMessage(),
+                    'linked_rows_preserved' => $result->preservedLinkedRows,
                 ]);
-
-                return;
             }
+
+            $doc->markStepSucceeded($step);
+        } catch (\Throwable $e) {
+            $this->recordStepFailure($message->rawDocumentId, $step, $e, $this->buildSyncStatusContext($message));
 
             throw $e;
         }

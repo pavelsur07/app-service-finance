@@ -13,7 +13,6 @@ use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
-use App\Marketplace\Exception\WbGeneratedRowsConflictException;
 use App\Marketplace\Infrastructure\Normalizer\Contract\RowClassifierInterface;
 use App\Marketplace\Infrastructure\Normalizer\RowClassifierRegistryInterface;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
@@ -143,7 +142,8 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
 
         $result = $action(new ProcessMarketplaceRawDocumentCommand('company-1', 'doc-1', 'costs'));
 
-        self::assertSame(42, $result);
+        self::assertSame(42, $result->processedRows);
+        self::assertSame(0, $result->preservedLinkedRows);
     }
 
     public function testForceReprocessWbSalesCallsDeleteByRawDocument(): void
@@ -238,7 +238,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $action(new ProcessMarketplaceRawDocumentCommand('company-1', 'doc-2', 'returns', true));
     }
 
-    public function testWbCostsAreProcessedBeforeLinkedRowsAreReportedAsPartialConflict(): void
+    public function testWbCostsPartialReprocessSucceedsAndReportsPreservedLinkedRows(): void
     {
         $document = $this->createMock(MarketplaceRawDocument::class);
         $document->method('getMarketplace')->willReturn(MarketplaceType::WILDBERRIES);
@@ -264,7 +264,14 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $connection->expects(self::once())->method('executeStatement');
 
         $logger = $this->createMock(AppLogger::class);
-        $logger->expects(self::never())->method('warning');
+        $logger->expects(self::once())
+            ->method('warning')
+            ->with(
+                'WB raw document partially reprocessed; linked rows preserved',
+                self::callback(static fn (array $context): bool => $context['preservedLinkedRows'] === 2
+                    && $context['processedRows'] === 7
+                    && $context['kind'] === 'costs'),
+            );
 
         $action = new ProcessMarketplaceRawDocumentAction(
             $this->createMock(RowClassifierRegistryInterface::class),
@@ -279,14 +286,12 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $logger,
         );
 
-        try {
-            $action(new ProcessMarketplaceRawDocumentCommand('company-1', 'doc-costs', 'costs', true));
-            self::fail('A forced partial WB costs reprocess must remain visible as a conflict.');
-        } catch (WbGeneratedRowsConflictException $e) {
-            self::assertSame('Partially reprocessed WB raw document doc-costs: preserved 2 linked cost rows.', $e->getMessage());
-            self::assertSame(2, $e->getLinkedRows());
-            self::assertSame(7, $e->getProcessedRows());
-        }
+        // Частичная переобработка — успех: строки обработаны, сохранённые linked rows
+        // возвращены счётчиком, а не исключением.
+        $result = $action(new ProcessMarketplaceRawDocumentCommand('company-1', 'doc-costs', 'costs', true));
+
+        self::assertSame(7, $result->processedRows);
+        self::assertSame(2, $result->preservedLinkedRows);
     }
 
     public function testForceReprocessOzonDoesNotCallWbDeleteByRawDocument(): void

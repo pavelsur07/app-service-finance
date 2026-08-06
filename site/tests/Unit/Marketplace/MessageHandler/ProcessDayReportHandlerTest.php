@@ -5,28 +5,27 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Marketplace\MessageHandler;
 
 use App\Company\Entity\Company;
-use App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdaterInterface;
 use App\Marketplace\Application\Service\WbGeneratedRowsSafeReplaceServiceInterface;
-use App\Marketplace\Entity\MarketplaceFinancialReportSyncStatus;
 use App\Marketplace\Entity\MarketplaceRawDocument;
-use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Exception\WbGeneratedRowsConflictException;
 use App\Marketplace\Message\ProcessDayReportMessage;
 use App\Marketplace\Message\ProcessRawDocumentStepMessage;
 use App\Marketplace\MessageHandler\ProcessDayReportHandler;
-use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusLookupInterface;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Messenger\Envelope;
-use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 final class ProcessDayReportHandlerTest extends TestCase
 {
-    public function testConflictMarksSyncStatusAndThrowsUnrecoverableWithoutDispatch(): void
+    /**
+     * Регрессия: раньше linked rows закрытого документа обрывали refresh дня
+     * (conflict + UnrecoverableMessageHandlingException без dispatch).
+     * Теперь cleanup удаляет только открытые строки, а pipeline всегда запускается.
+     */
+    public function testWbForceRefreshCleansOpenRowsAndDispatchesAllSteps(): void
     {
         $company = $this->createMock(Company::class);
         $company->method('getId')->willReturn('11111111-1111-4111-8111-111111111111');
@@ -37,53 +36,40 @@ final class ProcessDayReportHandlerTest extends TestCase
         $repo->method('find')->willReturn($doc);
 
         $safe = $this->createMock(WbGeneratedRowsSafeReplaceServiceInterface::class);
-        $safe->expects(self::once())->method('cleanupForRawDocument')->willThrowException(new WbGeneratedRowsConflictException('conflict'));
+        $safe->expects(self::once())
+            ->method('cleanupForRawDocument')
+            ->with($company, $doc->getId(), self::callback(static fn (\DateTimeImmutable $d): bool => '2026-05-10' === $d->format('Y-m-d')));
 
-        $syncStatusId = '33333333-3333-4333-8333-333333333333';
-        $connectionId = '44444444-4444-4444-8444-444444444444';
-        $status = $this->createMock(MarketplaceFinancialReportSyncStatus::class);
-        $statusRepo = $this->createMock(MarketplaceFinancialReportSyncStatusLookupInterface::class);
-        $statusRepo->expects(self::once())
-            ->method('findByRawPipelineContext')
-            ->with(
-                $syncStatusId,
-                (string) $company->getId(),
-                $connectionId,
-                MarketplaceType::WILDBERRIES,
-                'sales_report',
-                FinancialReportSyncMode::INITIAL,
-                self::callback(static fn (\DateTimeImmutable $date): bool => '2026-05-10' === $date->format('Y-m-d')),
-                $doc->getId(),
-            )
-            ->willReturn($status);
-
-        $updater = $this->createMock(WbFinancialReportSyncStatusUpdaterInterface::class);
-        $updater->expects(self::once())->method('markConflict')->with($status, WbGeneratedRowsConflictException::class, 'conflict');
-
+        $dispatched = [];
         $bus = $this->createMock(MessageBusInterface::class);
-        $bus->expects(self::never())->method('dispatch');
+        $bus->expects(self::exactly(3))
+            ->method('dispatch')
+            ->willReturnCallback(
+                static function (object $message, array $stamps = []) use (&$dispatched): Envelope {
+                    $dispatched[] = $message;
 
-        $flushes = 0;
+                    return new Envelope($message, $stamps);
+                },
+            );
+
         $em = $this->createMock(EntityManagerInterface::class);
-        $em->method('flush')->willReturnCallback(static function () use (&$flushes): void { $flushes++; });
 
-        $handler = new ProcessDayReportHandler($repo, $bus, $em, new NullLogger(), $safe, $statusRepo, $updater);
+        $handler = new ProcessDayReportHandler($repo, $bus, $em, new NullLogger(), $safe);
+        $handler(new ProcessDayReportMessage(
+            companyId: (string) $company->getId(),
+            rawDocumentId: $doc->getId(),
+            forceRefresh: true,
+            syncStatusId: '33333333-3333-4333-8333-333333333333',
+            connectionId: '44444444-4444-4444-8444-444444444444',
+            marketplace: MarketplaceType::WILDBERRIES->value,
+            reportType: 'sales_report',
+            businessDate: '2026-05-10',
+        ));
 
-        $this->expectException(UnrecoverableMessageHandlingException::class);
-        try {
-            $handler(new ProcessDayReportMessage(
-                companyId: (string) $company->getId(),
-                rawDocumentId: $doc->getId(),
-                forceRefresh: true,
-                syncStatusId: $syncStatusId,
-                connectionId: $connectionId,
-                marketplace: MarketplaceType::WILDBERRIES->value,
-                reportType: 'sales_report',
-                mode: FinancialReportSyncMode::INITIAL->value,
-                businessDate: '2026-05-10',
-            ));
-        } finally {
-            self::assertSame(1, $flushes);
+        self::assertCount(3, $dispatched);
+        foreach ($dispatched as $message) {
+            self::assertInstanceOf(ProcessRawDocumentStepMessage::class, $message);
+            self::assertTrue($message->forceRefresh);
         }
     }
 
@@ -100,8 +86,6 @@ final class ProcessDayReportHandlerTest extends TestCase
         $safe = $this->createMock(WbGeneratedRowsSafeReplaceServiceInterface::class);
         $safe->expects(self::never())->method('cleanupForRawDocument');
 
-        $statusRepo = $this->createMock(MarketplaceFinancialReportSyncStatusLookupInterface::class);
-        $updater = $this->createMock(WbFinancialReportSyncStatusUpdaterInterface::class);
         $dispatched = [];
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::exactly(3))
@@ -115,15 +99,13 @@ final class ProcessDayReportHandlerTest extends TestCase
             );
         $em = $this->createMock(EntityManagerInterface::class);
 
-        $handler = new ProcessDayReportHandler($repo, $bus, $em, new NullLogger(), $safe, $statusRepo, $updater);
-        $handler(new ProcessDayReportMessage((string)$company->getId(), $doc->getId(), true));
+        $handler = new ProcessDayReportHandler($repo, $bus, $em, new NullLogger(), $safe);
+        $handler(new ProcessDayReportMessage((string) $company->getId(), $doc->getId(), true));
 
         self::assertCount(3, $dispatched);
         foreach ($dispatched as $message) {
             self::assertInstanceOf(ProcessRawDocumentStepMessage::class, $message);
             self::assertTrue($message->forceRefresh);
         }
-
-        self::assertTrue(true);
     }
 }

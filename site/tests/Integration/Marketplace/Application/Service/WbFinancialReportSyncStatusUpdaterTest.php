@@ -11,7 +11,7 @@ use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PipelineStep;
-use App\Marketplace\Exception\WbGeneratedRowsConflictException;
+use App\Marketplace\Exception\WbRawDocumentRefreshConflictException;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncErrorRepository;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusRepository;
 use App\Tests\Support\Kernel\IntegrationTestCase;
@@ -244,8 +244,8 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
         );
         $raw->markStepFailed(PipelineStep::SALES);
 
-        $conflict = new WbGeneratedRowsConflictException('linked rows prevent refresh');
-        $this->updater->syncByRawPipelineResult($raw, $conflict);
+        // CONFLICT выставляет только доменный путь (in-flight raw / legacy reconcile).
+        $this->updater->markConflict($status, WbRawDocumentRefreshConflictException::class, 'raw is in-flight');
         $this->em->flush();
 
         $raw->markStepSucceeded(PipelineStep::RETURNS);
@@ -256,7 +256,7 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
         $persisted = $this->findStatus();
         self::assertNotNull($persisted);
         self::assertSame(FinancialReportSyncStatus::CONFLICT, $persisted->getStatus());
-        self::assertSame(WbGeneratedRowsConflictException::class, $persisted->getLastErrorClass());
+        self::assertSame(WbRawDocumentRefreshConflictException::class, $persisted->getLastErrorClass());
 
         $errors = $this->errorRepository->findBy(['syncStatusId' => $persisted->getId()]);
         self::assertCount(1, $errors);
@@ -272,6 +272,36 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
 
         $errors = $this->errorRepository->findBy(['syncStatusId' => $persisted->getId()]);
         self::assertCount(2, $errors);
+    }
+
+    /**
+     * Регрессия: программная ошибка шага (LogicException) раньше маскировалась
+     * под CONFLICT — терминальный статус доменного смысла. Теперь это FAILED_FINAL.
+     */
+    public function testSyncByRawPipelineResultMarksLogicExceptionAsFailedFinalNotConflict(): void
+    {
+        $status = $this->startLoadingStatus();
+        $this->updater->markRawLoaded($status, $this->rawId(), 1, 'h');
+        $this->updater->markProcessing($status);
+        $this->em->flush();
+
+        $company = $this->em->getReference(\App\Company\Entity\Company::class, $this->companyId());
+        $raw = new \App\Marketplace\Entity\MarketplaceRawDocument(
+            $this->rawId(),
+            $company,
+            MarketplaceType::WILDBERRIES,
+            'sales_report',
+        );
+        $raw->markStepFailed(PipelineStep::SALES);
+
+        $this->updater->syncByRawPipelineResult($raw, new \LogicException('unknown kind "sale"'));
+        $this->em->flush();
+        $this->em->clear();
+
+        $persisted = $this->findStatus();
+        self::assertNotNull($persisted);
+        self::assertSame(FinancialReportSyncStatus::FAILED_FINAL, $persisted->getStatus());
+        self::assertSame(\LogicException::class, $persisted->getLastErrorClass());
     }
 
     public function testSyncByRawPipelineResultSkipsNonWbOrNonSalesReport(): void
