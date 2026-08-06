@@ -1,5 +1,31 @@
 # Production logging and operational artifacts
 
+## Manual production gates
+
+Pushes to `master` build and publish application images but do not change the
+main application production environment. The separate TG gateway workflow keeps
+its own path-scoped deployment behavior. Run the `🚀 Deploy to Production`
+workflow manually and select one gate at a time:
+
+1. Select `deploy` on the target `master` ref to build the images and roll out
+   web, workers and scheduler. Images are pinned to the selected commit SHA;
+   this gate never runs Doctrine migrations.
+2. Complete the task-specific read-only acceptance and backup requirements.
+   Code running between the gates must remain compatible with the old schema;
+   use expand-style migrations when this cannot be guaranteed.
+3. Before another commit reaches `master`, select `migrations` on the unchanged
+   `master` ref only after separate owner approval. This gate verifies that
+   `site-php-fpm` runs that exact commit before applying Doctrine migrations.
+
+The two production jobs share the `production-release` concurrency group, so a
+deploy and a migration cannot run at the same time. The default `none` action is
+non-mutating and runs neither gate.
+
+The deploy keeps its selected `IMAGE_TAG` in the Compose project `.env`. Images
+not used by a container and older than 14 days are removed after a successful
+deploy; running images are retained, and older SHA-tagged images remain
+available in GHCR when a rollback requires pulling them again.
+
 ## Runtime logs
 
 Symfony, Messenger workers and supercronic write production logs to container

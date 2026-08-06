@@ -4,6 +4,17 @@ on:
     push:
         branches: [ master ]
     pull_request:
+    workflow_dispatch:
+        inputs:
+            production_action:
+                description: Production gate to execute
+                required: true
+                default: none
+                type: choice
+                options:
+                    - none
+                    - deploy
+                    - migrations
 
 jobs:
     # 0. ЧТО ИЗМЕНИЛОСЬ: один источник правды для path-фильтров.
@@ -13,9 +24,9 @@ jobs:
         name: 🔎 Detect changes
         runs-on: ubuntu-latest
         outputs:
-            backend: ${{ steps.f.outputs.backend }}
-            frontend: ${{ steps.f.outputs.frontend }}
-            landing: ${{ steps.f.outputs.landing }}
+            backend: ${{ steps.matrix.outputs.backend }}
+            frontend: ${{ steps.matrix.outputs.frontend }}
+            landing: ${{ steps.matrix.outputs.landing }}
             matrix: ${{ steps.matrix.outputs.matrix }}
         steps:
             - name: 📦 Checkout repository
@@ -24,6 +35,7 @@ jobs:
             - name: 🔎 Path filter
               uses: dorny/paths-filter@v3
               id: f
+              if: ${{ github.event_name != 'workflow_dispatch' }}
               with:
                   filters: |
                       backend:
@@ -55,10 +67,29 @@ jobs:
             #   landing         → land-nginx
             - name: 🧩 Build image matrix
               id: matrix
+              env:
+                  PRODUCTION_ACTION: ${{ inputs.production_action }}
               run: |
                   be='${{ steps.f.outputs.backend }}'
                   fe='${{ steps.f.outputs.frontend }}'
                   la='${{ steps.f.outputs.landing }}'
+
+                  if [ "$GITHUB_EVENT_NAME" = 'workflow_dispatch' ]; then
+                    be=false
+                    fe=false
+                    la=false
+
+                    if [ "$PRODUCTION_ACTION" != 'none' ] && [ "$GITHUB_REF" != 'refs/heads/master' ]; then
+                      echo '::error::Production gates can run only from master'
+                      exit 1
+                    fi
+
+                    if [ "$PRODUCTION_ACTION" = 'deploy' ]; then
+                      be=true
+                      la=true
+                    fi
+                  fi
+
                   items=()
                   # site-nginx и site-php-fpm оба пекут public/build из одного yarn build
                   # (nginx отдаёт файлы, fpm хранит manifest для Twig) — на фронт-правке
@@ -75,6 +106,9 @@ jobs:
                     items+=('{"service":"landing","context":"./landing","file":"./landing/docker/production/nginx/Dockerfile","image":"land-nginx"}')
                   fi
                   IFS=,
+                  echo "backend=$be" >> "$GITHUB_OUTPUT"
+                  echo "frontend=$fe" >> "$GITHUB_OUTPUT"
+                  echo "landing=$la" >> "$GITHUB_OUTPUT"
                   echo "matrix={\"include\":[${items[*]}]}" >> "$GITHUB_OUTPUT"
 
     unit-tests:
@@ -112,7 +146,7 @@ jobs:
         needs: [ changes, unit-tests ]
         # !cancelled() — чтобы job стартовал даже когда unit-tests пропущены (frontend/landing-only).
         # != 'failure'  — но НЕ собираем, если бэкенд-тесты упали.
-        if: ${{ !cancelled() && needs.unit-tests.result != 'failure' && needs.changes.outputs.matrix != '{"include":[]}' }}
+        if: ${{ !cancelled() && needs.changes.result == 'success' && needs.unit-tests.result != 'failure' && needs.changes.outputs.matrix != '{"include":[]}' }}
         runs-on: ubuntu-latest
         strategy:
             fail-fast: false
@@ -149,11 +183,11 @@ jobs:
     # 2. ЭТАП ДЕПЛОЯ (rolling update — минимальный даунтайм)
     #    Идёт только если что-то реально собралось (build success).
     deploy:
-        needs: build-and-push
-        # !cancelled() — иначе GitHub неявно требует success() всей цепочки needs,
-        # и на frontend-only пуше (unit-tests skipped) deploy молча скипается,
-        # хотя образы собраны. Тот же паттерн, что в build-and-push и migrations.
-        if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.build-and-push.result == 'success' }}
+        needs: [ build-and-push, migrations-empty-db, api-types-check ]
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.production_action == 'deploy' && needs.build-and-push.result == 'success' && needs.migrations-empty-db.result == 'success' && needs.api-types-check.result == 'success' }}
+        concurrency:
+            group: production-release
+            cancel-in-progress: false
         runs-on: ubuntu-latest
         steps:
             - name: 📦 Checkout repository
@@ -197,6 +231,7 @@ jobs:
                     export SITE_MAILER_DSN="${{ secrets.SITE_MAILER_DSN }}"
                     export SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
                     export SENTRY_RELEASE="${{ github.sha }}"
+                    export IMAGE_TAG="${{ github.sha }}"
                     export HEALTH_CHECK_TOKEN="${{ secrets.HEALTH_CHECK_TOKEN }}"
                     export APP_OBJECT_STORAGE_S3_ACCESS_KEY="${{ secrets.APP_OBJECT_STORAGE_S3_ACCESS_KEY }}"
                     export APP_OBJECT_STORAGE_S3_SECRET_KEY="${{ secrets.APP_OBJECT_STORAGE_S3_SECRET_KEY }}"
@@ -207,6 +242,8 @@ jobs:
                     # строка крона выключает себя сама по [ -n "$..." ].
                     # См. docs/maintenance/mailer-monitoring.md
                     export GLITCHTIP_SCHEDULER_HEARTBEAT_URL="${{ secrets.GLITCHTIP_SCHEDULER_HEARTBEAT_URL }}"
+
+                    printf 'IMAGE_TAG=%s\n' "$IMAGE_TAG" > .env
 
                     echo "🚚 Скачивание свежих образов из GHCR"
                     docker compose -f docker-compose.prod.yml pull land site site-php-fpm site-php-cli
@@ -235,14 +272,17 @@ jobs:
                     docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
                     echo "🧹 Очистка старых образов Docker"
-                    docker image prune -f
+                    docker image prune -af --filter "until=336h"
                     echo "✅ Деплой завершён без даунтайма"
                   EOF
 
-    # 3. ЭТАП МИГРАЦИЙ — только когда менялся бэкенд и деплой прошёл.
+    # 3. ЭТАП МИГРАЦИЙ — отдельный ручной gate для уже развёрнутого commit SHA.
     migrations:
-        needs: [ changes, deploy ]
-        if: ${{ !cancelled() && needs.deploy.result == 'success' && needs.changes.outputs.backend == 'true' }}
+        needs: changes
+        if: ${{ !cancelled() && needs.changes.result == 'success' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.production_action == 'migrations' }}
+        concurrency:
+            group: production-release
+            cancel-in-progress: false
         runs-on: ubuntu-latest
         steps:
             - name: 🔐 Setup SSH key
@@ -271,6 +311,14 @@ jobs:
                       exit 1
                     fi
 
+                    DEPLOYED_RELEASE=$(docker inspect --format='{{range .Config.Env}}{{println .}}{{end}}' site-php-fpm | sed -n 's/^SENTRY_RELEASE=//p')
+                    DEPLOYED_IMAGE=$(docker inspect --format='{{.Config.Image}}' site-php-fpm)
+                    EXPECTED_IMAGE="ghcr.io/pavelsur07/site-php-fpm:${{ github.sha }}"
+                    if [ "$DEPLOYED_RELEASE" != "${{ github.sha }}" ] || [ "$DEPLOYED_IMAGE" != "$EXPECTED_IMAGE" ]; then
+                      echo "❌ Deployed release does not match the selected migration ref"
+                      exit 1
+                    fi
+
                     echo "🚧 Выполняем миграции"
                     export APP_ENV="${{ secrets.APP_ENV }}"
                     export APP_SECRET="${{ secrets.APP_SECRET }}"
@@ -279,6 +327,7 @@ jobs:
                     export SITE_MAILER_DSN="${{ secrets.SITE_MAILER_DSN }}"
                     export SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
                     export SENTRY_RELEASE="${{ github.sha }}"
+                    export IMAGE_TAG="${{ github.sha }}"
                     export HEALTH_CHECK_TOKEN="${{ secrets.HEALTH_CHECK_TOKEN }}"
                     export APP_OBJECT_STORAGE_S3_ACCESS_KEY="${{ secrets.APP_OBJECT_STORAGE_S3_ACCESS_KEY }}"
                     export APP_OBJECT_STORAGE_S3_SECRET_KEY="${{ secrets.APP_OBJECT_STORAGE_S3_SECRET_KEY }}"
