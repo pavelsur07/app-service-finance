@@ -59,15 +59,6 @@ WHERE company_id = 'UUID'
 GROUP BY kind;
 ```
 
-### Грязные периоды P&L
-
-```sql
-SELECT period_year, period_month, status, reason, marked_at
-FROM pnl_dirty_periods
-WHERE company_id = 'UUID'
-ORDER BY period_year DESC, period_month DESC;
-```
-
 ---
 
 ## 2. Запуск первичной загрузки (backfill)
@@ -249,67 +240,36 @@ WHERE company_id = 'UUID'
 
 ---
 
-## 6. Закрытый период получил новые данные
+## 6. Новые Ingestion-данные относятся к закрытому периоду
 
-### Симптом
+Ingestion больше не переносит нормализованные транзакции в регистры ОПиУ и не
+ведёт `pnl_dirty_periods`. Такие данные остаются в `ingest_financial_transactions`
+для проверки и не запускают автоматический пересчёт финансового отчёта.
 
-```sql
-SELECT period_year, period_month, status, last_error, marked_at
-FROM pnl_dirty_periods
-WHERE company_id = 'UUID'
-  AND status = 'blocked_by_close';
-```
+> При развёртывании отключающей версии сначала переключите web/worker-код, а
+> затем запускайте `Version20260806120000`. Старый код ещё записывает
+> `rebuilt_at` и несовместим со схемой после этой миграции.
 
-### Варианты решения
-
-**Вариант А: Провести корректировку в текущем периоде**
-
-Данные за закрытый период не пересчитывать. Разница отражается корректировкой в текущем месяце.
-Решение принимает бухгалтер/владелец компании.
-
-**Вариант Б: Переоткрыть период и пересчитать**
-
-Только с согласия клиента и если период не сдан в налоговую.
-
-```sql
--- Переоткрыть dirty period
-UPDATE pnl_dirty_periods
-SET status = 'pending', last_error = NULL, updated_at = NOW()
-WHERE company_id = 'UUID'
-  AND period_year = YYYY
-  AND period_month = MM
-  AND status = 'blocked_by_close';
-```
-
-Далее нужно переоткрыть `MarketplaceMonthClose` или обнулить `financeLockBefore`
-через интерфейс «Закрытие месяца». Пересчёт запустится автоматически.
-
-Каждое такое действие логировать в AuditLog с причиной.
+Если закрытый период нужно скорректировать в legacy Finance, решение о текущем
+или переоткрытом периоде принимает бухгалтер/владелец компании. Используйте
+штатный процесс «Закрытие месяца» и команды Finance; не изменяйте Ingestion-таблицы.
 
 ---
 
-## 7. Ручной пересчёт P&L периода
+## 7. Ручной пересчёт ОПиУ legacy Finance
 
 ```bash
-# Пометить период грязным (сбросить в PENDING)
-docker exec -it symfony-postgres psql -U app -d app -c \
-  "UPDATE pnl_dirty_periods
-   SET status = 'pending', updated_at = NOW()
-   WHERE company_id = 'UUID'
-     AND period_year = 2026
-     AND period_month = 6;"
+# Сначала показать изменения без записи
+docker compose run --rm site-php-cli php bin/console app:finance:recalc-pl-register UUID \
+  --from=2026-06-01 --to=2026-06-30 --dry-run
+
+# После проверки выполнить пересчёт из legacy Finance-источников
+docker compose run --rm site-php-cli php bin/console app:finance:recalc-pl-register UUID \
+  --from=2026-06-01 --to=2026-06-30
 ```
 
-Пересчёт запустится автоматически через воркер.
-Проверить результат:
-
-```sql
-SELECT status, rebuilt_at, last_error
-FROM pnl_dirty_periods
-WHERE company_id = 'UUID'
-  AND period_year = 2026
-  AND period_month = 6;
-```
+Команда пересобирает `pl_daily_totals` и `pl_monthly_snapshots` только по
+источникам legacy Finance. Нормализованные Ingestion-транзакции в расчёт не входят.
 
 ---
 
@@ -426,9 +386,8 @@ php -d memory_limit=1G bin/console app:ingestion:ozon-accrual:prune-stale-projec
 
 Удаляет только строки, отсутствующие в latest mapped raw. Перед DELETE повторно
 проверяет, что строка всё ещё принадлежит старому raw (защита от гонки с
-параллельной нормализацией). После удаления диспатчит `NormalizationCompletedEvent`
-→ затронутые периоды P&L помечаются грязными и пересчитываются. Команда
-идемпотентна — повторный запуск безопасен.
+параллельной нормализацией). Команда не публикует события ОПиУ и не запускает
+пересчёт финансового отчёта. Повторный запуск безопасен.
 
 **Шаг 4 — verify повторно (как шаг 1):** все метрики должны стать 0, статус `ok`.
 

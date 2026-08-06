@@ -83,7 +83,6 @@
 | `ExternalCategory` | Ingestion | global marketplace source dictionary, no company filter |
 | `ExternalCategoryMapping` | Ingestion | global mapping dictionary, no company filter |
 | `NormalizationIssue` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
-| `PLDirtyPeriod` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
 | `Product` | Catalog | `Company $company` (legacy) — ещё не мигрирован |
 | `ProductImport` | Catalog | `string $companyId` ✅ |
 | `ProductBarcode` | Catalog | `string $companyId` ✅ |
@@ -130,7 +129,7 @@
 ### Ingestion: canonical finance layer
 
 - `FinancialTransaction` is the canonical transaction record produced from normalized raw source rows. Natural key: `(companyId, source, externalId, type)`.
-- **Boundary rule:** `FinancialTransaction` (and any `App\Ingestion\Entity\*` except the documented Variant-B `PLDirtyPeriod`) must not cross a module boundary. `IngestionFacade::getTransactions` projects each entity into a read-only `App\Ingestion\Application\DTO\FinancialTransactionView` (enum fields exposed as scalar `value`) so consumers never receive a managed, mutable entity. Enforced by `tests/Unit/Ingestion/Architecture/EntityBoundaryTest`.
+- **Boundary rule:** `FinancialTransaction` and all other `App\Ingestion\Entity\*` types must not cross a module boundary. `IngestionFacade::getTransactions` projects each entity into a read-only `App\Ingestion\Application\DTO\FinancialTransactionView` (enum fields exposed as scalar `value`) so consumers never receive a managed, mutable entity. Enforced by `tests/Unit/Ingestion/Architecture/EntityBoundaryTest`.
 - Amounts are stored in minor units. Shared `Money` is signed and can represent positive, negative, or zero values; `TransactionDirection` (`IN`/`OUT`) remains the normalized flow classification. `Money` enforces one ISO-4217 currency per arithmetic operation.
 - `operationGroupId` groups decomposed transactions from one source operation for audit and sum-control checks.
 - `SystemCounterparty` is a global source dictionary (`source`, `name`, optional `inn`) for marketplace/system counterparties. It is not tenant-owned and is resolved by source during normalization; missing source rows leave `FinancialTransaction.counterpartyId = null` and are logged.
@@ -139,13 +138,12 @@
 - `ListingResolverInterface` resolves source-specific listing attribution from `MappedTransaction.sourceData`; implementations are registered with `app.ingestion.listing_resolver`. `OzonListingResolver` uses supplier SKU (`offer_id`/`item_code`) and marketplace SKU fallbacks; WB resolver is intentionally a warning-only stub until WB ingestion mapping is defined.
 - `MarketplaceListingFacade` is the Ingestion-facing boundary to legacy Marketplace listing repositories. Ingestion must not query Marketplace entities directly outside this facade.
 - `NormalizationIssue` is append-only for mapper failures, control-sum mismatches, unknown fields, and currency mismatches; resolving sets `resolvedAt`.
-- Repository reads require explicit `companyId`; period reads use `toIterable()` for future P&L rebuilds over large months.
+- Repository reads require explicit `companyId`; period reads use `toIterable()` for large verification ranges.
 - `SourceConnectorInterface` is the per-source boundary for `discoverShops`, `pull`, and future `push`. Production connectors must be registered with `app.ingestion.connector`.
 - `SourceMapperInterface` maps raw rows to `MappedTransaction` DTOs and control sums. Mappers are pure and registered with `app.ingestion.mapper`.
 - `OzonSellerReportConnector` is the first production source connector. It supports `ozon_seller_daily_report` (`/v3/finance/transaction/list`) and `ozon_seller_realization` (`/v2/finance/realization`) through the Ingestion Ozon adapter. Legacy Marketplace Ozon jobs remain enabled until a later shadow/switch task.
 - `OzonSellerReportMapper` and `OzonRealizationMapper` decompose one Ozon operation into multiple canonical transactions with a shared `operationGroupId`. External ids use `ozon:operation:{operation_id}:{component}` so multiple same-type Ozon components can coexist under the current `(companyId, source, externalId, type)` natural key.
-- `NormalizeRawRecordAction` reads NDJSON raw payload, calls the mapper, upserts canonical transactions, records `NormalizationIssue` on mapper/control-sum problems, marks the raw record `DONE`/`FAILED`, and dispatches `NormalizationCompletedEvent` after successful flush.
-- `NormalizationCompletedEvent` carries affected periods for future P&L dirty-period marking. Stage 4 only publishes the event; subscribers for P&L rebuild are added later.
+- `NormalizeRawRecordAction` reads NDJSON raw payload, calls the mapper, upserts canonical transactions, records `NormalizationIssue` on mapper/control-sum problems, and marks the raw record `DONE`/`FAILED`. Normalization does not publish Finance events or write P&L aggregates.
 
 ### Ingestion: verification client API
 
@@ -154,11 +152,11 @@
   - `GET /api/ingestion/verification/coverage` — raw/canonical/open-issue coverage heatmap plus shop options.
   - `GET /api/ingestion/verification/reconciliation` — canonical transaction totals by shop vs latest legacy `OzonTransactionTotalsCheck` company-period control total.
   - `GET /api/ingestion/verification/issues` — unresolved normalization issues with human-readable descriptions only.
-  - `GET /api/ingestion/verification/financial-summary` — rebuilt P&L monthly/category summary from `pl_monthly_snapshots`.
+  - `GET /api/ingestion/verification/financial-summary` — monthly/category summary read directly from canonical `FinancialTransaction` rows.
 - All controllers resolve `companyId` from `ActiveCompanyService`; DBAL read queries also include explicit `company_id` predicates and do not rely only on Doctrine filters.
 - API period validation errors use `IngestionExceptionListener` and return `{ "error": { "code": "...", "message": "..." } }` with HTTP 422.
 - Reconciliation reads `OzonTransactionTotalsCheck::getOzonTotals()["total_minor"]`; missing or invalid legacy totals are returned as `null`.
-- `pl_monthly_snapshots` has no shop dimension, so financial summary currently accepts `shop_ref` for API compatibility but returns company-level rebuilt P&L until Finance source/shop linking exists.
+- Financial summary applies the requested `shop_ref` directly to canonical transactions and does not read or mutate Finance P&L tables.
 
 ### Ingestion: verification client UI
 
@@ -166,26 +164,18 @@
   - `GET /ingestion/verification/coverage` — coverage heatmap island.
   - `GET /ingestion/verification/reconciliation` — shop-scoped reconciliation island.
   - `GET /ingestion/verification/issues` — open normalization issues island.
-  - `GET /ingestion/verification/financial-summary` — rebuilt P&L summary island.
+  - `GET /ingestion/verification/financial-summary` — canonical financial summary island.
 - Page controllers live in `App\Ingestion\Controller\Page`, require `ROLE_COMPANY_USER`, and only render Twig templates.
 - React source lives in `site/assets/react/ingestion-verification/`; flat Vite entries live in `site/assets/react/ingestion-verification-*-page.tsx`.
 - Data loading uses the existing `useAbortableQuery` + `httpJson` pattern and generated `site/assets/api/schema.d.ts` aliases. No TanStack Query dependency is added.
 - `ShopSelector` persists the selected shop in `localStorage` key `ingestion.selected_shop`; reconciliation requires a concrete shop and does not call its API until one is selected.
 - Coverage is also used as the current shop-options source because the backend verification API exposes shop options only through the coverage response.
 
-### Finance: P&L dirty-period projection infrastructure
+### Finance: Ingestion P&L projection is disabled
 
-- `PLDirtyPeriod` is the Ingestion-side pipeline marker for month-level P&L projection rebuilds from canonical Ingestion transactions. It uses scalar `companyId`, `periodYear`, `periodMonth`, `shopRef`, `status`, `reason`, attempts, and audit timestamps.
-- Status flow is explicit: `pending -> rebuilding -> done|failed|blocked_by_close`; terminal statuses can be reopened to `pending` when a later import/remap needs another rebuild.
-- `PLDailyTotal` and `PLMonthlySnapshot` now have nullable `rebuiltAt` audit columns. Legacy writers leave them `NULL`; future canonical rebuild code sets them when it owns the recalculation.
-- Existing P&L aggregate tables do not store `shop_ref` and must not receive a source/shop dimension. Repository delete methods support all-shop monthly cleanup (`shopRef = ''`) and reject non-empty `shopRef`; source linkage should be decided later at `Document` / `DocumentOperation` level under `docs/tasks/ingestion/FOLLOWUP-finance-source-linking.md`.
-- `NormalizationCompletedSubscriber` listens to Ingestion normalization events and dispatches `MarkPnlPeriodDirtyMessage`; it does not rebuild P&L inline.
-- `MarkPnlPeriodDirtyAction` is idempotent. Existing `DONE`/`FAILED`/`BLOCKED_BY_CLOSE` periods are reopened to `PENDING`; `PENDING`/`REBUILDING` periods are left unchanged. (Note: `TASK-PHASE0` §4.5 envisioned leaving `BLOCKED_BY_CLOSE` untouched; current code reopens it. Changing that is out of Phase 0 scope — verify-only — and tracked as a follow-up.)
-- `RebuildPnlPeriodAction` owns the Redis/Symfony Lock, close-period guard, delete-then-upsert rebuild, and `rebuiltAt` audit marking. It supports only all-source/all-shop rebuild (`shopRef = ''`) until Finance source-linking is decided.
-- `RebuildDirtyPnlPeriodsCommand` only dispatches `RebuildPnlPeriodMessage` jobs for pending dirty periods. No production cron entry is added by Ingestion Stage 8.
-- `pnl_rebuild` Messenger transport uses `MESSENGER_TRANSPORT_DSN_PIPELINE`. `MarkPnlPeriodDirtyMessage` routes to `ingest_normalize`; `RebuildPnlPeriodMessage` routes to `pnl_rebuild`.
-- `App\Finance\Facade\PnlFacade` is the single entry point for marking `pnl_dirty_periods` dirty from outside `App\Ingestion` (`markPeriodDirty(MarkPnlPeriodDirtyCommand)`). `TASK-FIX-06` (`EnrichCogsAction`) and `App\Marketplace` cost-price updates must call it rather than touching the repository.
-- **Variant-B temporary exception (deliberate MVP compromise):** `PLDirtyPeriod` физически остаётся в `App\Ingestion\Entity`, поэтому `App\Finance` (`PnlFacade` через `MarkPnlPeriodDirtyAction`/`RebuildPnlPeriodAction`/`RebuildDirtyPnlPeriodsCommand`) импортирует `App\Ingestion\Entity\PLDirtyPeriod` и `App\Ingestion\Repository\PLDirtyPeriodRepository` напрямую. Это единственное допустимое исключение из правила «соседний модуль — только через Facade». План миграции: перенос `PLDirtyPeriod` Entity + Repository в `App\Finance` после стабилизации (отдельная задача, не Phase 0). Арх-тест `EntityBoundaryTest` whitelist'ит `PLDirtyPeriod`.
+- Ingestion canonical transactions are not projected into `PLDailyTotal`, `PLMonthlySnapshot`, `Document`, or `DocumentOperation`.
+- The dirty-period table, rebuild actions, batch command, and `PnlFacade` integration have been removed. Finance/Marketplace legacy writers remain responsible for P&L aggregates.
+- `MarkPnlPeriodDirtyMessage` and `RebuildPnlPeriodMessage` plus their routes remain only as deprecated compatibility tombstones. Their handlers consume messages queued before removal without changing database state.
 
 ### Finance: перенос дерева категорий ОПиУ между компаниями
 
@@ -525,22 +515,6 @@ getFinancialSummary(string $companyId, ?string $shopRef, int $yearFrom, int $mon
 findBySupplierSku(string $companyId, string $marketplace, string $supplierSku): ?string
 findByMarketplaceSku(string $companyId, string $marketplace, string $marketplaceSku): ?string
 findByBarcode(string $companyId, string $marketplace, string $barcode): ?string
-```
-
-### `PnlFacade` (`src/Finance/Facade/PnlFacade.php`)
-```php
-// Единственная точка входа для пометки периода dirty извне App\Ingestion.
-// Идемпотентно: DONE/FAILED/BLOCKED_BY_CLOSE → reopen в PENDING; PENDING/REBUILDING не трогает.
-// Использует Variant-B исключение (импорт App\Ingestion\Repository\PLDirtyPeriodRepository).
-markPeriodDirty(MarkPnlPeriodDirtyCommand $command): void
-rebuildPeriod(RebuildPnlPeriodCommand $command): void
-
-// Dirty-period views for future UI/admin blocks.
-// @return list<PLDirtyPeriodView>
-getDirtyPeriods(string $companyId): array
-
-// Counters by status: pending/rebuilding/done/failed/blocked.
-getProgress(string $companyId): PnlProgressView
 ```
 
 ### `CompanyFacade` (`src/Company/Facade/CompanyFacade.php`)

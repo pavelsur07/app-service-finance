@@ -15,8 +15,6 @@ use App\Ingestion\Application\Service\SystemCounterpartyResolver;
 use App\Ingestion\Application\Service\WbFinanceStaleComponentVoider;
 use App\Ingestion\Domain\Contract\PreviewIssueAwareMapperInterface;
 use App\Ingestion\Domain\Contract\RawRecordAwareControlSumMapperInterface;
-use App\Ingestion\Domain\Event\AffectedPeriod;
-use App\Ingestion\Domain\Event\NormalizationCompletedEvent;
 use App\Ingestion\Domain\Service\MapperRegistry;
 use App\Ingestion\Enum\NormalizationIssueKind;
 use App\Ingestion\Enum\RawNormalizationStatus;
@@ -29,7 +27,6 @@ use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
-use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 final readonly class NormalizeRawRecordAction
 {
@@ -46,14 +43,12 @@ final readonly class NormalizeRawRecordAction
         private WbFinanceStaleComponentVoider $wbFinanceStaleComponentVoider,
         private RecordNormalizationIssueAction $recordNormalizationIssueAction,
         private EntityManagerInterface $entityManager,
-        private EventDispatcherInterface $eventDispatcher,
         private LoggerInterface $logger,
     ) {
     }
 
     public function __invoke(NormalizeRawRecordCommand $command): void
     {
-        $event = null;
         $connection = $this->entityManager->getConnection();
         $connection->beginTransaction();
 
@@ -99,7 +94,6 @@ final readonly class NormalizeRawRecordAction
                 return;
             }
 
-            $affectedPeriods = [];
             $counterpartyId = $this->systemCounterpartyResolver->resolve($rawRecord->getSource());
             if (null === $counterpartyId) {
                 $this->logger->warning('System counterparty was not found for ingestion source.', [
@@ -140,7 +134,7 @@ final readonly class NormalizeRawRecordAction
                     ]);
                 }
 
-                $result = ($this->upsertFinancialTransactionAction)(new UpsertFinancialTransactionCommand(
+                ($this->upsertFinancialTransactionAction)(new UpsertFinancialTransactionCommand(
                     companyId: $command->companyId,
                     connectionRef: $rawRecord->getConnectionRef(),
                     shopRef: $rawRecord->getShopRef(),
@@ -152,36 +146,15 @@ final readonly class NormalizeRawRecordAction
                     listingSku: $listingResolution?->listingSku,
                     allowSameVersion: $command->forceReplay,
                 ));
-
-                if (null !== $result && $result->affectsFinancialReport) {
-                    $affectedPeriods[] = new AffectedPeriod(
-                        shopRef: $rawRecord->getShopRef(),
-                        oldOccurredAt: $result->oldOccurredAt,
-                        newOccurredAt: $result->newOccurredAt,
-                    );
-                }
             }
 
             $this->entityManager->flush();
 
             if ($command->forceReplay) {
-                foreach ($this->wbFinanceStaleComponentVoider->void($rawRecord, $mappedTransactions) as $affectedAt) {
-                    $affectedPeriods[] = new AffectedPeriod(
-                        shopRef: $rawRecord->getShopRef(),
-                        oldOccurredAt: $affectedAt,
-                        newOccurredAt: $affectedAt,
-                    );
-                }
+                $this->wbFinanceStaleComponentVoider->void($rawRecord, $mappedTransactions);
             }
 
-            $pruneResult = $this->ozonAccrualStaleProjectionPruner->prune($rawRecord, $mappedTransactions, execute: true);
-            foreach ($pruneResult->affectedDates as $date) {
-                $affectedPeriods[] = new AffectedPeriod(
-                    shopRef: $rawRecord->getShopRef(),
-                    oldOccurredAt: null,
-                    newOccurredAt: $this->affectedDate($date),
-                );
-            }
+            $this->ozonAccrualStaleProjectionPruner->prune($rawRecord, $mappedTransactions, execute: true);
 
             $this->entityManager->flush();
             // Mark the raw record DONE before recording control-sum issues: issues are
@@ -193,17 +166,6 @@ final readonly class NormalizeRawRecordAction
             $this->recordPreviewIssues($command->companyId, $rawRecord->getId(), $previewIssues);
             $this->entityManager->flush();
             $connection->commit();
-
-            // Only publish when something actually changed. If every upsert returned a
-            // no-change result (B3), there is no affected period and nothing for
-            // subscribers (P&L dirty-period marking) to do.
-            if ([] !== $affectedPeriods) {
-                $event = new NormalizationCompletedEvent(
-                    companyId: $command->companyId,
-                    rawRecordId: $rawRecord->getId(),
-                    affectedPeriods: $affectedPeriods,
-                );
-            }
         } catch (UniqueConstraintViolationException $exception) {
             // A concurrent normalization of the same raw record (event + cron safety
             // net) won the race and inserted the same natural key first. The flush
@@ -227,15 +189,6 @@ final readonly class NormalizeRawRecordAction
 
             throw $exception;
         }
-
-        if (null !== $event) {
-            $this->eventDispatcher->dispatch($event);
-        }
-    }
-
-    private function affectedDate(string $date): \DateTimeImmutable
-    {
-        return new \DateTimeImmutable(sprintf('%s 00:00:00', $date), new \DateTimeZone('Europe/Moscow'));
     }
 
     /**

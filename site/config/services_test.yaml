@@ -28,7 +28,3 @@ services:
     App\Ingestion\Application\Service\IngestRateLimitGuard:
         arguments:
             $lockFactory: '@test.ingestion_lock_factory'
-
-    App\Finance\Application\Action\RebuildPnlPeriodAction:
-        arguments:
-            $lockFactory: '@test.ingestion_lock_factory'

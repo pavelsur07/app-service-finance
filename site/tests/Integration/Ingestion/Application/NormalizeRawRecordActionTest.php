@@ -22,7 +22,6 @@ use App\Ingestion\Repository\IngestRawRecordRepository;
 use App\Ingestion\Repository\NormalizationIssueRepository;
 use App\Shared\Domain\ValueObject\Money;
 use App\Tests\Integration\Ingestion\Fixtures\FakeConnector;
-use App\Tests\Integration\Ingestion\Fixtures\NormalizationCompletedRecorder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Ramsey\Uuid\Uuid;
@@ -30,7 +29,7 @@ use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
 
 final class NormalizeRawRecordActionTest extends IntegrationTestCase
 {
-    public function testNormalizesRawRecordUpsertsTransactionAndDispatchesEvent(): void
+    public function testNormalizesRawRecordAndUpsertsTransaction(): void
     {
         $companyId = Uuid::uuid7()->toString();
         $operationGroupId = Uuid::uuid7()->toString();
@@ -47,9 +46,6 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
             'counterpartyExternalKey' => 'buyer-1',
             'counterpartyName' => 'Buyer One',
         ]]);
-
-        $recorder = $this->eventRecorder();
-        $recorder->reset();
 
         $this->normalize($record->getId(), $companyId);
         $this->em->clear();
@@ -87,16 +83,19 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
             ),
         );
 
-        $events = $recorder->events();
-        self::assertCount(1, $events);
-        self::assertSame($companyId, $events[0]->companyId);
-        self::assertSame($record->getId(), $events[0]->rawRecordId);
-        self::assertCount(1, $events[0]->affectedPeriods);
-        self::assertNull($events[0]->affectedPeriods[0]->oldOccurredAt);
-        self::assertEquals(new \DateTimeImmutable('2026-06-18T09:00:00+00:00'), $events[0]->affectedPeriods[0]->newOccurredAt);
+        foreach (['pl_daily_totals', 'pl_monthly_snapshots'] as $tableName) {
+            self::assertSame(
+                0,
+                (int) $this->connection->fetchOne(
+                    sprintf('SELECT COUNT(*) FROM %s WHERE company_id = :companyId', $tableName),
+                    ['companyId' => $companyId],
+                ),
+                sprintf('Normalization must not project Ingestion data into %s.', $tableName),
+            );
+        }
     }
 
-    public function testReNormalizationWithUnchangedContentDoesNotDispatchEvent(): void
+    public function testReNormalizationWithUnchangedContentDoesNotCreateDuplicate(): void
     {
         $companyId = Uuid::uuid7()->toString();
         $row = [
@@ -109,80 +108,21 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
             'occurredAt' => '2026-06-18T09:00:00+00:00',
         ];
 
-        $recorder = $this->eventRecorder();
-
         $first = $this->storeRawRecord($companyId, [$row]);
-        $recorder->reset();
         $this->normalize($first->getId(), $companyId);
         $this->em->clear();
 
-        self::assertCount(1, $recorder->events());
-
         // A second raw record with byte-identical content normalizes to the same
-        // natural key; every upsert is a no-change (B3), so no event is published.
+        // natural key; every upsert is a no-change (B3).
         $second = $this->storeRawRecord($companyId, [$row]);
-        $recorder->reset();
         $this->normalize($second->getId(), $companyId);
         $this->em->clear();
-
-        self::assertSame([], $recorder->events());
 
         /** @var FinancialTransactionRepository $transactionRepository */
         $transactionRepository = self::getContainer()->get(FinancialTransactionRepository::class);
-        // No duplicate created; raw attribution moves to the latest identical snapshot
-        // without publishing a financial rebuild event.
+        // No duplicate is created; raw attribution moves to the latest identical snapshot.
         self::assertCount(0, $transactionRepository->findByRawRecordId($companyId, $first->getId()));
         self::assertCount(1, $transactionRepository->findByRawRecordId($companyId, $second->getId()));
-    }
-
-    public function testDispatchesEventOnlyForTransactionsThatChanged(): void
-    {
-        $companyId = Uuid::uuid7()->toString();
-        $rowSale1 = [
-            'externalId' => 'sale-1',
-            'externalUpdatedAt' => '2026-06-18T10:00:00+00:00',
-            'operationGroupId' => Uuid::uuid7()->toString(),
-            'amountMinor' => 10000,
-            'controlAmountMinor' => 10000,
-            'currency' => 'RUB',
-            'occurredAt' => '2026-06-18T09:00:00+00:00',
-        ];
-        $rowSale2 = [
-            'externalId' => 'sale-2',
-            'externalUpdatedAt' => '2026-06-18T10:00:00+00:00',
-            'operationGroupId' => Uuid::uuid7()->toString(),
-            'amountMinor' => 20000,
-            'controlAmountMinor' => 20000,
-            'currency' => 'RUB',
-            'occurredAt' => '2026-06-18T09:00:00+00:00',
-        ];
-
-        $recorder = $this->eventRecorder();
-
-        $first = $this->storeRawRecord($companyId, [$rowSale1, $rowSale2]);
-        $recorder->reset();
-        $this->normalize($first->getId(), $companyId);
-        $this->em->clear();
-
-        $firstEvents = $recorder->events();
-        self::assertCount(1, $firstEvents);
-        self::assertCount(2, $firstEvents[0]->affectedPeriods);
-
-        // Second record: sale-1 byte-identical (no-change), sale-2 a newer version.
-        $rowSale2Changed = $rowSale2;
-        $rowSale2Changed['externalUpdatedAt'] = '2026-06-18T11:00:00+00:00';
-        $rowSale2Changed['amountMinor'] = 25000;
-        $rowSale2Changed['controlAmountMinor'] = 25000;
-
-        $second = $this->storeRawRecord($companyId, [$rowSale1, $rowSale2Changed]);
-        $recorder->reset();
-        $this->normalize($second->getId(), $companyId);
-        $this->em->clear();
-
-        $secondEvents = $recorder->events();
-        self::assertCount(1, $secondEvents);
-        // Only sale-2 changed, so exactly one affected period is reported.
-        self::assertCount(1, $secondEvents[0]->affectedPeriods);
     }
 
     public function testControlSumMismatchRecordsIssueButMarksRawRecordDone(): void
@@ -197,7 +137,6 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
             'currency' => 'RUB',
         ]]);
 
-        $this->eventRecorder()->reset();
         $this->normalize($record->getId(), $companyId);
         $this->em->clear();
 
@@ -256,9 +195,6 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
             'failMapper' => true,
         ]]);
 
-        $recorder = $this->eventRecorder();
-        $recorder->reset();
-
         $this->normalize($record->getId(), $companyId);
         $this->em->clear();
 
@@ -279,7 +215,6 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
             RawNormalizationStatus::FAILED,
             $rawRecordRepository->findByIdAndCompany($record->getId(), $companyId)?->getNormalizationStatus(),
         );
-        self::assertSame([], $recorder->events());
     }
 
     public function testConcurrentInsertViolationIsTranslatedToRecoverableRetry(): void
@@ -392,13 +327,5 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
         /** @var NormalizeRawRecordAction $action */
         $action = self::getContainer()->get(NormalizeRawRecordAction::class);
         $action(new NormalizeRawRecordCommand($rawRecordId, $companyId));
-    }
-
-    private function eventRecorder(): NormalizationCompletedRecorder
-    {
-        /** @var NormalizationCompletedRecorder $recorder */
-        $recorder = self::getContainer()->get(NormalizationCompletedRecorder::class);
-
-        return $recorder;
     }
 }

@@ -10,7 +10,6 @@ use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\Persistence\ManagerRegistry;
 use Ramsey\Uuid\Uuid;
-use Webmozart\Assert\Assert;
 
 class PLDailyTotalRepository extends ServiceEntityRepository
 {
@@ -60,7 +59,6 @@ class PLDailyTotalRepository extends ServiceEntityRepository
         string $amountExpense,
         bool $replace,
         ?\DateTimeImmutable $timestamp = null,
-        ?\DateTimeImmutable $rebuiltAt = null,
         ?string $responsibilityCenterId = null,
     ): void {
         $timestamp ??= new \DateTimeImmutable();
@@ -79,13 +77,12 @@ class PLDailyTotalRepository extends ServiceEntityRepository
 
         $sql = sprintf(
             <<<'SQL'
-INSERT INTO pl_daily_totals (id, company_id, pl_category_id, date, project_direction_id, responsibility_center_id, amount_income, amount_expense, created_at, updated_at, rebuilt_at)
-VALUES (:id, :company_id, :category_id, :date, :project_direction_id, :responsibility_center_id, :amount_income, :amount_expense, :created_at, :updated_at, :rebuilt_at)
+INSERT INTO pl_daily_totals (id, company_id, pl_category_id, date, project_direction_id, responsibility_center_id, amount_income, amount_expense, created_at, updated_at)
+VALUES (:id, :company_id, :category_id, :date, :project_direction_id, :responsibility_center_id, :amount_income, :amount_expense, :created_at, :updated_at)
 ON CONFLICT %s DO UPDATE SET
     amount_income = %s,
     amount_expense = %s,
-    updated_at = EXCLUDED.updated_at,
-    rebuilt_at = EXCLUDED.rebuilt_at
+    updated_at = EXCLUDED.updated_at
 SQL,
             $categoryConflictTarget,
             $replace ? 'EXCLUDED.amount_income' : 'pl_daily_totals.amount_income + EXCLUDED.amount_income',
@@ -105,7 +102,6 @@ SQL,
                 'amount_expense' => $amountExpense,
                 'created_at' => $timestamp,
                 'updated_at' => $timestamp,
-                'rebuilt_at' => $rebuiltAt,
             ],
             [
                 'id' => Types::GUID,
@@ -116,7 +112,6 @@ SQL,
                 'responsibility_center_id' => Types::GUID,
                 'created_at' => Types::DATETIME_IMMUTABLE,
                 'updated_at' => Types::DATETIME_IMMUTABLE,
-                'rebuilt_at' => Types::DATETIME_IMMUTABLE,
             ],
         );
     }
@@ -132,7 +127,7 @@ WITH moved AS (
     DELETE FROM pl_daily_totals
     WHERE company_id = :company_id
       AND pl_category_id = :category_id
-    RETURNING company_id, date, project_direction_id, responsibility_center_id, amount_income, amount_expense, created_at, rebuilt_at
+    RETURNING company_id, date, project_direction_id, responsibility_center_id, amount_income, amount_expense, created_at
 ),
 aggregated AS (
     SELECT company_id,
@@ -141,19 +136,17 @@ aggregated AS (
            responsibility_center_id,
            SUM(amount_income) AS amount_income,
            SUM(amount_expense) AS amount_expense,
-           MIN(created_at) AS created_at,
-           MAX(rebuilt_at) AS rebuilt_at
+           MIN(created_at) AS created_at
     FROM moved
     GROUP BY company_id, date, project_direction_id, responsibility_center_id
 )
-INSERT INTO pl_daily_totals (id, company_id, pl_category_id, date, project_direction_id, responsibility_center_id, amount_income, amount_expense, created_at, updated_at, rebuilt_at)
-SELECT gen_random_uuid(), company_id, NULL, date, project_direction_id, responsibility_center_id, amount_income, amount_expense, created_at, :updated_at, rebuilt_at
+INSERT INTO pl_daily_totals (id, company_id, pl_category_id, date, project_direction_id, responsibility_center_id, amount_income, amount_expense, created_at, updated_at)
+SELECT gen_random_uuid(), company_id, NULL, date, project_direction_id, responsibility_center_id, amount_income, amount_expense, created_at, :updated_at
 FROM aggregated
 ON CONFLICT (company_id, date, project_direction_id, COALESCE(responsibility_center_id, '%s'::uuid)) WHERE pl_category_id IS NULL DO UPDATE SET
     amount_income = pl_daily_totals.amount_income + EXCLUDED.amount_income,
     amount_expense = pl_daily_totals.amount_expense + EXCLUDED.amount_expense,
-    updated_at = EXCLUDED.updated_at,
-    rebuilt_at = COALESCE(EXCLUDED.rebuilt_at, pl_daily_totals.rebuilt_at)
+    updated_at = EXCLUDED.updated_at
 SQL,
                 self::NULL_RESPONSIBILITY_CENTER_KEY,
             ),
@@ -166,39 +159,6 @@ SQL,
                 'company_id' => Types::GUID,
                 'category_id' => Types::GUID,
                 'updated_at' => Types::DATETIME_IMMUTABLE,
-            ],
-        );
-    }
-
-    public function deleteByCompanyShopAndMonth(string $companyId, string $shopRef, int $year, int $month): int
-    {
-        Assert::uuid($companyId);
-        Assert::range($year, 2020, 2100);
-        Assert::range($month, 1, 12);
-
-        if ('' !== $shopRef) {
-            throw new \LogicException('Shop-scoped P&L daily delete is not available: pl_daily_totals has no shop_ref column.');
-        }
-
-        $from = new \DateTimeImmutable(sprintf('%04d-%02d-01', $year, $month));
-        $toExclusive = $from->modify('first day of next month');
-
-        return $this->getEntityManager()->getConnection()->executeStatement(
-            <<<'SQL'
-DELETE FROM pl_daily_totals
-WHERE company_id = :company_id
-  AND date >= :from
-  AND date < :to_exclusive
-SQL,
-            [
-                'company_id' => $companyId,
-                'from' => $from,
-                'to_exclusive' => $toExclusive,
-            ],
-            [
-                'company_id' => Types::GUID,
-                'from' => Types::DATE_IMMUTABLE,
-                'to_exclusive' => Types::DATE_IMMUTABLE,
             ],
         );
     }

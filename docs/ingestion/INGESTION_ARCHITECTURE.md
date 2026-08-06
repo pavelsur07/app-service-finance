@@ -9,8 +9,8 @@
 один источник за раз, параллельно с legacy, без его отключения.
 
 **Граница модуля:** Ingestion знает про источники и канон.
-Он не знает про `PLDailyTotal`, `Document`, `CashTransaction`.
-Только публикует события и отдаёт данные через Facade.
+Он не знает про `PLDailyTotal`, `PLMonthlySnapshot`, `Document` или `CashTransaction`,
+не публикует события пересчёта ОПиУ и отдаёт данные только через Facade/verification API.
 
 ---
 
@@ -33,19 +33,10 @@
   → IngestRawRecord status=DONE
         ↓
   Канон (FinancialTransaction)
-  + NormalizationCompletedEvent опубликован
         ↓
-  [ENRICH]
-  EnrichCogsHandler
-  → MarketplaceFacade.getCostPriceForListing()
-  → EnrichmentTransaction (kind=COGS)
-        ↓
-  PLDirtyPeriod помечен (PENDING)
-        ↓
-  [REBUILD] — App\Finance
-  RebuildPnlPeriodHandler
-  → IngestionFacade.getTransactions() + getEnrichments()
-  → PLDailyTotal / PLMonthlySnapshot перезаписаны
+  Verification API / сверки
+
+  Записей в Finance P&L из этого пайплайна нет.
 ```
 
 ---
@@ -55,8 +46,8 @@
 | Transport | DSN (underlying) | Что обрабатывает |
 |---|---|---|
 | `ingest_fetch` | `async_sync` | `RunSyncChunkMessage` — HTTP к источникам |
-| `ingest_normalize` | `async_pipeline` | `NormalizeRawRecordMessage`, `EnrichCogsMessage`, `MarkPnlPeriodDirtyMessage` |
-| `pnl_rebuild` | `async_pipeline` | `RebuildPnlPeriodMessage` |
+| `ingest_normalize` | `async_pipeline` | `NormalizeRawRecordMessage`; старые `MarkPnlPeriodDirtyMessage` поглощаются no-op handler |
+| `pnl_rebuild` | `async_pipeline` | Только compatibility tombstone для уже поставленных `RebuildPnlPeriodMessage` |
 
 Prod-воркеры: `site-messenger-worker-sync`, `site-messenger-worker-pipeline`.
 Отдельных воркеров для Ingestion не нужно — DSN совпадают с существующими.
@@ -137,7 +128,7 @@ Prod-воркеры: `site-messenger-worker-sync`, `site-messenger-worker-pipeli
 #### `FinancialTransaction`
 Таблица: `ingest_financial_transactions`
 
-Нормализованный факт от источника. Источник истины для P&L.
+Нормализованный факт от источника. Источник истины для verification и сверок Ingestion.
 
 | Поле | Смысл |
 |---|---|
@@ -149,7 +140,7 @@ Prod-воркеры: `site-messenger-worker-sync`, `site-messenger-worker-pipeli
 | `direction` | IN (приход) / OUT (расход) |
 | `amountMinor` | Сумма в копейках, всегда >= 0 |
 | `currency` | ISO 4217 |
-| `occurredAt` | Дата операции в источнике (UTC) — используется для P&L периода |
+| `occurredAt` | Дата операции в источнике (UTC) |
 | `listingId` | Ссылка на `MarketplaceListing.id` (nullable) |
 | `counterpartyId` | Ссылка на `SystemCounterparty.id` (nullable) |
 | `rawRecordId` | Ссылка на `IngestRawRecord.id` |
@@ -161,7 +152,7 @@ Prod-воркеры: `site-messenger-worker-sync`, `site-messenger-worker-pipeli
 - При более свежем `externalUpdatedAt` — перезаписать через `replaceFromNewerVersion`.
 - При старом `externalUpdatedAt` — пропустить без ошибки.
 - **Никогда не удалять.** Только upsert.
-- `occurredAt` — дата из источника (не дата загрузки). Используется для определения P&L периода.
+- `occurredAt` — дата из источника (не дата загрузки). Используется в периодах verification-отчётов.
 - `sourceData` содержит полную исходную строку — для аудита и отладки.
 
 #### `EnrichmentTransaction`
@@ -219,56 +210,18 @@ Prod-воркеры: `site-messenger-worker-sync`, `site-messenger-worker-pipeli
 
 ---
 
-### P&L проекция
-
-#### `PLDirtyPeriod`
-Таблица: `pnl_dirty_periods`
-
-Очередь периодов на пересчёт P&L. Живёт в `App\Ingestion`.
-
-| Поле | Смысл |
-|---|---|
-| `periodYear + periodMonth + shopRef` | Какой период грязный |
-| `status` | PENDING → REBUILDING → DONE / FAILED / BLOCKED_BY_CLOSE |
-| `reason` | INGEST / MANUAL / REMAP / MONTH_CHANGE |
-| `markedAt` | Когда помечен |
-| `rebuiltAt` | Когда последний раз пересчитан |
-
-**Правила:**
-- Помечается по `occurredAt` транзакции, не по дате загрузки.
-- При смене периода операции (Ozon передатировал) — помечаются оба: старый и новый.
-- Закрытый период (`MarketplaceMonthClose`, `financeLockBefore`) → `BLOCKED_BY_CLOSE` + уведомление. Автопересчёт запрещён.
-- `rebuildPeriod` идемпотентен: 1 запуск = 5 запусков по результату.
-- Redis Lock защищает от конкурентных пересчётов одного периода.
-
----
-
 ## Контракты между модулями
-
-### На выход из Ingestion (события)
-```
-NormalizationCompletedEvent(
-    companyId: string,
-    rawRecordId: string,
-    affectedPeriods: list<AffectedPeriod>  // occurredAt старый и новый
-)
-```
-Публикуется после нормализации. Подписчики: Finance (PLDirtyPeriod), Ingestion (EnrichCogs).
 
 ### На вход в Ingestion (Facade)
 ```php
 IngestionFacade::getTransactions(string $companyId, DateTimeImmutable $from, DateTimeImmutable $to, ?string $shopRef): iterable<FinancialTransaction>
-IngestionFacade::getEnrichments(string $companyId, DateTimeImmutable $from, DateTimeImmutable $to): iterable<EnrichmentTransaction>
 IngestionFacade::countOpenIssues(string $companyId): int
-IngestionFacade::storeEnrichment(...): void  // для Finance при создании COGS
 ```
 
 ### Ссылки между модулями — только строки
 ```
 FinancialTransaction.listingId      → MarketplaceListing.id (string)
 FinancialTransaction.counterpartyId → SystemCounterparty.id (string)
-EnrichmentTransaction.transactionId → FinancialTransaction.id (string)
-PLDirtyPeriod                       → через PnlFacade в Finance
 ```
 
 ---
@@ -412,7 +365,6 @@ src/Ingestion/
       Ozon/          # OzonSellerReportConnector, OzonAccrualByDayMapper, ...
   Domain/
     Contract/        # SourceConnectorInterface, SourceMapperInterface, ...
-    Event/           # NormalizationCompletedEvent, AffectedPeriod
     ValueObject/     # Money
   Entity/            # IngestRawRecord, FinancialTransaction, SyncJob, ...
   Enum/              # IngestSource, TransactionType, SyncJobStatus, ...

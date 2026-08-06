@@ -7,6 +7,9 @@ namespace App\Finance\Message;
 use App\Ingestion\Message\CompanyAwareMessage;
 use Webmozart\Assert\Assert;
 
+/**
+ * @deprecated compatibility tombstone for messages queued before the Ingestion P&L projection was removed
+ */
 final readonly class RebuildPnlPeriodMessage implements CompanyAwareMessage
 {
     public function __construct(

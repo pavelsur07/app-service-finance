@@ -7,8 +7,6 @@ namespace App\Ingestion\Command;
 use App\Ingestion\Application\Service\OzonAccrualStaleProjectionPruner;
 use App\Ingestion\Application\Source\Ozon\OzonAccrualByDayMapper;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
-use App\Ingestion\Domain\Event\AffectedPeriod;
-use App\Ingestion\Domain\Event\NormalizationCompletedEvent;
 use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\RawNormalizationStatus;
@@ -24,7 +22,6 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 use Webmozart\Assert\Assert;
 
 #[AsCommand(
@@ -44,7 +41,6 @@ final class OzonAccrualPruneStaleProjectionCommand extends Command
         private readonly RawStorageFacade $rawStorageFacade,
         private readonly OzonAccrualByDayMapper $mapper,
         private readonly OzonAccrualStaleProjectionPruner $pruner,
-        private readonly EventDispatcherInterface $eventDispatcher,
         private readonly LoggerInterface $logger,
     ) {
         parent::__construct();
@@ -159,14 +155,6 @@ final class OzonAccrualPruneStaleProjectionCommand extends Command
             $totals['candidates'] += $candidates;
             $totals['deleted'] += $result->deleted;
             $this->collectGroupedRows($groupedRows, $rawRecord, $rows);
-
-            if ($execute && $result->deleted > 0) {
-                $this->eventDispatcher->dispatch(new NormalizationCompletedEvent(
-                    companyId: $rawRecord->getCompanyId(),
-                    rawRecordId: $rawRecord->getId(),
-                    affectedPeriods: $this->affectedPeriods($rawRecord->getShopRef(), $result->affectedDates),
-                ));
-            }
         }
 
         $io->section('Stale projection rows');
@@ -232,7 +220,7 @@ final class OzonAccrualPruneStaleProjectionCommand extends Command
 
     /**
      * @param array<string, array<string, mixed>> $groupedRows
-     * @param list<array<string, mixed>> $rows
+     * @param list<array<string, mixed>>          $rows
      */
     private function collectGroupedRows(array &$groupedRows, IngestRawRecord $rawRecord, array $rows): void
     {
@@ -290,23 +278,6 @@ final class OzonAccrualPruneStaleProjectionCommand extends Command
                 (string) $row['count'],
                 number_format($row['amountMinor'] / 100, 2, '.', ''),
             ], $rows),
-        );
-    }
-
-    /**
-     * @param list<string> $dates
-     *
-     * @return list<AffectedPeriod>
-     */
-    private function affectedPeriods(string $shopRef, array $dates): array
-    {
-        return array_map(
-            static fn (string $date): AffectedPeriod => new AffectedPeriod(
-                shopRef: $shopRef,
-                oldOccurredAt: null,
-                newOccurredAt: new \DateTimeImmutable(sprintf('%s 00:00:00', $date), new \DateTimeZone(self::BUSINESS_TIMEZONE)),
-            ),
-            $dates,
         );
     }
 

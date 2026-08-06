@@ -4,27 +4,25 @@ declare(strict_types=1);
 
 namespace App\Finance\MessageHandler;
 
-use App\Finance\Application\Action\MarkPnlPeriodDirtyAction;
-use App\Finance\Application\Command\MarkPnlPeriodDirtyCommand;
 use App\Finance\Message\MarkPnlPeriodDirtyMessage;
-use App\Ingestion\Enum\PLDirtyPeriodReason;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 #[AsMessageHandler]
-final readonly class MarkPnlPeriodDirtyHandler
+final class MarkPnlPeriodDirtyHandler
 {
-    public function __construct(private MarkPnlPeriodDirtyAction $action)
+    public function __construct(private readonly LoggerInterface $logger)
     {
     }
 
     public function __invoke(MarkPnlPeriodDirtyMessage $message): void
     {
-        ($this->action)(new MarkPnlPeriodDirtyCommand(
-            companyId: $message->companyId,
-            year: $message->year,
-            month: $message->month,
-            shopRef: $message->shopRef,
-            reason: PLDirtyPeriodReason::from($message->reasonValue),
-        ));
+        $this->logger->info('Discarded legacy Ingestion P&L dirty-period message.', [
+            'companyId' => $message->companyId,
+            'year' => $message->year,
+            'month' => $message->month,
+            'shopRef' => $message->shopRef,
+            'reason' => $message->reasonValue,
+        ]);
     }
 }
