@@ -6,12 +6,13 @@ namespace App\Marketplace\Application\Service;
 
 use App\Marketplace\Entity\MarketplaceFinancialReportSyncError;
 use App\Marketplace\Entity\MarketplaceFinancialReportSyncStatus;
+use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\FinancialReportSyncMode;
+use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\PipelineStatus;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncErrorRepository;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusRepository;
-use App\Marketplace\Entity\MarketplaceRawDocument;
-use App\Marketplace\Enum\PipelineStatus;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 
@@ -165,6 +166,14 @@ final readonly class WbFinancialReportSyncStatusUpdater implements WbFinancialRe
 
         $status = $this->resolveStatusForRawPipelineResult($rawDocument, $context);
         if ($status === null) {
+            return;
+        }
+
+        // Успешный соседний step не должен затирать CONFLICT общим PipelineFailedException.
+        if (null === $failure
+            && PipelineStatus::FAILED === $rawDocument->getProcessingStatus()
+            && FinancialReportSyncStatus::CONFLICT === $status->getStatus()
+        ) {
             return;
         }
 

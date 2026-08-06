@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Marketplace\MessageHandler;
 
-use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
+use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
 use App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdaterInterface;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\PipelineStep;
+use App\Marketplace\Exception\WbGeneratedRowsConflictException;
 use App\Marketplace\Message\ProcessRawDocumentStepMessage;
 use App\Marketplace\MessageHandler\ProcessRawDocumentStepMessageHandler;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
@@ -20,6 +21,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
 // Bootstrap pins BypassFinals to an allowlist; extend it so the action under test
@@ -261,6 +263,117 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
 
         $this->expectExceptionObject($primaryException);
         $handler($message);
+    }
+
+    public function testHandlerAcknowledgesRecordedGeneratedRowsConflict(): void
+    {
+        $user = UserBuilder::aUser()->withIndex(7)->build();
+        $company = CompanyBuilder::aCompany()->withIndex(7)->withOwner($user)->build();
+        $doc = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)->build();
+        $conflict = new WbGeneratedRowsConflictException('13 sales rows are linked to closed documents.');
+
+        $initialRepo = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $initialRepo->method('find')->with($doc->getId())->willReturn($doc);
+
+        $processAction = $this->createMock(ProcessMarketplaceRawDocumentAction::class);
+        $processAction->method('__invoke')->willThrowException($conflict);
+
+        $freshRepo = $this->createMock(EntityRepository::class);
+        $freshRepo->expects(self::once())->method('find')->with($doc->getId())->willReturn($doc);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('isOpen')->willReturn(true);
+        $em->method('getRepository')->with(MarketplaceRawDocument::class)->willReturn($freshRepo);
+        $em->expects(self::once())->method('flush');
+
+        $updater = $this->createMock(WbFinancialReportSyncStatusUpdaterInterface::class);
+        $updater->expects(self::once())->method('syncByRawPipelineResult')->with($doc, $conflict, [
+            'sync_status_id' => '00000000-0000-0000-0000-000000000710',
+            'company_id' => $company->getId(),
+            'connection_id' => '00000000-0000-0000-0000-000000000711',
+            'marketplace' => 'wildberries',
+            'report_type' => 'sales_report',
+            'mode' => 'refresh_14d',
+            'business_date' => '2026-07-28',
+            'raw_document_id' => $doc->getId(),
+        ]);
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('warning')->with(
+            'WB raw document step conflict: linked document rows prevent refresh',
+            [
+                'company_id' => $company->getId(),
+                'raw_document_id' => $doc->getId(),
+                'step' => PipelineStep::SALES->value,
+                'reason' => $conflict->getMessage(),
+            ],
+        );
+
+        $handler = new ProcessRawDocumentStepMessageHandler(
+            $initialRepo,
+            $processAction,
+            $em,
+            $this->createMock(ManagerRegistry::class),
+            $logger,
+            $updater,
+        );
+
+        $handler(new ProcessRawDocumentStepMessage(
+            rawDocumentId: $doc->getId(),
+            step: PipelineStep::SALES->value,
+            companyId: $company->getId(),
+            syncStatusId: '00000000-0000-0000-0000-000000000710',
+            connectionId: '00000000-0000-0000-0000-000000000711',
+            marketplace: 'wildberries',
+            reportType: 'sales_report',
+            mode: 'refresh_14d',
+            businessDate: '2026-07-28',
+            forceRefresh: true,
+        ));
+
+        self::assertContains(PipelineStep::SALES->value, $doc->getFailedSteps());
+        self::assertNotContains(PipelineStep::SALES->value, $doc->getSucceededSteps());
+    }
+
+    public function testHandlerRethrowsConflictWhenSyncStatusCannotBeUpdated(): void
+    {
+        $user = UserBuilder::aUser()->withIndex(8)->build();
+        $company = CompanyBuilder::aCompany()->withIndex(8)->withOwner($user)->build();
+        $doc = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)->build();
+        $conflict = new WbGeneratedRowsConflictException('conflict');
+
+        $initialRepo = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $initialRepo->method('find')->with($doc->getId())->willReturn($doc);
+
+        $processAction = $this->createMock(ProcessMarketplaceRawDocumentAction::class);
+        $processAction->method('__invoke')->willThrowException($conflict);
+
+        $freshRepo = $this->createMock(EntityRepository::class);
+        $freshRepo->method('find')->with($doc->getId())->willReturn($doc);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('isOpen')->willReturn(true);
+        $em->method('getRepository')->with(MarketplaceRawDocument::class)->willReturn($freshRepo);
+        $em->expects(self::once())->method('flush');
+
+        $updater = $this->createMock(WbFinancialReportSyncStatusUpdaterInterface::class);
+        $updater->method('syncByRawPipelineResult')->willThrowException(new \RuntimeException('status unavailable'));
+
+        $handler = new ProcessRawDocumentStepMessageHandler(
+            $initialRepo,
+            $processAction,
+            $em,
+            $this->createMock(ManagerRegistry::class),
+            $this->createMock(LoggerInterface::class),
+            $updater,
+        );
+
+        $this->expectExceptionObject($conflict);
+        $handler(new ProcessRawDocumentStepMessage(
+            $doc->getId(),
+            PipelineStep::SALES->value,
+            $company->getId(),
+        ));
     }
 
     public function testHandlerSyncsWbStatusOnSuccessfulPipelineCompletion(): void
