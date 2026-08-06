@@ -99,6 +99,8 @@ final class WidgetGroupBackwardCompatTest extends TestCase
         'ozon_seller_correction' => 'Другие услуги и штрафы',
         'ozon_additional_packaging_warehouse' => 'Другие услуги и штрафы',
         'ozon_original_label' => 'Другие услуги и штрафы',
+        'ozon_brand_verified' => 'Другие услуги и штрафы',
+        'ozon_stock_insurance' => 'Другие услуги и штрафы',
         'ozon_charity' => 'Другие услуги и штрафы',
         'ozon_fines_prohibited_products' => 'Другие услуги и штрафы',
         'ozon_fines_shipment_delay' => 'Другие услуги и штрафы',
@@ -148,7 +150,7 @@ final class WidgetGroupBackwardCompatTest extends TestCase
     public function testExpectedGroupsCount(): void
     {
         $this->assertCount(
-            83,
+            85,
             self::EXPECTED_GROUPS,
             'EXPECTED_GROUPS should contain all current entries from the baseline map',
         );

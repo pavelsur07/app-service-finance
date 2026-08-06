@@ -25,6 +25,8 @@ final class OzonCostCategoryTest extends TestCase
      * @var array<string, string>
      */
     private const NEW_OZON_TYPES = [
+        'InsuranceServiceSellerItem' => 'ozon_stock_insurance',
+        'OperationLabelBrandVerified' => 'ozon_brand_verified',
         'OperationMarketplaceSendingPushNotifications' => 'ozon_sending_push_notifications',
         'OperationLabelOriginal' => 'ozon_original_label',
         'OperationMarketplaceServicePartialCompensationToClient' => 'ozon_partial_compensation_to_client',
