@@ -1,0 +1,257 @@
+<div class="modal modal-blur fade" id="modal-default-sale-mapping" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document">
+        <div class="modal-content"
+             data-default-sale-mapping-modal
+             data-preview-url="{{ path('marketplace_pl_mappings_default_preview') }}"
+             data-apply-url="{{ path('marketplace_pl_mappings_default_apply') }}"
+             data-csrf-token="{{ csrf_token('marketplace_default_sale_mapping') }}"
+             data-marketplace="{{ marketplaceFilterValue }}">
+            <div class="modal-header">
+                <h5 class="modal-title">Базовый маппинг продаж и возвратов</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger d-none" data-default-sale-mapping-blocking>
+                    Есть блокирующие проблемы. Исправьте дерево ОПиУ перед применением.
+                </div>
+                <div class="alert alert-warning d-none" data-default-sale-mapping-mismatch></div>
+                <div class="alert alert-danger d-none" data-default-sale-mapping-error></div>
+                <div class="alert alert-success d-none" data-default-sale-mapping-success></div>
+
+                <div class="d-flex align-items-center gap-2 text-muted d-none" data-default-sale-mapping-loading>
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    Загрузка preview…
+                </div>
+
+                <div class="d-none" data-default-sale-mapping-empty>
+                    <div class="alert alert-info mb-0">Для выбранного маркетплейса нет правил базового маппинга.</div>
+                </div>
+
+                <div data-default-sale-mapping-preview></div>
+            </div>
+            <div class="modal-footer">
+                <small class="text-muted me-auto" data-default-sale-mapping-hint></small>
+                <button type="button" class="btn" data-bs-dismiss="modal">Закрыть</button>
+                <button type="button" class="btn btn-primary" data-default-sale-mapping-apply disabled>
+                    Применить базовый маппинг
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        var modalRoot = document.querySelector('[data-default-sale-mapping-modal]');
+        if (!modalRoot) {
+            return;
+        }
+
+        var modalEl = document.getElementById('modal-default-sale-mapping');
+        var previewUrl = modalRoot.dataset.previewUrl;
+        var applyUrl = modalRoot.dataset.applyUrl;
+        var token = modalRoot.dataset.csrfToken;
+        var marketplace = modalRoot.dataset.marketplace;
+
+        var loadingEl = modalRoot.querySelector('[data-default-sale-mapping-loading]');
+        var previewEl = modalRoot.querySelector('[data-default-sale-mapping-preview]');
+        var emptyEl = modalRoot.querySelector('[data-default-sale-mapping-empty]');
+        var errorEl = modalRoot.querySelector('[data-default-sale-mapping-error]');
+        var successEl = modalRoot.querySelector('[data-default-sale-mapping-success]');
+        var blockingEl = modalRoot.querySelector('[data-default-sale-mapping-blocking]');
+        var mismatchEl = modalRoot.querySelector('[data-default-sale-mapping-mismatch]');
+        var hintEl = modalRoot.querySelector('[data-default-sale-mapping-hint]');
+        var applyBtn = modalRoot.querySelector('[data-default-sale-mapping-apply]');
+
+        var state = {preview: null, loading: false, applying: false, requested: false, applied: false};
+        var statusClass = {
+            will_create: 'bg-green-lt',
+            skipped_existing: 'bg-secondary-lt',
+            missing_pl_category: 'bg-red-lt',
+            invalid_target_category: 'bg-red-lt'
+        };
+
+        function escapeHtml(text) {
+            return String(text === null || text === undefined ? '' : text).replace(/[&<>"']/g, function (char) {
+                return ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'})[char];
+            });
+        }
+
+        function hideAlerts() {
+            [errorEl, successEl, blockingEl, mismatchEl].forEach(function (el) { el.classList.add('d-none'); });
+        }
+
+        function showError(message) {
+            errorEl.textContent = message;
+            errorEl.classList.remove('d-none');
+        }
+
+        function updateApplyState() {
+            var summary = state.preview ? (state.preview.summary || {}) : {};
+            var actionable = summary.will_create || 0;
+            var hasBlocking = Boolean(state.preview && state.preview.hasBlockingIssues);
+            applyBtn.disabled = !state.preview || state.loading || state.applying || state.applied || hasBlocking || actionable === 0;
+
+            if (!state.preview) {
+                hintEl.textContent = '';
+            } else if (hasBlocking) {
+                hintEl.textContent = 'Применение недоступно: не хватает категорий ОПиУ.';
+            } else if (actionable === 0) {
+                hintEl.textContent = 'Нет новых правил для применения.';
+            } else {
+                hintEl.textContent = 'Будет создано правил: ' + actionable;
+            }
+        }
+
+        function renderPreview(payload) {
+            previewEl.innerHTML = '';
+            emptyEl.classList.add('d-none');
+
+            var items = payload.items || [];
+            if (items.length === 0) {
+                emptyEl.classList.remove('d-none');
+                return;
+            }
+
+            if (payload.hasBlockingIssues) {
+                blockingEl.classList.remove('d-none');
+            }
+
+            var mismatched = items.filter(function (item) { return item.signMismatch; });
+            if (mismatched.length > 0) {
+                mismatchEl.textContent = 'Настроенных правил со знаком, противоречащим базовому: '
+                    + mismatched.length
+                    + '. Автонастройка их не меняет — проверьте вручную: неверный знак у возврата прибавляет его к выручке вместо вычитания.';
+                mismatchEl.classList.remove('d-none');
+            }
+
+            var rows = items.map(function (item) {
+                // У уже настроенного правила целевая категория из конфига не
+                // применяется — показываем ту, что реально стоит, иначе строка
+                // «не найдена» врёт про исправную настройку.
+                var target;
+                var existing = '';
+                if (item.existingPlCategoryName) {
+                    target = escapeHtml(item.existingPlCategoryName);
+                    existing = '<div class="text-muted small">настроено вручную</div>';
+                } else if (item.plCategoryName) {
+                    target = escapeHtml(item.plCategoryName) + ' <span class="text-muted">(' + escapeHtml(item.plCode) + ')</span>';
+                } else {
+                    target = '<span class="text-muted">' + escapeHtml(item.plCode) + ' — не найдена</span>';
+                }
+
+                return '<tr>'
+                    + '<td>' + (item.operationType === 'return' ? 'Возврат' : 'Продажа') + '</td>'
+                    + '<td><div>' + escapeHtml(item.amountSourceLabel) + '</div>'
+                    + '<div class="text-muted small"><code>' + escapeHtml(item.amountSource) + '</code></div></td>'
+                    + '<td>' + target + existing + '</td>'
+                    + '<td>' + (item.isNegative ? '<span class="badge bg-orange-lt">минус</span>' : '<span class="text-muted">плюс</span>')
+                    + (item.signMismatch
+                        ? '<div class="text-danger small">ожидается «' + (item.expectedNegative ? 'минус' : 'плюс') + '»</div>'
+                        : '') + '</td>'
+                    + '<td><span class="badge ' + (statusClass[item.status] || 'bg-secondary-lt') + '">'
+                    + escapeHtml(item.statusLabel) + '</span>'
+                    + '<div class="text-muted small">' + escapeHtml(item.message) + '</div></td>'
+                    + '</tr>';
+            }).join('');
+
+            previewEl.innerHTML = '<div class="table-responsive"><table class="table table-sm table-vcenter">'
+                + '<thead><tr><th>Операция</th><th>Источник суммы</th><th>Категория ОПиУ</th><th>Знак</th><th>Статус</th></tr></thead>'
+                + '<tbody>' + rows + '</tbody></table></div>';
+        }
+
+        async function post(url) {
+            var body = new URLSearchParams();
+            body.set('marketplace', marketplace);
+            body.set('_token', token);
+
+            var res = await fetch(url, {
+                method: 'POST',
+                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                body: body
+            });
+
+            var text = await res.text();
+            var data = null;
+            if (text) {
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    throw new Error('Сервер вернул неожиданный ответ. Обновите страницу и повторите попытку.');
+                }
+            }
+
+            if (!res.ok || !data || data.ok === false) {
+                throw new Error((data && data.message) ? data.message : 'Ошибка запроса. Попробуйте позже.');
+            }
+
+            return data;
+        }
+
+        async function loadPreview() {
+            if (state.loading) {
+                return;
+            }
+
+            state.requested = true;
+            hideAlerts();
+            previewEl.innerHTML = '';
+            emptyEl.classList.add('d-none');
+            state.loading = true;
+            updateApplyState();
+            loadingEl.classList.remove('d-none');
+
+            try {
+                var payload = await post(previewUrl);
+                state.preview = payload;
+                renderPreview(payload);
+            } catch (e) {
+                state.preview = null;
+                showError(e.message);
+            } finally {
+                state.loading = false;
+                loadingEl.classList.add('d-none');
+                updateApplyState();
+            }
+        }
+
+        if (modalEl) {
+            modalEl.addEventListener('shown.bs.modal', function () {
+                if (!state.requested) {
+                    loadPreview();
+                }
+            });
+            modalEl.addEventListener('hidden.bs.modal', function () {
+                state.requested = false;
+            });
+        }
+
+        applyBtn.addEventListener('click', async function () {
+            if (applyBtn.disabled) {
+                return;
+            }
+
+            state.applying = true;
+            hideAlerts();
+            applyBtn.textContent = 'Применяем…';
+            updateApplyState();
+
+            try {
+                var data = await post(applyUrl);
+                successEl.textContent = 'Готово. Создано правил: ' + (data.summary.created || 0)
+                    + ', пропущено: ' + (data.summary.skipped || 0);
+                successEl.classList.remove('d-none');
+                // До перезагрузки кнопку больше не оживляем: повторный apply
+                // отчитался бы «создано 0» и сбил бы с толку.
+                state.applied = true;
+                setTimeout(function () { window.location.reload(); }, 1000);
+            } catch (e) {
+                showError(e.message);
+            } finally {
+                state.applying = false;
+                applyBtn.textContent = 'Применить базовый маппинг';
+                updateApplyState();
+            }
+        });
+    })();
+</script>

@@ -1,0 +1,7 @@
+version: 1
+marketplaces:
+  wildberries:
+    sale_mappings:
+      - amount_source: sale_realization
+        pl_code: REV_SPP_SALES
+        is_negative: false

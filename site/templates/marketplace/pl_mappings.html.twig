@@ -53,9 +53,19 @@
 
             <div class="col-md-4 text-end">
                 {% if marketplaceFilterValue != 'all' and missingAmountSources is not empty %}
-                    <span class="badge bg-yellow-lt">
+                    <span class="badge bg-yellow-lt me-2">
                         Не настроено: {{ missingAmountSources|length }}
                     </span>
+                {% endif %}
+                {% if marketplaceFilterValue != 'all' %}
+                    <button type="button"
+                            class="btn btn-outline-primary"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modal-default-sale-mapping">
+                        Настроить автоматически
+                    </button>
+                {% else %}
+                    <span class="text-muted small">Выберите маркетплейс, чтобы настроить маппинг автоматически</span>
                 {% endif %}
             </div>
         </div>
@@ -347,4 +357,8 @@
             </div>
         </div>
     </div>
+
+    {% if marketplaceFilterValue != 'all' %}
+        {% include 'marketplace/pl_mappings/_default_mapping_modal.html.twig' %}
+    {% endif %}
 {% endblock %}

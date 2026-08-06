@@ -1,0 +1,59 @@
+# Базовый маппинг продаж и возвратов → категории ОПиУ.
+#
+# Одна продажа даёт несколько строк ОПиУ: выручка без СПП, выручка с СПП и
+# себестоимость берутся из разных полей одной записи (AmountSource).
+# Активным может быть только одно правило на источник суммы, поэтому
+# автонастройка создаёт только недостающие и никогда не трогает существующие.
+#
+# is_negative инвертирует знак суммы. Источники хранят возвраты положительными
+# числами, а листья «Возвраты …(−)» и «Себестоимость возвратов» суммируются
+# родителем-SUBTOTAL напрямую — значит у всех правил возврата обязан стоять
+# is_negative: true, иначе возврат прибавится к выручке вместо вычитания.
+# Инвариант проверяется тестом DefaultMappingConfigTest::testEveryReturnRuleInvertsSign.
+#
+# sale_realization / return_realization доступны только Ozon: суммы приходят
+# из месячного отчёта реализации (AmountSource::getMarketplaceRestriction).
+version: 1
+marketplaces:
+  ozon:
+    sale_mappings:
+      - amount_source: sale_gross
+        pl_code: REV_NOT_SPP
+        is_negative: false
+      - amount_source: sale_realization
+        pl_code: REV_SPP_SALES
+        is_negative: false
+      - amount_source: sale_cost_price
+        pl_code: COGS_PRODUCT_REV
+        is_negative: false
+      - amount_source: return_gross
+        pl_code: REV_RETURNS
+        is_negative: true
+      - amount_source: return_realization
+        pl_code: REV_SPP_RETURNS
+        is_negative: true
+        description: "Возврат с СПП Ozon"
+      - amount_source: return_cost_price
+        pl_code: COGS_PRODUCT_RET
+        is_negative: true
+
+  wildberries:
+    sale_mappings:
+      - amount_source: sale_gross
+        pl_code: REV_NOT_SPP
+        is_negative: false
+      - amount_source: sale_revenue
+        pl_code: REV_SPP_SALES
+        is_negative: false
+      - amount_source: sale_cost_price
+        pl_code: COGS_PRODUCT_REV
+        is_negative: false
+      - amount_source: return_gross
+        pl_code: REV_RETURNS
+        is_negative: true
+      - amount_source: return_refund
+        pl_code: REV_SPP_RETURNS
+        is_negative: true
+      - amount_source: return_cost_price
+        pl_code: COGS_PRODUCT_RET
+        is_negative: true

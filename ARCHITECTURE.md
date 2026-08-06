@@ -237,6 +237,29 @@
 - Скоуп компании обеспечивается внутри SQL (`INSERT … SELECT … WHERE l.company_id = :companyId`), а не проверкой в PHP.
 - Кросс-модульный доступ — только через `ListingTagFacade` (см. раздел Facade). Внутри модуля Marketplace контроллеры реестра листингов ходят в репозитории напрямую.
 
+### Marketplace: базовый (автоматический) маппинг в ОПиУ
+
+Два независимых конфига в `config/marketplace/`, каждый со своим провайдером, preview- и apply-экшеном. Оба матчат категории ОПиУ по `pl_categories.code`, поэтому работают только на компании со стандартным деревом ОПиУ.
+
+| | Затраты | Продажи и возвраты |
+|---|---|---|
+| Конфиг | `default_cost_mapping.yaml` | `default_sale_mapping.yaml` |
+| Ключ правила | `cost_code` (`marketplace_cost_categories.code`) | `amount_source` (`AmountSource`) |
+| Провайдер | `DefaultCostMappingYamlProvider` | `DefaultSaleMappingYamlProvider` |
+| Preview / Apply | `PreviewDefaultCostMappingAction` / `ApplyDefaultCostMappingAction` | `PreviewDefaultSaleMappingAction` / `ApplyDefaultSaleMappingAction` |
+| Writer | `DefaultCostMappingWriter` | `DefaultSaleMappingWriter` |
+| Таблица | `marketplace_cost_pl_mappings` | `marketplace_sale_mappings` |
+| Маршруты | `/marketplace/cost-pl-mapping/default/{preview,apply}` | `/marketplace/pl-mappings/default/{preview,apply}` |
+
+Общие правила:
+
+- **Существующее правило не перезаписывается.** Затраты дополняют только пустой `pl_category_id` (`WILL_FILL_EMPTY`), продажи не трогают ничего: активное правило на источник суммы → `SKIPPED_EXISTING`.
+- Отсутствующая или не-`LEAF_INPUT` категория ОПиУ, **найденная на preview**, блокирует apply целиком (`hasBlockingIssues()`), а не пропускает строку. Если категория исчезает, меняет код или тип уже во время записи, вставка этого правила не проходит и строка отчитывается как `skipped`; остальные правила сохраняются.
+- Правила продаж пишутся одной инструкцией `INSERT … SELECT` из `pl_categories`: категория перепроверяется по компании, коду и типу внутри самой вставки, а частичный индекс `uniq_active_sale_mapping_source` не даёт появиться второму активному правилу на источник суммы.
+- Правила продаж создаются сразу активными; уникальный ключ `uniq_sale_mapping` включает `pl_category_id`, поэтому отключённое правило с той же целью занимает место — preview показывает это отдельным сообщением.
+- Знак: у всех правил с `operation_type = return` обязателен `is_negative: true` (источники отдают возвраты положительными, а родитель-`SUBTOTAL` суммирует листья напрямую). Инвариант закреплён тестом `tests/Unit/Marketplace/Config/DefaultMappingConfigTest.php`, там же гварды на неизвестные `cost_code` / `pl_code`.
+- Коды затрат WB частично динамические: `WbDeductionCalculator` слугифицирует название удержания и режет до 50 символов, поэтому помесячные удержания перечислены в конфиге по букве месяца.
+
 ### `UnitEconomyCostMapping` — поля
 
 | Поле | Тип | Описание |
@@ -1896,6 +1919,19 @@ enum OrderStatus: string
     case CANCELLED = 'cancelled';
 }
 ```
+
+### `src/Marketplace/Enum/DefaultSaleMappingPreviewStatus.php`
+```php
+enum DefaultSaleMappingPreviewStatus: string
+{
+    case WILL_CREATE = 'will_create';
+    case SKIPPED_EXISTING = 'skipped_existing';
+    case MISSING_PL_CATEGORY = 'missing_pl_category';
+    case INVALID_TARGET_CATEGORY = 'invalid_target_category';
+}
+```
+`MISSING_PL_CATEGORY` и `INVALID_TARGET_CATEGORY` блокируют применение целиком
+(`DefaultSaleMappingPreviewResult::hasBlockingIssues()`).
 
 ### `src/MarketplaceAnalytics/Enum/UnitEconomyCostType.php`
 ```php

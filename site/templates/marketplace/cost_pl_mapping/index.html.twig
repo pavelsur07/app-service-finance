@@ -253,7 +253,8 @@
                 emptyEl.classList.add('d-none');
 
                 var summary = payload.summary || {};
-                if ((payload.total || 0) === 0) {
+                var allItems = payload.items || [];
+                if (allItems.length === 0) {
                     emptyEl.classList.remove('d-none');
                     return;
                 }
@@ -269,7 +270,7 @@
                 var tabPanes = [];
 
                 Object.keys(statusLabels).forEach(function (key, i) {
-                    var items = (payload.groupedItems && payload.groupedItems[key]) ? payload.groupedItems[key] : [];
+                    var items = allItems.filter(function (item) { return item.status === key; });
                     var active = i === 0 ? 'active' : '';
                     var show = i === 0 ? 'show active' : '';
                     var rows = items.length ? items.map(function (item) {
