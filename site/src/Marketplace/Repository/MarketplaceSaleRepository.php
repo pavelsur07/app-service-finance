@@ -220,31 +220,6 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
     }
 
-    /**
-     * @param string[] $externalOrderIds
-     */
-    public function countDocumentLinkedByExternalIds(
-        Company $company,
-        MarketplaceType $marketplace,
-        array $externalOrderIds,
-    ): int {
-        if (empty($externalOrderIds)) {
-            return 0;
-        }
-
-        return (int) $this->createQueryBuilder('s')
-            ->select('COUNT(s.id)')
-            ->where('s.company = :company')
-            ->andWhere('s.marketplace = :marketplace')
-            ->andWhere('s.externalOrderId IN (:externalOrderIds)')
-            ->andWhere('s.document IS NOT NULL')
-            ->setParameter('company', $company)
-            ->setParameter('marketplace', $marketplace)
-            ->setParameter('externalOrderIds', array_values(array_unique($externalOrderIds)))
-            ->getQuery()
-            ->getSingleScalarResult();
-    }
-
     public function deleteByRawDocument(
         Company $company,
         MarketplaceType $marketplace,

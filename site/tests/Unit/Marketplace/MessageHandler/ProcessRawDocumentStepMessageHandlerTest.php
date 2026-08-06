@@ -32,7 +32,7 @@ BypassFinals::allowPaths([
 
 final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
 {
-    public function testLegacySerializedMessageWithoutForceRefreshKeepsOldBehavior(): void
+    public function testLegacySerializedCostsMessageDoesNotPretendForceRefreshWasRequested(): void
     {
         $user    = UserBuilder::aUser()->withIndex(6)->build();
         $company = CompanyBuilder::aCompany()->withIndex(6)->withOwner($user)->build();
@@ -66,13 +66,13 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
             $updater,
         );
 
-        $message = $this->legacySerializedStepMessage($doc->getId(), PipelineStep::SALES->value, $company->getId());
+        $message = $this->legacySerializedStepMessage($doc->getId(), PipelineStep::COSTS->value, $company->getId());
         self::assertFalse($message->shouldForceRefresh());
 
         $handler($message);
 
         self::assertInstanceOf(ProcessMarketplaceRawDocumentCommand::class, $captured);
-        self::assertSame(PipelineStep::SALES->value, $captured->kind);
+        self::assertSame(PipelineStep::COSTS->value, $captured->kind);
         self::assertFalse($captured->forceReprocess);
     }
 
@@ -270,7 +270,7 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
         $user = UserBuilder::aUser()->withIndex(7)->build();
         $company = CompanyBuilder::aCompany()->withIndex(7)->withOwner($user)->build();
         $doc = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)->build();
-        $conflict = new WbGeneratedRowsConflictException('13 sales rows are linked to closed documents.');
+        $conflict = new WbGeneratedRowsConflictException('13 sales rows are linked to closed documents.', linkedRows: 13);
 
         $initialRepo = $this->createMock(MarketplaceRawDocumentRepository::class);
         $initialRepo->method('find')->with($doc->getId())->willReturn($doc);
@@ -300,11 +300,12 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
 
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects(self::once())->method('warning')->with(
-            'WB raw document step conflict: linked document rows prevent refresh',
+            'WB raw document step partially reprocessed; linked rows were preserved',
             [
                 'company_id' => $company->getId(),
                 'raw_document_id' => $doc->getId(),
                 'step' => PipelineStep::SALES->value,
+                'linked_rows_preserved' => 13,
                 'reason' => $conflict->getMessage(),
             ],
         );

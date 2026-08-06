@@ -13,6 +13,7 @@ use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Exception\WbGeneratedRowsConflictException;
 use App\Marketplace\Infrastructure\Normalizer\Contract\RowClassifierInterface;
 use App\Marketplace\Infrastructure\Normalizer\RowClassifierRegistryInterface;
+use App\Marketplace\Repository\MarketplaceCostRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
@@ -39,6 +40,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
         private MarketplaceRawDocumentRepository $repository,
         private MarketplaceSaleRepository $saleRepository,
         private MarketplaceReturnRepository $returnRepository,
+        private MarketplaceCostRepository $costRepository,
         private EntityManagerInterface $entityManager,
         private MarketplaceCostCategoryResolver $costCategoryResolver,
         private Connection $connection,
@@ -98,6 +100,10 @@ final readonly class ProcessMarketplaceRawDocumentAction
         // commissions, delivery charges, and logistics services that are costs.
         // process() reads ALL operations from the raw document and handles them correctly.
         if ($command->kind === 'costs') {
+            $linkedRows = $command->forceReprocess && MarketplaceType::WILDBERRIES === $marketplace
+                ? $this->costRepository->countDocumentLinkedByRawDocument($document->getCompany(), $marketplace, $command->rawDocId)
+                : 0;
+
             // Delete existing unfiled costs before reprocessing (WB needs this;
             // Ozon's process() also does its own DELETE, the double-delete is a safe no-op).
             $this->connection->executeStatement(
@@ -110,6 +116,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
             $processor = $this->processorRegistry->get(StagingRecordType::COST, $marketplace);
             $result = $processor->process($command->companyId, $command->rawDocId);
             $this->costCategoryResolver->clearCache();
+            $this->throwWbPartialReprocessConflict($command->rawDocId, $command->kind, $linkedRows, $result);
 
             return $result;
         }
@@ -134,8 +141,9 @@ final readonly class ProcessMarketplaceRawDocumentAction
 
         $classifier = $this->classifierRegistry->get($marketplace);
 
+        $linkedRows = 0;
         if ($command->forceReprocess && $marketplace === MarketplaceType::WILDBERRIES) {
-            $this->cleanupWbOpenRowsByExternalIds(
+            $linkedRows = $this->cleanupWbOpenRowsByExternalIds(
                 company: $document->getCompany(),
                 marketplace: $marketplace,
                 kind: $command->kind,
@@ -204,6 +212,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
         }
 
         $this->costCategoryResolver->clearCache();
+        $this->throwWbPartialReprocessConflict($command->rawDocId, $command->kind, $linkedRows, $totalProcessed);
 
         return $totalProcessed;
     }
@@ -219,9 +228,9 @@ final readonly class ProcessMarketplaceRawDocumentAction
         array $rows,
         RowClassifierInterface $classifier,
         string $rawDocId,
-    ): void {
+    ): int {
         if (!in_array($kind, ['sales', 'returns'], true)) {
-            return;
+            return 0;
         }
 
         $externalIds = [];
@@ -242,34 +251,37 @@ final readonly class ProcessMarketplaceRawDocumentAction
         }
 
         $externalIds = array_values(array_unique($externalIds));
-        if ([] === $externalIds) {
-            return;
-        }
 
         if ('sales' === $kind) {
-            $linkedRows = $this->saleRepository->countDocumentLinkedByExternalIds($company, $marketplace, $externalIds);
-            if ($linkedRows > 0) {
-                throw new WbGeneratedRowsConflictException(sprintf(
-                    'Cannot force reprocess WB raw document %s: %d sales rows are linked to closed documents.',
-                    $rawDocId,
-                    $linkedRows,
-                ));
-            }
-
+            $linkedRows = $this->saleRepository->countDocumentLinkedByRawDocument($company, $marketplace, $rawDocId);
             $this->saleRepository->deleteOpenByExternalIds($company, $marketplace, $externalIds);
 
+            return $linkedRows;
+        }
+
+        $linkedRows = $this->returnRepository->countDocumentLinkedByRawDocument($company, $marketplace, $rawDocId);
+        $this->returnRepository->deleteOpenByExternalIds($company, $marketplace, $externalIds);
+
+        return $linkedRows;
+    }
+
+    private function throwWbPartialReprocessConflict(string $rawDocId, string $kind, int $linkedRows, int $processedRows): void
+    {
+        if ($linkedRows <= 0) {
             return;
         }
 
-        $linkedRows = $this->returnRepository->countDocumentLinkedByExternalIds($company, $marketplace, $externalIds);
-        if ($linkedRows > 0) {
-            throw new WbGeneratedRowsConflictException(sprintf(
-                'Cannot force reprocess WB raw document %s: %d return rows are linked to closed documents.',
-                $rawDocId,
-                $linkedRows,
-            ));
-        }
+        $rowKind = match ($kind) {
+            'sales' => 'sale',
+            'returns' => 'return',
+            'costs' => 'cost',
+            default => $kind,
+        };
 
-        $this->returnRepository->deleteOpenByExternalIds($company, $marketplace, $externalIds);
+        throw new WbGeneratedRowsConflictException(
+            sprintf('Partially reprocessed WB raw document %s: preserved %d linked %s %s.', $rawDocId, $linkedRows, $rowKind, 1 === $linkedRows ? 'row' : 'rows'),
+            linkedRows: $linkedRows,
+            processedRows: $processedRows,
+        );
     }
 }

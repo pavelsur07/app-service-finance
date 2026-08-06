@@ -13,7 +13,6 @@ use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Exception\WbGeneratedRowsConflictException;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceRawDocumentBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
@@ -51,7 +50,7 @@ final class WbFinancialReportRefreshTest extends IntegrationTestCase
         self::assertSame(0, (int) $conn->fetchOne('SELECT COUNT(*) FROM marketplace_costs WHERE raw_document_id=:id', ['id' => $rawDocId]));
     }
 
-    public function testLinkedRowsCauseConflictAndNoPartialDeletion(): void
+    public function testLinkedRowsArePreservedWhileOpenRowsAreDeletedForPartialRefresh(): void
     {
         $company = CompanyBuilder::aCompany()->build();
         $this->em->persist($company->getUser());
@@ -81,15 +80,12 @@ final class WbFinancialReportRefreshTest extends IntegrationTestCase
             $this->em->persist($e);
         } $this->em->flush();
 
-        $this->expectException(WbGeneratedRowsConflictException::class);
-        try {
-            self::getContainer()->get(WbGeneratedRowsSafeReplaceService::class)->cleanupForRawDocument($company, $rawDocId, $day);
-        } finally {
-            $conn = $this->em->getConnection();
-            self::assertSame(2, (int) $conn->fetchOne('SELECT COUNT(*) FROM marketplace_sales WHERE raw_document_id=:id', ['id' => $rawDocId]));
-            self::assertSame(2, (int) $conn->fetchOne('SELECT COUNT(*) FROM marketplace_returns WHERE raw_document_id=:id', ['id' => $rawDocId]));
-            self::assertSame(2, (int) $conn->fetchOne('SELECT COUNT(*) FROM marketplace_costs WHERE raw_document_id=:id', ['id' => $rawDocId]));
-        }
+        self::getContainer()->get(WbGeneratedRowsSafeReplaceService::class)->cleanupForRawDocument($company, $rawDocId, $day);
+
+        $conn = $this->em->getConnection();
+        self::assertSame('linked-sale', $conn->fetchOne('SELECT external_order_id FROM marketplace_sales WHERE raw_document_id=:id', ['id' => $rawDocId]));
+        self::assertSame('linked-ret', $conn->fetchOne('SELECT external_return_id FROM marketplace_returns WHERE raw_document_id=:id', ['id' => $rawDocId]));
+        self::assertSame('linked-cost', $conn->fetchOne('SELECT external_id FROM marketplace_costs WHERE raw_document_id=:id', ['id' => $rawDocId]));
     }
 
     private function buildListing(Company $company): MarketplaceListing
