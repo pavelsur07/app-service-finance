@@ -163,9 +163,6 @@ services:
     App\Ingestion\Facade\MarketplaceListingFacade:
         public: true
 
-    App\Finance\Facade\PnlFacade:
-        public: true
-
     App\Ingestion\Infrastructure\Api\Ozon\OzonCredentialProviderInterface: '@App\Ingestion\Infrastructure\Api\Ozon\CredentialFacadeOzonCredentialProvider'
     App\Ingestion\Infrastructure\Api\Ozon\OzonAccrualClientInterface: '@App\Ingestion\Infrastructure\Api\Ozon\OzonAccrualClient'
     App\Ingestion\Infrastructure\Api\Ozon\OzonPerformanceReportClientInterface: '@App\Ingestion\Infrastructure\Api\Ozon\OzonPerformanceReportClient'

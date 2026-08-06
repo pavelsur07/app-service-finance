@@ -16,15 +16,6 @@ use PHPUnit\Framework\TestCase;
  */
 final class EntityBoundaryTest extends TestCase
 {
-    /**
-     * Documented temporary exception (Variant B, see ARCHITECTURE.md): the P&L
-     * dirty-period entity physically stays in App\Ingestion while App\Finance owns
-     * the PnlFacade. Until that entity is moved, these references are tolerated.
-     *
-     * @var list<string>
-     */
-    private const ALLOWED_ENTITIES = ['PLDirtyPeriod'];
-
     public function testIngestionEntitiesAreNotReferencedFromOtherModules(): void
     {
         $violations = [];
@@ -36,10 +27,6 @@ final class EntityBoundaryTest extends TestCase
             }
 
             foreach (array_unique($matches[1]) as $entity) {
-                if (in_array($entity, self::ALLOWED_ENTITIES, true)) {
-                    continue;
-                }
-
                 $violations[] = sprintf('%s references App\\Ingestion\\Entity\\%s', $this->relative($file), $entity);
             }
         }

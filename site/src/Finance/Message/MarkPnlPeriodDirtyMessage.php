@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Finance\Message;
 
-use App\Ingestion\Enum\PLDirtyPeriodReason;
 use App\Ingestion\Message\CompanyAwareMessage;
 use Webmozart\Assert\Assert;
 
+/**
+ * @deprecated compatibility tombstone for messages queued before the Ingestion P&L projection was removed
+ */
 final readonly class MarkPnlPeriodDirtyMessage implements CompanyAwareMessage
 {
     public function __construct(
@@ -20,7 +22,6 @@ final readonly class MarkPnlPeriodDirtyMessage implements CompanyAwareMessage
         Assert::uuid($this->companyId);
         Assert::range($this->year, 2020, 2100);
         Assert::range($this->month, 1, 12);
-        PLDirtyPeriodReason::from($this->reasonValue);
     }
 
     public function getCompanyId(): string

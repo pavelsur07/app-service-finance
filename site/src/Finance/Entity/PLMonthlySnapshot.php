@@ -39,9 +39,6 @@ class PLMonthlySnapshot
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $updatedAt;
 
-    #[ORM\Column(type: 'datetime_immutable', precision: 6, nullable: true)]
-    private ?\DateTimeImmutable $rebuiltAt = null;
-
     public function __construct(string $id, Company $company, string $period, ?PLCategory $category)
     {
         Assert::uuid($id);
@@ -125,18 +122,6 @@ class PLMonthlySnapshot
     public function setUpdatedAt(\DateTimeImmutable $updatedAt): self
     {
         $this->updatedAt = $updatedAt;
-
-        return $this;
-    }
-
-    public function getRebuiltAt(): ?\DateTimeImmutable
-    {
-        return $this->rebuiltAt;
-    }
-
-    public function setRebuiltAt(\DateTimeImmutable $rebuiltAt): self
-    {
-        $this->rebuiltAt = $rebuiltAt;
 
         return $this;
     }

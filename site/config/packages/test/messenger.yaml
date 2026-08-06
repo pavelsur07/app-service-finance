@@ -11,5 +11,6 @@ framework:
         routing:
             'App\Tests\Integration\Ingestion\Fixtures\TenantVisibilityMessage': async_pipeline
             'App\Ingestion\Message\NormalizeRawRecordMessage': ingest_normalize
+            # Deprecated compatibility tombstones; handlers intentionally do nothing.
             'App\Finance\Message\MarkPnlPeriodDirtyMessage': ingest_normalize
             'App\Finance\Message\RebuildPnlPeriodMessage': pnl_rebuild
