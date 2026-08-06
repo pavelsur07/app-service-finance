@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace App\Marketplace\MessageHandler;
 
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
-use App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdaterInterface;
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
+use App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdaterInterface;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\PipelineStep;
+use App\Marketplace\Exception\WbGeneratedRowsConflictException;
 use App\Marketplace\Message\ProcessRawDocumentStepMessage;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -20,7 +21,8 @@ use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 /**
  * Выполняет один шаг обработки (sales/returns/costs) для одного RawDocument.
  * Обновляет processingStatus документа — succeeded или failed.
- * При ошибке rethrow-ит исключение чтобы Messenger сделал retry.
+ * Ожидаемый конфликт закрытого периода фиксирует и подтверждает без retry;
+ * остальные ошибки rethrow-ит, чтобы Messenger выполнил retry.
  */
 #[AsMessageHandler]
 final class ProcessRawDocumentStepMessageHandler
@@ -77,7 +79,18 @@ final class ProcessRawDocumentStepMessageHandler
             }
             $doc->markStepSucceeded($step);
         } catch (\Throwable $e) {
-            $this->recordStepFailure($message->rawDocumentId, $step, $e, $this->buildSyncStatusContext($message));
+            $failureStateRecorded = $this->recordStepFailure($message->rawDocumentId, $step, $e, $this->buildSyncStatusContext($message));
+            if ($e instanceof WbGeneratedRowsConflictException && $failureStateRecorded) {
+                $this->logger->warning('WB raw document step conflict: linked document rows prevent refresh', [
+                    'company_id' => $message->companyId,
+                    'raw_document_id' => $message->rawDocumentId,
+                    'step' => $step->value,
+                    'reason' => $e->getMessage(),
+                ]);
+
+                return;
+            }
+
             throw $e;
         }
 
@@ -118,12 +131,16 @@ final class ProcessRawDocumentStepMessageHandler
         ];
     }
 
+    /**
+     * Returns true once the failed step is flushed and status sync completes without a secondary
+     * exception. Ambiguous status resolution may still be skipped by the updater by design.
+     */
     private function recordStepFailure(
         string $rawDocumentId,
         PipelineStep $step,
         \Throwable $originalException,
         ?array $context = null,
-    ): void {
+    ): bool {
         try {
             $em = $this->entityManager;
             if (!$em->isOpen()) {
@@ -141,11 +158,12 @@ final class ProcessRawDocumentStepMessageHandler
                     'step' => $step->value,
                 ]);
 
-                return;
+                return false;
             }
 
             $doc->markStepFailed($step);
 
+            $statusSyncSucceeded = true;
             try {
                 // Failure recording may run after the original EntityManager was reset; keep this
                 // path backward-compatible for legacy messages that do not carry exact status context.
@@ -155,6 +173,7 @@ final class ProcessRawDocumentStepMessageHandler
                     $this->statusUpdater->syncByRawPipelineResult($doc, $originalException, $context);
                 }
             } catch (\Throwable $updaterException) {
+                $statusSyncSucceeded = false;
                 $this->logger->error('Failed to sync WB status after pipeline failure', [
                     'rawDocumentId' => $rawDocumentId,
                     'step' => $step->value,
@@ -164,6 +183,8 @@ final class ProcessRawDocumentStepMessageHandler
             }
 
             $em->flush();
+
+            return $statusSyncSucceeded;
         } catch (\Throwable $secondary) {
             // Не маскируем оригинальное исключение — только логируем secondary.
             $this->logger->error('Failed to record step failure status', [
@@ -173,7 +194,7 @@ final class ProcessRawDocumentStepMessageHandler
                 'secondaryException' => $secondary->getMessage(),
             ]);
 
-            return;
+            return false;
         }
     }
 }

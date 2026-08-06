@@ -10,6 +10,8 @@ use App\Marketplace\Entity\MarketplaceFinancialReportSyncStatus;
 use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\PipelineStep;
+use App\Marketplace\Exception\WbGeneratedRowsConflictException;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncErrorRepository;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusRepository;
 use App\Tests\Support\Kernel\IntegrationTestCase;
@@ -212,7 +214,7 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
             MarketplaceType::WILDBERRIES,
             'sales_report',
         );
-        $raw->markStepFailed(\App\Marketplace\Enum\PipelineStep::SALES);
+        $raw->markStepFailed(PipelineStep::SALES);
 
         $this->updater->syncByRawPipelineResult($raw, new \RuntimeException('pipeline exploded'));
         $this->em->flush();
@@ -224,6 +226,52 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
 
         $errors = $this->errorRepository->findBy(['syncStatusId' => $persisted->getId()]);
         self::assertNotEmpty($errors);
+    }
+
+    public function testSyncByRawPipelineResultPreservesConflictAfterSiblingStepSucceeds(): void
+    {
+        $status = $this->startLoadingStatus();
+        $this->updater->markRawLoaded($status, $this->rawId(), 1, 'h');
+        $this->updater->markProcessing($status);
+        $this->em->flush();
+
+        $company = $this->em->getReference(\App\Company\Entity\Company::class, $this->companyId());
+        $raw = new \App\Marketplace\Entity\MarketplaceRawDocument(
+            $this->rawId(),
+            $company,
+            MarketplaceType::WILDBERRIES,
+            'sales_report',
+        );
+        $raw->markStepFailed(PipelineStep::SALES);
+
+        $conflict = new WbGeneratedRowsConflictException('linked rows prevent refresh');
+        $this->updater->syncByRawPipelineResult($raw, $conflict);
+        $this->em->flush();
+
+        $raw->markStepSucceeded(PipelineStep::RETURNS);
+        $this->updater->syncByRawPipelineResult($raw);
+        $this->em->flush();
+        $this->em->clear();
+
+        $persisted = $this->findStatus();
+        self::assertNotNull($persisted);
+        self::assertSame(FinancialReportSyncStatus::CONFLICT, $persisted->getStatus());
+        self::assertSame(WbGeneratedRowsConflictException::class, $persisted->getLastErrorClass());
+
+        $errors = $this->errorRepository->findBy(['syncStatusId' => $persisted->getId()]);
+        self::assertCount(1, $errors);
+
+        $this->updater->syncByRawPipelineResult($raw, new \RuntimeException('later technical failure'));
+        $this->em->flush();
+        $this->em->clear();
+
+        $persisted = $this->findStatus();
+        self::assertNotNull($persisted);
+        self::assertSame(FinancialReportSyncStatus::FAILED_FINAL, $persisted->getStatus());
+        self::assertSame(\RuntimeException::class, $persisted->getLastErrorClass());
+
+        $errors = $this->errorRepository->findBy(['syncStatusId' => $persisted->getId()]);
+        self::assertCount(2, $errors);
     }
 
     public function testSyncByRawPipelineResultSkipsNonWbOrNonSalesReport(): void
