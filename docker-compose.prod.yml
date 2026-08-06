@@ -101,7 +101,7 @@ services:
             - traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true
 
     land:
-        image: ghcr.io/pavelsur07/land-nginx:latest
+        image: ghcr.io/pavelsur07/land-nginx:${IMAGE_TAG:-latest}
         container_name: land-nginx
         restart: always
         logging: *default-logging
@@ -133,7 +133,7 @@ services:
             - traefik.docker.network=traefik-public
 
     site:
-        image: ghcr.io/pavelsur07/site-nginx:latest
+        image: ghcr.io/pavelsur07/site-nginx:${IMAGE_TAG:-latest}
         container_name: site-nginx
         restart: always
         logging: *default-logging
@@ -171,7 +171,7 @@ services:
             - site_storage:/app/var/storage
 
     site-php-fpm:
-        image: ghcr.io/pavelsur07/site-php-fpm:latest
+        image: ghcr.io/pavelsur07/site-php-fpm:${IMAGE_TAG:-latest}
         container_name: site-php-fpm
         restart: always
         logging: *default-logging
@@ -207,7 +207,7 @@ services:
                     memory: 128M
 
     site-php-cli:
-        image: ghcr.io/pavelsur07/site-php-cli:latest
+        image: ghcr.io/pavelsur07/site-php-cli:${IMAGE_TAG:-latest}
         container_name: site-php-cli
         logging: *default-logging
         environment:
@@ -225,7 +225,7 @@ services:
             - site_var_log:/app/var/log
 
     site-messenger-worker-sync:
-        image: ghcr.io/pavelsur07/site-php-cli:latest
+        image: ghcr.io/pavelsur07/site-php-cli:${IMAGE_TAG:-latest}
         container_name: site-messenger-worker-sync
         restart: always
         logging: *default-logging
@@ -258,7 +258,7 @@ services:
                     memory: 64M
 
     site-messenger-worker-pipeline:
-        image: ghcr.io/pavelsur07/site-php-cli:latest
+        image: ghcr.io/pavelsur07/site-php-cli:${IMAGE_TAG:-latest}
         container_name: site-messenger-worker-pipeline
         restart: always
         logging: *default-logging
@@ -291,7 +291,7 @@ services:
                     memory: 192M
 
     site-messenger-worker-wb-finance:
-        image: ghcr.io/pavelsur07/site-php-cli:latest
+        image: ghcr.io/pavelsur07/site-php-cli:${IMAGE_TAG:-latest}
         container_name: site-messenger-worker-wb-finance
         restart: always
         logging: *default-logging
@@ -324,7 +324,7 @@ services:
                     memory: 64M
 
     site-messenger-worker-ads:
-        image: ghcr.io/pavelsur07/site-php-cli:latest
+        image: ghcr.io/pavelsur07/site-php-cli:${IMAGE_TAG:-latest}
         container_name: site-messenger-worker-ads
         restart: always
         logging: *default-logging
@@ -408,7 +408,7 @@ services:
             start_period: 5s
 
     scheduler:
-        image: ghcr.io/pavelsur07/site-php-cli:latest
+        image: ghcr.io/pavelsur07/site-php-cli:${IMAGE_TAG:-latest}
         container_name: scheduler
         logging: *default-logging
         user: root

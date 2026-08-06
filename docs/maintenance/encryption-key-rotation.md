@@ -42,7 +42,8 @@ openssl rand -base64 32
 
 ### 3. Деплой
 
-Любой push в master (или re-run последнего deploy workflow). После деплоя:
+Вручную запустить workflow `🚀 Deploy to Production` с action `deploy` на
+текущем `master`. Обычный push и re-run CI production не меняют. После деплоя:
 - старые строки (`v1`) читаются через карту — ничего не ломается;
 - новые/изменённые подключения шифруются уже `v2`.
 
