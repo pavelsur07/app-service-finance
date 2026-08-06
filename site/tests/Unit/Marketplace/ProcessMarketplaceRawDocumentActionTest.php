@@ -4,18 +4,20 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Marketplace;
 
+use App\Company\Entity\Company;
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorInterface;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistryInterface;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
-use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
+use App\Marketplace\Exception\WbGeneratedRowsConflictException;
 use App\Marketplace\Infrastructure\Normalizer\Contract\RowClassifierInterface;
 use App\Marketplace\Infrastructure\Normalizer\RowClassifierRegistryInterface;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
+use App\Marketplace\Repository\MarketplaceCostRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
@@ -45,6 +47,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $repository,
             $this->createMock(\App\Marketplace\Repository\MarketplaceSaleRepository::class),
             $this->createMock(\App\Marketplace\Repository\MarketplaceReturnRepository::class),
+            $this->createMock(MarketplaceCostRepository::class),
             $this->createMock(EntityManagerInterface::class),
             $this->createCostCategoryResolver(),
             $this->createMock(Connection::class),
@@ -80,6 +83,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $repository,
             $this->createMock(\App\Marketplace\Repository\MarketplaceSaleRepository::class),
             $this->createMock(\App\Marketplace\Repository\MarketplaceReturnRepository::class),
+            $this->createMock(MarketplaceCostRepository::class),
             $this->createMock(EntityManagerInterface::class),
             $this->createCostCategoryResolver(),
             $this->createMock(Connection::class),
@@ -92,11 +96,11 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $action(new ProcessMarketplaceRawDocumentCommand('company-1', 'doc-1', 'unknown'));
     }
 
-    public function testCostsKindUsesProcessDirectly(): void
+    public function testOrdinaryWbCostsUseProcessDirectlyWithoutReportingForceConflict(): void
     {
         $document = $this->createMock(MarketplaceRawDocument::class);
         $document->method('getRawData')->willReturn([['x' => 1]]);
-        $document->method('getMarketplace')->willReturn(MarketplaceType::OZON);
+        $document->method('getMarketplace')->willReturn(MarketplaceType::WILDBERRIES);
         $company = $this->createMock(Company::class);
         $company->method('getId')->willReturn('company-1');
         $document->method('getCompany')->willReturn($company);
@@ -118,8 +122,11 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $processorRegistry
             ->expects(self::once())
             ->method('get')
-            ->with(StagingRecordType::COST, MarketplaceType::OZON)
+            ->with(StagingRecordType::COST, MarketplaceType::WILDBERRIES)
             ->willReturn($processor);
+
+        $costRepository = $this->createMock(MarketplaceCostRepository::class);
+        $costRepository->expects(self::never())->method('countDocumentLinkedByRawDocument');
 
         $action = new ProcessMarketplaceRawDocumentAction(
             $this->createMock(RowClassifierRegistryInterface::class),
@@ -127,6 +134,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $repository,
             $this->createMock(\App\Marketplace\Repository\MarketplaceSaleRepository::class),
             $this->createMock(\App\Marketplace\Repository\MarketplaceReturnRepository::class),
+            $costRepository,
             $this->createMock(EntityManagerInterface::class),
             $this->createCostCategoryResolver(),
             $this->createMock(Connection::class),
@@ -174,6 +182,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $repository,
             $saleRepository,
             $returnRepository,
+            $this->createMock(MarketplaceCostRepository::class),
             $this->createMock(EntityManagerInterface::class),
             $this->createCostCategoryResolver(),
             $this->createMock(Connection::class),
@@ -219,6 +228,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $repository,
             $saleRepository,
             $returnRepository,
+            $this->createMock(MarketplaceCostRepository::class),
             $this->createMock(EntityManagerInterface::class),
             $this->createCostCategoryResolver(),
             $this->createMock(Connection::class),
@@ -226,6 +236,57 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         );
 
         $action(new ProcessMarketplaceRawDocumentCommand('company-1', 'doc-2', 'returns', true));
+    }
+
+    public function testWbCostsAreProcessedBeforeLinkedRowsAreReportedAsPartialConflict(): void
+    {
+        $document = $this->createMock(MarketplaceRawDocument::class);
+        $document->method('getMarketplace')->willReturn(MarketplaceType::WILDBERRIES);
+        $company = $this->createMock(Company::class);
+        $company->method('getId')->willReturn('company-1');
+        $document->method('getCompany')->willReturn($company);
+
+        $repository = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $repository->method('find')->willReturn($document);
+
+        $processor = $this->createMock(MarketplaceRawProcessorInterface::class);
+        $processor->expects(self::once())->method('process')->with('company-1', 'doc-costs')->willReturn(7);
+        $processorRegistry = $this->createMock(MarketplaceRawProcessorRegistryInterface::class);
+        $processorRegistry->expects(self::once())->method('get')->with(StagingRecordType::COST, MarketplaceType::WILDBERRIES)->willReturn($processor);
+
+        $costRepository = $this->createMock(MarketplaceCostRepository::class);
+        $costRepository->expects(self::once())
+            ->method('countDocumentLinkedByRawDocument')
+            ->with($company, MarketplaceType::WILDBERRIES, 'doc-costs')
+            ->willReturn(2);
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::once())->method('executeStatement');
+
+        $logger = $this->createMock(AppLogger::class);
+        $logger->expects(self::never())->method('warning');
+
+        $action = new ProcessMarketplaceRawDocumentAction(
+            $this->createMock(RowClassifierRegistryInterface::class),
+            $processorRegistry,
+            $repository,
+            $this->createMock(MarketplaceSaleRepository::class),
+            $this->createMock(MarketplaceReturnRepository::class),
+            $costRepository,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createCostCategoryResolver(),
+            $connection,
+            $logger,
+        );
+
+        try {
+            $action(new ProcessMarketplaceRawDocumentCommand('company-1', 'doc-costs', 'costs', true));
+            self::fail('A forced partial WB costs reprocess must remain visible as a conflict.');
+        } catch (WbGeneratedRowsConflictException $e) {
+            self::assertSame('Partially reprocessed WB raw document doc-costs: preserved 2 linked cost rows.', $e->getMessage());
+            self::assertSame(2, $e->getLinkedRows());
+            self::assertSame(7, $e->getProcessedRows());
+        }
     }
 
     public function testForceReprocessOzonDoesNotCallWbDeleteByRawDocument(): void
@@ -262,6 +323,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $repository,
             $saleRepository,
             $returnRepository,
+            $this->createMock(MarketplaceCostRepository::class),
             $this->createMock(EntityManagerInterface::class),
             $this->createCostCategoryResolver(),
             $this->createMock(Connection::class),

@@ -2446,7 +2446,7 @@ Payload (только scalar):
 - `FAILED` — retryable-ошибка; день может попасть в missing/retry-due планирование.
 - `FAILED_FINAL` — unrecoverable processing/API ошибка.
 - `AUTH_FAILED` — ошибка авторизации WB API.
-- `CONFLICT` — refresh/reprocess невозможен из-за in-flight raw или linked generated rows.
+- `CONFLICT` — terminal-результат: in-flight raw блокирует запуск либо linked generated rows сохранены, а доступная часть raw-документа переобработана.
 
 ### Modes
 
@@ -2460,8 +2460,10 @@ Payload (только scalar):
 
 - `forceRefresh=true` передаётся в `ProcessDayReportMessage`.
 - Перед reprocess WB `sales_report` удаляются только generated rows без связанного `document`.
-- Если `sales/returns/costs` rows связаны с закрытым `document`, статус дня переводится в `CONFLICT`.
-- Linked rows не удаляются; автоматический retry для такого дня не требуется.
+- Связанные с `document` rows текущего raw-документа сохраняются, а его незакреплённые generated rows пересоздаются.
+- Частичная переобработка завершается статусом `CONFLICT`; сообщение и warning содержат количество сохранённых linked rows текущего raw-документа.
+- Linked row чужого raw-документа с тем же external ID сохраняется и не создаёт конфликт для текущего raw-документа.
+- Автоматические режимы не планируют `CONFLICT` повторно; переобработка такого дня доступна только через ручной force-refresh.
 
 ### Planner rules
 

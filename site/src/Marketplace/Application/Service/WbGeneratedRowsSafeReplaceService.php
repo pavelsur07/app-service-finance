@@ -6,7 +6,6 @@ namespace App\Marketplace\Application\Service;
 
 use App\Company\Entity\Company;
 use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Exception\WbGeneratedRowsConflictException;
 use App\Marketplace\Repository\MarketplaceCostRepository;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
@@ -29,7 +28,7 @@ final readonly class WbGeneratedRowsSafeReplaceService implements WbGeneratedRow
         $lockedCosts = $this->costRepository->countDocumentLinkedByRawDocument($company, MarketplaceType::WILDBERRIES, $rawDocumentId);
 
         if (($lockedSales + $lockedReturns + $lockedCosts) > 0) {
-            $this->logger->warning('WB refresh conflict: generated rows are linked to closed documents', [
+            $this->logger->warning('WB partial refresh: linked generated rows will be preserved', [
                 'raw_document_id' => $rawDocumentId,
                 'company_id' => $company->getId(),
                 'business_date' => $businessDate->format('Y-m-d'),
@@ -37,8 +36,6 @@ final readonly class WbGeneratedRowsSafeReplaceService implements WbGeneratedRow
                 'locked_returns' => $lockedReturns,
                 'locked_costs' => $lockedCosts,
             ]);
-
-            throw new WbGeneratedRowsConflictException(sprintf('Cannot reprocess WB raw document %s: generated rows linked to closed documents.', $rawDocumentId));
         }
 
         $this->saleRepository->deleteByRawDocument($company, MarketplaceType::WILDBERRIES, $rawDocumentId);

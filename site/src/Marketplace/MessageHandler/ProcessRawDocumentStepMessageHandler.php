@@ -57,7 +57,7 @@ final class ProcessRawDocumentStepMessageHandler
             companyId:      $message->companyId,
             rawDocId:       $message->rawDocumentId,
             kind:           $message->step,
-            forceReprocess: $message->shouldForceRefresh() || $message->step === PipelineStep::COSTS->value,
+            forceReprocess: $message->shouldForceRefresh(),
         );
 
         $step = PipelineStep::tryFrom($message->step);
@@ -81,10 +81,11 @@ final class ProcessRawDocumentStepMessageHandler
         } catch (\Throwable $e) {
             $failureStateRecorded = $this->recordStepFailure($message->rawDocumentId, $step, $e, $this->buildSyncStatusContext($message));
             if ($e instanceof WbGeneratedRowsConflictException && $failureStateRecorded) {
-                $this->logger->warning('WB raw document step conflict: linked document rows prevent refresh', [
+                $this->logger->warning('WB raw document step partially reprocessed; linked rows were preserved', [
                     'company_id' => $message->companyId,
                     'raw_document_id' => $message->rawDocumentId,
                     'step' => $step->value,
+                    'linked_rows_preserved' => $e->getLinkedRows(),
                     'reason' => $e->getMessage(),
                 ]);
 

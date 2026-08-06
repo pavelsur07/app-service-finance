@@ -6,8 +6,7 @@ namespace App\Marketplace\Application;
 
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Infrastructure\Query\MarkProcessedQuery;
-use App\Marketplace\Repository\MarketplaceOzonRealizationRepository;
+use App\Marketplace\Exception\WbGeneratedRowsConflictException;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Psr\Log\LoggerInterface;
 
@@ -33,7 +32,7 @@ use Psr\Log\LoggerInterface;
  * это задача ReopenMonthStageAction при переоткрытии месяца.
  * Команда только переобрабатывает сырые данные.
  *
- * @return array{docs: int, sales: int, returns: int, costs: int, realization: int}
+ * @return array{docs: int, sales: int, returns: int, costs: int, realization: int, conflicts: int, linked_rows_preserved: int}
  */
 final class ReprocessMarketplacePeriodAction
 {
@@ -46,7 +45,7 @@ final class ReprocessMarketplacePeriodAction
     }
 
     /**
-     * @return array{docs: int, sales: int, returns: int, costs: int, realization: int}
+     * @return array{docs: int, sales: int, returns: int, costs: int, realization: int, conflicts: int, linked_rows_preserved: int}
      */
     public function __invoke(
         string $companyId,
@@ -72,7 +71,7 @@ final class ReprocessMarketplacePeriodAction
             $documentType,
         );
 
-        $stats = ['docs' => 0, 'sales' => 0, 'returns' => 0, 'costs' => 0, 'realization' => 0];
+        $stats = ['docs' => 0, 'sales' => 0, 'returns' => 0, 'costs' => 0, 'realization' => 0, 'conflicts' => 0, 'linked_rows_preserved' => 0];
 
         foreach ($rawDocs as $doc) {
             $docId   = $doc->getId();
@@ -88,16 +87,31 @@ final class ReprocessMarketplacePeriodAction
                 $result = ($this->processRealizationAction)($companyId, $docId);
                 $stats['realization'] += $result['created'] + $result['updated'];
             } elseif ($docType === 'sales_report') {
-                $forceGeneratedRowsReplace = $marketplaceEnum === MarketplaceType::WILDBERRIES;
+                $forceGeneratedRowsReplace = MarketplaceType::WILDBERRIES === $marketplaceEnum;
 
-                $cmd = new ProcessMarketplaceRawDocumentCommand($companyId, $docId, 'sales', forceReprocess: $forceGeneratedRowsReplace);
-                $stats['sales'] += ($this->processRawAction)($cmd);
+                foreach (['sales', 'returns', 'costs'] as $kind) {
+                    $cmd = new ProcessMarketplaceRawDocumentCommand(
+                        $companyId,
+                        $docId,
+                        $kind,
+                        forceReprocess: $forceGeneratedRowsReplace || 'costs' === $kind,
+                    );
 
-                $cmd = new ProcessMarketplaceRawDocumentCommand($companyId, $docId, 'returns', forceReprocess: $forceGeneratedRowsReplace);
-                $stats['returns'] += ($this->processRawAction)($cmd);
+                    try {
+                        $stats[$kind] += ($this->processRawAction)($cmd);
+                    } catch (WbGeneratedRowsConflictException $e) {
+                        $stats[$kind] += $e->getProcessedRows();
+                        ++$stats['conflicts'];
+                        $stats['linked_rows_preserved'] += $e->getLinkedRows();
 
-                $cmd = new ProcessMarketplaceRawDocumentCommand($companyId, $docId, 'costs', forceReprocess: true);
-                $stats['costs'] += ($this->processRawAction)($cmd);
+                        $this->logger->warning('[Reprocess] WB raw document was partially reprocessed', [
+                            'doc_id' => $docId,
+                            'step' => $kind,
+                            'linked_rows_preserved' => $e->getLinkedRows(),
+                            'reason' => $e->getMessage(),
+                        ]);
+                    }
+                }
             }
 
             $stats['docs']++;

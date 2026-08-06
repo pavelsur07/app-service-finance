@@ -602,14 +602,24 @@ class MarketplaceController extends AbstractController
                 type:        $type,
             );
 
-            $this->addFlash('success', sprintf(
+            $message = sprintf(
                 'Переобработка завершена: документов %d, продажи %d, возвраты %d, затраты %d, реализация %d.',
                 $result['docs'],
                 $result['sales'],
                 $result['returns'],
                 $result['costs'],
                 $result['realization'],
-            ));
+            );
+
+            if ($result['conflicts'] > 0) {
+                $message .= sprintf(
+                    ' Частично обработано шагов: %d; сохранено связанных с документом строк: %d.',
+                    $result['conflicts'],
+                    $result['linked_rows_preserved'],
+                );
+            }
+
+            $this->addFlash($result['conflicts'] > 0 ? 'warning' : 'success', $message);
         } catch (\Exception $e) {
             // Переобработка идёт через тот же ProcessOzonRealizationAction,
             // поэтому падает так же и так же молча — логируем наравне.

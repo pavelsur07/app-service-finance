@@ -131,6 +131,16 @@ final class ReprocessMarketplaceCommand extends Command
         if ($result['costs'] > 0)       { $io->text(sprintf('  Затраты:    %d', $result['costs'])); }
         if ($result['realization'] > 0) { $io->text(sprintf('  Реализация: %d строк', $result['realization'])); }
 
+        if ($result['conflicts'] > 0) {
+            $io->warning(sprintf(
+                'Частично обработано шагов: %d; сохранено связанных с документом строк: %d.',
+                $result['conflicts'],
+                $result['linked_rows_preserved'],
+            ));
+
+            return Command::SUCCESS;
+        }
+
         $io->success('Переобработка завершена.');
 
         return Command::SUCCESS;
