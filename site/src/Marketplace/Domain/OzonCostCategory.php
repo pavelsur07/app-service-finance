@@ -269,6 +269,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Услуги доставки и FBO',
                 xlsxGroup: 'Услуги FBO',
                 serviceNames: ['OperationMarketplaceServiceSupplyInboundCargoSurplus'],
+                operationTypes: ['OperationMarketplaceServiceSupplyInboundSupplySurplus'],
             ),
             new self(
                 code: 'ozon_storage',
@@ -358,6 +359,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Услуги партнёров',
                 xlsxGroup: 'Услуги FBO',
                 serviceNames: ['MarketplaceServiceItemPackageRedistribution'],
+                operationTypes: ['OperationMarketplacePackageRedistribution'],
             ),
             new self(
                 code: 'ozon_dropoff_apvz',
@@ -398,6 +400,7 @@ final readonly class OzonCostCategory
                 xlsxGroup: 'Продвижение и реклама',
                 serviceNames: ['MarketplaceServicePremiumPromotion'],
                 operationTypes: [
+                    'OperationSubscriptionPremium',
                     'OperationSubscriptionPremiumPlus',
                     'Подписка Premium Plus',
                 ],
@@ -421,6 +424,7 @@ final readonly class OzonCostCategory
                 serviceNames: [
                     'MarketplaceSaleReviewsItem',
                     'OperationMarketplaceAcceleratedProductReviews',
+                    'MarketplaceServiceItemProductReviewsManagementSubscription',
                 ],
                 operationTypes: [
                     'OperationPointsForReviews',
@@ -432,7 +436,11 @@ final readonly class OzonCostCategory
                 name: 'Закрепление отзыва Ozon',
                 widgetGroup: 'Продвижение и реклама',
                 xlsxGroup: 'Продвижение и реклама',
-                operationTypes: ['OperationMarketplaceItemPinReview'],
+                // Ozon отдаёт обе формы написания одного типа; точный matcher должен знать обе.
+                operationTypes: [
+                    'OperationMarketplaceItemPinReview',
+                    'OperationMarketPlaceItemPinReview',
+                ],
             ),
             new self(
                 code: 'ozon_seller_bonus',
@@ -483,6 +491,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Услуги FBO',
                 serviceNames: ['MarketplaceServiceItemPackageMaterialsProvision'],
+                operationTypes: ['OperationMarketplacePackageMaterialsProvision'],
             ),
             new self(
                 code: 'ozon_additional_packaging_warehouse',
@@ -540,6 +549,20 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Другие услуги и штрафы',
                 operationTypes: ['OperationLabelOriginal'],
+            ),
+            new self(
+                code: 'ozon_brand_verified',
+                name: 'Бейдж «Бренд проверен» Ozon',
+                widgetGroup: 'Другие услуги и штрафы',
+                xlsxGroup: 'Другие услуги и штрафы',
+                operationTypes: ['OperationLabelBrandVerified'],
+            ),
+            new self(
+                code: 'ozon_stock_insurance',
+                name: 'Страхование товара Ozon',
+                widgetGroup: 'Другие услуги и штрафы',
+                xlsxGroup: 'Другие услуги и штрафы',
+                serviceNames: ['InsuranceServiceSellerItem'],
             ),
             new self(
                 code: 'ozon_charity',

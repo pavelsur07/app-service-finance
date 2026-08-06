@@ -170,6 +170,14 @@ final class OzonServiceCategoryMapTest extends TestCase
         $logger = new WarningCapturingLogger();
 
         $cases = [
+            'MarketplaceServiceItemProductReviewsManagementSubscription' => 'ozon_reviews',
+            'InsuranceServiceSellerItem' => 'ozon_stock_insurance',
+            'OperationLabelBrandVerified' => 'ozon_brand_verified',
+            'OperationSubscriptionPremium' => 'ozon_premium_promotion',
+            'OperationMarketplaceServiceSupplyInboundSupplySurplus' => 'ozon_supply_surplus',
+            'OperationMarketplacePackageRedistribution' => 'ozon_package_labor',
+            'OperationMarketplacePackageMaterialsProvision' => 'ozon_package_materials',
+            'OperationMarketPlaceItemPinReview' => 'ozon_pin_review',
             'OperationMarketplaceSendingPushNotifications' => 'ozon_sending_push_notifications',
             'OperationLabelOriginal' => 'ozon_original_label',
             'OperationMarketplaceServicePartialCompensationToClient' => 'ozon_partial_compensation_to_client',

@@ -285,6 +285,11 @@ marketplaces:
         include_in_pl: true
         confidence: low
         note: "Гипотеза: компенсация клиенту отнесена к удержаниям маркетплейса"
+      - cost_code: ozon_stock_insurance
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: medium
+        note: "Страхование товара от массовых повреждений — удержание маркетплейса"
 
       # ── Внутреннее продвижение ───────────────────────────────────────────
       - cost_code: ozon_cpc
@@ -331,6 +336,11 @@ marketplaces:
         pl_code: OVERHEAD_PROD_CERT
         include_in_pl: true
         note: "Обязательная маркировка — Честный знак"
+      - cost_code: ozon_brand_verified
+        pl_code: OVERHEAD_PROD_CERT
+        include_in_pl: true
+        confidence: medium
+        note: "Платная проверка бренда и выдача бейджа"
       - cost_code: ozon_early_payment
         pl_code: OVERHEAD_ADMIN_BANK
         include_in_pl: true

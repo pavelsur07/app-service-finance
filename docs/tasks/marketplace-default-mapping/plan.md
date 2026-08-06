@@ -178,6 +178,35 @@ App\Marketplace\Infrastructure\Provider\DefaultSaleMappingYamlProvider:
 - Префиксные правила (`cost_code_prefix`) в движке затрат — не нужны, раз помесячные коды перечисляются явно.
 - Рефакторинг затратной модалки под общий скрипт.
 
+## Stage 3: актуальные PROD-типы Ozon перестают попадать в `ozon_other_service`
+
+Risk: HIGH-LOCAL
+owner_gate: yes
+release_candidate: yes
+independently_deployable: yes
+stage_base_commit: `5b77b5bb`
+
+Definition of Done:
+- восемь точных идентификаторов Ozon из read-only PROD-аудита разрешаются без warning и без fallback `ozon_other_service`;
+- шесть вариантов используют существующие канонические категории, страхование получает совместимый с Ingestion код `ozon_stock_insurance`, бейдж — отдельный код `ozon_brand_verified`;
+- новые канонические категории входят в базовый YAML: страхование → `OPEX_WH_MP_DEDUCTIONS`, «Бренд проверен» → `OVERHEAD_PROD_CERT`;
+- каталог и YAML остаются взаимно полными, повторная обработка PROD и другие production mutation не выполняются.
+
+Work items:
+- 3.1 — добавить точные алиасы и две недостающие категории в `OzonCostCategory`, поднять версию словаря.
+- 3.2 — добавить два правила базового маппинга и regression-тесты на все восемь PROD-идентификаторов.
+- 3.3 — выполнить проверки, внутренний и внешний review, обновить отчёт и Draft PR.
+
+Stage checks:
+- targeted PHPUnit для `OzonCostCategory`, `OzonServiceCategoryMap` и `DefaultMappingConfig`;
+- полный `make site-test-unit` и релевантная проверка стиля;
+- read-only сравнение каталога и YAML.
+
+Reviewer focus:
+- точность привязки алиасов, отсутствие fallback и дублей;
+- финансовая классификация двух новых категорий и полнота YAML;
+- отсутствие PROD-записи или скрытого исторического reprocess.
+
 ## Проверка
 
 1. `make site-test-unit` — провайдеры и конфиг-гварды.
