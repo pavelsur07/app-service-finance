@@ -611,15 +611,15 @@ class MarketplaceController extends AbstractController
                 $result['realization'],
             );
 
-            if ($result['conflicts'] > 0) {
+            if ($result['partial_steps'] > 0) {
                 $message .= sprintf(
                     ' Частично обработано шагов: %d; сохранено связанных с документом строк: %d.',
-                    $result['conflicts'],
+                    $result['partial_steps'],
                     $result['linked_rows_preserved'],
                 );
             }
 
-            $this->addFlash($result['conflicts'] > 0 ? 'warning' : 'success', $message);
+            $this->addFlash($result['partial_steps'] > 0 ? 'warning' : 'success', $message);
         } catch (\Exception $e) {
             // Переобработка идёт через тот же ProcessOzonRealizationAction,
             // поэтому падает так же и так же молча — логируем наравне.

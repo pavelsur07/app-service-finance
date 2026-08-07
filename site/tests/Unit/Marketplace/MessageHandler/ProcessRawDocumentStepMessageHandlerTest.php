@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Marketplace\MessageHandler;
 
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
+use App\Marketplace\Application\DTO\ProcessRawDocumentResult;
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
 use App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdaterInterface;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\PipelineStep;
-use App\Marketplace\Exception\WbGeneratedRowsConflictException;
 use App\Marketplace\Message\ProcessRawDocumentStepMessage;
 use App\Marketplace\MessageHandler\ProcessRawDocumentStepMessageHandler;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
@@ -45,10 +45,10 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
         $processAction = $this->createMock(ProcessMarketplaceRawDocumentAction::class);
         $processAction->expects(self::once())
             ->method('__invoke')
-            ->willReturnCallback(static function (ProcessMarketplaceRawDocumentCommand $command) use (&$captured): int {
+            ->willReturnCallback(static function (ProcessMarketplaceRawDocumentCommand $command) use (&$captured): ProcessRawDocumentResult {
                 $captured = $command;
 
-                return 1;
+                return new ProcessRawDocumentResult(1);
             });
 
         $em = $this->createMock(EntityManagerInterface::class);
@@ -89,10 +89,10 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
         $processAction = $this->createMock(ProcessMarketplaceRawDocumentAction::class);
         $processAction->expects(self::exactly(count(PipelineStep::cases())))
             ->method('__invoke')
-            ->willReturnCallback(static function (ProcessMarketplaceRawDocumentCommand $command) use (&$forceByStep): int {
+            ->willReturnCallback(static function (ProcessMarketplaceRawDocumentCommand $command) use (&$forceByStep): ProcessRawDocumentResult {
                 $forceByStep[$command->kind] = $command->forceReprocess;
 
-                return 1;
+                return new ProcessRawDocumentResult(1);
             });
 
         $em = $this->createMock(EntityManagerInterface::class);
@@ -265,29 +265,28 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
         $handler($message);
     }
 
-    public function testHandlerAcknowledgesRecordedGeneratedRowsConflict(): void
+    /**
+     * Регрессия: частичная переобработка (сохранены linked rows закрытого документа)
+     * раньше писалась в failed_steps и делала день недостижимо красным.
+     * Теперь это успех шага с warning-логом.
+     */
+    public function testPartialReprocessMarksStepSucceededAndLogsPreservedRows(): void
     {
         $user = UserBuilder::aUser()->withIndex(7)->build();
         $company = CompanyBuilder::aCompany()->withIndex(7)->withOwner($user)->build();
         $doc = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)->build();
-        $conflict = new WbGeneratedRowsConflictException('13 sales rows are linked to closed documents.', linkedRows: 13);
 
-        $initialRepo = $this->createMock(MarketplaceRawDocumentRepository::class);
-        $initialRepo->method('find')->with($doc->getId())->willReturn($doc);
+        $repo = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $repo->method('find')->with($doc->getId())->willReturn($doc);
 
         $processAction = $this->createMock(ProcessMarketplaceRawDocumentAction::class);
-        $processAction->method('__invoke')->willThrowException($conflict);
-
-        $freshRepo = $this->createMock(EntityRepository::class);
-        $freshRepo->expects(self::once())->method('find')->with($doc->getId())->willReturn($doc);
+        $processAction->method('__invoke')->willReturn(new ProcessRawDocumentResult(42, 13));
 
         $em = $this->createMock(EntityManagerInterface::class);
-        $em->method('isOpen')->willReturn(true);
-        $em->method('getRepository')->with(MarketplaceRawDocument::class)->willReturn($freshRepo);
         $em->expects(self::once())->method('flush');
 
         $updater = $this->createMock(WbFinancialReportSyncStatusUpdaterInterface::class);
-        $updater->expects(self::once())->method('syncByRawPipelineResult')->with($doc, $conflict, [
+        $updater->expects(self::once())->method('syncByRawPipelineResult')->with($doc, null, [
             'sync_status_id' => '00000000-0000-0000-0000-000000000710',
             'company_id' => $company->getId(),
             'connection_id' => '00000000-0000-0000-0000-000000000711',
@@ -306,12 +305,11 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
                 'raw_document_id' => $doc->getId(),
                 'step' => PipelineStep::SALES->value,
                 'linked_rows_preserved' => 13,
-                'reason' => $conflict->getMessage(),
             ],
         );
 
         $handler = new ProcessRawDocumentStepMessageHandler(
-            $initialRepo,
+            $repo,
             $processAction,
             $em,
             $this->createMock(ManagerRegistry::class),
@@ -332,22 +330,22 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
             forceRefresh: true,
         ));
 
-        self::assertContains(PipelineStep::SALES->value, $doc->getFailedSteps());
-        self::assertNotContains(PipelineStep::SALES->value, $doc->getSucceededSteps());
+        self::assertContains(PipelineStep::SALES->value, $doc->getSucceededSteps());
+        self::assertNotContains(PipelineStep::SALES->value, $doc->getFailedSteps());
     }
 
-    public function testHandlerRethrowsConflictWhenSyncStatusCannotBeUpdated(): void
+    public function testHandlerRethrowsFailureWhenSyncStatusCannotBeUpdated(): void
     {
         $user = UserBuilder::aUser()->withIndex(8)->build();
         $company = CompanyBuilder::aCompany()->withIndex(8)->withOwner($user)->build();
         $doc = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)->build();
-        $conflict = new WbGeneratedRowsConflictException('conflict');
+        $failure = new \RuntimeException('processor failed');
 
         $initialRepo = $this->createMock(MarketplaceRawDocumentRepository::class);
         $initialRepo->method('find')->with($doc->getId())->willReturn($doc);
 
         $processAction = $this->createMock(ProcessMarketplaceRawDocumentAction::class);
-        $processAction->method('__invoke')->willThrowException($conflict);
+        $processAction->method('__invoke')->willThrowException($failure);
 
         $freshRepo = $this->createMock(EntityRepository::class);
         $freshRepo->method('find')->with($doc->getId())->willReturn($doc);
@@ -369,7 +367,7 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
             $updater,
         );
 
-        $this->expectExceptionObject($conflict);
+        $this->expectExceptionObject($failure);
         $handler(new ProcessRawDocumentStepMessage(
             $doc->getId(),
             PipelineStep::SALES->value,
@@ -387,7 +385,7 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
         $repo->method('find')->with($doc->getId())->willReturn($doc);
 
         $processAction = $this->createMock(ProcessMarketplaceRawDocumentAction::class);
-        $processAction->method('__invoke')->willReturn(10);
+        $processAction->method('__invoke')->willReturn(new ProcessRawDocumentResult(10));
 
         $em = $this->createMock(EntityManagerInterface::class);
         $em->expects(self::exactly(count(PipelineStep::cases())))->method('flush');
@@ -424,7 +422,7 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
         $repo->method('find')->with($doc->getId())->willReturn($doc);
 
         $processAction = $this->createMock(ProcessMarketplaceRawDocumentAction::class);
-        $processAction->method('__invoke')->willReturn(1);
+        $processAction->method('__invoke')->willReturn(new ProcessRawDocumentResult(1));
 
         $em = $this->createMock(EntityManagerInterface::class);
         $em->expects(self::once())->method('flush');

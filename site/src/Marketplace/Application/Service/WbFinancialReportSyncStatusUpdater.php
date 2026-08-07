@@ -185,11 +185,10 @@ final readonly class WbFinancialReportSyncStatusUpdater implements WbFinancialRe
             $errorClass = null !== $failure ? $failure::class : 'PipelineFailedException';
             $errorMessage = $failure?->getMessage() ?? sprintf('Raw pipeline failed for document %s', $rawDocument->getId());
 
-            if ($failure instanceof \LogicException || $failure instanceof \InvalidArgumentException) {
-                $status->markConflict($errorClass, $errorMessage, null, null);
-            } else {
-                $status->markFailedFinal($errorClass, $errorMessage, null, null);
-            }
+            // CONFLICT выставляют только явные доменные пути (in-flight raw, legacy reconcile).
+            // LogicException/InvalidArgumentException здесь — программная ошибка шага,
+            // и она обязана называться провалом, а не конфликтом.
+            $status->markFailedFinal($errorClass, $errorMessage, null, null);
 
             $this->saveError($status, $errorClass, $errorMessage, null, null, null);
         } else {

@@ -6,11 +6,11 @@ namespace App\Marketplace\Application;
 
 use App\Company\Entity\Company;
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
+use App\Marketplace\Application\DTO\ProcessRawDocumentResult;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistryInterface;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
-use App\Marketplace\Exception\WbGeneratedRowsConflictException;
 use App\Marketplace\Infrastructure\Normalizer\Contract\RowClassifierInterface;
 use App\Marketplace\Infrastructure\Normalizer\RowClassifierRegistryInterface;
 use App\Marketplace\Repository\MarketplaceCostRepository;
@@ -29,7 +29,9 @@ use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
  * Целевой контракт daily pipeline:
  * - покрывает только шаги sales / returns / costs;
  * - реализация (realization) намеренно исключена из daily pipeline;
- * - retry шага допустим и не должен менять контракт существующего ручного flow.
+ * - retry шага допустим и не должен менять контракт существующего ручного flow;
+ * - частичная переобработка WB (сохранены linked rows) — успех шага; количество
+ *   сохранённых строк возвращается в результате, а не сигнализируется исключением.
  */
 #[AsMessageHandler]
 final readonly class ProcessMarketplaceRawDocumentAction
@@ -48,7 +50,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
     ) {
     }
 
-    public function __invoke(ProcessMarketplaceRawDocumentCommand $command): int
+    public function __invoke(ProcessMarketplaceRawDocumentCommand $command): ProcessRawDocumentResult
     {
         $document = $this->repository->find($command->rawDocId);
 
@@ -116,9 +118,8 @@ final readonly class ProcessMarketplaceRawDocumentAction
             $processor = $this->processorRegistry->get(StagingRecordType::COST, $marketplace);
             $result = $processor->process($command->companyId, $command->rawDocId);
             $this->costCategoryResolver->clearCache();
-            $this->throwWbPartialReprocessConflict($command->rawDocId, $command->kind, $linkedRows, $result);
 
-            return $result;
+            return $this->buildResult($command->rawDocId, $command->kind, $result, $linkedRows);
         }
 
         // --- Sales / Returns path ---
@@ -212,9 +213,8 @@ final readonly class ProcessMarketplaceRawDocumentAction
         }
 
         $this->costCategoryResolver->clearCache();
-        $this->throwWbPartialReprocessConflict($command->rawDocId, $command->kind, $linkedRows, $totalProcessed);
 
-        return $totalProcessed;
+        return $this->buildResult($command->rawDocId, $command->kind, $totalProcessed, $linkedRows);
     }
 
     /**
@@ -265,23 +265,19 @@ final readonly class ProcessMarketplaceRawDocumentAction
         return $linkedRows;
     }
 
-    private function throwWbPartialReprocessConflict(string $rawDocId, string $kind, int $linkedRows, int $processedRows): void
+    private function buildResult(string $rawDocId, string $kind, int $processedRows, int $linkedRows): ProcessRawDocumentResult
     {
-        if ($linkedRows <= 0) {
-            return;
+        if ($linkedRows > 0) {
+            // Ожидаемый штатный исход: строки закрытого документа не перезаписываются.
+            // warning, а не error — будить человека нечем, ремонта не требуется.
+            $this->appLogger->warning('WB raw document partially reprocessed; linked rows preserved', [
+                'rawDocId' => $rawDocId,
+                'kind' => $kind,
+                'processedRows' => $processedRows,
+                'preservedLinkedRows' => $linkedRows,
+            ]);
         }
 
-        $rowKind = match ($kind) {
-            'sales' => 'sale',
-            'returns' => 'return',
-            'costs' => 'cost',
-            default => $kind,
-        };
-
-        throw new WbGeneratedRowsConflictException(
-            sprintf('Partially reprocessed WB raw document %s: preserved %d linked %s %s.', $rawDocId, $linkedRows, $rowKind, 1 === $linkedRows ? 'row' : 'rows'),
-            linkedRows: $linkedRows,
-            processedRows: $processedRows,
-        );
+        return new ProcessRawDocumentResult($processedRows, $linkedRows);
     }
 }
