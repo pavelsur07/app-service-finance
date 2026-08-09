@@ -790,10 +790,40 @@ updatePLRegisterForDocument(string $documentId): void
   matcher рассматривает только RUB-транзакции. Существующие сохранённые связи
   остаются читаемыми независимо от валюты для обратной совместимости.
 
+### Cash: агрегат перевода между денежными счетами (`cash_transfer`)
+
+- `CashTransfer` связывает ровно две уникальные `CashTransaction`: исходящую
+  ногу со счёта-источника и входящую на счёт-получатель. Суммы и валюты не
+  дублируются в агрегате: источником истины остаются транзакции.
+- Обе ноги принадлежат одной компании, разным активным не-криптовалютным
+  счетам и имеют одну дату. Они помечены `isTransfer=true` и содержат по одной
+  строке разбивки: `CF_TECH_OUT` для списания и `CF_TECH_IN` для поступления.
+  Это обязательные активные системные дочерние категории корня `CF_TECH`.
+- Для перевода в одной валюте фактические суммы должны совпадать, FX-поля
+  остаются `NULL`. Кросс-валютный v1 разрешает только `RUB↔USD` и `RUB↔EUR`;
+  пользователь передаёт обе фактические суммы, а агрегат хранит производный
+  effective rate «валюта назначения за единицу валюты источника» со scale 18,
+  датой операции и источником `manual_effective`. Float не используется.
+- `CreateCashTransferAction` выполняет агрегат, ноги, разбивки, аудит и
+  пересчёт обоих счетов в одной DB-транзакции. PostgreSQL advisory lock и
+  unique `(company_id, idempotency_key)` сериализуют повторную команду;
+  duplicate-result не повторяет side effects. Snapshot cache инвалидируется
+  один раз после commit. Ключ идентифицирует первую принятую команду, не
+  является dedupe hash её полей и должен повторно отправляться только с тем же
+  payload; повтор всегда возвращает исходный агрегат.
+- Технические ноги обходят VAT, `PaymentPlanMatcher` и автоправила. Комиссия
+  банка является отдельной обычной исходящей операцией, а не третьей ногой.
+- Поля soft-delete на агрегате зарезервированы для атомарного lifecycle пары в
+  следующем Stage. Legacy-транзакции с `isTransfer=true`, не связанные с
+  `cash_transfer`, не спариваются и не изменяются автоматически.
+
 ### `CashFacade` (`src/Cash/Facade/CashFacade.php`)
 ```php
 // Создать ДДС-транзакцию из внешнего модуля (идемпотентно для внешних источников)
 createTransaction(CreateCashTransactionCommand $command): CreateCashTransactionResult
+
+// Атомарно создать перевод между двумя счетами (идемпотентно в пределах компании)
+createTransfer(CreateCashTransferCommand $command): CreateCashTransferResult
 
 // Чтение: постраничный список транзакций компании, per_page ≤ CashFacade::MAX_PER_PAGE (200)
 listTransactions(string $companyId, array $filters = [], int $page = 1, int $perPage = 50): array
@@ -2676,6 +2706,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.73 | 2026-08-09 | Cash: атомарный агрегат перевода, две технические ноги, точный effective FX rate и company-scoped idempotency |
 | 1.72 | 2026-08-09 | Cash: единый fiat-контракт RUB/USD/EUR/KZT, неизменяемая валюта счёта, company-scoped transaction writers, currency-safe imports и RUB-only PaymentPlan matching |
 | 1.71 | 2026-08-04 | Company: `CompanyFacade::listAccessibleCompaniesForUser()` и `userHasAccess()` — доступ и список компаний пользователя (owned + активный CompanyMember), для межкомпанийных операций (Finance: импорт дерева ОПиУ между своими компаниями) |
 | 1.70 | 2026-08-02 | Doc sync с кодом: legacy-зона (`src/Entity|Service|Repository|Controller`) отмечена пустой — сущности уже переехали в `Finance/Entity/` и `Company/Entity/`; `Catalog` перестал считаться полностью мигрированным (`Product` всё ещё на `Company $company`); в карту модулей добавлены `Mcp` и `Report` |

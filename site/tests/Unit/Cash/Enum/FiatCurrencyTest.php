@@ -33,4 +33,13 @@ final class FiatCurrencyTest extends TestCase
             self::assertSame(2, $currency->scale());
         }
     }
+
+    public function testTransferPairsAreLimitedToSameCurrencyAndRubWithUsdOrEur(): void
+    {
+        self::assertTrue(FiatCurrency::RUB->canTransferTo(FiatCurrency::RUB));
+        self::assertTrue(FiatCurrency::RUB->canTransferTo(FiatCurrency::USD));
+        self::assertTrue(FiatCurrency::EUR->canTransferTo(FiatCurrency::RUB));
+        self::assertFalse(FiatCurrency::USD->canTransferTo(FiatCurrency::EUR));
+        self::assertFalse(FiatCurrency::KZT->canTransferTo(FiatCurrency::RUB));
+    }
 }

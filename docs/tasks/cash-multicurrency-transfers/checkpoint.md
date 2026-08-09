@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 1
+**Phase:** Stage 2
 **Status:** REVIEW_GREEN — delivery in progress
-**Stage base commit:** 1b77472f66085752ed3dffd78e3a4f6ccbc9162b
+**Stage base commit:** e339b3dabdde1c8c893dc19e7bc0143699d08dac
 **Current Work item:** Stage boundary
 **Owner gate:** no
 
@@ -56,18 +56,95 @@
     `ARCHITECTURE.md`;
   - completed the integrated Stage checks and review-fix cycles;
   - added the Stage Report under `stages/stage-1.md`.
+- Stage 1 delivered:
+  - commit `e339b3dabdde1c8c893dc19e7bc0143699d08dac` pushed without force;
+  - Draft PR #2310 opened against `master`;
+  - CI status at handoff to Stage 2: `IN_PROGRESS` (`Detect changes`).
+- Stage 2 baseline: 19 tests, 121 assertions, green.
+- Work item 2.1 complete:
+  - added the `CashTransfer` aggregate without duplicating leg amounts or
+    currencies; transactions remain the source of truth;
+  - added company-scoped idempotency, unique source/target legs, nullable
+    manual FX metadata, timestamps and soft-delete audit fields;
+  - added company/idempotency/leg repository lookups;
+  - added PostgreSQL-only expand migration with FKs, unique indexes and
+    structural CHECK constraints;
+  - migration dry-run succeeded; the first isolated test up exposed and fixed
+    the `companies` table name; final isolated up/down/up succeeded;
+  - Doctrine mapping is valid and schema diff contains no `cash_transfer`
+    drift (unrelated pre-existing schema drift remains outside the task);
+  - red proof: three tests failed before the class existed; final entity and
+    persistence slice: 4 tests, 24 assertions, green.
+- Work item 2.2 complete:
+  - `FiatCurrency::canTransferTo()` is the single v1 pair contract: same
+    currency or RUB↔USD/EUR; KZT remains same-currency only;
+  - added `EffectiveExchangeRateCalculator` using Money minor units and BCMath,
+    with no float and HALF_UP rounding to scale 18;
+  - quote direction is target currency per one source currency; the immutable
+    rate value carries base, quote, date and `manual_effective` source;
+  - same-currency transfers require equal Money amounts and return no FX
+    metadata; inputs with excess currency scale are rejected instead of
+    rounded silently;
+  - red proof: 7 tests failed before the calculator existed; final rate/entity/
+    pair slice: 15 tests, 55 assertions, green.
+- Work item 2.3 complete:
+  - added public create-transfer command/result and `CashFacade::createTransfer`;
+  - source/target accounts are resolved company-scoped and must be different,
+    active, non-crypto and open on the transfer date;
+  - closed financial periods and unsupported currency pairs are rejected before
+    persistence;
+  - technical legs use exact active system children `CF_TECH_OUT`/`CF_TECH_IN`
+    under system root `CF_TECH`, one balanced split each and the company general
+    Project×ЦФО pair;
+  - both leg amounts are user-provided, validated without implicit conversion,
+    and canonicalized through `Money`;
+  - red proof: facade tests failed before the contract existed; final create/
+    tenant/period/opening/category validation slice: 7 tests, 34 assertions,
+    green.
+- Work item 2.4 complete:
+  - aggregate, both legs, splits, transaction audits, balance snapshots and
+    current balances are committed in one Doctrine/DBAL transaction;
+  - account recalculation order is deterministic by account UUID and nested
+    balance transactions use configured savepoints;
+  - transfer creation suppresses auto-rule dispatch and does not invoke VAT or
+    PaymentPlan matching; technical legs retain null VAT fields and no plan
+    matches;
+  - company-scoped idempotency uses a PostgreSQL transaction advisory lock plus
+    the unique database constraint, and a sequential retry returns the exact
+    same aggregate and leg IDs without repeating side effects;
+  - snapshot cache invalidation runs once after commit only;
+  - injected balance failure after the first flush proved rollback of the
+    aggregate, both transactions and all related audit rows;
+  - final action integration slice: 10 tests, 66 assertions, green.
+- Work item 2.5 implementation/checks complete:
+  - `ARCHITECTURE.md` now documents the aggregate, exact rate direction,
+    technical categories, side-effect exclusions and public facade contract;
+  - transfer-focused slice: 26 tests, 128 assertions, green;
+  - complete `tests/Unit/Cash`: 190 tests, 661 assertions, green;
+  - complete `tests/Integration/Cash`: 160 tests, 672 assertions, green;
+  - bounded Cash/account functional slice: 59 tests, 415 assertions, green;
+  - Doctrine mapping validation and PHP CS Fixer dry-run are green;
+  - isolated test DB migration down/up succeeded; existing unrelated schema
+    drift remains, with no generated `cash_transfer` SQL;
+  - internal complete Stage review: no BLOCKER/IMPORTANT findings;
+  - external review: `REVIEW_GREEN`; one safe MINOR clarified the idempotency
+    replay contract in architecture documentation, and the alleged FX-pair
+    duplication was rejected because both layers use the single
+    `FiatCurrency::canTransferTo()` contract while aggregate validation is
+    intentional defense in depth.
+- Stage 2 review gate complete:
+  - review-fix targeted repeat: 26 tests, 128 assertions, green;
+  - final external complete-diff repeat: `REVIEW_GREEN`;
+  - Stage Report added under `stages/stage-2.md`;
+  - no unresolved BLOCKER or IMPORTANT findings.
 
 ### Current diff / affected files
-- `docs/tasks/cash-multicurrency-transfers/plan.md` — Phase 0 plan.
-- `docs/tasks/cash-multicurrency-transfers/checkpoint.md` — this checkpoint.
-- `site/src/Cash/Enum/FiatCurrency.php` — supported fiat contract.
-- `site/src/Cash/Entity/Accounts/MoneyAccount.php` — validation and immutable
-  persisted currency.
-- Account/transaction forms, DTO and focused tests for Work item 1.1.
-- Transaction service, account/project repositories, Company facade and
-  tenant-safety tests for Work item 1.2.
-- Bank, 1C and file import currency boundaries and tests for Work item 1.3.
-- PaymentPlan RUB-only matching boundary and regression test for Work item 1.4.
+- `site/migrations/Version20260809120000.php` — expand-only transfer table.
+- `site/src/Cash/Entity/Transfer`, `Repository/Transfer`, `Service/Transfer`
+  and `ValueObject/Transfer` — aggregate and exact FX contract.
+- `site/src/Cash/Application/CreateCashTransferAction.php` plus command/result
+  DTOs and `CashFacade` — atomic public use case.
+- Transfer unit/integration tests, `ARCHITECTURE.md`, plan and checkpoint.
 
 ### Checks and baseline
 - Previous exploratory baseline on the prior branch:
@@ -80,22 +157,27 @@
 
 ### Review status
 - Work items 1.1–1.4: focused self-review green.
-- Internal complete Stage review: green after preserving crypto compatibility
+- Stage 1 internal complete review: green after preserving crypto compatibility
   and correcting bank import error/duplicate accounting.
-- External complete Stage review: `REVIEW_GREEN`; safe repository UUID-guard
+- Stage 1 external complete review: `REVIEW_GREEN`; safe repository UUID-guard
   MINOR fixed and the updated complete diff re-reviewed `REVIEW_GREEN`.
+- Stage 2 internal complete review: green; no BLOCKER/IMPORTANT findings.
+- Stage 2 external complete review: final repeat `REVIEW_GREEN` after the
+  idempotency caller contract was documented.
 - Unresolved BLOCKER/IMPORTANT: none.
-- FOLLOW-UP: consider a pre-flush account update contract if account editing is
+- Stage 1 FOLLOW-UP: consider a pre-flush account update contract if account editing is
   moved away from the current entity-bound form; keep the Doctrine callback as
   the global safety net until an equally comprehensive replacement exists.
+- Stage 2 FOLLOW-UP for planned Work item 3.1: require `companyId` in the
+  transaction-to-transfer lookup before production lifecycle callers use it.
 
 ### Exact next action
-- Commit and push the reviewed Stage 1 diff, update the task Draft PR, then
-  record the new HEAD as the Stage 2 base and continue automatically.
+- Commit and push the reviewed Stage 2 diff, update Draft PR #2310, record the
+  new HEAD as Stage 3 base and continue automatically with Work item 3.1.
 
 ### Files to inspect first on resume
-- `site/src/Cash/Entity/Accounts/MoneyAccount.php`
-- `site/src/Cash/Service/Accounts/MoneyAccountService.php`
-- `site/src/Cash/Form/Accounts/MoneyAccountType.php`
-- `site/src/Cash/Form/Transaction/CashTransactionType.php`
+- `site/src/Cash/Repository/Transfer/CashTransferRepository.php`
+- `site/src/Cash/Application/BulkDeleteCashTransactionsAction.php`
 - `site/src/Cash/Service/Transaction/CashTransactionService.php`
+- `site/src/Cash/Controller/Transaction/CashTransactionController.php`
+- `site/src/Cash/Entity/Transfer/CashTransfer.php`

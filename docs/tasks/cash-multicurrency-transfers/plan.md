@@ -83,7 +83,7 @@ Risk: HIGH-LOCAL
 owner_gate: no
 release_candidate: no
 independently_deployable: yes
-stage_base_commit: TBD — зафиксировать после commit Stage 1
+stage_base_commit: e339b3dabdde1c8c893dc19e7bc0143699d08dac
 
 Definition of Done:
 - Добавлена expand-only таблица `cash_transfer` и Doctrine Entity с двумя

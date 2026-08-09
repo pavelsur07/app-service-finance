@@ -44,4 +44,14 @@ enum FiatCurrency: string
     {
         return 2;
     }
+
+    public function canTransferTo(self $target): bool
+    {
+        if ($this === $target) {
+            return true;
+        }
+
+        return (self::RUB === $this && in_array($target, [self::USD, self::EUR], true))
+            || (self::RUB === $target && in_array($this, [self::USD, self::EUR], true));
+    }
 }

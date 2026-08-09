@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Cash\Facade;
 
+use App\Cash\Application\CreateCashTransferAction;
 use App\Cash\Application\DTO\AutoRuleConditionInput;
 use App\Cash\Application\DTO\AutoRuleInput;
 use App\Cash\Application\DTO\CashflowCategoryInput;
 use App\Cash\Application\DTO\CreateCashTransactionCommand;
 use App\Cash\Application\DTO\CreateCashTransactionResult;
+use App\Cash\Application\DTO\CreateCashTransferCommand;
+use App\Cash\Application\DTO\CreateCashTransferResult;
 use App\Cash\Application\SaveCashflowCategoryAction;
 use App\Cash\Application\SaveCashTransactionAutoRuleAction;
 use App\Cash\DTO\CashTransactionDTO;
@@ -44,7 +47,13 @@ final readonly class CashFacade
         private CompanyFacade $companyFacade,
         private SaveCashflowCategoryAction $saveCategory,
         private SaveCashTransactionAutoRuleAction $saveAutoRule,
+        private CreateCashTransferAction $createCashTransfer,
     ) {
+    }
+
+    public function createTransfer(CreateCashTransferCommand $command): CreateCashTransferResult
+    {
+        return ($this->createCashTransfer)($command);
     }
 
     /**
