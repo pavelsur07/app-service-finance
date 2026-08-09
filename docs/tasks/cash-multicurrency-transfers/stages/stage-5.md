@@ -40,6 +40,11 @@ Stage base commit: `0e646cb42cf971180d7d9107f0983ee48490df62`
 - Direct test-environment verifier run, command help and `git diff --check` —
   green. Stage 2 isolated migration down/up and SQL review remain green; the
   migration has not changed since that Stage.
+- The first final-SHA CI run exposed a production cache warmup failure because
+  the new Doctrine entity was `final` and could not receive a lazy ghost. The
+  entity now follows the existing non-final entity pattern. Local production
+  cache clear/assets install, mapping validation, CS and a 24-test / 174-
+  assertion transfer slice are green; CI repeat is pending.
 
 ## Reviews
 
@@ -60,6 +65,10 @@ Stage base commit: `0e646cb42cf971180d7d9107f0983ee48490df62`
 - Accepted FOLLOW-UP items are dashboard selector UX without a full reload and
   a possible future DB-level guard against cross-role leg reuse. Current write
   paths create fresh legs and the verifier detects the latter corruption.
+- After delivery, GitHub Actions found the Doctrine lazy-ghost incompatibility
+  above. Internal review of the one-line entity fix is green; the mandatory
+  full-task external review repeat validated proxy behavior and ended
+  `REVIEW_GREEN` before the follow-up commit.
 
 ## Production
 

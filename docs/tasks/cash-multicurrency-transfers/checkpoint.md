@@ -376,7 +376,17 @@
     path, and the latter is detected by the verifier;
   - final full-task external review repeat confirmed the normalization fix and
     ended `REVIEW_GREEN`; no new findings remain. Stage 5 review gate and the
-    complete task review gate are green.
+    complete task review gate are green;
+  - first CI run for final SHA `73ad217a91cd2d3f4e76c6bb38380d7fa4bd1c19`
+    passed frontend lint, unit tests, empty-DB migrations, API type sync and two
+    of three production image builds, but failed the `site-php-fpm` image at
+    production cache warmup: Doctrine could not generate a lazy ghost for the
+    new `final` `CashTransfer` entity;
+  - `CashTransfer` now follows the repository's non-final Doctrine entity
+    pattern. Local production cache clear/assets install, mapping validation,
+    CS, `git diff --check` and the focused transfer slice (24 tests, 174
+    assertions) are green; internal review is green and the full-task external
+    review repeat ended `REVIEW_GREEN`. CI repeat is pending.
 
 ### Current diff / affected files
 - `site/src/Cash/Command/VerifyCashTransfersCommand.php` and its integration
@@ -421,8 +431,8 @@
   the global safety net until an equally comprehensive replacement exists.
 
 ### Exact next action
-- Commit the task-owned Stage 5 changes, push without force and update Draft PR
-  #2310. Then report the completed Final Release Gate and request only the
+- Commit and push the reviewed CI fix without force, then confirm the repeated
+  Draft PR #2310 checks. Report the Final Release Gate and request only the
   owner's decision whether to mark the PR Ready.
 
 ### Files to inspect first on resume

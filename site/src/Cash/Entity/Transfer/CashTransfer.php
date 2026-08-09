@@ -22,7 +22,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Index(name: 'idx_cash_transfer_company_created', columns: ['company_id', 'created_at'])]
 #[ORM\Index(name: 'idx_cash_transfer_company_deleted', columns: ['company_id', 'deleted_at'])]
 #[ORM\HasLifecycleCallbacks]
-final class CashTransfer
+class CashTransfer
 {
     public const RATE_SOURCE_MANUAL_EFFECTIVE = EffectiveExchangeRate::SOURCE_MANUAL_EFFECTIVE;
 
