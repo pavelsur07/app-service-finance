@@ -104,6 +104,27 @@ final class CreateCashTransferActionTest extends IntegrationTestCase
         self::assertSame('USD', $transfer->getRateQuoteCurrency());
     }
 
+    public function testCreatesTransferFromCommaDecimalAmountsThroughFacade(): void
+    {
+        [$company, $sourceAccount, $targetAccount] = $this->fixture('RUB', 'USD');
+
+        $result = $this->cashFacade->createTransfer(new CreateCashTransferCommand(
+            companyId: (string) $company->getId(),
+            sourceAccountId: (string) $sourceAccount->getId(),
+            targetAccountId: (string) $targetAccount->getId(),
+            sourceAmount: '9 500,00',
+            targetAmount: '100,00',
+            occurredAt: new \DateTimeImmutable('2026-08-09'),
+            idempotencyKey: 'create-transfer-comma-decimal',
+        ));
+
+        $source = $this->transactionRepository->find($result->sourceTransactionId);
+        $target = $this->transactionRepository->find($result->targetTransactionId);
+
+        self::assertSame('9500.00', $source?->getAmount());
+        self::assertSame('100.00', $target?->getAmount());
+    }
+
     public function testCreatesSameCurrencyTransferWithoutFxMetadata(): void
     {
         [$company, $sourceAccount, $targetAccount] = $this->fixture('USD', 'USD');

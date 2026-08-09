@@ -1,10 +1,10 @@
 ## Current checkpoint
 
-**Phase:** Stage 4
-**Status:** review gate complete; delivery in progress
-**Stage base commit:** 3c9cd4cd53dc07dadf4a06f541f69e52ce28163f
-**Current Work item:** 4.5
-**Owner gate:** no
+**Phase:** Stage 5
+**Status:** implementation in progress
+**Stage base commit:** 0e646cb42cf971180d7d9107f0983ee48490df62
+**Current Work item:** 5.3
+**Owner gate:** yes — Final Release Gate after completed delivery
 
 ### Completed
 - Phase 0 repository inspection and business-rule reconciliation.
@@ -291,15 +291,100 @@
     IMPORTANT findings remain. Its currency-formatter MINOR was rejected as
     confirmed pre-existing UI-Kit debt outside this Stage;
   - Stage Report added under `stages/stage-4.md`.
+- Stage 4 delivered:
+  - commit `0e646cb42cf971180d7d9107f0983ee48490df62` pushed without force;
+  - Draft PR #2310 updated and remains Draft;
+  - CI at Stage 5 handoff: Frontend Lint and the repository deploy-named
+    workflow are `in_progress`; no production action was invoked by Codex.
+- Stage 5 baseline: 33 transfer tests, 238 assertions, green.
+- Work item 5.1 complete:
+  - added read-only `app:cash:verify-transfers` using DBAL so damaged rows do
+    not need to hydrate through domain constructors;
+  - detailed company scope is processed in batches of 100 and only aggregate
+    counts are printed; IDs, amounts and account details never enter
+    diagnostics. Idempotency/leg uniqueness use two intentional global scans
+    so cross-batch corruption cannot be hidden;
+  - verifier covers pair/company/account/direction/currency, technical splits,
+    same-currency equality, exact FX metadata, pair deletion, idempotency and
+    cross-role leg ownership;
+  - unlinked legacy `isTransfer=true` rows are counted as INFO, not errors;
+  - the command has no repair/execute option and a failing test proves corrupt
+    direction/rate values remain unchanged after diagnostics;
+  - focused verifier tests: 3 tests, 19 assertions; combined transfer/verifier
+    slice: 36 tests, 257 assertions, green; command help and focused PHP CS are
+    green.
+- Work item 5.2 complete:
+  - `ARCHITECTURE.md` now records transfer UI boundaries, selected-currency
+    Home behavior and the read-only verifier contract;
+  - `site/src/Cash/README.md` documents the aggregate/facade contract, exact
+    v1 limits, operational verification and safe expand-first rollout;
+  - production category execution, migration, deploy, write smoke and rollback
+    remain explicit Production Gate actions;
+  - rollback after aggregate creation is documented as forward-fix preferred;
+    code without pair guards must not receive Cash writes.
+- Work item 5.3 verification in progress:
+  - complete backend suite: 3221 tests, 17687 assertions, green;
+  - final verifier review-fix repeat: 3 tests, 20 assertions, green;
+  - all 225 Twig templates and Doctrine mapping validation are green;
+  - task-owned PHP CS Fixer scope: 79 files, green; whole-repository CS remains
+    red on 576 pre-existing unrelated files;
+  - frontend ESLint and production build are green; the existing missing
+    `@symfony/ux-turbo/package.json` build warning is unchanged;
+  - whole-repository UI-Kit class check remains red: task-base baseline was
+    9086 legacy usages and current is 9194 because the new Twig screens reuse
+    the same neighboring legacy Bootstrap patterns; fixing the global gate or
+    redesigning the screens is excluded UI-Kit scope;
+  - React UI-Kit mapping remains red on the same 47 missing wrappers; neither
+    its inputs nor non-legacy React UI-Kit files changed in this task;
+  - full schema validation confirms mapping is valid but reports pre-existing
+    unrelated DB drift; schema dump contains no `cash_transfer` SQL;
+  - direct test-environment `app:cash:verify-transfers` run is green and prints
+    only zero-valued aggregate diagnostics;
+  - frontend typecheck/test scripts do not exist; supported lint/build checks
+    were run instead. The Stage 2 isolated migration down/up and SQL review
+    remain green because the migration has not changed since delivery.
+  - internal independent Stage 5 review is green after extending the account
+    check to supported fiat account types, existing account rows and opening
+    dates; no BLOCKER or IMPORTANT findings remain;
+  - first external Stage 5 review found one confirmed BLOCKER in the read-only
+    FX predicate: PostgreSQL division of two `NUMERIC(18,2)` values may retain
+    only 16 fractional digits for a rate greater than one, causing false FAIL;
+  - the verifier now casts the numerator to `NUMERIC(38,19)` before HALF_UP
+    rounding to scale 18; direct SQL reproduced the old mismatch
+    `...940900` versus the application value `...940902`;
+  - a non-round USD→RUB regression (`1234.56` → `98765.43`) proves the valid
+    large-quotient direction is green; focused repeat: 3 tests, 20 assertions,
+    and PHP CS are green;
+  - internal review-fix repeat is green; the next external repeat exhausted 40
+    turns without a verdict and was not counted;
+  - the completed external repeat ended `REVIEW_GREEN`; no BLOCKER/IMPORTANT
+    findings remain. Its batching MINOR was resolved by documenting the two
+    intentional global uniqueness scans; the final documentation repeat also
+    ended `REVIEW_GREEN`.
+  - final internal review of the complete task diff from exact task base
+    `1b77472f66085752ed3dffd78e3a4f6ccbc9162b` is green; no new BLOCKER or
+    IMPORTANT findings remain;
+  - the first final external full-task review ended `REVIEW_GREEN` with one
+    confirmed local MINOR: direct `CashFacade::createTransfer()` callers could
+    pass comma-decimal amounts that the rate calculator normalized but the
+    persisted `Money` parser did not. The action now normalizes amounts once
+    before both operations, and a facade-level regression covers spaced comma
+    decimals; focused transfer/verifier repeat is green (20 tests, 147
+    assertions), as are PHP CS Fixer and `git diff --check`;
+  - the dashboard reload UX and a stronger DB-level cross-role leg uniqueness
+    guard remain accepted FOLLOW-UP items: neither is a current correctness
+    path, and the latter is detected by the verifier;
+  - final full-task external review repeat confirmed the normalization fix and
+    ended `REVIEW_GREEN`; no new findings remain. Stage 5 review gate and the
+    complete task review gate are green.
 
 ### Current diff / affected files
-- `site/src/Cash/Controller/Transfer`, `DTO/CashTransferFormData.php`,
-  `Form/Transfer` and `templates/cash/transfer` — transfer UI boundary.
-- Cash transaction controller/templates and transfer repository — aggregate
-  navigation and batch leg lookup.
-- Home controller/templates and existing dashboard React entry — selected
-  cash currency without a new entrypoint or dependency.
-- Transfer form/controller and Home functional tests, plan and checkpoint.
+- `site/src/Cash/Command/VerifyCashTransfersCommand.php` and its integration
+  test — read-only invariant diagnostics.
+- `site/src/Cash/Application/CreateCashTransferAction.php` and its integration
+  test — facade-safe amount normalization found during final review.
+- `ARCHITECTURE.md`, `site/src/Cash/README.md`, plan, checkpoint and Stage 5
+  report — architecture, rollout and delivery evidence.
 
 ### Checks and baseline
 - Previous exploratory baseline on the prior branch:
@@ -325,16 +410,23 @@
 - Stage 4 internal complete review: green; no BLOCKER/IMPORTANT findings.
 - Stage 4 external review: final complete-diff `--max-turns 120` repeat ended
   `REVIEW_GREEN`; no unresolved in-scope BLOCKER, IMPORTANT or MINOR findings.
+- Stage 5 internal and external complete reviews: `REVIEW_GREEN` after the FX
+  precision fix and batching documentation clarification.
+- Final internal and external full-task reviews from exact task base
+  `1b77472f66085752ed3dffd78e3a4f6ccbc9162b`: `REVIEW_GREEN` after the
+  facade amount-normalization MINOR was fixed and re-reviewed.
 - Unresolved BLOCKER/IMPORTANT: none.
 - Stage 1 FOLLOW-UP: consider a pre-flush account update contract if account editing is
   moved away from the current entity-bound form; keep the Doctrine callback as
   the global safety net until an equally comprehensive replacement exists.
 
 ### Exact next action
-- Commit and push the green Stage 4 diff, update Draft PR #2310, then record
-  the Stage 5 base commit and continue autonomously with Work item 5.1.
+- Commit the task-owned Stage 5 changes, push without force and update Draft PR
+  #2310. Then report the completed Final Release Gate and request only the
+  owner's decision whether to mark the PR Ready.
 
 ### Files to inspect first on resume
-- Stage 4 diff from `3c9cd4cd53dc07dadf4a06f541f69e52ce28163f`.
-- Transfer controller/form/templates and linked transaction UI.
-- Home currency filtering and dashboard selector/query propagation.
+- Stage 5 diff from `0e646cb42cf971180d7d9107f0983ee48490df62`.
+- Existing read-only verification commands and company-batched repository
+  iteration patterns.
+- Transfer aggregate invariants, technical categories and migration checks.

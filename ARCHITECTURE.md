@@ -826,6 +826,20 @@ updatePLRegisterForDocument(string $documentId): void
   same-currency перевод даёт нулевой net, а cross-currency перевод остаётся
   двумя независимыми движениями без пересчёта и смешанного итога. Soft-delete
   агрегата исключает из отчёта обе ноги.
+- UI агрегата расположен под `/finance/cash-transfers`: форма разрешает только
+  company-scoped активные fiat-счета, hidden UUIDv7 служит idempotency key, а
+  create/delete/restore делегируют финансовую семантику в `CashFacade`.
+  Связанная нога ведёт на show агрегата и не предоставляет отдельные edit,
+  split, delete, restore или bulk actions.
+- Read-only команда `app:cash:verify-transfers` обрабатывает детальную область
+  пакетами компаний и сверяет структуру пары, tenant/account/currency/direction,
+  обязательные `CF_TECH_OUT`/`CF_TECH_IN` split-строки, суммы same-currency,
+  effective-rate, pair deletion, idempotency и уникальное владение ногами.
+  Две проверки глобальной уникальности (`company + idempotency key` и владение
+  ногой между source/target ролями) выполняются отдельными aggregate scans,
+  чтобы не скрыть нарушение на границе company batches.
+  Вывод содержит только агрегированные счётчики; legacy `isTransfer=true` без
+  агрегата — INFO, а не ошибка. Repair/execute режима у команды нет.
 
 ### Analytics dashboard: валюта Cash-виджетов
 
@@ -839,6 +853,9 @@ updatePLRegisterForDocument(string $documentId): void
 - Список операций и XLSX export используют единый `CashTransactionFilters` и
   поддерживают `currency`; company scope применяется независимо от фильтра,
   а пустой параметр сохраняет прежний список всех валют без их агрегации.
+- Home и dashboard UI сохраняют выбранную RUB/USD/EUR/KZT валюту в URL и
+  передают её в snapshot API. Server-rendered Home balance учитывает только
+  активные счета выбранной валюты; URL без параметра намеренно означает RUB.
 
 ### `CashFacade` (`src/Cash/Facade/CashFacade.php`)
 ```php
@@ -2735,6 +2752,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.75 | 2026-08-09 | Cash: tenant-safe UI агрегата перевода, selector валюты ДДС и read-only verifier целостности |
 | 1.74 | 2026-08-09 | Cash: атомарный lifecycle пары перевода, защищённые generic mutations, currency-safe отчёт/дашборд/list/export |
 | 1.73 | 2026-08-09 | Cash: атомарный агрегат перевода, две технические ноги, точный effective FX rate и company-scoped idempotency |
 | 1.72 | 2026-08-09 | Cash: единый fiat-контракт RUB/USD/EUR/KZT, неизменяемая валюта счёта, company-scoped transaction writers, currency-safe imports и RUB-only PaymentPlan matching |

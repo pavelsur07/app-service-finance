@@ -213,7 +213,7 @@ Risk: MEDIUM
 owner_gate: yes
 release_candidate: yes
 independently_deployable: yes
-stage_base_commit: TBD — зафиксировать после commit Stage 4
+stage_base_commit: 0e646cb42cf971180d7d9107f0983ee48490df62
 
 Definition of Done:
 - Read-only `app:cash:verify-transfers` проверяет pair/company/account/currency/

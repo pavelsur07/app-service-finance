@@ -67,15 +67,17 @@ final readonly class CreateCashTransferAction
         $this->assertAccounts($sourceAccount, $targetAccount, $command->occurredAt);
         $this->assertPeriodIsOpen($company, $command->occurredAt);
 
+        $sourceAmountInput = $this->normalizeAmount($command->sourceAmount);
+        $targetAmountInput = $this->normalizeAmount($command->targetAmount);
         $rate = $this->rateCalculator->calculate(
-            $command->sourceAmount,
+            $sourceAmountInput,
             $sourceAccount->getCurrency(),
-            $command->targetAmount,
+            $targetAmountInput,
             $targetAccount->getCurrency(),
             $command->occurredAt,
         );
-        $sourceAmount = Money::fromString($command->sourceAmount, $sourceAccount->getCurrency())->toDecimalString();
-        $targetAmount = Money::fromString($command->targetAmount, $targetAccount->getCurrency())->toDecimalString();
+        $sourceAmount = Money::fromString($sourceAmountInput, $sourceAccount->getCurrency())->toDecimalString();
+        $targetAmount = Money::fromString($targetAmountInput, $targetAccount->getCurrency())->toDecimalString();
         $technicalOut = $this->requireTechnicalCategory($company, CashflowCategory::CODE_TECHNICAL_OUT);
         $technicalIn = $this->requireTechnicalCategory($company, CashflowCategory::CODE_TECHNICAL_IN);
         $responsibilityPair = $this->responsibilityCenterResolver->resolveForCreate($command->companyId, null, null);
@@ -324,6 +326,11 @@ final readonly class CreateCashTransferAction
         }
 
         return $idempotencyKey;
+    }
+
+    private function normalizeAmount(string $amount): string
+    {
+        return str_replace(["\u{00A0}", ' ', ','], ['', '', '.'], trim($amount));
     }
 
     private function duplicateResult(CashTransfer $transfer): CreateCashTransferResult
