@@ -10,11 +10,12 @@ function mountReactStarted() {
     }
 
     const defaultPreset = el.dataset.defaultPreset || 'month';
+    const defaultCurrency = el.dataset.defaultCurrency || 'RUB';
     const root = createRoot(el);
     el.__reactRoot = root;
 
     // Смотри, как чисто! Вместо React.createElement используем нормальный JSX
-    root.render(<DashboardGrid defaultPreset={defaultPreset} />);
+    root.render(<DashboardGrid defaultPreset={defaultPreset} defaultCurrency={defaultCurrency} />);
 }
 
 window.addEventListener('DOMContentLoaded', mountReactStarted);

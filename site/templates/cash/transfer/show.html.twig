@@ -1,0 +1,68 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Перевод между счетами{% endblock %}
+
+{% block breadcrumbs %}
+    {% include 'partials/_breadcrumbs.html.twig' with {
+        breadcrumbs: [
+            {'label': 'Главная', 'path': 'app_home_index'},
+            {'label': 'Операции ДДС', 'path': 'cash_transaction_index'},
+            {'label': 'Перевод'}
+        ]
+    } %}
+{% endblock %}
+
+{% block content %}
+{% set source = transfer.sourceTransaction %}
+{% set target = transfer.targetTransaction %}
+<div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+    <h2 class="page-title mb-0">Перевод между счетами</h2>
+    <span class="badge bg-{{ transfer.deleted ? 'secondary' : 'success' }}">{{ transfer.deleted ? 'Удалён' : 'Проведён' }}</span>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-md-3">Дата</dt><dd class="col-md-9">{{ source.occurredAt|date('d.m.Y') }}</dd>
+            <dt class="col-md-3">Списание</dt>
+            <dd class="col-md-9">
+                <a href="{{ path('cash_transaction_show', {id: source.id}) }}">{{ source.moneyAccount.name }}</a>
+                — {{ source.amount|number_format(2, ',', ' ') }} {{ source.currency }}
+            </dd>
+            <dt class="col-md-3">Поступление</dt>
+            <dd class="col-md-9">
+                <a href="{{ path('cash_transaction_show', {id: target.id}) }}">{{ target.moneyAccount.name }}</a>
+                — {{ target.amount|number_format(2, ',', ' ') }} {{ target.currency }}
+            </dd>
+            <dt class="col-md-3">Технические статьи</dt>
+            <dd class="col-md-9">
+                {{ source.singleSplitCategory.parent.name }} / {{ source.singleSplitCategory.name }}
+                → {{ target.singleSplitCategory.parent.name }} / {{ target.singleSplitCategory.name }}
+            </dd>
+            {% if transfer.effectiveRate %}
+                <dt class="col-md-3">Эффективный курс</dt>
+                <dd class="col-md-9">1 {{ transfer.rateBaseCurrency }} = {{ transfer.effectiveRate }} {{ transfer.rateQuoteCurrency }}</dd>
+                <dt class="col-md-3">Источник курса</dt><dd class="col-md-9">Рассчитан по фактическим суммам</dd>
+            {% endif %}
+            <dt class="col-md-3">Примечание</dt><dd class="col-md-9">{{ source.description ?: '—' }}</dd>
+            {% if transfer.deletedAt %}
+                <dt class="col-md-3">Удалён</dt><dd class="col-md-9">{{ transfer.deletedAt|date('d.m.Y H:i') }}</dd>
+            {% endif %}
+        </dl>
+    </div>
+    <div class="card-footer d-flex justify-content-end gap-2 flex-wrap">
+        <a href="{{ path('cash_transaction_index') }}" class="btn btn-secondary">К операциям ДДС</a>
+        {% if transfer.deleted %}
+            <form method="post" action="{{ path('cash_transfer_restore', {id: transfer.id}) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('cash_transfer_restore' ~ transfer.id) }}">
+                <button type="submit" class="btn btn-outline-primary">Восстановить перевод</button>
+            </form>
+        {% else %}
+            <form method="post" action="{{ path('cash_transfer_delete', {id: transfer.id}) }}" onsubmit="return confirm('Удалить перевод и обе связанные операции?')">
+                <input type="hidden" name="_token" value="{{ csrf_token('cash_transfer_delete' ~ transfer.id) }}">
+                <button type="submit" class="btn btn-danger">Удалить перевод</button>
+            </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

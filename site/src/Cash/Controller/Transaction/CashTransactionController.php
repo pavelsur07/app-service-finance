@@ -6,6 +6,7 @@ use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\DTO\CashTransactionFilters;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Entity\Transfer\CashTransfer;
 use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleApplyMode;
 use App\Cash\Form\Transaction\CashTransactionType;
@@ -13,6 +14,7 @@ use App\Cash\Message\EnqueueAutoRulesForRange;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
+use App\Cash\Repository\Transfer\CashTransferRepository;
 use App\Cash\Service\Transaction\CashTransactionService;
 use App\Cash\Service\Transaction\CashTransactionToDocumentService;
 use App\Company\Repository\CounterpartyRepository;
@@ -47,6 +49,7 @@ class CashTransactionController extends AbstractController
         MoneyAccountRepository $accountRepo,
         CashflowCategoryRepository $categoryRepo,
         CounterpartyRepository $counterpartyRepo,
+        CashTransferRepository $transferRepository,
     ): Response {
         $company = $this->companyService->getActiveCompany();
 
@@ -65,6 +68,16 @@ class CashTransactionController extends AbstractController
 
         $transactions = iterator_to_array($pager->getCurrentPageResults());
         $txRepo->warmSplits($transactions);
+        $transactionIds = array_map(
+            static fn (CashTransaction $transaction): string => (string) $transaction->getId(),
+            $transactions,
+        );
+        $transferByTransactionId = $this->mapTransfersToLegIds(
+            $transferRepository->findByTransactionIdsAndCompanyId(
+                $transactionIds,
+                $company->getId(),
+            ),
+        );
 
         $accounts = $accountRepo->findBy(['company' => $company]);
         $categories = $categoryRepo->findTreeByCompany($company);
@@ -78,6 +91,11 @@ class CashTransactionController extends AbstractController
             'counterparties' => $counterparties,
             'currencies' => FiatCurrency::cases(),
             'pager' => $pager,
+            'transferByTransactionId' => $transferByTransactionId,
+            'hasStandaloneTransactions' => (bool) array_diff(
+                $transactionIds,
+                array_keys($transferByTransactionId),
+            ),
         ]);
     }
 
@@ -152,6 +170,7 @@ class CashTransactionController extends AbstractController
     public function deletedIndex(
         Request $request,
         CashTransactionRepository $txRepo,
+        CashTransferRepository $transferRepository,
         CompanyContextService $companyContextService,
     ): Response {
         $companyId = $companyContextService->getCompanyId();
@@ -161,24 +180,34 @@ class CashTransactionController extends AbstractController
         $pager = $txRepo->paginateDeletedByCompany($companyId, $page, $perPage);
         $transactions = iterator_to_array($pager->getCurrentPageResults());
         $txRepo->warmSplits($transactions);
+        $transferByTransactionId = $this->mapTransfersToLegIds(
+            $transferRepository->findByTransactionIdsAndCompanyId(
+                array_map(static fn (CashTransaction $transaction): string => (string) $transaction->getId(), $transactions),
+                $companyId,
+            ),
+        );
 
         return $this->render('cash/transaction/deleted_index.html.twig', [
             'pager' => $pager,
             'transactions' => $transactions,
+            'transferByTransactionId' => $transferByTransactionId,
         ]);
     }
 
     #[Route('/{id}', name: 'cash_transaction_show', requirements: ['id' => Requirement::UUID], methods: ['GET'])]
-    public function show(CashTransaction $tx): Response
+    public function show(CashTransaction $tx, CashTransferRepository $transferRepository): Response
     {
         $company = $this->companyService->getActiveCompany();
         if ($tx->getCompany() !== $company) {
             throw $this->createNotFoundException();
         }
 
+        $transfer = $transferRepository->findOneByTransactionAndCompanyId($tx, $company->getId());
+
         return $this->render('transaction/show.html.twig', [
             'tx' => $tx,
-            'canCreatePnlDocument' => $this->canCreatePnlDocument($tx),
+            'transfer' => $transfer,
+            'canCreatePnlDocument' => null === $transfer && $this->canCreatePnlDocument($tx),
             'pnlDocuments' => $this->getDocumentsForTransaction($tx),
         ]);
     }
@@ -240,6 +269,22 @@ class CashTransactionController extends AbstractController
         );
 
         return $documents;
+    }
+
+    /**
+     * @param list<CashTransfer> $transfers
+     *
+     * @return array<string, CashTransfer>
+     */
+    private function mapTransfersToLegIds(array $transfers): array
+    {
+        $map = [];
+        foreach ($transfers as $transfer) {
+            $map[(string) $transfer->getSourceTransaction()->getId()] = $transfer;
+            $map[(string) $transfer->getTargetTransaction()->getId()] = $transfer;
+        }
+
+        return $map;
     }
 
     /**

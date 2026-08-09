@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Finance\Controller;
 
+use App\Cash\Enum\FiatCurrency;
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Report\Cashflow\CashflowReportBuilder;
@@ -11,6 +12,7 @@ use App\Report\Cashflow\CashflowReportParams;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\UiModeResolver;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -28,12 +30,27 @@ class HomeController extends AbstractController
     }
 
     #[Route('/', name: 'app_home_index')]
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        try {
+            $cashCurrency = $this->resolveCashCurrency($request);
+        } catch (\InvalidArgumentException) {
+            $this->addFlash('danger', 'Выберите поддерживаемую валюту ДДС.');
+
+            return $this->redirectToRoute('app_home_index', ['currency' => FiatCurrency::RUB->value]);
+        }
+
         $company = $this->activeCompanyService->getActiveCompany();
         $today = (new \DateTimeImmutable('today'))->setTime(0, 0);
 
-        $accounts = $this->moneyAccountRepository->findBy(['company' => $company]);
+        $accounts = $this->moneyAccountRepository->findByFilters(
+            $company,
+            null,
+            [$cashCurrency->value],
+            true,
+            null,
+            ['name' => 'ASC'],
+        );
 
         $todayBalance = 0.0;
         foreach ($accounts as $account) {
@@ -63,7 +80,7 @@ class HomeController extends AbstractController
 
         $inflow30 = 0.0;
         $outflow30 = 0.0;
-        $accumulate = static function (array $node) use (&$accumulate, &$inflow30, &$outflow30): array {
+        $accumulate = static function (array $node) use (&$accumulate, &$inflow30, &$outflow30, $cashCurrency): array {
             $childrenInflow = 0.0;
             $childrenOutflow = 0.0;
 
@@ -75,13 +92,11 @@ class HomeController extends AbstractController
 
             $nodeInflow = 0.0;
             $nodeOutflow = 0.0;
-            foreach ($node['totals'] ?? [] as $values) {
-                foreach ($values as $amount) {
-                    if ($amount > 0) {
-                        $nodeInflow += $amount;
-                    } elseif ($amount < 0) {
-                        $nodeOutflow += abs($amount);
-                    }
+            foreach (($node['totals'] ?? [])[$cashCurrency->value] ?? [] as $amount) {
+                if ($amount > 0) {
+                    $nodeInflow += $amount;
+                } elseif ($amount < 0) {
+                    $nodeOutflow += abs($amount);
                 }
             }
 
@@ -109,6 +124,8 @@ class HomeController extends AbstractController
 
         return $this->render($template, [
             'activeCompany' => $company,
+            'cashCurrency' => $cashCurrency,
+            'cashCurrencies' => FiatCurrency::cases(),
             'kpi' => [
                 'todayBalance' => $todayBalance,
                 'inflow30' => $inflow30,
@@ -118,8 +135,27 @@ class HomeController extends AbstractController
     }
 
     #[Route('/dashboard', name: 'app_dashboard_index', methods: ['GET'])]
-    public function dashboard(): Response
+    public function dashboard(Request $request): Response
     {
-        return $this->render('home/dashboard.html.twig');
+        try {
+            $cashCurrency = $this->resolveCashCurrency($request);
+        } catch (\InvalidArgumentException) {
+            return $this->redirectToRoute('app_dashboard_index', ['currency' => FiatCurrency::RUB->value]);
+        }
+
+        return $this->render('home/dashboard.html.twig', ['cashCurrency' => $cashCurrency]);
+    }
+
+    private function resolveCashCurrency(Request $request): FiatCurrency
+    {
+        $currency = $request->query->get('currency');
+        if (null === $currency) {
+            return FiatCurrency::RUB;
+        }
+        if (!is_string($currency)) {
+            throw new \InvalidArgumentException('Invalid cash currency.');
+        }
+
+        return FiatCurrency::fromCode($currency);
     }
 }

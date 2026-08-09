@@ -1,9 +1,9 @@
 ## Current checkpoint
 
-**Phase:** Stage 3
-**Status:** Stage 3 review green; preparing delivery
-**Stage base commit:** 9384ec7ec99ba0d1f921fa2e52bf8b8160cebce4
-**Current Work item:** Stage 3 delivery
+**Phase:** Stage 4
+**Status:** review gate complete; delivery in progress
+**Stage base commit:** 3c9cd4cd53dc07dadf4a06f541f69e52ce28163f
+**Current Work item:** 4.5
 **Owner gate:** no
 
 ### Completed
@@ -205,14 +205,101 @@
   - external review-fix cycles ended with final `REVIEW_GREEN`; both reported
     MINORs (currency validation and repository finality) are resolved;
   - Stage Report added under `stages/stage-3.md`.
+- Stage 3 delivered:
+  - commit `3c9cd4cd53dc07dadf4a06f541f69e52ce28163f` pushed without force;
+  - Draft PR #2310 updated and remains Draft;
+  - PR workflow at Stage 4 handoff: `in_progress` (run 4900).
+- Stage 4 frontend instructions recorded:
+  - `CLAUDE.frontend.md` hash:
+    `1d4176e3de4f865f37a185c3596b89bba334723bb26782de5eb31fa229ada22c`;
+  - `PATTERNS.md` hash:
+    `aee5498cae3cf96a6922103d931f4b92771171625e8512afa18135f0d52a09f7`;
+  - legacy frontend STOP language is supplementary and does not override the
+    explicit implementation instruction plus repository-root autonomous
+    Stage workflow; no Vite entry, dependency or UI Kit mutation is planned.
+- Stage 4 baseline:
+  - backend slice: 25 tests, 231 assertions, green;
+  - frontend lint and production build green; the existing missing
+    `@symfony/ux-turbo/package.json` warning remains unchanged.
+- Work item 4.1 complete:
+  - added a transfer form DTO preserving exact decimal strings and a hidden
+    UUIDv7 idempotency key;
+  - account choices are active, fiat, non-crypto and company-scoped, with
+    currency metadata exposed read-only;
+  - tampered foreign choices and missing dates remain validation errors;
+  - final form slice: 3 tests, 12 assertions, green.
+- Work item 4.2 complete:
+  - added create/show/delete/restore/deleted-list routes under
+    `/finance/cash-transfers` with `ROLE_USER`, company scoping and CSRF;
+  - the controller delegates all financial validation and atomic lifecycle to
+    `CashFacade`; JavaScript only mirrors account currency labels;
+  - show/deleted templates display both exact legs, effective quote direction,
+    real system category names and pair status;
+  - functional coverage proves idempotent resubmit, invalid-CSRF protection,
+    tenant isolation and atomic delete/restore.
+- Work item 4.3 complete:
+  - list/deleted-list screens resolve aggregate legs in one company-scoped
+    batch query, avoiding N+1 lookups;
+  - aggregate legs link to the transfer, are excluded from bulk selection and
+    do not expose edit/split/delete/individual-restore actions;
+  - direct split entry redirects to the aggregate; standalone transactions
+    and legacy `isTransfer=true` rows remain unchanged.
+- Work item 4.4 complete:
+  - dashboard selector supports RUB/USD/EUR/KZT, carries `currency` into the
+    snapshot API and persists currency plus active period in the URL;
+  - Cash widgets render in the selected currency while P&L widgets retain RUB;
+  - server-rendered home KPIs now filter active accounts and cashflow tree
+    totals by the selected currency instead of mixing fiat balances;
+  - unsupported home currency redirects to the explicit RUB default;
+  - frontend lint/build and Home functional coverage are green.
+- Work item 4.5 complete:
+  - complete bounded Cash/Analytics/Home run: 438 tests, 1977 assertions,
+    green;
+  - Doctrine mapping, Twig lint, test cache warmup, task-scoped PHP CS,
+    frontend lint/build and `git diff --check` are green;
+  - host-side Vite initially hit a root-owned generated `.vite` directory from
+    prior container output; the project `site-frontend` container build is
+    green without changing host permissions.
+  - internal independent Stage review is green after two safe MINOR fixes:
+    selected-currency cashflow KPI coverage and loading the existing dashboard
+    Vite entry on `/dashboard`;
+  - four initial external Claude attempts (ordinary
+    working diff, intent-to-add diff, fully staged diff, and full diff supplied
+    through stdin) each exhausted mandatory `--max-turns 40` without returning
+    findings or `REVIEW_GREEN`; preflight/auth succeeded every time;
+  - owner explicitly authorized `--max-turns 120` with all safe/read-only
+    restrictions unchanged; the first completed review ended `REVIEW_GREEN`;
+  - its one confirmed MINOR found an unsound count heuristic for the list
+    header checkbox when only one transfer leg is present after filtering;
+    calculation now compares current-page IDs with aggregate-leg map keys and
+    functional coverage reproduces the filtered one-leg boundary;
+  - two reviewer FOLLOW-UPs (response race guard and URL persistence for the
+    pre-existing period controls) remain outside the Stage 4 DoD;
+  - review-fix complete Stage run: 438 tests, 1978 assertions, green; focused
+    PHP CS is green;
+  - a second completed review ended `REVIEW_GREEN`; its safe MINORs were fixed
+    by reusing the current-page transaction IDs and adding a dedicated eager
+    detail lookup without changing generic lifecycle/persistence semantics;
+  - focused tests caught an invalid eager-join assumption for aggregates
+    persisted without splits, so detail and generic lookup paths were cleanly
+    separated; final transfer slice: 19 tests, 179 assertions, green;
+  - a third completed review ended `REVIEW_GREEN`; its two cosmetic MINORs
+    (unused frontend type field and inline test class names) were fixed;
+  - final functional repeat: 2 tests, 44 assertions; frontend lint and focused
+    PHP CS are green;
+  - final complete-diff external review ended `REVIEW_GREEN`; no BLOCKER or
+    IMPORTANT findings remain. Its currency-formatter MINOR was rejected as
+    confirmed pre-existing UI-Kit debt outside this Stage;
+  - Stage Report added under `stages/stage-4.md`.
 
 ### Current diff / affected files
-- `site/migrations/Version20260809120000.php` — expand-only transfer table.
-- `site/src/Cash/Entity/Transfer`, `Repository/Transfer`, `Service/Transfer`
-  and `ValueObject/Transfer` — aggregate and exact FX contract.
-- `site/src/Cash/Application/CreateCashTransferAction.php` plus command/result
-  DTOs and `CashFacade` — atomic public use case.
-- Transfer unit/integration tests, `ARCHITECTURE.md`, plan and checkpoint.
+- `site/src/Cash/Controller/Transfer`, `DTO/CashTransferFormData.php`,
+  `Form/Transfer` and `templates/cash/transfer` — transfer UI boundary.
+- Cash transaction controller/templates and transfer repository — aggregate
+  navigation and batch leg lookup.
+- Home controller/templates and existing dashboard React entry — selected
+  cash currency without a new entrypoint or dependency.
+- Transfer form/controller and Home functional tests, plan and checkpoint.
 
 ### Checks and baseline
 - Previous exploratory baseline on the prior branch:
@@ -235,17 +322,19 @@
 - Stage 3 internal complete review: green; no BLOCKER/IMPORTANT.
 - Stage 3 external complete review: final repeat `REVIEW_GREEN`; no unresolved
   BLOCKER, IMPORTANT or MINOR findings.
+- Stage 4 internal complete review: green; no BLOCKER/IMPORTANT findings.
+- Stage 4 external review: final complete-diff `--max-turns 120` repeat ended
+  `REVIEW_GREEN`; no unresolved in-scope BLOCKER, IMPORTANT or MINOR findings.
 - Unresolved BLOCKER/IMPORTANT: none.
 - Stage 1 FOLLOW-UP: consider a pre-flush account update contract if account editing is
   moved away from the current entity-bound form; keep the Doctrine callback as
   the global safety net until an equally comprehensive replacement exists.
-- Stage 2 FOLLOW-UP for planned Work item 3.1: require `companyId` in the
-  transaction-to-transfer lookup before production lifecycle callers use it.
 
 ### Exact next action
-- Commit and push the complete Stage 3 diff, update Draft PR #2310, record the
-  Stage 4 base commit and continue automatically because `owner_gate: no`.
+- Commit and push the green Stage 4 diff, update Draft PR #2310, then record
+  the Stage 5 base commit and continue autonomously with Work item 5.1.
 
 ### Files to inspect first on resume
-- `ARCHITECTURE.md`
-- complete Stage diff from `9384ec7ec99ba0d1f921fa2e52bf8b8160cebce4`.
+- Stage 4 diff from `3c9cd4cd53dc07dadf4a06f541f69e52ce28163f`.
+- Transfer controller/form/templates and linked transaction UI.
+- Home currency filtering and dashboard selector/query propagation.

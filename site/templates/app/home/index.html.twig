@@ -3,8 +3,8 @@
 {% set app_breadcrumb = 'Финансовый обзор' %}
 {% set app_nav_active = 'home' %}
 
-{% macro rubles(value) %}
-    {% if value < 0 %}−{% endif %}{{ value|abs|number_format(0, ',', ' ') }} ₽
+{% macro money(value, currency) %}
+    {% if value < 0 %}−{% endif %}{{ value|abs|number_format(0, ',', ' ') }} {{ currency }}
 {% endmacro %}
 
 {% block title %}Финансовый обзор{% endblock %}
@@ -17,30 +17,39 @@
                 Финансовый обзор
                 <span class="wz-sub">Ключевые показатели компании на текущую дату</span>
             </h1>
+            <form method="get" class="wz-head-actions">
+                <label class="sr-only" for="app-dashboard-currency">Валюта ДДС</label>
+                <select id="app-dashboard-currency" name="currency" class="select">
+                    {% for currency in cashCurrencies %}
+                        <option value="{{ currency.value }}" {{ currency == cashCurrency ? 'selected' : '' }}>{{ currency.value }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-md btn-primary">Применить</button>
+            </form>
         </header>
 
         <div class="wz-row" aria-label="Ключевые финансовые показатели">
             <article class="kpi kpi--dark">
                 <div class="kpi-label">Остаток на сегодня</div>
-                <div class="kpi-value kpi-value--hero money">{{ _self.rubles(kpi.todayBalance) }}</div>
+                <div class="kpi-value kpi-value--hero money">{{ _self.money(kpi.todayBalance, cashCurrency.value) }}</div>
                 <div class="kpi-meta">По активным денежным счетам</div>
             </article>
 
             <article class="kpi kpi--accent-success">
                 <div class="kpi-label">Приход</div>
-                <div class="kpi-value money">{{ _self.rubles(kpi.inflow30) }}</div>
+                <div class="kpi-value money">{{ _self.money(kpi.inflow30, cashCurrency.value) }}</div>
                 <div class="kpi-meta">Последние 30 дней</div>
             </article>
 
             <article class="kpi kpi--accent-danger">
                 <div class="kpi-label">Расход</div>
-                <div class="kpi-value money">{{ _self.rubles(kpi.outflow30) }}</div>
+                <div class="kpi-value money">{{ _self.money(kpi.outflow30, cashCurrency.value) }}</div>
                 <div class="kpi-meta">Последние 30 дней</div>
             </article>
 
             <article class="kpi kpi--accent-primary">
                 <div class="kpi-label">Чистый поток</div>
-                <div class="kpi-value money">{{ _self.rubles(net_flow) }}</div>
+                <div class="kpi-value money">{{ _self.money(net_flow, cashCurrency.value) }}</div>
                 <div class="kpi-meta">Приход минус расход за 30 дней</div>
             </article>
         </div>

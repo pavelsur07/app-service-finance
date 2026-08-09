@@ -172,7 +172,7 @@ Risk: MEDIUM
 owner_gate: no
 release_candidate: yes
 independently_deployable: yes
-stage_base_commit: TBD — зафиксировать после commit Stage 3
+stage_base_commit: 3c9cd4cd53dc07dadf4a06f541f69e52ce28163f
 
 Definition of Done:
 - Пользователь может открыть форму, выбрать дату, исходный/целевой счёт,

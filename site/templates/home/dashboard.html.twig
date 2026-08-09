@@ -2,6 +2,11 @@
 
 {% block title %}Dashboard{% endblock %}
 
+{% block importmap %}
+  {{ parent() }}
+  {{ vite_entry_script_tags('dashboard') }}
+{% endblock %}
+
 {% block content %}
   <div class="page-header d-print-none mb-3">
     <div class="container-xl">
@@ -11,6 +16,6 @@
   </div>
 
   <div class="container-xl">
-    <div id="react-dashboard-started" data-default-preset="month"></div>
+    <div id="react-dashboard-started" data-default-preset="month" data-default-currency="{{ cashCurrency.value }}"></div>
   </div>
 {% endblock %}

@@ -5,6 +5,7 @@
 {% block content %}
 <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
     <h2 class="page-title mb-0">Удалённые транзакции ДДС</h2>
+    <a href="{{ path('cash_transfer_deleted_index') }}" class="btn btn-outline-secondary ms-auto">Удалённые переводы</a>
 </div>
 
 <div class="card">
@@ -36,6 +37,7 @@
             </thead>
             <tbody>
             {% for tx in transactions %}
+                {% set transfer = transferByTransactionId[tx.id]|default(null) %}
                 <tr>
                     <td>{{ tx.deletedAt ? tx.deletedAt|date('d.m.Y H:i') : '—' }}</td>
                     <td class="text-end text-nowrap">
@@ -48,10 +50,14 @@
                         <div class="text-muted small">{% if tx.splits is empty %}—{% else %}{% for s in tx.splits %}{{ s.cashflowCategory.name }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}</div>
                     </td>
                     <td class="text-end">
+                        {% if transfer %}
+                            <a href="{{ path('cash_transfer_show', {id: transfer.id}) }}" class="btn btn-outline-secondary btn-sm">Открыть перевод</a>
+                        {% else %}
                         <form method="post" action="{{ path('cash_transaction_restore', {id: tx.id}) }}">
                             <input type="hidden" name="_token" value="{{ csrf_token('tx_restore' ~ tx.id) }}">
                             <button type="submit" class="btn btn-outline-primary btn-sm">Восстановить</button>
                         </form>
+                        {% endif %}
                     </td>
                 </tr>
             {% else %}
