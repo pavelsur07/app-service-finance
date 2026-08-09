@@ -48,5 +48,10 @@ final class ReportAccountBalancesControllerTest extends WebTestCaseBase
         $client->request('GET', '/finance/reports/account-balances');
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('h2.page-title', 'Остатки по счетам / кассам / кошелькам');
+
+        $client->request('POST', '/finance/reports/account-balances/recalc', [
+            '_token' => 'invalid',
+        ]);
+        self::assertResponseRedirects('/finance/reports/account-balances');
     }
 }
