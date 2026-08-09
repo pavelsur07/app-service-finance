@@ -100,14 +100,14 @@
                                 <input type="checkbox" class="form-check-input m-0" id="select-all"
                                        aria-label="Выбрать все листинги на странице">
                             </th>
-                            <th>Маркетплейс</th>
-                            <th>Marketplace SKU</th>
-                            <th>Supplier SKU</th>
+                            <th>Маркет</th>
+                            <th>SKU</th>
+                            <th>Наименование</th>
+                            <th>Артикул</th>
                             <th>Размер</th>
                             <th>Цена</th>
                             <th>Товар</th>
                             <th>Теги</th>
-                            <th>Создан</th>
                             <th class="w-1"></th>
                         </tr>
                         </thead>
@@ -122,13 +122,20 @@
                                 <td><span class="badge bg-azure-lt">{{ listing.marketplace.value|upper }}</span></td>
                                 <td><strong>{{ listing.marketplaceSku }}</strong></td>
                                 <td>
+                                    {% if listing.name %}
+                                        <span class="text-truncate d-inline-block" style="max-width:220px" title="{{ listing.name }}">{{ listing.name }}</span>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
                                     {% if listing.supplierSku %}
                                         <code>{{ listing.supplierSku }}</code>
                                     {% else %}
                                         <span class="text-muted">—</span>
                                     {% endif %}
                                 </td>
-                                <td>{{ listing.size }}</td>
+                                <td>{% include 'marketplace/listings/_listing_size.html.twig' with {size: listing.size} only %}</td>
                                 <td>{{ listing.price }} ₽</td>
                                 <td>
                                     {% if listing.product %}
@@ -165,7 +172,6 @@
                                         {% endfor %}
                                     </div>
                                 </td>
-                                <td><span class="text-muted">{{ listing.createdAt|date('d.m.Y') }}</span></td>
                                 <td>
                                     {% if listing.product %}
                                         <button class="btn btn-sm btn-ghost-secondary map-listing-btn"
