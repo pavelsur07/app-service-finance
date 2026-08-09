@@ -1,6 +1,6 @@
 {% extends 'marketplace/layout.html.twig' %}
 
-{% set active_tab = 'marketplace' %}
+{% set active_tab = 'connections' %}
 
 {% block tab_content %}
     <div class="container-xl">
@@ -37,7 +37,7 @@
 
                     <div class="form-footer">
                         <button type="submit" class="btn btn-primary">Сохранить</button>
-                        <a href="{{ path('marketplace_index') }}" class="btn btn-link">Отмена</a>
+                        <a href="{{ path('marketplace_connections_index') }}" class="btn btn-link">Отмена</a>
                     </div>
 
                 </form>
