@@ -6,6 +6,7 @@ use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\DTO\CashTransactionFilters;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleApplyMode;
 use App\Cash\Form\Transaction\CashTransactionType;
 use App\Cash\Message\EnqueueAutoRulesForRange;
@@ -49,7 +50,13 @@ class CashTransactionController extends AbstractController
     ): Response {
         $company = $this->companyService->getActiveCompany();
 
-        $filters = CashTransactionFilters::fromQuery($request->query->all());
+        try {
+            $filters = CashTransactionFilters::fromQuery($request->query->all());
+        } catch (\InvalidArgumentException $exception) {
+            $this->addFlash('danger', $exception->getMessage());
+
+            return $this->redirectToRoute('cash_transaction_index');
+        }
 
         $page = max(1, (int) $request->query->get('page', 1));
         $limit = 20;
@@ -69,6 +76,7 @@ class CashTransactionController extends AbstractController
             'accounts' => $accounts,
             'categories' => $categories,
             'counterparties' => $counterparties,
+            'currencies' => FiatCurrency::cases(),
             'pager' => $pager,
         ]);
     }
@@ -289,6 +297,13 @@ class CashTransactionController extends AbstractController
         if ($tx->getCompany() !== $company) {
             throw $this->createNotFoundException();
         }
+        try {
+            $service->assertStandaloneTransaction($tx);
+        } catch (\DomainException $exception) {
+            $this->addFlash('danger', $exception->getMessage());
+
+            return $this->redirectToRoute('cash_transaction_show', ['id' => $tx->getId()]);
+        }
 
         $dto = new CashTransactionDTO();
         $dto->occurredAt = $tx->getOccurredAt();
@@ -354,8 +369,12 @@ class CashTransactionController extends AbstractController
             return $this->redirectToRoute('cash_transaction_deleted_index');
         }
 
-        $service->restore($tx);
-        $this->addFlash('success', 'Транзакция восстановлена');
+        try {
+            $service->restore($tx);
+            $this->addFlash('success', 'Транзакция восстановлена');
+        } catch (\DomainException $exception) {
+            $this->addFlash('danger', $exception->getMessage());
+        }
 
         return $this->redirectToRoute('cash_transaction_deleted_index');
     }

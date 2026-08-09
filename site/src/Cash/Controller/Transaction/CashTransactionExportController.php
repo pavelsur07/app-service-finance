@@ -28,7 +28,13 @@ final class CashTransactionExportController extends AbstractController
     public function __invoke(Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
-        $filters = CashTransactionFilters::fromQuery($request->query->all());
+        try {
+            $filters = CashTransactionFilters::fromQuery($request->query->all());
+        } catch (\InvalidArgumentException $exception) {
+            $this->addFlash('danger', $exception->getMessage());
+
+            return $this->redirectToRoute('cash_transaction_index');
+        }
 
         $from = $this->isoDateOrNull($filters['dateFrom']);
         $to = $this->isoDateOrNull($filters['dateTo']);

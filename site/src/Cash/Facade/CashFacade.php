@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Facade;
 
+use App\Cash\Application\CashTransferLifecycleAction;
 use App\Cash\Application\CreateCashTransferAction;
 use App\Cash\Application\DTO\AutoRuleConditionInput;
 use App\Cash\Application\DTO\AutoRuleInput;
@@ -48,12 +49,27 @@ final readonly class CashFacade
         private SaveCashflowCategoryAction $saveCategory,
         private SaveCashTransactionAutoRuleAction $saveAutoRule,
         private CreateCashTransferAction $createCashTransfer,
+        private CashTransferLifecycleAction $cashTransferLifecycle,
     ) {
     }
 
     public function createTransfer(CreateCashTransferCommand $command): CreateCashTransferResult
     {
         return ($this->createCashTransfer)($command);
+    }
+
+    public function deleteTransfer(
+        string $companyId,
+        string $transferId,
+        ?string $actorUserId = null,
+        ?string $reason = null,
+    ): void {
+        $this->cashTransferLifecycle->delete($companyId, $transferId, $actorUserId, $reason);
+    }
+
+    public function restoreTransfer(string $companyId, string $transferId, ?string $actorUserId = null): void
+    {
+        $this->cashTransferLifecycle->restore($companyId, $transferId, $actorUserId);
     }
 
     /**

@@ -55,6 +55,15 @@
                     </select>
                 </div>
                 <div class="col-12 col-sm-6">
+                    <label class="form-label" for="filter-currency">Валюта</label>
+                    <select id="filter-currency" name="currency" class="form-select">
+                        <option value="">Все</option>
+                        {% for currency in currencies %}
+                            <option value="{{ currency.value }}" {% if filters.currency == currency.value %}selected{% endif %}>{{ currency.value }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12 col-sm-6">
                     <label class="form-label" for="filter-amount-min">Сумма от</label>
                     <input type="number" step="0.01" id="filter-amount-min" name="amountMin" value="{{ filters.amountMin ?? '' }}" class="form-control" />
                 </div>

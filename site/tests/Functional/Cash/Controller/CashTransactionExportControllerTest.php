@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Cash\Controller;
 
+use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Infrastructure\Export\CashTransactionXlsxExporter;
 use App\Company\Entity\Company;
@@ -147,6 +148,56 @@ final class CashTransactionExportControllerTest extends WebTestCaseBase
         self::assertSame(['Своя операция'], $descriptions);
     }
 
+    public function testExportAppliesCurrencyFilter(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        $em = $this->em();
+
+        $owner = UserBuilder::aUser()->withEmail('cash-export-currency@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
+        $rubAccount = MoneyAccountBuilder::aMoneyAccount()
+            ->withId(Uuid::uuid4()->toString())
+            ->forCompany($company)
+            ->withName('RUB account')
+            ->withCurrency('RUB')
+            ->build();
+        $usdAccount = MoneyAccountBuilder::aMoneyAccount()
+            ->withId(Uuid::uuid4()->toString())
+            ->forCompany($company)
+            ->withName('USD account')
+            ->withCurrency('USD')
+            ->build();
+
+        $em->persist($owner);
+        $em->persist($company);
+        $em->persist($rubAccount);
+        $em->persist($usdAccount);
+        foreach ([[$rubAccount, 'RUB export row'], [$usdAccount, 'USD export row']] as [$account, $description]) {
+            $transaction = new CashTransaction(
+                Uuid::uuid4()->toString(),
+                $company,
+                $account,
+                CashDirection::OUTFLOW,
+                '10.00',
+                $account->getCurrency(),
+                new \DateTimeImmutable('2026-01-15'),
+            );
+            $transaction->setDescription($description);
+            $em->persist($transaction);
+        }
+        $em->flush();
+
+        $this->authenticate($client, $owner, $company);
+        $client->request('GET', self::PERIOD_URL.'&currency=USD');
+
+        self::assertResponseIsSuccessful();
+        $rows = $this->readXlsxRows((string) $client->getInternalResponse()->getContent());
+        self::assertCount(2, $rows);
+        self::assertSame('USD account', $rows[1][1]);
+        self::assertSame('USD export row', $rows[1][4]);
+    }
+
     public function testMalformedPeriodRedirectsInsteadOfBreakingTheDownload(): void
     {
         $client = static::createClient();
@@ -161,6 +212,24 @@ final class CashTransactionExportControllerTest extends WebTestCaseBase
 
         $this->authenticate($client, $owner, $company);
         $client->request('GET', '/finance/cash-transactions/export?dateFrom=не-дата&dateTo=2026-01-31');
+
+        self::assertResponseRedirects('/finance/cash-transactions/');
+    }
+
+    public function testUnsupportedCurrencyRedirectsInsteadOfExporting(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        $em = $this->em();
+
+        $owner = UserBuilder::aUser()->withEmail('cash-export-bad-currency@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
+        $em->persist($owner);
+        $em->persist($company);
+        $em->flush();
+
+        $this->authenticate($client, $owner, $company);
+        $client->request('GET', self::PERIOD_URL.'&currency=BTC');
 
         self::assertResponseRedirects('/finance/cash-transactions/');
     }

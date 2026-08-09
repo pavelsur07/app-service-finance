@@ -128,7 +128,7 @@ Risk: HIGH-LOCAL
 owner_gate: no
 release_candidate: no
 independently_deployable: yes
-stage_base_commit: TBD — зафиксировать после commit Stage 2
+stage_base_commit: 9384ec7ec99ba0d1f921fa2e52bf8b8160cebce4
 
 Definition of Done:
 - Перевод удаляется и восстанавливается только целиком и атомарно; период,

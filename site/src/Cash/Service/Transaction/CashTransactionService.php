@@ -19,6 +19,7 @@ use App\Cash\Exception\FinancePeriodLockedException;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
+use App\Cash\Repository\Transfer\CashTransferRepository;
 use App\Cash\Service\PaymentPlan\PaymentPlanMatcher;
 use App\Cash\Service\Vat\VatCalculator;
 use App\Cash\Service\Vat\VatPolicy;
@@ -45,6 +46,7 @@ final class CashTransactionService
         private readonly CompanyFacade $companyFacade,
         private readonly MoneyAccountRepository $moneyAccountRepository,
         private readonly CashflowCategoryRepository $cashflowCategoryRepository,
+        private readonly CashTransferRepository $cashTransferRepository,
     ) {
     }
 
@@ -160,6 +162,8 @@ final class CashTransactionService
      */
     public function update(CashTransaction $tx, CashTransactionDTO $dto): CashTransaction
     {
+        $this->assertStandaloneTransaction($tx);
+
         $company = $tx->getCompany();
         $oldAccount = $tx->getMoneyAccount();
         $oldDate = $tx->getOccurredAt();
@@ -310,6 +314,8 @@ final class CashTransactionService
      */
     public function delete(CashTransaction $tx, ?string $userId = null, ?string $reason = null): void
     {
+        $this->assertStandaloneTransaction($tx);
+
         $company = $tx->getCompany();
 
         // --- Безопасность: нельзя удалять транзакцию из закрытого периода
@@ -339,6 +345,8 @@ final class CashTransactionService
      */
     public function restore(CashTransaction $tx): void
     {
+        $this->assertStandaloneTransaction($tx);
+
         $company = $tx->getCompany();
 
         // --- Безопасность: нельзя восстанавливать транзакцию из закрытого периода
@@ -356,6 +364,16 @@ final class CashTransactionService
 
         // Пересчёт по счёту
         $this->recalculator->recalcRange($company, $from, $to, [$account->getId()]);
+    }
+
+    public function assertStandaloneTransaction(CashTransaction $transaction): void
+    {
+        if (null !== $this->cashTransferRepository->findOneByTransactionAndCompanyId(
+            $transaction,
+            (string) $transaction->getCompany()->getId(),
+        )) {
+            throw new \DomainException('Операцию перевода нельзя изменить отдельно. Откройте связанный перевод.');
+        }
     }
 
     /**

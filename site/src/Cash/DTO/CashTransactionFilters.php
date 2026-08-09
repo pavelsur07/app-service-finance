@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Cash\DTO;
 
+use App\Cash\Enum\FiatCurrency;
+
 /**
  * Разбор фильтров списка операций ДДС из query string.
  *
@@ -18,6 +20,7 @@ final readonly class CashTransactionFilters
         'categoryId',
         'counterpartyId',
         'direction',
+        'currency',
         'amountMin',
         'amountMax',
         'q',
@@ -34,6 +37,9 @@ final readonly class CashTransactionFilters
         foreach (self::KEYS as $key) {
             $value = $query[$key] ?? null;
             $filters[$key] = is_string($value) && '' !== $value ? $value : null;
+        }
+        if (null !== $filters['currency']) {
+            $filters['currency'] = FiatCurrency::fromCode($filters['currency'])->value;
         }
 
         return $filters;

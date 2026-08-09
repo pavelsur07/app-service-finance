@@ -1,9 +1,9 @@
 ## Current checkpoint
 
-**Phase:** Stage 2
-**Status:** REVIEW_GREEN — delivery in progress
-**Stage base commit:** e339b3dabdde1c8c893dc19e7bc0143699d08dac
-**Current Work item:** Stage boundary
+**Phase:** Stage 3
+**Status:** Stage 3 review green; preparing delivery
+**Stage base commit:** 9384ec7ec99ba0d1f921fa2e52bf8b8160cebce4
+**Current Work item:** Stage 3 delivery
 **Owner gate:** no
 
 ### Completed
@@ -137,6 +137,74 @@
   - final external complete-diff repeat: `REVIEW_GREEN`;
   - Stage Report added under `stages/stage-2.md`;
   - no unresolved BLOCKER or IMPORTANT findings.
+- Stage 2 delivered:
+  - commit `9384ec7ec99ba0d1f921fa2e52bf8b8160cebce4` pushed without force;
+  - Draft PR #2310 updated and remains Draft;
+  - CI at Stage 3 handoff: detect-changes green; isolated migrations, unit and
+    API type checks in progress; production migrations job skipped.
+- Stage 3 baseline: 26 tests, 133 assertions, green.
+- Work item 3.1 complete:
+  - added row-locked, company-scoped transfer delete/restore through
+    `CashFacade`; aggregate and both legs change state atomically;
+  - lifecycle validates current pair consistency and closed periods before
+    mutation, then repeats validation under `PESSIMISTIC_WRITE` lock;
+  - aggregate and both leg audit rows preserve the supplied actor; balance
+    recalculation uses deterministic account order and snapshot cache is
+    invalidated once after commit;
+  - a balance failure after lifecycle flush proved rollback of aggregate,
+    legs and audits;
+  - ordinary edit/delete/restore, manual split edit and bulk delete reject an
+    aggregate leg, while legacy `isTransfer=true` without an aggregate remains
+    mutable;
+  - transaction-to-transfer queries now require company scope and parenthesize
+    source/target OR branches to preserve tenant filtering;
+  - red-cycle fixed expected preflight exceptions closing EntityManager, a
+    stale ORM read after DBAL balance upsert and repository testability;
+  - final lifecycle/generic-guard slice: 52 tests, 267 assertions, green.
+- Work item 3.2 complete:
+  - verified the existing cashflow read model consumes transfer split rows,
+    keeps totals keyed by currency and excludes both soft-deleted legs;
+  - same-currency USD reports `CF_TECH_OUT=-100`, `CF_TECH_IN=+100` and zero
+    technical-root/account net;
+  - cross-currency RUB→EUR reports independent `RUB=-10000` and `EUR=+100`
+    movements without conversion or a mixed total;
+  - deleting the aggregate removes both movements and returns each currency
+    closing to zero;
+  - cashflow/transfer slice: 18 tests, 156 assertions, green.
+- Work item 3.3 complete:
+  - dashboard API accepts a validated fiat `currency` and defaults to `RUB`;
+  - snapshot context, telemetry, warmup output and cache key carry the selected
+    `cash_currency`, so cached RUB/USD/EUR/KZT snapshots cannot collide;
+  - free cash, funds, inflow, outflow, CAPEX, cashflow split and top-cash
+    queries filter by currency before aggregation, while revenue/profit/top-P&L
+    builders remain unchanged;
+  - every Cash drilldown propagates the selected currency;
+  - functional coverage proves separate RUB/USD cash totals and identical P&L
+    payloads; unsupported currency returns 422;
+  - analytics/dashboard slice: 17 tests, 180 assertions, green.
+- Work item 3.4 complete:
+  - the shared list/export filter contract now carries an explicit currency;
+  - the company-scoped repository applies currency before pagination or XLSX
+    projection, so the screen and export cannot diverge;
+  - the list filter exposes all supported fiat currencies and current query
+    context is retained in pagination and the export link;
+  - functional coverage combines 21 USD rows, a RUB row and a foreign-tenant
+    USD row to prove currency filtering, page boundaries, tenant isolation and
+    unfiltered backward compatibility;
+  - final list/export slice with invalid-currency coverage: 10 tests,
+    49 assertions, green.
+- Work item 3.5 complete:
+  - `ARCHITECTURE.md` documents atomic transfer lifecycle, generic mutation
+    guards, report behavior, dashboard currency/cache contract and list/export;
+  - final combined Unit/Integration/Functional Cash+Analytics run: 439 tests,
+    1962 assertions, green;
+  - Doctrine mapping, warmup help, Twig lint, Stage-owned PHP CS and
+    `git diff --check` are green;
+  - whole-repository CS remains red on 581 pre-existing unrelated files;
+  - internal review is green;
+  - external review-fix cycles ended with final `REVIEW_GREEN`; both reported
+    MINORs (currency validation and repository finality) are resolved;
+  - Stage Report added under `stages/stage-3.md`.
 
 ### Current diff / affected files
 - `site/migrations/Version20260809120000.php` — expand-only transfer table.
@@ -164,6 +232,9 @@
 - Stage 2 internal complete review: green; no BLOCKER/IMPORTANT findings.
 - Stage 2 external complete review: final repeat `REVIEW_GREEN` after the
   idempotency caller contract was documented.
+- Stage 3 internal complete review: green; no BLOCKER/IMPORTANT.
+- Stage 3 external complete review: final repeat `REVIEW_GREEN`; no unresolved
+  BLOCKER, IMPORTANT or MINOR findings.
 - Unresolved BLOCKER/IMPORTANT: none.
 - Stage 1 FOLLOW-UP: consider a pre-flush account update contract if account editing is
   moved away from the current entity-bound form; keep the Doctrine callback as
@@ -172,12 +243,9 @@
   transaction-to-transfer lookup before production lifecycle callers use it.
 
 ### Exact next action
-- Commit and push the reviewed Stage 2 diff, update Draft PR #2310, record the
-  new HEAD as Stage 3 base and continue automatically with Work item 3.1.
+- Commit and push the complete Stage 3 diff, update Draft PR #2310, record the
+  Stage 4 base commit and continue automatically because `owner_gate: no`.
 
 ### Files to inspect first on resume
-- `site/src/Cash/Repository/Transfer/CashTransferRepository.php`
-- `site/src/Cash/Application/BulkDeleteCashTransactionsAction.php`
-- `site/src/Cash/Service/Transaction/CashTransactionService.php`
-- `site/src/Cash/Controller/Transaction/CashTransactionController.php`
-- `site/src/Cash/Entity/Transfer/CashTransfer.php`
+- `ARCHITECTURE.md`
+- complete Stage diff from `9384ec7ec99ba0d1f921fa2e52bf8b8160cebce4`.

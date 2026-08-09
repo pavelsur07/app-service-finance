@@ -5,6 +5,7 @@ namespace App\Analytics\Controller\Api\V1;
 use App\Analytics\Api\Request\SnapshotQuery;
 use App\Analytics\Application\DashboardSnapshotService;
 use App\Analytics\Application\PeriodResolver;
+use App\Cash\Enum\FiatCurrency;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -26,11 +27,14 @@ final class DashboardSnapshotController extends AbstractController
     public function __invoke(Request $request): JsonResponse
     {
         try {
-            $period = $this->periodResolver->resolve(new SnapshotQuery(
+            $query = new SnapshotQuery(
                 preset: $this->stringOrNull($request->query->get('preset')),
                 from: $this->stringOrNull($request->query->get('from')),
                 to: $this->stringOrNull($request->query->get('to')),
-            ));
+                currency: $this->stringOrNull($request->query->get('currency')),
+            );
+            $period = $this->periodResolver->resolve($query);
+            $cashCurrency = FiatCurrency::fromCode($query->currency ?? FiatCurrency::RUB->value);
         } catch (\InvalidArgumentException $exception) {
             return $this->json([
                 'type' => 'validation_error',
@@ -39,12 +43,13 @@ final class DashboardSnapshotController extends AbstractController
                     'preset' => $request->query->get('preset'),
                     'from' => $request->query->get('from'),
                     'to' => $request->query->get('to'),
+                    'currency' => $request->query->get('currency'),
                 ],
             ], 422);
         }
 
         $company = $this->activeCompanyService->getActiveCompany();
-        $snapshot = $this->dashboardSnapshotService->getSnapshot($company, $period);
+        $snapshot = $this->dashboardSnapshotService->getSnapshot($company, $period, $cashCurrency);
 
         return $this->json($snapshot->toArray());
     }

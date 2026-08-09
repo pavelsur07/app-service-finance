@@ -48,6 +48,7 @@ final class DashboardSnapshotGoldenTest extends WebTestCaseBase
         self::assertGreaterThan(0, count($payload['widgets']['top_cash']['items'] ?? []));
         self::assertGreaterThan(0, count($payload['widgets']['top_pnl']['items'] ?? []));
         self::assertArrayHasKey('last_updated_at', $payload['context']);
+        self::assertSame('RUB', $payload['context']['cash_currency']);
 
         // Golden values from A22 fixture rules for current month.
         $expectedInflow = 400000.0 + 10000.0;

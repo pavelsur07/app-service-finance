@@ -813,9 +813,32 @@ updatePLRegisterForDocument(string $documentId): void
   payload; повтор всегда возвращает исходный агрегат.
 - Технические ноги обходят VAT, `PaymentPlanMatcher` и автоправила. Комиссия
   банка является отдельной обычной исходящей операцией, а не третьей ногой.
-- Поля soft-delete на агрегате зарезервированы для атомарного lifecycle пары в
-  следующем Stage. Legacy-транзакции с `isTransfer=true`, не связанные с
-  `cash_transfer`, не спариваются и не изменяются автоматически.
+- `CashTransferLifecycleAction` удаляет или восстанавливает агрегат и обе ноги
+  только вместе, под company-scoped pessimistic lock и в одной DB-транзакции.
+  Операция повторно проверяет состояние пары и открытость периода, пишет аудит
+  агрегата и обеих ног, пересчитывает оба счёта в стабильном UUID-порядке и
+  инвалидирует snapshot cache один раз после commit.
+- Обычные edit/delete/restore, ручная разбивка и bulk-delete отвергают
+  транзакцию, если она является ногой `cash_transfer`. Legacy-транзакции с
+  `isTransfer=true`, не связанные с агрегатом, сохраняют прежнее поведение и
+  не спариваются автоматически.
+- ДДС-отчёт читает технические split-строки в исходной валюте каждой ноги:
+  same-currency перевод даёт нулевой net, а cross-currency перевод остаётся
+  двумя независимыми движениями без пересчёта и смешанного итога. Soft-delete
+  агрегата исключает из отчёта обе ноги.
+
+### Analytics dashboard: валюта Cash-виджетов
+
+- `GET /api/dashboard/v1/snapshot` принимает `currency` из `FiatCurrency` и
+  по умолчанию использует `RUB`. Ответ возвращает выбранную валюту в
+  `context.cash_currency`; cache key, telemetry, warmup и Cash drilldowns
+  содержат тот же код валюты.
+- Free cash, зарезервированные фонды, inflow/outflow, CAPEX, cashflow split и
+  top-cash фильтруются по валюте до `SUM`. Revenue, profit и top-P&L не зависят
+  от Cash currency selector и сохраняют текущую семантику ОПиУ.
+- Список операций и XLSX export используют единый `CashTransactionFilters` и
+  поддерживают `currency`; company scope применяется независимо от фильтра,
+  а пустой параметр сохраняет прежний список всех валют без их агрегации.
 
 ### `CashFacade` (`src/Cash/Facade/CashFacade.php`)
 ```php
@@ -824,6 +847,12 @@ createTransaction(CreateCashTransactionCommand $command): CreateCashTransactionR
 
 // Атомарно создать перевод между двумя счетами (идемпотентно в пределах компании)
 createTransfer(CreateCashTransferCommand $command): CreateCashTransferResult
+
+// Атомарно soft-delete агрегат и обе ноги
+deleteTransfer(string $companyId, string $transferId, ?string $actorUserId = null, ?string $reason = null): void
+
+// Атомарно восстановить агрегат и обе ноги
+restoreTransfer(string $companyId, string $transferId, ?string $actorUserId = null): void
 
 // Чтение: постраничный список транзакций компании, per_page ≤ CashFacade::MAX_PER_PAGE (200)
 listTransactions(string $companyId, array $filters = [], int $page = 1, int $perPage = 50): array
@@ -2706,6 +2735,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.74 | 2026-08-09 | Cash: атомарный lifecycle пары перевода, защищённые generic mutations, currency-safe отчёт/дашборд/list/export |
 | 1.73 | 2026-08-09 | Cash: атомарный агрегат перевода, две технические ноги, точный effective FX rate и company-scoped idempotency |
 | 1.72 | 2026-08-09 | Cash: единый fiat-контракт RUB/USD/EUR/KZT, неизменяемая валюта счёта, company-scoped transaction writers, currency-safe imports и RUB-only PaymentPlan matching |
 | 1.71 | 2026-08-04 | Company: `CompanyFacade::listAccessibleCompaniesForUser()` и `userHasAccess()` — доступ и список компаний пользователя (owned + активный CompanyMember), для межкомпанийных операций (Finance: импорт дерева ОПиУ между своими компаниями) |

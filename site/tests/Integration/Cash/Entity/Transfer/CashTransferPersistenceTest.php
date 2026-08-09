@@ -9,6 +9,7 @@ use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transfer\CashTransfer;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Repository\Transfer\CashTransferRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -83,7 +84,8 @@ final class CashTransferPersistenceTest extends IntegrationTestCase
         $byId = $repository->findOneByIdAndCompanyId($transferId, $companyId);
         $byKey = $repository->findOneByCompanyIdAndIdempotencyKey($companyId, 'transfer-persistence-1');
         $sourceReference = $this->em->getReference(CashTransaction::class, $sourceId);
-        $byLeg = $repository->findOneByTransaction($sourceReference);
+        $byLeg = $repository->findOneByTransactionAndCompanyId($sourceReference, $companyId);
+        $transactionRepository = self::getContainer()->get(CashTransactionRepository::class);
 
         self::assertNotNull($byId);
         self::assertSame($transferId, $byKey?->getId());
@@ -92,5 +94,8 @@ final class CashTransferPersistenceTest extends IntegrationTestCase
         self::assertSame('RUB', $byId->getRateBaseCurrency());
         self::assertSame('USD', $byId->getRateQuoteCurrency());
         self::assertSame(CashTransfer::RATE_SOURCE_MANUAL_EFFECTIVE, $byId->getRateSource());
+        self::assertTrue($transactionRepository->hasAnyTransferAggregateByIdsAndCompanyId([$sourceId], $companyId));
+        self::assertNull($repository->findOneByTransactionAndCompanyId($sourceReference, Uuid::uuid4()->toString()));
+        self::assertFalse($transactionRepository->hasAnyTransferAggregateByIdsAndCompanyId([$sourceId], Uuid::uuid4()->toString()));
     }
 }
