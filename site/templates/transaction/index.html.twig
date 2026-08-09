@@ -85,7 +85,7 @@
     <div class="col-12">
         <div class="card cashflow-ops"
              data-csrf-token="{{ csrf_token('cash_transaction_create_from') }}">
-            <div class="card-header card-head">
+            <div class="card-header card-head d-flex align-items-center gap-3 flex-wrap">
                 <ul class="nav nav-tabs card-header-tabs">
                     <li class="nav-item">
                         <a class="nav-link active" href="{{ path('cash_transaction_index') }}">Все</a>
@@ -100,11 +100,27 @@
                         <a class="nav-link" href="{{ path('cash_transaction_auto_rule_apply_page') }}">Авто-правило прим.</a>
                     </li>
                 </ul>
+                <button type="button"
+                        class="btn btn-danger ms-auto"
+                        id="bulk-delete-button"
+                        data-bs-toggle="modal"
+                        data-bs-target="#bulkDeleteModal"
+                        disabled>
+                    <i class="ti ti-trash me-1"></i>
+                    <span id="bulk-delete-button-label">Удалить</span>
+                </button>
             </div>
             <div class="table-responsive">
                 <table class="table card-table table-vcenter">
                     <thead class="sticky-top">
                         <tr>
+                            <th class="w-1">
+                                <input type="checkbox"
+                                       class="form-check-input m-0"
+                                       id="cash-transactions-select-all"
+                                       aria-label="Выбрать все транзакции на странице"
+                                       {{ transactions is empty ? 'disabled' : '' }}>
+                            </th>
                             <th>Дата</th>
                             <th>Счет</th>
                             <th class="text-center text-nowrap">ОПиУ</th>
@@ -117,6 +133,12 @@
                     <tbody>
                     {% for tx in transactions %}
                         <tr>
+                            <td>
+                                <input type="checkbox"
+                                       class="form-check-input m-0 js-cash-transaction-select"
+                                       value="{{ tx.id }}"
+                                       aria-label="Выбрать транзакцию от {{ tx.occurredAt|date('d.m.Y') }}">
+                            </td>
                             <td>{{ tx.occurredAt|date('d.m.Y') }}</td>
                             <td>{{ tx.moneyAccount ? tx.moneyAccount.name : '' }}</td>
                             <td class="text-center text-nowrap" data-tx-id="{{ tx.id }}">
@@ -220,7 +242,7 @@
                         </tr>
                     {% else %}
                         <tr>
-                            <td colspan="7" class="text-center text-muted">Нет транзакций</td>
+                            <td colspan="8" class="text-center text-muted">Нет транзакций</td>
                         </tr>
                     {% endfor %}
                     </tbody>
@@ -231,6 +253,36 @@
             </div>
         </div>
     </div>
+</div>
+
+<div class="modal fade" id="bulkDeleteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="ti ti-alert-triangle text-warning me-2"></i>
+          Удалить выбранные транзакции?
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+      </div>
+      <div class="modal-body">
+        <p>Выбрано транзакций: <strong id="bulk-delete-modal-count">0</strong>.</p>
+        <p class="mb-0 text-muted">
+          Транзакции будут перемещены во вкладку «Удалённые». При необходимости их можно восстановить.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+        <form method="post"
+              action="{{ path('cash_transaction_bulk_delete', app.request.query.all) }}"
+              id="bulk-delete-form">
+          <input type="hidden" name="_token" value="{{ csrf_token('cash_transaction_bulk_delete') }}">
+          <div id="bulk-delete-transaction-ids"></div>
+          <button type="submit" class="btn btn-danger">Удалить</button>
+        </form>
+      </div>
+    </div>
+  </div>
 </div>
 
 {{ include('transaction/_filters.html.twig') }}
@@ -305,6 +357,57 @@
                 to.value = fmt(now);
             });
         });
+    </script>
+    <script>
+    (function () {
+      const selectAll = document.getElementById('cash-transactions-select-all');
+      const rowCheckboxes = Array.from(document.querySelectorAll('.js-cash-transaction-select'));
+      const deleteButton = document.getElementById('bulk-delete-button');
+      const deleteButtonLabel = document.getElementById('bulk-delete-button-label');
+      const modal = document.getElementById('bulkDeleteModal');
+      const modalCount = document.getElementById('bulk-delete-modal-count');
+      const form = document.getElementById('bulk-delete-form');
+      const idsContainer = document.getElementById('bulk-delete-transaction-ids');
+
+      if (!selectAll || !deleteButton || !deleteButtonLabel || !modal || !modalCount || !form || !idsContainer) {
+        return;
+      }
+
+      function selectedCheckboxes() {
+        return rowCheckboxes.filter(checkbox => checkbox.checked);
+      }
+
+      function renderSelection() {
+        const selectedCount = selectedCheckboxes().length;
+        selectAll.checked = rowCheckboxes.length > 0 && selectedCount === rowCheckboxes.length;
+        selectAll.indeterminate = selectedCount > 0 && selectedCount < rowCheckboxes.length;
+        deleteButton.disabled = selectedCount === 0;
+        deleteButtonLabel.textContent = selectedCount > 0 ? `Удалить (${selectedCount})` : 'Удалить';
+        modalCount.textContent = String(selectedCount);
+      }
+
+      function renderHiddenIds() {
+        idsContainer.replaceChildren(...selectedCheckboxes().map(checkbox => {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'transaction_ids[]';
+          input.value = checkbox.value;
+
+          return input;
+        }));
+      }
+
+      selectAll.addEventListener('change', function () {
+        rowCheckboxes.forEach(checkbox => {
+          checkbox.checked = selectAll.checked;
+        });
+        renderSelection();
+      });
+      rowCheckboxes.forEach(checkbox => checkbox.addEventListener('change', renderSelection));
+      modal.addEventListener('show.bs.modal', renderHiddenIds);
+      form.addEventListener('submit', renderHiddenIds);
+      renderSelection();
+    }());
     </script>
     <script>
     document.addEventListener('click', async (e) => {
