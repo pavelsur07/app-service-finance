@@ -25,14 +25,9 @@
             <a class="dropdown-item {{ mp_ads_active ? 'active' : '' }}" href="{{ path('marketplace_ads_efficiency_index') }}">
                 <span>Реклама</span>
             </a>
-            {% set mp_stocks_active = current_route starts with 'inventory_' or current_route starts with 'marketplace_inventory_' or current_route == 'marketplace_listings_index' %}
+            {% set mp_stocks_active = current_route starts with 'inventory_' or current_route starts with 'marketplace_inventory_' or current_route == 'marketplace_listings_index' or current_route == 'marketplace_listing_tags_manage' %}
             <a class="dropdown-item {{ mp_stocks_active ? 'active' : '' }}" href="{{ path('inventory_stocks_index') }}">
                 <span>Товары и остатки</span>
-            </a>
-
-            {% set mp_tags_active = current_route == 'marketplace_listing_tags_manage' %}
-            <a class="dropdown-item {{ mp_tags_active ? 'active' : '' }}" href="{{ path('marketplace_listing_tags_manage') }}">
-                <span>Тэги</span>
             </a>
 
             {% set mp_reconciliation_active = current_route == 'marketplace_reconciliation' %}
