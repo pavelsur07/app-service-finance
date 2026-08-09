@@ -32,6 +32,29 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    /**
+     * @param list<string> $ids
+     *
+     * @return list<CashTransaction>
+     */
+    public function findActiveByIdsAndCompanyId(array $ids, string $companyId): array
+    {
+        if ([] === $ids) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('t')
+            ->addSelect('moneyAccount')
+            ->innerJoin('t.moneyAccount', 'moneyAccount')
+            ->andWhere('t.id IN (:ids)')
+            ->andWhere('IDENTITY(t.company) = :companyId')
+            ->andWhere('t.deletedAt IS NULL')
+            ->setParameter('ids', $ids)
+            ->setParameter('companyId', $companyId)
+            ->getQuery()
+            ->getResult();
+    }
+
     /** @return iterable<CashTransaction> */
     public function iterateForAutoRulePreview(
         Company $company,
