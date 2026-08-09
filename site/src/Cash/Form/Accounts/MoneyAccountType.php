@@ -1,9 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Cash\Form\Accounts;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Enum\Accounts\MoneyAccountType as MoneyAccountTypeEnum;
+use App\Cash\Enum\FiatCurrency;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
@@ -14,7 +17,7 @@ use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Validator\Constraints\LessThanOrEqual;
 
-class MoneyAccountType extends AbstractType
+final class MoneyAccountType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
@@ -38,13 +41,9 @@ class MoneyAccountType extends AbstractType
 
         $builder->add('currency', $options['currency_choices'] ? ChoiceType::class : TextType::class, [
             'label' => 'Валюта',
+            'disabled' => $options['currency_disabled'],
             ...($options['currency_choices'] ? [
-                'choices' => [
-                    '₽ RUB' => 'RUB',
-                    '$ USD' => 'USD',
-                    '€ EUR' => 'EUR',
-                    '₸ KZT' => 'KZT',
-                ],
+                'choices' => FiatCurrency::choices(),
             ] : []),
         ])
             ->add('openingBalance', MoneyType::class, [
@@ -113,8 +112,10 @@ class MoneyAccountType extends AbstractType
             'data_class' => MoneyAccount::class,
             'expanded_type' => false,
             'currency_choices' => false,
+            'currency_disabled' => false,
         ]);
         $resolver->setAllowedTypes('expanded_type', 'bool');
         $resolver->setAllowedTypes('currency_choices', 'bool');
+        $resolver->setAllowedTypes('currency_disabled', 'bool');
     }
 }

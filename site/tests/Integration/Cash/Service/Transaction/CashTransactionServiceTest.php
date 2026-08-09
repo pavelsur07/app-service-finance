@@ -300,6 +300,82 @@ final class CashTransactionServiceTest extends IntegrationTestCase
         self::assertSame($customCenter->getId(), $tx->getResponsibilityCenterId());
     }
 
+    public function testAddRejectsMoneyAccountFromAnotherCompany(): void
+    {
+        $fixture = $this->tenantSafetyFixture();
+        $dto = $this->tenantSafetyDto($fixture['company']->getId(), $fixture['foreignAccount']->getId());
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Счёт не найден.');
+
+        $this->txService->add($dto);
+    }
+
+    public function testAddRejectsCounterpartyFromAnotherCompany(): void
+    {
+        $fixture = $this->tenantSafetyFixture();
+        $dto = $this->tenantSafetyDto($fixture['company']->getId(), $fixture['account']->getId());
+        $dto->counterpartyId = $fixture['foreignCounterparty']->getId();
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Контрагент не найден.');
+
+        $this->txService->add($dto);
+    }
+
+    public function testAddRejectsCashflowCategoryFromAnotherCompany(): void
+    {
+        $fixture = $this->tenantSafetyFixture();
+        $dto = $this->tenantSafetyDto($fixture['company']->getId(), $fixture['account']->getId());
+        $dto->cashflowCategoryId = $fixture['foreignCategory']->getId();
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Категория ДДС не найдена.');
+
+        $this->txService->add($dto);
+    }
+
+    public function testUpdateRejectsMoneyAccountFromAnotherCompany(): void
+    {
+        $fixture = $this->tenantSafetyFixture();
+        $create = $this->tenantSafetyDto($fixture['company']->getId(), $fixture['account']->getId());
+        $transaction = $this->txService->add($create);
+
+        $update = $this->tenantSafetyDto($fixture['company']->getId(), $fixture['foreignAccount']->getId());
+        $update->amount = '15.00';
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Счёт не найден.');
+
+        $this->txService->update($transaction, $update);
+    }
+
+    public function testAddRejectsCurrencyDifferentFromAccountCurrency(): void
+    {
+        $fixture = $this->tenantSafetyFixture();
+        $dto = $this->tenantSafetyDto($fixture['company']->getId(), $fixture['account']->getId());
+        $dto->currency = 'EUR';
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Валюта транзакции должна совпадать с валютой счёта.');
+
+        $this->txService->add($dto);
+    }
+
+    public function testUpdateChangesAccountAndDerivedCurrencyTogether(): void
+    {
+        $fixture = $this->tenantSafetyFixture();
+        $create = $this->tenantSafetyDto($fixture['company']->getId(), $fixture['account']->getId());
+        $transaction = $this->txService->add($create);
+
+        $update = $this->tenantSafetyDto($fixture['company']->getId(), $fixture['eurAccount']->getId());
+        $update->currency = 'EUR';
+        $this->txService->update($transaction, $update);
+
+        self::assertSame($fixture['eurAccount']->getId(), $transaction->getMoneyAccount()->getId());
+        self::assertSame('EUR', $transaction->getCurrency());
+    }
+
     /**
      * @return array{project: ProjectDirection, center: FinancialResponsibilityCenter}
      */
@@ -332,5 +408,76 @@ final class CashTransactionServiceTest extends IntegrationTestCase
         $this->em->flush();
 
         return $category;
+    }
+
+    /**
+     * @return array{
+     *     company: \App\Company\Entity\Company,
+     *     account: MoneyAccount,
+     *     eurAccount: MoneyAccount,
+     *     foreignAccount: MoneyAccount,
+     *     foreignCounterparty: Counterparty,
+     *     foreignCategory: CashflowCategory
+     * }
+     */
+    private function tenantSafetyFixture(): array
+    {
+        $user = UserBuilder::aUser()
+            ->withId(Uuid::uuid4()->toString())
+            ->withEmail('tenant-a-'.Uuid::uuid4().'@example.test')
+            ->build();
+        $foreignUser = UserBuilder::aUser()
+            ->withId(Uuid::uuid4()->toString())
+            ->withEmail('tenant-b-'.Uuid::uuid4().'@example.test')
+            ->build();
+        $company = CompanyBuilder::aCompany()
+            ->withId(Uuid::uuid4()->toString())
+            ->withOwner($user)
+            ->withName('Tenant A '.Uuid::uuid4())
+            ->build();
+        $foreignCompany = CompanyBuilder::aCompany()
+            ->withId(Uuid::uuid4()->toString())
+            ->withOwner($foreignUser)
+            ->withName('Tenant B '.Uuid::uuid4())
+            ->build();
+        $account = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Tenant A account', 'USD');
+        $eurAccount = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::CASH, 'Tenant A EUR account', 'EUR');
+        $foreignAccount = new MoneyAccount(Uuid::uuid4()->toString(), $foreignCompany, MoneyAccountType::BANK, 'Tenant B account', 'USD');
+        $foreignCounterparty = new Counterparty(
+            Uuid::uuid4()->toString(),
+            $foreignCompany,
+            (new CounterpartyNameNormalizer())->normalize('Foreign counterparty'),
+            CounterpartyType::LEGAL_ENTITY,
+        );
+        $foreignCategory = new CashflowCategory(Uuid::uuid4()->toString(), $foreignCompany);
+        $foreignCategory->setName('Foreign category');
+        $this->persistSystemPair($company);
+
+        foreach ([$user, $foreignUser, $company, $foreignCompany, $account, $eurAccount, $foreignAccount, $foreignCounterparty, $foreignCategory] as $entity) {
+            $this->em->persist($entity);
+        }
+        $this->em->flush();
+
+        return [
+            'company' => $company,
+            'account' => $account,
+            'eurAccount' => $eurAccount,
+            'foreignAccount' => $foreignAccount,
+            'foreignCounterparty' => $foreignCounterparty,
+            'foreignCategory' => $foreignCategory,
+        ];
+    }
+
+    private function tenantSafetyDto(string $companyId, string $accountId): CashTransactionDTO
+    {
+        $dto = new CashTransactionDTO();
+        $dto->companyId = $companyId;
+        $dto->moneyAccountId = $accountId;
+        $dto->direction = CashDirection::OUTFLOW;
+        $dto->amount = '10.00';
+        $dto->currency = 'USD';
+        $dto->occurredAt = new \DateTimeImmutable('2024-01-15');
+
+        return $dto;
     }
 }

@@ -6,6 +6,7 @@ use App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Import\ImportLog;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
@@ -201,6 +202,10 @@ class ClientBank1CImportService
     public function import(array $preview, MoneyAccount $account, bool $overwrite, array $context = []): array
     {
         $company = $this->activeCompanyService->getActiveCompany();
+        if ($account->getCompany()->getId() !== $company->getId()) {
+            throw new \DomainException('Счёт импорта принадлежит другой компании.');
+        }
+        FiatCurrency::fromCode($account->getCurrency());
 
         // Очистим кэш контрагентов перед стартом импорта
         $this->cpCache = [];

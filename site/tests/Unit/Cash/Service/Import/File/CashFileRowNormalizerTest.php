@@ -169,6 +169,34 @@ final class CashFileRowNormalizerTest extends TestCase
         self::assertSame($expected, $result['externalId']);
     }
 
+    public function testRejectsCurrencyDifferentFromAccountCurrency(): void
+    {
+        $normalizer = new CashFileRowNormalizer();
+
+        $result = $normalizer->normalize(
+            ['Date' => '2025-12-01', 'Amount' => '1000', 'Currency' => 'USD'],
+            ['date' => 'Date', 'amount' => 'Amount', 'currency' => 'Currency'],
+            'RUB',
+        );
+
+        self::assertFalse($result['ok']);
+        self::assertContains('Валюта операции не совпадает с валютой счёта.', $result['errors']);
+    }
+
+    public function testRejectsUnsupportedCurrency(): void
+    {
+        $normalizer = new CashFileRowNormalizer();
+
+        $result = $normalizer->normalize(
+            ['Date' => '2025-12-01', 'Amount' => '1000', 'Currency' => 'ABC'],
+            ['date' => 'Date', 'amount' => 'Amount', 'currency' => 'Currency'],
+            'RUB',
+        );
+
+        self::assertFalse($result['ok']);
+        self::assertContains('Неподдерживаемая валюта операции.', $result['errors']);
+    }
+
     public function testEmptyCounterpartyIsNull(): void
     {
         $normalizer = new CashFileRowNormalizer();

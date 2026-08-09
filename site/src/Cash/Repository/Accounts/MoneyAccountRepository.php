@@ -1,13 +1,16 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Cash\Repository\Accounts;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
-use App\Company\Entity\Company;
 use App\Cash\Enum\Accounts\MoneyAccountType;
+use App\Company\Entity\Company;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 use Ramsey\Uuid\UuidInterface;
+use Webmozart\Assert\Assert;
 
 /**
  * @extends ServiceEntityRepository<MoneyAccount>
@@ -17,6 +20,20 @@ class MoneyAccountRepository extends ServiceEntityRepository
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, MoneyAccount::class);
+    }
+
+    public function findOneByIdAndCompanyId(string $id, string $companyId): ?MoneyAccount
+    {
+        Assert::uuid($id);
+        Assert::uuid($companyId);
+
+        return $this->createQueryBuilder('account')
+            ->andWhere('account.id = :id')
+            ->andWhere('IDENTITY(account.company) = :companyId')
+            ->setParameter('id', $id)
+            ->setParameter('companyId', $companyId)
+            ->getQuery()
+            ->getOneOrNullResult();
     }
 
     /**

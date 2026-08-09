@@ -19,6 +19,7 @@ use App\Company\Enum\CounterpartyType;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Ramsey\Uuid\Uuid;
 
 final class CashFacadeTest extends IntegrationTestCase
@@ -160,6 +161,44 @@ final class CashFacadeTest extends IntegrationTestCase
         self::assertSame([], $saved->getRawData());
         self::assertSame($systemPair['project']->getId(), $saved->getProjectDirection()?->getId());
         self::assertSame($systemPair['center']->getId(), $saved->getResponsibilityCenterId());
+    }
+
+    #[DataProvider('invalidCurrencyProvider')]
+    public function testCreateTransactionRejectsInvalidCurrency(
+        string $currency,
+        string $exceptionClass,
+        string $message,
+    ): void {
+        $user = UserBuilder::aUser()->withEmail('facade-currency@example.com')->withPasswordHash('pass')->build();
+        $company = CompanyBuilder::aCompany()->withOwner($user)->withName('Facade Currency Company')->build();
+        $account = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Main', 'USD');
+        $this->persistSystemPair($company);
+
+        $this->em->persist($user);
+        $this->em->persist($company);
+        $this->em->persist($account);
+        $this->em->flush();
+
+        $this->expectException($exceptionClass);
+        $this->expectExceptionMessage($message);
+
+        $this->cashFacade->createTransaction(new CreateCashTransactionCommand(
+            companyId: $company->getId(),
+            moneyAccountId: $account->getId(),
+            direction: CashDirection::OUTFLOW,
+            amount: '10.00',
+            currency: $currency,
+            occurredAt: new \DateTimeImmutable('2024-03-01'),
+        ));
+    }
+
+    /**
+     * @return iterable<string, array{string, class-string<\Throwable>, string}>
+     */
+    public static function invalidCurrencyProvider(): iterable
+    {
+        yield 'unsupported' => ['ABC', \InvalidArgumentException::class, 'Unsupported fiat currency: ABC.'];
+        yield 'account mismatch' => ['EUR', \DomainException::class, 'Валюта транзакции должна совпадать с валютой счёта.'];
     }
 
     public function testCreateTransactionReturnsDuplicateForSameImportSourceAndExternalId(): void

@@ -7,10 +7,12 @@ namespace App\Company\Facade;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
 use App\Company\Entity\Counterparty;
+use App\Company\Entity\ProjectDirection;
 use App\Company\Entity\User;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Repository\CounterpartyRepository;
+use App\Company\Repository\ProjectDirectionRepository;
 use App\Company\Service\CompanyOwnerAccountCreator;
 use Ramsey\Uuid\Uuid;
 
@@ -24,6 +26,7 @@ final class CompanyFacade
         private readonly CompanyOwnerAccountCreator $accountCreator,
         private readonly CounterpartyRepository $counterpartyRepository,
         private readonly CompanyMemberRepository $companyMemberRepository,
+        private readonly ProjectDirectionRepository $projectDirectionRepository,
     ) {
     }
 
@@ -97,6 +100,15 @@ final class CompanyFacade
         }
 
         return $this->counterpartyRepository->findOneByIdAndCompany($counterpartyId, $companyId);
+    }
+
+    public function findProjectDirectionByIdAndCompany(string $projectDirectionId, string $companyId): ?ProjectDirection
+    {
+        if (!Uuid::isValid($projectDirectionId) || !Uuid::isValid($companyId)) {
+            return null;
+        }
+
+        return $this->projectDirectionRepository->findOneByIdAndCompanyId($projectDirectionId, $companyId);
     }
 
     /**

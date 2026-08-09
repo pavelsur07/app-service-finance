@@ -157,6 +157,49 @@ final class CashFileImportServiceTest extends TestCase
         self::assertSame($centerId, $persistedTransactions[0]->getResponsibilityCenterId());
     }
 
+    public function testRejectsJobWithAccountFromAnotherCompanyBeforeStorageRead(): void
+    {
+        $company = new Company(Uuid::uuid4()->toString(), new User(Uuid::uuid4()->toString()));
+        $foreignCompany = new Company(Uuid::uuid4()->toString(), new User(Uuid::uuid4()->toString()));
+        $foreignAccount = new MoneyAccount(
+            Uuid::uuid4()->toString(),
+            $foreignCompany,
+            MoneyAccountType::BANK,
+            'Foreign account',
+            'RUB',
+        );
+        $job = new CashFileImportJob(
+            Uuid::uuid4()->toString(),
+            $company,
+            $foreignAccount,
+            'file',
+            'transactions.csv',
+            'file-hash',
+            [],
+        );
+        $objectStorage = $this->createMock(ObjectStorageInterface::class);
+        $objectStorage->expects(self::never())->method('exists');
+
+        $service = new CashFileImportService(
+            new CashFileRowNormalizer(),
+            new CounterpartyNameNormalizer(),
+            $this->createMock(CounterpartyRepository::class),
+            $this->createMock(CashTransactionRepository::class),
+            new ImportLogger($this->createMock(EntityManagerInterface::class)),
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(AccountBalanceService::class),
+            $objectStorage,
+            new TemporaryLocalFile($objectStorage),
+            new LegacyXlsConverter(new TemporaryFileFactory(), \dirname(__DIR__, 6)),
+            $this->createResolver(Uuid::uuid4()->toString(), Uuid::uuid4()->toString()),
+        );
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Счёт импорта принадлежит другой компании.');
+
+        $service->import($job);
+    }
+
     private function createResolver(string $projectId, string $centerId): CashTransactionResponsibilityCenterResolver
     {
         $facade = $this->createMock(FinancialResponsibilityCenterFacade::class);
