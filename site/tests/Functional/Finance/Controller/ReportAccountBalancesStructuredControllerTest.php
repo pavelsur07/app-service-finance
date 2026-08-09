@@ -71,8 +71,24 @@ final class ReportAccountBalancesStructuredControllerTest extends WebTestCaseBas
 
         self::assertResponseIsSuccessful();
 
+        self::assertSelectorTextContains('[data-bs-target="#recalcModal"]', 'Пересчёт');
+        self::assertSelectorExists('#recalcModal form[action="/finance/reports/account-balances/recalc"]');
+        self::assertSelectorExists('#recalcModal input[name="from"][value="2026-01-01"]');
+        self::assertSelectorExists('#recalcModal input[name="to"][value="2026-01-01"]');
+
         $rowText = $this->tableRowText($crawler, 'ПАО СБЕРБАНК');
         self::assertMatchesRegularExpression('/ПАО СБЕРБАНК RUB 209 594\\.87 0\\.00 990\\.00 208 604\\.87/', $rowText);
+
+        $client->request('POST', '/finance/reports/account-balances/recalc', [
+            '_token' => 'invalid',
+            'returnTo' => 'structured',
+            'backFrom' => '2026-01-01',
+            'backTo' => '2026-01-01',
+        ]);
+
+        self::assertResponseRedirects('/finance/reports/account-balances-structured?from=2026-01-01&to=2026-01-01');
+        $client->followRedirect();
+        self::assertSelectorTextContains('.toast.text-bg-danger', 'Неверный CSRF-токен.');
     }
 
     public function testStructuredReportShowsBalancesAndTotals(): void
@@ -89,6 +105,7 @@ final class ReportAccountBalancesStructuredControllerTest extends WebTestCaseBas
         $user->setPassword($hasher->hashPassword($user, 'password'));
         $company = new Company(Uuid::uuid4()->toString(), $user);
         $company->setName('TestCo');
+        $company->setFinanceLockBefore(new \DateTimeImmutable('2023-12-15'));
 
         $accountRub = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Main RUB', 'RUB');
         $accountRub->setOpeningBalance('0');
@@ -214,12 +231,21 @@ final class ReportAccountBalancesStructuredControllerTest extends WebTestCaseBas
         self::assertStringNotContainsString('Скрывать нулевые строки', $content);
         self::assertStringContainsString('Валюта: RUB', $content);
         self::assertStringContainsString('Валюта: USD', $content);
+        self::assertSelectorExists('#recalcModal input[name="from"][value="2023-12-15"]');
+        self::assertSelectorExists('#recalcModal input[name="to"][value="2024-01-05"]');
 
         $mainRubRowText = $this->tableRowText($crawler, 'Main RUB');
         self::assertMatchesRegularExpression('/Main RUB RUB 0\\.00 60\\.00 10\\.00 150\\.00/', $mainRubRowText);
 
         $cashUsdRowText = $this->tableRowText($crawler, 'Cash USD');
         self::assertMatchesRegularExpression('/Cash USD USD 0\\.00 20\\.00 5\\.00 90\\.00/', $cashUsdRowText);
+
+        $form = $crawler->selectButton('Пересчитать')->form();
+        $client->submit($form);
+
+        self::assertResponseRedirects('/finance/reports/account-balances-structured?from=2024-01-01&to=2024-01-05');
+        $client->followRedirect();
+        self::assertSelectorTextContains('.toast.text-bg-success', 'Пересчёт выполнен: 15.12.2023 — 05.01.2024.');
     }
 
     public function testStructuredReportShowsAllAccounts(): void
@@ -295,6 +321,8 @@ final class ReportAccountBalancesStructuredControllerTest extends WebTestCaseBas
         self::assertStringContainsString('Visible USD', $content);
         self::assertStringContainsString('Zero RUB', $content);
         self::assertStringContainsString('60.00', $content);
+        self::assertSelectorExists('#recalcModal input[name="from"][value="2024-01-01"]');
+        self::assertSelectorExists('#recalcModal input[name="to"][value="2024-01-05"]');
     }
 
     private function tableRowText(\Symfony\Component\DomCrawler\Crawler $crawler, string $needle): string

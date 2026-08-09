@@ -123,7 +123,7 @@ class ReportAccountBalancesController extends AbstractController
         if (!$this->isCsrfTokenValid('recalc_balances', (string) $request->request->get('_token'))) {
             $this->addFlash('danger', 'Неверный CSRF-токен.');
 
-            return $this->redirectToRoute('report_account_balances_index');
+            return $this->redirectAfterRecalculation($request, false);
         }
 
         $company = $this->activeCompanyService->getActiveCompany();
@@ -134,7 +134,7 @@ class ReportAccountBalancesController extends AbstractController
         } catch (\Throwable) {
             $this->addFlash('danger', 'Неверный формат дат.');
 
-            return $this->redirectToRoute('report_account_balances_index');
+            return $this->redirectAfterRecalculation($request, false);
         }
 
         // Нормализуем на 00:00
@@ -153,7 +153,22 @@ class ReportAccountBalancesController extends AbstractController
             $this->addFlash('danger', 'Ошибка пересчёта: '.$e->getMessage());
         }
 
-        // Вернуться к тому дню, который был открыт до пересчёта
+        return $this->redirectAfterRecalculation($request);
+    }
+
+    private function redirectAfterRecalculation(Request $request, bool $includeBackDate = true): RedirectResponse
+    {
+        if ('structured' === (string) $request->request->get('returnTo')) {
+            return $this->redirectToRoute('report_account_balances_structured_index', [
+                'from' => (string) $request->request->get('backFrom'),
+                'to' => (string) $request->request->get('backTo'),
+            ]);
+        }
+
+        if (!$includeBackDate) {
+            return $this->redirectToRoute('report_account_balances_index');
+        }
+
         $backDate = (string) $request->request->get('backDate');
 
         return $this->redirectToRoute('report_account_balances_index', [

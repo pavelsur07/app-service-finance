@@ -13,6 +13,15 @@
 {% block content %}
     <div class="d-flex align-items-center justify-content-between mb-3">
         <h2 class="page-title mb-0">Остатки и счета</h2>
+
+        <button
+            type="button"
+            class="btn btn-outline-primary"
+            data-bs-toggle="modal"
+            data-bs-target="#recalcModal"
+        >
+            <i class="ti ti-reload me-1"></i> Пересчёт
+        </button>
     </div>
 
     <form method="get" class="card mb-4">
@@ -31,6 +40,56 @@
             </div>
         </div>
     </form>
+
+    <div class="modal fade" id="recalcModal" tabindex="-1" aria-labelledby="recalcModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <form method="post" action="{{ path('report_account_balances_recalc') }}" class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="recalcModalLabel">Пересчёт ежедневных остатков</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="_token" value="{{ csrf_token('recalc_balances') }}">
+                    <input type="hidden" name="returnTo" value="structured">
+                    <input type="hidden" name="backFrom" value="{{ from|date('Y-m-d') }}">
+                    <input type="hidden" name="backTo" value="{{ to|date('Y-m-d') }}">
+
+                    <div class="mb-3">
+                        <label class="form-label" for="structured_recalc_from">Дата с</label>
+                        <input
+                            type="date"
+                            id="structured_recalc_from"
+                            name="from"
+                            class="form-control"
+                            value="{{ recalcFrom|date('Y-m-d') }}"
+                            required
+                        >
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="structured_recalc_to">Дата по</label>
+                        <input
+                            type="date"
+                            id="structured_recalc_to"
+                            name="to"
+                            class="form-control"
+                            value="{{ to|date('Y-m-d') }}"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-text">
+                        Будут пересчитаны ежедневные остатки всех счетов компании в выбранном диапазоне.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-link" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="ti ti-reload me-1"></i> Пересчитать
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     {% set hasAccountRows = false %}
     {% for currency, rows in rowsByCurrency %}

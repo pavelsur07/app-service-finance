@@ -48,6 +48,9 @@ class ReportAccountBalancesStructuredController extends AbstractController
             $to = $today;
         }
 
+        $recalcFrom = $company->getFinanceLockBefore()
+            ?? $to->setDate((int) $to->format('Y'), 1, 1);
+
         $accounts = $this->accountRepository->findBy(
             ['company' => $company, 'isActive' => true],
             ['type' => 'ASC', 'name' => 'ASC']
@@ -109,6 +112,7 @@ class ReportAccountBalancesStructuredController extends AbstractController
             'company' => $company,
             'from' => $from,
             'to' => $to,
+            'recalcFrom' => $recalcFrom,
             'rowsByCurrency' => $rowsByCurrency,
         ]);
     }
