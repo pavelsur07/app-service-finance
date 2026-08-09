@@ -104,6 +104,7 @@ Release Gate
 Production Gate
 - Production preflight, production migrations, queue processing, deploy, production acceptance, and rollback/forward-fix execution are separate HIGH-EXTERNAL actions.
 - A green Release Gate does not authorize any Production Gate action.
+- A push/merge to `master` automatically deploys deployable application changes after the required checks pass. Before Codex merges, the owner must explicitly approve both the merge and its automatic production deploy; merge-only approval is insufficient.
 - Obtain explicit owner approval immediately before each mutating production action. Read-only production checks require an explicit production-check request and must use the restricted wrappers below.
 
 Continuous autonomous execution
@@ -910,6 +911,7 @@ After a separate explicit owner instruction to enter the Production Gate, not me
 5. Run only the approved action, then perform the explicitly scoped production acceptance check.
 
 Approval for merge does not authorize deploy. Approval for deploy does not authorize migrations, backfill, history rewrite, recalculation, or another production mutation unless those exact actions were included explicitly.
+Because a merge to `master` triggers the deploy workflow, approval for both actions may be given in one owner instruction, but that instruction must explicitly name both merge and automatic production deploy.
 
 Forbidden in autonomous mode
 Never do these autonomously:

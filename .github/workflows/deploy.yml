@@ -61,10 +61,12 @@ jobs:
                       landing:
                         - 'landing/**'
 
-            # Собираем матрицу образов ровно под то, что изменилось:
+            # В PR собираем матрицу образов ровно под то, что изменилось:
             #   frontend        → site-nginx + site-php-fpm (оба пекут public/build)
             #   backend         → site-nginx + site-php-fpm + site-php-cli
             #   landing         → land-nginx
+            # На push в master с deployable-изменениями собираем полный набор:
+            # rolling deploy тянет все образы по единому commit SHA.
             - name: 🧩 Build image matrix
               id: matrix
               env:
@@ -73,6 +75,13 @@ jobs:
                   be='${{ steps.f.outputs.backend }}'
                   fe='${{ steps.f.outputs.frontend }}'
                   la='${{ steps.f.outputs.landing }}'
+
+                  if [ "$GITHUB_EVENT_NAME" = 'push' ] && [ "$GITHUB_REF" = 'refs/heads/master' ]; then
+                    if [ "$be" = 'true' ] || [ "$fe" = 'true' ] || [ "$la" = 'true' ]; then
+                      be=true
+                      la=true
+                    fi
+                  fi
 
                   if [ "$GITHUB_EVENT_NAME" = 'workflow_dispatch' ]; then
                     be=false
@@ -181,10 +190,11 @@ jobs:
                   cache-to: type=gha,scope=${{ matrix.service }},mode=max
 
     # 2. ЭТАП ДЕПЛОЯ (rolling update — минимальный даунтайм)
-    #    Идёт только если что-то реально собралось (build success).
+    #    Автоматически после push в master или вручную через production_action=deploy.
+    #    Идёт только если полный SHA-pinned набор образов успешно собран.
     deploy:
         needs: [ build-and-push, migrations-empty-db, api-types-check ]
-        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.production_action == 'deploy' && needs.build-and-push.result == 'success' && needs.migrations-empty-db.result == 'success' && needs.api-types-check.result == 'success' }}
+        if: ${{ !cancelled() && github.ref == 'refs/heads/master' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.production_action == 'deploy')) && needs.build-and-push.result == 'success' && needs.migrations-empty-db.result == 'success' && needs.api-types-check.result == 'success' }}
         concurrency:
             group: production-release
             cancel-in-progress: false
