@@ -63,6 +63,7 @@ Makefile-based commands
 - На границе Stage: полные релевантные проверки, внутренний review полного Stage diff, внешний read-only review другим агентом до `REVIEW_GREEN` (см. «Внешнее ревью»), Stage Report, commit/push и обновление единственного Draft PR задачи.
 - **Release Gate** — явно объявленная точка решения Владельца после одного или нескольких Stage либо в финале задачи. Она управляет owner review, переводом PR в Ready, merge и release readiness.
 - **Production Gate** — отдельная точка разрешения production preflight, migrations, deploy, backfill, queue processing, acceptance и других production-действий. Release Gate не разрешает Production Gate автоматически.
+- Push/merge в `master` автоматически разворачивает deployable-изменения приложения после обязательных проверок. Перед merge, делегированным агенту, Владелец должен явно разрешить и merge, и вызванный им production deploy; разрешения только на merge недостаточно.
 
 Для каждого Stage в плане указывать:
 
@@ -381,6 +382,7 @@ Stage Report создаётся один раз для каждого верхн
 4. Выполнить только разрешённое действие и явно согласованный production acceptance.
 
 Разрешение на merge не разрешает deploy. Разрешение на deploy не разрешает migrations, backfill, history rewrite, recalculation или иную production mutation, если она не указана явно.
+Так как merge в `master` запускает deploy workflow автоматически, оба разрешения можно дать одной инструкцией Владельца, но в ней должны быть явно названы и merge, и автоматический production deploy.
 
 ### Практики автономной работы
 
