@@ -153,8 +153,8 @@ final readonly class CashFacade
         if (null !== $input->name) {
             $category->setName($input->name);
         }
-        if (null !== $input->parentId) {
-            $category->setParent($this->requireCategory($input->parentId, $company));
+        if ($input->parentIdProvided || null !== $input->parentId) {
+            $category->setParent(null === $input->parentId ? null : $this->requireCategory($input->parentId, $company));
         }
         if (null !== $input->description) {
             $category->setDescription($input->description);

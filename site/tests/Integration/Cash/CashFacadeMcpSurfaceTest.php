@@ -14,6 +14,7 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Cash\Facade\CashFacade;
+use App\Mcp\Application\Tool\CashCategoryUpsertTool;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
@@ -78,6 +79,47 @@ final class CashFacadeMcpSurfaceTest extends IntegrationTestCase
             id: $foreignId,
             name: 'Захват чужой статьи',
         ));
+    }
+
+    public function testMcpCategoryToolDistinguishesOmittedParentFromExplicitNull(): void
+    {
+        $this->createCompany(self::COMPANY_ID, 'mcp-facade-parent@example.test');
+
+        $rootId = $this->facade()->upsertCashflowCategory(self::COMPANY_ID, new CashflowCategoryInput(
+            name: 'Инвестиционная деятельность',
+            flowKind: CashflowFlowKind::INVESTING,
+        ));
+        $childId = $this->facade()->upsertCashflowCategory(self::COMPANY_ID, new CashflowCategoryInput(
+            name: 'Оборудование',
+            parentId: $rootId,
+        ));
+
+        $tool = self::getContainer()->get(CashCategoryUpsertTool::class);
+        self::assertSame(['string', 'null'], $tool->inputSchema()['properties']['parentId']['type']);
+
+        $tool->call(self::COMPANY_ID, ['id' => $childId, 'name' => 'Оборудование и мебель']);
+        $this->em->clear();
+        $renamed = $this->em->getRepository(CashflowCategory::class)->find($childId);
+        self::assertInstanceOf(CashflowCategory::class, $renamed);
+        self::assertSame($rootId, $renamed->getParent()?->getId());
+
+        $tool->call(self::COMPANY_ID, ['id' => $childId, 'parentId' => null]);
+        $this->em->clear();
+        $detached = $this->em->getRepository(CashflowCategory::class)->find($childId);
+        self::assertInstanceOf(CashflowCategory::class, $detached);
+        self::assertNull($detached->getParent());
+        self::assertSame(CashflowFlowKind::INVESTING, $detached->getFlowKind());
+    }
+
+    public function testMcpCategoryToolRejectsInvalidParentTypeInsteadOfDetaching(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('UUID-строкой или null');
+
+        self::getContainer()->get(CashCategoryUpsertTool::class)->call(
+            self::COMPANY_ID,
+            ['parentId' => 123],
+        );
     }
 
     public function testCreatesAutoRuleAndReplacesConditions(): void

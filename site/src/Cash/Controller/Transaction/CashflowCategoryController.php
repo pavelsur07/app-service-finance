@@ -71,13 +71,13 @@ class CashflowCategoryController extends AbstractController
         $company = $companyService->getActiveCompany();
         $article = new CashflowCategory(Uuid::uuid4()->toString(), $company);
 
-        $parents = $repo->findTreeByCompany($company);
+        $parents = $this->regularParentChoices($repo->findTreeByCompany($company));
         $plCategories = $plCategoryRepository->findTreeByCompany($company);
 
         $form = $this->createForm(CashflowCategoryType::class, $article, [
             'parents' => $parents,
             'plCategories' => $plCategories,
-            'allow_flow_kind_edit' => $article->isRoot(),
+            'allow_flow_kind_edit' => true,
             'protected_system_fields' => false,
         ]);
         $form->handleRequest($request);
@@ -111,13 +111,15 @@ class CashflowCategoryController extends AbstractController
             throw $this->createNotFoundException();
         }
 
-        $parents = $repo->findTreeByCompany($company);
+        $parents = $article->isSystem()
+            ? []
+            : $this->regularParentChoices($repo->findTreeByCompany($company), $article);
         $plCategories = $plCategoryRepository->findTreeByCompany($company);
 
         $form = $this->createForm(CashflowCategoryType::class, $article, [
             'parents' => $parents,
             'plCategories' => $plCategories,
-            'allow_flow_kind_edit' => $article->isRoot(),
+            'allow_flow_kind_edit' => !$article->isSystem(),
             'protected_system_fields' => $article->isSystem(),
         ]);
         $form->handleRequest($request);
@@ -184,5 +186,19 @@ class CashflowCategoryController extends AbstractController
                 $category->getChildren()->toArray(),
             ),
         ];
+    }
+
+    /**
+     * @param list<CashflowCategory> $categories
+     *
+     * @return list<CashflowCategory>
+     */
+    private function regularParentChoices(array $categories, ?CashflowCategory $current = null): array
+    {
+        return array_values(array_filter(
+            $categories,
+            static fn (CashflowCategory $candidate): bool => $candidate->acceptsRegularChildren()
+                && (null === $current || ($candidate !== $current && !$candidate->isDescendantOf($current))),
+        ));
     }
 }

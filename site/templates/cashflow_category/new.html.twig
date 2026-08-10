@@ -19,7 +19,7 @@
     </div>
 
     <div class="container-xl mt-3">
-        {{ form_start(form, {'attr': {'id': 'cashflow-category-new-form'}}) }}
+        {{ form_start(form, {'attr': {'id': 'cashflow-category-new-form', 'data-controller': 'cashflow-category-flow-kind'}}) }}
         <div class="row row-cards">
             <div class="col-lg-8">
                 <div class="card">
@@ -56,7 +56,7 @@
                         {{ form_row(form.sort) }}
                         {{ form_row(form.allowPlDocument, {'label_attr': {'class': 'checkbox-switch'}}) }}
                         {% if form.flowKind is defined %}
-                            {{ form_row(form.flowKind, {'help': 'только для категорий верхнего уровня'}) }}
+                            {{ form_row(form.flowKind) }}
                         {% endif %}
                     </div>
                 </div>
