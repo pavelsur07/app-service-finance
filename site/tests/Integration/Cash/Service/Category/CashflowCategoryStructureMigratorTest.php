@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Service\Category;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Enum\Transaction\CashflowFlowKind;
 use App\Cash\Service\Category\CashflowCategoryStructureMigrator;
 use App\Company\Entity\Company;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Tester\CommandTester;
 
 final class CashflowCategoryStructureMigratorTest extends IntegrationTestCase
 {
@@ -104,10 +109,43 @@ final class CashflowCategoryStructureMigratorTest extends IntegrationTestCase
         ));
     }
 
-    private function persistCompany(): Company
+    public function testReadOnlyCommandScopesCompaniesByMoneyAccountsAndDoesNotExposeIds(): void
     {
-        $user = UserBuilder::aUser()->build();
-        $company = CompanyBuilder::aCompany()->withOwner($user)->build();
+        $companyWithAccount = $this->persistCompany(1);
+        $companyWithoutAccount = $this->persistCompany(2);
+        $account = new MoneyAccount(
+            '44444444-4444-4444-8444-444444444444',
+            $companyWithAccount,
+            MoneyAccountType::BANK,
+            'Основной счёт',
+            'RUB',
+        );
+        $this->em->persist($account);
+        $this->em->flush();
+
+        self::assertSame(
+            [(string) $companyWithAccount->getId()],
+            self::getContainer()->get(CashflowCategoryStructureMigrator::class)->findCompanyIdsWithMoneyAccounts(),
+        );
+
+        $application = new Application(self::$kernel);
+        $tester = new CommandTester($application->find('app:cashflow-categories:migrate-system-structure'));
+        $tester->execute(['--companies-with-accounts' => true]);
+        $output = $tester->getDisplay();
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $output);
+        self::assertStringContainsString('Компаний в scope', $output);
+        self::assertStringContainsString('Создать категорий', $output);
+        self::assertStringNotContainsString((string) $companyWithAccount->getId(), $output);
+        self::assertStringNotContainsString((string) $companyWithoutAccount->getId(), $output);
+        self::assertStringNotContainsString((string) $account->getId(), $output);
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM cashflow_categories'));
+    }
+
+    private function persistCompany(int $index = 1): Company
+    {
+        $user = UserBuilder::aUser()->withIndex($index)->build();
+        $company = CompanyBuilder::aCompany()->withIndex($index)->withOwner($user)->build();
         $this->em->persist($user);
         $this->em->persist($company);
 
