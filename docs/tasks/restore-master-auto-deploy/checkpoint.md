@@ -16,6 +16,7 @@
   - `git diff --check`: green.
 - Internal Stage review: green; no BLOCKER or IMPORTANT findings.
 - External read-only review: `REVIEW_GREEN`; no BLOCKER or IMPORTANT findings.
-- Stage 1: DONE, committed as `0e56be92`; awaiting push and Draft PR CI.
-- Current gate: final Release Gate; Draft PR must remain Draft until explicit owner approval.
+- Stage 1: DONE, executable change committed as `0e56be92` and pushed.
+- Draft PR: #2317; CI for code revision `cf75c704` is green, with production jobs skipped on the PR event.
+- Current gate: final Release Gate; PR remains Draft until explicit owner approval.
 - Production actions performed: none.
