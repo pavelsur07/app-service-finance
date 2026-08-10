@@ -151,14 +151,13 @@ class CashflowCategoryController extends AbstractController
         }
 
         if ($this->isCsrfTokenValid('delete'.$article->getId(), $request->request->get('_token'))) {
-            if ($article->isSystem()) {
-                $this->addFlash('danger', 'Системную категорию нельзя удалить.');
-
-                return $this->redirectToRoute('cashflow_category_index');
+            try {
+                $article->assertCanDelete();
+                $em->remove($article);
+                $em->flush();
+            } catch (\DomainException $exception) {
+                $this->addFlash('danger', $exception->getMessage());
             }
-
-            $em->remove($article);
-            $em->flush();
         }
 
         return $this->redirectToRoute('cashflow_category_index');

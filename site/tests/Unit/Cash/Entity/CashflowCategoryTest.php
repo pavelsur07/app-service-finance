@@ -39,6 +39,7 @@ final class CashflowCategoryTest extends TestCase
             static fn () => $category->setCode('CF_OTHER'),
             static fn () => $category->setParent($newParent),
             static fn () => $category->setSort(20),
+            static fn () => $category->setFlowKind(CashflowFlowKind::FINANCING),
             static fn () => $category->setIsSystem(false),
             static fn () => $category->assertCanDelete(),
         ] as $change) {
@@ -64,6 +65,7 @@ final class CashflowCategoryTest extends TestCase
             ->setCode(CashflowCategory::CODE_OPERATING)
             ->setParent(null)
             ->setSort(10)
+            ->setFlowKind(CashflowFlowKind::OPERATING)
             ->setIsSystem(true)
             ->setDescription('Разрешённое изменение');
 
@@ -174,5 +176,56 @@ final class CashflowCategoryTest extends TestCase
 
         self::assertSame(CashflowFlowKind::FINANCING, $child->getFlowKind());
         self::assertSame(CashflowFlowKind::FINANCING, $grandchild->getFlowKind());
+    }
+
+    public function testRejectsParentFromOwnSubtree(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $root = (new CashflowCategory('11111111-1111-4111-8111-111111111111', $company))->setName('Корень');
+        $child = (new CashflowCategory('22222222-2222-4222-8222-222222222222', $company))
+            ->setName('Дочерняя')
+            ->setParent($root);
+        $grandchild = (new CashflowCategory('33333333-3333-4333-8333-333333333333', $company))
+            ->setName('Внучатая')
+            ->setParent($child);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('текущую категорию или её потомка');
+
+        $root->setParent($grandchild);
+    }
+
+    public function testRejectsDeletingCategoryWithChildren(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $parent = (new CashflowCategory('11111111-1111-4111-8111-111111111111', $company))->setName('Родитель');
+        (new CashflowCategory('22222222-2222-4222-8222-222222222222', $company))
+            ->setName('Дочерняя статья')
+            ->setParent($parent);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('есть дочерние статьи');
+
+        $parent->assertCanDelete();
+    }
+
+    public function testOnlyActivitySystemRootsAcceptRegularChildren(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $operating = (new CashflowCategory('11111111-1111-4111-8111-111111111111', $company))
+            ->setName('Операционная деятельность')
+            ->markAsSystem(CashflowCategory::CODE_OPERATING);
+        $technical = (new CashflowCategory('22222222-2222-4222-8222-222222222222', $company))
+            ->setName('Технические операции')
+            ->setFlowKind(CashflowFlowKind::TECHNICAL)
+            ->markAsSystem(CashflowCategory::CODE_TECHNICAL);
+
+        self::assertTrue($operating->acceptsRegularChildren());
+        self::assertFalse($technical->acceptsRegularChildren());
+
+        $regularTechnical = (new CashflowCategory('33333333-3333-4333-8333-333333333333', $company))
+            ->setName('Legacy technical root')
+            ->setFlowKind(CashflowFlowKind::TECHNICAL);
+        self::assertFalse($regularTechnical->acceptsRegularChildren());
     }
 }
