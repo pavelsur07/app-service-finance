@@ -888,7 +888,15 @@ upsertAutoRule(string $companyId, AutoRuleInput $input, ?string $actorUserId = n
 ```
 
 Все методы принимают `companyId` и бросают `\DomainException`, если компания или
-запрошенная сущность к ней не относится. Во входных DTO `null` означает «не менять».
+запрошенная сущность к ней не относится. Во входных DTO `null` означает «не менять»,
+кроме tri-state поля `CashflowCategoryInput::parentId`: `parentIdProvided=false`
+сохраняет текущего родителя, UUID меняет его, а явный `null` при
+`parentIdProvided=true` переносит обычную категорию в root.
+
+Обычные root-категории ДДС хранят собственный `flowKind`; дочерние наследуют
+его от root. Обычные категории могут быть дочерними у `CF_OP`, `CF_FIN`, `CF_INV`
+или обычной нетехнической категории. `CF_TECH`, `CF_TECH_IN`, `CF_TECH_OUT`, `CF_UNALLOC`
+не принимают обычных потомков, а `TECHNICAL` зарезервирован для системных категорий.
 
 **Назначение:** `CashFacade` — единственный публичный контракт Cash-модуля для чтения и записи данных ДДС из других модулей (в том числе из MCP-инструментов).
 
@@ -2752,6 +2760,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.76 | 2026-08-10 | Cash/MCP: обычные root-категории ДДС, защищённые системные ветки и tri-state `parentId` для переноса в root |
 | 1.75 | 2026-08-09 | Cash: tenant-safe UI агрегата перевода, selector валюты ДДС и read-only verifier целостности |
 | 1.74 | 2026-08-09 | Cash: атомарный lifecycle пары перевода, защищённые generic mutations, currency-safe отчёт/дашборд/list/export |
 | 1.73 | 2026-08-09 | Cash: атомарный агрегат перевода, две технические ноги, точный effective FX rate и company-scoped idempotency |

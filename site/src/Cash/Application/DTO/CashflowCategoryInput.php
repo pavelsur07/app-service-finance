@@ -11,7 +11,7 @@ use App\Cash\Enum\Transaction\CashflowFlowKind;
  * Вход для создания или изменения статьи ДДС.
  *
  * null означает «не менять» — при создании применяются значения по умолчанию сущности.
- * Поэтому очистить описание или вынести статью в корень через этот вход нельзя.
+ * Для parentId явный parentIdProvided=true отличает «поле не передано» от «перенести в root».
  */
 final readonly class CashflowCategoryInput
 {
@@ -23,6 +23,7 @@ final readonly class CashflowCategoryInput
         public ?CashflowCategoryStatus $status = null,
         public ?int $sort = null,
         public ?CashflowFlowKind $flowKind = null,
+        public bool $parentIdProvided = false,
     ) {
     }
 }

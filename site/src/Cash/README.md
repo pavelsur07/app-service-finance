@@ -89,6 +89,16 @@ idempotency key и владения ногами проверяется двум
 счётчики — без UUID, сумм и реквизитов. Legacy `isTransfer=true` без агрегата
 печатается как INFO и не делает проверку красной. Автоматического repair нет.
 
+## Дерево категорий ДДС
+
+- Обычная категория может быть root; её `flowKind` — `OPERATING`, `INVESTING` или `FINANCING`.
+- Дочерние категории наследуют `flowKind` от root. Обычные потомки не разрешены в
+  `CF_TECH`, `CF_TECH_IN`, `CF_TECH_OUT` и `CF_UNALLOC`.
+- `app:cashflow-categories:migrate-system-structure` создаёт и нормализует только
+  канонические системные категории. Она не перемещает обычные root-категории.
+- Обычные legacy root с `TECHNICAL` не изменяются автоматически и отражаются в CLI только
+  агрегированным warning без UUID, названий и реквизитов.
+
 ## Безопасный rollout
 
 1. До production-действий открыть отдельный Production Gate. Проверить
@@ -96,7 +106,8 @@ idempotency key и владения ногами проверяется двум
    `app:cashflow-categories:migrate-system-structure --companies-with-accounts`
    без `--execute`. Команда выбирает только компании со счетами ДДС и выводит
    агрегированные счётчики без UUID и реквизитов. В production этот dry-run
-   запускается ручным workflow action `category-plan`.
+   запускается ручным workflow action `category-plan`. Обычные root-категории не входят
+   в execute-план; warning о legacy `TECHNICAL` root остаётся read-only.
 2. Применить expand-only migration `cash_transfer`, затем развернуть application
    code. Backfill и автоматическое спаривание legacy-операций не нужны.
 3. После deploy выполнить smoke создания/просмотра на разрешённой паре и
