@@ -7,6 +7,7 @@ namespace App\Tests\Builders\Company;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyInvite;
 use App\Company\Entity\CompanyMember;
+use App\Company\Entity\CompanyRole;
 use App\Company\Entity\User;
 use Webmozart\Assert\Assert;
 
@@ -30,6 +31,7 @@ final class CompanyInviteBuilder
     private ?\DateTimeImmutable $acceptedAt;
     private ?\DateTimeImmutable $revokedAt;
     private ?User $acceptedByUser;
+    private ?CompanyRole $accessRole;
 
     private function __construct()
     {
@@ -44,6 +46,7 @@ final class CompanyInviteBuilder
         $this->acceptedAt = null;
         $this->revokedAt = null;
         $this->acceptedByUser = null;
+        $this->accessRole = null;
     }
 
     public static function anInvite(): self
@@ -147,6 +150,14 @@ final class CompanyInviteBuilder
         return $clone;
     }
 
+    public function withAccessRole(?CompanyRole $accessRole): self
+    {
+        $clone = clone $this;
+        $clone->accessRole = $accessRole;
+
+        return $clone;
+    }
+
     public function build(): CompanyInvite
     {
         $invite = new CompanyInvite(
@@ -158,6 +169,7 @@ final class CompanyInviteBuilder
             $this->tokenHash,
             $this->expiresAt,
             $this->createdAt,
+            $this->accessRole,
         );
 
         if (null !== $this->acceptedAt) {

@@ -5,11 +5,17 @@ namespace App\Company\Controller;
 use App\Company\Application\DisableCompanyMemberAction;
 use App\Company\Application\EnableCompanyMemberAction;
 use App\Company\Entity\Company;
+use App\Company\Entity\CompanyMember;
+use App\Company\Entity\CompanyRole;
 use App\Company\Entity\User;
 use App\Company\Form\CompanyInviteOperatorType;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Repository\CompanyInviteRepository;
 use App\Company\Repository\CompanyMemberRepository;
+use App\Company\Repository\CompanyRoleRepository;
+use App\Company\Security\AccessLevel;
+use App\Company\Security\Module;
+use App\Company\Security\SystemCompanyRoles;
 use App\Company\Service\CompanyInviteManager;
 use App\Notification\DTO\EmailMessage;
 use App\Notification\DTO\NotificationContext;
@@ -33,6 +39,7 @@ class CompanyMemberController extends AbstractController
         ActiveCompanyService $activeCompanyService,
         CompanyMemberRepository $memberRepository,
         CompanyInviteRepository $inviteRepository,
+        CompanyRoleRepository $roleRepository,
     ): Response {
         $company = $activeCompanyService->getActiveCompany();
         $this->assertCompanyMemberAccess($company, $memberRepository);
@@ -46,14 +53,16 @@ class CompanyMemberController extends AbstractController
             static fn ($invite) => !$invite->isPending($now),
         ));
         $user = $this->getUser();
+        $isOwner = $user instanceof User && $company->getUser()->getId() === $user->getId();
 
         return $this->render('company/company_member/index.html.twig', [
             'company' => $company,
             'members' => $members,
             'pendingInvites' => $pendingInvites,
             'nonPendingInvites' => $nonPendingInvites,
-            'inviteForm' => $this->createForm(CompanyInviteOperatorType::class)->createView(),
-            'isOwner' => $user instanceof User && $company->getUser()->getId() === $user->getId(),
+            'inviteForm' => $this->createInviteForm($company, $roleRepository)->createView(),
+            'availableRoles' => $this->resolveAvailableRoles($company, $roleRepository),
+            'isOwner' => $isOwner,
         ]);
     }
 
@@ -62,6 +71,7 @@ class CompanyMemberController extends AbstractController
         Request $request,
         ActiveCompanyService $activeCompanyService,
         CompanyInviteManager $inviteManager,
+        CompanyRoleRepository $roleRepository,
         NotificationRouter $notifier,
         LoggerInterface $logger,
     ): Response {
@@ -72,12 +82,21 @@ class CompanyMemberController extends AbstractController
             throw $this->createAccessDeniedException();
         }
 
-        $form = $this->createForm(CompanyInviteOperatorType::class);
+        $form = $this->createInviteForm($company, $roleRepository);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
             $email = (string) $form->get('email')->getData();
-            $result = $inviteManager->inviteOperator($company, $email, $user);
+            $accessRole = $form->get('accessRole')->getData();
+            if (!$accessRole instanceof CompanyRole) {
+                $accessRole = $roleRepository->find(SystemCompanyRoles::FULL_ACCESS_ID);
+            }
+            $result = $inviteManager->inviteOperator(
+                company: $company,
+                email: $email,
+                actor: $user,
+                accessRole: $accessRole,
+            );
 
             if ($result->plainToken) {
                 $this->addFlash('invite_token', $result->plainToken);
@@ -220,6 +239,67 @@ class CompanyMemberController extends AbstractController
         return $this->redirectToRoute('company_users_index');
     }
 
+    #[Route('/users/{memberId}/access-role', name: 'company_member_access_role', methods: ['POST'])]
+    public function setAccessRole(
+        string $memberId,
+        Request $request,
+        ActiveCompanyService $activeCompanyService,
+        CompanyMemberRepository $memberRepository,
+        CompanyRoleRepository $roleRepository,
+        LoggerInterface $logger,
+    ): Response {
+        $company = $activeCompanyService->getActiveCompany();
+        $this->assertOwner($company);
+
+        if (!$this->isCsrfTokenValid('member_access_role_'.$memberId, (string) $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException();
+        }
+
+        $member = $memberRepository->findOneByIdAndCompanyId($memberId, (string) $company->getId());
+        if (!$member instanceof CompanyMember) {
+            throw $this->createNotFoundException();
+        }
+
+        if (CompanyMember::ROLE_OWNER === $member->getRole()) {
+            $this->addFlash('danger', 'Роль владельца нельзя изменить через шаблон.');
+
+            return $this->redirectToRoute('company_users_index');
+        }
+
+        $roleId = (string) $request->request->get('roleId');
+        $newRole = $roleRepository->find($roleId);
+        if (!$newRole instanceof CompanyRole
+            || SystemCompanyRoles::OWNER_ID === (string) $newRole->getId()
+            || !$this->roleBelongsToCompanyOrSystem($newRole, $company)
+        ) {
+            $this->addFlash('danger', 'Выбранный шаблон не найден или недоступен.');
+
+            return $this->redirectToRoute('company_users_index');
+        }
+
+        if (!$this->hasAnotherAdminAfterChange($company, $member, $newRole, $memberRepository)) {
+            $this->addFlash('danger', 'Нельзя снять последний административный доступ у компании.');
+
+            return $this->redirectToRoute('company_users_index');
+        }
+
+        $oldRole = $member->getAccessRole();
+        $member->setAccessRole($newRole);
+        $memberRepository->save($member);
+
+        $logger->info('Company member access role changed', [
+            'companyId' => (string) $company->getId(),
+            'userId' => (string) $this->requireUser()->getId(),
+            'memberId' => (string) $member->getId(),
+            'oldRoleId' => null !== $oldRole ? (string) $oldRole->getId() : null,
+            'newRoleId' => (string) $newRole->getId(),
+        ]);
+
+        $this->addFlash('success', 'Шаблон доступа участника обновлён.');
+
+        return $this->redirectToRoute('company_users_index');
+    }
+
     #[Route('/{companyId}/users', name: 'company_users_index_legacy', methods: ['GET'])]
     public function legacyIndex(
         string $companyId,
@@ -228,10 +308,11 @@ class CompanyMemberController extends AbstractController
         CompanyMemberRepository $memberRepository,
         ActiveCompanyService $activeCompanyService,
         CompanyInviteRepository $inviteRepository,
+        CompanyRoleRepository $roleRepository,
     ): Response {
         $this->activateLegacyCompany($companyId, $request, $companyRepository, $memberRepository);
 
-        return $this->index($activeCompanyService, $memberRepository, $inviteRepository);
+        return $this->index($activeCompanyService, $memberRepository, $inviteRepository, $roleRepository);
     }
 
     #[Route('/{companyId}/users/invite', name: 'company_users_invite_legacy', methods: ['POST'])]
@@ -242,12 +323,13 @@ class CompanyMemberController extends AbstractController
         CompanyMemberRepository $memberRepository,
         ActiveCompanyService $activeCompanyService,
         CompanyInviteManager $inviteManager,
+        CompanyRoleRepository $roleRepository,
         NotificationRouter $notifier,
         LoggerInterface $logger,
     ): Response {
         $this->activateLegacyCompany($companyId, $request, $companyRepository, $memberRepository);
 
-        return $this->invite($request, $activeCompanyService, $inviteManager, $notifier, $logger);
+        return $this->invite($request, $activeCompanyService, $inviteManager, $roleRepository, $notifier, $logger);
     }
 
     #[Route('/{companyId}/invites/{inviteId}/revoke', name: 'company_invite_revoke_legacy', methods: ['POST'])]
@@ -346,5 +428,112 @@ class CompanyMemberController extends AbstractController
         if (!$user instanceof User || $company->getUser()->getId() !== $user->getId()) {
             throw new AccessDeniedException('Only company owner can manage members.');
         }
+    }
+
+    #[Route('/{companyId}/users/{memberId}/access-role', name: 'company_member_access_role_legacy', methods: ['POST'])]
+    public function legacySetAccessRole(
+        string $companyId,
+        string $memberId,
+        Request $request,
+        CompanyRepository $companyRepository,
+        CompanyMemberRepository $memberRepository,
+        ActiveCompanyService $activeCompanyService,
+        CompanyRoleRepository $roleRepository,
+        LoggerInterface $logger,
+    ): Response {
+        $this->activateLegacyCompany($companyId, $request, $companyRepository, $memberRepository);
+
+        return $this->setAccessRole(
+            $memberId,
+            $request,
+            $activeCompanyService,
+            $memberRepository,
+            $roleRepository,
+            $logger,
+        );
+    }
+
+    private function requireUser(): User
+    {
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException();
+        }
+
+        return $user;
+    }
+
+    private function createInviteForm(Company $company, CompanyRoleRepository $roleRepository): \Symfony\Component\Form\FormInterface
+    {
+        return $this->createForm(CompanyInviteOperatorType::class, null, [
+            'company' => $company,
+            'full_access_role' => $roleRepository->find(SystemCompanyRoles::FULL_ACCESS_ID),
+        ]);
+    }
+
+    /**
+     * @return list<CompanyRole>
+     */
+    private function resolveAvailableRoles(Company $company, CompanyRoleRepository $roleRepository): array
+    {
+        return $roleRepository->findAssignableForCompany($company);
+    }
+
+    private function roleBelongsToCompanyOrSystem(CompanyRole $role, Company $company): bool
+    {
+        $roleCompany = $role->getCompany();
+
+        return null === $roleCompany || (string) $roleCompany->getId() === (string) $company->getId();
+    }
+
+    private function hasAnotherAdminAfterChange(
+        Company $company,
+        CompanyMember $targetMember,
+        CompanyRole $newRole,
+        CompanyMemberRepository $memberRepository,
+    ): bool {
+        if ($this->roleHasAdminWrite($newRole)) {
+            return true;
+        }
+
+        $activeMembers = $memberRepository->findActiveByCompany($company);
+        foreach ($activeMembers as $member) {
+            if ((string) $member->getId() === (string) $targetMember->getId()) {
+                continue;
+            }
+            if ($this->memberHasAdminWrite($member, $company)) {
+                return true;
+            }
+        }
+
+        return (string) $company->getUser()->getId() === (string) $targetMember->getUser()->getId();
+    }
+
+    private function roleHasAdminWrite(CompanyRole $role): bool
+    {
+        $level = AccessLevel::tryFrom($role->getPermissions()[Module::ADMIN->value] ?? '');
+
+        return null !== $level && $level->atLeast(AccessLevel::WRITE);
+    }
+
+    private function memberHasAdminWrite(CompanyMember $member, Company $company): bool
+    {
+        // Участник-владелец компании не участвует в проверке "другой admin":
+        // у него unconditional доступ, его нельзя лишить административного доступа через шаблон.
+        if ((string) $member->getUser()->getId() === (string) $company->getUser()->getId()) {
+            return false;
+        }
+
+        if (CompanyMember::ROLE_OWNER === $member->getRole()) {
+            return true;
+        }
+
+        $role = $member->getAccessRole();
+        if (null === $role) {
+            // Legacy fallback: OPERATOR без шаблона имеет полный доступ.
+            return CompanyMember::ROLE_OPERATOR === $member->getRole();
+        }
+
+        return $this->roleHasAdminWrite($role);
     }
 }

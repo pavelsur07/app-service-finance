@@ -63,7 +63,7 @@ final class AnalyticsDashboardWarmupCommand extends Command
                 $this->plRegisterUpdater->recalcRange($company, $period->getFrom(), $period->getTo());
             }
 
-            $snapshot = $this->dashboardSnapshotService->getSnapshot($company, $period);
+            $snapshot = $this->dashboardSnapshotService->getSnapshot($company, $period, forSystemContext: true);
             $context = $snapshot->toArray()['context'];
             $companyId = (string) $company->getId();
             $cacheKey = sprintf(

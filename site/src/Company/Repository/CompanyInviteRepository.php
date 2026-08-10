@@ -4,6 +4,7 @@ namespace App\Company\Repository;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyInvite;
+use App\Company\Entity\CompanyRole;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -37,6 +38,16 @@ class CompanyInviteRepository extends ServiceEntityRepository
             ->setParameter('tokenHash', $tokenHash)
             ->getQuery()
             ->getOneOrNullResult();
+    }
+
+    public function countPendingByAccessRole(CompanyRole $role, \DateTimeImmutable $now): int
+    {
+        return (int) $this->createPendingInviteQueryBuilder($now)
+            ->andWhere('invite.accessRole = :role')
+            ->setParameter('role', $role)
+            ->select('COUNT(invite.id)')
+            ->getQuery()
+            ->getSingleScalarResult();
     }
 
     /**

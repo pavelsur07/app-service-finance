@@ -4,6 +4,7 @@ namespace App\Company\Repository;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
+use App\Company\Entity\CompanyRole;
 use App\Company\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -88,6 +89,16 @@ class CompanyMemberRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    public function countByAccessRole(CompanyRole $role): int
+    {
+        return (int) $this->createQueryBuilder('companyMember')
+            ->andWhere('companyMember.accessRole = :role')
+            ->setParameter('role', $role)
+            ->select('COUNT(companyMember.id)')
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
     /**
      * Активные членства пользователя во всех компаниях (кроме собственных —
      * там членства нет, компания видна через Company.user).
@@ -110,6 +121,12 @@ class CompanyMemberRepository extends ServiceEntityRepository
             ->getResult();
 
         return $result;
+    }
+
+    public function save(CompanyMember $member): void
+    {
+        $this->getEntityManager()->persist($member);
+        $this->getEntityManager()->flush();
     }
 
     public function findFirstActiveCompanyForUser(User $user): ?Company
