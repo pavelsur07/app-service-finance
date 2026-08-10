@@ -20,12 +20,20 @@
   - Doctrine mapping validation and scoped PHP CS Fixer: green;
   - full repository CS check: pre-existing unrelated failure (572 of 2265 files); all Stage files are clean.
 - External review: `REVIEW_GREEN` after fixing persisted detach deletion and explicit non-leaf delete semantics.
-- Stage 2: DONE locally; checks and both reviews green, awaiting Stage commit.
+- Stage 2: DONE, committed as `5e4d1804d0dc058175613b88822d8413d70e65d4`, pushed to Draft PR #2316.
 - Stage 2 checks:
   - targeted unit: 23 tests, 60 assertions, green;
   - relevant integration: 9 tests, 33 assertions, green;
   - relevant functional: 9 tests, 54 assertions, green;
   - Twig lint, scoped PHP CS Fixer, ESLint and Vite production build: green;
   - external review: `REVIEW_GREEN` after adding a server-side fallback for the JS-disabled `flowKind` field.
+- Stage 3: DONE locally; checks and both reviews green, awaiting Stage commit.
+- Stage 3/final relevant checks:
+  - full unit: 1835 tests, 10583 assertions, green;
+  - category integration: 12 tests, 83 assertions, green;
+  - relevant functional: 9 tests, 54 assertions, green;
+  - Doctrine mapping, Twig lint and scoped PHP CS Fixer (16 files): green;
+  - external Stage review: `REVIEW_GREEN` after removing a vestigial duplicate return branch.
+- Local test DB was rebuilt after baseline exposed a pre-existing persisted money account from earlier manual runs; only isolated `app_test` was affected.
 - `CLAUDE.frontend.md`: `1d4176e3de4f865f37a185c3596b89bba334723bb26782de5eb31fa229ada22c`.
 - Production actions performed: none.

@@ -15,7 +15,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 #[AsCommand(
     name: 'app:cashflow-categories:migrate-system-structure',
-    description: 'Проверяет или переводит категории ДДС компаний на системную CF_* структуру',
+    description: 'Проверяет или синхронизирует системную CF_* структуру без перемещения обычных root-категорий',
 )]
 final class MigrateCashflowCategoryStructureCommand extends Command
 {
@@ -61,11 +61,11 @@ final class MigrateCashflowCategoryStructureCommand extends Command
             return Command::FAILURE;
         }
 
-        $io->title($execute ? 'Перенос системных категорий ДДС' : 'Аудит системных категорий ДДС (read-only)');
+        $io->title($execute ? 'Синхронизация системных категорий ДДС' : 'Аудит системных категорий ДДС (read-only)');
 
         $createdCount = 0;
         $reusedCount = 0;
-        $rootsToMoveCount = 0;
+        $warningCompanyCount = 0;
         $conflictCount = 0;
         $conflictCompanyCount = 0;
         $readyCompanyCount = 0;
@@ -76,7 +76,7 @@ final class MigrateCashflowCategoryStructureCommand extends Command
             $conflicts = count($plan['conflicts']);
             $createdCount += $created;
             $reusedCount += count($plan['categories']) - $created;
-            $rootsToMoveCount += count($plan['rootsToMove']);
+            $warningCompanyCount += [] === $plan['warnings'] ? 0 : 1;
             $conflictCount += $conflicts;
             $conflictCompanyCount += 0 === $conflicts ? 0 : 1;
             $readyCompanyCount += 0 === $conflicts ? 1 : 0;
@@ -94,9 +94,16 @@ final class MigrateCashflowCategoryStructureCommand extends Command
         }
 
         $io->table(
-            ['Компаний в scope', $execute ? 'Обработано' : 'Без конфликтов', 'С конфликтами', 'Создать категорий', 'Переиспользовать', 'Переместить корней'],
-            [[count($companyIds), $readyCompanyCount, $conflictCompanyCount, $createdCount, $reusedCount, $rootsToMoveCount]],
+            ['Компаний в scope', $execute ? 'Обработано' : 'Без конфликтов', 'С конфликтами', 'Создать категорий', 'Переиспользовать', 'С legacy TECHNICAL root'],
+            [[count($companyIds), $readyCompanyCount, $conflictCompanyCount, $createdCount, $reusedCount, $warningCompanyCount]],
         );
+
+        if ($warningCompanyCount > 0) {
+            $io->warning(sprintf(
+                'Обычные root-категории с TECHNICAL найдены у компаний: %d. Они не изменяются автоматически.',
+                $warningCompanyCount,
+            ));
+        }
 
         if ($conflictCount > 0) {
             $io->error(sprintf('Найдено конфликтов: %d. Компании с конфликтами не изменены.', $conflictCount));
