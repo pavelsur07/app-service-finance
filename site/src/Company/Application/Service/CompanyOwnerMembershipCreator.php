@@ -8,10 +8,13 @@ use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
+use App\Company\Entity\CompanyRole;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Entity\User;
+use App\Company\Repository\CompanyRoleRepository;
+use App\Company\Security\SystemCompanyRoles;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 
@@ -19,6 +22,7 @@ final readonly class CompanyOwnerMembershipCreator
 {
     public function __construct(
         private EntityManagerInterface $entityManager,
+        private CompanyRoleRepository $companyRoleRepository,
     ) {
     }
 
@@ -48,12 +52,19 @@ final readonly class CompanyOwnerMembershipCreator
         );
 
         $this->entityManager->persist($company);
-        $this->entityManager->persist(new CompanyMember(
+        $ownerMember = new CompanyMember(
             id: Uuid::uuid4()->toString(),
             company: $company,
             user: $owner,
             role: CompanyMember::ROLE_OWNER,
-        ));
+        );
+        // Шаблон «Владелец». Если seed-строка системного шаблона отсутствует в БД —
+        // оставляем null, сработает legacy-fallback по строковой роли.
+        $ownerRole = $this->companyRoleRepository->find(SystemCompanyRoles::OWNER_ID);
+        if ($ownerRole instanceof CompanyRole) {
+            $ownerMember->setAccessRole($ownerRole);
+        }
+        $this->entityManager->persist($ownerMember);
         $this->entityManager->persist($generalProject);
         $this->entityManager->persist($generalCenter);
         $this->entityManager->persist(new FinancialResponsibilityCenterProject(

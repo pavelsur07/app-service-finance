@@ -27,7 +27,7 @@ class HomeController extends AbstractController
     ) {
     }
 
-    #[Route('/', name: 'app_home_index')]
+    #[Route('/dashboard', name: 'app_dashboard_index', methods: ['GET'])]
     public function index(): Response
     {
         $company = $this->activeCompanyService->getActiveCompany();
@@ -115,11 +115,5 @@ class HomeController extends AbstractController
                 'outflow30' => $outflow30,
             ],
         ]);
-    }
-
-    #[Route('/dashboard', name: 'app_dashboard_index', methods: ['GET'])]
-    public function dashboard(): Response
-    {
-        return $this->render('home/dashboard.html.twig');
     }
 }

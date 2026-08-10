@@ -7,6 +7,7 @@ namespace App\Company\Controller;
 use App\Company\Entity\User;
 use App\Company\Form\RegistrationFormType;
 use App\Company\Repository\CompanyInviteRepository;
+use App\Company\Security\PublicAccess;
 use App\Company\Service\CompanyInviteManager;
 use App\Company\Service\CompanyOwnerAccountCreator;
 use App\Company\Service\InviteTokenService;
@@ -21,6 +22,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
+#[PublicAccess]
 final class RegistrationController extends AbstractController
 {
     private const GENERIC_REG_ERROR = 'Не удалось создать аккаунт. Попробуйте позже.';

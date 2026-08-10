@@ -21,7 +21,7 @@
         <div class="vf-sidebar-body">
         <ul class="navbar-nav">
             <!-- Dashboard -->
-            {% set dashboard_active = current_route == 'app_home_index' %}
+            {% set dashboard_active = current_route in ['app_home_index', 'app_dashboard_index'] %}
             <li class="nav-item {{ dashboard_active ? 'active' : '' }}">
                 <a class="nav-link {{ dashboard_active ? 'active' : '' }}" href="{{ path('app_home_index') }}" title="Главная">
                     <span class="nav-link-icon"><i class="ti ti-home"></i></span>

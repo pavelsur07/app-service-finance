@@ -32,6 +32,13 @@ class CompanyMember
     #[ORM\Column(length: 32)]
     private string $role;
 
+    /**
+     * Шаблон модульного доступа. null — действует legacy-fallback по строковой роли.
+     */
+    #[ORM\ManyToOne(targetEntity: CompanyRole::class)]
+    #[ORM\JoinColumn(name: 'role_id', nullable: true, onDelete: 'SET NULL')]
+    private ?CompanyRole $accessRole = null;
+
     #[ORM\Column(length: 32)]
     private string $status;
 
@@ -72,6 +79,16 @@ class CompanyMember
     public function getStatus(): string
     {
         return $this->status;
+    }
+
+    public function getAccessRole(): ?CompanyRole
+    {
+        return $this->accessRole;
+    }
+
+    public function setAccessRole(?CompanyRole $accessRole): void
+    {
+        $this->accessRole = $accessRole;
     }
 
     public function getCreatedAt(): \DateTimeImmutable

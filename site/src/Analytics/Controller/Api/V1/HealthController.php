@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Analytics\Controller\Api\V1;
 
+use App\Company\Security\PublicAccess;
 use Doctrine\DBAL\Connection;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -13,6 +14,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
 
+#[PublicAccess]
 #[OA\Tag(name: 'Health')]
 final class HealthController extends AbstractController
 {
