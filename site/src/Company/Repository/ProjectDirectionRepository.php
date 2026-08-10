@@ -8,6 +8,7 @@ use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
+use Webmozart\Assert\Assert;
 
 class ProjectDirectionRepository extends ServiceEntityRepository
 {
@@ -35,6 +36,20 @@ class ProjectDirectionRepository extends ServiceEntityRepository
             'company' => $company,
             'name' => self::LEGACY_DEFAULT_PROJECT_NAME,
         ]);
+    }
+
+    public function findOneByIdAndCompanyId(string $id, string $companyId): ?ProjectDirection
+    {
+        Assert::uuid($id);
+        Assert::uuid($companyId);
+
+        return $this->createQueryBuilder('project')
+            ->andWhere('project.id = :id')
+            ->andWhere('IDENTITY(project.company) = :companyId')
+            ->setParameter('id', $id)
+            ->setParameter('companyId', $companyId)
+            ->getQuery()
+            ->getOneOrNullResult();
     }
 
     /**

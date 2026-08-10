@@ -1,0 +1,31 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Новый перевод между счетами{% endblock %}
+
+{% block breadcrumbs %}
+    {% include 'partials/_breadcrumbs.html.twig' with {
+        breadcrumbs: [
+            {'label': 'Главная', 'path': 'app_home_index'},
+            {'label': 'Операции ДДС', 'path': 'cash_transaction_index'},
+            {'label': 'Новый перевод'}
+        ]
+    } %}
+{% endblock %}
+
+{% block content %}
+    <h2 class="page-title mb-3">Перевод между счетами</h2>
+    <p class="text-muted">Укажите фактически списанную и фактически полученную суммы. Для валютного перевода эффективный курс будет рассчитан автоматически.</p>
+    {{ include('cash/transfer/_form.html.twig') }}
+{% endblock %}
+
+{% block scripts %}
+    {{ parent() }}
+    <script>
+        document.querySelectorAll('[data-currency-select]').forEach((select) => {
+            const output = document.querySelector(`[data-currency-output="${select.dataset.currencySelect}"]`);
+            const update = () => { output.value = select.selectedOptions[0]?.dataset.currency || '—'; };
+            select.addEventListener('change', update);
+            update();
+        });
+    </script>
+{% endblock %}

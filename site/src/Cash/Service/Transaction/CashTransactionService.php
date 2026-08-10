@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Cash\Service\Transaction;
 
 use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
@@ -9,33 +11,42 @@ use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashTransactionSplitSource;
 use App\Cash\Exception\CurrencyMismatchException;
 use App\Cash\Exception\FinancePeriodLockedException;
+use App\Cash\Repository\Accounts\MoneyAccountRepository;
+use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
+use App\Cash\Repository\Transfer\CashTransferRepository;
 use App\Cash\Service\PaymentPlan\PaymentPlanMatcher;
 use App\Cash\Service\Vat\VatCalculator;
 use App\Cash\Service\Vat\VatPolicy;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
+use App\Company\Facade\CompanyFacade;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Exception\ORMException;
 use Ramsey\Uuid\Uuid;
 
-class CashTransactionService
+final class CashTransactionService
 {
     public function __construct(
-        private EntityManagerInterface $em,
-        private DailyBalanceRecalculator $recalculator,   // ← как и было: после CRUD пересчитываем факты
-        private CashTransactionRepository $txRepo,
-        private PaymentPlanMatcher $paymentPlanMatcher,
-        private VatPolicy $vatPolicy,
-        private VatCalculator $vatCalculator,
-        private SnapshotCacheInvalidator $snapshotCacheInvalidator,
-        private CashTransactionResponsibilityCenterResolver $responsibilityCenterResolver,
-        private CashTransactionSplitSynchronizer $splitSynchronizer,
+        private readonly EntityManagerInterface $em,
+        private readonly DailyBalanceRecalculator $recalculator,
+        private readonly CashTransactionRepository $txRepo,
+        private readonly PaymentPlanMatcher $paymentPlanMatcher,
+        private readonly VatPolicy $vatPolicy,
+        private readonly VatCalculator $vatCalculator,
+        private readonly SnapshotCacheInvalidator $snapshotCacheInvalidator,
+        private readonly CashTransactionResponsibilityCenterResolver $responsibilityCenterResolver,
+        private readonly CashTransactionSplitSynchronizer $splitSynchronizer,
+        private readonly CompanyFacade $companyFacade,
+        private readonly MoneyAccountRepository $moneyAccountRepository,
+        private readonly CashflowCategoryRepository $cashflowCategoryRepository,
+        private readonly CashTransferRepository $cashTransferRepository,
     ) {
     }
 
@@ -47,8 +58,11 @@ class CashTransactionService
      */
     public function add(CashTransactionDTO $dto): CashTransaction
     {
-        /** @var Company $company */
-        $company = $this->em->getReference(Company::class, $dto->companyId);
+        $company = $this->resolveCompany($dto->companyId);
+        $account = $this->resolveAccount($dto->moneyAccountId, $dto->companyId);
+        $currency = $this->resolveCurrencyForAccount($dto->currency, $account);
+        $counterparty = $this->resolveCounterparty($dto->counterpartyId, $dto->companyId);
+        $category = $this->resolveCategory($dto->cashflowCategoryId, $dto->companyId);
 
         // --- Безопасность: запрет операций в закрытом периоде компании
         $this->assertNotLockedForCompany($company, $dto->occurredAt);
@@ -75,7 +89,6 @@ class CashTransactionService
 
             if (null !== $dto->counterpartyId) {
                 if ($existingCounterpartyId !== $dto->counterpartyId) {
-                    $counterparty = $this->em->getReference(Counterparty::class, $dto->counterpartyId);
                     $existingTransaction->setCounterparty($counterparty);
                     $changed = true;
                 }
@@ -91,14 +104,6 @@ class CashTransactionService
             return $existingTransaction;
         }
 
-        /** @var MoneyAccount $account */
-        $account = $this->em->getReference(MoneyAccount::class, $dto->moneyAccountId);
-
-        // Контроль валюты счёта vs. валюты транзакции
-        if ($dto->currency !== $account->getCurrency()) {
-            throw new CurrencyMismatchException();
-        }
-
         // Создаём сущность транзакции
         $tx = new CashTransaction(
             Uuid::uuid4()->toString(),
@@ -106,23 +111,17 @@ class CashTransactionService
             $account,
             $dto->direction,
             $dto->amount,
-            $dto->currency,
+            $currency,
             $dto->occurredAt
         );
 
         // Опциональные связи
-        $counterparty = $dto->counterpartyId
-            ? $this->em->getReference(Counterparty::class, $dto->counterpartyId)
-            : null;
-        $category = $dto->cashflowCategoryId
-            ? $this->em->getReference(CashflowCategory::class, $dto->cashflowCategoryId)
-            : null;
         $responsibilityPair = $this->responsibilityCenterResolver->resolveForCreate(
             $dto->companyId,
             $dto->projectDirectionId,
             $dto->responsibilityCenterId,
         );
-        $projectDirection = $this->em->getReference(ProjectDirection::class, $responsibilityPair->projectDirectionId);
+        $projectDirection = $this->resolveProjectDirection($responsibilityPair->projectDirectionId, $dto->companyId);
 
         $tx
             ->setDescription($dto->description)
@@ -163,6 +162,8 @@ class CashTransactionService
      */
     public function update(CashTransaction $tx, CashTransactionDTO $dto): CashTransaction
     {
+        $this->assertStandaloneTransaction($tx);
+
         $company = $tx->getCompany();
         $oldAccount = $tx->getMoneyAccount();
         $oldDate = $tx->getOccurredAt();
@@ -171,37 +172,29 @@ class CashTransactionService
         $this->assertNotLockedForCompany($company, $oldDate);
         $this->assertNotLockedForCompany($company, $dto->occurredAt);
 
-        /** @var MoneyAccount $account */
-        $account = $this->em->getReference(MoneyAccount::class, $dto->moneyAccountId);
-
-        // Контроль валюты
-        if ($dto->currency !== $account->getCurrency()) {
-            throw new CurrencyMismatchException();
-        }
+        $companyId = (string) $company->getId();
+        $account = $this->resolveAccount($dto->moneyAccountId, $companyId);
+        $currency = $this->resolveCurrencyForAccount($dto->currency, $account);
 
         // Обновляем поля
         $tx->setMoneyAccount($account)
             ->setDirection($dto->direction)
             ->setAmount($dto->amount)
-            ->setCurrency($dto->currency)
+            ->setCurrency($currency)
             ->setOccurredAt($dto->occurredAt)
             ->setDescription($dto->description);
 
-        $counterparty = $dto->counterpartyId
-            ? $this->em->getReference(Counterparty::class, $dto->counterpartyId)
-            : null;
-        $category = $dto->cashflowCategoryId
-            ? $this->em->getReference(CashflowCategory::class, $dto->cashflowCategoryId)
-            : null;
+        $counterparty = $this->resolveCounterparty($dto->counterpartyId, $companyId);
+        $category = $this->resolveCategory($dto->cashflowCategoryId, $companyId);
         $responsibilityPair = $this->responsibilityCenterResolver->resolveChangedPairForUpdate(
-            (string) $company->getId(),
+            $companyId,
             $tx->getProjectDirection()?->getId(),
             $tx->getResponsibilityCenterId(),
             $dto->projectDirectionId ?? $tx->getProjectDirection()?->getId(),
             $dto->responsibilityCenterId ?? $tx->getResponsibilityCenterId(),
         );
         $projectDirection = null !== $responsibilityPair
-            ? $this->em->getReference(ProjectDirection::class, $responsibilityPair->projectDirectionId)
+            ? $this->resolveProjectDirection($responsibilityPair->projectDirectionId, $companyId)
             : $tx->getProjectDirection();
         $responsibilityCenterId = null !== $responsibilityPair
             ? $responsibilityPair->responsibilityCenterId
@@ -255,12 +248,74 @@ class CashTransactionService
         $tx->setVatAmount($split['vat']);
     }
 
+    private function resolveCompany(string $companyId): Company
+    {
+        if (!Uuid::isValid($companyId)) {
+            throw new \DomainException('Компания не найдена.');
+        }
+
+        return $this->companyFacade->findById($companyId)
+            ?? throw new \DomainException('Компания не найдена.');
+    }
+
+    private function resolveAccount(string $accountId, string $companyId): MoneyAccount
+    {
+        if (!Uuid::isValid($accountId)) {
+            throw new \DomainException('Счёт не найден.');
+        }
+
+        return $this->moneyAccountRepository->findOneByIdAndCompanyId($accountId, $companyId)
+            ?? throw new \DomainException('Счёт не найден.');
+    }
+
+    private function resolveCounterparty(?string $counterpartyId, string $companyId): ?Counterparty
+    {
+        if (null === $counterpartyId) {
+            return null;
+        }
+
+        return $this->companyFacade->findCounterpartyByIdAndCompany($counterpartyId, $companyId)
+            ?? throw new \DomainException('Контрагент не найден.');
+    }
+
+    private function resolveCategory(?string $categoryId, string $companyId): ?CashflowCategory
+    {
+        if (null === $categoryId) {
+            return null;
+        }
+
+        if (!Uuid::isValid($categoryId)) {
+            throw new \DomainException('Категория ДДС не найдена.');
+        }
+
+        return $this->cashflowCategoryRepository->findOneByIdAndCompanyId($categoryId, $companyId)
+            ?? throw new \DomainException('Категория ДДС не найдена.');
+    }
+
+    private function resolveProjectDirection(string $projectDirectionId, string $companyId): ProjectDirection
+    {
+        return $this->companyFacade->findProjectDirectionByIdAndCompany($projectDirectionId, $companyId)
+            ?? throw new \DomainException('Проект не найден.');
+    }
+
+    private function resolveCurrencyForAccount(string $currency, MoneyAccount $account): string
+    {
+        $normalized = FiatCurrency::fromCode($currency)->value;
+        if ($normalized !== $account->getCurrency()) {
+            throw new CurrencyMismatchException('Валюта транзакции должна совпадать с валютой счёта.');
+        }
+
+        return $account->getCurrency();
+    }
+
     /**
      * Удаление транзакции.
      * Сначала удаляем и фиксируем это в БД, затем запускаем пересчёт по затронутому счёту.
      */
     public function delete(CashTransaction $tx, ?string $userId = null, ?string $reason = null): void
     {
+        $this->assertStandaloneTransaction($tx);
+
         $company = $tx->getCompany();
 
         // --- Безопасность: нельзя удалять транзакцию из закрытого периода
@@ -290,6 +345,8 @@ class CashTransactionService
      */
     public function restore(CashTransaction $tx): void
     {
+        $this->assertStandaloneTransaction($tx);
+
         $company = $tx->getCompany();
 
         // --- Безопасность: нельзя восстанавливать транзакцию из закрытого периода
@@ -307,6 +364,16 @@ class CashTransactionService
 
         // Пересчёт по счёту
         $this->recalculator->recalcRange($company, $from, $to, [$account->getId()]);
+    }
+
+    public function assertStandaloneTransaction(CashTransaction $transaction): void
+    {
+        if (null !== $this->cashTransferRepository->findOneByTransactionAndCompanyId(
+            $transaction,
+            (string) $transaction->getCompany()->getId(),
+        )) {
+            throw new \DomainException('Операцию перевода нельзя изменить отдельно. Откройте связанный перевод.');
+        }
     }
 
     /**

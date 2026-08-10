@@ -6,6 +6,7 @@ use App\Analytics\Api\Response\FreeCashWidgetResponse;
 use App\Analytics\Application\DrilldownBuilder;
 use App\Analytics\Domain\Period;
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Enum\FiatCurrency;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Accounts\MoneyFundMovementRepository;
 use App\Cash\Service\Accounts\AccountBalanceProvider;
@@ -22,9 +23,9 @@ final readonly class FreeCashWidgetBuilder
     ) {
     }
 
-    public function build(Company $company, Period $period): FreeCashWidgetResponse
+    public function build(Company $company, Period $period, FiatCurrency $cashCurrency): FreeCashWidgetResponse
     {
-        $accounts = $this->moneyAccountRepository->findByFilters($company, null, null, true, null, ['name' => 'ASC']);
+        $accounts = $this->moneyAccountRepository->findByFilters($company, null, [$cashCurrency->value], true, null, ['name' => 'ASC']);
         $accountIds = array_map(static fn (MoneyAccount $account): string => (string) $account->getId(), $accounts);
 
         $balancesAtEnd = $this->accountBalanceProvider->getClosingBalancesUpToDate($company, $period->getTo(), $accountIds);
@@ -33,22 +34,21 @@ final readonly class FreeCashWidgetBuilder
         $cashAtEnd = $this->sumBalances($balancesAtEnd);
         $cashAtStart = $this->sumBalances($balancesAtStart);
 
-        $fundBalancesAtEnd = $this->moneyFundMovementRepository->sumFundBalancesUpToDate($company, $period->getTo());
-        $fundBalancesAtStart = $this->moneyFundMovementRepository->sumFundBalancesUpToDate($company, $period->getFrom());
+        $fundBalancesAtEnd = $this->moneyFundMovementRepository->sumFundBalancesUpToDate($company, $period->getTo(), $cashCurrency->value);
+        $fundBalancesAtStart = $this->moneyFundMovementRepository->sumFundBalancesUpToDate($company, $period->getFrom(), $cashCurrency->value);
 
-        $currency = $this->resolveCurrency($accounts);
-        $reservedAtEnd = $this->convertMinorToMoney(array_sum($fundBalancesAtEnd), $currency);
-        $reservedAtStart = $this->convertMinorToMoney(array_sum($fundBalancesAtStart), $currency);
+        $reservedAtEnd = $this->convertMinorToMoney(array_sum($fundBalancesAtEnd), $cashCurrency->value);
+        $reservedAtStart = $this->convertMinorToMoney(array_sum($fundBalancesAtStart), $cashCurrency->value);
 
         $freeCashAtEnd = (float) bcsub($cashAtEnd, $reservedAtEnd, 2);
         $freeCashAtStart = (float) bcsub($cashAtStart, $reservedAtStart, 2);
 
         $prevPeriodTo = $period->prevPeriod()->getTo();
         $balancesAtPrevEnd = $this->accountBalanceProvider->getClosingBalancesUpToDate($company, $prevPeriodTo, $accountIds);
-        $fundBalancesAtPrevEnd = $this->moneyFundMovementRepository->sumFundBalancesUpToDate($company, $prevPeriodTo);
+        $fundBalancesAtPrevEnd = $this->moneyFundMovementRepository->sumFundBalancesUpToDate($company, $prevPeriodTo, $cashCurrency->value);
 
         $cashAtPrevEnd = $this->sumBalances($balancesAtPrevEnd);
-        $reservedAtPrevEnd = $this->convertMinorToMoney(array_sum($fundBalancesAtPrevEnd), $currency);
+        $reservedAtPrevEnd = $this->convertMinorToMoney(array_sum($fundBalancesAtPrevEnd), $cashCurrency->value);
         $freeCashAtPrevEnd = (float) bcsub($cashAtPrevEnd, $reservedAtPrevEnd, 2);
 
         $deltaAbs = (float) bcsub((string) $freeCashAtEnd, (string) $freeCashAtStart, 2);
@@ -65,8 +65,8 @@ final readonly class FreeCashWidgetBuilder
             reservedAtEnd: (float) $reservedAtEnd,
             lastUpdatedAt: new \DateTimeImmutable('now', new \DateTimeZone('UTC')),
             drilldown: [
-                'cash_balances' => $this->drilldownBuilder->cashBalances($period->getTo()->format('Y-m-d')),
-                'funds_reserved' => $this->drilldownBuilder->fundsReserved($period->getTo()->format('Y-m-d')),
+                'cash_balances' => $this->drilldownBuilder->cashBalances($period->getTo()->format('Y-m-d'), $cashCurrency->value),
+                'funds_reserved' => $this->drilldownBuilder->fundsReserved($period->getTo()->format('Y-m-d'), $cashCurrency->value),
             ],
         );
     }
@@ -82,18 +82,6 @@ final readonly class FreeCashWidgetBuilder
         }
 
         return $sum;
-    }
-
-    /**
-     * @param MoneyAccount[] $accounts
-     */
-    private function resolveCurrency(array $accounts): string
-    {
-        if (isset($accounts[0])) {
-            return $accounts[0]->getCurrency();
-        }
-
-        return 'USD';
     }
 
     private function convertMinorToMoney(int $amountMinor, string $currency): string

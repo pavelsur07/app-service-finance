@@ -9,6 +9,7 @@ use App\Company\Facade\CompanyFacade;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Repository\CounterpartyRepository;
+use App\Company\Repository\ProjectDirectionRepository;
 use App\Company\Service\CompanyOwnerAccountCreator;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -97,7 +98,7 @@ final class CompanyFacadeTest extends TestCase
 
     /**
      * @param array<string, list<\App\Company\Entity\Company>> $findByUserId
-     * @param array<string, list<CompanyMember>>               $findActiveByUserId
+     * @param array<string, list<CompanyMember>> $findActiveByUserId
      */
     private function facade(array $findByUserId, array $findActiveByUserId): CompanyFacade
     {
@@ -116,6 +117,7 @@ final class CompanyFacadeTest extends TestCase
             (new \ReflectionClass(CompanyOwnerAccountCreator::class))->newInstanceWithoutConstructor(),
             $this->createMock(CounterpartyRepository::class),
             $companyMemberRepository,
+            $this->createMock(ProjectDirectionRepository::class),
         );
     }
 }

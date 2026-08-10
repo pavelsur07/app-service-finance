@@ -79,7 +79,7 @@ final class AuditLogSubscriber implements EventSubscriber
             return;
         }
 
-        if (null !== $this->autoRuleDispatchGuard->getApplicationPlan()) {
+        if ($this->autoRuleDispatchGuard->isSuppressed()) {
             return;
         }
 

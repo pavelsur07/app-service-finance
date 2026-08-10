@@ -5,6 +5,7 @@ namespace App\Cash\Form\Transaction;
 use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
@@ -61,7 +62,7 @@ class CashTransactionType extends AbstractType
             ])
             ->add('amount', NumberType::class, ['scale' => 2])
             ->add('currency', ChoiceType::class, [
-                'choices' => ['RUB' => 'RUB'],
+                'choices' => FiatCurrency::choices(),
                 'disabled' => true,
                 'mapped' => false,
             ])

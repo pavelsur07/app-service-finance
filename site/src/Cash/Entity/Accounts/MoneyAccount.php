@@ -1,13 +1,19 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Cash\Entity\Accounts;
 
-use App\Company\Entity\Company;
 use App\Cash\Enum\Accounts\MoneyAccountType;
+use App\Cash\Enum\FiatCurrency;
+use App\Cash\Exception\MoneyAccountCurrencyImmutableException;
+use App\Company\Entity\Company;
+use Doctrine\ORM\Event\PreUpdateEventArgs;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
 #[ORM\Entity]
+#[ORM\HasLifecycleCallbacks]
 #[ORM\Table(name: '`money_account`')]
 #[ORM\UniqueConstraint(name: 'uniq_company_name', columns: ['company_id', 'name'])]
 #[ORM\Index(name: 'idx_company_type', columns: ['company_id', 'type'])]
@@ -46,7 +52,7 @@ class MoneyAccount
     #[ORM\Column(type: 'decimal', precision: 18, scale: 2)]
     private string $currentBalance = '0.00';
 
-    #Коментарий: Неснижаемый остаток (ватерлиния) для конкретного счёта.
+    // Коментарий: Неснижаемый остаток (ватерлиния) для конкретного счёта.
     #[ORM\Column(type: 'decimal', precision: 14, scale: 2)]
     private string $minimumSafeBalance = '0.00';
 
@@ -99,7 +105,7 @@ class MoneyAccount
         $this->company = $company;
         $this->type = $type;
         $this->name = $name;
-        $this->currency = strtoupper($currency);
+        $this->currency = $this->normalizeCurrency($currency);
         $this->openingBalanceDate = new \DateTimeImmutable('today');
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
@@ -153,9 +159,26 @@ class MoneyAccount
 
     public function setCurrency(string $currency): self
     {
-        $this->currency = strtoupper($currency);
+        $this->currency = $this->normalizeCurrency($currency);
 
         return $this;
+    }
+
+    #[ORM\PreUpdate]
+    public function preventCurrencyChange(PreUpdateEventArgs $event): void
+    {
+        if ($event->hasChangedField('currency')) {
+            throw new MoneyAccountCurrencyImmutableException();
+        }
+    }
+
+    private function normalizeCurrency(string $currency): string
+    {
+        if (MoneyAccountType::CRYPTO_WALLET === $this->type) {
+            return strtoupper(trim($currency));
+        }
+
+        return FiatCurrency::fromCode($currency)->value;
     }
 
     public function isActive(): bool

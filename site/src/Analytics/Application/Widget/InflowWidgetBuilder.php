@@ -6,6 +6,7 @@ use App\Analytics\Api\Response\InflowWidgetResponse;
 use App\Analytics\Application\DrilldownBuilder;
 use App\Analytics\Domain\Period;
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Enum\FiatCurrency;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Company\Entity\Company;
@@ -19,9 +20,9 @@ final readonly class InflowWidgetBuilder
     ) {
     }
 
-    public function build(Company $company, Period $period): InflowWidgetResponse
+    public function build(Company $company, Period $period, FiatCurrency $cashCurrency): InflowWidgetResponse
     {
-        $accounts = $this->moneyAccountRepository->findByFilters($company, null, null, true, null, ['name' => 'ASC']);
+        $accounts = $this->moneyAccountRepository->findByFilters($company, null, [$cashCurrency->value], true, null, ['name' => 'ASC']);
         $accountIds = array_map(static fn (MoneyAccount $account): string => (string) $account->getId(), $accounts);
 
         if ([] === $accountIds) {
@@ -31,15 +32,15 @@ final readonly class InflowWidgetBuilder
                 deltaPct: 0.0,
                 avgDaily: 0.0,
                 series: [],
-                drilldown: $this->drilldownBuilder->cashTransactions(['direction' => 'inflow', 'exclude_transfers' => true]),
+                drilldown: $this->drilldownBuilder->cashTransactions(['direction' => 'inflow', 'exclude_transfers' => true, 'currency' => $cashCurrency->value]),
             );
         }
 
-        $sum = $this->cashTransactionRepository->sumInflowByCompanyAndPeriodExcludeTransfers($company, $period->getFrom(), $period->getTo());
+        $sum = $this->cashTransactionRepository->sumInflowByCompanyAndPeriodExcludeTransfers($company, $period->getFrom(), $period->getTo(), $cashCurrency->value);
         $prevPeriod = $period->prevPeriod();
-        $prevSum = $this->cashTransactionRepository->sumInflowByCompanyAndPeriodExcludeTransfers($company, $prevPeriod->getFrom(), $prevPeriod->getTo());
+        $prevSum = $this->cashTransactionRepository->sumInflowByCompanyAndPeriodExcludeTransfers($company, $prevPeriod->getFrom(), $prevPeriod->getTo(), $cashCurrency->value);
 
-        $seriesRows = $this->cashTransactionRepository->sumInflowByDayExcludeTransfers($company, $period->getFrom(), $period->getTo());
+        $seriesRows = $this->cashTransactionRepository->sumInflowByDayExcludeTransfers($company, $period->getFrom(), $period->getTo(), $cashCurrency->value);
         $series = array_map(
             static fn (array $row): array => ['date' => $row['date'], 'value' => (float) $row['value']],
             $seriesRows,
@@ -65,6 +66,7 @@ final readonly class InflowWidgetBuilder
                 'account_ids' => $accountIds,
                 'from' => $period->getFrom()->format('Y-m-d'),
                 'to' => $period->getTo()->format('Y-m-d'),
+                'currency' => $cashCurrency->value,
             ]),
         );
     }

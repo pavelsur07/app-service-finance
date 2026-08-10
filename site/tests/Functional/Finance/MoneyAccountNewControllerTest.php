@@ -124,6 +124,7 @@ final class MoneyAccountNewControllerTest extends WebTestCaseBase
         self::assertCount(4, $editCrawler->filter('input[data-money-account-type] + .form-selectgroup-label'));
         self::assertCount(1, $editCrawler->filter('input[data-money-account-type][value="bank"]:checked'));
         self::assertCount(1, $editCrawler->filter('select[id$="_currency"]'));
+        self::assertCount(1, $editCrawler->filter('select[id$="_currency"]:disabled'));
         self::assertCount(0, $editCrawler->filter('#tab-integration, [name="bank_provider"]'));
         self::assertCount(1, $editCrawler->filter('#money-account-create-form button[type="submit"]'));
         self::assertSelectorTextContains('#money-account-create-form button[type="submit"]', 'Сохранить');

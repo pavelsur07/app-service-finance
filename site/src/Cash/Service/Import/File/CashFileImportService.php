@@ -5,6 +5,7 @@ namespace App\Cash\Service\Import\File;
 use App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Enum\FiatCurrency;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Import\ImportLogger;
@@ -46,6 +47,13 @@ final class CashFileImportService
 
     public function import(CashFileImportJob $job): void
     {
+        $company = $job->getCompany();
+        $account = $job->getMoneyAccount();
+        if ($account->getCompany()->getId() !== $company->getId()) {
+            throw new \DomainException('Счёт импорта принадлежит другой компании.');
+        }
+        FiatCurrency::fromCode($account->getCurrency());
+
         $storageKey = $this->resolveStorageKey($job);
 
         // Файл читается воркером через объектное хранилище: скачиваем во временную

@@ -5,9 +5,14 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Analytics;
 
 use App\Analytics\Domain\DrilldownKey;
+use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Enum\Accounts\MoneyAccountType;
+use App\Cash\Enum\Transaction\CashDirection;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use Ramsey\Uuid\Uuid;
 
 final class DashboardSnapshotControllerTest extends WebTestCaseBase
 {
@@ -44,6 +49,7 @@ final class DashboardSnapshotControllerTest extends WebTestCaseBase
         self::assertArrayHasKey('context', $payload);
         self::assertIsArray($payload['context']);
         self::assertArrayHasKey('last_updated_at', $payload['context']);
+        self::assertSame('RUB', $payload['context']['cash_currency']);
 
         self::assertArrayHasKey('free_cash', $payload['widgets']);
         self::assertArrayHasKey('inflow', $payload['widgets']);
@@ -113,6 +119,78 @@ final class DashboardSnapshotControllerTest extends WebTestCaseBase
         foreach ($this->collectDrilldownKeys($payload) as $drilldownKey) {
             self::assertTrue(in_array($drilldownKey, $allowedDrilldownKeys, true));
         }
+    }
+
+    public function testCurrencyFiltersCashWidgetsAndSeparatesCachedSnapshots(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $em = $this->em();
+        $user = UserBuilder::aUser()->build();
+        $company = CompanyBuilder::aCompany()->withOwner($user)->build();
+        $rubAccount = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'RUB account', 'RUB');
+        $usdAccount = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'USD account', 'USD');
+        $today = new \DateTimeImmutable('today');
+
+        $transactions = [
+            new CashTransaction(Uuid::uuid4()->toString(), $company, $rubAccount, CashDirection::INFLOW, '100.00', 'RUB', $today),
+            new CashTransaction(Uuid::uuid4()->toString(), $company, $rubAccount, CashDirection::OUTFLOW, '20.00', 'RUB', $today),
+            new CashTransaction(Uuid::uuid4()->toString(), $company, $usdAccount, CashDirection::INFLOW, '7.00', 'USD', $today),
+            new CashTransaction(Uuid::uuid4()->toString(), $company, $usdAccount, CashDirection::OUTFLOW, '2.00', 'USD', $today),
+        ];
+
+        $em->persist($user);
+        $em->persist($company);
+        $em->persist($rubAccount);
+        $em->persist($usdAccount);
+        foreach ($transactions as $transaction) {
+            $em->persist($transaction);
+        }
+        $em->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+
+        $client->request('GET', '/api/dashboard/v1/snapshot?preset=day');
+        self::assertResponseIsSuccessful();
+        $rub = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
+
+        $client->request('GET', '/api/dashboard/v1/snapshot?preset=day&currency=USD');
+        self::assertResponseIsSuccessful();
+        $usd = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
+
+        self::assertSame('RUB', $rub['context']['cash_currency']);
+        self::assertSame(100.0, (float) $rub['widgets']['inflow']['sum']);
+        self::assertSame(20.0, (float) $rub['widgets']['outflow']['sum_abs']);
+        self::assertSame('USD', $usd['context']['cash_currency']);
+        self::assertSame(7.0, (float) $usd['widgets']['inflow']['sum']);
+        self::assertSame(2.0, (float) $usd['widgets']['outflow']['sum_abs']);
+        self::assertSame($rub['widgets']['revenue'], $usd['widgets']['revenue']);
+        self::assertSame('USD', $usd['widgets']['inflow']['drilldown']['params']['currency']);
+        self::assertSame('USD', $usd['widgets']['outflow']['drilldown']['params']['currency']);
+    }
+
+    public function testRejectsUnsupportedCurrency(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $em = $this->em();
+        $user = UserBuilder::aUser()->build();
+        $company = CompanyBuilder::aCompany()->withOwner($user)->build();
+        $em->persist($user);
+        $em->persist($company);
+        $em->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+        $client->request('GET', '/api/dashboard/v1/snapshot?currency=BTC');
+
+        self::assertResponseStatusCodeSame(422);
+        $payload = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
+        self::assertSame('validation_error', $payload['type']);
+        self::assertSame('BTC', $payload['details']['currency']);
     }
 
     /**

@@ -13,6 +13,12 @@
 {% endblock %}
 
 {% block content %}
+{% if transfer %}
+    <div class="alert alert-info" role="alert">
+        Это операция перевода. Изменение и удаление выполняются только для всего перевода.
+        <a href="{{ path('cash_transfer_show', {id: transfer.id}) }}" class="alert-link">Открыть перевод</a>
+    </div>
+{% endif %}
 <div class="card">
     <div class="card-body">
         <dl class="row">
@@ -51,6 +57,9 @@
         </dl>
     </div>
     <div class="card-footer text-end">
+        {% if transfer %}
+            <a href="{{ path('cash_transfer_show', {id: transfer.id}) }}" class="btn btn-primary">Открыть перевод</a>
+        {% else %}
         {% if canCreatePnlDocument %}
             <form method="post" action="{{ path('cash_transaction_create_pnl_document', {id: tx.id}) }}" class="d-inline">
                 <input type="hidden" name="_token" value="{{ csrf_token('create_pnl_document' ~ tx.id) }}">
@@ -72,6 +81,7 @@
             <i class="ti ti-trash"></i>
             <span class="visually-hidden">Удалить</span>
         </button>
+        {% endif %}
         <a href="{{ path('cash_transaction_index') }}" class="btn btn-secondary">Назад к списку</a>
     </div>
 </div>
@@ -116,6 +126,7 @@
         {% endif %}
     </div>
 </div>
-{{ include('transaction/_delete_modal.html.twig', {tx: tx}) }}
+{% if not transfer %}
+    {{ include('transaction/_delete_modal.html.twig', {tx: tx}) }}
+{% endif %}
 {% endblock %}
-

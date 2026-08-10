@@ -8,6 +8,7 @@ final readonly class SnapshotQuery
         public ?string $preset,
         public ?string $from,
         public ?string $to,
+        public ?string $currency = null,
     ) {
     }
 }

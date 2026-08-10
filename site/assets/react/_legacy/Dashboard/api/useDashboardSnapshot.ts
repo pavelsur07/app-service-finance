@@ -1,16 +1,18 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
-export function useDashboardSnapshot(preset: string, customFrom: string, customTo: string) {
+export function useDashboardSnapshot(preset: string, customFrom: string, customTo: string, currency: string) {
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [retryTick, setRetryTick] = useState(0);
 
     const queryString = useMemo(() => {
-        return (customFrom && customTo)
+        const period = (customFrom && customTo)
             ? `from=${encodeURIComponent(customFrom)}&to=${encodeURIComponent(customTo)}`
             : `preset=${encodeURIComponent(preset)}`;
-    }, [customFrom, customTo, preset]);
+
+        return `${period}&currency=${encodeURIComponent(currency)}`;
+    }, [currency, customFrom, customTo, preset]);
 
     const fetchSnapshot = useCallback(async () => {
         setLoading(true);

@@ -4,6 +4,8 @@ import { PRESETS, MapsToDrilldown, resolveDrilldown } from './utils/routing.ts';
 import { showToast } from './utils/toast.ts';
 import { useDashboardSnapshot } from './api/useDashboardSnapshot.ts';
 
+const CASH_CURRENCIES = ['RUB', 'USD', 'EUR', 'KZT'];
+
 function DrilldownButton({ payload, label = 'Подробнее', onOpen }) {
   const { key, params } = resolveDrilldown(payload);
 
@@ -25,7 +27,7 @@ function DrilldownButton({ payload, label = 'Подробнее', onOpen }) {
   );
 }
 
-function KpiCard({ title, value, meta, payload, onOpen }) {
+function KpiCard({ title, value, meta, payload, onOpen, currency = 'RUB' }) {
   const { key } = resolveDrilldown(payload);
 
   return React.createElement('div', { className: 'col-sm-6 col-lg-3' },
@@ -43,7 +45,7 @@ function KpiCard({ title, value, meta, payload, onOpen }) {
     },
       React.createElement('div', { className: 'card-body' },
         React.createElement('div', { className: 'subheader' }, title),
-        React.createElement('div', { className: 'h2 mb-1' }, formatAmount(value)),
+        React.createElement('div', { className: 'h2 mb-1' }, formatAmount(value, currency)),
         React.createElement('div', { className: 'text-muted small' }, meta),
         React.createElement(DrilldownButton, {
           payload,
@@ -68,10 +70,13 @@ function renderSkeleton() {
   );
 }
 
-export function DashboardGrid({ defaultPreset = 'month' }) {
-  const [preset, setPreset] = useState(PRESETS.includes(defaultPreset) ? defaultPreset : 'month');
-  const [customFrom, setCustomFrom] = useState('');
-  const [customTo, setCustomTo] = useState('');
+export function DashboardGrid({ defaultPreset = 'month', defaultCurrency = 'RUB' }) {
+  const initialQuery = new URLSearchParams(window.location.search);
+  const queryPreset = initialQuery.get('preset');
+  const [preset, setPreset] = useState(PRESETS.includes(queryPreset) ? queryPreset : (PRESETS.includes(defaultPreset) ? defaultPreset : 'month'));
+  const currency = CASH_CURRENCIES.includes(defaultCurrency) ? defaultCurrency : 'RUB';
+  const [customFrom, setCustomFrom] = useState(initialQuery.get('from') || '');
+  const [customTo, setCustomTo] = useState(initialQuery.get('to') || '');
 
   const openDrilldown = useCallback((drilldown) => {
     if (!drilldown?.key) {
@@ -81,7 +86,7 @@ export function DashboardGrid({ defaultPreset = 'month' }) {
     MapsToDrilldown(drilldown);
   }, []);
 
-  const { data, loading, error, retry } = useDashboardSnapshot(preset, customFrom, customTo);
+  const { data, loading, error, retry } = useDashboardSnapshot(preset, customFrom, customTo, currency);
 
   const widgets = data?.widgets ?? null;
 
@@ -119,7 +124,30 @@ export function DashboardGrid({ defaultPreset = 'month' }) {
     React.createElement('div', { className: 'card mb-3' },
       React.createElement('div', { className: 'card-body' },
         React.createElement('div', { className: 'row g-2 align-items-end' },
-          React.createElement('div', { className: 'col-sm-4' },
+          React.createElement('div', { className: 'col-sm-3' },
+            React.createElement('label', { className: 'form-label', htmlFor: 'dashboard-cash-currency' }, 'Валюта ДДС'),
+            React.createElement('select', {
+              id: 'dashboard-cash-currency',
+              className: 'form-select',
+              value: currency,
+              onChange: (event) => {
+                const nextCurrency = event.target.value;
+                const url = new URL(window.location.href);
+                url.searchParams.set('currency', nextCurrency);
+                if (customFrom && customTo) {
+                  url.searchParams.set('from', customFrom);
+                  url.searchParams.set('to', customTo);
+                  url.searchParams.delete('preset');
+                } else {
+                  url.searchParams.set('preset', preset);
+                  url.searchParams.delete('from');
+                  url.searchParams.delete('to');
+                }
+                window.location.assign(url.toString());
+              },
+            }, CASH_CURRENCIES.map((item) => React.createElement('option', { key: item, value: item }, item))),
+          ),
+          React.createElement('div', { className: 'col-sm-3' },
             React.createElement('label', { className: 'form-label' }, 'Preset'),
             React.createElement('select', {
               className: 'form-select',
@@ -131,7 +159,7 @@ export function DashboardGrid({ defaultPreset = 'month' }) {
               },
             }, PRESETS.map((item) => React.createElement('option', { key: item, value: item }, item))),
           ),
-          React.createElement('div', { className: 'col-sm-3' },
+          React.createElement('div', { className: 'col-sm-2' },
             React.createElement('label', { className: 'form-label' }, 'From'),
             React.createElement('input', {
               type: 'date',
@@ -145,7 +173,7 @@ export function DashboardGrid({ defaultPreset = 'month' }) {
               },
             }),
           ),
-          React.createElement('div', { className: 'col-sm-3' },
+          React.createElement('div', { className: 'col-sm-2' },
             React.createElement('label', { className: 'form-label' }, 'To'),
             React.createElement('input', {
               type: 'date',
@@ -173,9 +201,9 @@ export function DashboardGrid({ defaultPreset = 'month' }) {
       ),
     ),
     React.createElement('div', { className: 'row row-cards g-3 mb-3' },
-      React.createElement(KpiCard, { title: 'Free Cash', value: widgets.free_cash?.value, meta: `Δ ${widgets.free_cash?.delta_pct ?? 0}%`, payload: widgets.free_cash, onOpen: openDrilldown }),
-      React.createElement(KpiCard, { title: 'Inflow', value: widgets.inflow?.sum, meta: `Среднее в день: ${formatAmount(widgets.inflow?.avg_daily)}`, payload: widgets.inflow, onOpen: openDrilldown }),
-      React.createElement(KpiCard, { title: 'Outflow', value: widgets.outflow?.sum_abs, meta: `CAPEX: ${formatAmount(widgets.outflow?.capex_abs)}`, payload: widgets.outflow, onOpen: openDrilldown }),
+      React.createElement(KpiCard, { title: 'Free Cash', value: widgets.free_cash?.value, meta: `Δ ${widgets.free_cash?.delta_pct ?? 0}%`, payload: widgets.free_cash, onOpen: openDrilldown, currency }),
+      React.createElement(KpiCard, { title: 'Inflow', value: widgets.inflow?.sum, meta: `Среднее в день: ${formatAmount(widgets.inflow?.avg_daily, currency)}`, payload: widgets.inflow, onOpen: openDrilldown, currency }),
+      React.createElement(KpiCard, { title: 'Outflow', value: widgets.outflow?.sum_abs, meta: `CAPEX: ${formatAmount(widgets.outflow?.capex_abs, currency)}`, payload: widgets.outflow, onOpen: openDrilldown, currency }),
       React.createElement(KpiCard, { title: 'Revenue', value: widgets.revenue?.value, meta: `Δ ${widgets.revenue?.delta_pct ?? 0}%`, payload: widgets.revenue, onOpen: openDrilldown }),
     ),
     React.createElement('div', { className: 'row row-cards g-3 mb-3' },
@@ -184,7 +212,7 @@ export function DashboardGrid({ defaultPreset = 'month' }) {
           React.createElement('div', { className: 'card-body' },
             React.createElement('h3', { className: 'card-title' }, 'Cash Flow Split'),
             React.createElement('ul', { className: 'list-unstyled mb-0' },
-              ['operating', 'investing', 'financing', 'total'].map((key) => React.createElement('li', { key }, `${key}: ${formatAmount(widgets.cashflow_split?.[key]?.net)}`)),
+              ['operating', 'investing', 'financing', 'total'].map((key) => React.createElement('li', { key }, `${key}: ${formatAmount(widgets.cashflow_split?.[key]?.net, currency)}`)),
             ),
             React.createElement(DrilldownButton, { payload: widgets.cashflow_split, onOpen: openDrilldown }),
           ),
@@ -224,7 +252,7 @@ export function DashboardGrid({ defaultPreset = 'month' }) {
                       openDrilldown(item.drilldown);
                     }
                   } : undefined,
-                }, `${item.category_name}: ${formatAmount(item.sum_abs)}`)),
+                }, `${item.category_name}: ${formatAmount(item.sum_abs, currency)}`)),
               ),
           ),
         ),

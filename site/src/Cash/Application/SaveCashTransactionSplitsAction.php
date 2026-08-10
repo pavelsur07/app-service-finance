@@ -13,6 +13,7 @@ use App\Cash\Enum\Transaction\CashTransactionSplitSource;
 use App\Cash\Exception\FinancePeriodLockedException;
 use App\Cash\Repository\PaymentPlan\PaymentPlanMatchRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
+use App\Cash\Repository\Transfer\CashTransferRepository;
 use App\Cash\Service\Category\CashflowSystemCategoryService;
 use App\Shared\Audit\AuditContextProvider;
 use App\Shared\Entity\AuditLog;
@@ -30,6 +31,7 @@ final class SaveCashTransactionSplitsAction
         private readonly CashflowSystemCategoryService $systemCategoryService,
         private readonly PaymentPlanMatchRepository $paymentPlanMatchRepository,
         private readonly AuditContextProvider $auditContextProvider,
+        private readonly CashTransferRepository $cashTransferRepository,
     ) {
     }
 
@@ -78,6 +80,13 @@ final class SaveCashTransactionSplitsAction
      */
     private function assertTransactionEditable(CashTransaction $transaction): void
     {
+        if (null !== $this->cashTransferRepository->findOneByTransactionAndCompanyId(
+            $transaction,
+            (string) $transaction->getCompany()->getId(),
+        )) {
+            throw new \DomainException('Разбивку операции перевода нельзя изменить отдельно.');
+        }
+
         if ($transaction->isDeleted()) {
             throw new \DomainException('Удалённую операцию нельзя разбить по статьям.');
         }

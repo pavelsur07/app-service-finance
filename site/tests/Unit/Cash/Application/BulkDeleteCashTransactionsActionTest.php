@@ -98,6 +98,10 @@ final class BulkDeleteCashTransactionsActionTest extends TestCase
             );
 
         $cacheInvalidator = new SnapshotCacheInvalidator(new ArrayAdapter());
+        $repository->expects(self::once())
+            ->method('hasAnyTransferAggregateByIdsAndCompanyId')
+            ->with($ids, $company->getId())
+            ->willReturn(false);
 
         $deletedCount = (new BulkDeleteCashTransactionsAction(
             $repository,
@@ -141,6 +145,32 @@ final class BulkDeleteCashTransactionsActionTest extends TestCase
             self::assertFalse($locked->isDeleted());
             self::assertFalse($open->isDeleted());
         }
+    }
+
+    public function testRejectsSelectionContainingTransferLegBeforeMutation(): void
+    {
+        $company = CompanyBuilder::aCompany()->withId(Uuid::uuid4()->toString())->build();
+        $transaction = $this->transaction($company, $this->account($company), '2026-08-07');
+        $ids = [$transaction->getId()];
+        $repository = $this->createMock(CashTransactionRepository::class);
+        $repository->method('findActiveByIdsAndCompanyId')->willReturn([$transaction]);
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::never())->method('flush');
+        $recalculator = $this->createMock(DailyBalanceRecalculator::class);
+        $recalculator->expects(self::never())->method('recalcRange');
+        $repository->method('hasAnyTransferAggregateByIdsAndCompanyId')->willReturn(true);
+
+        $action = new BulkDeleteCashTransactionsAction(
+            $repository,
+            $entityManager,
+            $recalculator,
+            new SnapshotCacheInvalidator(new ArrayAdapter()),
+        );
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Операции перевода нельзя удалить отдельно.');
+
+        $action($company, $ids, null);
     }
 
     private function account(Company $company): MoneyAccount

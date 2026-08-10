@@ -53,6 +53,7 @@
                 Экспорт XLS
             </a>
             <a href="{{ path('cash_transaction_new', app.request.query.all) }}" class="btn btn-primary">Добавить</a>
+            <a href="{{ path('cash_transfer_new') }}" class="btn btn-outline-primary">Перевод между счетами</a>
             <a href="/cash/import/bank1c"
                class="btn btn-primary"
                data-testid="btn-import-1c">
@@ -119,7 +120,7 @@
                                        class="form-check-input m-0"
                                        id="cash-transactions-select-all"
                                        aria-label="Выбрать все транзакции на странице"
-                                       {{ transactions is empty ? 'disabled' : '' }}>
+                                       {{ not hasStandaloneTransactions ? 'disabled' : '' }}>
                             </th>
                             <th>Дата</th>
                             <th>Счет</th>
@@ -132,12 +133,14 @@
                     </thead>
                     <tbody>
                     {% for tx in transactions %}
+                        {% set transfer = transferByTransactionId[tx.id]|default(null) %}
                         <tr>
                             <td>
                                 <input type="checkbox"
-                                       class="form-check-input m-0 js-cash-transaction-select"
+                                       class="form-check-input m-0{{ transfer ? '' : ' js-cash-transaction-select' }}"
                                        value="{{ tx.id }}"
-                                       aria-label="Выбрать транзакцию от {{ tx.occurredAt|date('d.m.Y') }}">
+                                       aria-label="Выбрать транзакцию от {{ tx.occurredAt|date('d.m.Y') }}"
+                                       {{ transfer ? 'disabled' : '' }}>
                             </td>
                             <td>{{ tx.occurredAt|date('d.m.Y') }}</td>
                             <td>{{ tx.moneyAccount ? tx.moneyAccount.name : '' }}</td>
@@ -163,11 +166,15 @@
                             <td class="text-end text-nowrap" style="min-width: 12rem;"><span class="text-{{ tx.direction.value == 'INFLOW' ? 'success' : 'danger' }}">{{ tx.direction.value == 'INFLOW' ? '+' : '-' }}{{ tx.amount|number_format(2, ',', ' ') }} {{ tx.currency }}</span></td>
                             <td>
                                 {% for s in tx.splits %}{{ s.cashflowCategory.name }}{% if not loop.last %}, {% endif %}{% endfor %}
-                                <a href="{{ path('cash_transaction_splits', {id: tx.id}) }}"
-                                   class="d-block small text-muted"
-                                   title="Разнести операцию по нескольким статьям">
-                                    {{ tx.splits|length > 1 ? 'изменить разбивку' : 'разбить' }}
-                                </a>
+                                {% if transfer %}
+                                    <a href="{{ path('cash_transfer_show', {id: transfer.id}) }}" class="d-block small">Открыть перевод</a>
+                                {% else %}
+                                    <a href="{{ path('cash_transaction_splits', {id: tx.id}) }}"
+                                       class="d-block small text-muted"
+                                       title="Разнести операцию по нескольким статьям">
+                                        {{ tx.splits|length > 1 ? 'изменить разбивку' : 'разбить' }}
+                                    </a>
+                                {% endif %}
                                 {% if tx.projectDirection %}
                                     <div class="text-muted small">{{ tx.projectDirection.name }}</div>
                                 {% endif %}
@@ -182,6 +189,9 @@
                                 {% endif %}
                             </td>
                             <td class="text-end">
+                                {% if transfer %}
+                                    <a href="{{ path('cash_transfer_show', {id: transfer.id}) }}" class="btn btn-link btn-sm">Перевод</a>
+                                {% else %}
                                 <div class="dropdown position-static {{ loop.last ? 'dropup' : '' }}">
                                     <button class="btn btn-link p-0 text-muted" data-bs-toggle="dropdown" aria-label="Действия">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
@@ -238,6 +248,7 @@
                                 </div>
 
                               {{ include('transaction/_delete_modal.html.twig', {tx: tx}) }}
+                                {% endif %}
                             </td>
                         </tr>
                     {% else %}

@@ -4,6 +4,7 @@ namespace App\Analytics\Application\Widget;
 
 use App\Analytics\Application\DrilldownBuilder;
 use App\Analytics\Domain\Period;
+use App\Cash\Enum\FiatCurrency;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Company\Entity\Company;
 
@@ -22,12 +23,12 @@ final readonly class TopCashWidgetBuilder
     /**
      * @return array<string, mixed>
      */
-    public function build(Company $company, Period $period): array
+    public function build(Company $company, Period $period, FiatCurrency $cashCurrency): array
     {
-        $rows = $this->cashTransactionRepository->sumOutflowByCategoryExcludeTransfers($company, $period->getFrom(), $period->getTo());
+        $rows = $this->cashTransactionRepository->sumOutflowByCategoryExcludeTransfers($company, $period->getFrom(), $period->getTo(), $cashCurrency->value);
 
         $prevPeriod = $period->prevPeriod();
-        $prevRows = $this->cashTransactionRepository->sumOutflowByCategoryExcludeTransfers($company, $prevPeriod->getFrom(), $prevPeriod->getTo());
+        $prevRows = $this->cashTransactionRepository->sumOutflowByCategoryExcludeTransfers($company, $prevPeriod->getFrom(), $prevPeriod->getTo(), $cashCurrency->value);
 
         $prevSums = [];
         foreach ($prevRows as $row) {
@@ -78,6 +79,7 @@ final readonly class TopCashWidgetBuilder
                         'direction' => 'out',
                         'exclude_transfers' => true,
                         'category_id' => $categoryId,
+                        'currency' => $cashCurrency->value,
                     ]),
                 ];
 

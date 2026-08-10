@@ -100,6 +100,7 @@ class MoneyAccountController extends AbstractController
         $form = $this->createForm(MoneyAccountFormType::class, $account, [
             'expanded_type' => true,
             'currency_choices' => true,
+            'currency_disabled' => true,
         ]);
         foreach ([
             'minimumSafeBalance',

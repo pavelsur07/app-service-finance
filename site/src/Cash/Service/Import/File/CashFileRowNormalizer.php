@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Cash\Service\Import\File;
 
+use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\Transaction\CashDirection;
 
 class CashFileRowNormalizer
@@ -117,19 +120,30 @@ class CashFileRowNormalizer
     private function resolveCurrency(array $rowByHeader, array $mapping, string $defaultCurrency): array
     {
         $errors = [];
+        $normalizedDefault = strtoupper(trim($defaultCurrency));
+        $default = FiatCurrency::tryFrom($normalizedDefault);
+        if (null === $default) {
+            $errors[] = 'Неподдерживаемая валюта счёта.';
+        }
+
         $currencyValue = $this->getMappedValue($rowByHeader, $mapping['currency'] ?? null);
         if (null === $currencyValue) {
-            return [$defaultCurrency, $errors];
+            return [$normalizedDefault, $errors];
         }
 
         $normalized = strtoupper(trim($currencyValue));
-        if (3 !== strlen($normalized)) {
-            $errors[] = 'Не удалось распознать валюту операции.';
+        $currency = FiatCurrency::tryFrom($normalized);
+        if (null === $currency) {
+            $errors[] = 'Неподдерживаемая валюта операции.';
 
-            return [$defaultCurrency, $errors];
+            return [$normalized, $errors];
         }
 
-        return [$normalized, $errors];
+        if (null !== $default && $currency !== $default) {
+            $errors[] = 'Валюта операции не совпадает с валютой счёта.';
+        }
+
+        return [$currency->value, $errors];
     }
 
     private function getMappedValue(array $rowByHeader, ?string $column): ?string
