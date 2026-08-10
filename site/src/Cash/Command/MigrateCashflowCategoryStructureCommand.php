@@ -28,6 +28,7 @@ final class MigrateCashflowCategoryStructureCommand extends Command
     {
         $this
             ->addOption('company-id', null, InputOption::VALUE_REQUIRED, 'Обработать только одну компанию')
+            ->addOption('companies-with-accounts', null, InputOption::VALUE_NONE, 'Обработать только компании, у которых есть счета ДДС')
             ->addOption('execute', null, InputOption::VALUE_NONE, 'Применить изменения; без флага команда работает в read-only режиме');
     }
 
@@ -36,6 +37,7 @@ final class MigrateCashflowCategoryStructureCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $companyId = $input->getOption('company-id');
         $companyId = is_string($companyId) && '' !== trim($companyId) ? trim($companyId) : null;
+        $companiesWithAccounts = true === $input->getOption('companies-with-accounts');
         $execute = true === $input->getOption('execute');
 
         if (null !== $companyId && !Uuid::isValid($companyId)) {
@@ -44,49 +46,57 @@ final class MigrateCashflowCategoryStructureCommand extends Command
             return Command::INVALID;
         }
 
-        $companyIds = $this->migrator->findCompanyIds($companyId);
+        if (null !== $companyId && $companiesWithAccounts) {
+            $io->error('Опции --company-id и --companies-with-accounts нельзя использовать одновременно.');
+
+            return Command::INVALID;
+        }
+
+        $companyIds = $companiesWithAccounts
+            ? $this->migrator->findCompanyIdsWithMoneyAccounts()
+            : $this->migrator->findCompanyIds($companyId);
         if ([] === $companyIds) {
-            $io->error(null === $companyId ? 'Компании не найдены.' : 'Компания не найдена.');
+            $io->error($companiesWithAccounts ? 'Компании со счетами ДДС не найдены.' : (null === $companyId ? 'Компании не найдены.' : 'Компания не найдена.'));
 
             return Command::FAILURE;
         }
 
         $io->title($execute ? 'Перенос системных категорий ДДС' : 'Аудит системных категорий ДДС (read-only)');
 
-        $table = [];
+        $createdCount = 0;
+        $reusedCount = 0;
+        $rootsToMoveCount = 0;
         $conflictCount = 0;
+        $conflictCompanyCount = 0;
+        $readyCompanyCount = 0;
         $processedCount = 0;
         foreach ($companyIds as $id) {
             $plan = $this->migrator->plan($id);
             $created = count(array_filter($plan['categories'], static fn (array $category): bool => $category['create']));
             $conflicts = count($plan['conflicts']);
+            $createdCount += $created;
+            $reusedCount += count($plan['categories']) - $created;
+            $rootsToMoveCount += count($plan['rootsToMove']);
             $conflictCount += $conflicts;
+            $conflictCompanyCount += 0 === $conflicts ? 0 : 1;
+            $readyCompanyCount += 0 === $conflicts ? 1 : 0;
 
             if ($execute && 0 === $conflicts) {
                 try {
                     $this->migrator->execute($plan);
                     ++$processedCount;
-                } catch (\Throwable $exception) {
-                    $io->error(sprintf('Ошибка при переносе компании %s: %s', $id, $exception->getMessage()));
+                } catch (\Throwable) {
+                    $io->error('Не удалось применить план одной компании; выполнение остановлено.');
 
                     return Command::FAILURE;
                 }
             }
-
-            $table[] = [
-                $id,
-                (string) $created,
-                (string) (count($plan['categories']) - $created),
-                (string) count($plan['rootsToMove']),
-                0 === $conflicts ? ($execute ? 'DONE' : 'READY') : 'CONFLICT',
-            ];
-
-            foreach ($plan['conflicts'] as $conflict) {
-                $io->warning(sprintf('%s: %s', $id, $conflict));
-            }
         }
 
-        $io->table(['company_id', 'create', 'reuse', 'move roots', 'status'], $table);
+        $io->table(
+            ['Компаний в scope', $execute ? 'Обработано' : 'Без конфликтов', 'С конфликтами', 'Создать категорий', 'Переиспользовать', 'Переместить корней'],
+            [[count($companyIds), $readyCompanyCount, $conflictCompanyCount, $createdCount, $reusedCount, $rootsToMoveCount]],
+        );
 
         if ($conflictCount > 0) {
             $io->error(sprintf('Найдено конфликтов: %d. Компании с конфликтами не изменены.', $conflictCount));

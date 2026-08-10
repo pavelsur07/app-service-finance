@@ -40,6 +40,15 @@ final readonly class CashflowCategoryStructureMigrator
         );
     }
 
+    /** @return list<string> */
+    public function findCompanyIdsWithMoneyAccounts(): array
+    {
+        return array_map(
+            static fn (mixed $id): string => (string) $id,
+            $this->connection->fetchFirstColumn('SELECT DISTINCT company_id FROM money_account ORDER BY company_id'),
+        );
+    }
+
     /**
      * @return array{
      *     companyId: string,
