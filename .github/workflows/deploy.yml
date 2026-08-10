@@ -190,11 +190,11 @@ jobs:
                   cache-from: type=gha,scope=${{ matrix.service }}
                   cache-to: type=gha,scope=${{ matrix.service }},mode=max
 
-    # 2. ПРОВЕРКА СХЕМЫ — deploy разрешён только после отдельного migration gate.
+    # 2. ПРОВЕРКА СХЕМЫ — перед автоматическим или ручным deploy.
     schema-ready:
         name: 🔍 Verify production schema is ready
         needs: [ build-and-push, migrations-empty-db, api-types-check ]
-        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.production_action == 'deploy' && needs.build-and-push.result == 'success' && needs.migrations-empty-db.result == 'success' && needs.api-types-check.result == 'success' }}
+        if: ${{ !cancelled() && github.ref == 'refs/heads/master' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.production_action == 'deploy')) && needs.build-and-push.result == 'success' && needs.migrations-empty-db.result == 'success' && needs.api-types-check.result == 'success' }}
         concurrency:
             group: production-release
             cancel-in-progress: false
@@ -232,10 +232,11 @@ jobs:
                   EOF
 
     # 3. ЭТАП ДЕПЛОЯ (rolling update — минимальный даунтайм).
-    #    Только вручную через production_action=deploy и после schema-ready.
+    #    Автоматически после push в master или вручную через production_action=deploy.
+    #    Всегда только после schema-ready.
     deploy:
         needs: schema-ready
-        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.production_action == 'deploy' && needs.schema-ready.result == 'success' }}
+        if: ${{ !cancelled() && github.ref == 'refs/heads/master' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.production_action == 'deploy')) && needs.schema-ready.result == 'success' }}
         concurrency:
             group: production-release
             cancel-in-progress: false
