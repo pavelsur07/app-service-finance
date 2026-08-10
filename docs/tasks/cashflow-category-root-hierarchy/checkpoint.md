@@ -9,7 +9,8 @@
   - `AGENTS.md`: `07a7a9f66507e979ee3474513991371b439ecbdbce18605cb0bb715077e9c239`
   - `CLAUDE.md`: `73f70bc02a51684bbe9db99ec4644fbcfc6b3ef6ef934d985bf80a448f13bf75`
   - `PATTERNS.md`: `aee5498cae3cf96a6922103d931f4b92771171625e8512afa18135f0d52a09f7`
-  - `ARCHITECTURE.md`: `776754b84bf8623ebff9654b34e9d09d01a840ab1f6f4b64a4994f22a05fe194`
+  - `ARCHITECTURE.md` at task start: `776754b84bf8623ebff9654b34e9d09d01a840ab1f6f4b64a4994f22a05fe194`
+  - `ARCHITECTURE.md` after the task update: `a0e295ff937510f9fc1ccbb0efdb289e793cdcb3b39dc98027968f2413554f45`
 - Similar patterns inspected: PL category parent filtering, ProjectDirection descendant filtering, BalanceStructure root placeholder/depth checks.
 - Baseline: Docker unit filter green (14 tests, 34 assertions); host-PHP target unavailable before test execution.
 - Stage 1: DONE, committed as `50f500246bad1d46c8ae7fd04c509c1df38a43de`, pushed to Draft PR #2316.
@@ -27,13 +28,15 @@
   - relevant functional: 9 tests, 54 assertions, green;
   - Twig lint, scoped PHP CS Fixer, ESLint and Vite production build: green;
   - external review: `REVIEW_GREEN` after adding a server-side fallback for the JS-disabled `flowKind` field.
-- Stage 3: DONE locally; checks and both reviews green, awaiting Stage commit.
+- Stage 3: DONE, committed as `58510bb7`, pushed to Draft PR #2316.
 - Stage 3/final relevant checks:
   - full unit: 1835 tests, 10583 assertions, green;
   - category integration: 12 tests, 83 assertions, green;
   - relevant functional: 9 tests, 54 assertions, green;
   - Doctrine mapping, Twig lint and scoped PHP CS Fixer (16 files): green;
   - external Stage review: `REVIEW_GREEN` after removing a vestigial duplicate return branch.
+- Final full-task review from base `30fd264964d3f2309ff180320d471b346244a9f6`: `REVIEW_GREEN`; no unresolved BLOCKER or IMPORTANT findings.
+- Release Gate: implementation complete in Draft PR #2316; awaiting only the owner's decision about Ready for review. Merge, deploy and production actions are not authorized.
 - Local test DB was rebuilt after baseline exposed a pre-existing persisted money account from earlier manual runs; only isolated `app_test` was affected.
 - `CLAUDE.frontend.md`: `1d4176e3de4f865f37a185c3596b89bba334723bb26782de5eb31fa229ada22c`.
 - Production actions performed: none.
