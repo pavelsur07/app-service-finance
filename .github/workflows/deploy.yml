@@ -14,7 +14,6 @@ on:
                 options:
                     - none
                     - category-plan
-                    - category-execute
                     - deploy
                     - migrations
 
@@ -410,48 +409,7 @@ jobs:
                     docker compose -f docker-compose.prod.yml run --rm --no-deps -T site-php-cli bin/console app:cashflow-categories:migrate-system-structure --companies-with-accounts --no-interaction
                   EOF
 
-    # 6. ВРЕМЕННЫЙ EXECUTE СИСТЕМНЫХ КАТЕГОРИЙ — отдельный ручной gate.
-    category-execute:
-        name: ⚠️ Execute scoped category rollout
-        needs: changes
-        if: ${{ !cancelled() && needs.changes.result == 'success' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.production_action == 'category-execute' }}
-        concurrency:
-            group: production-release
-            cancel-in-progress: false
-        runs-on: ubuntu-latest
-        timeout-minutes: 10
-        steps:
-            - name: 🔐 Setup SSH key
-              uses: webfactory/ssh-agent@v0.8.0
-              with:
-                  ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-            - name: ⚠️ Run scoped category rollout (--execute)
-              run: |
-                  ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-                    set -e
-                    cd ${{ secrets.SERVER_DIR }}/current
-
-                    export APP_ENV="${{ secrets.APP_ENV }}"
-                    export APP_SECRET="${{ secrets.APP_SECRET }}"
-                    export DATABASE_URL="${{ secrets.DATABASE_URL }}"
-                    export POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
-                    export SITE_MAILER_DSN="${{ secrets.SITE_MAILER_DSN }}"
-                    export SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
-                    export SENTRY_RELEASE="${{ github.sha }}"
-                    export IMAGE_TAG="${{ github.sha }}"
-                    export HEALTH_CHECK_TOKEN="${{ secrets.HEALTH_CHECK_TOKEN }}"
-                    export APP_OBJECT_STORAGE_S3_ACCESS_KEY="${{ secrets.APP_OBJECT_STORAGE_S3_ACCESS_KEY }}"
-                    export APP_OBJECT_STORAGE_S3_SECRET_KEY="${{ secrets.APP_OBJECT_STORAGE_S3_SECRET_KEY }}"
-                    export APP_ENCRYPTION_FALLBACK_KEY="${{ secrets.APP_ENCRYPTION_FALLBACK_KEY }}"
-                    export APP_ENCRYPTION_KEYS_JSON='${{ secrets.APP_ENCRYPTION_KEYS_JSON }}'
-                    export APP_ENCRYPTION_CURRENT_KEY_VERSION="${{ secrets.APP_ENCRYPTION_CURRENT_KEY_VERSION }}"
-
-                    docker compose -f docker-compose.prod.yml pull site-php-cli
-                    docker compose -f docker-compose.prod.yml run --rm --no-deps -T site-php-cli bin/console app:cashflow-categories:migrate-system-structure --companies-with-accounts --execute --no-interaction
-                  EOF
-
-    # 7. ТЕСТЫ НА ПУСТОЙ БД — только при изменении бэкенда.
+    # 6. ТЕСТЫ НА ПУСТОЙ БД — только при изменении бэкенда.
     migrations-empty-db:
         needs: changes
         if: ${{ needs.changes.outputs.backend == 'true' }}
@@ -521,7 +479,7 @@ jobs:
                   MESSENGER_TRANSPORT_DSN: "redis://127.0.0.1:6379/messages"
               run: php bin/console doctrine:migrations:migrate --no-interaction
 
-    # 8. ПРОВЕРКА СИНХРОНИЗАЦИИ API-ТИПОВ — при изменении бэкенда или фронта.
+    # 7. ПРОВЕРКА СИНХРОНИЗАЦИИ API-ТИПОВ — при изменении бэкенда или фронта.
     api-types-check:
         name: 🔍 Check API types sync
         needs: changes
