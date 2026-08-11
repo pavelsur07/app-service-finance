@@ -46,19 +46,24 @@ Merge `bc030ed4` — resolved:
 
 ### Checks and baseline
 
-- `make site-test-db-rebuild` — OK, 234 миграции, до `Version20260809120000`.
-  Обе миграции ветки (`20260808120000`, `20260808130000`) применились до master-овской.
-- `make site-test-unit` — OK (1873 tests, 10761 assertions).
-- `composer test:functional` — OK (470 tests, 2823 assertions).
-- `tests/Unit/Analytics tests/Unit/Company` — OK (187 tests, 666 assertions).
+- `make site-test-db-rebuild` — OK, 236 миграций, до `Version20260811150000`.
+  Миграции ветки перенумерованы выше задеплоенной на прод `Version20260809120000`.
+- `make site-test-unit` — OK (1874 tests, 10765 assertions).
+- `composer test:functional` — OK (485 tests, 2855 assertions).
+- `doctrine:schema:update --dump-sql --env=test` — по FK `role_id` расхождений нет.
+  Остаются pre-existing drift по типам timestamp и ложный `DROP INDEX` функционального индекса.
+- `php-cs-fixer` точечно по файлам Stage 3 — чисто. Репозиторный `cs:check` красный по baseline.
 - Прод-проверка состава участников (read-only, с согласия Владельца):
   `company_members` = 3 × OWNER/ACTIVE + 1 × OPERATOR/ACTIVE. Legacy-значений роли нет,
-  бэкфилл миграции покрывает 100% строк.
+  бэкфилл миграции покрывает 100% строк, поэтому снятие BC-fallback никого не отрезает.
 
 ### Review status
 
-- Stage 1: REVIEW_GREEN. Stage 2: REVIEW_GREEN (7 итераций).
-- Stage 3: реализация не закончена, review не запускался.
+- Stage 1: REVIEW_GREEN (4 итерации). Stage 2: REVIEW_GREEN (7 итераций).
+- Stage 3: REVIEW_GREEN (3 итерации, Codex CLI 0.147.0). 4 IMPORTANT и 7 MINOR подтверждены
+  и исправлены, отклонённых находок нет. Ограничение: песочница Codex не запускалась
+  (`bwrap: loopback`), дифф и контекст передавались через stdin.
+- Нерешённых BLOCKER/IMPORTANT нет.
 
 ### Exact next action
 
@@ -69,7 +74,7 @@ Merge `bc030ed4` — resolved:
 
 ### Files to inspect first on resume
 
-- `docs/tasks/module-access-roles/plan.md` — Stage 3 DoD и Work items
-- `site/migrations/Version20260808120000.php`, `site/migrations/Version20260808130000.php`
-- `/tmp/.../scratchpad/discarded-module-access-roles.patch` — черновик write-гейтов Stage 3
-  (86 гейтов, без тестов); патч живёт только до конца сессии, снят с дерева до мержа
+- `docs/tasks/module-access-roles/plan.md` — Stage 4 и 5
+- `docs/tasks/module-access-roles/stages/stage-3.md` — Stage Report и follow-ups
+- `site/src/Company/Security/ModuleAccessMap.php` — карта, куда добавлять marketplace-гейты
+- `site/tests/Functional/Company/ModuleWriteGateTest.php` — матрица гейтов, расширять на marketplace
