@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\Controller\Api;
 
+use App\Company\Security\ModuleAccess;
 use App\MarketplaceAnalytics\Api\Request\RemapCostMappingRequest;
 use App\MarketplaceAnalytics\Api\Response\CostMappingResponse;
 use App\MarketplaceAnalytics\Enum\UnitEconomyCostType;
@@ -26,13 +27,15 @@ final class CostMappingRemapController extends AbstractController
         private readonly MarketplaceAnalyticsFacade $facade,
         private readonly SerializerInterface $serializer,
         private readonly ValidatorInterface $validator,
-    ) {}
+    ) {
+    }
 
     #[Route(
         '/api/marketplace-analytics/cost-mappings/{id}/remap',
         name: 'marketplace_analytics_api_cost_mapping_remap',
         methods: ['PATCH'],
     )]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function __invoke(string $id, Request $request): JsonResponse
     {
         $company = $this->activeCompanyService->getActiveCompany();
@@ -60,7 +63,7 @@ final class CostMappingRemapController extends AbstractController
         }
 
         $type = UnitEconomyCostType::tryFrom($dto->unitEconomyCostType);
-        if ($type === null) {
+        if (null === $type) {
             return $this->json(
                 ['type' => 'VALIDATION_ERROR', 'message' => 'Неизвестный тип статьи юнит-экономики'],
                 Response::HTTP_UNPROCESSABLE_ENTITY,

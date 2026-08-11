@@ -40,6 +40,7 @@ final class ModuleWriteGateTest extends WebTestCaseBase
         yield 'deals' => [Module::DEALS, '/deals', '/deals/new'];
         yield 'catalog' => [Module::CATALOG, '/catalog/products', '/catalog/products/new'];
         yield 'admin' => [Module::ADMIN, '/integrations/telegram', '/integrations/telegram/generate-link'];
+        yield 'marketplace' => [Module::MARKETPLACE, '/marketplace', '/marketplace/cost-categories/create'];
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('moduleGateProvider')]

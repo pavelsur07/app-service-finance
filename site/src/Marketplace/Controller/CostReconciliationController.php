@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Controller;
 
+use App\Company\Security\ModuleAccess;
 use App\Marketplace\Application\ReconcileCostsAction;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Shared\Service\ActiveCompanyService;
@@ -28,27 +29,28 @@ final class CostReconciliationController extends AbstractController
     ) {
     }
 
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function __invoke(Request $request): Response
     {
-        $company     = $this->companyService->getActiveCompany();
-        $companyId   = (string) $company->getId();
+        $company = $this->companyService->getActiveCompany();
+        $companyId = (string) $company->getId();
 
         if (!$this->isCsrfTokenValid('marketplace_month_close_reconcile', (string) $request->request->get('_token', ''))) {
             throw $this->createAccessDeniedException('Недействительный CSRF-токен');
         }
 
         $marketplace = (string) $request->request->get('marketplace', MarketplaceType::OZON->value);
-        $year        = (int) $request->request->get('year');
-        $month       = (int) $request->request->get('month');
-        $file        = $request->files->get('xlsx_file');
+        $year = (int) $request->request->get('year');
+        $month = (int) $request->request->get('month');
+        $file = $request->files->get('xlsx_file');
 
-        if (MarketplaceType::tryFrom($marketplace) === null || $year === 0 || $month === 0 || $file === null) {
+        if (null === MarketplaceType::tryFrom($marketplace) || 0 === $year || 0 === $month || null === $file) {
             $this->addFlash('error', 'Некорректные параметры или файл не загружен.');
 
             return $this->redirectToRoute('marketplace_month_close_index', [
                 'marketplace' => $marketplace,
-                'year'        => $year,
-                'month'       => $month,
+                'year' => $year,
+                'month' => $month,
             ]);
         }
 
@@ -57,7 +59,7 @@ final class CostReconciliationController extends AbstractController
                 $companyId, $marketplace, $year, $month, $file,
             );
 
-            if ($result['status'] === 'matched') {
+            if ('matched' === $result['status']) {
                 $this->addFlash('success', sprintf(
                     'Сверка выполнена: данные совпадают. Delta: %s руб.',
                     number_format(abs($result['delta']), 2, '.', ' '),
@@ -71,13 +73,13 @@ final class CostReconciliationController extends AbstractController
         } catch (\DomainException $e) {
             $this->addFlash('error', $e->getMessage());
         } catch (\Throwable $e) {
-            $this->addFlash('error', 'Ошибка сверки: ' . $e->getMessage());
+            $this->addFlash('error', 'Ошибка сверки: '.$e->getMessage());
         }
 
         return $this->redirectToRoute('marketplace_month_close_index', [
             'marketplace' => $marketplace,
-            'year'        => $year,
-            'month'       => $month,
+            'year' => $year,
+            'month' => $month,
         ]);
     }
 }

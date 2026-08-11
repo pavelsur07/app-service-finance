@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Controller\Api;
 
+use App\Company\Security\ModuleAccess;
 use App\Marketplace\Application\DeleteListingTagAction;
 use App\Marketplace\Exception\ListingTagNotFoundException;
 use App\Shared\Service\ActiveCompanyService;
@@ -27,6 +28,7 @@ final class ListingTagDeleteController extends AbstractController
     ) {
     }
 
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function __invoke(string $tagId): JsonResponse
     {
         $company = $this->activeCompanyService->getActiveCompany();

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\Controller\Api;
 
+use App\Company\Security\ModuleAccess;
 use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAnalytics\Api\Response\CostMappingResponse;
 use App\MarketplaceAnalytics\Enum\UnitEconomyCostType;
@@ -22,32 +23,34 @@ final class CostMappingAddController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly MarketplaceAnalyticsFacade $facade,
-    ) {}
+    ) {
+    }
 
     #[Route(
         '/api/marketplace-analytics/cost-mappings',
         name: 'marketplace_analytics_api_cost_mapping_add',
         methods: ['POST'],
     )]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function __invoke(Request $request): JsonResponse
     {
         $company = $this->activeCompanyService->getActiveCompany();
 
         $body = json_decode($request->getContent(), true) ?? [];
 
-        $marketplace         = $body['marketplace'] ?? '';
-        $costCategoryId      = $body['costCategoryId'] ?? '';
-        $costCategoryName    = $body['costCategoryName'] ?? '';
+        $marketplace = $body['marketplace'] ?? '';
+        $costCategoryId = $body['costCategoryId'] ?? '';
+        $costCategoryName = $body['costCategoryName'] ?? '';
         $unitEconomyCostType = $body['unitEconomyCostType'] ?? '';
 
-        if ($marketplace === '' || $costCategoryId === '' || $costCategoryName === '' || $unitEconomyCostType === '') {
+        if ('' === $marketplace || '' === $costCategoryId || '' === $costCategoryName || '' === $unitEconomyCostType) {
             return $this->json(
                 ['type' => 'VALIDATION_ERROR', 'message' => 'Все поля обязательны'],
                 Response::HTTP_UNPROCESSABLE_ENTITY,
             );
         }
 
-        if (MarketplaceType::tryFrom($marketplace) === null) {
+        if (null === MarketplaceType::tryFrom($marketplace)) {
             return $this->json(
                 ['type' => 'VALIDATION_ERROR', 'message' => 'Неверное значение маркетплейса'],
                 Response::HTTP_UNPROCESSABLE_ENTITY,
@@ -55,7 +58,7 @@ final class CostMappingAddController extends AbstractController
         }
 
         $type = UnitEconomyCostType::tryFrom($unitEconomyCostType);
-        if ($type === null) {
+        if (null === $type) {
             return $this->json(
                 ['type' => 'VALIDATION_ERROR', 'message' => 'Неверное значение статьи юнит-экономики'],
                 Response::HTTP_UNPROCESSABLE_ENTITY,

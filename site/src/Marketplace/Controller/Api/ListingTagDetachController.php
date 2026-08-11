@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Controller\Api;
 
+use App\Company\Security\ModuleAccess;
 use App\Marketplace\Application\DetachListingTagAction;
 use App\Marketplace\Application\DTO\ListingTagPayload;
 use App\Marketplace\Exception\InvalidListingTagPayloadException;
@@ -29,6 +30,7 @@ final class ListingTagDetachController extends AbstractController
     ) {
     }
 
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function __invoke(Request $request): JsonResponse
     {
         $company = $this->activeCompanyService->getActiveCompany();

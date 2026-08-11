@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Controller\Api;
 
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -32,17 +33,18 @@ final class ReconciliationSalesCheckController extends AbstractController
         name: 'api_marketplace_reconciliation_debug_sales_check',
         methods: ['POST'],
     )]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function __invoke(Request $request): JsonResponse
     {
-        $company   = $this->activeCompanyService->getActiveCompany();
+        $company = $this->activeCompanyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
-        $payload     = json_decode($request->getContent(), true) ?? [];
-        $periodFrom  = $payload['periodFrom'] ?? '';
-        $periodTo    = $payload['periodTo'] ?? '';
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $periodFrom = $payload['periodFrom'] ?? '';
+        $periodTo = $payload['periodTo'] ?? '';
         $marketplace = $payload['marketplace'] ?? 'ozon';
 
-        if ($periodFrom === '' || $periodTo === '') {
+        if ('' === $periodFrom || '' === $periodTo) {
             return $this->json(['error' => 'periodFrom and periodTo are required'], 400);
         }
 
@@ -51,7 +53,7 @@ final class ReconciliationSalesCheckController extends AbstractController
         } catch (\Throwable $e) {
             return new JsonResponse([
                 'error' => $e->getMessage(),
-                'file'  => $e->getFile() . ':' . $e->getLine(),
+                'file' => $e->getFile().':'.$e->getLine(),
                 'trace' => array_slice(explode("\n", $e->getTraceAsString()), 0, 5),
             ], 500);
         }
@@ -63,12 +65,11 @@ final class ReconciliationSalesCheckController extends AbstractController
         string $periodFrom,
         string $periodTo,
     ): JsonResponse {
-
         $params = [
-            'companyId'   => $companyId,
+            'companyId' => $companyId,
             'marketplace' => $marketplace,
-            'periodFrom'  => $periodFrom,
-            'periodTo'    => $periodTo,
+            'periodFrom' => $periodFrom,
+            'periodTo' => $periodTo,
         ];
 
         // 1. sales_total
@@ -112,7 +113,7 @@ final class ReconciliationSalesCheckController extends AbstractController
 
         // 4. boundary_sales — продажи на границах периода
         $boundaryParams = [
-            'companyId'   => $companyId,
+            'companyId' => $companyId,
             'marketplace' => $marketplace,
         ];
 
@@ -148,17 +149,17 @@ final class ReconciliationSalesCheckController extends AbstractController
 
         // delta
         $apiTotal = (float) ($salesTotal['total_revenue'] ?? 0);
-        $delta    = round($apiTotal - $xlsxSalesTotal, 2);
+        $delta = round($apiTotal - $xlsxSalesTotal, 2);
 
         return $this->json([
-            'sales_total'      => $salesTotal,
-            'sales_by_date'    => $salesByDate,
+            'sales_total' => $salesTotal,
+            'sales_by_date' => $salesByDate,
             'xlsx_sales_total' => $xlsxSalesTotal,
-            'delta'            => $delta,
-            'boundary_sales'   => [
+            'delta' => $delta,
+            'boundary_sales' => [
                 $prevDay => $prevDaySales,
                 $nextDay => $nextDaySales,
             ],
-        ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
+        ], 200, [], ['json_encode_options' => \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE]);
     }
 }

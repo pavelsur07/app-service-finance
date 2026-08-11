@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAds\Controller\Api;
 
+use App\Company\Security\ModuleAccess;
 use App\MarketplaceAds\Application\ReprocessAdRawDocumentAction;
 use App\MarketplaceAds\Exception\AdRawDocumentNotFoundException;
 use App\Shared\Service\ActiveCompanyService;
@@ -27,6 +28,7 @@ final class ReprocessAdRawDocumentController extends AbstractController
     ) {
     }
 
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function __invoke(string $id): JsonResponse
     {
         $company = $this->activeCompanyService->getActiveCompany();

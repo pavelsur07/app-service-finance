@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Controller;
 
 use App\Company\Repository\ProjectDirectionRepository;
+use App\Company\Security\ModuleAccess;
 use App\Marketplace\Application\Command\SyncConnectionCommand;
 use App\Marketplace\Application\ProcessOzonRealizationAction;
 use App\Marketplace\Application\ReprocessMarketplacePeriodAction;
@@ -101,6 +102,7 @@ class MarketplaceController extends AbstractController
     }
 
     #[Route('/connection/create', name: 'marketplace_connection_create', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function createConnection(Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
@@ -203,6 +205,7 @@ class MarketplaceController extends AbstractController
     }
 
     #[Route('/connection/{id}/test', name: 'marketplace_connection_test', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function testConnection(string $id, Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
@@ -259,6 +262,7 @@ class MarketplaceController extends AbstractController
     }
 
     #[Route('/connection/{id}/sync', name: 'marketplace_connection_sync', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function syncConnection(string $id, Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
@@ -309,6 +313,7 @@ class MarketplaceController extends AbstractController
     }
 
     #[Route('/connection/{id}/sync-period', name: 'marketplace_connection_sync_period', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function syncConnectionPeriod(string $id, Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
@@ -385,6 +390,7 @@ class MarketplaceController extends AbstractController
     }
 
     #[Route('/connection/{id}/sync-realization', name: 'marketplace_connection_sync_realization', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function syncRealization(string $id, Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
@@ -459,6 +465,7 @@ class MarketplaceController extends AbstractController
     }
 
     #[Route('/raw/{id}/process-realization', name: 'marketplace_raw_process_realization', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function processRealization(
         string $id,
         Request $request,
@@ -517,6 +524,7 @@ class MarketplaceController extends AbstractController
     }
 
     #[Route('/raw/{id}/process-costs', name: 'marketplace_raw_process_costs', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function processCosts(string $id, Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
@@ -565,6 +573,7 @@ class MarketplaceController extends AbstractController
     }
 
     #[Route('/reprocess', name: 'marketplace_reprocess', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function reprocess(Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
@@ -727,6 +736,7 @@ class MarketplaceController extends AbstractController
     }
 
     #[Route('/connection/{id}/toggle', name: 'marketplace_connection_toggle', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function toggleConnection(string $id, Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
@@ -777,6 +787,7 @@ class MarketplaceController extends AbstractController
     }
 
     #[Route('/connection/{id}/delete', name: 'marketplace_connection_delete', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function deleteConnection(string $id, Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
@@ -920,6 +931,11 @@ class MarketplaceController extends AbstractController
     #[Route('/connection/{id}/edit', name: 'marketplace_connection_edit', methods: ['GET', 'POST'])]
     public function editConnection(string $id, Request $request): Response
     {
+        // Один экшен на GET и POST: read покрыт ModuleAccessSubscriber, write гейтим здесь.
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::MARKETPLACE_WRITE);
+        }
+
         $company = $this->companyService->getActiveCompany();
         $connection = $this->connectionRepository->find($id);
 

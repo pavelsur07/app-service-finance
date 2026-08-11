@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Controller;
 
+use App\Company\Security\ModuleAccess;
 use App\Marketplace\Application\Service\OzonPerformanceConnectionValidator;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceConnectionType;
@@ -47,6 +48,7 @@ final class CreatePerformanceConnectionController extends AbstractController
         name: 'marketplace_connection_performance_create',
         methods: ['POST'],
     )]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function __invoke(Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();

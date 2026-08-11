@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Controller\Api;
 
+use App\Company\Security\ModuleAccess;
 use App\Marketplace\Application\Processor\OzonServiceCategoryMap;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Enum\MarketplaceType;
@@ -34,9 +35,10 @@ final class ReconciliationCreateOvhCategoryController extends AbstractController
         name: 'api_marketplace_reconciliation_debug_create_ovh',
         methods: ['POST'],
     )]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function __invoke(): JsonResponse
     {
-        $company   = $this->activeCompanyService->getActiveCompany();
+        $company = $this->activeCompanyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
         // Проверяем существует ли уже (marketplace + deleted_at как в MarketplaceCostCategoryResolver)
@@ -50,18 +52,18 @@ final class ReconciliationCreateOvhCategoryController extends AbstractController
               AND deleted_at IS NULL
             SQL,
             [
-                'companyId'   => $companyId,
+                'companyId' => $companyId,
                 'marketplace' => MarketplaceType::OZON->value,
             ],
         );
 
-        if ($existing !== false) {
+        if (false !== $existing) {
             return $this->json([
                 'created' => false,
                 'message' => 'Категория уже существует',
-                'id'      => $existing['id'],
-                'code'    => $existing['code'],
-                'name'    => $existing['name'],
+                'id' => $existing['id'],
+                'code' => $existing['code'],
+                'name' => $existing['name'],
             ]);
         }
 
@@ -76,9 +78,9 @@ final class ReconciliationCreateOvhCategoryController extends AbstractController
 
         return $this->json([
             'created' => true,
-            'id'      => $category->getId(),
-            'code'    => 'ozon_ovh_processing',
-            'name'    => $categoryName,
+            'id' => $category->getId(),
+            'code' => 'ozon_ovh_processing',
+            'name' => $categoryName,
         ]);
     }
 }

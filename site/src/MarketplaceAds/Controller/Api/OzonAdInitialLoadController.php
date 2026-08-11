@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAds\Controller\Api;
 
+use App\Company\Security\ModuleAccess;
 use App\MarketplaceAds\Application\DispatchOzonAdLoadAction;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -18,15 +19,17 @@ final class OzonAdInitialLoadController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $companyService,
         private readonly DispatchOzonAdLoadAction $dispatchAction,
-    ) {}
+    ) {
+    }
 
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function __invoke(): JsonResponse
     {
         $company = $this->companyService->getActiveCompany();
         $companyId = $company->getId();
 
         $now = new \DateTimeImmutable();
-        $dateFrom = new \DateTimeImmutable($now->format('Y') . '-01-01');
+        $dateFrom = new \DateTimeImmutable($now->format('Y').'-01-01');
         $dateTo = (new \DateTimeImmutable('yesterday'))->setTime(0, 0);
 
         try {

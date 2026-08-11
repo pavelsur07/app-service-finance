@@ -135,6 +135,7 @@ class BalanceStructureController extends AbstractController
     }
 
     #[Route('/move', name: 'balance_structure_move', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function move(Request $request, BalanceCategoryRepository $repo, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
@@ -177,6 +178,7 @@ class BalanceStructureController extends AbstractController
     }
 
     #[Route('/{id}/link-money-accounts-total', name: 'balance_structure_link_money_accounts_total', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function linkMoneyAccountsTotal(Request $request, BalanceCategory $category, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
@@ -202,6 +204,7 @@ class BalanceStructureController extends AbstractController
     }
 
     #[Route('/{id}/link-money-funds-total', name: 'balance_structure_link_money_funds_total', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function linkMoneyFundsTotal(Request $request, BalanceCategory $category, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
