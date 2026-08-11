@@ -98,8 +98,14 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
     /**
      * Гейты строже модульного. Сравниваются точно: `ROLE_ADMIN` не должен совпадать
      * с гипотетическим `ROLE_ADMIN_SOMETHING`.
+     *
+     * `ROLE_COMPANY_OWNER` сюда НЕ входит: это глобальная роль из role_hierarchy, её ставит
+     * CompanyOwnerAccountCreator при регистрации. Она означает «пользователь зарегистрирован
+     * как владелец компании», а не «владелец активной компании», поэтому владелец компании A,
+     * будучи read-only участником компании B, прошёл бы такой гейт и записал бы в компанию B.
+     * Заменой tenant-scoped write-гейту она быть не может — только дополнением.
      */
-    private const STRICTER_ATTRIBUTES = ['ROLE_COMPANY_OWNER', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN'];
+    private const STRICTER_ATTRIBUTES = ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'];
 
     /**
      * Единственная допустимая форма owner-проверки в теле: она бросает AccessDenied.
@@ -118,6 +124,7 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
         $mutatingByClass = [];
         $readByClass = [];
         $usedPolicies = [];
+        $usedRoutePolicies = [];
 
         foreach ($router->getRouteCollection() as $routeName => $route) {
             $controller = (string) ($route->getDefaults()['_controller'] ?? '');
@@ -134,41 +141,47 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
             $exempt = $map->isExempt($className);
             $module = $map->resolve($className);
 
-            if (!$exempt && (null === $module || !\in_array($module->value, self::COVERED_MODULES, true))) {
-                continue;
-            }
-
-            if ($isMutating && $this->hasPublicAccess($className, $methodName)) {
-                // Явное осознанное исключение: логин, регистрация, приём инвайта, вебхуки.
-                $usedPolicies[$routeName] = 'public-access';
-
-                continue;
-            }
-
-            if ($isMutating && isset(self::ROUTE_POLICY[$routeName])) {
-                $usedPolicies[$routeName] = self::ROUTE_POLICY[$routeName];
-
-                continue;
-            }
-
-            if ($exempt) {
-                if ($isMutating) {
-                    $problems[] = sprintf('%s (%s::%s) — мутирующий маршрут в exempt-зоне без записи в ROUTE_POLICY', $routeName, $className, $methodName);
+            // Read-маршруты интересны только как контекст для проверки class-level write-гейта.
+            if (!$isMutating) {
+                if (!$exempt && null !== $module && \in_array($module->value, self::COVERED_MODULES, true)) {
+                    $readByClass[$className][] = $routeName;
                 }
 
                 continue;
             }
 
-            \assert($module instanceof Module);
-
-            if ($isMutating) {
-                $mutatingByClass[$className][] = $routeName;
-            } else {
-                $readByClass[$className][] = $routeName;
+            // Явное осознанное исключение: логин, регистрация, приём инвайта, вебхуки.
+            if ($this->hasPublicAccess($className, $methodName)) {
+                $usedPolicies[$routeName] = 'public-access';
 
                 continue;
             }
 
+            if (isset(self::ROUTE_POLICY[$routeName])) {
+                $usedRoutePolicies[$routeName] = self::ROUTE_POLICY[$routeName];
+
+                continue;
+            }
+
+            if ($exempt) {
+                $problems[] = sprintf('%s (%s::%s) — мутирующий маршрут в exempt-зоне без записи в ROUTE_POLICY', $routeName, $className, $methodName);
+
+                continue;
+            }
+
+            if (null === $module) {
+                // Заявленное правило: неклассифицированный контроллер — падение, а не пропуск.
+                // Иначе перенос контроллера в нераспознанный namespace снимает с него надзор.
+                $problems[] = sprintf('%s (%s::%s) — не классифицирован в ModuleAccessMap', $routeName, $className, $methodName);
+
+                continue;
+            }
+
+            if (!\in_array($module->value, self::COVERED_MODULES, true)) {
+                continue;
+            }
+
+            $mutatingByClass[$className][] = $routeName;
             ++$perModule[$module->value];
 
             if (!$this->isGated($className, $methodName, $module)) {
@@ -194,7 +207,7 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
 
         // Устаревшая запись в карте политик так же опасна, как отсутствующая: она бы молча
         // разрешала маршрут, которого уже нет, и маскировала переименование.
-        $stale = array_diff(array_keys(self::ROUTE_POLICY), array_keys($usedPolicies));
+        $stale = array_diff(array_keys(self::ROUTE_POLICY), array_keys($usedRoutePolicies));
         self::assertSame([], array_values($stale), 'ROUTE_POLICY описывает маршруты, которых больше нет: '.implode(', ', $stale));
 
         foreach (self::MIN_MUTATING_PER_MODULE as $moduleValue => $minimum) {

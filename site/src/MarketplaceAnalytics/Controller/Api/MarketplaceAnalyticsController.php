@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\Controller\Api;
 
+use App\Company\Security\ModuleAccess;
 use App\MarketplaceAnalytics\Api\Request\CreateMarketplaceAnalyticsRequest;
 use App\MarketplaceAnalytics\Application\CreateMarketplaceAnalyticsAction;
 use App\Shared\Service\ActiveCompanyService;
@@ -22,7 +23,8 @@ final class MarketplaceAnalyticsController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly CreateMarketplaceAnalyticsAction $createAction,
-    ) {}
+    ) {
+    }
 
     #[OA\Post(
         summary: 'Создать маркетплейс-аналитику',
@@ -54,6 +56,7 @@ final class MarketplaceAnalyticsController extends AbstractController
         description: 'Ошибка валидации входных данных (legacy-формат, не RFC 7807)'
     )]
     #[Route('/api/marketplaceanalytics', name: 'api_marketplaceanalytics_create', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function create(
         #[MapRequestPayload] CreateMarketplaceAnalyticsRequest $request,
     ): JsonResponse {

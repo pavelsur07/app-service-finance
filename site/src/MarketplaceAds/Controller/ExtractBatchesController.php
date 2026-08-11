@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAds\Controller;
 
+use App\Company\Security\ModuleAccess;
 use App\MarketplaceAds\Application\ExtractBatchesToRawDocumentsAction;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -42,6 +43,7 @@ final class ExtractBatchesController extends AbstractController
         requirements: ['jobId' => '[0-9a-fA-F-]{36}'],
         methods: ['POST'],
     )]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function __invoke(string $jobId, Request $request): Response
     {
         if (!$this->isCsrfTokenValid(

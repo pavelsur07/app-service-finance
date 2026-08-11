@@ -2378,8 +2378,13 @@ read-страница обязана объявлять `methods: ['GET']`. Ма
 (firewall админки, owner-проверка внутри Action, личные настройки, `#[PublicAccess]`),
 перечислены в карте политик теста поимённо, и устаревшая запись в ней — тоже падение.
 
-Пять контроллеров остаются под `ROLE_COMPANY_OWNER` вместо модульного гейта (Inventory snapshots,
-MarketplaceAds Ozon load/extract, MarketplaceAnalytics): owner-only строже, замена ослабила бы их.
+**`ROLE_COMPANY_OWNER` не заменяет модульный write-гейт.** Это глобальная роль из `role_hierarchy`,
+её ставит `CompanyOwnerAccountCreator` при регистрации: она означает «пользователь зарегистрирован
+как владелец компании», а не «владелец активной компании». Владелец компании A, будучи read-only
+участником компании B, проходит такой гейт и пишет в компанию B. Пять контроллеров, стоявших только
+под ней (Inventory snapshots, MarketplaceAds Ozon load/extract, MarketplaceAnalytics), получили
+`MARKETPLACE_WRITE`; глобальная роль оставлена как дополнительный coarse-гейт.
+Настоящая per-company проверка — `assertOwner($company)` или Action, сверяющий `$company->getUser()`.
 
 **Owner-only, а не `admin.write`.** Управление шаблонами (`CompanyRoleController`) и
 назначение шаблона участнику остаются под `assertOwner`. `module.admin.write` слабее:

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Inventory\Controller;
 
+use App\Company\Security\ModuleAccess;
 use App\Inventory\Application\RequestWbInventorySnapshotAction;
 use App\Inventory\Enum\SnapshotTriggerType;
 use App\Shared\Service\ActiveCompanyService;
@@ -23,6 +24,7 @@ final class WbSnapshotRequestController extends AbstractController
     }
 
     #[Route('/inventory/snapshots/request/wildberries', name: 'inventory_wb_snapshots_request', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function __invoke(Request $request): RedirectResponse
     {
         if (!$this->isCsrfTokenValid('inventory_wb_snapshots_request', (string) $request->request->get('_token'))) {
