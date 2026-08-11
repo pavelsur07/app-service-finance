@@ -36,6 +36,15 @@ final class ModuleMixedRouteGateTest extends WebTestCaseBase
     /** Модули, для которых расставлены write-гейты и есть смешанные маршруты. */
     private const MODULES = ['finance', 'deals', 'catalog', 'marketplace'];
 
+    /**
+     * Беспараметрические маршруты, где 404 приходит раньше гейта по биллинговому флагу
+     * (`assertFeatureEnabled()` в FundController). Перечислены поимённо, чтобы послабление
+     * не расползалось: для всех остальных беспараметрических маршрутов требуется ровно 403.
+     *
+     * @var list<string>
+     */
+    private const FEATURE_GATED_ROUTES = ['finance_funds_new'];
+
     public function testMixedRoutesAllowReadAndDenyWriteForReadOnlyRole(): void
     {
         $client = static::createClient();
@@ -51,8 +60,11 @@ final class ModuleMixedRouteGateTest extends WebTestCaseBase
                 continue;
             }
 
+            // Пустой список методов = маршрут принимает всё, значит он тоже смешанный.
             $methods = $route->getMethods();
-            if (!\in_array('GET', $methods, true) || [] === array_intersect($methods, self::MUTATING_METHODS)) {
+            $acceptsRead = [] === $methods || \in_array('GET', $methods, true);
+            $acceptsWrite = [] === $methods || [] !== array_intersect($methods, self::MUTATING_METHODS);
+            if (!$acceptsRead || !$acceptsWrite) {
                 continue;
             }
 
@@ -96,12 +108,21 @@ final class ModuleMixedRouteGateTest extends WebTestCaseBase
 
                 $client->request('POST', $url);
                 $status = $client->getResponse()->getStatusCode();
-                if (!\in_array($status, [403, 404], true)) {
+
+                // Для маршрута без параметров 404 нечем оправдать: сущность не искалась.
+                // Значит гейт обязан отдать ровно 403 — кроме явно feature-gated случаев.
+                $hasPlaceholders = str_contains($path, '{');
+                $allowed = ($hasPlaceholders || \in_array($routeName, self::FEATURE_GATED_ROUTES, true))
+                    ? [403, 404]
+                    : [403];
+
+                if (!\in_array($status, $allowed, true)) {
                     $problems[] = sprintf(
-                        '%s — POST отдал %d участнику без %s:write; ожидались 403 (гейт) или 404 (нет сущности/выключен флаг)',
+                        '%s — POST отдал %d участнику без %s:write; ожидалось %s',
                         $routeName,
                         $status,
                         $moduleValue,
+                        implode(' или ', $allowed),
                     );
                 }
             }

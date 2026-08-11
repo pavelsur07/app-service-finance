@@ -213,7 +213,10 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
             $mutatingByClass[$className][] = $routeName;
             ++$perModule[$module->value];
 
-            $acceptsRead = [] !== array_intersect($route->getMethods(), ['GET', 'HEAD']);
+            // Пустой список методов означает «принимает всё», то есть и GET, и POST:
+            // такой маршрут одновременно читающий и мутирующий, атрибут отрезал бы чтение.
+            $routeMethods = $route->getMethods();
+            $acceptsRead = [] === $routeMethods || [] !== array_intersect($routeMethods, ['GET', 'HEAD']);
 
             if ($acceptsRead) {
                 // Смешанный GET+POST: атрибут закрыл бы и чтение, поэтому гейт обязан быть
