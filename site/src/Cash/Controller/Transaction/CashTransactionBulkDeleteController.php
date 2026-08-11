@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Cash\Controller\Transaction;
 
 use App\Cash\Application\BulkDeleteCashTransactionsAction;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Audit\AuditContextProvider;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -17,6 +18,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[Route('/finance/cash-transactions/bulk-delete', name: 'cash_transaction_bulk_delete', methods: ['POST'])]
 final class CashTransactionBulkDeleteController extends AbstractController
 {
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function __invoke(
         Request $request,
         ActiveCompanyService $companyService,
