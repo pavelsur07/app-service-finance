@@ -223,7 +223,16 @@ class CompanyMemberController extends AbstractController
             throw $this->createAccessDeniedException();
         }
 
-        $disableCompanyMember((string) $company->getId(), $memberId, $user);
+        try {
+            $disableCompanyMember((string) $company->getId(), $memberId, $user);
+        } catch (LastCompanyAdminException) {
+            // Отключение — такой же путь снятия admin:write, как переназначение шаблона,
+            // и отвечать он должен так же: сообщением, а не 500.
+            $this->addFlash('danger', 'Нельзя снять последний административный доступ у компании.');
+
+            return $this->redirectToRoute('company_users_index');
+        }
+
         $this->addFlash('success', 'Участник отключен.');
 
         return $this->redirectToRoute('company_users_index');

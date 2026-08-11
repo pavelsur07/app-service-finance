@@ -279,6 +279,53 @@ final class CompanyMemberAccessRoleTest extends WebTestCaseBase
         self::assertSame(SystemCompanyRoles::FINANCE_ID, (string) $accessRole->getId());
     }
 
+    public function testOwnerCannotDisableLastAdminMember(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        (new SystemCompanyRolesSeeder())->seed($this->em());
+
+        $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
+        $memberUser = UserBuilder::aUser()->withIndex(2)->withEmail('member@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
+        $adminRole = new CompanyRole(
+            '77777777-7777-4777-8777-777777777777',
+            'Администратор',
+            [Module::ADMIN->value => AccessLevel::WRITE->value],
+            $company,
+        );
+        $member = CompanyMemberBuilder::aMember()
+            ->withCompany($company)
+            ->withUser($memberUser)
+            ->withAccessRole($adminRole)
+            ->withId('88888888-8888-4888-8888-888888888888')
+            ->build();
+
+        $em = $this->em();
+        $em->persist($owner);
+        $em->persist($memberUser);
+        $em->persist($company);
+        $em->persist($adminRole);
+        $em->persist($member);
+        $em->flush();
+
+        $client->loginUser($owner);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+
+        // Отключение снимает admin:write так же, как понижение шаблона, поэтому инвариант
+        // обязан сработать здесь и ответить сообщением, а не 500.
+        $client->request('POST', sprintf('/company/users/%s/disable', $member->getId()), [
+            '_token' => $this->csrfToken($client, 'member_disable_'.$member->getId()),
+        ]);
+
+        self::assertTrue($client->getResponse()->isRedirect());
+
+        $em->clear();
+        $updated = $this->em()->find(CompanyMember::class, $member->getId());
+        self::assertInstanceOf(CompanyMember::class, $updated);
+        self::assertSame(CompanyMember::STATUS_ACTIVE, $updated->getStatus());
+    }
+
     public function testInviteWithSelectedRoleAssignsRoleOnAccept(): void
     {
         $client = static::createClient();
