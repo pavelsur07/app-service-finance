@@ -20,6 +20,37 @@ class CompanyMemberRepository extends ServiceEntityRepository
     }
 
     /**
+     * Состояние активных участников для проверки инварианта «остался делегированный админ».
+     *
+     * Возвращает массивы, а не сущности: под блокировкой нужно свежее состояние из БД,
+     * а объектный запрос вернул бы те же managed-инстансы, что уже лежат в identity map
+     * после предварительной UX-проверки, то есть устаревшие.
+     *
+     * @return list<array{memberId: string, userId: string, memberRole: string, roleId: ?string, permissions: ?array<string, string>}>
+     */
+    public function findActiveAdminStateByCompany(Company $company): array
+    {
+        /** @var list<array{memberId: string, userId: string, memberRole: string, roleId: ?string, permissions: ?array<string, string>}> $rows */
+        $rows = $this->createQueryBuilder('m')
+            ->select(
+                'm.id AS memberId',
+                'IDENTITY(m.user) AS userId',
+                'm.role AS memberRole',
+                'IDENTITY(m.accessRole) AS roleId',
+                'r.permissions AS permissions',
+            )
+            ->leftJoin('m.accessRole', 'r')
+            ->andWhere('m.company = :company')
+            ->andWhere('m.status = :active')
+            ->setParameter('company', $company)
+            ->setParameter('active', CompanyMember::STATUS_ACTIVE)
+            ->getQuery()
+            ->getArrayResult();
+
+        return $rows;
+    }
+
+    /**
      * @return list<CompanyMember>
      */
     public function findActiveByCompany(Company $company): array

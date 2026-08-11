@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Company;
 
-use App\Company\Entity\CompanyInvite;
 use App\Company\Entity\CompanyMember;
 use App\Company\Entity\CompanyRole;
-use App\Company\Repository\CompanyInviteRepository;
 use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Security\AccessLevel;
 use App\Company\Security\Module;
@@ -197,9 +195,17 @@ final class CompanyMemberAccessRoleTest extends WebTestCaseBase
             ->withRole(CompanyMember::ROLE_OWNER)
             ->withId('44444444-4444-4444-4444-444444444444')
             ->build();
+        // Участник действительно администратор: только тогда его понижение что-то отнимает.
+        $adminRole = new CompanyRole(
+            '66666666-6666-4666-8666-666666666666',
+            'Администратор',
+            [Module::ADMIN->value => AccessLevel::WRITE->value],
+            $company,
+        );
         $member = CompanyMemberBuilder::aMember()
             ->withCompany($company)
             ->withUser($memberUser)
+            ->withAccessRole($adminRole)
             ->withId('55555555-5555-5555-5555-555555555555')
             ->build();
 
@@ -207,6 +213,7 @@ final class CompanyMemberAccessRoleTest extends WebTestCaseBase
         $em->persist($owner);
         $em->persist($memberUser);
         $em->persist($company);
+        $em->persist($adminRole);
         $em->persist($ownerMember);
         $em->persist($member);
         $em->flush();
@@ -224,9 +231,52 @@ final class CompanyMemberAccessRoleTest extends WebTestCaseBase
         $em->clear();
         $updated = $this->em()->find(CompanyMember::class, $member->getId());
         self::assertInstanceOf(CompanyMember::class, $updated);
-        // Finance-шаблон не содержит admin:write, а участник-владелец не считается
-        // "другим admin", поэтому изменение должно быть отклонено.
-        self::assertNull($updated->getAccessRole());
+        // Finance-шаблон не содержит admin:write, участник-владелец «другим admin» не считается,
+        // поэтому единственного делегированного администратора понизить нельзя.
+        $accessRole = $updated->getAccessRole();
+        self::assertInstanceOf(CompanyRole::class, $accessRole);
+        self::assertSame((string) $adminRole->getId(), (string) $accessRole->getId());
+    }
+
+    public function testOwnerCanAssignLimitedRoleToMemberWhoWasNeverAdmin(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        (new SystemCompanyRolesSeeder())->seed($this->em());
+
+        $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
+        $memberUser = UserBuilder::aUser()->withIndex(2)->withEmail('member@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
+        // Участник без шаблона: администратором он не был, значит и отнимать нечего.
+        $member = CompanyMemberBuilder::aMember()
+            ->withCompany($company)
+            ->withUser($memberUser)
+            ->withId('55555555-5555-5555-5555-555555555555')
+            ->build();
+
+        $em = $this->em();
+        $em->persist($owner);
+        $em->persist($memberUser);
+        $em->persist($company);
+        $em->persist($member);
+        $em->flush();
+
+        $client->loginUser($owner);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+
+        $client->request('POST', sprintf('/company/users/%s/access-role', $member->getId()), [
+            'roleId' => SystemCompanyRoles::FINANCE_ID,
+            '_token' => $this->csrfToken($client, 'member_access_role_'.$member->getId()),
+        ]);
+
+        self::assertTrue($client->getResponse()->isRedirect());
+
+        $em->clear();
+        $updated = $this->em()->find(CompanyMember::class, $member->getId());
+        self::assertInstanceOf(CompanyMember::class, $updated);
+        $accessRole = $updated->getAccessRole();
+        self::assertInstanceOf(CompanyRole::class, $accessRole);
+        self::assertSame(SystemCompanyRoles::FINANCE_ID, (string) $accessRole->getId());
     }
 
     public function testInviteWithSelectedRoleAssignsRoleOnAccept(): void

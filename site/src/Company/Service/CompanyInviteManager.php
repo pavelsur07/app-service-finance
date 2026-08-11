@@ -8,9 +8,11 @@ use App\Company\Entity\CompanyInvite;
 use App\Company\Entity\CompanyMember;
 use App\Company\Entity\CompanyRole;
 use App\Company\Entity\User;
+use App\Company\Exception\CompanyRoleNotAvailableException;
 use App\Company\Repository\CompanyInviteRepository;
 use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Security\SystemCompanyRoles;
+use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
@@ -52,7 +54,7 @@ class CompanyInviteManager
         if ($invite) {
             $invite->renewToken($tokenHash, $expiresAt);
             $invite->setAccessRole($accessRole);
-            $this->em->flush();
+            $this->flushInvite();
 
             return new CompanyInviteResult(
                 type: 'invite_renewed',
@@ -73,7 +75,7 @@ class CompanyInviteManager
             accessRole: $accessRole,
         );
         $this->em->persist($invite);
-        $this->em->flush();
+        $this->flushInvite();
 
         return new CompanyInviteResult(
             type: 'invite_created',
@@ -184,5 +186,19 @@ class CompanyInviteManager
         ]);
 
         return null;
+    }
+
+    /**
+     * Шаблон могли удалить между проверкой и записью приглашения. FK RESTRICT данные защитит,
+     * но необработанное нарушение дало бы 500 — переводим в доменный отказ, как и на пути
+     * назначения шаблона участнику.
+     */
+    private function flushInvite(): void
+    {
+        try {
+            $this->em->flush();
+        } catch (ForeignKeyConstraintViolationException $exception) {
+            throw new CompanyRoleNotAvailableException('unknown', $exception);
+        }
     }
 }

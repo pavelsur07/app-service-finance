@@ -46,7 +46,7 @@ final readonly class SaveCompanyRoleAction
                 // снятие admin:write у шаблона лишает прав сразу всех, кому он назначен.
                 $this->em->lock($company, LockMode::PESSIMISTIC_WRITE);
 
-                if (!$this->adminWriteGuard->keepsAdminWriteAfterRoleChange($company, $role, $permissions)) {
+                if (!$this->adminWriteGuard->keepsAdminWriteAfterRoleChange($company, (string) $role->getId(), $permissions)) {
                     throw new LastCompanyAdminException();
                 }
 

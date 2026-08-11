@@ -67,28 +67,50 @@ final readonly class CompanyAdminWriteGuard
 
     /**
      * Останется ли делегированный админ после назначения участнику другого шаблона.
+     *
+     * Состояние читается массивами через findActiveAdminStateByCompany(): под блокировкой
+     * нужен свежий снимок из БД, а объектный запрос вернул бы managed-инстансы,
+     * уже загруженные предварительной UX-проверкой.
+     *
+     * @param array<string, string> $newPermissions
      */
     public function keepsAdminWriteAfterMemberChange(
         Company $company,
-        CompanyMember $targetMember,
-        CompanyRole $newRole,
+        string $targetMemberId,
+        array $newPermissions,
     ): bool {
-        if ($this->roleGrantsAdminWrite($newRole)) {
+        if ($this->permissionsGrantAdminWrite($newPermissions)) {
             return true;
         }
 
-        foreach ($this->memberRepository->findActiveByCompany($company) as $member) {
-            if ((string) $member->getId() === (string) $targetMember->getId()) {
+        $rows = $this->memberRepository->findActiveAdminStateByCompany($company);
+        $ownerUserId = (string) $company->getUser()->getId();
+
+        $targetIsActiveAdmin = false;
+        $anotherAdminRemains = false;
+
+        foreach ($rows as $row) {
+            $isTarget = (string) $row['memberId'] === $targetMemberId;
+            $hasAdmin = $this->rowHasAdminWrite($row, $ownerUserId);
+
+            if ($isTarget) {
+                $targetIsActiveAdmin = $hasAdmin;
+
                 continue;
             }
 
-            if ($this->memberHasAdminWrite($member, $company)) {
-                return true;
+            if ($hasAdmin) {
+                $anotherAdminRemains = true;
             }
         }
 
-        // Сам владелец компании административный доступ не теряет ни при каком шаблоне.
-        return (string) $company->getUser()->getId() === (string) $targetMember->getUser()->getId();
+        // Участник, который и так не был активным администратором, ничего не отнимает:
+        // отклонять такое назначение — значит запрещать владельцу обычные операции.
+        if (!$targetIsActiveAdmin) {
+            return true;
+        }
+
+        return $anotherAdminRemains;
     }
 
     /**
@@ -99,36 +121,54 @@ final readonly class CompanyAdminWriteGuard
      *
      * @param array<string, string> $newPermissions
      */
-    public function keepsAdminWriteAfterRoleChange(Company $company, CompanyRole $role, array $newPermissions): bool
+    public function keepsAdminWriteAfterRoleChange(Company $company, string $roleId, array $newPermissions): bool
     {
         if ($this->permissionsGrantAdminWrite($newPermissions)) {
             return true;
         }
 
-        if (!$this->roleGrantsAdminWrite($role)) {
-            // Шаблон и раньше не давал admin:write — снимать нечего.
-            return true;
-        }
+        $rows = $this->memberRepository->findActiveAdminStateByCompany($company);
+        $ownerUserId = (string) $company->getUser()->getId();
 
-        $roleId = (string) $role->getId();
-        $affectsActiveMember = false;
+        $affectsActiveAdmin = false;
+        $anotherAdminRemains = false;
 
-        foreach ($this->memberRepository->findActiveByCompany($company) as $member) {
-            $memberRole = $member->getAccessRole();
-            if (null !== $memberRole && $roleId === (string) $memberRole->getId()) {
-                // Этот участник теряет admin:write вместе с шаблоном.
-                $affectsActiveMember = true;
+        foreach ($rows as $row) {
+            $hasAdmin = $this->rowHasAdminWrite($row, $ownerUserId);
+
+            if (null !== $row['roleId'] && $roleId === (string) $row['roleId']) {
+                // Этот участник теряет права вместе с изменением шаблона.
+                $affectsActiveAdmin = $affectsActiveAdmin || $hasAdmin;
 
                 continue;
             }
 
-            if ($this->memberHasAdminWrite($member, $company)) {
-                return true;
+            if ($hasAdmin) {
+                $anotherAdminRemains = true;
             }
         }
 
-        // Считаем только активных: шаблон, назначенный лишь отключённому участнику,
-        // никого административного доступа не лишает.
-        return !$affectsActiveMember;
+        // Шаблон, который активным администратором никого не делает, снимать безопасно.
+        if (!$affectsActiveAdmin) {
+            return true;
+        }
+
+        return $anotherAdminRemains;
+    }
+
+    /**
+     * @param array{memberId: string, userId: string, memberRole: string, roleId: ?string, permissions: ?array<string, string>} $row
+     */
+    private function rowHasAdminWrite(array $row, string $ownerUserId): bool
+    {
+        if ((string) $row['userId'] === $ownerUserId) {
+            return false;
+        }
+
+        if (CompanyMember::ROLE_OWNER === $row['memberRole']) {
+            return true;
+        }
+
+        return $this->permissionsGrantAdminWrite($row['permissions'] ?? []);
     }
 }

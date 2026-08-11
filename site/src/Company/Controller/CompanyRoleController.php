@@ -138,7 +138,7 @@ final class CompanyRoleController extends AbstractController
             // Защита последнего admin:write действует и на редактирование шаблона, а не только
             // на переназначение участнику: снятие admin:write у шаблона применяется сразу ко всем,
             // кому он назначен, и точно так же может оставить компанию без делегированного админа.
-            if (!$this->adminWriteGuard->keepsAdminWriteAfterRoleChange($company, $role, $newPermissions)) {
+            if (!$this->adminWriteGuard->keepsAdminWriteAfterRoleChange($company, (string) $role->getId(), $newPermissions)) {
                 $this->addFlash('danger', 'Нельзя снять последний административный доступ у компании.');
 
                 return $this->redirectToRoute('company_role_index');

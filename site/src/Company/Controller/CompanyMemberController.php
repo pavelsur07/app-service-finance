@@ -285,7 +285,7 @@ class CompanyMemberController extends AbstractController
             return $this->redirectToRoute('company_users_index');
         }
 
-        if (!$this->adminWriteGuard->keepsAdminWriteAfterMemberChange($company, $member, $newRole)) {
+        if (!$this->adminWriteGuard->keepsAdminWriteAfterMemberChange($company, (string) $member->getId(), $newRole->getPermissions())) {
             $this->addFlash('danger', 'Нельзя снять последний административный доступ у компании.');
 
             return $this->redirectToRoute('company_users_index');

@@ -40,9 +40,15 @@ final readonly class AssignCompanyMemberAccessRoleAction
                 // компании: два одновременных понижения иначе прошли бы каждое своей проверкой
                 // и вместе оставили компанию без администратора.
                 $this->em->lock($company, LockMode::PESSIMISTIC_WRITE);
-                $this->em->refresh($member);
+                // Права назначаемого шаблона тоже читаем заново: под блокировкой решение
+                // должно опираться на состояние БД, а не на то, что осело в identity map.
+                $this->em->refresh($role);
 
-                if (!$this->adminWriteGuard->keepsAdminWriteAfterMemberChange($company, $member, $role)) {
+                if (!$this->adminWriteGuard->keepsAdminWriteAfterMemberChange(
+                    $company,
+                    (string) $member->getId(),
+                    $role->getPermissions(),
+                )) {
                     throw new LastCompanyAdminException();
                 }
 
