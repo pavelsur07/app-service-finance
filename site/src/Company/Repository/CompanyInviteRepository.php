@@ -40,6 +40,24 @@ class CompanyInviteRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    /**
+     * Все приглашения, ссылающиеся на шаблон, а не только активные.
+     *
+     * Считать нужно ровно то, что запрещает FK `ON DELETE RESTRICT`, иначе сообщение
+     * «назначен активным приглашениям» разойдётся с реальным отказом базы.
+     * Терминальные приглашения ссылку освобождают сами (см. CompanyInvite::accept/revoke),
+     * поэтому здесь остаются только живые и просроченные.
+     */
+    public function countByAccessRole(CompanyRole $role): int
+    {
+        return (int) $this->createQueryBuilder('invite')
+            ->andWhere('invite.accessRole = :role')
+            ->setParameter('role', $role)
+            ->select('COUNT(invite.id)')
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
     public function countPendingByAccessRole(CompanyRole $role, \DateTimeImmutable $now): int
     {
         return (int) $this->createPendingInviteQueryBuilder($now)

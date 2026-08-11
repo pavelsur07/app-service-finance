@@ -6,6 +6,7 @@ namespace App\Company\Controller;
 
 use App\Company\Application\DeleteCompanyRoleAction;
 use App\Company\Application\SaveCompanyRoleAction;
+use App\Company\Domain\Service\CompanyAdminWriteGuard;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyRole;
 use App\Company\Exception\CompanyRoleInUseException;
@@ -30,6 +31,11 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[Route('/company/roles')]
 final class CompanyRoleController extends AbstractController
 {
+    public function __construct(
+        private readonly CompanyAdminWriteGuard $adminWriteGuard,
+    ) {
+    }
+
     #[Route('', name: 'company_role_index', methods: ['GET'])]
     public function index(
         ActiveCompanyService $activeCompanyService,
@@ -106,6 +112,7 @@ final class CompanyRoleController extends AbstractController
         Request $request,
         ActiveCompanyService $activeCompanyService,
         CompanyRoleRepository $roleRepository,
+        CompanyMemberRepository $memberRepository,
         SaveCompanyRoleAction $saveRole,
         LoggerInterface $logger,
     ): Response {
@@ -125,8 +132,19 @@ final class CompanyRoleController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            $newPermissions = $this->collectPermissionsFromForm($form);
+
+            // Защита последнего admin:write действует и на редактирование шаблона, а не только
+            // на переназначение участнику: снятие admin:write у шаблона применяется сразу ко всем,
+            // кому он назначен, и точно так же может оставить компанию без делегированного админа.
+            if (!$this->keepsAdminWriteAfterRoleChange($company, $role, $newPermissions, $memberRepository)) {
+                $this->addFlash('danger', 'Нельзя снять последний административный доступ у компании.');
+
+                return $this->redirectToRoute('company_role_index');
+            }
+
             try {
-                $saveRole($company, $role, $this->collectPermissionsFromForm($form));
+                $saveRole($company, $role, $newPermissions);
             } catch (CompanyRoleNameAlreadyExistsException) {
                 $form->get('name')->addError(new FormError('Шаблон с таким названием уже есть.'));
 
@@ -183,19 +201,19 @@ final class CompanyRoleController extends AbstractController
             return $this->redirectToRoute('company_role_index');
         }
 
-        $now = new \DateTimeImmutable();
         $membersCount = $memberRepository->countByAccessRole($role);
-        $pendingInvitesCount = $inviteRepository->countPendingByAccessRole($role, $now);
+        // Считаем все приглашения со ссылкой, а не только активные: ровно это запрещает FK.
+        $invitesCount = $inviteRepository->countByAccessRole($role);
 
-        if ($membersCount > 0 || $pendingInvitesCount > 0) {
+        if ($membersCount > 0 || $invitesCount > 0) {
             $logger->info('Company role deletion rejected: in use', [
                 'companyId' => (string) $company->getId(),
                 'userId' => (string) $this->requireUser()->getId(),
                 'roleId' => (string) $role->getId(),
                 'membersCount' => $membersCount,
-                'pendingInvitesCount' => $pendingInvitesCount,
+                'invitesCount' => $invitesCount,
             ]);
-            $this->addFlash('danger', 'Нельзя удалить шаблон, назначенный участникам или активным приглашениям.');
+            $this->addFlash('danger', 'Нельзя удалить шаблон, назначенный участникам или приглашениям. Отзовите приглашения и переназначьте участников.');
 
             return $this->redirectToRoute('company_role_index');
         }
@@ -221,6 +239,43 @@ final class CompanyRoleController extends AbstractController
         $this->addFlash('success', 'Шаблон доступа удалён.');
 
         return $this->redirectToRoute('company_role_index');
+    }
+
+    /**
+     * Останется ли в компании хотя бы один не-владелец с admin:write после изменения прав шаблона.
+     *
+     * @param array<string, string> $newPermissions
+     */
+    private function keepsAdminWriteAfterRoleChange(
+        Company $company,
+        CompanyRole $role,
+        array $newPermissions,
+        CompanyMemberRepository $memberRepository,
+    ): bool {
+        if ($this->adminWriteGuard->permissionsGrantAdminWrite($newPermissions)) {
+            return true;
+        }
+
+        if (!$this->adminWriteGuard->roleGrantsAdminWrite($role)) {
+            // Шаблон и раньше не давал admin:write — снимать нечего.
+            return true;
+        }
+
+        $roleId = (string) $role->getId();
+        foreach ($memberRepository->findActiveByCompany($company) as $member) {
+            $memberRole = $member->getAccessRole();
+            if (null !== $memberRole && $roleId === (string) $memberRole->getId()) {
+                // Этот участник теряет admin:write вместе с шаблоном.
+                continue;
+            }
+
+            if ($this->adminWriteGuard->memberHasAdminWrite($member, $company)) {
+                return true;
+            }
+        }
+
+        // Никого с admin:write не осталось — блокируем, только если он был.
+        return 0 === $memberRepository->countByAccessRole($role);
     }
 
     private function assertOwner(Company $company): void

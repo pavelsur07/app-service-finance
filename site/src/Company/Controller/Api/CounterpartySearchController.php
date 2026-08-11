@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Company\Controller\Api;
 
 use App\Company\Infrastructure\Query\CounterpartySearchQuery;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -21,6 +22,14 @@ final class CounterpartySearchController extends AbstractController
         CounterpartySearchQuery $query,
         ActiveCompanyService $companyService,
     ): JsonResponse {
+        // Справочник общий для двух модулей (форма сделки и финансовые экраны), поэтому он
+        // exempt в ModuleAccessMap — модульный read-гейт подписчика выбрал бы один модуль.
+        // Но данные контрагентов — бизнес-данные, и без права хотя бы на один из этих модулей
+        // отдавать их нельзя: tenant-scope ограничивает компанию, а не право на модуль.
+        if (!$this->isGranted(ModuleAccess::FINANCE_READ) && !$this->isGranted(ModuleAccess::DEALS_READ)) {
+            throw $this->createAccessDeniedException('No finance or deals module access.');
+        }
+
         // companyId берётся из контекста аутентификации, никогда из параметра запроса.
         $company = $companyService->getActiveCompany();
 

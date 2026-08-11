@@ -10,6 +10,7 @@ use App\Company\Security\AccessLevel;
 use App\Company\Security\Module;
 use App\Company\Security\SystemCompanyRoles;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\CompanyInviteBuilder;
 use App\Tests\Builders\Company\CompanyMemberBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Db\SystemCompanyRolesSeeder;
@@ -457,6 +458,111 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
 
         $this->em()->clear();
         self::assertNull($this->em()->find(CompanyRole::class, $roleId));
+    }
+
+    public function testOwnerCannotRemoveAdminWriteFromLastAdminRole(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
+        $memberUser = UserBuilder::aUser()->withIndex(2)->withEmail('admin-member@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
+        $adminRole = new CompanyRole(
+            'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+            'Администратор',
+            [Module::ADMIN->value => AccessLevel::WRITE->value],
+            $company,
+        );
+        $member = CompanyMemberBuilder::aMember()
+            ->withCompany($company)
+            ->withUser($memberUser)
+            ->withAccessRole($adminRole)
+            ->build();
+
+        $em = $this->em();
+        $em->persist($owner);
+        $em->persist($memberUser);
+        $em->persist($company);
+        $em->persist($adminRole);
+        $em->persist($member);
+        $em->flush();
+
+        $client->loginUser($owner);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+
+        $crawler = $client->request('GET', sprintf('/company/roles/%s/edit', $adminRole->getId()));
+        $token = (string) $crawler->filter('input[name="company_role[_token]"]')->attr('value');
+
+        // Снятие admin:write у шаблона применяется сразу ко всем, кому он назначен,
+        // поэтому защита последнего админа обязана работать и на редактировании шаблона.
+        $client->request('POST', sprintf('/company/roles/%s/update', $adminRole->getId()), [
+            'company_role' => [
+                'name' => 'Администратор',
+                'permissions' => [
+                    Module::FINANCE->value => AccessLevel::READ->value,
+                    Module::MARKETPLACE->value => AccessLevel::NONE->value,
+                    Module::DEALS->value => AccessLevel::NONE->value,
+                    Module::CATALOG->value => AccessLevel::NONE->value,
+                    Module::ADMIN->value => AccessLevel::NONE->value,
+                ],
+                '_token' => $token,
+            ],
+        ]);
+
+        self::assertTrue($client->getResponse()->isRedirect());
+
+        $this->em()->clear();
+        $unchanged = $this->em()->find(CompanyRole::class, $adminRole->getId());
+        self::assertInstanceOf(CompanyRole::class, $unchanged);
+        self::assertSame(
+            AccessLevel::WRITE->value,
+            $unchanged->getPermissions()[Module::ADMIN->value] ?? null,
+            'admin:write сняли у последнего административного шаблона.',
+        );
+    }
+
+    public function testRevokedInviteDoesNotBlockRoleDeletion(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
+        $role = new CompanyRole(
+            'ffffffff-ffff-4fff-8fff-ffffffffffff',
+            'Временный',
+            [Module::FINANCE->value => AccessLevel::READ->value],
+            $company,
+        );
+        $invite = CompanyInviteBuilder::anInvite()
+            ->withCompany($company)
+            ->withCreatedBy($owner)
+            ->withAccessRole($role)
+            ->build();
+
+        $em = $this->em();
+        $em->persist($owner);
+        $em->persist($company);
+        $em->persist($role);
+        $em->persist($invite);
+        $em->flush();
+
+        // Отзыв освобождает ссылку на шаблон: иначе FK RESTRICT запретил бы удаление навсегда.
+        $invite->revoke();
+        $em->flush();
+
+        $client->loginUser($owner);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+
+        $client->request('POST', sprintf('/company/roles/%s/delete', $role->getId()), [
+            '_token' => $this->csrfToken($client, 'delete_role_'.$role->getId()),
+        ]);
+
+        self::assertTrue($client->getResponse()->isRedirect());
+
+        $this->em()->clear();
+        self::assertNull($this->em()->find(CompanyRole::class, $role->getId()));
     }
 
     public function testOwnerCannotCreateRoleWithDuplicateName(): void

@@ -5,6 +5,7 @@ namespace App\Company\Controller;
 use App\Company\Application\AssignCompanyMemberAccessRoleAction;
 use App\Company\Application\DisableCompanyMemberAction;
 use App\Company\Application\EnableCompanyMemberAction;
+use App\Company\Domain\Service\CompanyAdminWriteGuard;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
 use App\Company\Entity\CompanyRole;
@@ -15,8 +16,6 @@ use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Repository\CompanyInviteRepository;
 use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Repository\CompanyRoleRepository;
-use App\Company\Security\AccessLevel;
-use App\Company\Security\Module;
 use App\Company\Security\SystemCompanyRoles;
 use App\Company\Service\CompanyInviteManager;
 use App\Notification\DTO\EmailMessage;
@@ -36,6 +35,11 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[Route('/company')]
 class CompanyMemberController extends AbstractController
 {
+    public function __construct(
+        private readonly CompanyAdminWriteGuard $adminWriteGuard,
+    ) {
+    }
+
     #[Route('/users', name: 'company_users_index', methods: ['GET'])]
     public function index(
         ActiveCompanyService $activeCompanyService,
@@ -504,7 +508,7 @@ class CompanyMemberController extends AbstractController
         CompanyRole $newRole,
         CompanyMemberRepository $memberRepository,
     ): bool {
-        if ($this->roleHasAdminWrite($newRole)) {
+        if ($this->adminWriteGuard->roleGrantsAdminWrite($newRole)) {
             return true;
         }
 
@@ -513,39 +517,11 @@ class CompanyMemberController extends AbstractController
             if ((string) $member->getId() === (string) $targetMember->getId()) {
                 continue;
             }
-            if ($this->memberHasAdminWrite($member, $company)) {
+            if ($this->adminWriteGuard->memberHasAdminWrite($member, $company)) {
                 return true;
             }
         }
 
         return (string) $company->getUser()->getId() === (string) $targetMember->getUser()->getId();
-    }
-
-    private function roleHasAdminWrite(CompanyRole $role): bool
-    {
-        $level = AccessLevel::tryFrom($role->getPermissions()[Module::ADMIN->value] ?? '');
-
-        return null !== $level && $level->atLeast(AccessLevel::WRITE);
-    }
-
-    private function memberHasAdminWrite(CompanyMember $member, Company $company): bool
-    {
-        // Участник-владелец компании не участвует в проверке "другой admin":
-        // у него unconditional доступ, его нельзя лишить административного доступа через шаблон.
-        if ((string) $member->getUser()->getId() === (string) $company->getUser()->getId()) {
-            return false;
-        }
-
-        if (CompanyMember::ROLE_OWNER === $member->getRole()) {
-            return true;
-        }
-
-        $role = $member->getAccessRole();
-        if (null === $role) {
-            // Legacy fallback: OPERATOR без шаблона имеет полный доступ.
-            return CompanyMember::ROLE_OPERATOR === $member->getRole();
-        }
-
-        return $this->roleHasAdminWrite($role);
     }
 }

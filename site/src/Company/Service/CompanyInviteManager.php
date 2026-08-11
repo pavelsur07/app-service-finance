@@ -174,12 +174,15 @@ class CompanyInviteManager
             return $accessRole;
         }
 
-        $this->logger?->warning('Invite access role does not belong to company; falling back to Full Access.', [
+        // Шаблон чужой компании — повреждение данных, а не легаси. Fallback на «Полный доступ»
+        // здесь был fail-open: испорченная строка превращалась в полное повышение прав.
+        // Участник создаётся без шаблона, то есть без доступа, пока владелец не назначит его явно.
+        $this->logger?->error('Invite access role belongs to another company; membership created without access.', [
             'companyId' => (string) $company->getId(),
             'inviteId' => (string) $invite->getId(),
             'roleId' => (string) $accessRole->getId(),
         ]);
 
-        return $this->em->find(CompanyRole::class, SystemCompanyRoles::FULL_ACCESS_ID);
+        return null;
     }
 }

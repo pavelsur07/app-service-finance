@@ -226,6 +226,27 @@ final class ModuleAccessTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
     }
 
+    public function testCounterpartySearchRequiresFinanceOrDealsAccess(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        (new SystemCompanyRolesSeeder())->seed($this->em());
+
+        [$company] = $this->seedCompanyWithOwner();
+
+        // Справочник контрагентов exempt в карте модулей, но это бизнес-данные:
+        // без права на finance или deals отдавать их нельзя.
+        $marketplaceRole = $this->em()->find(CompanyRole::class, SystemCompanyRoles::MARKETPLACE_ID);
+        self::assertInstanceOf(CompanyRole::class, $marketplaceRole);
+        $memberUser = $this->seedMember($company, CompanyMember::ROLE_OPERATOR, $marketplaceRole);
+
+        $client->loginUser($memberUser);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+
+        $client->request('GET', '/api/counterparties/search?q=test');
+        self::assertResponseStatusCodeSame(403);
+    }
+
     /**
      * @return array{0: Company, 1: User}
      */

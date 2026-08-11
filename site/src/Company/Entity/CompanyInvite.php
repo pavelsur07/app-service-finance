@@ -160,12 +160,17 @@ class CompanyInvite
     public function accept(User $user, ?\DateTimeImmutable $at = null): void
     {
         $this->acceptedAt = $at ?? new \DateTimeImmutable();
+        // Шаблон уже применён к участнику: держать ссылку дальше незачем, а FK RESTRICT
+        // из-за неё навсегда запрещал бы удалить шаблон.
+        $this->accessRole = null;
         $this->acceptedByUser = $user;
     }
 
     public function revoke(?\DateTimeImmutable $at = null): void
     {
         $this->revokedAt = $at ?? new \DateTimeImmutable();
+        // Отозванное приглашение больше не назначит шаблон — освобождаем ссылку.
+        $this->accessRole = null;
     }
 
     public function renewToken(string $tokenHash, \DateTimeImmutable $expiresAt): void
