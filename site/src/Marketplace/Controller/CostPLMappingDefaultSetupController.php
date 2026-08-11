@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Controller;
 
+use App\Company\Security\ModuleAccess;
 use App\Marketplace\Application\Action\ApplyDefaultCostMappingAction;
 use App\Marketplace\Application\Action\PreviewDefaultCostMappingAction;
 use App\Marketplace\Application\Command\ApplyDefaultCostMappingCommand;
@@ -30,6 +31,7 @@ final class CostPLMappingDefaultSetupController extends AbstractController
     }
 
     #[Route('/preview', name: 'marketplace_cost_pl_mapping_default_preview', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function preview(Request $request): JsonResponse
     {
         if (!$this->isCsrfTokenValid('marketplace_default_cost_mapping', $this->extractCsrfToken($request))) {
@@ -48,6 +50,7 @@ final class CostPLMappingDefaultSetupController extends AbstractController
     }
 
     #[Route('/apply', name: 'marketplace_cost_pl_mapping_default_apply', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function apply(Request $request): JsonResponse
     {
         if (!$this->isCsrfTokenValid('marketplace_default_cost_mapping', $this->extractCsrfToken($request))) {
@@ -55,7 +58,7 @@ final class CostPLMappingDefaultSetupController extends AbstractController
         }
 
         $user = $this->getUser();
-        if ($user === null || !method_exists($user, 'getId')) {
+        if (null === $user || !method_exists($user, 'getId')) {
             return $this->json(['ok' => false, 'message' => 'Пользователь не найден.'], JsonResponse::HTTP_FORBIDDEN);
         }
 
@@ -69,10 +72,11 @@ final class CostPLMappingDefaultSetupController extends AbstractController
             return $this->json(['ok' => false, 'message' => $e->getMessage()]);
         }
     }
+
     private function extractCsrfToken(Request $request): string
     {
         $token = $request->request->getString('_token', '');
-        if ($token !== '') {
+        if ('' !== $token) {
             return $token;
         }
 
@@ -86,7 +90,7 @@ final class CostPLMappingDefaultSetupController extends AbstractController
     private function extractMarketplace(Request $request): string
     {
         $marketplace = $request->request->getString('marketplace', '');
-        if ($marketplace !== '') {
+        if ('' !== $marketplace) {
             return $marketplace;
         }
 
@@ -101,7 +105,7 @@ final class CostPLMappingDefaultSetupController extends AbstractController
     private function extractJsonPayload(Request $request): array
     {
         $content = (string) $request->getContent();
-        if ($content === '') {
+        if ('' === $content) {
             return [];
         }
 

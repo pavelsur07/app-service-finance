@@ -1,0 +1,105 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Шаблоны доступа{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Шаблоны доступа {{ company.name }}</h2>
+                </div>
+                <div class="col-auto">
+                    <a href="{{ path('company_role_new') }}" class="btn btn-primary">Создать шаблон</a>
+                    <a href="{{ path('company_users_index') }}" class="btn btn-secondary">Участники</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-xl mt-3">
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title">Системные шаблоны</h3>
+            </div>
+            <div class="card-body">
+                <table class="table table-vcenter">
+                    <thead>
+                    <tr>
+                        <th>Название</th>
+                        <th>Права</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for role in systemRoles %}
+                        <tr>
+                            <td>{{ role.name }}</td>
+                            <td>
+                                {% for module, level in role.permissions %}
+                                    <span class="badge bg-blue-lt">{{ module }}: {{ level }}</span>
+                                {% else %}
+                                    <span class="text-muted">Нет прав</span>
+                                {% endfor %}
+                            </td>
+                            <td>
+                                <span class="text-muted">Системный</span>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="3" class="text-center">Нет системных шаблонов.</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title">Шаблоны компании</h3>
+            </div>
+            <div class="card-body">
+                <table class="table table-vcenter">
+                    <thead>
+                    <tr>
+                        <th>Название</th>
+                        <th>Права</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for role in companyRoles %}
+                        <tr>
+                            <td>{{ role.name }}</td>
+                            <td>
+                                {% for module, level in role.permissions %}
+                                    <span class="badge bg-blue-lt">{{ module }}: {{ level }}</span>
+                                {% else %}
+                                    <span class="text-muted">Нет прав</span>
+                                {% endfor %}
+                            </td>
+                            <td>
+                                <a href="{{ path('company_role_edit', {roleId: role.id}) }}" class="btn btn-sm btn-primary">Изменить</a>
+                                <form method="post"
+                                      action="{{ path('company_role_delete', {roleId: role.id}) }}"
+                                      style="display:inline;"
+                                      data-role-name="{{ role.name }}"
+                                      onsubmit="return confirm('Удалить шаблон «' + this.dataset.roleName + '»?');">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('delete_role_' ~ role.id) }}">
+                                    <button class="btn btn-sm btn-danger">Удалить</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="3" class="text-center">Нет собственных шаблонов.</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}

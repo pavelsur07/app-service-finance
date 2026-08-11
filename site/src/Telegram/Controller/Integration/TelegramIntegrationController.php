@@ -2,6 +2,7 @@
 
 namespace App\Telegram\Controller\Integration;
 
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use App\Telegram\Entity\BotLink;
 use App\Telegram\Repository\TelegramBotRepository;
@@ -60,6 +61,7 @@ class TelegramIntegrationController extends AbstractController
     }
 
     #[Route('/generate-link', name: 'generate_link', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::ADMIN_WRITE)]
     public function generateLink(Request $request): Response
     {
         if (!$this->isCsrfTokenValid('telegram_generate_link', (string) $request->request->get('_token'))) {

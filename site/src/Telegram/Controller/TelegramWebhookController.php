@@ -6,6 +6,7 @@ namespace App\Telegram\Controller;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Exception\CurrencyMismatchException;
+use App\Company\Security\PublicAccess;
 use App\Shared\Domain\Exception\UserFacingException;
 use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Telegram\Application\CreateTelegramCashTransactionAction;
@@ -27,6 +28,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
+#[PublicAccess]
 final class TelegramWebhookController extends AbstractController
 {
     public function __construct(

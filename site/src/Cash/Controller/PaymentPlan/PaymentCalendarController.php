@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\PaymentPlan;
 
+use App\Cash\DTO\ForecastDTO;
+use App\Cash\DTO\PaymentPlanDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Cash\Form\PaymentPlan\PaymentPlanType;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Cash\Service\PaymentPlan\ForecastBalanceService;
@@ -14,10 +17,8 @@ use App\Cash\Service\PaymentPlan\PaymentCalendarFacade;
 use App\Cash\Service\PaymentPlan\PaymentPlanService;
 use App\Cash\Service\PaymentPlan\RecurrenceMaterializer;
 use App\Company\Entity\Company;
-use App\Cash\DTO\ForecastDTO;
-use App\Cash\DTO\PaymentPlanDTO;
 use App\Company\Entity\Counterparty;
-use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
@@ -54,6 +55,11 @@ final class PaymentCalendarController extends AbstractController
     public function new(Request $request): Response
     {
         $company = $this->activeCompanyService->getActiveCompany();
+
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         $filters = $this->extractFilters($request);
 
         $dto = new PaymentPlanDTO();
@@ -82,6 +88,10 @@ final class PaymentCalendarController extends AbstractController
     public function edit(Request $request, PaymentPlan $plan): Response
     {
         $company = $this->activeCompanyService->getActiveCompany();
+
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
 
         if ($plan->getCompany()->getId() !== $company->getId()) {
             throw $this->createAccessDeniedException();
@@ -126,6 +136,7 @@ final class PaymentCalendarController extends AbstractController
     }
 
     #[Route('/{id}/status', name: 'payment_calendar_status', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function changeStatus(Request $request, PaymentPlan $plan): Response
     {
         $company = $this->activeCompanyService->getActiveCompany();
@@ -180,6 +191,7 @@ final class PaymentCalendarController extends AbstractController
     }
 
     #[Route('/{id}/postpone', name: 'payment_calendar_postpone', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function postpone(Request $request, PaymentPlan $plan): Response
     {
         $company = $this->activeCompanyService->getActiveCompany();

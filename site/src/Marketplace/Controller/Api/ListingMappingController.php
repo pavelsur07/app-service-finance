@@ -2,8 +2,9 @@
 
 namespace App\Marketplace\Controller\Api;
 
-use App\Marketplace\DTO\MapListingToProductCommand;
+use App\Company\Security\ModuleAccess;
 use App\Marketplace\Application\MapListingToProductAction;
+use App\Marketplace\DTO\MapListingToProductCommand;
 use App\Shared\Service\ActiveCompanyService;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -14,7 +15,7 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * API для маппинга листингов на продукты
+ * API для маппинга листингов на продукты.
  *
  * ВАЖНО: Единственное место где используется ActiveCompanyService!
  */
@@ -25,7 +26,7 @@ class ListingMappingController extends AbstractController
     public function __construct(
         private readonly MapListingToProductAction $mapListingAction,
         private readonly ActiveCompanyService $activeCompanyService,  // ← ТОЛЬКО в Controller!
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -36,6 +37,7 @@ class ListingMappingController extends AbstractController
      * Body: {"productId": "uuid"}
      */
     #[Route('/{listingId}/map', name: 'api_marketplace_listing_map', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function mapToProduct(string $listingId, Request $request): JsonResponse
     {
         // ✅ ПРАВИЛЬНО: Получаем компанию через ActiveCompanyService в Controller
@@ -46,7 +48,7 @@ class ListingMappingController extends AbstractController
 
         if (!isset($data['productId'])) {
             return new JsonResponse([
-                'error' => 'productId is required'
+                'error' => 'productId is required',
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -66,19 +68,16 @@ class ListingMappingController extends AbstractController
 
             return new JsonResponse([
                 'success' => true,
-                'message' => 'Листинг успешно привязан к продукту'
+                'message' => 'Листинг успешно привязан к продукту',
             ]);
-
         } catch (\InvalidArgumentException $e) {
             return new JsonResponse([
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], Response::HTTP_BAD_REQUEST);
-
         } catch (\LogicException $e) {
             return new JsonResponse([
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], Response::HTTP_CONFLICT);
-
         } catch (\Exception $e) {
             $this->logger->error('Failed to map listing', [
                 'company_id' => $company->getId(),
@@ -88,7 +87,7 @@ class ListingMappingController extends AbstractController
             ]);
 
             return new JsonResponse([
-                'error' => 'Не удалось связать листинг с продуктом'
+                'error' => 'Не удалось связать листинг с продуктом',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Controller;
 
+use App\Company\Security\ModuleAccess;
 use App\Marketplace\Application\Action\ApplyDefaultSaleMappingAction;
 use App\Marketplace\Application\Action\PreviewDefaultSaleMappingAction;
 use App\Marketplace\Application\Command\ApplyDefaultSaleMappingCommand;
@@ -30,6 +31,7 @@ final class SaleMappingDefaultSetupController extends AbstractController
     }
 
     #[Route('/preview', name: 'marketplace_pl_mappings_default_preview', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function preview(Request $request): JsonResponse
     {
         if (!$this->isCsrfTokenValid('marketplace_default_sale_mapping', $request->request->getString('_token'))) {
@@ -50,6 +52,7 @@ final class SaleMappingDefaultSetupController extends AbstractController
     }
 
     #[Route('/apply', name: 'marketplace_pl_mappings_default_apply', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function apply(Request $request): JsonResponse
     {
         if (!$this->isCsrfTokenValid('marketplace_default_sale_mapping', $request->request->getString('_token'))) {

@@ -7,6 +7,7 @@ namespace App\Company\Controller;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Form\ProjectDirectionType;
 use App\Company\Repository\ProjectDirectionRepository;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -35,6 +36,12 @@ class ProjectDirectionController extends AbstractController
     public function new(Request $request, EntityManagerInterface $em, ActiveCompanyService $companyService, ProjectDirectionRepository $repo): Response
     {
         $company = $companyService->getActiveCompany();
+
+        // Один экшен на GET и POST: read покрыт ModuleAccessSubscriber, write гейтим здесь.
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         $parents = $repo->findTreeByCompany($company);
         $direction = new ProjectDirection(Uuid::uuid4()->toString(), $company, '');
         $form = $this->createForm(ProjectDirectionType::class, $direction, [
@@ -57,6 +64,12 @@ class ProjectDirectionController extends AbstractController
     public function edit(ProjectDirection $direction, Request $request, EntityManagerInterface $em, ActiveCompanyService $companyService, ProjectDirectionRepository $repo): Response
     {
         $company = $companyService->getActiveCompany();
+
+        // Один экшен на GET и POST: read покрыт ModuleAccessSubscriber, write гейтим здесь.
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         if ($direction->getCompany() !== $company) {
             throw $this->createNotFoundException();
         }
@@ -93,6 +106,7 @@ class ProjectDirectionController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'project_direction_delete', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function delete(ProjectDirection $direction, Request $request, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();

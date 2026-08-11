@@ -4,6 +4,7 @@ namespace App\Finance\Controller\Api;
 
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Company\Repository\ProjectDirectionRepository;
+use App\Company\Security\PublicAccess;
 use App\Company\Service\ReportApiKeyManager;
 use App\Finance\Report\PlReportGridBuilder;
 use App\Finance\Report\PlReportPeriod;
@@ -14,6 +15,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 
+#[PublicAccess]
 final class PublicPlReportController extends AbstractController
 {
     public function __construct(

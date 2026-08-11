@@ -21,7 +21,7 @@ final class AiSuggestionController extends AbstractController
     ) {
     }
 
-    #[Route('', name: 'index')]
+    #[Route('', name: 'index', methods: ['GET'])]
     public function index(): Response
     {
         $company = $this->activeCompanyService->getActiveCompany();

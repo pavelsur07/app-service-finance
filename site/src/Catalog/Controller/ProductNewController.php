@@ -8,6 +8,7 @@ use App\Catalog\Application\CreateProductAction;
 use App\Catalog\DTO\CreateProductCommand;
 use App\Catalog\Enum\ProductStatus;
 use App\Catalog\Form\ProductType;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
@@ -23,6 +24,9 @@ final class ProductNewController extends AbstractController
     public function __invoke(Request $request, CreateProductAction $createProductAction, ActiveCompanyService $activeCompanyService): Response
     {
         $companyId = $activeCompanyService->getActiveCompany()->getId();
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::CATALOG_WRITE);
+        }
 
         $command = new CreateProductCommand();
         $command->status = ProductStatus::ACTIVE;

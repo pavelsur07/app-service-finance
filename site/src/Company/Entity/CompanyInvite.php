@@ -51,6 +51,14 @@ class CompanyInvite
     #[ORM\JoinColumn(nullable: true)]
     private ?User $acceptedByUser = null;
 
+    /**
+     * Шаблон модульного доступа, который получит принявший приглашение пользователь.
+     * null — legacy-поведение, при приёме будет назначен системный «Полный доступ».
+     */
+    #[ORM\ManyToOne(targetEntity: CompanyRole::class)]
+    #[ORM\JoinColumn(name: 'role_id', nullable: true, onDelete: 'RESTRICT')]
+    private ?CompanyRole $accessRole = null;
+
     public function __construct(
         string $id,
         Company $company,
@@ -60,6 +68,7 @@ class CompanyInvite
         string $tokenHash,
         \DateTimeImmutable $expiresAt,
         ?\DateTimeImmutable $createdAt = null,
+        ?CompanyRole $accessRole = null,
     ) {
         Assert::uuid($id);
         Assert::email($email);
@@ -71,6 +80,7 @@ class CompanyInvite
         $this->tokenHash = $tokenHash;
         $this->expiresAt = $expiresAt;
         $this->createdAt = $createdAt ?? new \DateTimeImmutable();
+        $this->accessRole = $accessRole;
     }
 
     public function getId(): ?string
@@ -150,18 +160,33 @@ class CompanyInvite
     public function accept(User $user, ?\DateTimeImmutable $at = null): void
     {
         $this->acceptedAt = $at ?? new \DateTimeImmutable();
+        // Шаблон уже применён к участнику: держать ссылку дальше незачем, а FK RESTRICT
+        // из-за неё навсегда запрещал бы удалить шаблон.
+        $this->accessRole = null;
         $this->acceptedByUser = $user;
     }
 
     public function revoke(?\DateTimeImmutable $at = null): void
     {
         $this->revokedAt = $at ?? new \DateTimeImmutable();
+        // Отозванное приглашение больше не назначит шаблон — освобождаем ссылку.
+        $this->accessRole = null;
     }
 
     public function renewToken(string $tokenHash, \DateTimeImmutable $expiresAt): void
     {
         $this->tokenHash = $tokenHash;
         $this->expiresAt = $expiresAt;
+    }
+
+    public function getAccessRole(): ?CompanyRole
+    {
+        return $this->accessRole;
+    }
+
+    public function setAccessRole(?CompanyRole $accessRole): void
+    {
+        $this->accessRole = $accessRole;
     }
 
     public function isPending(?\DateTimeImmutable $now = null): bool

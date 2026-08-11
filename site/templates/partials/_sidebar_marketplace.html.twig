@@ -1,3 +1,5 @@
+{# Весь раздел — модуль marketplace: без права на чтение пункты не показываем. #}
+{% if is_granted('module.marketplace.read') %}
 {% set marketplace_path = app.request ? app.request.pathinfo : '' %}
 {% set marketplace_menu_active =
     (current_route starts with 'marketplace_' and not (current_route starts with 'marketplace_analytics_') and not (current_route starts with 'marketplace_ads_'))
@@ -43,3 +45,4 @@
         </div>
     </div>
 </li>
+{% endif %}

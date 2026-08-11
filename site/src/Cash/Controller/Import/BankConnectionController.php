@@ -7,6 +7,7 @@ use App\Cash\Form\Bank\BankConnectionType;
 use App\Cash\Message\Import\BankImportMessage;
 use App\Cash\Repository\Bank\BankConnectionRepository;
 use App\Cash\Service\Bank\BankConnectionService;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -42,6 +43,11 @@ class BankConnectionController extends AbstractController
     public function new(Request $request): Response
     {
         $company = $this->activeCompanyService->getActiveCompany();
+
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         $connection = new BankConnection(
             id: Uuid::uuid4()->toString(),
             company: $company,
@@ -73,6 +79,11 @@ class BankConnectionController extends AbstractController
         BankConnectionRepository $repository,
     ): Response {
         $company = $this->activeCompanyService->getActiveCompany();
+
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         $connection = $repository->find($id);
 
         if (!$connection || $connection->getCompany()->getId() !== $company->getId()) {
@@ -105,6 +116,7 @@ class BankConnectionController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'cash_bank_connection_delete', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function delete(
         Request $request,
         string $id,
@@ -125,6 +137,7 @@ class BankConnectionController extends AbstractController
     }
 
     #[Route('/{id}/enqueue-import', name: 'cash_bank_connection_enqueue_import', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function enqueueImport(
         Request $request,
         string $id,

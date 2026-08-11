@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Loan\Controller;
 
+use App\Company\Security\ModuleAccess;
 use App\Loan\Application\UpdateLoanScheduleItemAction;
 use App\Loan\Entity\LoanPaymentSchedule;
 use App\Loan\Form\LoanPaymentScheduleType;
@@ -30,6 +31,12 @@ final class LoanScheduleEditController extends AbstractController
         UpdateLoanScheduleItemAction $updateAction,
     ): Response {
         $company = $activeCompanyService->getActiveCompany();
+
+        // Один экшен на GET и POST: read покрыт ModuleAccessSubscriber, write гейтим здесь.
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         $loan = $loanRepository->find($loanId);
 
         if (null === $loan || $loan->getCompany() !== $company) {

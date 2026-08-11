@@ -4,6 +4,7 @@ namespace App\Company\Repository;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
+use App\Company\Entity\CompanyRole;
 use App\Company\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -16,6 +17,37 @@ class CompanyMemberRepository extends ServiceEntityRepository
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, CompanyMember::class);
+    }
+
+    /**
+     * Состояние активных участников для проверки инварианта «остался делегированный админ».
+     *
+     * Возвращает массивы, а не сущности: под блокировкой нужно свежее состояние из БД,
+     * а объектный запрос вернул бы те же managed-инстансы, что уже лежат в identity map
+     * после предварительной UX-проверки, то есть устаревшие.
+     *
+     * @return list<array{memberId: string, userId: string, memberRole: string, roleId: ?string, permissions: ?array<string, string>}>
+     */
+    public function findActiveAdminStateByCompany(Company $company): array
+    {
+        /** @var list<array{memberId: string, userId: string, memberRole: string, roleId: ?string, permissions: ?array<string, string>}> $rows */
+        $rows = $this->createQueryBuilder('m')
+            ->select(
+                'm.id AS memberId',
+                'IDENTITY(m.user) AS userId',
+                'm.role AS memberRole',
+                'IDENTITY(m.accessRole) AS roleId',
+                'r.permissions AS permissions',
+            )
+            ->leftJoin('m.accessRole', 'r')
+            ->andWhere('m.company = :company')
+            ->andWhere('m.status = :active')
+            ->setParameter('company', $company)
+            ->setParameter('active', CompanyMember::STATUS_ACTIVE)
+            ->getQuery()
+            ->getArrayResult();
+
+        return $rows;
     }
 
     /**
@@ -86,6 +118,16 @@ class CompanyMemberRepository extends ServiceEntityRepository
             ->setParameter('status', CompanyMember::STATUS_ACTIVE)
             ->getQuery()
             ->getOneOrNullResult();
+    }
+
+    public function countByAccessRole(CompanyRole $role): int
+    {
+        return (int) $this->createQueryBuilder('companyMember')
+            ->andWhere('companyMember.accessRole = :role')
+            ->setParameter('role', $role)
+            ->select('COUNT(companyMember.id)')
+            ->getQuery()
+            ->getSingleScalarResult();
     }
 
     /**

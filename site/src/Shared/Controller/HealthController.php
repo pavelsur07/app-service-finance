@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Controller;
 
+use App\Company\Security\PublicAccess;
 use Doctrine\DBAL\Connection;
 use Predis\Client as PredisClient;
 use Psr\Log\LoggerInterface;
@@ -13,6 +14,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
+#[PublicAccess]
 class HealthController extends AbstractController
 {
     #[Route('/_health', name: 'app_health_check', methods: ['GET'])]

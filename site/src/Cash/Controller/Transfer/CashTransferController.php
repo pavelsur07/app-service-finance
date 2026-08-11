@@ -9,6 +9,7 @@ use App\Cash\DTO\CashTransferFormData;
 use App\Cash\Facade\CashFacade;
 use App\Cash\Form\Transfer\CashTransferType;
 use App\Cash\Repository\Transfer\CashTransferRepository;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Audit\AuditContextProvider;
 use App\Shared\Service\ActiveCompanyService;
 use Ramsey\Uuid\Uuid;
@@ -31,6 +32,11 @@ final class CashTransferController extends AbstractController
     #[Route('/new', name: 'cash_transfer_new', methods: ['GET', 'POST'])]
     public function new(Request $request, CashFacade $cashFacade): Response
     {
+        // Один экшен на GET и POST: read покрыт ModuleAccessSubscriber, write гейтим здесь.
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         $company = $this->companyService->getActiveCompany();
         $data = new CashTransferFormData(Uuid::uuid7()->toString());
         $form = $this->createForm(CashTransferType::class, $data, ['company' => $company]);
@@ -89,6 +95,7 @@ final class CashTransferController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'cash_transfer_delete', requirements: ['id' => Requirement::UUID], methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function delete(
         string $id,
         Request $request,
@@ -119,6 +126,7 @@ final class CashTransferController extends AbstractController
     }
 
     #[Route('/{id}/restore', name: 'cash_transfer_restore', requirements: ['id' => Requirement::UUID], methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function restore(
         string $id,
         Request $request,

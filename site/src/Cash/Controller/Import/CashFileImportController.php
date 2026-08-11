@@ -11,6 +11,7 @@ use App\Cash\Service\Import\File\CashFileRowNormalizer;
 use App\Cash\Service\Import\File\FileTabularReader;
 use App\Cash\Service\Import\File\HeaderAutoMapper;
 use App\Company\Entity\User;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Shared\Service\Storage\TemporaryLocalFile;
@@ -65,6 +66,7 @@ class CashFileImportController extends AbstractController
     }
 
     #[Route('/preview/upload', name: 'cash_file_import_upload_post', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function previewUpload(
         Request $request,
         SessionInterface $session,
@@ -191,6 +193,7 @@ class CashFileImportController extends AbstractController
     }
 
     #[Route('/mapping', name: 'cash_file_import_mapping_save', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function mappingSave(Request $request, SessionInterface $session): Response
     {
         if (!$this->isCsrfTokenValid('cash_file_import_mapping', $request->request->get('_token'))) {
@@ -219,6 +222,7 @@ class CashFileImportController extends AbstractController
     }
 
     #[Route('/mapping/profile/apply', name: 'cash_file_import_mapping_profile_apply', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function mappingApplyProfile(
         Request $request,
         SessionInterface $session,
@@ -267,6 +271,7 @@ class CashFileImportController extends AbstractController
     }
 
     #[Route('/mapping/profile/save', name: 'cash_file_import_mapping_profile_save', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function mappingSaveProfile(
         Request $request,
         SessionInterface $session,
@@ -420,6 +425,7 @@ class CashFileImportController extends AbstractController
     }
 
     #[Route('/commit', name: 'cash_file_import_commit', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function commit(
         Request $request,
         SessionInterface $session,

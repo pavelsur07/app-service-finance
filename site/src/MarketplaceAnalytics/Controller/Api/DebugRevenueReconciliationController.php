@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\Controller\Api;
 
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -35,31 +36,37 @@ final class DebugRevenueReconciliationController extends AbstractController
 
     public function __invoke(Request $request): JsonResponse
     {
+        // Один экшен на GET и POST: read покрыт ModuleAccessSubscriber, write гейтим здесь.
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::MARKETPLACE_WRITE);
+        }
+
         $periodStr = (string) $request->query->get('period', '');
 
-        if ($periodStr === '' || preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $periodStr) !== 1) {
+        if ('' === $periodStr || 1 !== preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $periodStr)) {
             return $this->json(['error' => 'period is required in Y-m format with month 01-12 (e.g. 2026-02)'], 422);
         }
 
         try {
-            $periodFrom = new \DateTimeImmutable($periodStr . '-01');
+            $periodFrom = new \DateTimeImmutable($periodStr.'-01');
         } catch (\Exception) {
             return $this->json(['error' => 'Invalid period value'], 422);
         }
 
-        $periodTo      = $periodFrom->modify('last day of this month');
+        $periodTo = $periodFrom->modify('last day of this month');
         $breakdownFrom = $periodTo->modify('-2 days');
-        $breakdownTo   = $periodTo->modify('+2 days');
+        $breakdownTo = $periodTo->modify('+2 days');
 
-        $company   = $this->activeCompanyService->getActiveCompany();
+        $company = $this->activeCompanyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
-        $cleanup = (string) $request->query->get('cleanup', '0') === '1';
-        $confirm = (string) $request->query->get('confirm', '0') === '1';
+        $cleanup = '1' === (string) $request->query->get('cleanup', '0');
+        $confirm = '1' === (string) $request->query->get('confirm', '0');
 
         // Cleanup mode: удаление дублей возвратов
         if ($cleanup && $confirm && $request->isMethod('POST')) {
             $deleted = $this->deleteReturnDuplicates($companyId, $periodFrom, $periodTo);
+
             return new JsonResponse([
                 'action' => 'cleanup_executed',
                 'period' => $periodStr,
@@ -71,14 +78,14 @@ final class DebugRevenueReconciliationController extends AbstractController
         $result = [
             'period' => [
                 'value' => $periodStr,
-                'from'  => $periodFrom->format('Y-m-d'),
-                'to'    => $periodTo->format('Y-m-d'),
+                'from' => $periodFrom->format('Y-m-d'),
+                'to' => $periodTo->format('Y-m-d'),
             ],
-            'total_revenue'    => $this->fetchTotalRevenue($companyId, $periodFrom, $periodTo),
-            'orphan_rows'      => $this->fetchOrphanRows($companyId, $periodFrom, $periodTo),
-            'duplicates'       => $this->fetchDuplicates($companyId, $periodFrom, $periodTo),
-            'daily_breakdown'  => $this->fetchDailyBreakdown($companyId, $breakdownFrom, $breakdownTo),
-            'raw_documents'    => $this->fetchRawDocuments($companyId, $periodFrom, $periodTo),
+            'total_revenue' => $this->fetchTotalRevenue($companyId, $periodFrom, $periodTo),
+            'orphan_rows' => $this->fetchOrphanRows($companyId, $periodFrom, $periodTo),
+            'duplicates' => $this->fetchDuplicates($companyId, $periodFrom, $periodTo),
+            'daily_breakdown' => $this->fetchDailyBreakdown($companyId, $breakdownFrom, $breakdownTo),
+            'raw_documents' => $this->fetchRawDocuments($companyId, $periodFrom, $periodTo),
             // Новые секции
             'returns' => $this->fetchReturnsTotal($companyId, $periodFrom, $periodTo),
             'return_duplicates' => $this->fetchReturnDuplicates($companyId, $periodFrom, $periodTo),
@@ -109,6 +116,7 @@ final class DebugRevenueReconciliationController extends AbstractController
             SQL,
             ['companyId' => $companyId, 'periodFrom' => $from->format('Y-m-d'), 'periodTo' => $to->format('Y-m-d')],
         );
+
         return ['count' => (int) ($row['cnt'] ?? 0), 'sum' => (string) ($row['total'] ?? '0')];
     }
 
@@ -124,6 +132,7 @@ final class DebugRevenueReconciliationController extends AbstractController
             SQL,
             ['companyId' => $companyId, 'periodFrom' => $from->format('Y-m-d'), 'periodTo' => $to->format('Y-m-d')],
         );
+
         return ['count' => (int) ($row['cnt'] ?? 0), 'sum' => (string) ($row['total'] ?? '0')];
     }
 
@@ -140,7 +149,8 @@ final class DebugRevenueReconciliationController extends AbstractController
             SQL,
             ['companyId' => $companyId, 'periodFrom' => $from->format('Y-m-d'), 'periodTo' => $to->format('Y-m-d')],
         );
-        return array_map(fn($r) => [
+
+        return array_map(static fn ($r) => [
             'posting_number' => (string) $r['posting_number'],
             'count' => (int) $r['cnt'],
             'sum' => (string) ($r['total'] ?? '0'),
@@ -170,6 +180,7 @@ final class DebugRevenueReconciliationController extends AbstractController
             $result[] = ['accrual_date' => $date, 'count' => $byDate[$date]['count'] ?? 0, 'sum' => $byDate[$date]['sum'] ?? '0'];
             $cursor = $cursor->modify('+1 day');
         }
+
         return $result;
     }
 
@@ -185,8 +196,9 @@ final class DebugRevenueReconciliationController extends AbstractController
             SQL,
             ['companyId' => $companyId, 'periodFrom' => $from->format('Y-m-d'), 'periodTo' => $to->format('Y-m-d')],
         );
-        return array_map(fn($r) => [
-            'raw_document_id' => $r['raw_document_id'] !== null ? (string) $r['raw_document_id'] : null,
+
+        return array_map(static fn ($r) => [
+            'raw_document_id' => null !== $r['raw_document_id'] ? (string) $r['raw_document_id'] : null,
             'count' => (int) $r['cnt'],
             'sum' => (string) ($r['total'] ?? '0'),
         ], $rows);
@@ -205,6 +217,7 @@ final class DebugRevenueReconciliationController extends AbstractController
             SQL,
             ['companyId' => $companyId, 'periodFrom' => $from->format('Y-m-d'), 'periodTo' => $to->format('Y-m-d')],
         );
+
         return ['count' => (int) ($row['cnt'] ?? 0), 'sum' => (string) ($row['total'] ?? '0')];
     }
 
@@ -224,7 +237,8 @@ final class DebugRevenueReconciliationController extends AbstractController
             SQL,
             ['companyId' => $companyId, 'periodFrom' => $from->format('Y-m-d'), 'periodTo' => $to->format('Y-m-d')],
         );
-        return array_map(fn($r) => [
+
+        return array_map(static fn ($r) => [
             'posting_number' => (string) $r['posting_number'],
             'count' => (int) $r['cnt'],
             'sum' => (string) ($r['total'] ?? '0'),
@@ -243,8 +257,9 @@ final class DebugRevenueReconciliationController extends AbstractController
             SQL,
             ['companyId' => $companyId, 'periodFrom' => $from->format('Y-m-d'), 'periodTo' => $to->format('Y-m-d')],
         );
-        return array_map(fn($r) => [
-            'raw_document_id' => $r['raw_document_id'] !== null ? (string) $r['raw_document_id'] : null,
+
+        return array_map(static fn ($r) => [
+            'raw_document_id' => null !== $r['raw_document_id'] ? (string) $r['raw_document_id'] : null,
             'count' => (int) $r['cnt'],
             'sum' => (string) ($r['total'] ?? '0'),
         ], $rows);
@@ -309,6 +324,7 @@ final class DebugRevenueReconciliationController extends AbstractController
             SQL,
             ['companyId' => $companyId, 'periodFrom' => $from->format('Y-m-d'), 'periodTo' => $to->format('Y-m-d')],
         );
+
         return [
             'total' => (int) ($row['cnt'] ?? 0),
             'orphan' => (int) ($row['orphan_count'] ?? 0),

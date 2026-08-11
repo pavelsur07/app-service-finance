@@ -22,7 +22,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted('ROLE_USER')]
 class RawPlReportController extends AbstractController
 {
-    #[Route('/finance/reports/pl-raw', name: 'finance_report_pl_raw')]
+    #[Route('/finance/reports/pl-raw', name: 'finance_report_pl_raw', methods: ['GET'])]
     public function __invoke(
         Request $request,
         ActiveCompanyService $activeCompany,

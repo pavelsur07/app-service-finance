@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\Controller\Api;
 
+use App\Company\Security\ModuleAccess;
 use App\Marketplace\Application\LoadMutualSettlementAction;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\AppLogger;
@@ -37,6 +38,7 @@ final class DebugLoadMutualSettlementController extends AbstractController
     ) {
     }
 
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function __invoke(Request $request): JsonResponse
     {
         $year = $request->query->getInt('year', 0);
@@ -72,8 +74,8 @@ final class DebugLoadMutualSettlementController extends AbstractController
 
         $responseSize = $result['responseSize'];
         $formattedSize = $responseSize >= 1024
-            ? round($responseSize / 1024, 1) . 'KB'
-            : $responseSize . 'B';
+            ? round($responseSize / 1024, 1).'KB'
+            : $responseSize.'B';
 
         return $this->json([
             'success' => true,

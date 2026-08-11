@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\Controller\Api;
 
+use App\Company\Security\ModuleAccess;
 use App\MarketplaceAnalytics\Facade\MarketplaceAnalyticsFacade;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -17,13 +18,15 @@ final class CostMappingDeleteController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly MarketplaceAnalyticsFacade $facade,
-    ) {}
+    ) {
+    }
 
     #[Route(
         '/api/marketplace-analytics/cost-mappings/{id}',
         name: 'marketplace_analytics_api_cost_mapping_delete',
         methods: ['DELETE'],
     )]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function __invoke(string $id): Response
     {
         $company = $this->activeCompanyService->getActiveCompany();

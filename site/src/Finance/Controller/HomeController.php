@@ -29,7 +29,9 @@ class HomeController extends AbstractController
     ) {
     }
 
-    #[Route('/', name: 'app_home_index')]
+    // «/» отдан HomeRedirectController: он выбирает лендинг по доступным модулям.
+    // Финансовый дашборд живёт на своём роуте, чтобы не конкурировать с React-пилотом на /dashboard.
+    #[Route('/finance', name: 'app_finance_index', methods: ['GET'])]
     public function index(Request $request): Response
     {
         try {
@@ -37,7 +39,7 @@ class HomeController extends AbstractController
         } catch (\InvalidArgumentException) {
             $this->addFlash('danger', 'Выберите поддерживаемую валюту ДДС.');
 
-            return $this->redirectToRoute('app_home_index', ['currency' => FiatCurrency::RUB->value]);
+            return $this->redirectToRoute('app_finance_index', ['currency' => FiatCurrency::RUB->value]);
         }
 
         $company = $this->activeCompanyService->getActiveCompany();

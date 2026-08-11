@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MoySklad\Controller;
 
+use App\Company\Security\ModuleAccess;
 use App\MoySklad\Application\Action\CreateMoySkladConnectionAction;
 use App\MoySklad\Application\Action\DeleteMoySkladConnectionAction;
 use App\MoySklad\Application\Action\UpdateMoySkladConnectionAction;
@@ -15,10 +16,9 @@ use App\MoySklad\Infrastructure\Query\MoySkladConnectionsQuery;
 use App\MoySklad\Infrastructure\Repository\MoySkladConnectionWriteRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpFoundation\RedirectResponse;
-use Symfony\Component\Form\FormInterface;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -41,6 +41,11 @@ final class MoySkladConnectionsController extends AbstractController
     #[Route('/create', name: 'moysklad_connections_create', methods: ['GET', 'POST'])]
     public function create(Request $request, CreateMoySkladConnectionAction $action): Response
     {
+        // Один экшен на GET и POST: read покрыт ModuleAccessSubscriber, write гейтим здесь.
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::MARKETPLACE_WRITE);
+        }
+
         $form = $this->createForm(MoySkladConnectionType::class, ['isActive' => true]);
         $form->handleRequest($request);
 
@@ -57,9 +62,9 @@ final class MoySkladConnectionsController extends AbstractController
                     companyId: $companyId,
                     name: (string) $data['name'],
                     baseUrl: (string) $data['baseUrl'],
-                    login: $data['login'] !== '' ? $data['login'] : null,
-                    accessToken: $data['accessToken'] !== '' ? $data['accessToken'] : null,
-                    refreshToken: $data['refreshToken'] !== '' ? $data['refreshToken'] : null,
+                    login: '' !== $data['login'] ? $data['login'] : null,
+                    accessToken: '' !== $data['accessToken'] ? $data['accessToken'] : null,
+                    refreshToken: '' !== $data['refreshToken'] ? $data['refreshToken'] : null,
                     tokenExpiresAt: $data['tokenExpiresAt'],
                     isActive: (bool) ($data['isActive'] ?? false),
                 ));
@@ -82,10 +87,15 @@ final class MoySkladConnectionsController extends AbstractController
         MoySkladConnectionWriteRepository $repository,
         UpdateMoySkladConnectionAction $action,
     ): Response {
+        // Один экшен на GET и POST: read покрыт ModuleAccessSubscriber, write гейтим здесь.
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::MARKETPLACE_WRITE);
+        }
+
         $companyId = (string) $this->activeCompanyService->getActiveCompany()->getId();
         $connection = $repository->findByIdAndCompanyId($id, $companyId);
 
-        if ($connection === null) {
+        if (null === $connection) {
             throw $this->createNotFoundException();
         }
 
@@ -110,9 +120,9 @@ final class MoySkladConnectionsController extends AbstractController
                     companyId: $companyId,
                     name: (string) $data['name'],
                     baseUrl: (string) $data['baseUrl'],
-                    login: $data['login'] !== '' ? $data['login'] : null,
-                    accessToken: $data['accessToken'] !== '' ? $data['accessToken'] : null,
-                    refreshToken: $data['refreshToken'] !== '' ? $data['refreshToken'] : null,
+                    login: '' !== $data['login'] ? $data['login'] : null,
+                    accessToken: '' !== $data['accessToken'] ? $data['accessToken'] : null,
+                    refreshToken: '' !== $data['refreshToken'] ? $data['refreshToken'] : null,
                     tokenExpiresAt: $data['tokenExpiresAt'],
                     isActive: (bool) ($data['isActive'] ?? false),
                 ));
@@ -129,9 +139,10 @@ final class MoySkladConnectionsController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'moysklad_connections_delete', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function delete(string $id, Request $request, DeleteMoySkladConnectionAction $action): Response
     {
-        if (!$this->isCsrfTokenValid('delete' . $id, $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('delete'.$id, $request->request->get('_token'))) {
             throw $this->createAccessDeniedException('Invalid CSRF token.');
         }
 
@@ -151,7 +162,7 @@ final class MoySkladConnectionsController extends AbstractController
     {
         $companyId = (string) $this->activeCompanyService->getActiveCompany()->getId();
 
-        if ($createForm === null) {
+        if (null === $createForm) {
             $createForm = $this->createForm(MoySkladConnectionType::class, ['isActive' => true]);
         }
 

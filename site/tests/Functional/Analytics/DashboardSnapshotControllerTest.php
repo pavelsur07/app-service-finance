@@ -9,8 +9,12 @@ use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Company\Entity\CompanyRole;
+use App\Company\Security\SystemCompanyRoles;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\CompanyMemberBuilder;
 use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Support\Db\SystemCompanyRolesSeeder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Ramsey\Uuid\Uuid;
 
@@ -119,6 +123,48 @@ final class DashboardSnapshotControllerTest extends WebTestCaseBase
         foreach ($this->collectDrilldownKeys($payload) as $drilldownKey) {
             self::assertTrue(in_array($drilldownKey, $allowedDrilldownKeys, true));
         }
+    }
+
+    public function testMarketplaceOnlyMemberDoesNotSeeFinanceWidgets(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        (new SystemCompanyRolesSeeder())->seed($this->em());
+
+        $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
+        $marketplaceRole = $this->em()->find(CompanyRole::class, SystemCompanyRoles::MARKETPLACE_ID);
+        self::assertInstanceOf(CompanyRole::class, $marketplaceRole);
+        $memberUser = UserBuilder::aUser()->withIndex(2)->withEmail('marketplace@example.test')->build();
+        $member = CompanyMemberBuilder::aMember()
+            ->withCompany($company)
+            ->withUser($memberUser)
+            ->withAccessRole($marketplaceRole)
+            ->build();
+
+        $em = $this->em();
+        $em->persist($owner);
+        $em->persist($memberUser);
+        $em->persist($company);
+        $em->persist($member);
+        $em->flush();
+
+        $client->loginUser($memberUser);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+
+        $client->request('GET', '/api/dashboard/v1/snapshot');
+
+        self::assertResponseStatusCodeSame(200);
+
+        $payload = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
+        self::assertArrayHasKey('context', $payload);
+        self::assertArrayHasKey('widgets', $payload);
+        self::assertArrayNotHasKey('free_cash', $payload['widgets']);
+        self::assertArrayNotHasKey('inflow', $payload['widgets']);
+        self::assertArrayNotHasKey('revenue', $payload['widgets']);
+        self::assertArrayNotHasKey('profit', $payload['widgets']);
+        self::assertArrayHasKey('alerts', $payload['widgets']);
+        self::assertArrayHasKey('warnings', $payload['widgets']);
     }
 
     public function testCurrencyFiltersCashWidgetsAndSeparatesCachedSnapshots(): void

@@ -10,6 +10,7 @@ use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
 use App\Company\Entity\User;
 use App\Company\Message\SendRegistrationEmailMessage;
+use App\Company\Repository\CompanyRoleRepository;
 use App\Company\Service\CompanyOwnerAccountCreator;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
@@ -58,7 +59,7 @@ final class CompanyOwnerAccountCreatorTest extends TestCase
             $passwordHasher,
             $entityManager,
             $bus,
-            new CompanyOwnerMembershipCreator($entityManager),
+            new CompanyOwnerMembershipCreator($entityManager, $this->createMock(CompanyRoleRepository::class)),
             $this->createSystemCategoryServiceMock(),
         );
 
@@ -113,7 +114,7 @@ final class CompanyOwnerAccountCreatorTest extends TestCase
             $passwordHasher,
             $entityManager,
             $bus,
-            new CompanyOwnerMembershipCreator($entityManager),
+            new CompanyOwnerMembershipCreator($entityManager, $this->createMock(CompanyRoleRepository::class)),
             $this->createSystemCategoryServiceMock(),
         );
 
@@ -154,7 +155,7 @@ final class CompanyOwnerAccountCreatorTest extends TestCase
             $passwordHasher,
             $entityManager,
             $bus,
-            new CompanyOwnerMembershipCreator($entityManager),
+            new CompanyOwnerMembershipCreator($entityManager, $this->createMock(CompanyRoleRepository::class)),
             $this->createSystemCategoryServiceMock(),
         );
 

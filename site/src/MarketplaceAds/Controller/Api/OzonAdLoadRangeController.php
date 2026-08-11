@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAds\Controller\Api;
 
+use App\Company\Security\ModuleAccess;
 use App\MarketplaceAds\Application\DispatchOzonAdLoadAction;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -19,8 +20,10 @@ final class OzonAdLoadRangeController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $companyService,
         private readonly DispatchOzonAdLoadAction $dispatchAction,
-    ) {}
+    ) {
+    }
 
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function __invoke(Request $request): JsonResponse
     {
         $company = $this->companyService->getActiveCompany();
@@ -51,7 +54,7 @@ final class OzonAdLoadRangeController extends AbstractController
                     ['jobId' => $job->getId()],
                 ),
             ]);
-        } catch (\DomainException | \InvalidArgumentException $e) {
+        } catch (\DomainException|\InvalidArgumentException $e) {
             return $this->json(['message' => $e->getMessage()], 400);
         }
     }

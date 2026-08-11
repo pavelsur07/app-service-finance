@@ -7,6 +7,7 @@ namespace App\Catalog\Controller;
 use App\Catalog\Entity\ProductImport;
 use App\Catalog\Infrastructure\Repository\ProductImportRepository;
 use App\Catalog\Message\ImportProductsMessage;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\Storage\ObjectStorageInterface;
 use Ramsey\Uuid\Uuid;
@@ -33,6 +34,9 @@ final class ProductImportController extends AbstractController
     ): Response {
         // ✅ ActiveCompanyService — только в Controller
         $companyId = $activeCompanyService->getActiveCompany()->getId();
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::CATALOG_WRITE);
+        }
 
         if (!$request->isMethod('POST')) {
             return $this->render('catalog/product/import.html.twig');
@@ -41,24 +45,26 @@ final class ProductImportController extends AbstractController
         $file = $request->files->get('file');
         if (null === $file) {
             $this->addFlash('error', 'Файл не выбран.');
+
             return $this->render('catalog/product/import.html.twig');
         }
 
         $extension = strtolower($file->getClientOriginalExtension());
         if (!in_array($extension, ['xls', 'xlsx'], true)) {
             $this->addFlash('error', 'Допустимые форматы: xls, xlsx.');
+
             return $this->render('catalog/product/import.html.twig');
         }
 
-        $importId     = Uuid::uuid7()->toString();
+        $importId = Uuid::uuid7()->toString();
         $relativePath = sprintf('product_imports/%s/%s.%s', $companyId, $importId, $extension);
 
         $stored = $storage->write($relativePath, $file->getContent());
 
         $import = new ProductImport(
-            id:           $importId,
-            companyId:    $companyId,
-            filePath:     $stored->path,
+            id: $importId,
+            companyId: $companyId,
+            filePath: $stored->path,
             originalName: $file->getClientOriginalName(),
         );
         $importRepository->save($import);
@@ -66,7 +72,7 @@ final class ProductImportController extends AbstractController
         // ✅ companyId передаётся как string — ActiveCompanyService в Handler запрещён
         $bus->dispatch(new ImportProductsMessage(
             companyId: $companyId,
-            importId:  $importId,
+            importId: $importId,
         ));
 
         return $this->redirectToRoute('catalog_products_import_status', ['importId' => $importId]);

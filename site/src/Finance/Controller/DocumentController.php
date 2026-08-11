@@ -7,6 +7,7 @@ namespace App\Finance\Controller;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Company\Entity\Company;
 use App\Company\Repository\ProjectDirectionRepository;
+use App\Company\Security\ModuleAccess;
 use App\Finance\Application\Service\FinanceDocumentResponsibilityCenterNormalizer;
 use App\Finance\Application\Service\PlNatureResolver;
 use App\Finance\Application\Service\PLRegisterUpdater;
@@ -67,6 +68,11 @@ class DocumentController extends AbstractController
     public function new(Request $request, DocumentRepository $repo, PLCategoryRepository $catRepo, ProjectDirectionRepository $projectDirectionRepo, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
+
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         $document = new Document(Uuid::uuid4()->toString(), $company);
         $document->setStatus(DocumentStatus::ACTIVE);
 
@@ -112,6 +118,11 @@ class DocumentController extends AbstractController
         ActiveCompanyService $companyService,
     ): Response {
         $company = $companyService->getActiveCompany();
+
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         if ($document->getCompany() !== $company) {
             throw $this->createNotFoundException();
         }
@@ -185,6 +196,11 @@ class DocumentController extends AbstractController
     public function edit(Request $request, Document $document, PLCategoryRepository $catRepo, ProjectDirectionRepository $projectDirectionRepo, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
+
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         if ($document->getCompany() !== $company) {
             throw $this->createNotFoundException();
         }
@@ -318,6 +334,7 @@ class DocumentController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'document_delete', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function delete(Request $request, Document $document, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();

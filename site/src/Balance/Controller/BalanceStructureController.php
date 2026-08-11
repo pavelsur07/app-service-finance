@@ -9,6 +9,7 @@ use App\Balance\Repository\BalanceCategoryLinkRepository;
 use App\Balance\Repository\BalanceCategoryRepository;
 use App\Balance\Service\BalanceStructureSeeder;
 use App\Company\Entity\Company;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -41,6 +42,11 @@ class BalanceStructureController extends AbstractController
     public function new(Request $request, BalanceCategoryRepository $repo, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
+
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         $category = new BalanceCategory(Uuid::uuid4()->toString(), $company);
 
         $parents = $repo->findTreeByCompany($company);
@@ -72,6 +78,11 @@ class BalanceStructureController extends AbstractController
     public function edit(Request $request, BalanceCategory $category, BalanceCategoryRepository $repo, BalanceCategoryLinkRepository $linkRepository, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
+
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         if ($category->getCompany() !== $company) {
             throw $this->createNotFoundException();
         }
@@ -107,6 +118,7 @@ class BalanceStructureController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'balance_structure_delete', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function delete(Request $request, BalanceCategory $category, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
@@ -123,6 +135,7 @@ class BalanceStructureController extends AbstractController
     }
 
     #[Route('/move', name: 'balance_structure_move', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function move(Request $request, BalanceCategoryRepository $repo, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
@@ -165,6 +178,7 @@ class BalanceStructureController extends AbstractController
     }
 
     #[Route('/{id}/link-money-accounts-total', name: 'balance_structure_link_money_accounts_total', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function linkMoneyAccountsTotal(Request $request, BalanceCategory $category, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
@@ -190,6 +204,7 @@ class BalanceStructureController extends AbstractController
     }
 
     #[Route('/{id}/link-money-funds-total', name: 'balance_structure_link_money_funds_total', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function linkMoneyFundsTotal(Request $request, BalanceCategory $category, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();

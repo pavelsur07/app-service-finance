@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Controller\Api;
 
+use App\Company\Security\ModuleAccess;
 use App\Marketplace\Application\RenameListingTagAction;
 use App\Marketplace\Entity\MarketplaceListingTag;
 use App\Marketplace\Exception\ListingTagNameConflictException;
@@ -30,6 +31,7 @@ final class ListingTagRenameController extends AbstractController
     ) {
     }
 
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function __invoke(string $tagId, Request $request): JsonResponse
     {
         $company = $this->activeCompanyService->getActiveCompany();

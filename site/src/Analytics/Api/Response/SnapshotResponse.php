@@ -6,19 +6,19 @@ final readonly class SnapshotResponse
 {
     public function __construct(
         private SnapshotContextResponse $context,
-        private FreeCashWidgetResponse $freeCash,
-        private InflowWidgetResponse $inflow,
+        private ?FreeCashWidgetResponse $freeCash = null,
+        private ?InflowWidgetResponse $inflow = null,
         /** @var array<string, mixed> */
-        private array $outflow,
+        private array $outflow = [],
         /** @var array<string, mixed> */
-        private array $cashflowSplit,
-        private RevenueWidgetResponse $revenue,
+        private array $cashflowSplit = [],
+        private ?RevenueWidgetResponse $revenue = null,
         /** @var array<string, mixed> */
-        private array $profit,
+        private array $profit = [],
         /** @var array<string, mixed> */
-        private array $topCash,
+        private array $topCash = [],
         /** @var array<string, mixed> */
-        private array $topPnl,
+        private array $topPnl = [],
         /** @var list<array{code: string}> */
         private array $alerts = [],
         /** @var list<array{code: string, message: string}> */
@@ -31,24 +31,43 @@ final readonly class SnapshotResponse
      */
     public function toArray(): array
     {
+        $widgets = [
+            'alerts' => [
+                'items' => $this->alerts,
+            ],
+            'warnings' => [
+                'items' => $this->warnings,
+            ],
+        ];
+
+        if (null !== $this->freeCash) {
+            $widgets['free_cash'] = $this->freeCash->toArray();
+        }
+        if (null !== $this->inflow) {
+            $widgets['inflow'] = $this->inflow->toArray();
+        }
+        if ([] !== $this->outflow) {
+            $widgets['outflow'] = $this->outflow;
+        }
+        if ([] !== $this->cashflowSplit) {
+            $widgets['cashflow_split'] = $this->cashflowSplit;
+        }
+        if (null !== $this->revenue) {
+            $widgets['revenue'] = $this->revenue->toArray();
+        }
+        if ([] !== $this->topCash) {
+            $widgets['top_cash'] = $this->topCash;
+        }
+        if ([] !== $this->topPnl) {
+            $widgets['top_pnl'] = $this->topPnl;
+        }
+        if ([] !== $this->profit) {
+            $widgets['profit'] = $this->profit;
+        }
+
         return [
             'context' => $this->context->toArray(),
-            'widgets' => [
-                'free_cash' => $this->freeCash->toArray(),
-                'inflow' => $this->inflow->toArray(),
-                'outflow' => $this->outflow,
-                'cashflow_split' => $this->cashflowSplit,
-                'revenue' => $this->revenue->toArray(),
-                'top_cash' => $this->topCash,
-                'top_pnl' => $this->topPnl,
-                'profit' => $this->profit,
-                'alerts' => [
-                    'items' => $this->alerts,
-                ],
-                'warnings' => [
-                    'items' => $this->warnings,
-                ],
-            ],
+            'widgets' => $widgets,
         ];
     }
 }

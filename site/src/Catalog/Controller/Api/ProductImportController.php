@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace App\Catalog\Controller\Api;
 
-use App\Catalog\Application\Command\ImportProductsCommand;
-use App\Catalog\Application\ImportProductsFromXlsAction;
 use App\Catalog\Entity\ProductImport;
 use App\Catalog\Infrastructure\Repository\ProductImportRepository;
 use App\Catalog\Message\ImportProductsMessage;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\Storage\ObjectStorageInterface;
 use Ramsey\Uuid\Uuid;
@@ -22,7 +21,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class ProductImportController extends AbstractController
 {
     #[Route('/api/catalog/products/import', name: 'api_catalog_products_import', methods: ['POST'])]
-    #[IsGranted('ROLE_USER')]
+    #[IsGranted(ModuleAccess::CATALOG_WRITE)]
     public function import(
         Request $request,
         ActiveCompanyService $activeCompanyService,
@@ -43,15 +42,15 @@ final class ProductImportController extends AbstractController
             return $this->json(['error' => 'Допустимые форматы: xls, xlsx.'], 422);
         }
 
-        $importId    = Uuid::uuid7()->toString();
+        $importId = Uuid::uuid7()->toString();
         $relativePath = sprintf('product_imports/%s/%s.%s', $companyId, $importId, $extension);
 
         $stored = $storage->write($relativePath, $file->getContent());
 
         $import = new ProductImport(
-            id:           $importId,
-            companyId:    $companyId,
-            filePath:     $stored->path,
+            id: $importId,
+            companyId: $companyId,
+            filePath: $stored->path,
             originalName: $file->getClientOriginalName(),
         );
         $importRepository->save($import);
@@ -59,12 +58,12 @@ final class ProductImportController extends AbstractController
         // ✅ companyId передаётся как string в Message — ActiveCompanyService в Handler запрещён
         $bus->dispatch(new ImportProductsMessage(
             companyId: $companyId,
-            importId:  $importId,
+            importId: $importId,
         ));
 
         return $this->json([
             'importId' => $importId,
-            'status'   => $import->getStatus(),
+            'status' => $import->getStatus(),
         ], 202);
     }
 
@@ -85,13 +84,13 @@ final class ProductImportController extends AbstractController
         }
 
         return $this->json([
-            'importId'    => $import->getId(),
-            'status'      => $import->getStatus(),
-            'rowsTotal'   => $import->getRowsTotal(),
+            'importId' => $import->getId(),
+            'status' => $import->getStatus(),
+            'rowsTotal' => $import->getRowsTotal(),
             'rowsCreated' => $import->getRowsCreated(),
             'rowsSkipped' => $import->getRowsSkipped(),
-            'errors'      => $import->getResultJson() ?? [],
-            'finishedAt'  => $import->getFinishedAt()?->format(\DateTimeInterface::ATOM),
+            'errors' => $import->getResultJson() ?? [],
+            'finishedAt' => $import->getFinishedAt()?->format(\DateTimeInterface::ATOM),
         ]);
     }
 }

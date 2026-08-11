@@ -4,6 +4,7 @@ namespace App\Company\Repository;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyInvite;
+use App\Company\Entity\CompanyRole;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -37,6 +38,56 @@ class CompanyInviteRepository extends ServiceEntityRepository
             ->setParameter('tokenHash', $tokenHash)
             ->getQuery()
             ->getOneOrNullResult();
+    }
+
+    /**
+     * Все приглашения, ссылающиеся на шаблон, а не только активные.
+     *
+     * Считать нужно ровно то, что запрещает FK `ON DELETE RESTRICT`, иначе сообщение
+     * «назначен активным приглашениям» разойдётся с реальным отказом базы.
+     * Терминальные приглашения ссылку освобождают сами (см. CompanyInvite::accept/revoke),
+     * поэтому здесь остаются только живые и просроченные.
+     */
+    /**
+     * Снимает ссылку на шаблон у приглашений, которые уже нельзя принять: принятых, отозванных
+     * и просроченных.
+     *
+     * Истечение срока происходит само собой, без вызова revoke(), поэтому просроченное
+     * приглашение иначе держало бы FK `ON DELETE RESTRICT` вечно и навсегда запрещало бы
+     * удалить шаблон, хотя применить его уже невозможно.
+     */
+    public function releaseAccessRoleFromUnusableInvites(CompanyRole $role, \DateTimeImmutable $now): int
+    {
+        return (int) $this->createQueryBuilder('invite')
+            ->update()
+            ->set('invite.accessRole', ':null')
+            ->andWhere('invite.accessRole = :role')
+            ->andWhere('invite.acceptedAt IS NOT NULL OR invite.revokedAt IS NOT NULL OR invite.expiresAt <= :now')
+            ->setParameter('null', null)
+            ->setParameter('role', $role)
+            ->setParameter('now', $now)
+            ->getQuery()
+            ->execute();
+    }
+
+    public function countByAccessRole(CompanyRole $role): int
+    {
+        return (int) $this->createQueryBuilder('invite')
+            ->andWhere('invite.accessRole = :role')
+            ->setParameter('role', $role)
+            ->select('COUNT(invite.id)')
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    public function countPendingByAccessRole(CompanyRole $role, \DateTimeImmutable $now): int
+    {
+        return (int) $this->createPendingInviteQueryBuilder($now)
+            ->andWhere('invite.accessRole = :role')
+            ->setParameter('role', $role)
+            ->select('COUNT(invite.id)')
+            ->getQuery()
+            ->getSingleScalarResult();
     }
 
     /**

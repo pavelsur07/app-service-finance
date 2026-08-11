@@ -17,6 +17,7 @@ use App\Company\Facade\CompanyFacade;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Message\SendRegistrationEmailMessage;
 use App\Company\Repository\CompanyMemberRepository;
+use App\Company\Repository\CompanyRoleRepository;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Company\Service\CompanyOwnerAccountCreator;
@@ -68,7 +69,7 @@ final class CreateAccountActionTest extends TestCase
             $passwordHasher,
             $entityManager,
             $bus,
-            new CompanyOwnerMembershipCreator($entityManager),
+            new CompanyOwnerMembershipCreator($entityManager, $this->createMock(CompanyRoleRepository::class)),
             $this->createMock(CashflowSystemCategoryService::class),
         );
         $companyFacade = new CompanyFacade(

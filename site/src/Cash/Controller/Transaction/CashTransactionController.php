@@ -18,6 +18,7 @@ use App\Cash\Repository\Transfer\CashTransferRepository;
 use App\Cash\Service\Transaction\CashTransactionService;
 use App\Cash\Service\Transaction\CashTransactionToDocumentService;
 use App\Company\Repository\CounterpartyRepository;
+use App\Company\Security\ModuleAccess;
 use App\Finance\Entity\Document;
 use App\Shared\Audit\AuditContextProvider;
 use App\Shared\Service\ActiveCompanyService;
@@ -112,6 +113,7 @@ class CashTransactionController extends AbstractController
     }
 
     #[Route('/auto-rule-apply', name: 'cash_transaction_auto_rule_apply_enqueue', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function autoRuleApplyEnqueue(
         Request $request,
         MessageBusInterface $bus,
@@ -213,6 +215,7 @@ class CashTransactionController extends AbstractController
     }
 
     #[Route('/{id}/create-pnl-document', name: 'cash_transaction_create_pnl_document', requirements: ['id' => Requirement::UUID], methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function createPnlDocument(
         Request $request,
         CashTransaction $tx,
@@ -296,6 +299,11 @@ class CashTransactionController extends AbstractController
         CashTransactionService $service,
     ): Response {
         $company = $this->companyService->getActiveCompany();
+
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         $dto = new CashTransactionDTO();
         $dto->occurredAt = new \DateTimeImmutable('today');
 
@@ -339,6 +347,11 @@ class CashTransactionController extends AbstractController
         CashTransactionService $service,
     ): Response {
         $company = $this->companyService->getActiveCompany();
+
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         if ($tx->getCompany() !== $company) {
             throw $this->createNotFoundException();
         }
@@ -396,6 +409,7 @@ class CashTransactionController extends AbstractController
     }
 
     #[Route('/{id}/restore', name: 'cash_transaction_restore', requirements: ['id' => Requirement::UUID], methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function restore(
         Request $request,
         string $id,
@@ -425,6 +439,7 @@ class CashTransactionController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'cash_transaction_delete', requirements: ['id' => Requirement::UUID], methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function delete(Request $request, CashTransaction $tx, CashTransactionService $service): Response
     {
         $company = $this->companyService->getActiveCompany();

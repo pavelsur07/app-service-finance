@@ -68,6 +68,7 @@
     </li>#}
 
 <!-- Справочники -->
+{% if is_granted('module.finance.read') %}
 <li class="nav-item dropdown">
     <a class="nav-link dropdown-toggle" href="#navbar-base" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
         <span class="nav-link-icon"><i class="ti ti-chart-pie"></i></span>
@@ -84,8 +85,10 @@
         </div>
     </div>
 </li>
+{% endif %}
 <!-- Справочники -->
 
+{% if is_granted('module.marketplace.read') %}
 {% set ingestion_verification_active = current_route starts with 'ingestion_verification_' %}
 {% set ingestion_coverage_active = current_route == 'ingestion_coverage' %}
 {% set ingestion_menu_active = ingestion_verification_active or ingestion_coverage_active %}
@@ -105,3 +108,4 @@
         </div>
     </div>
 </li>
+{% endif %}

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Finance\Controller\Api;
 
+use App\Company\Security\PublicAccess;
 use App\Company\Service\ReportApiKeyManager;
 use App\Finance\Infrastructure\Normalizer\CashflowReportJsonFormatter;
 use App\Report\Cashflow\CashflowReportBuilder;
@@ -16,6 +17,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
+#[PublicAccess]
 final class PublicCashflowReportController extends AbstractController
 {
     public function __construct(

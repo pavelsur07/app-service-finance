@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Loan\Controller;
 
+use App\Company\Security\ModuleAccess;
 use App\Loan\Application\UploadLoanScheduleAction;
 use App\Loan\Entity\Loan;
 use App\Loan\Form\LoanScheduleUploadType;
@@ -28,6 +29,12 @@ final class LoanScheduleUploadController extends AbstractController
         UploadLoanScheduleAction $uploadAction,
     ): Response {
         $company = $activeCompanyService->getActiveCompany();
+
+        // Один экшен на GET и POST: read покрыт ModuleAccessSubscriber, write гейтим здесь.
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         $loan = $loanRepository->find($id);
 
         if (!$loan instanceof Loan || $loan->getCompany() !== $company) {

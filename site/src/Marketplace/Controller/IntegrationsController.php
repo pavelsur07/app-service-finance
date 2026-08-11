@@ -12,7 +12,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted('ROLE_USER')]
 class IntegrationsController extends AbstractController
 {
-    #[Route('/integrations/marketplace', name: 'integrations_marketplace_index')]
+    #[Route('/integrations/marketplace', name: 'integrations_marketplace_index', methods: ['GET'])]
     public function marketplace(): Response
     {
         return $this->render('integrations/marketplace.html.twig');

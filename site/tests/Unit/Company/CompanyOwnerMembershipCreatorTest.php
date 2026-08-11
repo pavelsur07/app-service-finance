@@ -9,9 +9,12 @@ use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
+use App\Company\Entity\CompanyRole;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
 use App\Company\Entity\ProjectDirection;
+use App\Company\Repository\CompanyRoleRepository;
+use App\Company\Security\SystemCompanyRoles;
 use App\Tests\Builders\Company\UserBuilder;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
@@ -35,7 +38,7 @@ final class CompanyOwnerMembershipCreatorTest extends TestCase
             ->expects(self::never())
             ->method('flush');
 
-        $creator = new CompanyOwnerMembershipCreator($entityManager);
+        $creator = new CompanyOwnerMembershipCreator($entityManager, $this->createCompanyRoleRepository(null));
 
         $company = $creator->createCompany($owner, '  Acme LLC  ');
 
@@ -49,6 +52,8 @@ final class CompanyOwnerMembershipCreatorTest extends TestCase
         self::assertSame($owner, $persisted[1]->getUser());
         self::assertSame(CompanyMember::ROLE_OWNER, $persisted[1]->getRole());
         self::assertSame(CompanyMember::STATUS_ACTIVE, $persisted[1]->getStatus());
+        // Шаблон не найден в репозитории — остаётся null (legacy-fallback).
+        self::assertNull($persisted[1]->getAccessRole());
         self::assertTrue(Uuid::isValid((string) $company->getId()));
         self::assertTrue(Uuid::isValid((string) $persisted[1]->getId()));
         self::assertInstanceOf(ProjectDirection::class, $persisted[2]);
@@ -91,7 +96,7 @@ final class CompanyOwnerMembershipCreatorTest extends TestCase
             ->expects(self::never())
             ->method('flush');
 
-        $creator = new CompanyOwnerMembershipCreator($entityManager);
+        $creator = new CompanyOwnerMembershipCreator($entityManager, $this->createCompanyRoleRepository(null));
 
         $result = $creator->persistCompanyWithOwnerMembership($company, $owner);
 
@@ -104,5 +109,50 @@ final class CompanyOwnerMembershipCreatorTest extends TestCase
         self::assertInstanceOf(FinancialResponsibilityCenter::class, $persisted[3]);
         self::assertInstanceOf(FinancialResponsibilityCenterProject::class, $persisted[4]);
         self::assertInstanceOf(MoneyAccount::class, $persisted[5]);
+    }
+
+    public function testOwnerMembershipGetsSystemOwnerRoleWhenTemplateExists(): void
+    {
+        $owner = UserBuilder::aUser()->build();
+        $ownerRole = new CompanyRole(
+            SystemCompanyRoles::OWNER_ID,
+            'Владелец',
+            SystemCompanyRoles::definitions()[SystemCompanyRoles::OWNER_ID]['permissions'],
+        );
+
+        $persisted = [];
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager
+            ->method('persist')
+            ->willReturnCallback(static function (object $entity) use (&$persisted): void {
+                $persisted[] = $entity;
+            });
+
+        $creator = new CompanyOwnerMembershipCreator(
+            $entityManager,
+            $this->createCompanyRoleRepository($ownerRole),
+        );
+        $creator->createCompany($owner, 'Acme LLC');
+
+        $member = null;
+        foreach ($persisted as $entity) {
+            if ($entity instanceof CompanyMember) {
+                $member = $entity;
+            }
+        }
+
+        self::assertInstanceOf(CompanyMember::class, $member);
+        self::assertSame($ownerRole, $member->getAccessRole());
+    }
+
+    private function createCompanyRoleRepository(?CompanyRole $role): CompanyRoleRepository
+    {
+        $repository = $this->createMock(CompanyRoleRepository::class);
+        $repository
+            ->method('find')
+            ->with(SystemCompanyRoles::OWNER_ID)
+            ->willReturn($role);
+
+        return $repository;
     }
 }

@@ -6,6 +6,7 @@ namespace App\Tests\Builders\Company;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
+use App\Company\Entity\CompanyRole;
 use App\Company\Entity\User;
 use Webmozart\Assert\Assert;
 
@@ -20,6 +21,7 @@ final class CompanyMemberBuilder
     private Company $company;
     private User $user;
     private string $role;
+    private ?CompanyRole $accessRole = null;
     private string $status;
     private \DateTimeImmutable $createdAt;
 
@@ -72,6 +74,14 @@ final class CompanyMemberBuilder
         return $clone;
     }
 
+    public function withAccessRole(?CompanyRole $accessRole): self
+    {
+        $clone = clone $this;
+        $clone->accessRole = $accessRole;
+
+        return $clone;
+    }
+
     public function withStatus(string $status): self
     {
         if (!in_array($status, [CompanyMember::STATUS_ACTIVE, CompanyMember::STATUS_DISABLED], true)) {
@@ -103,6 +113,7 @@ final class CompanyMemberBuilder
     public function build(): CompanyMember
     {
         $member = new CompanyMember($this->id, $this->company, $this->user, $this->role, $this->createdAt);
+        $member->setAccessRole($this->accessRole);
 
         if (CompanyMember::STATUS_DISABLED === $this->status) {
             $member->disable();

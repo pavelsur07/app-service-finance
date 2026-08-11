@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\Controller\Api;
 
+use App\Company\Security\ModuleAccess;
 use App\MarketplaceAnalytics\Api\Request\RecalculateSnapshotsRequest;
 use App\MarketplaceAnalytics\Api\Response\RecalculateJobResponse;
 use App\MarketplaceAnalytics\Domain\ValueObject\AnalysisPeriod;
@@ -26,13 +27,15 @@ final class SnapshotRecalculateController extends AbstractController
         private readonly MarketplaceAnalyticsFacade $facade,
         private readonly SerializerInterface $serializer,
         private readonly ValidatorInterface $validator,
-    ) {}
+    ) {
+    }
 
     #[Route(
         '/api/marketplace-analytics/snapshots/recalculate',
         name: 'marketplace_analytics_api_snapshot_recalculate',
         methods: ['POST'],
     )]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function __invoke(Request $request): JsonResponse
     {
         $company = $this->activeCompanyService->getActiveCompany();

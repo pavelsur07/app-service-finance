@@ -14,12 +14,15 @@ use Symfony\Component\HttpFoundation\Response;
 
 final class HomeUiModeTest extends WebTestCaseBase
 {
+    /** Финансовый дашборд: «/» отдан роутеру лендинга, «/dashboard» — React-пилоту. */
+    private const DASHBOARD_URL = '/finance';
+
     public function testDashboardUsesLegacyModeByDefault(): void
     {
         $client = static::createClient();
         $this->loginWithCompany($client, false);
 
-        $client->request('GET', '/');
+        $client->request('GET', self::DASHBOARD_URL);
 
         self::assertResponseIsSuccessful();
         self::assertSelectorExists('html[data-ui-mode="legacy"]');
@@ -34,7 +37,7 @@ final class HomeUiModeTest extends WebTestCaseBase
         $this->loginWithCompany($client, false);
         $client->getCookieJar()->set(new Cookie(UiModeResolver::COOKIE_NAME, UiModeResolver::APP));
 
-        $client->request('GET', '/');
+        $client->request('GET', self::DASHBOARD_URL);
 
         self::assertResponseIsSuccessful();
         self::assertSelectorExists('html[data-ui-mode="app"]');
@@ -56,7 +59,7 @@ final class HomeUiModeTest extends WebTestCaseBase
         $this->loginWithCompany($client, true);
         $client->getCookieJar()->set(new Cookie(UiModeResolver::COOKIE_NAME, UiModeResolver::APP));
 
-        $client->request('GET', '/');
+        $client->request('GET', self::DASHBOARD_URL);
 
         self::assertResponseIsSuccessful();
         self::assertSelectorExists('html[data-ui-mode="app"]');
@@ -67,18 +70,18 @@ final class HomeUiModeTest extends WebTestCaseBase
     {
         $client = static::createClient();
         $this->loginWithCompany($client, false);
-        $crawler = $client->request('GET', '/');
-        $client->setServerParameter('HTTP_REFERER', 'http://localhost/');
+        $crawler = $client->request('GET', self::DASHBOARD_URL);
+        $client->setServerParameter('HTTP_REFERER', 'http://localhost'.self::DASHBOARD_URL);
 
         $client->submit($crawler->selectButton('Новый')->form());
 
-        self::assertResponseRedirects('/', Response::HTTP_SEE_OTHER);
+        self::assertResponseRedirects(self::DASHBOARD_URL, Response::HTTP_SEE_OTHER);
         $crawler = $client->followRedirect();
         self::assertSelectorExists('html[data-ui-mode="app"]');
 
         $client->submit($crawler->selectButton('Старый')->form());
 
-        self::assertResponseRedirects('/', Response::HTTP_SEE_OTHER);
+        self::assertResponseRedirects(self::DASHBOARD_URL, Response::HTTP_SEE_OTHER);
         $client->followRedirect();
         self::assertSelectorExists('html[data-ui-mode="legacy"]');
     }
@@ -89,7 +92,7 @@ final class HomeUiModeTest extends WebTestCaseBase
         $this->loginWithCompany($client, false);
         $client->getCookieJar()->set(new Cookie(UiModeResolver::COOKIE_NAME, UiModeResolver::APP));
 
-        $client->request('GET', '/dashboard');
+        $client->request('GET', '/finance/cash-transactions/');
 
         self::assertResponseIsSuccessful();
         self::assertSelectorExists('html[data-ui-mode="legacy"]');

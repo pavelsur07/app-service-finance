@@ -8,6 +8,7 @@ use App\Catalog\Application\GetProductAction;
 use App\Catalog\Application\UpdateProductAction;
 use App\Catalog\DTO\UpdateProductCommand;
 use App\Catalog\Form\ProductType;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
@@ -23,6 +24,9 @@ final class ProductEditController extends AbstractController
     public function __invoke(string $id, Request $request, GetProductAction $getProductAction, UpdateProductAction $updateProductAction, ActiveCompanyService $activeCompanyService): Response
     {
         $companyId = $activeCompanyService->getActiveCompany()->getId();
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::CATALOG_WRITE);
+        }
         $product = $getProductAction($companyId, $id);
 
         $command = new UpdateProductCommand();

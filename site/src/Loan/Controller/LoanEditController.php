@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Loan\Controller;
 
+use App\Company\Security\ModuleAccess;
 use App\Finance\Facade\PLCategoryFacade;
 use App\Loan\Application\UpdateLoanAction;
 use App\Loan\Entity\Loan;
@@ -27,6 +28,12 @@ final class LoanEditController extends AbstractController
         UpdateLoanAction $updateLoanAction,
     ): Response {
         $company = $activeCompanyService->getActiveCompany();
+
+        // Один экшен на GET и POST: read покрыт ModuleAccessSubscriber, write гейтим здесь.
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         if ($loan->getCompany() !== $company) {
             throw $this->createNotFoundException();
         }

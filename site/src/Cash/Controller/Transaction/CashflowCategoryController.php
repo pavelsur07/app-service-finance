@@ -6,6 +6,7 @@ use App\Cash\Application\SaveCashflowCategoryAction;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Form\Transaction\CashflowCategoryType;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
+use App\Company\Security\ModuleAccess;
 use App\Finance\Repository\PLCategoryRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -69,6 +70,12 @@ class CashflowCategoryController extends AbstractController
         PLCategoryRepository $plCategoryRepository,
     ): Response {
         $company = $companyService->getActiveCompany();
+
+        // Один экшен на GET и POST: read покрыт ModuleAccessSubscriber, write гейтим здесь.
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         $article = new CashflowCategory(Uuid::uuid4()->toString(), $company);
 
         $parents = $this->regularParentChoices($repo->findTreeByCompany($company));
@@ -107,6 +114,12 @@ class CashflowCategoryController extends AbstractController
         PLCategoryRepository $plCategoryRepository,
     ): Response {
         $company = $companyService->getActiveCompany();
+
+        // Один экшен на GET и POST: read покрыт ModuleAccessSubscriber, write гейтим здесь.
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         if ($article->getCompany() !== $company) {
             throw $this->createNotFoundException();
         }
@@ -141,6 +154,7 @@ class CashflowCategoryController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'cashflow_category_delete', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function delete(
         Request $request,
         CashflowCategory $article,

@@ -64,7 +64,8 @@ final class AnalyticsDashboardWarmupCommand extends Command
                 $this->plRegisterUpdater->recalcRange($company, $period->getFrom(), $period->getTo());
             }
 
-            $snapshot = $this->dashboardSnapshotService->getSnapshot($company, $period, $cashCurrency);
+            // CLI-контекст: пользователя нет, гейт по module.finance.read обходим осознанно.
+            $snapshot = $this->dashboardSnapshotService->getSnapshot($company, $period, $cashCurrency, forSystemContext: true);
             $context = $snapshot->toArray()['context'];
             $companyId = (string) $company->getId();
             $cacheKey = $this->dashboardSnapshotService->buildCacheKey($company, $period, $cashCurrency);

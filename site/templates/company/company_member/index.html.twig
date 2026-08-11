@@ -9,6 +9,11 @@
                 <div class="col">
                     <h2 class="page-title">Участники {{ company.name }}</h2>
                 </div>
+                {% if isOwner %}
+                    <div class="col-auto">
+                        <a href="{{ path('company_role_index') }}" class="btn btn-secondary">Шаблоны доступа</a>
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -43,10 +48,13 @@
                         method: 'POST'
                     }) }}
                     <div class="row g-2 align-items-end">
-                        <div class="col-md-6 mb-0">
+                        <div class="col-md-4 mb-0">
                             {{ form_row(inviteForm.email, {'label': 'Email'}) }}
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4 mb-0">
+                            {{ form_row(inviteForm.accessRole, {'label': 'Шаблон доступа'}) }}
+                        </div>
+                        <div class="col-md-2">
                             <button class="btn btn-primary w-100">Отправить</button>
                         </div>
                     </div>
@@ -76,7 +84,25 @@
                     {% for member in members %}
                         <tr>
                             <td>{{ member.user.email }}</td>
-                            <td>{{ member.role }}</td>
+                            <td>
+                                {{ member.accessRole.name ?? '—' }}
+                                {% if isOwner and member.role != 'OWNER' %}
+                                    <form method="post"
+                                          action="{{ path('company_member_access_role', {memberId: member.id}) }}"
+                                          class="mt-1"
+                                          style="display:inline;">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('member_access_role_' ~ member.id) }}">
+                                        <select name="roleId" class="form-select form-select-sm d-inline-block w-auto">
+                                            {% for role in availableRoles %}
+                                                <option value="{{ role.id }}" {% if member.accessRole and member.accessRole.id == role.id %}selected{% endif %}>
+                                                    {{ role.name }}{% if role.company is null %} (системный){% endif %}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                        <button class="btn btn-sm btn-primary">Изменить</button>
+                                    </form>
+                                {% endif %}
+                            </td>
                             <td>
                                 {% if member.status == 'ACTIVE' %}
                                     <span class="badge bg-green-lt">Активен</span>

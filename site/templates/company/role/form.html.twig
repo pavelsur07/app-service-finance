@@ -1,0 +1,50 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ role is defined and role ? 'Редактировать' : 'Создать' }} шаблон доступа{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">{{ role is defined and role ? 'Редактировать' : 'Создать' }} шаблон доступа</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-xl mt-3">
+        <div class="card">
+            <div class="card-body">
+                {{ form_start(form) }}
+                <div class="mb-3">
+                    {{ form_label(form.name) }}
+                    {{ form_widget(form.name, {'attr': {'class': 'form-control'}}) }}
+                    {{ form_errors(form.name) }}
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">{{ form.permissions.vars.label }}</label>
+                    {% for moduleField in form.permissions %}
+                        <div class="mb-3">
+                            {{ form_label(moduleField) }}
+                            <div class="form-selectgroup">
+                                {% for choice in moduleField %}
+                                    <label class="form-selectgroup-item">
+                                        {{ form_widget(choice, {'attr': {'class': 'form-selectgroup-input'}}) }}
+                                        <span class="form-selectgroup-label">{{ choice.vars.label }}</span>
+                                    </label>
+                                {% endfor %}
+                            </div>
+                            {{ form_errors(moduleField) }}
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <button class="btn btn-primary">Сохранить</button>
+                <a href="{{ path('company_role_index') }}" class="btn btn-secondary">Назад</a>
+                {{ form_end(form) }}
+            </div>
+        </div>
+    </div>
+{% endblock %}

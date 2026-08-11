@@ -3,6 +3,7 @@
 namespace App\Company\Controller;
 
 use App\Company\Repository\CompanyInviteRepository;
+use App\Company\Security\PublicAccess;
 use App\Company\Service\CompanyInviteManager;
 use App\Company\Service\InviteTokenService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -10,6 +11,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
+#[PublicAccess]
 class InviteController extends AbstractController
 {
     #[Route('/invite/{token}', name: 'company_invite_show', methods: ['GET'])]

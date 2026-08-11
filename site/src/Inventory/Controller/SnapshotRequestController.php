@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Inventory\Controller;
 
+use App\Company\Security\ModuleAccess;
 use App\Inventory\Application\RequestOzonInventorySnapshotAction;
 use App\Inventory\Enum\SnapshotTriggerType;
 use App\Shared\Service\ActiveCompanyService;
@@ -23,6 +24,7 @@ final class SnapshotRequestController extends AbstractController
     }
 
     #[Route('/inventory/snapshots/request', name: 'inventory_snapshots_request', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function __invoke(Request $request): RedirectResponse
     {
         if (!$this->isCsrfTokenValid('inventory_snapshots_request', (string) $request->request->get('_token'))) {

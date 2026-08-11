@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\Controller\Api;
 
+use App\Company\Security\ModuleAccess;
 use App\Marketplace\Application\Processor\OzonMutualSettlementProcessor;
 use App\Marketplace\Enum\PipelineStep;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
@@ -43,6 +44,7 @@ final class DebugReparseMutualSettlementController extends AbstractController
     ) {
     }
 
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function __invoke(string $id): JsonResponse
     {
         $company = $this->activeCompanyService->getActiveCompany();
@@ -66,7 +68,7 @@ final class DebugReparseMutualSettlementController extends AbstractController
         if (!$this->storage->exists($rawData['file_path'])) {
             return $this->json([
                 'success' => false,
-                'error' => 'Файл не найден в хранилище: ' . $rawData['file_path'],
+                'error' => 'Файл не найден в хранилище: '.$rawData['file_path'],
             ], 404);
         }
 
@@ -82,7 +84,7 @@ final class DebugReparseMutualSettlementController extends AbstractController
             $document->setRecordsCount($parsed['meta']['rows_parsed'] ?? $parsed['totals']['rows_count'] ?? 0);
             $document->resetProcessingStatus();
             $document->markCompleted();
-            $document->addSyncNote('Reparsed at ' . (new \DateTimeImmutable())->format('Y-m-d H:i:s'));
+            $document->addSyncNote('Reparsed at '.(new \DateTimeImmutable())->format('Y-m-d H:i:s'));
 
             $this->em->flush();
 
@@ -97,7 +99,7 @@ final class DebugReparseMutualSettlementController extends AbstractController
             $document->setRawData($rawData);
             $document->resetProcessingStatus();
             $document->markStepFailed(PipelineStep::COSTS);
-            $document->addSyncNote('Reparse failed: ' . $e->getMessage());
+            $document->addSyncNote('Reparse failed: '.$e->getMessage());
 
             $this->em->flush();
 

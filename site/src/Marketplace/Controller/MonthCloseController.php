@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Controller;
 
+use App\Company\Security\ModuleAccess;
 use App\Marketplace\Application\Command\PreflightMonthCloseCommand;
 use App\Marketplace\Application\Command\ReopenMonthStageCommand;
 use App\Marketplace\Application\MonthClosePreflightAction;
@@ -25,26 +26,26 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class MonthCloseController extends AbstractController
 {
     public function __construct(
-        private readonly ActiveCompanyService            $companyService,
-        private readonly MonthClosePreflightAction       $preflightAction,
-        private readonly ReopenMonthStageAction          $reopenMonthStageAction,
+        private readonly ActiveCompanyService $companyService,
+        private readonly MonthClosePreflightAction $preflightAction,
+        private readonly ReopenMonthStageAction $reopenMonthStageAction,
         private readonly MarketplaceMonthCloseRepository $monthCloseRepository,
-        private readonly MessageBusInterface             $messageBus,
+        private readonly MessageBusInterface $messageBus,
     ) {
     }
 
     #[Route('', name: 'marketplace_month_close_index', methods: ['GET'])]
     public function index(Request $request): Response
     {
-        $company     = $this->companyService->getActiveCompany();
-        $companyId   = (string) $company->getId();
+        $company = $this->companyService->getActiveCompany();
+        $companyId = (string) $company->getId();
         $marketplace = $request->query->get('marketplace') ?: MarketplaceType::OZON->value;
-        $year        = (int) $request->query->get('year', date('Y'));
-        $month       = (int) $request->query->get('month', date('n'));
+        $year = (int) $request->query->get('year', date('Y'));
+        $month = (int) $request->query->get('month', date('n'));
 
         $marketplaceType = MarketplaceType::tryFrom($marketplace);
-        if ($marketplaceType === null) {
-            $marketplace     = MarketplaceType::OZON->value;
+        if (null === $marketplaceType) {
+            $marketplace = MarketplaceType::OZON->value;
             $marketplaceType = MarketplaceType::OZON;
         }
 
@@ -66,22 +67,23 @@ final class MonthCloseController extends AbstractController
         $isCurrentMonth = $year === (int) date('Y') && $month === (int) date('n');
 
         return $this->render('marketplace/month_close/index.html.twig', [
-            'active_tab'          => 'month_close',
-            'marketplace'         => $marketplace,
+            'active_tab' => 'month_close',
+            'marketplace' => $marketplace,
             'available_marketplaces' => MarketplaceType::cases(),
-            'year'                => $year,
-            'month'               => $month,
-            'month_close'         => $monthClose,
-            'history'             => $history,
-            'stages'              => CloseStage::cases(),
-            'is_current_month'    => $isCurrentMonth,
+            'year' => $year,
+            'month' => $month,
+            'month_close' => $monthClose,
+            'history' => $history,
+            'stages' => CloseStage::cases(),
+            'is_current_month' => $isCurrentMonth,
         ]);
     }
 
     #[Route('/preflight', name: 'marketplace_month_close_preflight', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function preflight(Request $request): Response
     {
-        $company   = $this->companyService->getActiveCompany();
+        $company = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
         if (!$this->isCsrfTokenValid('marketplace_month_close_preflight', (string) $request->request->get('_token', ''))) {
@@ -89,53 +91,54 @@ final class MonthCloseController extends AbstractController
         }
 
         $marketplace = (string) $request->request->get('marketplace', '');
-        $year        = (int) $request->request->get('year', date('Y'));
-        $month       = (int) $request->request->get('month', date('n'));
-        $stageValue  = (string) $request->request->get('stage', '');
+        $year = (int) $request->request->get('year', date('Y'));
+        $month = (int) $request->request->get('month', date('n'));
+        $stageValue = (string) $request->request->get('stage', '');
 
         $marketplaceType = MarketplaceType::tryFrom($marketplace);
-        $stage           = CloseStage::tryFrom($stageValue);
+        $stage = CloseStage::tryFrom($stageValue);
 
-        if ($marketplaceType === null || $stage === null) {
+        if (null === $marketplaceType || null === $stage) {
             return $this->json(['error' => 'Некорректные параметры'], 400);
         }
 
         $command = new PreflightMonthCloseCommand(
-            companyId:   $companyId,
+            companyId: $companyId,
             marketplace: $marketplace,
-            year:        $year,
-            month:       $month,
-            stage:       $stage,
+            year: $year,
+            month: $month,
+            stage: $stage,
         );
 
         $result = ($this->preflightAction)($command);
 
         return $this->json([
             'can_close' => $result->canClose(),
-            'checks'    => $result->toArray(),
+            'checks' => $result->toArray(),
         ]);
     }
 
     #[Route('/close-stage', name: 'marketplace_month_close_stage', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function closeStage(Request $request): Response
     {
-        $company   = $this->companyService->getActiveCompany();
+        $company = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
-        $user      = $this->getUser();
+        $user = $this->getUser();
 
         if (!$this->isCsrfTokenValid('marketplace_month_close_stage', (string) $request->request->get('_token', ''))) {
             throw $this->createAccessDeniedException('Недействительный CSRF-токен');
         }
 
         $marketplace = (string) $request->request->get('marketplace', '');
-        $year        = (int) $request->request->get('year', 0);
-        $month       = (int) $request->request->get('month', 0);
-        $stageValue  = (string) $request->request->get('stage', '');
+        $year = (int) $request->request->get('year', 0);
+        $month = (int) $request->request->get('month', 0);
+        $stageValue = (string) $request->request->get('stage', '');
 
         $marketplaceType = MarketplaceType::tryFrom($marketplace);
-        $stage           = CloseStage::tryFrom($stageValue);
+        $stage = CloseStage::tryFrom($stageValue);
 
-        if ($marketplaceType === null || $stage === null || $year === 0 || $month === 0) {
+        if (null === $marketplaceType || null === $stage || 0 === $year || 0 === $month) {
             $this->addFlash('error', 'Некорректные параметры запроса.');
 
             return $this->redirectToRoute('marketplace_month_close_index');
@@ -143,11 +146,11 @@ final class MonthCloseController extends AbstractController
 
         // Синхронный preflight перед dispatch
         $preflightResult = ($this->preflightAction)(new PreflightMonthCloseCommand(
-            companyId:   $companyId,
+            companyId: $companyId,
             marketplace: $marketplace,
-            year:        $year,
-            month:       $month,
-            stage:       $stage,
+            year: $year,
+            month: $month,
+            stage: $stage,
         ));
 
         if (!$preflightResult->canClose()) {
@@ -157,17 +160,17 @@ final class MonthCloseController extends AbstractController
 
             return $this->redirectToRoute('marketplace_month_close_index', [
                 'marketplace' => $marketplace,
-                'year'        => $year,
-                'month'       => $month,
+                'year' => $year,
+                'month' => $month,
             ]);
         }
 
         $this->messageBus->dispatch(new CloseMonthStageMessage(
-            companyId:   $companyId,
+            companyId: $companyId,
             marketplace: $marketplace,
-            year:        $year,
-            month:       $month,
-            stage:       $stageValue,
+            year: $year,
+            month: $month,
+            stage: $stageValue,
             actorUserId: (string) $user->getId(),
         ));
 
@@ -180,15 +183,16 @@ final class MonthCloseController extends AbstractController
 
         return $this->redirectToRoute('marketplace_month_close_index', [
             'marketplace' => $marketplace,
-            'year'        => $year,
-            'month'       => $month,
+            'year' => $year,
+            'month' => $month,
         ]);
     }
 
     #[Route('/reopen-stage', name: 'marketplace_month_close_reopen', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     public function reopenStage(Request $request): Response
     {
-        $company   = $this->companyService->getActiveCompany();
+        $company = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
         if (!$this->isCsrfTokenValid('marketplace_month_close_reopen', (string) $request->request->get('_token', ''))) {
@@ -196,14 +200,14 @@ final class MonthCloseController extends AbstractController
         }
 
         $marketplace = (string) $request->request->get('marketplace', '');
-        $year        = (int) $request->request->get('year', 0);
-        $month       = (int) $request->request->get('month', 0);
-        $stageValue  = (string) $request->request->get('stage', '');
+        $year = (int) $request->request->get('year', 0);
+        $month = (int) $request->request->get('month', 0);
+        $stageValue = (string) $request->request->get('stage', '');
 
         $marketplaceType = MarketplaceType::tryFrom($marketplace);
-        $stage           = CloseStage::tryFrom($stageValue);
+        $stage = CloseStage::tryFrom($stageValue);
 
-        if ($marketplaceType === null || $stage === null) {
+        if (null === $marketplaceType || null === $stage) {
             $this->addFlash('error', 'Некорректные параметры.');
 
             return $this->redirectToRoute('marketplace_month_close_index');
@@ -222,8 +226,8 @@ final class MonthCloseController extends AbstractController
 
             return $this->redirectToRoute('marketplace_month_close_index', [
                 'marketplace' => $marketplace,
-                'year'        => $year,
-                'month'       => $month,
+                'year' => $year,
+                'month' => $month,
             ]);
         }
 
@@ -236,8 +240,8 @@ final class MonthCloseController extends AbstractController
 
         return $this->redirectToRoute('marketplace_month_close_index', [
             'marketplace' => $marketplace,
-            'year'        => $year,
-            'month'       => $month,
+            'year' => $year,
+            'month' => $month,
         ]);
     }
 

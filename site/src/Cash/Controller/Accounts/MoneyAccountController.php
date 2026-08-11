@@ -8,6 +8,7 @@ use App\Cash\Form\Accounts\MoneyAccountType as MoneyAccountFormType;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Accounts\MoneyAccountService;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -42,6 +43,11 @@ class MoneyAccountController extends AbstractController
     public function new(Request $request, AccountBalanceService $balanceService): Response
     {
         $company = $this->activeCompanyService->getActiveCompany();
+
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         $account = new MoneyAccount(
             id: Uuid::uuid4()->toString(),
             company: $company,
@@ -93,6 +99,11 @@ class MoneyAccountController extends AbstractController
         AccountBalanceService $balanceService,
     ): Response {
         $company = $this->activeCompanyService->getActiveCompany();
+
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         if ($account->getCompany() !== $company) {
             throw $this->createNotFoundException();
         }

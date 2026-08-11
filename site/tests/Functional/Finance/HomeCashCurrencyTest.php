@@ -66,7 +66,7 @@ final class HomeCashCurrencyTest extends WebTestCaseBase
         $client->loginUser($user);
         $this->setClientSessionValue($client, 'active_company_id', $company->getId());
 
-        $crawler = $client->request('GET', '/?currency=USD');
+        $crawler = $client->request('GET', '/finance?currency=USD');
 
         self::assertResponseIsSuccessful();
         self::assertSame('USD', $crawler->filter('#react-dashboard-started')->attr('data-default-currency'));
@@ -88,8 +88,8 @@ final class HomeCashCurrencyTest extends WebTestCaseBase
         $client->loginUser($user);
         $this->setClientSessionValue($client, 'active_company_id', $company->getId());
 
-        $client->request('GET', '/?currency=BTC');
+        $client->request('GET', '/finance?currency=BTC');
 
-        self::assertResponseRedirects('/?currency=RUB');
+        self::assertResponseRedirects('/finance?currency=RUB');
     }
 }

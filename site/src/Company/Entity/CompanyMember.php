@@ -32,6 +32,16 @@ class CompanyMember
     #[ORM\Column(length: 32)]
     private string $role;
 
+    /**
+     * Шаблон модульного доступа. `null` означает отсутствие доступа: legacy-fallback
+     * по строковой роли снят в Stage 3, потому что был fail-open — обнуление role_id
+     * повышало права вместо их снятия. FK объявлен RESTRICT, чтобы назначенный шаблон
+     * нельзя было удалить и обнулить ссылку гонкой.
+     */
+    #[ORM\ManyToOne(targetEntity: CompanyRole::class)]
+    #[ORM\JoinColumn(name: 'role_id', nullable: true, onDelete: 'RESTRICT')]
+    private ?CompanyRole $accessRole = null;
+
     #[ORM\Column(length: 32)]
     private string $status;
 
@@ -72,6 +82,16 @@ class CompanyMember
     public function getStatus(): string
     {
         return $this->status;
+    }
+
+    public function getAccessRole(): ?CompanyRole
+    {
+        return $this->accessRole;
+    }
+
+    public function setAccessRole(?CompanyRole $accessRole): void
+    {
+        $this->accessRole = $accessRole;
     }
 
     public function getCreatedAt(): \DateTimeImmutable

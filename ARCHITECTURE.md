@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.70 / 2026-08-02
+> Версия: 1.79 / 2026-08-11
 
 ---
 
@@ -95,6 +95,7 @@
 | `Deal`, `ChargeType` | Deals | `Company $company` (legacy) |
 | `PLCategory`, `Document`, `DocumentOperation`, `PLDailyTotal`, `PLMonthlySnapshot` | Finance | `Company $company` (legacy) |
 | `ProjectDirection`, `Counterparty`, `ReportApiKey` | Company | `Company $company` (legacy) |
+| `CompanyRole` | Company | `?Company $company` — `NULL` = системный шаблон (общий для всех компаний) |
 
 ### Ingestion: tenant isolation
 
@@ -1870,6 +1871,31 @@ Telegram создаёт ДДС-транзакции только через це
 
 > Используй **только** эти значения. Не придумывай новые без обновления файла.
 
+### `src/Company/Security/Module.php`
+```php
+enum Module: string
+{
+    case FINANCE = 'finance';          // Cash, Finance, Balance, Report, Loan, Ai + Counterparty/ЦФО/ProjectDirection
+    case MARKETPLACE = 'marketplace';  // Marketplace, MarketplaceAds, MarketplaceAnalytics, Inventory, Ingestion, MoySklad
+    case DEALS = 'deals';
+    case CATALOG = 'catalog';
+    case ADMIN = 'admin';              // Company (прочее), Billing, Telegram (пользовательские интеграции)
+}
+```
+Группы `system` нет: `Admin`, `Mcp`, `/admin/*` и debug-роуты в exempt-зоне под
+`ROLE_ADMIN`/`ROLE_SUPER_ADMIN`. Модуль, который нельзя выдать шаблоном, в enum не нужен.
+
+### `src/Company/Security/AccessLevel.php`
+```php
+enum AccessLevel: string
+{
+    case NONE = 'none';
+    case READ = 'read';
+    case WRITE = 'write';
+}
+```
+`atLeast()` реализует `write ⊃ read`. `allows($module, NONE)` не грантит никому.
+
 ### `src/Shared/Enum/AuditLogAction.php`
 ```php
 enum AuditLogAction: string
@@ -2320,6 +2346,76 @@ Admin-роли: `ROLE_ADMIN → ROLE_SUPER_ADMIN`
 
 Публичное API: токен через `?token=...` (ReportApiKey)
 Rate limiting: `reports_api` — 60 req/мин · `registration` — 5 req/10 мин
+Login throttling: 5 попыток / 15 мин (`security.yaml`, firewall `main`)
+
+---
+
+## Модульные роли доступа (`src/Company/Security/`)
+
+Владелец компании раздаёт участникам доступ к группам модулей через **шаблоны ролей**
+(`company_role`). Per-member override отсутствует по решению владельца: нестандартный
+доступ = копия шаблона. Уровни — `none | read | write`, `write ⊃ read`.
+
+| Класс | Роль |
+|---|---|
+| `Module` (enum) | 5 групп модулей — единственный источник списка |
+| `AccessLevel` (enum) | `none/read/write` + `atLeast()` |
+| `ModuleAccess` | Константы атрибутов `module.<group>.read|write` + `parse()` |
+| `ModuleAccessMap` | Карта FQCN/namespace-префиксов контроллеров → `Module`; побеждает самый длинный префикс |
+| `ModuleAccessVoter` | Голосует по `module.*`, делегирует резолверу |
+| `ModuleAccessResolver` | Уровни текущего пользователя; мемоизация на запрос по паре (user, company), `ResetInterface` |
+| `ModuleAccessSubscriber` | **Read-гейт fail-closed** на `kernel.controller`: неклассифицированный контроллер без `#[PublicAccess]` → 403 |
+| `PublicAccess` (attribute) | Снимает модульный гейт с класса или метода |
+| `SystemCompanyRoles` | 5 системных шаблонов с фиксированными UUID (те же значения вставляет миграция) |
+
+**Write-гейты.** POST-only экшены — атрибутом `#[IsGranted(ModuleAccess::X_WRITE)]`;
+смешанные `GET+POST` — `denyAccessUnlessGranted()` в теле, иначе атрибут гейтил бы и чтение.
+Расставлены во всех пяти группах (Stage 3 — finance/deals/catalog/admin, Stage 4 — marketplace).
+Инвариант держит `ModuleWriteGateCoverageTest` (integration): обход идёт по скомпилированной
+RouteCollection, мутирующий маршрут без гейта своего модуля роняет тест. Правило fail-closed —
+**роут без явного `methods:` считается мутирующим**, потому что роутер принимает на него и POST;
+read-страница обязана объявлять `methods: ['GET']`. Маршруты, закрытые не модульным гейтом
+(firewall админки, owner-проверка внутри Action, личные настройки, `#[PublicAccess]`),
+перечислены в карте политик теста поимённо, и устаревшая запись в ней — тоже падение.
+
+**`ROLE_COMPANY_OWNER` не заменяет модульный write-гейт.** Это глобальная роль из `role_hierarchy`,
+её ставит `CompanyOwnerAccountCreator` при регистрации: она означает «пользователь зарегистрирован
+как владелец компании», а не «владелец активной компании». Владелец компании A, будучи read-only
+участником компании B, проходит такой гейт и пишет в компанию B. Пять контроллеров, стоявших только
+под ней (Inventory snapshots, MarketplaceAds Ozon load/extract, MarketplaceAnalytics), получили
+`MARKETPLACE_WRITE`; глобальная роль оставлена как дополнительный coarse-гейт.
+Настоящая per-company проверка — `assertOwner($company)` или Action, сверяющий `$company->getUser()`.
+
+**Owner-only, а не `admin.write`.** Управление шаблонами (`CompanyRoleController`) и
+назначение шаблона участнику остаются под `assertOwner`. `module.admin.write` слабее:
+участник с ним отредактировал бы свой шаблон и выдал себе `finance:write`. То же для
+`ReportApiKeyController::generate/revoke`.
+
+**Exempt-зоны** (свои гейты, модульным не покрыты): `App\Admin\`, `App\Mcp\`,
+`App\Analytics\`, `App\Notification\`, `App\Telegram\Controller\Admin\`,
+`App\Marketplace\Controller\Admin\`, `App\MarketplaceAds\Controller\Api\Admin\`,
+плюс точечно `ProfileController`, `UiModeController`, `CompanyController`,
+`HomeRedirectController`, `CounterpartySearchController`.
+
+**Инвариант покрытия** проверяется тестом `ControllerAccessCoverageTest`: каждый routed-контроллер
+в `src/` либо в карте, либо помечен `#[PublicAccess]`. Новый контроллер в новом неймспейсе
+без записи в карте получит 403 — это by design, тест ловит это на CI.
+
+**Лендинг.** `/` → `HomeRedirectController` (`app_home_index`) редиректит на первый доступный
+модуль. Финансовый дашборд — `/finance` (`app_finance_index`), React-пилот — `/dashboard`
+(`app_dashboard_index`).
+
+**Меню.** `partials/_sidebar.html.twig` и вложенные `_sidebar_marketplace` / `_sidebar_report`
+скрывают разделы по `is_granted('module.<group>.read')`. Однородные блоки закрыты целиком,
+смешанные — на двух уровнях: блок показывается при доступе хотя бы к одному из своих модулей,
+а пункты внутри гейтятся каждый под свой («Справочники» = finance + catalog, «Интеграции» =
+admin + finance + marketplace). «Главная» не гейтится — за ней exempt-редирект.
+Админка использует собственный `admin/partials/_sidebar.html.twig` и модульными гейтами
+не затронута. Инвариант: `SidebarModuleVisibilityTest`.
+
+**Actions** (`src/Company/Application/`): `SaveCompanyRoleAction` (создание/изменение +
+проверка уникальности имени), `DeleteCompanyRoleAction`, `AssignCompanyMemberAccessRoleAction`.
+`flush()` живёт только в них — `CompanyRoleRepository`/`CompanyMemberRepository` его не вызывают.
 
 ---
 
@@ -2760,6 +2856,9 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.79 | 2026-08-11 | Company: меню скрывает разделы недоступных модулей — модульные роли доступа закрыты по всем этапам |
+| 1.78 | 2026-08-11 | Company: write-гейты marketplace и статический инвариант покрытия мутирующих экшенов |
+| 1.77 | 2026-08-11 | Company: модульные роли доступа — Module/AccessLevel enum, fail-closed read-гейт, write-гейты finance/deals/catalog/admin, owner-only управление шаблонами, новый лендинг `/` |
 | 1.76 | 2026-08-10 | Cash/MCP: обычные root-категории ДДС, защищённые системные ветки и tri-state `parentId` для переноса в root |
 | 1.75 | 2026-08-09 | Cash: tenant-safe UI агрегата перевода, selector валюты ДДС и read-only verifier целостности |
 | 1.74 | 2026-08-09 | Cash: атомарный lifecycle пары перевода, защищённые generic mutations, currency-safe отчёт/дашборд/list/export |

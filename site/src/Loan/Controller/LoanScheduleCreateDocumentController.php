@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Loan\Controller;
 
+use App\Company\Security\ModuleAccess;
 use App\Loan\Application\CreateDocumentFromLoanScheduleAction;
 use App\Loan\Entity\LoanPaymentSchedule;
 use App\Loan\Repository\LoanPaymentScheduleRepository;
@@ -23,6 +24,7 @@ final class LoanScheduleCreateDocumentController extends AbstractController
         name: 'loan_schedule_create_document',
         methods: ['POST']
     )]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function __invoke(
         string $loanId,
         string $itemId,

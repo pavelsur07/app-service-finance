@@ -12,6 +12,7 @@ use App\Company\Enum\CounterpartyType as CounterpartyTypeEnum;
 use App\Company\Exception\CounterpartyInnAlreadyExistsException;
 use App\Company\Form\CounterpartyType;
 use App\Company\Repository\CounterpartyRepository;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -50,6 +51,11 @@ class CounterpartyController extends AbstractController
     {
         $company = $companyService->getActiveCompany();
 
+        // Один экшен на GET и POST: read покрыт ModuleAccessSubscriber, write гейтим здесь.
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         $form = $this->createForm(CounterpartyType::class, new CounterpartyFormData());
         $form->handleRequest($request);
 
@@ -68,6 +74,12 @@ class CounterpartyController extends AbstractController
     public function edit(string $id, Request $request, CounterpartyRepository $repo, SaveCounterpartyAction $save, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
+
+        // Один экшен на GET и POST: read покрыт ModuleAccessSubscriber, write гейтим здесь.
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         $counterparty = $this->findForCompany($repo, $id, $company->getId());
 
         $data = new CounterpartyFormData();
@@ -92,6 +104,7 @@ class CounterpartyController extends AbstractController
     }
 
     #[Route('/{id}/archive', name: 'counterparty_archive', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function archive(string $id, Request $request, CounterpartyRepository $repo, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
@@ -107,6 +120,7 @@ class CounterpartyController extends AbstractController
     }
 
     #[Route('/{id}/unarchive', name: 'counterparty_unarchive', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function unarchive(string $id, Request $request, CounterpartyRepository $repo, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
