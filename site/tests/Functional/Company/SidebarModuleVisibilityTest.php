@@ -22,6 +22,9 @@ use Ramsey\Uuid\Uuid;
  * До Stage 5 участник с ограниченным шаблоном видел полный сайдбар и получал 403 по клику:
  * гейты работали, а навигация врала. Здесь проверяется, что пункт исчезает, а не просто
  * перестаёт открываться.
+ *
+ * Проверки ограничены контейнером `#sidebar-menu`: слово «Маркетплейсы» встречается и в
+ * заголовке страницы, поэтому поиск по всему HTML давал бы ложный green.
  */
 final class SidebarModuleVisibilityTest extends WebTestCaseBase
 {
@@ -38,18 +41,20 @@ final class SidebarModuleVisibilityTest extends WebTestCaseBase
         $client->loginUser($memberUser);
         $this->setClientSessionValue($client, 'active_company_id', $company->getId());
 
-        $client->request('GET', self::FINANCE_URL);
+        $crawler = $client->request('GET', self::FINANCE_URL);
         self::assertResponseIsSuccessful();
 
-        $html = (string) $client->getResponse()->getContent();
+        $sidebar = $this->sidebarText($crawler);
 
-        self::assertStringContainsString('Деньги', $html);
-        self::assertStringContainsString('Отчёты', $html);
-        self::assertStringNotContainsString('Маркетплейсы', $html);
-        self::assertStringNotContainsString('Загрузка данных', $html);
-        self::assertStringNotContainsString('Маркетплейс интеграций', $html);
-        self::assertStringNotContainsString('Каталог / Товары', $html);
-        self::assertStringNotContainsString('Компания и доступы', $html);
+        self::assertStringContainsString('Деньги', $sidebar);
+        self::assertStringContainsString('Отчёты', $sidebar);
+        // Финансовые raw-отчёты доступны этому участнику, значит должны быть и в меню.
+        self::assertStringContainsString('Отладка', $sidebar);
+        self::assertStringNotContainsString('Маркетплейсы', $sidebar);
+        self::assertStringNotContainsString('Загрузка данных', $sidebar);
+        self::assertStringNotContainsString('Маркетплейс интеграций', $sidebar);
+        self::assertStringNotContainsString('Каталог / Товары', $sidebar);
+        self::assertStringNotContainsString('Компания и доступы', $sidebar);
     }
 
     public function testMarketplaceOnlyMemberDoesNotSeeFinanceSections(): void
@@ -66,16 +71,18 @@ final class SidebarModuleVisibilityTest extends WebTestCaseBase
         $client->loginUser($memberUser);
         $this->setClientSessionValue($client, 'active_company_id', $company->getId());
 
-        $client->request('GET', self::MARKETPLACE_URL);
+        $crawler = $client->request('GET', self::MARKETPLACE_URL);
         self::assertResponseIsSuccessful();
 
-        $html = (string) $client->getResponse()->getContent();
+        $sidebar = $this->sidebarText($crawler);
 
-        self::assertStringContainsString('Маркетплейсы', $html);
-        self::assertStringNotContainsString('Доходы и расходы', $html);
-        self::assertStringNotContainsString('Категории ДДС', $html);
-        self::assertStringNotContainsString('Журнал импорта', $html);
-        self::assertStringNotContainsString('Компания и доступы', $html);
+        self::assertStringContainsString('Маркетплейсы', $sidebar);
+        self::assertStringContainsString('Загрузка данных', $sidebar);
+        self::assertStringNotContainsString('Доходы и расходы', $sidebar);
+        self::assertStringNotContainsString('Категории ДДС', $sidebar);
+        self::assertStringNotContainsString('Журнал импорта', $sidebar);
+        self::assertStringNotContainsString('Отладка', $sidebar);
+        self::assertStringNotContainsString('Компания и доступы', $sidebar);
     }
 
     public function testCatalogItemIsVisibleOnlyWithCatalogAccess(): void
@@ -95,14 +102,21 @@ final class SidebarModuleVisibilityTest extends WebTestCaseBase
         $client->loginUser($memberUser);
         $this->setClientSessionValue($client, 'active_company_id', $company->getId());
 
-        $client->request('GET', self::FINANCE_URL);
+        $crawler = $client->request('GET', self::FINANCE_URL);
         self::assertResponseIsSuccessful();
 
-        $html = (string) $client->getResponse()->getContent();
+        $sidebar = $this->sidebarText($crawler);
 
-        // Общий блок «Справочники» и финансовые пункты, и пункт каталога.
-        self::assertStringContainsString('Категории ДДС', $html);
-        self::assertStringContainsString('Каталог / Товары', $html);
+        // Общий блок «Справочники» показывает и финансовые пункты, и пункт каталога.
+        self::assertStringContainsString('Категории ДДС', $sidebar);
+        self::assertStringContainsString('Каталог / Товары', $sidebar);
+
+        // Ссылка на каталог реально присутствует, а не только текст.
+        self::assertGreaterThan(
+            0,
+            $crawler->filter('#sidebar-menu a[href="/catalog/products"]')->count(),
+            'В сайдбаре нет ссылки на каталог товаров.',
+        );
     }
 
     public function testOwnerSeesEverySection(): void
@@ -125,15 +139,25 @@ final class SidebarModuleVisibilityTest extends WebTestCaseBase
         $client->loginUser($owner);
         $this->setClientSessionValue($client, 'active_company_id', $company->getId());
 
-        $client->request('GET', self::FINANCE_URL);
+        $crawler = $client->request('GET', self::FINANCE_URL);
         self::assertResponseIsSuccessful();
 
-        $html = (string) $client->getResponse()->getContent();
+        $sidebar = $this->sidebarText($crawler);
 
         // Владелец компании получает write на все модули, поэтому меню полное.
-        foreach (['Деньги', 'Доходы и расходы', 'Отчёты', 'Маркетплейсы', 'Каталог / Товары', 'Компания и доступы'] as $section) {
-            self::assertStringContainsString($section, $html, sprintf('Владелец не видит раздел «%s»', $section));
+        $sections = ['Деньги', 'Доходы и расходы', 'Отчёты', 'Отладка', 'Маркетплейсы',
+            'Загрузка данных', 'Каталог / Товары', 'Компания и доступы'];
+        foreach ($sections as $section) {
+            self::assertStringContainsString($section, $sidebar, sprintf('Владелец не видит раздел «%s»', $section));
         }
+    }
+
+    private function sidebarText(\Symfony\Component\DomCrawler\Crawler $crawler): string
+    {
+        $sidebar = $crawler->filter('#sidebar-menu');
+        self::assertGreaterThan(0, $sidebar->count(), 'Контейнер сайдбара #sidebar-menu не найден.');
+
+        return $sidebar->html();
     }
 
     /**

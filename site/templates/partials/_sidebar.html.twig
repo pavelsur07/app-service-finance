@@ -258,7 +258,7 @@
             </li>
             {% endif %}
 
-            {# Компания и доступы — модуль admin. Вложенная «Отладка» — финансовые отчёты. #}
+            {# Компания и доступы — модуль admin. #}
             {% if is_granted('module.admin.read') %}
             {% set company_users_active =
                 current_route starts with 'company_users_'
@@ -293,54 +293,59 @@
                             <span>Настройки отчётов (API-ключ)</span>
                         </a>
 
-                        {% if is_granted('module.finance.read') %}
-                        {% set reports_debug_active =
-                            current_route starts with 'report_transactions_statement_'
-                            or current_route starts with 'report_transactions_debug_'
+                    </div>
+                </div>
+            </li>
+            {% endif %}
+
+            {# «Отладка» — финансовые raw-отчёты. Раньше жила внутри «Компании и доступов»
+               и была заперта за admin-гейтом, из-за чего finance-участник не видел
+               навигацию к доступным ему страницам. Вынесена в свой блок. #}
+                    {% if is_granted('module.finance.read') %}
+                    {% set reports_debug_active =
+                        current_route starts with 'report_transactions_statement_'
+                        or current_route starts with 'report_transactions_debug_'
+                        or current_route starts with 'report_debug_'
+                        or current_route starts with 'finance_report_raw'
+                        or current_route starts with 'finance_report_pl_raw'
+                    %}
+            <li class="nav-item dropdown {{ reports_debug_active ? 'show' : '' }}">
+                <a class="nav-link dropdown-toggle {{ reports_debug_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ reports_debug_active ? 'true' : 'false' }}">
+                    <span class="nav-link-icon"><i class="ti ti-bug"></i></span>
+                    <span class="nav-link-title">Отладка</span>
+                </a>
+                        {% set reports_debug_show = (
+                            reports_debug_active
+                            or current_route starts with 'report_transactions_statement_'
                             or current_route starts with 'report_debug_'
                             or current_route starts with 'finance_report_raw'
                             or current_route starts with 'finance_report_pl_raw'
-                        %}
-                        <div class="dropend {{ reports_debug_active ? 'show' : '' }}">
-                            <a class="dropdown-item dropdown-toggle {{ reports_debug_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ reports_debug_active ? 'true' : 'false' }}">
-                                <span>Отладка</span>
+                        ) ? 'show' : '' %}
+                        <div class="dropdown-menu {{ reports_debug_show }}">
+                            {% set report_statement_active = current_route starts with 'report_transactions_statement_' %}
+                            <a class="dropdown-item {{ report_statement_active ? 'active' : '' }}" href="{{ path('report_transactions_statement_index') }}">
+                                <span>Выписка/Стейтмент</span>
                             </a>
-                            {% set reports_debug_show = (
-                                reports_debug_active
-                                or current_route starts with 'report_transactions_statement_'
-                                or current_route starts with 'report_debug_'
-                                or current_route starts with 'finance_report_raw'
-                                or current_route starts with 'finance_report_pl_raw'
-                            ) ? 'show' : '' %}
-                            <div class="dropdown-menu {{ reports_debug_show }}">
-                                {% set report_statement_active = current_route starts with 'report_transactions_statement_' %}
-                                <a class="dropdown-item {{ report_statement_active ? 'active' : '' }}" href="{{ path('report_transactions_statement_index') }}">
-                                    <span>Выписка/Стейтмент</span>
-                                </a>
 {#                                {% set report_debug_active = current_route starts with 'report_transactions_debug_' %}
-                                <a class="dropdown-item {{ report_debug_active ? 'active' : '' }}" href="{{ path('report_transactions_debug_index') }}">
-                                    <span>Отчёт отладка</span>
-                                </a>#}
-                               {# {% set report_raw_transactions_active = current_route starts with 'report_debug_transactions_raw' %}
-                                <a class="dropdown-item {{ report_raw_transactions_active ? 'active' : '' }}" href="{{ path('report_debug_transactions_raw') }}">
-                                    <span>Отчёт «Сырые транзакции»</span>
-                                </a>#}
-                                {#{% set report_daily_facts_active = current_route starts with 'report_debug_daily_facts' %}
-                                <a class="dropdown-item {{ report_daily_facts_active ? 'active' : '' }}" href="{{ path('report_debug_daily_facts') }}">
-                                    <span>Отчёт «Фактические дневные остатки»</span>
-                                </a>#}
-                                {% set finance_report_raw_active = current_route starts with 'finance_report_raw' %}
-                                <a class="dropdown-item {{ finance_report_raw_active ? 'active' : '' }}" href="{{ path('finance_report_raw') }}">
-                                    <span>Сырые транзакции ОПиУ</span>
-                                </a>
-                                {% set finance_report_pl_raw_active = current_route starts with 'finance_report_pl_raw' %}
-                                <a class="dropdown-item {{ finance_report_pl_raw_active ? 'active' : '' }}" href="{{ path('finance_report_pl_raw') }}">
-                                    <span>Сырые данные ОПиУ</span>
-                                </a>
-                            </div>
-                        </div>
-                        {% endif %}
-                    </div>
+                            <a class="dropdown-item {{ report_debug_active ? 'active' : '' }}" href="{{ path('report_transactions_debug_index') }}">
+                                <span>Отчёт отладка</span>
+                            </a>#}
+                           {# {% set report_raw_transactions_active = current_route starts with 'report_debug_transactions_raw' %}
+                            <a class="dropdown-item {{ report_raw_transactions_active ? 'active' : '' }}" href="{{ path('report_debug_transactions_raw') }}">
+                                <span>Отчёт «Сырые транзакции»</span>
+                            </a>#}
+                            {#{% set report_daily_facts_active = current_route starts with 'report_debug_daily_facts' %}
+                            <a class="dropdown-item {{ report_daily_facts_active ? 'active' : '' }}" href="{{ path('report_debug_daily_facts') }}">
+                                <span>Отчёт «Фактические дневные остатки»</span>
+                            </a>#}
+                            {% set finance_report_raw_active = current_route starts with 'finance_report_raw' %}
+                            <a class="dropdown-item {{ finance_report_raw_active ? 'active' : '' }}" href="{{ path('finance_report_raw') }}">
+                                <span>Сырые транзакции ОПиУ</span>
+                            </a>
+                            {% set finance_report_pl_raw_active = current_route starts with 'finance_report_pl_raw' %}
+                            <a class="dropdown-item {{ finance_report_pl_raw_active ? 'active' : '' }}" href="{{ path('finance_report_pl_raw') }}">
+                                <span>Сырые данные ОПиУ</span>
+                            </a>
                 </div>
             </li>
             {% endif %}
