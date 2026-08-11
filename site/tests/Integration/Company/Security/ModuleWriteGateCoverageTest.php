@@ -213,6 +213,24 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
             $mutatingByClass[$className][] = $routeName;
             ++$perModule[$module->value];
 
+            $acceptsRead = [] !== array_intersect($route->getMethods(), ['GET', 'HEAD']);
+
+            if ($acceptsRead) {
+                // Смешанный GET+POST: атрибут закрыл бы и чтение, поэтому гейт обязан быть
+                // рантайм-проверкой в теле. Поведение подтверждает ModuleMixedRouteGateTest.
+                if ($this->hasWriteAttribute($className, $methodName)) {
+                    $problems[] = sprintf('%s (%s::%s) — write-атрибут на смешанном GET+POST маршруте отрежет чтение', $routeName, $className, $methodName);
+
+                    continue;
+                }
+
+                if (!$this->hasInlineGate($className, $methodName, $module)) {
+                    $problems[] = sprintf('%s (%s::%s) — нет рантайм-гейта %s', $routeName, $className, $methodName, $this->writeConstant($module));
+                }
+
+                continue;
+            }
+
             if (!$this->isGated($className, $methodName, $module)) {
                 $problems[] = sprintf(
                     '%s (%s::%s) — нет гейта %s',
@@ -290,6 +308,38 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
         return 'ModuleAccess::'.strtoupper($module->value).'_WRITE';
     }
 
+    private function hasWriteAttribute(string $className, string $methodName): bool
+    {
+        $method = $this->method($className, $methodName);
+        $targets = [new \ReflectionClass($className)];
+        if (null !== $method) {
+            $targets[] = $method;
+        }
+
+        foreach ($targets as $target) {
+            foreach ($this->grantedAttributes($target) as $value) {
+                if (str_starts_with($value, 'module.') && str_ends_with($value, '.write')) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private function hasInlineGate(string $className, string $methodName, Module $module): bool
+    {
+        $method = $this->method($className, $methodName);
+        if (null === $method) {
+            return false;
+        }
+
+        return str_contains(
+            $this->executableBody($method),
+            '$this->denyAccessUnlessGranted('.$this->writeConstant($module).')',
+        );
+    }
+
     private function isGated(string $className, string $methodName, Module $module): bool
     {
         $method = $this->method($className, $methodName);
@@ -316,7 +366,7 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
         // по PHP-токенам без комментариев и строк — закомментированный вызов не считается.
         return str_contains(
             $this->executableBody($method),
-            'denyAccessUnlessGranted('.$this->writeConstant($module).')',
+            '$this->denyAccessUnlessGranted('.$this->writeConstant($module).')',
         );
     }
 
