@@ -2371,8 +2371,12 @@ Login throttling: 5 попыток / 15 мин (`security.yaml`, firewall `main`
 **Write-гейты.** POST-only экшены — атрибутом `#[IsGranted(ModuleAccess::X_WRITE)]`;
 смешанные `GET+POST` — `denyAccessUnlessGranted()` в теле, иначе атрибут гейтил бы и чтение.
 Расставлены во всех пяти группах (Stage 3 — finance/deals/catalog/admin, Stage 4 — marketplace).
-Инвариант держит `ModuleWriteGateCoverageTest`: мутирующий экшен в покрытом модуле без гейта
-роняет тест. Роут без явного `methods:` в этих модулях — read-страница, гейта не требует.
+Инвариант держит `ModuleWriteGateCoverageTest` (integration): обход идёт по скомпилированной
+RouteCollection, мутирующий маршрут без гейта своего модуля роняет тест. Правило fail-closed —
+**роут без явного `methods:` считается мутирующим**, потому что роутер принимает на него и POST;
+read-страница обязана объявлять `methods: ['GET']`. Маршруты, закрытые не модульным гейтом
+(firewall админки, owner-проверка внутри Action, личные настройки, `#[PublicAccess]`),
+перечислены в карте политик теста поимённо, и устаревшая запись в ней — тоже падение.
 
 Пять контроллеров остаются под `ROLE_COMPANY_OWNER` вместо модульного гейта (Inventory snapshots,
 MarketplaceAds Ozon load/extract, MarketplaceAnalytics): owner-only строже, замена ослабила бы их.

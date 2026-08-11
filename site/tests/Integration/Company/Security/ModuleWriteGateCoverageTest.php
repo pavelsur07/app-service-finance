@@ -6,6 +6,7 @@ namespace App\Tests\Integration\Company\Security;
 
 use App\Company\Security\Module;
 use App\Company\Security\ModuleAccessMap;
+use App\Company\Security\PublicAccess;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -21,8 +22,12 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  *   контроллеров `#[Route]` висит на классе, и проверка «по методу» их бы пропускала;
  * - покрытие определяется через ModuleAccessMap, а не вторым списком неймспейсов, который
  *   разъехался бы с картой. Неклассифицированный контроллер — падение, а не пропуск;
- * - exempt-контроллеры пропускаются осознанно: это отдельный отревьюенный список решений
- *   в ModuleAccessMap, полноту которого сторожит ControllerAccessCoverageTest;
+ * - exempt-зоны и делегированные owner-проверки не пропускаются по классу: каждый такой
+ *   мутирующий маршрут перечислен в ROUTE_POLICY поимённо с указанием, чем именно он закрыт.
+ *   Новый мутирующий маршрут в exempt-классе роняет тест, пока его не классифицируют;
+ * - ROUTE_POLICY проверяется и на устаревание: запись про исчезнувший маршрут тоже падение;
+ * - `#[PublicAccess]` признаётся явным осознанным исключением: это машинно-проверяемый атрибут,
+ *   а не догадка;
  * - тело экшена читается по PHP-токенам без комментариев и строк, чтобы закомментированный
  *   гейт не считался гейтом;
  * - маршрут без явного `methods` считается мутирующим без исключений: read-страницы обязаны
@@ -31,16 +36,53 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  */
 final class ModuleWriteGateCoverageTest extends KernelTestCase
 {
+    /** Модули, мутации которых обязаны быть закрыты (Stage 3 — четыре группы, Stage 4 — marketplace). */
+    private const COVERED_MODULES = ['finance', 'deals', 'catalog', 'admin', 'marketplace'];
+
     /**
-     * Модули, мутации которых закрыты модульными write-гейтами.
+     * Мутирующие маршруты, закрытые не модульным write-гейтом. Перечислены поимённо с политикой,
+     * потому что статический обход не видит ни firewall access_control, ни owner-проверку,
+     * выполненную внутри Action.
      *
-     * Группы `admin` здесь нет намеренно: её мутирующие маршруты (управление участниками,
-     * шаблонами ролей, компаниями) закрыты строже — owner-only, причём проверка живёт внутри
-     * Action-слоя (DisableCompanyMemberAction и др.), куда статический обход не заглядывает.
-     * Их покрывают функциональные тесты CompanyRoleControllerTest, CompanyMemberAccessRoleTest
-     * и CompanyMemberAccessTest. Требовать от них модульный гейт нельзя: он слабее owner-only.
+     * `delegated-owner` — экшен тонкий, владельца сверяет Action (например DisableCompanyMemberAction).
+     * `inline-owner`    — владелец сверяется прямо в теле сравнением с $company->getUser().
+     * `authenticated-self` — личная настройка пользователя, компания не при чём.
+     * `firewall`        — доступ ограничен access_control в security.yaml (админка).
+     *
+     * @var array<string, string>
      */
-    private const COVERED_MODULES = ['finance', 'deals', 'catalog', 'marketplace'];
+    private const ROUTE_POLICY = [
+        // Управление участниками: владельца сверяет Action, экшен только маршрутизирует.
+        'company_member_disable' => 'delegated-owner',
+        'company_member_enable' => 'delegated-owner',
+        'company_member_disable_legacy' => 'delegated-owner',
+        'company_member_enable_legacy' => 'delegated-owner',
+        'company_users_invite_legacy' => 'delegated-owner',
+        'company_invite_revoke_legacy' => 'delegated-owner',
+        'company_member_access_role_legacy' => 'delegated-owner',
+        // Список и удаление компаний: сверка владельца инлайном, работает и без активной компании.
+        'company_new' => 'inline-owner',
+        'company_edit' => 'inline-owner',
+        'company_delete' => 'inline-owner',
+        'company_set_active' => 'inline-owner',
+        // Личные настройки пользователя.
+        'app_profile_password' => 'authenticated-self',
+        'app_ui_mode_switch' => 'authenticated-self',
+        // Админка: отдельный firewall и access_control.
+        'admin_auth_login' => 'firewall',
+        'admin_user_create_account' => 'firewall',
+        'admin_user_update_roles' => 'firewall',
+        'admin_telegram_bot_new' => 'firewall',
+        'admin_telegram_bot_edit' => 'firewall',
+        'admin_telegram_bot_toggle' => 'firewall',
+        'admin_telegram_bot_webhook_set' => 'firewall',
+        'admin_ingestion_external_categories_discover' => 'firewall',
+        'admin_ingestion_external_categories_refresh_ozon_metadata' => 'firewall',
+        'admin_ingestion_external_categories_seed_defaults' => 'firewall',
+        'admin_ingestion_external_categories_update_mapping' => 'firewall',
+        'admin_marketplace_mapping_error_resolve' => 'firewall',
+        'marketplace_ads_admin_mark_load_job_failed' => 'firewall',
+    ];
 
     /** Минимум мутирующих маршрутов на модуль — против «тихого» зануления обхода. */
     private const MIN_MUTATING_PER_MODULE = [
@@ -48,6 +90,7 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
         'marketplace' => 50,
         'deals' => 5,
         'catalog' => 3,
+        'admin' => 5,
     ];
 
     private const MUTATING_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
@@ -74,6 +117,7 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
         $perModule = array_fill_keys(self::COVERED_MODULES, 0);
         $mutatingByClass = [];
         $readByClass = [];
+        $usedPolicies = [];
 
         foreach ($router->getRouteCollection() as $routeName => $route) {
             $controller = (string) ($route->getDefaults()['_controller'] ?? '');
@@ -87,19 +131,35 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
             }
 
             $isMutating = $this->isMutatingRoute($route);
-
-            // Exempt-зоны и публичные роуты пропускаем: это отдельный, отревьюенный список
-            // решений в ModuleAccessMap (личный профиль, переключение компаний, /admin/*),
-            // и полноту этого списка сторожит ControllerAccessCoverageTest. Свои проверки
-            // у них инлайновые или на уровне firewall, модульным гейтом их закрывать нельзя.
-            if ($map->isExempt($className)) {
-                continue;
-            }
-
+            $exempt = $map->isExempt($className);
             $module = $map->resolve($className);
-            if (null === $module || !\in_array($module->value, self::COVERED_MODULES, true)) {
+
+            if (!$exempt && (null === $module || !\in_array($module->value, self::COVERED_MODULES, true))) {
                 continue;
             }
+
+            if ($isMutating && $this->hasPublicAccess($className, $methodName)) {
+                // Явное осознанное исключение: логин, регистрация, приём инвайта, вебхуки.
+                $usedPolicies[$routeName] = 'public-access';
+
+                continue;
+            }
+
+            if ($isMutating && isset(self::ROUTE_POLICY[$routeName])) {
+                $usedPolicies[$routeName] = self::ROUTE_POLICY[$routeName];
+
+                continue;
+            }
+
+            if ($exempt) {
+                if ($isMutating) {
+                    $problems[] = sprintf('%s (%s::%s) — мутирующий маршрут в exempt-зоне без записи в ROUTE_POLICY', $routeName, $className, $methodName);
+                }
+
+                continue;
+            }
+
+            \assert($module instanceof Module);
 
             if ($isMutating) {
                 $mutatingByClass[$className][] = $routeName;
@@ -131,6 +191,11 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
                 $problems[] = sprintf('%s — class-level write-гейт отрезает read-маршруты %s', $className, implode(', ', $readByClass[$className]));
             }
         }
+
+        // Устаревшая запись в карте политик так же опасна, как отсутствующая: она бы молча
+        // разрешала маршрут, которого уже нет, и маскировала переименование.
+        $stale = array_diff(array_keys(self::ROUTE_POLICY), array_keys($usedPolicies));
+        self::assertSame([], array_values($stale), 'ROUTE_POLICY описывает маршруты, которых больше нет: '.implode(', ', $stale));
 
         foreach (self::MIN_MUTATING_PER_MODULE as $moduleValue => $minimum) {
             self::assertGreaterThanOrEqual(
@@ -164,6 +229,18 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
         // Пустой список — маршрут принимает всё, включая POST. Read-страница обязана
         // объявить methods явно, иначе read-only держится только на честном слове.
         return [] === $methods || [] !== array_intersect($methods, self::MUTATING_METHODS);
+    }
+
+    private function hasPublicAccess(string $className, string $methodName): bool
+    {
+        $reflection = new \ReflectionClass($className);
+
+        if ([] !== $reflection->getAttributes(PublicAccess::class, \ReflectionAttribute::IS_INSTANCEOF)) {
+            return true;
+        }
+
+        return $reflection->hasMethod($methodName)
+            && [] !== $reflection->getMethod($methodName)->getAttributes(PublicAccess::class, \ReflectionAttribute::IS_INSTANCEOF);
     }
 
     private function writeConstant(Module $module): string
