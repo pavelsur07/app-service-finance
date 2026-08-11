@@ -98,12 +98,19 @@ class CompanyMemberController extends AbstractController
             if (!$accessRole instanceof CompanyRole) {
                 $accessRole = $roleRepository->find(SystemCompanyRoles::FULL_ACCESS_ID);
             }
-            $result = $inviteManager->inviteOperator(
-                company: $company,
-                email: $email,
-                actor: $user,
-                accessRole: $accessRole,
-            );
+            try {
+                $result = $inviteManager->inviteOperator(
+                    company: $company,
+                    email: $email,
+                    actor: $user,
+                    accessRole: $accessRole,
+                );
+            } catch (CompanyRoleNotAvailableException) {
+                // Шаблон удалили между выбором в форме и записью приглашения.
+                $this->addFlash('danger', 'Выбранный шаблон больше недоступен.');
+
+                return $this->redirectToRoute('company_users_index');
+            }
 
             if ($result->plainToken) {
                 $this->addFlash('invite_token', $result->plainToken);

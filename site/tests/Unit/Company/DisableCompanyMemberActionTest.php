@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Company;
 
 use App\Company\Application\DisableCompanyMemberAction;
+use App\Company\Domain\Service\CompanyAdminWriteGuard;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
 use App\Company\Infrastructure\Repository\CompanyRepository;
@@ -30,13 +31,14 @@ final class DisableCompanyMemberActionTest extends TestCase
             ->withRole(CompanyMember::ROLE_OPERATOR)
             ->build();
 
-        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager = $this->entityManagerRunningTransaction();
         $entityManager->expects(self::once())->method('flush');
 
         $action = new DisableCompanyMemberAction(
             $this->companyRepositoryReturning($company),
             $this->memberRepositoryReturning($member),
             $entityManager,
+            $this->adminWriteGuardAllowing(),
         );
 
         $action((string) $company->getId(), (string) $member->getId(), $owner);
@@ -57,13 +59,14 @@ final class DisableCompanyMemberActionTest extends TestCase
             ->withRole(CompanyMember::ROLE_OPERATOR)
             ->build();
 
-        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager = $this->entityManagerRunningTransaction();
         $entityManager->expects(self::once())->method('flush');
 
         $action = new DisableCompanyMemberAction(
             $this->companyRepositoryReturning($company),
             $this->memberRepositoryReturning($member),
             $entityManager,
+            $this->adminWriteGuardAllowing(),
         );
 
         $action((string) $company->getId(), (string) $member->getId(), $actor);
@@ -79,13 +82,14 @@ final class DisableCompanyMemberActionTest extends TestCase
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
         $member = CompanyMemberBuilder::aMember()->withCompany($company)->withUser($memberUser)->build();
 
-        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager = $this->entityManagerRunningTransaction();
         $entityManager->expects(self::never())->method('flush');
 
         $action = new DisableCompanyMemberAction(
             $this->companyRepositoryReturning($company),
             $this->memberRepositoryReturning($member),
             $entityManager,
+            $this->adminWriteGuardAllowing(),
         );
 
         $this->expectException(AccessDeniedException::class);
@@ -103,13 +107,14 @@ final class DisableCompanyMemberActionTest extends TestCase
             ->withRole(CompanyMember::ROLE_OPERATOR)
             ->build();
 
-        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager = $this->entityManagerRunningTransaction();
         $entityManager->expects(self::never())->method('flush');
 
         $action = new DisableCompanyMemberAction(
             $this->companyRepositoryReturning($company),
             $this->memberRepositoryReturning($member),
             $entityManager,
+            $this->adminWriteGuardAllowing(),
         );
 
         $this->expectException(AccessDeniedException::class);
@@ -128,13 +133,14 @@ final class DisableCompanyMemberActionTest extends TestCase
             ->withRole(CompanyMember::ROLE_OWNER)
             ->build();
 
-        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager = $this->entityManagerRunningTransaction();
         $entityManager->expects(self::never())->method('flush');
 
         $action = new DisableCompanyMemberAction(
             $this->companyRepositoryReturning($company),
             $this->memberRepositoryReturning($member),
             $entityManager,
+            $this->adminWriteGuardAllowing(),
         );
 
         $this->expectException(AccessDeniedException::class);
@@ -147,13 +153,14 @@ final class DisableCompanyMemberActionTest extends TestCase
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
 
-        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager = $this->entityManagerRunningTransaction();
         $entityManager->expects(self::never())->method('flush');
 
         $action = new DisableCompanyMemberAction(
             $this->companyRepositoryReturning($company),
             $this->memberRepositoryReturning(null),
             $entityManager,
+            $this->adminWriteGuardAllowing(),
         );
 
         $this->expectException(NotFoundHttpException::class);
@@ -179,5 +186,32 @@ final class DisableCompanyMemberActionTest extends TestCase
             ->willReturn($member);
 
         return $repository;
+    }
+
+    /**
+     * Мок EntityManager, который действительно исполняет колбэк wrapInTransaction():
+     * иначе тело Action не выполнится и тест проверит пустоту.
+     */
+    private function entityManagerRunningTransaction(): EntityManagerInterface&\PHPUnit\Framework\MockObject\MockObject
+    {
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->method('wrapInTransaction')->willReturnCallback(
+            static fn (callable $callback) => $callback($entityManager),
+        );
+
+        return $entityManager;
+    }
+
+    /**
+     * Настоящий guard поверх мок-репозитория: класс final, и подменять сам предикат незачем —
+     * пустой снимок активных участников означает, что администраторов нет и отнимать нечего.
+     * Инвариант последнего админа проверяется функциональными тестами.
+     */
+    private function adminWriteGuardAllowing(): CompanyAdminWriteGuard
+    {
+        $repository = $this->createMock(CompanyMemberRepository::class);
+        $repository->method('findActiveAdminStateByCompany')->willReturn([]);
+
+        return new CompanyAdminWriteGuard($repository);
     }
 }

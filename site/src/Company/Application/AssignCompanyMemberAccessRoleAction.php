@@ -12,6 +12,7 @@ use App\Company\Exception\LastCompanyAdminException;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\EntityNotFoundException;
 
 /**
  * Назначение участнику шаблона доступа.
@@ -42,7 +43,13 @@ final readonly class AssignCompanyMemberAccessRoleAction
                 $this->em->lock($company, LockMode::PESSIMISTIC_WRITE);
                 // Права назначаемого шаблона тоже читаем заново: под блокировкой решение
                 // должно опираться на состояние БД, а не на то, что осело в identity map.
-                $this->em->refresh($role);
+                try {
+                    $this->em->refresh($role);
+                } catch (EntityNotFoundException $exception) {
+                    // Шаблон удалили до блокировки — тот же осмысленный отказ, что и при
+                    // нарушении FK на flush, а не 500.
+                    throw new CompanyRoleNotAvailableException($roleId, $exception);
+                }
 
                 if (!$this->adminWriteGuard->keepsAdminWriteAfterMemberChange(
                     $company,

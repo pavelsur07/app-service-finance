@@ -48,6 +48,28 @@ class CompanyInviteRepository extends ServiceEntityRepository
      * Терминальные приглашения ссылку освобождают сами (см. CompanyInvite::accept/revoke),
      * поэтому здесь остаются только живые и просроченные.
      */
+    /**
+     * Снимает ссылку на шаблон у приглашений, которые уже нельзя принять: принятых, отозванных
+     * и просроченных.
+     *
+     * Истечение срока происходит само собой, без вызова revoke(), поэтому просроченное
+     * приглашение иначе держало бы FK `ON DELETE RESTRICT` вечно и навсегда запрещало бы
+     * удалить шаблон, хотя применить его уже невозможно.
+     */
+    public function releaseAccessRoleFromUnusableInvites(CompanyRole $role, \DateTimeImmutable $now): int
+    {
+        return (int) $this->createQueryBuilder('invite')
+            ->update()
+            ->set('invite.accessRole', ':null')
+            ->andWhere('invite.accessRole = :role')
+            ->andWhere('invite.acceptedAt IS NOT NULL OR invite.revokedAt IS NOT NULL OR invite.expiresAt <= :now')
+            ->setParameter('null', null)
+            ->setParameter('role', $role)
+            ->setParameter('now', $now)
+            ->getQuery()
+            ->execute();
+    }
+
     public function countByAccessRole(CompanyRole $role): int
     {
         return (int) $this->createQueryBuilder('invite')

@@ -208,8 +208,9 @@ final class CompanyRoleController extends AbstractController
         }
 
         $membersCount = $memberRepository->countByAccessRole($role);
-        // Считаем все приглашения со ссылкой, а не только активные: ровно это запрещает FK.
-        $invitesCount = $inviteRepository->countByAccessRole($role);
+        // Считаем активные приглашения: неприменимые (принятые, отозванные, просроченные)
+        // освобождают ссылку в DeleteCompanyRoleAction, поэтому FK им не помешает.
+        $invitesCount = $inviteRepository->countPendingByAccessRole($role, new \DateTimeImmutable());
 
         if ($membersCount > 0 || $invitesCount > 0) {
             $logger->info('Company role deletion rejected: in use', [
@@ -219,7 +220,7 @@ final class CompanyRoleController extends AbstractController
                 'membersCount' => $membersCount,
                 'invitesCount' => $invitesCount,
             ]);
-            $this->addFlash('danger', 'Нельзя удалить шаблон, назначенный участникам или приглашениям. Отзовите приглашения и переназначьте участников.');
+            $this->addFlash('danger', 'Нельзя удалить шаблон, назначенный участникам или активным приглашениям. Отзовите приглашения и переназначьте участников.');
 
             return $this->redirectToRoute('company_role_index');
         }
