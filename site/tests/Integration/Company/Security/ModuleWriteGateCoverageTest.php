@@ -28,8 +28,10 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  * - ROUTE_POLICY проверяется и на устаревание: запись про исчезнувший маршрут тоже падение;
  * - `#[PublicAccess]` признаётся явным осознанным исключением: это машинно-проверяемый атрибут,
  *   а не догадка;
- * - тело экшена читается по PHP-токенам без комментариев и строк, чтобы закомментированный
- *   гейт не считался гейтом;
+ * - гейтом признаётся только точный атрибут `module.<resolved>.write`, точная форма
+ *   `denyAccessUnlessGranted(ModuleAccess::<MODULE>_WRITE)` в теле (для смешанных GET+POST,
+ *   тело читается по токенам без комментариев и строк) либо запись в ROUTE_POLICY
+ *   с совпадающим `Class::method`. Эвристик вида «где-то упомянут assertOwner» нет;
  * - маршрут без явного `methods` считается мутирующим без исключений: read-страницы обязаны
  *   объявлять `methods: ['GET']`, тогда read-only держит сам роутер, а не список в тесте;
  * - счётчики ведутся по каждому модулю, поэтому потеря целой группы не спрячется за общим порогом.
@@ -40,48 +42,63 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
     private const COVERED_MODULES = ['finance', 'deals', 'catalog', 'admin', 'marketplace'];
 
     /**
-     * Мутирующие маршруты, закрытые не модульным write-гейтом. Перечислены поимённо с политикой,
-     * потому что статический обход не видит ни firewall access_control, ни owner-проверку,
-     * выполненную внутри Action.
+     * Мутирующие маршруты, закрытые не модульным write-гейтом. Каждая запись называет и политику,
+     * и ожидаемый `Class::method`, поэтому переназначение имени маршрута на другой контроллер
+     * не даёт безусловного пропуска — запись перестанет совпадать и тест упадёт.
      *
-     * `delegated-owner` — экшен тонкий, владельца сверяет Action (например DisableCompanyMemberAction).
-     * `inline-owner`    — владелец сверяется прямо в теле сравнением с $company->getUser().
-     * `authenticated-self` — личная настройка пользователя, компания не при чём.
-     * `firewall`        — доступ ограничен access_control в security.yaml (админка).
+     * `owner`             — в теле экшена `assertOwner($company)`: сверка владельца именно активной компании.
+     * `delegated-owner`   — экшен тонкий, владельца сверяет Action (DisableCompanyMemberAction и др.).
+     * `inline-owner`      — сверка владельца сравнением `$company->getUser()` прямо в теле.
+     * `authenticated-self`— личная настройка пользователя, компания не при чём.
+     * `firewall`          — доступ ограничен access_control в security.yaml (админка).
      *
-     * @var array<string, string>
+     * Негативное поведение этих маршрутов покрыто функционально: CompanyRoleControllerTest
+     * (`testNonOwnerCannotAccessRoles`), CompanyMemberAccessRoleTest, CompanyMemberAccessTest.
+     *
+     * @var array<string, array{0: string, 1: string}>
      */
     private const ROUTE_POLICY = [
-        // Управление участниками: владельца сверяет Action, экшен только маршрутизирует.
-        'company_member_disable' => 'delegated-owner',
-        'company_member_enable' => 'delegated-owner',
-        'company_member_disable_legacy' => 'delegated-owner',
-        'company_member_enable_legacy' => 'delegated-owner',
-        'company_users_invite_legacy' => 'delegated-owner',
-        'company_invite_revoke_legacy' => 'delegated-owner',
-        'company_member_access_role_legacy' => 'delegated-owner',
-        // Список и удаление компаний: сверка владельца инлайном, работает и без активной компании.
-        'company_new' => 'inline-owner',
-        'company_edit' => 'inline-owner',
-        'company_delete' => 'inline-owner',
-        'company_set_active' => 'inline-owner',
+        // Шаблоны ролей и участники: owner-only, проверка в теле экшена.
+        'company_role_new' => ['owner', 'App\Company\Controller\CompanyRoleController::new'],
+        'company_role_create' => ['owner', 'App\Company\Controller\CompanyRoleController::new'],
+        'company_role_edit' => ['owner', 'App\Company\Controller\CompanyRoleController::edit'],
+        'company_role_update' => ['owner', 'App\Company\Controller\CompanyRoleController::edit'],
+        'company_role_delete' => ['owner', 'App\Company\Controller\CompanyRoleController::delete'],
+        'company_users_invite' => ['owner', 'App\Company\Controller\CompanyMemberController::invite'],
+        'company_invite_revoke' => ['owner', 'App\Company\Controller\CompanyMemberController::revokeInvite'],
+        'company_member_access_role' => ['owner', 'App\Company\Controller\CompanyMemberController::setAccessRole'],
+        'settings_report_api_key_generate' => ['owner', 'App\Company\Controller\ReportApiKeyController::generate'],
+        'settings_report_api_key_revoke' => ['owner', 'App\Company\Controller\ReportApiKeyController::revoke'],
+        // Тонкие экшены: владельца сверяет Action.
+        'company_member_disable' => ['delegated-owner', 'App\Company\Controller\CompanyMemberController::disableMember'],
+        'company_member_enable' => ['delegated-owner', 'App\Company\Controller\CompanyMemberController::enableMember'],
+        'company_member_disable_legacy' => ['delegated-owner', 'App\Company\Controller\CompanyMemberController::legacyDisable'],
+        'company_member_enable_legacy' => ['delegated-owner', 'App\Company\Controller\CompanyMemberController::legacyEnable'],
+        'company_users_invite_legacy' => ['delegated-owner', 'App\Company\Controller\CompanyMemberController::legacyInvite'],
+        'company_invite_revoke_legacy' => ['delegated-owner', 'App\Company\Controller\CompanyMemberController::legacyRevoke'],
+        'company_member_access_role_legacy' => ['delegated-owner', 'App\Company\Controller\CompanyMemberController::legacySetAccessRole'],
+        // Компании: сверка владельца инлайном, работает и без активной компании.
+        'company_new' => ['inline-owner', 'App\Company\Controller\CompanyController::new'],
+        'company_edit' => ['inline-owner', 'App\Company\Controller\CompanyController::edit'],
+        'company_delete' => ['inline-owner', 'App\Company\Controller\CompanyController::delete'],
+        'company_set_active' => ['inline-owner', 'App\Company\Controller\CompanyController::setActive'],
         // Личные настройки пользователя.
-        'app_profile_password' => 'authenticated-self',
-        'app_ui_mode_switch' => 'authenticated-self',
+        'app_profile_password' => ['authenticated-self', 'App\Company\Controller\ProfileController::changePassword'],
+        'app_ui_mode_switch' => ['authenticated-self', 'App\Shared\Controller\UiModeController::__invoke'],
         // Админка: отдельный firewall и access_control.
-        'admin_auth_login' => 'firewall',
-        'admin_user_create_account' => 'firewall',
-        'admin_user_update_roles' => 'firewall',
-        'admin_telegram_bot_new' => 'firewall',
-        'admin_telegram_bot_edit' => 'firewall',
-        'admin_telegram_bot_toggle' => 'firewall',
-        'admin_telegram_bot_webhook_set' => 'firewall',
-        'admin_ingestion_external_categories_discover' => 'firewall',
-        'admin_ingestion_external_categories_refresh_ozon_metadata' => 'firewall',
-        'admin_ingestion_external_categories_seed_defaults' => 'firewall',
-        'admin_ingestion_external_categories_update_mapping' => 'firewall',
-        'admin_marketplace_mapping_error_resolve' => 'firewall',
-        'marketplace_ads_admin_mark_load_job_failed' => 'firewall',
+        'admin_auth_login' => ['firewall', 'App\Admin\Controller\Security\AdminAuthController::login'],
+        'admin_user_create_account' => ['firewall', 'App\Admin\Controller\CreateAccountController::__invoke'],
+        'admin_user_update_roles' => ['firewall', 'App\Admin\Controller\UserController::updateRoles'],
+        'admin_telegram_bot_new' => ['firewall', 'App\Telegram\Controller\Admin\TelegramBotController::new'],
+        'admin_telegram_bot_edit' => ['firewall', 'App\Telegram\Controller\Admin\TelegramBotController::edit'],
+        'admin_telegram_bot_toggle' => ['firewall', 'App\Telegram\Controller\Admin\TelegramBotController::toggle'],
+        'admin_telegram_bot_webhook_set' => ['firewall', 'App\Telegram\Controller\Admin\TelegramBotController::webhookSet'],
+        'admin_ingestion_external_categories_discover' => ['firewall', 'App\Admin\Controller\IngestionExternalCategoriesController::discover'],
+        'admin_ingestion_external_categories_refresh_ozon_metadata' => ['firewall', 'App\Admin\Controller\IngestionExternalCategoriesController::refreshOzonMetadata'],
+        'admin_ingestion_external_categories_seed_defaults' => ['firewall', 'App\Admin\Controller\IngestionExternalCategoriesController::seedDefaults'],
+        'admin_ingestion_external_categories_update_mapping' => ['firewall', 'App\Admin\Controller\IngestionExternalCategoriesController::updateMapping'],
+        'admin_marketplace_mapping_error_resolve' => ['firewall', 'App\Marketplace\Controller\Admin\MappingErrorResolveController::__invoke'],
+        'marketplace_ads_admin_mark_load_job_failed' => ['firewall', 'App\MarketplaceAds\Controller\Api\Admin\MarkAdLoadJobFailedController::__invoke'],
     ];
 
     /** Минимум мутирующих маршрутов на модуль — против «тихого» зануления обхода. */
@@ -90,7 +107,9 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
         'marketplace' => 50,
         'deals' => 5,
         'catalog' => 3,
-        'admin' => 5,
+        // В admin модульный write-гейт остался только у telegram-интеграции: остальные мутации
+        // группы закрыты строже и перечислены в ROUTE_POLICY.
+        'admin' => 1,
     ];
 
     private const MUTATING_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
@@ -107,12 +126,6 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
      */
     private const STRICTER_ATTRIBUTES = ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'];
 
-    /**
-     * Единственная допустимая форма owner-проверки в теле: она бросает AccessDenied.
-     * Предикаты вида `isOwner()` сюда не входят — их результат можно проигнорировать.
-     */
-    private const OWNER_CALL = 'assertOwner(';
-
     public function testEveryMutatingRouteInCoveredModulesIsGatedByItsOwnModule(): void
     {
         self::bootKernel();
@@ -123,17 +136,23 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
         $perModule = array_fill_keys(self::COVERED_MODULES, 0);
         $mutatingByClass = [];
         $readByClass = [];
-        $usedPolicies = [];
         $usedRoutePolicies = [];
 
         foreach ($router->getRouteCollection() as $routeName => $route) {
             $controller = (string) ($route->getDefaults()['_controller'] ?? '');
-            if ('' === $controller || !str_starts_with($controller, 'App\\')) {
+            if ('' === $controller) {
                 continue;
             }
 
             [$className, $methodName] = $this->splitController($controller);
-            if (!class_exists($className)) {
+
+            if (!str_starts_with($controller, 'App\\') || !class_exists($className)) {
+                // Не наш контроллер или неразрешимый callable. Read-маршруты фреймворка
+                // игнорируем, но мутирующий неразрешимый маршрут прятать нельзя.
+                if ($this->isMutatingRoute($route) && str_starts_with($controller, 'App\\')) {
+                    $problems[] = sprintf('%s (%s) — контроллер не разрешается в класс', $routeName, $controller);
+                }
+
                 continue;
             }
 
@@ -152,13 +171,23 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
 
             // Явное осознанное исключение: логин, регистрация, приём инвайта, вебхуки.
             if ($this->hasPublicAccess($className, $methodName)) {
-                $usedPolicies[$routeName] = 'public-access';
-
                 continue;
             }
 
             if (isset(self::ROUTE_POLICY[$routeName])) {
-                $usedRoutePolicies[$routeName] = self::ROUTE_POLICY[$routeName];
+                [$policy, $expectedController] = self::ROUTE_POLICY[$routeName];
+                $actualController = $className.'::'.$methodName;
+                if ($expectedController !== $actualController) {
+                    $problems[] = sprintf(
+                        '%s — политика %s выписана на %s, а маршрут ведёт на %s',
+                        $routeName,
+                        $policy,
+                        $expectedController,
+                        $actualController,
+                    );
+                }
+
+                $usedRoutePolicies[$routeName] = $policy;
 
                 continue;
             }
@@ -282,7 +311,42 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
             }
         }
 
-        return $this->bodyHasGate($method, $module);
+        // Смешанные GET+POST экшены гейтятся в теле: атрибут на метод закрыл бы и чтение.
+        // Признаётся только точная форма с константой своего модуля, а тело читается
+        // по PHP-токенам без комментариев и строк — закомментированный вызов не считается.
+        return str_contains(
+            $this->executableBody($method),
+            'denyAccessUnlessGranted('.$this->writeConstant($module).')',
+        );
+    }
+
+    /** Тело метода без комментариев и строковых литералов. */
+    private function executableBody(\ReflectionMethod $method): string
+    {
+        $file = $method->getFileName();
+        $start = $method->getStartLine();
+        $end = $method->getEndLine();
+        if (false === $file || false === $start || false === $end) {
+            return '';
+        }
+
+        $lines = explode("\n", (string) file_get_contents($file));
+        $source = implode("\n", \array_slice($lines, $start - 1, $end - $start + 1));
+
+        $out = '';
+        foreach (token_get_all('<?php '.$source) as $token) {
+            if (\is_array($token)) {
+                if (\in_array($token[0], [\T_COMMENT, \T_DOC_COMMENT, \T_CONSTANT_ENCAPSED_STRING, \T_ENCAPSED_AND_WHITESPACE], true)) {
+                    continue;
+                }
+                $out .= $token[1];
+
+                continue;
+            }
+            $out .= $token;
+        }
+
+        return $out;
     }
 
     private function hasClassLevelWriteGate(string $className): bool
@@ -315,44 +379,5 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
         }
 
         return $values;
-    }
-
-    private function bodyHasGate(\ReflectionMethod $method, Module $module): bool
-    {
-        $body = $this->executableBody($method);
-
-        return str_contains($body, 'denyAccessUnlessGranted('.$this->writeConstant($module).')')
-            || str_contains($body, self::OWNER_CALL);
-    }
-
-    /**
-     * Тело метода без комментариев и строковых литералов: закомментированный или
-     * упомянутый в строке гейт гейтом не является.
-     */
-    private function executableBody(\ReflectionMethod $method): string
-    {
-        $file = $method->getFileName();
-        $start = $method->getStartLine();
-        $end = $method->getEndLine();
-        if (false === $file || false === $start || false === $end) {
-            return '';
-        }
-
-        $lines = explode("\n", (string) file_get_contents($file));
-        $source = implode("\n", \array_slice($lines, $start - 1, $end - $start + 1));
-
-        $out = '';
-        foreach (token_get_all('<?php '.$source) as $token) {
-            if (\is_array($token)) {
-                if (\in_array($token[0], [\T_COMMENT, \T_DOC_COMMENT, \T_CONSTANT_ENCAPSED_STRING, \T_ENCAPSED_AND_WHITESPACE], true)) {
-                    continue;
-                }
-                $out .= $token[1];
-                continue;
-            }
-            $out .= $token;
-        }
-
-        return $out;
     }
 }
