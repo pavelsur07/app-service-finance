@@ -457,9 +457,9 @@ force-push в shared-ветки                               — никогда
 Вызывать wrappers только в этих формах. Правила `permissions.allow` в `.claude/settings.local.json` написаны под них; любое отклонение — другой алиас, потерянный `sudo`, одинарные кавычки вместо двойных — под правило не подпадает и снова упирается в запрос разрешения.
 
 ```bash
-ssh -o BatchMode=yes vf-prod-codex "sudo /usr/local/bin/codex-psql-ro -c \"SELECT ...;\""
-ssh -o BatchMode=yes vf-prod-codex "sudo /usr/local/bin/codex-docker-ps"
-ssh -o BatchMode=yes vf-prod-codex "sudo /usr/local/bin/codex-console <allowed-command> ..."
+ssh -o BatchMode=yes vf-prod-codex "sudo /usr/local/bin/codex-psql-ro -c \"SELECT ...;\"" < /dev/null
+ssh -o BatchMode=yes vf-prod-codex "sudo /usr/local/bin/codex-docker-ps" < /dev/null
+ssh -o BatchMode=yes vf-prod-codex "sudo /usr/local/bin/codex-console <allowed-command> ..." < /dev/null
 ```
 
 Обязательные элементы формы:
@@ -467,7 +467,18 @@ ssh -o BatchMode=yes vf-prod-codex "sudo /usr/local/bin/codex-console <allowed-c
 - `-o BatchMode=yes` — без интерактивных запросов пароля;
 - удалённая команда в двойных кавычках, SQL внутри — в экранированных двойных;
 - обязательный префикс `sudo` и полный путь `/usr/local/bin/...`;
+- `< /dev/null` на конце — без закрытого stdin `codex-psql-ro` не отдаёт результат и вызов висит до таймаута;
 - допускается префикс `timeout <ms|s>` перед `ssh`.
+
+Если агент запущен в песочнице Bash, эти формы висят на connect молча: исходящий TCP глушится, и
+вместо `Connection refused` не приходит ничего до таймаута. Признак именно песочницы, а не прода —
+`ssh -o BatchMode=yes vf-prod-codex "true"` тоже не завершается. Лечится запуском конкретного
+wrapper-вызова вне песочницы (в Claude Code — `dangerouslyDisableSandbox` у этого вызова Bash);
+расширять права в `settings.local.json` для этого не нужно и нельзя.
+
+Диагностику `ssh -vv` снимать в файл, а не в пайп: при срабатывании `timeout` буферизованный вывод
+пайпа теряется и видно только `Terminated`. Вывод прогонять через
+`sed -E 's/([0-9]{1,3}\.){3}[0-9]{1,3}/<PROD-IP>/g'` — production IP не печатать и не коммитить.
 
 Модель разрешений: приоритет `deny > ask > allow`. Широкий паттерн в `ask` перекрывает любые `allow`, поэтому маски вида `Bash(*ssh*vf-prod*)` в `ask` запрещены — они накрывают и `vf-prod-codex`. Ограничения на стороне прода (непривилегированный пользователь, allowlist внутри wrapper, роль БД `codex_ro`) остаются единственной настоящей защитой; правила в settings только убирают лишние запросы.
 
