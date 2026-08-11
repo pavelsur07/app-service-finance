@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.77 / 2026-08-11
+> Версия: 1.78 / 2026-08-11
 
 ---
 
@@ -2370,6 +2370,12 @@ Login throttling: 5 попыток / 15 мин (`security.yaml`, firewall `main`
 
 **Write-гейты.** POST-only экшены — атрибутом `#[IsGranted(ModuleAccess::X_WRITE)]`;
 смешанные `GET+POST` — `denyAccessUnlessGranted()` в теле, иначе атрибут гейтил бы и чтение.
+Расставлены во всех пяти группах (Stage 3 — finance/deals/catalog/admin, Stage 4 — marketplace).
+Инвариант держит `ModuleWriteGateCoverageTest`: мутирующий экшен в покрытом модуле без гейта
+роняет тест. Роут без явного `methods:` в этих модулях — read-страница, гейта не требует.
+
+Пять контроллеров остаются под `ROLE_COMPANY_OWNER` вместо модульного гейта (Inventory snapshots,
+MarketplaceAds Ozon load/extract, MarketplaceAnalytics): owner-only строже, замена ослабила бы их.
 
 **Owner-only, а не `admin.write`.** Управление шаблонами (`CompanyRoleController`) и
 назначение шаблона участнику остаются под `assertOwner`. `module.admin.write` слабее:
@@ -2833,6 +2839,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.78 | 2026-08-11 | Company: write-гейты marketplace и статический инвариант покрытия мутирующих экшенов |
 | 1.77 | 2026-08-11 | Company: модульные роли доступа — Module/AccessLevel enum, fail-closed read-гейт, write-гейты finance/deals/catalog/admin, owner-only управление шаблонами, новый лендинг `/` |
 | 1.76 | 2026-08-10 | Cash/MCP: обычные root-категории ДДС, защищённые системные ветки и tri-state `parentId` для переноса в root |
 | 1.75 | 2026-08-09 | Cash: tenant-safe UI агрегата перевода, selector валюты ДДС и read-only verifier целостности |
