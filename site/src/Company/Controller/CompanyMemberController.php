@@ -11,6 +11,7 @@ use App\Company\Entity\CompanyMember;
 use App\Company\Entity\CompanyRole;
 use App\Company\Entity\User;
 use App\Company\Exception\CompanyRoleNotAvailableException;
+use App\Company\Exception\LastCompanyAdminException;
 use App\Company\Form\CompanyInviteOperatorType;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Repository\CompanyInviteRepository;
@@ -284,7 +285,7 @@ class CompanyMemberController extends AbstractController
             return $this->redirectToRoute('company_users_index');
         }
 
-        if (!$this->hasAnotherAdminAfterChange($company, $member, $newRole, $memberRepository)) {
+        if (!$this->adminWriteGuard->keepsAdminWriteAfterMemberChange($company, $member, $newRole)) {
             $this->addFlash('danger', 'Нельзя снять последний административный доступ у компании.');
 
             return $this->redirectToRoute('company_users_index');
@@ -294,6 +295,11 @@ class CompanyMemberController extends AbstractController
 
         try {
             $assignAccessRole($member, $newRole);
+        } catch (LastCompanyAdminException) {
+            // Конкурентное понижение между проверкой выше и записью под блокировкой.
+            $this->addFlash('danger', 'Нельзя снять последний административный доступ у компании.');
+
+            return $this->redirectToRoute('company_users_index');
         } catch (CompanyRoleNotAvailableException) {
             // Шаблон удалили между проверкой выше и назначением — отказ пришёл от FK.
             $this->addFlash('danger', 'Выбранный шаблон больше недоступен.');
@@ -500,28 +506,5 @@ class CompanyMemberController extends AbstractController
         $roleCompany = $role->getCompany();
 
         return null === $roleCompany || (string) $roleCompany->getId() === (string) $company->getId();
-    }
-
-    private function hasAnotherAdminAfterChange(
-        Company $company,
-        CompanyMember $targetMember,
-        CompanyRole $newRole,
-        CompanyMemberRepository $memberRepository,
-    ): bool {
-        if ($this->adminWriteGuard->roleGrantsAdminWrite($newRole)) {
-            return true;
-        }
-
-        $activeMembers = $memberRepository->findActiveByCompany($company);
-        foreach ($activeMembers as $member) {
-            if ((string) $member->getId() === (string) $targetMember->getId()) {
-                continue;
-            }
-            if ($this->adminWriteGuard->memberHasAdminWrite($member, $company)) {
-                return true;
-            }
-        }
-
-        return (string) $company->getUser()->getId() === (string) $targetMember->getUser()->getId();
     }
 }

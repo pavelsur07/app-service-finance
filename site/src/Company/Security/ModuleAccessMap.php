@@ -70,8 +70,10 @@ final class ModuleAccessMap
         UiModeController::class,    // переключение темы UI, личная настройка
         CompanyController::class,   // список/создание/переключение компаний; работает и без активной компании, свои owner-проверки
         HomeRedirectController::class, // роутер лендинга «/», доступен любому участнику; сам проверяет права через is_granted
-        // Общий company-scoped справочник (контрагенты), доступен любому участнику активной компании
-        // (форма сделки в Deals использует /api/counterparties/search); tenant-safe — компания из сессии.
+        // Общий company-scoped справочник контрагентов: его использует и форма сделки в Deals,
+        // и финансовые экраны, поэтому модульный read-гейт подписчика выбрал бы один модуль
+        // из двух. Exemption снимает только автоматический гейт: сам контроллер требует
+        // finance.read ИЛИ deals.read самостоятельно. Tenant-safe — компания из сессии.
         CounterpartySearchController::class,
     ];
 

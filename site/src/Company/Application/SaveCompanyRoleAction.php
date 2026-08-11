@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Company\Application;
 
+use App\Company\Domain\Service\CompanyAdminWriteGuard;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyRole;
 use App\Company\Exception\CompanyRoleNameAlreadyExistsException;
+use App\Company\Exception\LastCompanyAdminException;
 use App\Company\Repository\CompanyRoleRepository;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -23,6 +26,7 @@ final readonly class SaveCompanyRoleAction
     public function __construct(
         private CompanyRoleRepository $repository,
         private EntityManagerInterface $em,
+        private CompanyAdminWriteGuard $adminWriteGuard,
     ) {
     }
 
@@ -36,13 +40,22 @@ final readonly class SaveCompanyRoleAction
             throw new CompanyRoleNameAlreadyExistsException($role->getName());
         }
 
-        $role->setCompany($company);
-        $role->setPermissions($permissions);
-
-        $this->em->persist($role);
-
         try {
-            $this->em->flush();
+            $this->em->wrapInTransaction(function () use ($company, $role, $permissions): void {
+                // Та же граница сериализации, что и при назначении шаблона участнику:
+                // снятие admin:write у шаблона лишает прав сразу всех, кому он назначен.
+                $this->em->lock($company, LockMode::PESSIMISTIC_WRITE);
+
+                if (!$this->adminWriteGuard->keepsAdminWriteAfterRoleChange($company, $role, $permissions)) {
+                    throw new LastCompanyAdminException();
+                }
+
+                $role->setCompany($company);
+                $role->setPermissions($permissions);
+
+                $this->em->persist($role);
+                $this->em->flush();
+            });
         } catch (UniqueConstraintViolationException $exception) {
             // Гонка между проверкой выше и flush: последнее слово за частичным индексом
             // uniq_company_role_company_name. Ожидаемое условие, не инцидент.
