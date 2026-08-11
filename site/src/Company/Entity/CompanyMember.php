@@ -33,7 +33,10 @@ class CompanyMember
     private string $role;
 
     /**
-     * Шаблон модульного доступа. null — действует legacy-fallback по строковой роли.
+     * Шаблон модульного доступа. `null` означает отсутствие доступа: legacy-fallback
+     * по строковой роли снят в Stage 3, потому что был fail-open — обнуление role_id
+     * повышало права вместо их снятия. FK объявлен RESTRICT, чтобы назначенный шаблон
+     * нельзя было удалить и обнулить ссылку гонкой.
      */
     #[ORM\ManyToOne(targetEntity: CompanyRole::class)]
     #[ORM\JoinColumn(name: 'role_id', nullable: true, onDelete: 'RESTRICT')]
