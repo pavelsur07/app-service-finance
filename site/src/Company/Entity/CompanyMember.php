@@ -36,7 +36,7 @@ class CompanyMember
      * Шаблон модульного доступа. null — действует legacy-fallback по строковой роли.
      */
     #[ORM\ManyToOne(targetEntity: CompanyRole::class)]
-    #[ORM\JoinColumn(name: 'role_id', nullable: true, onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'role_id', nullable: true, onDelete: 'RESTRICT')]
     private ?CompanyRole $accessRole = null;
 
     #[ORM\Column(length: 32)]

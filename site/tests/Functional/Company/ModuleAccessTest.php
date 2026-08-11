@@ -194,7 +194,21 @@ final class ModuleAccessTest extends WebTestCaseBase
         $this->resetDb();
 
         [$company] = $this->seedCompanyWithOwner();
-        $memberUser = $this->seedMember($company, CompanyMember::ROLE_OPERATOR, null, CompanyMember::STATUS_DISABLED);
+
+        // Шаблон даёт полный доступ: отказ обязан прийти именно из-за статуса DISABLED,
+        // а не из-за отсутствия шаблона — иначе тест ничего не проверяет.
+        $fullAccess = new CompanyRole(
+            '55555555-5555-4555-8555-555555555555',
+            'Полный доступ (тест)',
+            [
+                Module::FINANCE->value => AccessLevel::WRITE->value,
+                Module::MARKETPLACE->value => AccessLevel::WRITE->value,
+            ],
+            $company,
+        );
+        $this->em()->persist($fullAccess);
+
+        $memberUser = $this->seedMember($company, CompanyMember::ROLE_OPERATOR, $fullAccess, CompanyMember::STATUS_DISABLED);
 
         $client->loginUser($memberUser);
         $this->setClientSessionValue($client, 'active_company_id', $company->getId());

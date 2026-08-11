@@ -21,6 +21,11 @@ use Doctrine\Migrations\AbstractMigration;
  * (CompanyRoleRepository::findOneByCompanyAndName), и правило должно совпадать с БД —
  * иначе гонка двух запросов с «Финансист»/«финансист» прошла бы индекс, а точный индекс
  * при одинаковых именах давал бы необработанный UniqueConstraintViolationException.
+ *
+ * ВНИМАНИЕ при генерации будущих миграций: частичный функциональный индекс не выражается
+ * атрибутами ORM, поэтому `doctrine:schema:update --dump-sql` и `migrations:diff` предлагают
+ * `DROP INDEX uniq_company_role_company_name`. Это ложное срабатывание — такую строку из
+ * сгенерированной миграции нужно удалять. Деплой использует migrations:migrate, не schema:update.
  */
 final class Version20260811140000 extends AbstractMigration
 {

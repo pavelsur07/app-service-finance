@@ -8,6 +8,7 @@ use App\Company\Application\DeleteCompanyRoleAction;
 use App\Company\Application\SaveCompanyRoleAction;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyRole;
+use App\Company\Exception\CompanyRoleInUseException;
 use App\Company\Exception\CompanyRoleNameAlreadyExistsException;
 use App\Company\Form\CompanyRoleType;
 use App\Company\Repository\CompanyInviteRepository;
@@ -200,7 +201,15 @@ final class CompanyRoleController extends AbstractController
         }
 
         $roleName = $role->getName();
-        $deleteRole($role);
+
+        try {
+            $deleteRole($role);
+        } catch (CompanyRoleInUseException) {
+            // Шаблон назначили между проверкой выше и удалением — отказ пришёл от FK.
+            $this->addFlash('danger', 'Нельзя удалить шаблон, назначенный участникам или активным приглашениям.');
+
+            return $this->redirectToRoute('company_role_index');
+        }
 
         $logger->info('Company role deleted', [
             'companyId' => (string) $company->getId(),

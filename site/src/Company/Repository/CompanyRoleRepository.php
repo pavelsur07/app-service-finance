@@ -44,10 +44,10 @@ class CompanyRoleRepository extends ServiceEntityRepository
      * Системные шаблоны (`company IS NULL`) в проверку не попадают: их имена
      * фиксированы seed'ом, а компания их не редактирует.
      *
-     * Сравнение регистронезависимое — намеренно строже, чем частичный unique index
-     * `uniq_company_role_company_name` (он точный). Направление безопасное: приложение
-     * отклоняет надмножество того, что отвергнет БД, поэтому 500 из-за ограничения
-     * не проскочит, а «Финансист»/«финансист» не расходятся визуально в списке.
+     * Сравнение регистронезависимое и совпадает с частичным индексом
+     * `uniq_company_role_company_name`, который построен по `(company_id, LOWER(name))`.
+     * Проверка нужна для понятного сообщения в форме; окончательное слово за индексом,
+     * его нарушение при гонке ловит SaveCompanyRoleAction.
      */
     public function findOneByCompanyAndName(Company $company, string $name, ?string $exceptRoleId = null): ?CompanyRole
     {

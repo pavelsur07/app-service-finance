@@ -56,7 +56,7 @@ class CompanyInvite
      * null — legacy-поведение, при приёме будет назначен системный «Полный доступ».
      */
     #[ORM\ManyToOne(targetEntity: CompanyRole::class)]
-    #[ORM\JoinColumn(name: 'role_id', nullable: true, onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'role_id', nullable: true, onDelete: 'RESTRICT')]
     private ?CompanyRole $accessRole = null;
 
     public function __construct(
