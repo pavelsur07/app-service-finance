@@ -2,10 +2,10 @@
 
 ## Current checkpoint
 
-**Phase:** Stage 3 — DONE
+**Phase:** Stage 4 — DONE
 **Status:** done
 **Stage base commit:** 32d181ae (Stage 2 committed and pushed)
-**Current Work item:** none (Stage 3 закрыт, REVIEW_GREEN)
+**Current Work item:** none (Stage 4 закрыт, REVIEW_GREEN)
 **Owner gate:** no
 
 ### Completed
@@ -19,6 +19,12 @@
   а легаси-дашборд переехал на `/finance` (см. plan.md, раздел «Решение по роутам лендинга»).
   `DashboardSnapshotService` сложил валюту ДДС от master и гейтинг от ветки; ключ кэша разделён
   по обоим измерениям.
+- Stage 4 — DONE: 64 гейта MARKETPLACE_WRITE (59 атрибутом, 5 рантайм), статический инвариант
+  ModuleWriteGateCoverageTest и поведенческий ModuleMixedRouteGateTest по 42 смешанным маршрутам.
+  Инварианты вскрыли 10 пропусков Stage 3 (модуль переводов и массовое удаление приехали с master
+  после черновика гейтов) — закрыты. Внешнее ревью: REVIEW_GREEN за 8 итераций, из них BLOCKER —
+  ROLE_COMPANY_OWNER оказалась глобальной ролью, а не владением активной компанией.
+  Stage Report: stages/stage-4.md.
 - Work items 3.3–3.8 — перенумерация миграций, write-гейты (89 шт.), unique index,
   flush в Action-слой, тесты. Внешнее ревью Codex: REVIEW_GREEN за 3 итерации
   (3+1 IMPORTANT и 2+3+2 MINOR — все исправлены). Stage Report: stages/stage-3.md.
@@ -49,7 +55,8 @@ Merge `bc030ed4` — resolved:
 - `make site-test-db-rebuild` — OK, 236 миграций, до `Version20260811150000`.
   Миграции ветки перенумерованы выше задеплоенной на прод `Version20260809120000`.
 - `make site-test-unit` — OK (1874 tests, 10765 assertions).
-- `composer test:functional` — OK (485 tests, 2855 assertions).
+- `composer test:functional` — OK (489 tests, 2864 assertions).
+- `composer test:integration` — OK (967 tests, 4494 assertions).
 - `doctrine:schema:update --dump-sql --env=test` — по FK `role_id` расхождений нет.
   Остаются pre-existing drift по типам timestamp и ложный `DROP INDEX` функционального индекса.
 - `php-cs-fixer` точечно по файлам Stage 3 — чисто. Репозиторный `cs:check` красный по baseline.
@@ -60,6 +67,8 @@ Merge `bc030ed4` — resolved:
 ### Review status
 
 - Stage 1: REVIEW_GREEN (4 итерации). Stage 2: REVIEW_GREEN (7 итераций).
+- Stage 4: REVIEW_GREEN (8 итераций). 1 BLOCKER, 16 IMPORTANT, 6 MINOR — исправлены;
+  одно частичное отклонение с обоснованием (fixtures для параметризованных маршрутов → follow-up).
 - Stage 3: REVIEW_GREEN (3 итерации, Codex CLI 0.147.0). 4 IMPORTANT и 7 MINOR подтверждены
   и исправлены, отклонённых находок нет. Ограничение: песочница Codex не запускалась
   (`bwrap: loopback`), дифф и контекст передавались через stdin.
@@ -67,10 +76,11 @@ Merge `bc030ed4` — resolved:
 
 ### Exact next action
 
-- Stage 4: write-гейты marketplace (Marketplace, MarketplaceAds, MarketplaceAnalytics, Inventory,
-  Ingestion, MoySklad), включая подпапки `Api/` и `Marketplace/Controller/Inventory`.
-  Work item 4.4 снят — master удалил DebugWipeCompanyDataController.
-- Затем Stage 5: сайдбары по `is_granted('module.<group>.read')`.
+- Stage 5: скрывать разделы в `_sidebar.html.twig`, `_sidebar_marketplace.html.twig`
+  и `app/_shell/sidebar.html.twig` по `is_granted('module.<group>.read')`; функциональный тест,
+  что у read-only участника пункты недоступных модулей не отображаются.
+  Гейтинг дашборд-снапшота уже сделан в Stage 2 (F2).
+- Затем Final Release Gate: handoff, финальные review, Draft PR к Владельцу.
 
 ### Files to inspect first on resume
 
