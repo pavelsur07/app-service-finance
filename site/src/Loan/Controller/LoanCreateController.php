@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Loan\Controller;
 
+use App\Company\Security\ModuleAccess;
 use App\Finance\Facade\PLCategoryFacade;
 use App\Loan\Application\CreateLoanAction;
 use App\Loan\Entity\Loan;
 use App\Loan\Form\LoanType;
-use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;

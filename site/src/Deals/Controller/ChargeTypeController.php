@@ -3,11 +3,11 @@
 namespace App\Deals\Controller;
 
 use App\Company\Entity\User;
+use App\Company\Security\ModuleAccess;
 use App\Deals\DTO\ChargeTypeFormData;
 use App\Deals\Exception\AccessDenied as DealAccessDenied;
 use App\Deals\Exception\ValidationFailed;
 use App\Deals\Form\ChargeTypeType;
-use App\Company\Security\ModuleAccess;
 use App\Deals\Repository\ChargeTypeRepository;
 use App\Deals\Service\ChargeTypeManager;
 use App\Shared\Service\ActiveCompanyService;

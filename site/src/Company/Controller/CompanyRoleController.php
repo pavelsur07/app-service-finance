@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Company\Controller;
 
+use App\Company\Application\DeleteCompanyRoleAction;
+use App\Company\Application\SaveCompanyRoleAction;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyRole;
+use App\Company\Exception\CompanyRoleNameAlreadyExistsException;
 use App\Company\Form\CompanyRoleType;
 use App\Company\Repository\CompanyInviteRepository;
 use App\Company\Repository\CompanyMemberRepository;
@@ -14,6 +17,7 @@ use App\Company\Security\Module;
 use App\Shared\Service\ActiveCompanyService;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Form\FormError;
 use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -48,7 +52,7 @@ final class CompanyRoleController extends AbstractController
     public function new(
         Request $request,
         ActiveCompanyService $activeCompanyService,
-        CompanyRoleRepository $roleRepository,
+        SaveCompanyRoleAction $saveRole,
         LoggerInterface $logger,
     ): Response {
         $company = $activeCompanyService->getActiveCompany();
@@ -61,9 +65,18 @@ final class CompanyRoleController extends AbstractController
         if ($form->isSubmitted() && $form->isValid()) {
             /** @var CompanyRole $role */
             $role = $form->getData();
-            $role->setCompany($company);
-            $role->setPermissions($this->collectPermissionsFromForm($form));
-            $roleRepository->save($role);
+
+            try {
+                $saveRole($company, $role, $this->collectPermissionsFromForm($form));
+            } catch (CompanyRoleNameAlreadyExistsException) {
+                $form->get('name')->addError(new FormError('Шаблон с таким названием уже есть.'));
+
+                return $this->render('company/role/form.html.twig', [
+                    'company' => $company,
+                    'form' => $form->createView(),
+                    'role' => null,
+                ]);
+            }
 
             $logger->info('Company role created', [
                 'companyId' => (string) $company->getId(),
@@ -92,6 +105,7 @@ final class CompanyRoleController extends AbstractController
         Request $request,
         ActiveCompanyService $activeCompanyService,
         CompanyRoleRepository $roleRepository,
+        SaveCompanyRoleAction $saveRole,
         LoggerInterface $logger,
     ): Response {
         $company = $activeCompanyService->getActiveCompany();
@@ -110,8 +124,17 @@ final class CompanyRoleController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $role->setPermissions($this->collectPermissionsFromForm($form));
-            $roleRepository->save($role);
+            try {
+                $saveRole($company, $role, $this->collectPermissionsFromForm($form));
+            } catch (CompanyRoleNameAlreadyExistsException) {
+                $form->get('name')->addError(new FormError('Шаблон с таким названием уже есть.'));
+
+                return $this->render('company/role/form.html.twig', [
+                    'company' => $company,
+                    'form' => $form->createView(),
+                    'role' => $role,
+                ]);
+            }
 
             $logger->info('Company role updated', [
                 'companyId' => (string) $company->getId(),
@@ -142,6 +165,7 @@ final class CompanyRoleController extends AbstractController
         CompanyRoleRepository $roleRepository,
         CompanyMemberRepository $memberRepository,
         CompanyInviteRepository $inviteRepository,
+        DeleteCompanyRoleAction $deleteRole,
         LoggerInterface $logger,
     ): Response {
         $company = $activeCompanyService->getActiveCompany();
@@ -176,7 +200,7 @@ final class CompanyRoleController extends AbstractController
         }
 
         $roleName = $role->getName();
-        $roleRepository->remove($role);
+        $deleteRole($role);
 
         $logger->info('Company role deleted', [
             'companyId' => (string) $company->getId(),

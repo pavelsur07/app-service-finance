@@ -51,12 +51,12 @@ final class CompanyRoleMigrationParityTest extends TestCase
             "/\\('([0-9a-f-]+)',\\s*NULL,\\s*'([^']+)',\\s*'([^']+)'/",
             $valuesBlock,
             $rows,
-            PREG_SET_ORDER,
+            \PREG_SET_ORDER,
         );
 
         $result = [];
         foreach ($rows as $row) {
-            $permissions = json_decode($row[3], true, 512, JSON_THROW_ON_ERROR);
+            $permissions = json_decode($row[3], true, 512, \JSON_THROW_ON_ERROR);
             self::assertIsArray($permissions);
 
             $result[$row[1]] = [

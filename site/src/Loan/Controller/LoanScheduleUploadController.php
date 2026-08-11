@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Loan\Controller;
 
+use App\Company\Security\ModuleAccess;
 use App\Loan\Application\UploadLoanScheduleAction;
 use App\Loan\Entity\Loan;
 use App\Loan\Form\LoanScheduleUploadType;
 use App\Loan\Repository\LoanRepository;
-use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\UploadedFile;

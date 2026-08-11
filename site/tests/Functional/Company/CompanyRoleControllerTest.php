@@ -4,17 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Company;
 
-use App\Company\Entity\CompanyInvite;
-use App\Company\Entity\CompanyMember;
 use App\Company\Entity\CompanyRole;
-use App\Company\Repository\CompanyInviteRepository;
-use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Repository\CompanyRoleRepository;
 use App\Company\Security\AccessLevel;
 use App\Company\Security\Module;
 use App\Company\Security\SystemCompanyRoles;
 use App\Tests\Builders\Company\CompanyBuilder;
-use App\Tests\Builders\Company\CompanyInviteBuilder;
 use App\Tests\Builders\Company\CompanyMemberBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Db\SystemCompanyRolesSeeder;
@@ -52,7 +47,7 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
         self::assertSelectorTextContains('h2.page-title', 'Шаблоны доступа');
         self::assertSelectorTextContains('table', 'Полный доступ');
 
-        $companyRoleTable = $crawler->filter('.card')->reduce(function ($node) {
+        $companyRoleTable = $crawler->filter('.card')->reduce(static function ($node) {
             return str_contains((string) $node->filter('.card-title')->text(), 'Шаблоны компании');
         })->filter('table');
         self::assertCount(1, $companyRoleTable);
@@ -425,6 +420,56 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
         /** @var CompanyRoleRepository $roleRepository */
         $roleRepository = self::getContainer()->get(CompanyRoleRepository::class);
         self::assertCount(0, $roleRepository->findBy(['company' => $company]));
+    }
+
+    public function testOwnerCannotCreateRoleWithDuplicateName(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
+
+        $existing = new CompanyRole(
+            '88888888-8888-4888-8888-888888888888',
+            'Бухгалтер',
+            [Module::FINANCE->value => AccessLevel::WRITE->value],
+        );
+        $existing->setCompany($company);
+
+        $em = $this->em();
+        $em->persist($owner);
+        $em->persist($company);
+        $em->persist($existing);
+        $em->flush();
+
+        $client->loginUser($owner);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+
+        $crawler = $client->request('GET', '/company/roles/new');
+        $token = (string) $crawler->filter('input[name="company_role[_token]"]')->attr('value');
+
+        // Регистр намеренно другой: проверка регистронезависимая, строже точного индекса.
+        $client->request('POST', '/company/roles/create', [
+            'company_role' => [
+                'name' => 'бухгалтер',
+                'permissions' => [
+                    Module::FINANCE->value => AccessLevel::READ->value,
+                    Module::MARKETPLACE->value => AccessLevel::NONE->value,
+                    Module::DEALS->value => AccessLevel::NONE->value,
+                    Module::CATALOG->value => AccessLevel::NONE->value,
+                    Module::ADMIN->value => AccessLevel::NONE->value,
+                ],
+                '_token' => $token,
+            ],
+        ]);
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.invalid-feedback', 'Шаблон с таким названием уже есть');
+
+        /** @var CompanyRoleRepository $roleRepository */
+        $roleRepository = self::getContainer()->get(CompanyRoleRepository::class);
+        self::assertCount(1, $roleRepository->findBy(['company' => $company]));
     }
 
     public function testOwnerCannotCreateRoleWithOverlongName(): void

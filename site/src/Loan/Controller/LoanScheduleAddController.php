@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Loan\Controller;
 
+use App\Company\Security\ModuleAccess;
 use App\Loan\Application\AddLoanScheduleItemAction;
 use App\Loan\Entity\Loan;
 use App\Loan\Entity\LoanPaymentSchedule;
 use App\Loan\Form\LoanPaymentScheduleType;
 use App\Loan\Repository\LoanPaymentScheduleRepository;
-use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;

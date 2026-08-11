@@ -4,6 +4,7 @@ namespace App\Deals\Controller;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
+use App\Company\Security\ModuleAccess;
 use App\Deals\DTO\CreateDealFormData;
 use App\Deals\DTO\DealAdjustmentFormData;
 use App\Deals\DTO\DealChargeFormData;
@@ -11,7 +12,6 @@ use App\Deals\DTO\DealItemFormData;
 use App\Deals\Entity\Deal;
 use App\Deals\Enum\DealChannel;
 use App\Deals\Enum\DealStatus;
-use App\Company\Security\ModuleAccess;
 use App\Deals\Exception\AccessDenied as DealAccessDenied;
 use App\Deals\Exception\DealNotFound;
 use App\Deals\Exception\InvalidDealState;

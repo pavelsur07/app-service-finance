@@ -56,7 +56,6 @@ class CounterpartyController extends AbstractController
             $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
         }
 
-
         $form = $this->createForm(CounterpartyType::class, new CounterpartyFormData());
         $form->handleRequest($request);
 

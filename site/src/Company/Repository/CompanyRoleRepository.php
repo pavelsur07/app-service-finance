@@ -39,15 +39,29 @@ class CompanyRoleRepository extends ServiceEntityRepository
             ->getResult();
     }
 
-    public function save(CompanyRole $role): void
+    /**
+     * Шаблон компании с таким именем, кроме самого редактируемого.
+     * Системные шаблоны (`company IS NULL`) в проверку не попадают: их имена
+     * фиксированы seed'ом, а компания их не редактирует.
+     *
+     * Сравнение регистронезависимое — намеренно строже, чем частичный unique index
+     * `uniq_company_role_company_name` (он точный). Направление безопасное: приложение
+     * отклоняет надмножество того, что отвергнет БД, поэтому 500 из-за ограничения
+     * не проскочит, а «Финансист»/«финансист» не расходятся визуально в списке.
+     */
+    public function findOneByCompanyAndName(Company $company, string $name, ?string $exceptRoleId = null): ?CompanyRole
     {
-        $this->getEntityManager()->persist($role);
-        $this->getEntityManager()->flush();
-    }
+        $qb = $this->createQueryBuilder('r')
+            ->andWhere('r.company = :company')
+            ->andWhere('LOWER(r.name) = LOWER(:name)')
+            ->setParameter('company', $company)
+            ->setParameter('name', $name)
+            ->setMaxResults(1);
 
-    public function remove(CompanyRole $role): void
-    {
-        $this->getEntityManager()->remove($role);
-        $this->getEntityManager()->flush();
+        if (null !== $exceptRoleId) {
+            $qb->andWhere('r.id != :exceptId')->setParameter('exceptId', $exceptRoleId);
+        }
+
+        return $qb->getQuery()->getOneOrNullResult();
     }
 }

@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Catalog\Controller;
 
 use App\Catalog\Application\GetProductAction;
-use App\Company\Security\ModuleAccess;
 use App\Catalog\Application\UpdateProductAction;
 use App\Catalog\DTO\UpdateProductCommand;
 use App\Catalog\Form\ProductType;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;

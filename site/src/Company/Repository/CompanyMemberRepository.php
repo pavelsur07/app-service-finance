@@ -123,12 +123,6 @@ class CompanyMemberRepository extends ServiceEntityRepository
         return $result;
     }
 
-    public function save(CompanyMember $member): void
-    {
-        $this->getEntityManager()->persist($member);
-        $this->getEntityManager()->flush();
-    }
-
     public function findFirstActiveCompanyForUser(User $user): ?Company
     {
         $companyMember = $this->createQueryBuilder('companyMember')

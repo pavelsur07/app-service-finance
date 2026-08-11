@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Catalog\Controller;
 
 use App\Catalog\Application\SetPurchasePriceAction;
-use App\Company\Security\ModuleAccess;
 use App\Catalog\DTO\SetPurchasePriceCommand;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -29,13 +29,13 @@ final class ProductPurchasePriceSetController extends AbstractController
         $company = $companyService->getActiveCompany();
 
         $command = new SetPurchasePriceCommand();
-        $command->companyId    = $company->getId();
-        $command->productId    = $id;
+        $command->companyId = $company->getId();
+        $command->productId = $id;
         $command->effectiveFrom = new \DateTimeImmutable((string) ($payload['effectiveFrom'] ?? 'now'));
-        $command->priceAmount  = (string) ($payload['priceAmount'] ?? '0');
-        $command->currency     = (string) ($payload['currency'] ?? 'RUB');
-        $command->note         = isset($payload['note']) ? (string) $payload['note'] : null;
-        $command->userId       = isset($payload['userId']) ? (string) $payload['userId'] : null;
+        $command->priceAmount = (string) ($payload['priceAmount'] ?? '0');
+        $command->currency = (string) ($payload['currency'] ?? 'RUB');
+        $command->note = isset($payload['note']) ? (string) $payload['note'] : null;
+        $command->userId = isset($payload['userId']) ? (string) $payload['userId'] : null;
 
         $priceId = $setPurchasePriceAction($command);
 

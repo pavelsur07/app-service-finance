@@ -2,6 +2,7 @@
 
 namespace App\Company\Controller;
 
+use App\Company\Application\AssignCompanyMemberAccessRoleAction;
 use App\Company\Application\DisableCompanyMemberAction;
 use App\Company\Application\EnableCompanyMemberAction;
 use App\Company\Entity\Company;
@@ -246,6 +247,7 @@ class CompanyMemberController extends AbstractController
         ActiveCompanyService $activeCompanyService,
         CompanyMemberRepository $memberRepository,
         CompanyRoleRepository $roleRepository,
+        AssignCompanyMemberAccessRoleAction $assignAccessRole,
         LoggerInterface $logger,
     ): Response {
         $company = $activeCompanyService->getActiveCompany();
@@ -284,8 +286,7 @@ class CompanyMemberController extends AbstractController
         }
 
         $oldRole = $member->getAccessRole();
-        $member->setAccessRole($newRole);
-        $memberRepository->save($member);
+        $assignAccessRole($member, $newRole);
 
         $logger->info('Company member access role changed', [
             'companyId' => (string) $company->getId(),
@@ -439,6 +440,7 @@ class CompanyMemberController extends AbstractController
         CompanyMemberRepository $memberRepository,
         ActiveCompanyService $activeCompanyService,
         CompanyRoleRepository $roleRepository,
+        AssignCompanyMemberAccessRoleAction $assignAccessRole,
         LoggerInterface $logger,
     ): Response {
         $this->activateLegacyCompany($companyId, $request, $companyRepository, $memberRepository);
@@ -449,6 +451,7 @@ class CompanyMemberController extends AbstractController
             $activeCompanyService,
             $memberRepository,
             $roleRepository,
+            $assignAccessRole,
             $logger,
         );
     }
