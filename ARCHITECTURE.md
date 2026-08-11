@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.78 / 2026-08-11
+> Версия: 1.79 / 2026-08-11
 
 ---
 
@@ -2405,6 +2405,14 @@ read-страница обязана объявлять `methods: ['GET']`. Ма
 модуль. Финансовый дашборд — `/finance` (`app_finance_index`), React-пилот — `/dashboard`
 (`app_dashboard_index`).
 
+**Меню.** `partials/_sidebar.html.twig` и вложенные `_sidebar_marketplace` / `_sidebar_report`
+скрывают разделы по `is_granted('module.<group>.read')`. Однородные блоки закрыты целиком,
+смешанные — на двух уровнях: блок показывается при доступе хотя бы к одному из своих модулей,
+а пункты внутри гейтятся каждый под свой («Справочники» = finance + catalog, «Интеграции» =
+admin + finance + marketplace). «Главная» не гейтится — за ней exempt-редирект.
+Админка использует собственный `admin/partials/_sidebar.html.twig` и модульными гейтами
+не затронута. Инвариант: `SidebarModuleVisibilityTest`.
+
 **Actions** (`src/Company/Application/`): `SaveCompanyRoleAction` (создание/изменение +
 проверка уникальности имени), `DeleteCompanyRoleAction`, `AssignCompanyMemberAccessRoleAction`.
 `flush()` живёт только в них — `CompanyRoleRepository`/`CompanyMemberRepository` его не вызывают.
@@ -2848,6 +2856,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.79 | 2026-08-11 | Company: меню скрывает разделы недоступных модулей — модульные роли доступа закрыты по всем этапам |
 | 1.78 | 2026-08-11 | Company: write-гейты marketplace и статический инвариант покрытия мутирующих экшенов |
 | 1.77 | 2026-08-11 | Company: модульные роли доступа — Module/AccessLevel enum, fail-closed read-гейт, write-гейты finance/deals/catalog/admin, owner-only управление шаблонами, новый лендинг `/` |
 | 1.76 | 2026-08-10 | Cash/MCP: обычные root-категории ДДС, защищённые системные ветки и tri-state `parentId` для переноса в root |
