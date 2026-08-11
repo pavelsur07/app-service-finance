@@ -1,18 +1,21 @@
 # Production logging and operational artifacts
 
-## Manual production gates
+## Production gates
 
-Pushes to `master` build and publish application images but do not change the
-main application production environment. The separate TG gateway workflow keeps
-its own path-scoped deployment behavior. Run the `🚀 Deploy to Production`
-workflow manually and select one gate at a time:
+Pushes to `master` with application or landing changes build a complete set of
+SHA-pinned images and automatically roll out web, workers and scheduler after
+the required checks pass. Pull requests and documentation-only pushes do not
+change production. The separate TG gateway workflow keeps its own path-scoped
+deployment behavior.
 
-1. Select `deploy` on the target `master` ref to build the images and roll out
-   web, workers and scheduler. Images are pinned to the selected commit SHA;
-   this gate never runs Doctrine migrations.
+The `🚀 Deploy to Production` workflow also keeps two manual actions, `deploy`
+and `migrations`. The complete operational sequence is:
+
+1. Select `deploy` on the target `master` ref only when an explicit redeploy is
+   required. It never runs Doctrine migrations.
 2. Complete the task-specific read-only acceptance and backup requirements.
-   Code running between the gates must remain compatible with the old schema;
-   use expand-style migrations when this cannot be guaranteed.
+   Code running before the migration gate must remain compatible with the old
+   schema; use expand-style migrations when this cannot be guaranteed.
 3. Before another commit reaches `master`, select `migrations` on the unchanged
    `master` ref only after separate owner approval. This gate verifies that
    `site-php-fpm` runs that exact commit before applying Doctrine migrations.

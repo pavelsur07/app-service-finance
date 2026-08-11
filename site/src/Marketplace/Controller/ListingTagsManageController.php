@@ -42,7 +42,7 @@ final class ListingTagsManageController extends AbstractController
 
         return $this->render('marketplace/listings/tags.html.twig', [
             'tags' => $tags,
-            'active_tab' => 'listings',
+            'active_tab' => 'listings_tags',
         ]);
     }
 }

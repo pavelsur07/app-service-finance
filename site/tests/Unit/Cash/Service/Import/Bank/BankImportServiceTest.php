@@ -22,13 +22,15 @@ use App\Company\Entity\ProjectDirection;
 use App\Company\Entity\User;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
 
 final class BankImportServiceTest extends TestCase
 {
-    public function testProviderImportCreatesTransactionWithSystemResponsibilityPair(): void
+    #[DataProvider('currencyProvider')]
+    public function testProviderImportValidatesCurrencyAgainstAccount(string $currency, int $expectedTransactions): void
     {
         $company = new Company(Uuid::uuid4()->toString(), new User(Uuid::uuid4()->toString()));
         $account = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Основной', 'RUB');
@@ -87,7 +89,7 @@ final class BankImportServiceTest extends TestCase
                         'operationDate' => '2026-07-18T10:00:00+00:00',
                         'amount' => [
                             'amount' => 1000,
-                            'currencyName' => 'RUB',
+                            'currencyName' => $currency,
                         ],
                         'direction' => 'CREDIT',
                         'paymentPurpose' => 'Bank import',
@@ -121,9 +123,21 @@ final class BankImportServiceTest extends TestCase
 
         $service->importCompany('alfa', $company, $connection, $provider);
 
-        self::assertCount(1, $persistedTransactions);
-        self::assertSame($projectId, $persistedTransactions[0]->getProjectDirection()?->getId());
-        self::assertSame($centerId, $persistedTransactions[0]->getResponsibilityCenterId());
+        self::assertCount($expectedTransactions, $persistedTransactions);
+        if (1 === $expectedTransactions) {
+            self::assertSame($projectId, $persistedTransactions[0]->getProjectDirection()?->getId());
+            self::assertSame($centerId, $persistedTransactions[0]->getResponsibilityCenterId());
+        }
+    }
+
+    /**
+     * @return iterable<string, array{string, int}>
+     */
+    public static function currencyProvider(): iterable
+    {
+        yield 'normalized matching RUB' => [' rub ', 1];
+        yield 'supported mismatch USD' => ['USD', 0];
+        yield 'unsupported ABC' => ['ABC', 0];
     }
 
     private function createResolver(string $projectId, string $centerId): CashTransactionResponsibilityCenterResolver

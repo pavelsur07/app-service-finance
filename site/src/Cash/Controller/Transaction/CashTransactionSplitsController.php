@@ -12,6 +12,7 @@ use App\Cash\Entity\Transaction\CashTransactionSplit;
 use App\Cash\Form\Transaction\CashTransactionSplitsType;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
+use App\Cash\Repository\Transfer\CashTransferRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -28,6 +29,7 @@ final class CashTransactionSplitsController extends AbstractController
         Request $request,
         ActiveCompanyService $companyService,
         CashTransactionRepository $transactionRepository,
+        CashTransferRepository $transferRepository,
         CashflowCategoryRepository $categoryRepository,
         SaveCashTransactionSplitsAction $saveSplits,
     ): Response {
@@ -36,6 +38,12 @@ final class CashTransactionSplitsController extends AbstractController
         $transaction = $transactionRepository->findOneByIdAndCompanyId($id, (string) $company->getId());
         if (!$transaction instanceof CashTransaction) {
             throw $this->createNotFoundException();
+        }
+        $transfer = $transferRepository->findOneByTransactionAndCompanyId($transaction, $company->getId());
+        if (null !== $transfer) {
+            $this->addFlash('danger', 'Разбивку операции перевода нельзя изменить отдельно.');
+
+            return $this->redirectToRoute('cash_transfer_show', ['id' => $transfer->getId()]);
         }
 
         $categories = $categoryRepository->findTreeByCompany($company);

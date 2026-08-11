@@ -64,6 +64,17 @@ final class McpServeCommandTest extends TestCase
         }
     }
 
+    public function testCategoryUpsertAdvertisesExplicitRootDetach(): void
+    {
+        $responses = $this->serve([['id' => 1, 'method' => 'tools/list']], allowWrite: true);
+        $tools = array_column($responses[0]['result']['tools'], null, 'name');
+        $properties = $tools['cash_category_upsert']['inputSchema']['properties'];
+
+        self::assertSame(['string', 'null'], $properties['parentId']['type']);
+        self::assertStringContainsString('root', $properties['parentId']['description']);
+        self::assertSame(['OPERATING', 'INVESTING', 'FINANCING'], $properties['flowKind']['enum']);
+    }
+
     public function testUnknownToolIsRejectedWithoutKillingSession(): void
     {
         $responses = $this->serve([

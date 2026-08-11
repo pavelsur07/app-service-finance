@@ -59,7 +59,7 @@ class CashflowCategory
     #[ORM\ManyToOne(targetEntity: self::class, inversedBy: 'children')]
     private ?self $parent = null;
 
-    #[ORM\OneToMany(targetEntity: self::class, mappedBy: 'parent', orphanRemoval: true)]
+    #[ORM\OneToMany(targetEntity: self::class, mappedBy: 'parent')]
     #[ORM\OrderBy(['sort' => 'ASC'])]
     private Collection $children;
 
@@ -171,6 +171,10 @@ class CashflowCategory
             throw new \DomainException('Системную категорию нельзя перемещать.');
         }
 
+        if ($parent === $this || (null !== $parent && $parent->isDescendantOf($this))) {
+            throw new \DomainException('Нельзя выбрать родителем текущую категорию или её потомка.');
+        }
+
         $this->parent?->children->removeElement($this);
         $this->parent = $parent;
 
@@ -189,6 +193,28 @@ class CashflowCategory
     public function getChildren(): Collection
     {
         return $this->children;
+    }
+
+    public function isDescendantOf(self $category): bool
+    {
+        $parent = $this->parent;
+        $visited = [];
+
+        while (null !== $parent) {
+            $objectId = spl_object_id($parent);
+            if (isset($visited[$objectId])) {
+                throw new \DomainException('В дереве категорий обнаружен цикл.');
+            }
+            $visited[$objectId] = true;
+
+            if ($parent === $category) {
+                return true;
+            }
+
+            $parent = $parent->parent;
+        }
+
+        return false;
     }
 
     public function getCompany(): Company
@@ -311,9 +337,26 @@ class CashflowCategory
 
     public function setFlowKind(CashflowFlowKind $kind): self
     {
+        if ($this->isSystem && $this->flowKind !== $kind) {
+            throw new \DomainException('Вид деятельности системной категории нельзя изменить.');
+        }
+
         $this->flowKind = $kind;
 
         return $this;
+    }
+
+    public function acceptsRegularChildren(): bool
+    {
+        if (!$this->isSystem) {
+            return CashflowFlowKind::TECHNICAL !== $this->getEffectiveFlowKind();
+        }
+
+        return in_array($this->systemCode, [
+            self::CODE_OPERATING,
+            self::CODE_FINANCING,
+            self::CODE_INVESTING,
+        ], true);
     }
 
     public function getEffectiveFlowKind(): CashflowFlowKind
@@ -361,6 +404,10 @@ class CashflowCategory
     {
         if ($this->isSystem) {
             throw new \DomainException('Системную категорию нельзя удалить.');
+        }
+
+        if (!$this->children->isEmpty()) {
+            throw new \DomainException('Нельзя удалить категорию, у которой есть дочерние статьи.');
         }
     }
 

@@ -15,6 +15,7 @@ use App\Analytics\Application\Widget\TopPnlWidgetBuilder;
 use App\Analytics\Domain\Period;
 use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
 use App\Analytics\Infrastructure\Telemetry\SnapshotTelemetry;
+use App\Cash\Enum\FiatCurrency;
 use App\Company\Entity\Company;
 use App\Company\Security\AccessLevel;
 use App\Company\Security\Module;
@@ -45,49 +46,43 @@ final class DashboardSnapshotService
     ) {
     }
 
-    public function getSnapshot(Company $company, Period $period, bool $forSystemContext = false): SnapshotResponse
-    {
+    public function getSnapshot(
+        Company $company,
+        Period $period,
+        FiatCurrency $cashCurrency = FiatCurrency::RUB,
+        bool $forSystemContext = false,
+    ): SnapshotResponse {
         $hasFinanceRead = $forSystemContext || $this->moduleAccessResolver->allows(Module::FINANCE, AccessLevel::READ);
 
         $telemetry = new SnapshotTelemetry();
         $telemetry->start(SnapshotTelemetry::globalTimerName());
         $cacheHit = true;
-        $snapshotVersion = $this->snapshotCacheInvalidator->resolveVersionForCompany($company);
+        $cacheKey = $this->buildCacheKey($company, $period, $cashCurrency, $hasFinanceRead);
 
-        $cacheKey = sprintf(
-            'dashboard_v1_snapshot_%s_%s_%s_%s_%s_%s',
-            (string) $company->getId(),
-            $snapshotVersion,
-            $period->getFrom()->format('Y-m-d'),
-            $period->getTo()->format('Y-m-d'),
-            self::VAT_MODE_EXCLUDE,
-            $hasFinanceRead ? 'finance_1' : 'finance_0',
-        );
-
-        $snapshot = $this->cache->get($cacheKey, function (ItemInterface $item) use ($company, $period, $hasFinanceRead, $telemetry, &$cacheHit) {
+        $snapshot = $this->cache->get($cacheKey, function (ItemInterface $item) use ($company, $period, $cashCurrency, $hasFinanceRead, $telemetry, &$cacheHit) {
             $cacheHit = false;
             $item->expiresAfter(self::SNAPSHOT_TTL_SECONDS);
 
             if (!$hasFinanceRead) {
-                return $this->buildEmptySnapshotResponse($company, $period);
+                return $this->buildEmptySnapshotResponse($company, $period, $cashCurrency);
             }
 
             $prevPeriod = $period->prevPeriod();
 
             $telemetry->start('free_cash');
-            $freeCash = $this->freeCashWidgetBuilder->build($company, $period);
+            $freeCash = $this->freeCashWidgetBuilder->build($company, $period, $cashCurrency);
             $telemetry->stop('free_cash');
 
             $telemetry->start('inflow');
-            $inflow = $this->inflowWidgetBuilder->build($company, $period);
+            $inflow = $this->inflowWidgetBuilder->build($company, $period, $cashCurrency);
             $telemetry->stop('inflow');
 
             $telemetry->start('outflow');
-            $outflow = $this->outflowWidgetBuilder->build($company, $period, $inflow->toArray());
+            $outflow = $this->outflowWidgetBuilder->build($company, $period, $inflow->toArray(), $cashCurrency);
             $telemetry->stop('outflow');
 
             $telemetry->start('cashflow_split');
-            $cashflowSplit = $this->cashflowSplitWidgetBuilder->build($company, $period);
+            $cashflowSplit = $this->cashflowSplitWidgetBuilder->build($company, $period, $cashCurrency);
             $telemetry->stop('cashflow_split');
 
             $telemetry->start('revenue');
@@ -99,7 +94,7 @@ final class DashboardSnapshotService
             $telemetry->stop('profit');
 
             $telemetry->start('top_cash');
-            $topCash = $this->topCashWidgetBuilder->build($company, $period);
+            $topCash = $this->topCashWidgetBuilder->build($company, $period, $cashCurrency);
             $telemetry->stop('top_cash');
 
             $telemetry->start('top_pnl');
@@ -118,6 +113,7 @@ final class DashboardSnapshotService
                     prevTo: $prevPeriod->getTo(),
                     vatMode: self::VAT_MODE_EXCLUDE,
                     lastUpdatedAt: $lastUpdatedAt,
+                    cashCurrency: $cashCurrency->value,
                 ),
                 $freeCash,
                 $inflow,
@@ -139,6 +135,7 @@ final class DashboardSnapshotService
             'company_id' => (string) $company->getId(),
             'from' => $period->getFrom()->format('Y-m-d'),
             'to' => $period->getTo()->format('Y-m-d'),
+            'cash_currency' => $cashCurrency->value,
             'cache_hit' => $cacheHit,
             'total_duration_ms' => $durations['total_duration_ms'],
             'widgets_duration_ms' => $durations['widgets_duration_ms'],
@@ -147,7 +144,11 @@ final class DashboardSnapshotService
         return $snapshot;
     }
 
-    private function buildEmptySnapshotResponse(Company $company, Period $period): SnapshotResponse
+    /**
+     * Пустой снапшот для роли без доступа к финансам: контекст периода отдаём,
+     * денежные виджеты — нет.
+     */
+    private function buildEmptySnapshotResponse(Company $company, Period $period, FiatCurrency $cashCurrency): SnapshotResponse
     {
         $prevPeriod = $period->prevPeriod();
 
@@ -161,7 +162,30 @@ final class DashboardSnapshotService
                 prevTo: $prevPeriod->getTo(),
                 vatMode: self::VAT_MODE_EXCLUDE,
                 lastUpdatedAt: null,
+                cashCurrency: $cashCurrency->value,
             ),
+        );
+    }
+
+    /**
+     * Ключ кэша разделён и по валюте ДДС, и по наличию доступа к финансам —
+     * иначе пустой снапшот read-only роли попадёт в кэш полноправного пользователя.
+     */
+    public function buildCacheKey(
+        Company $company,
+        Period $period,
+        FiatCurrency $cashCurrency,
+        bool $hasFinanceRead = true,
+    ): string {
+        return sprintf(
+            'dashboard_v1_snapshot_%s_%s_%s_%s_%s_%s_%s',
+            (string) $company->getId(),
+            $this->snapshotCacheInvalidator->resolveVersionForCompany($company),
+            $period->getFrom()->format('Y-m-d'),
+            $period->getTo()->format('Y-m-d'),
+            self::VAT_MODE_EXCLUDE,
+            $cashCurrency->value,
+            $hasFinanceRead ? 'finance_1' : 'finance_0',
         );
     }
 

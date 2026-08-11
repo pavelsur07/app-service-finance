@@ -22,7 +22,7 @@ final class HomeRedirectController extends AbstractController
      * @var list<array{0: string, 1: string}>
      */
     private const LANDING_BY_MODULE = [
-        [ModuleAccess::FINANCE_READ, 'app_dashboard_index'],
+        [ModuleAccess::FINANCE_READ, 'app_finance_index'],
         [ModuleAccess::MARKETPLACE_READ, 'marketplace_index'],
         [ModuleAccess::DEALS_READ, 'deal_index'],
         [ModuleAccess::CATALOG_READ, 'catalog_products_index'],

@@ -6,6 +6,7 @@ use App\Analytics\Application\DrilldownBuilder;
 use App\Analytics\Application\Widget\InflowWidgetBuilder;
 use App\Analytics\Domain\Period;
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Enum\FiatCurrency;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Company\Entity\Company;
@@ -22,7 +23,10 @@ final class InflowWidgetBuilderTest extends TestCase
         $account->method('getId')->willReturn('acc-1');
 
         $accountRepository = $this->createMock(MoneyAccountRepository::class);
-        $accountRepository->method('findByFilters')->willReturn([$account]);
+        $accountRepository->expects(self::once())
+            ->method('findByFilters')
+            ->with($company, null, ['USD'], true, null, ['name' => 'ASC'])
+            ->willReturn([$account]);
 
         $transactionRepository = $this->createMock(CashTransactionRepository::class);
         $transactionRepository->expects(self::exactly(2))
@@ -37,7 +41,7 @@ final class InflowWidgetBuilderTest extends TestCase
 
         $builder = new InflowWidgetBuilder($accountRepository, $transactionRepository, new DrilldownBuilder());
 
-        $result = $builder->build($company, $period)->toArray();
+        $result = $builder->build($company, $period, FiatCurrency::USD)->toArray();
 
         self::assertSame(100.0, $result['sum']);
         self::assertSame(60.0, $result['delta_abs']);
@@ -46,6 +50,7 @@ final class InflowWidgetBuilderTest extends TestCase
         self::assertCount(2, $result['series']);
         self::assertSame('2026-03-03', $result['series'][0]['date']);
         self::assertSame(30.0, $result['series'][0]['value']);
+        self::assertSame('USD', $result['drilldown']['params']['currency']);
     }
 
     private function createCompany(string $companyId): Company

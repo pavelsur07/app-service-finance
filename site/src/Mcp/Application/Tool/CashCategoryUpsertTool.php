@@ -39,14 +39,17 @@ final class CashCategoryUpsertTool implements McpToolInterface
             'properties' => [
                 'id' => ['type' => 'string', 'description' => 'UUID статьи. Без него создаётся новая.'],
                 'name' => ['type' => 'string', 'description' => 'Название. Обязательно при создании.'],
-                'parentId' => ['type' => 'string', 'description' => 'UUID родительской статьи'],
+                'parentId' => [
+                    'type' => ['string', 'null'],
+                    'description' => 'UUID родительской статьи; null переносит статью в root.',
+                ],
                 'description' => ['type' => 'string'],
                 'status' => ['type' => 'string', 'enum' => ['active', 'disabled']],
                 'sort' => ['type' => 'integer', 'description' => 'Порядок среди соседей'],
                 'flowKind' => [
                     'type' => 'string',
-                    'enum' => ['OPERATING', 'INVESTING', 'FINANCING', 'TECHNICAL'],
-                    'description' => 'Вид деятельности. У дочерних статей наследуется от корня.',
+                    'enum' => ['OPERATING', 'INVESTING', 'FINANCING'],
+                    'description' => 'Вид деятельности root-статьи. У дочерних статей наследуется от корня.',
                 ],
             ],
             'additionalProperties' => false,
@@ -63,7 +66,8 @@ final class CashCategoryUpsertTool implements McpToolInterface
         $id = $this->cashFacade->upsertCashflowCategory($companyId, new CashflowCategoryInput(
             id: $this->stringArg($arguments, 'id'),
             name: $this->stringArg($arguments, 'name'),
-            parentId: $this->stringArg($arguments, 'parentId'),
+            parentId: $this->parentIdArg($arguments),
+            parentIdProvided: array_key_exists('parentId', $arguments),
             description: $this->stringArg($arguments, 'description'),
             status: $this->enumArg($arguments, 'status', CashflowCategoryStatus::class),
             sort: isset($arguments['sort']) ? (int) $arguments['sort'] : null,
@@ -71,5 +75,20 @@ final class CashCategoryUpsertTool implements McpToolInterface
         ));
 
         return $this->json(['id' => $id, 'saved' => true]);
+    }
+
+    /** @param array<string, mixed> $arguments */
+    private function parentIdArg(array $arguments): ?string
+    {
+        if (!array_key_exists('parentId', $arguments) || null === $arguments['parentId']) {
+            return null;
+        }
+
+        $parentId = $this->stringArg($arguments, 'parentId');
+        if (null === $parentId) {
+            throw new \InvalidArgumentException('parentId должен быть UUID-строкой или null.');
+        }
+
+        return $parentId;
     }
 }

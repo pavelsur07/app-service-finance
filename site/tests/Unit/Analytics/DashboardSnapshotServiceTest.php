@@ -16,6 +16,7 @@ use App\Analytics\Application\Widget\TopCashWidgetBuilder;
 use App\Analytics\Application\Widget\TopPnlWidgetBuilder;
 use App\Analytics\Domain\Period;
 use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
+use App\Cash\Enum\FiatCurrency;
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Accounts\MoneyFundMovementRepository;
@@ -61,6 +62,7 @@ final class DashboardSnapshotServiceTest extends TestCase
         self::assertSame(1, $cache->snapshotMissesCount);
         self::assertEquals($first, $second);
         self::assertSame('exclude', $first['context']['vat_mode']);
+        self::assertSame('RUB', $first['context']['cash_currency']);
         self::assertNull($first['context']['last_updated_at']);
         self::assertSame(0.0, $first['widgets']['free_cash']['value']);
         self::assertSame(0.0, $first['widgets']['free_cash']['cash_at_end']);
@@ -84,10 +86,16 @@ final class DashboardSnapshotServiceTest extends TestCase
         self::assertArrayHasKey('items', $first['widgets']['top_pnl']);
         self::assertArrayHasKey('other', $first['widgets']['top_pnl']);
 
+        // Другая валюта ДДС — отдельный ключ кэша, а не переиспользование рублёвого снапшота.
+        $usd = $service->getSnapshot($company, $period, FiatCurrency::USD)->toArray();
+
+        self::assertSame(2, $cache->snapshotMissesCount);
+        self::assertSame('USD', $usd['context']['cash_currency']);
+
         (new SnapshotCacheInvalidator($cache))->invalidateForCompany($company);
         $service->getSnapshot($company, $period);
 
-        self::assertSame(2, $cache->snapshotMissesCount);
+        self::assertSame(3, $cache->snapshotMissesCount);
     }
 
     public function testNoFinanceReadReturnsContextOnly(): void

@@ -124,4 +124,48 @@ final class PaymentPlanMatcherTest extends IntegrationTestCase
         self::assertNull($result);
         self::assertNull($this->matchRepository->findOneByTransaction($transactionFromDb));
     }
+
+    public function testDoesNotMatchCurrencylessPlanToNonRubTransaction(): void
+    {
+        $user = UserBuilder::aUser()
+            ->withId(Uuid::uuid4()->toString())
+            ->withEmail('payment-plan-currency@example.test')
+            ->build();
+        $company = CompanyBuilder::aCompany()
+            ->withId(Uuid::uuid4()->toString())
+            ->withOwner($user)
+            ->withName('Payment plan currency company')
+            ->build();
+        $account = new MoneyAccount(
+            Uuid::uuid4()->toString(),
+            $company,
+            MoneyAccountType::BANK,
+            'USD account',
+            'USD',
+        );
+        $category = new CashflowCategory(Uuid::uuid4()->toString(), $company);
+        $category->setName('Payments');
+        $occurredAt = new \DateTimeImmutable('2024-08-20');
+        $transaction = new CashTransaction(
+            Uuid::uuid4()->toString(),
+            $company,
+            $account,
+            CashDirection::OUTFLOW,
+            '75.00',
+            'USD',
+            $occurredAt,
+        );
+        $transaction->setCashflowCategory($category);
+        $plan = new PaymentPlan(Uuid::uuid4()->toString(), $company, $category, $occurredAt, '75.00');
+        $plan->setStatus(PaymentPlanStatusEnum::APPROVED);
+
+        foreach ([$user, $company, $account, $category, $transaction, $plan] as $entity) {
+            $this->em->persist($entity);
+        }
+        $this->em->flush();
+
+        self::assertNull($this->matcher->matchForTransaction($transaction));
+        self::assertNull($this->matchRepository->findOneByTransaction($transaction));
+        self::assertSame(PaymentPlanStatusEnum::APPROVED, $plan->getStatus());
+    }
 }

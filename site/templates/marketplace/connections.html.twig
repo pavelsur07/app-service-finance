@@ -1,0 +1,522 @@
+{% extends 'marketplace/layout.html.twig' %}
+
+{% set active_tab = 'connections' %}
+
+{% block tab_content %}
+    <div class="p-3">
+
+        {# Подключения #}
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title">Активные подключения</h3>
+                <div class="card-actions">
+                    <a href="#" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-add-connection">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                        Добавить подключение
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if connections is empty %}
+                    <div class="empty">
+                        <div class="empty-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="7" cy="18" r="2" /><circle cx="7" cy="6" r="2" /><circle cx="17" cy="12" r="2" /><line x1="7" y1="8" x2="7" y2="16" /><path d="M7 8a4 4 0 0 0 4 4h4" /></svg>
+                        </div>
+                        <p class="empty-title">Нет активных подключений</p>
+                        <p class="empty-subtitle text-muted">Добавьте подключение к маркетплейсу для начала работы</p>
+                    </div>
+                {% else %}
+                    <div class="list-group list-group-flush">
+                        {% for connection in connections %}
+                            {% set is_seller = connection.connectionType.value == 'seller' %}
+                            {% set has_connection_error = connection.lastSyncError is not empty and not connection.isActive %}
+                            {% set can_manual_sync = is_seller and connection.isActive %}
+                            <div class="list-group-item">
+                                <div class="row align-items-center">
+                                    <div class="col-auto">
+                                        <span class="avatar">{{ connection.marketplace.value|slice(0, 2)|upper }}</span>
+                                    </div>
+                                    <div class="col text-truncate">
+                                        <div class="text-reset d-block">
+                                            {{ connection.marketplace.displayName }}{% if not is_seller %} (Реклама){% endif %}
+                                        </div>
+                                        <div class="d-block text-muted text-truncate mt-n1">
+                                            {% if connection.clientId %}
+                                                Client-Id: {{ connection.clientId }}{% if is_seller %} &middot;{% endif %}
+                                            {% endif %}
+                                            {% if is_seller %}
+                                                API Key: {{ connection.apiKey|slice(0, 20) }}***
+                                            {% endif %}
+                                        </div>
+                                        {% if is_seller %}
+                                            <div class="d-block text-muted mt-1"
+                                                 data-connection-id="{{ connection.id }}"
+                                                 data-status-url="{{ path('marketplace_connection_status', {id: connection.id}) }}"
+                                                 data-synced="{{ connection.lastSyncAt or has_connection_error or not connection.isActive ? '1' : '0' }}"
+                                                 id="connection-status-{{ connection.id }}">
+                                                {% if has_connection_error %}
+                                                    <small class="text-danger">Ошибка: {{ connection.lastSyncError|slice(0, 100) }}</small>
+                                                {% elseif not connection.isActive %}
+                                                    <small>Последняя синхронизация: —</small>
+                                                {% elseif connection.lastSyncAt %}
+                                                    <small>Последняя синхронизация: {{ connection.lastSyncAt|date('d.m.Y H:i') }}</small>
+                                                {% else %}
+                                                    <small class="text-warning">
+                                                        <span class="spinner-border spinner-border-sm me-1" style="width:.7rem;height:.7rem"></span>
+                                                        Первичная загрузка данных...
+                                                    </small>
+                                                {% endif %}
+                                            </div>
+                                        {% else %}
+                                            <div class="d-block text-muted mt-1">
+                                                <small>Последняя синхронизация: —</small>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-auto">
+                                        <span class="badge bg-{{ has_connection_error ? 'danger' : (connection.isActive ? 'success' : 'secondary') }}">
+                                            {{ has_connection_error ? 'Ошибка подключения' : (connection.isActive ? 'Активно' : 'Неактивно') }}
+                                        </span>
+                                    </div>
+                                    <div class="col-auto">
+                                        <div class="btn-list">
+                                            <a href="{{ path('marketplace_connection_edit', {id: connection.id}) }}" class="btn btn-sm btn-outline-secondary">Настройки</a>
+                                            <form method="post" action="{{ path('marketplace_connection_test', {id: connection.id}) }}" style="display:inline">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('test' ~ connection.id) }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-info">Проверить</button>
+                                            </form>
+                                            {% if is_seller %}
+                                                {% if can_manual_sync %}
+                                                    <form method="post" action="{{ path('marketplace_connection_sync', {id: connection.id}) }}" style="display:inline">
+                                                        <input type="hidden" name="_token" value="{{ csrf_token('sync' ~ connection.id) }}">
+                                                        <button type="submit" class="btn btn-sm btn-primary">Синхронизировать</button>
+                                                    </form>
+                                                    <a href="#" class="btn btn-sm btn-outline-primary"
+                                                       data-bs-toggle="modal"
+                                                       data-bs-target="#modal-sync-period"
+                                                       data-connection-id="{{ connection.id }}"
+                                                       data-token="{{ csrf_token('sync_period' ~ connection.id) }}">За период</a>
+                                                {% else %}
+                                                    <button type="button" class="btn btn-sm btn-primary" disabled>Синхронизировать</button>
+                                                    <button type="button" class="btn btn-sm btn-outline-primary" disabled>За период</button>
+                                                {% endif %}
+                                                {% if connection.marketplace.value == 'ozon' %}
+                                                    {% if can_manual_sync %}
+                                                        <button type="button"
+                                                                class="btn btn-sm btn-outline-teal"
+                                                                data-bs-toggle="modal"
+                                                                data-bs-target="#modal-sync-realization"
+                                                                data-connection-id="{{ connection.id }}"
+                                                                data-action="{{ path('marketplace_connection_sync_realization', {id: connection.id}) }}"
+                                                                data-token="{{ csrf_token('sync_realization' ~ connection.id) }}">
+                                                            Реализация
+                                                        </button>
+                                                    {% else %}
+                                                        <button type="button" class="btn btn-sm btn-outline-teal" disabled>Реализация</button>
+                                                    {% endif %}
+                                                {% endif %}
+                                                <button type="button"
+                                                        class="btn btn-sm btn-outline-warning"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#modal-reprocess"
+                                                        data-marketplace="{{ connection.marketplace.value }}">
+                                                    Переобработать
+                                                </button>
+                                            {% endif %}
+                                            <form method="post" action="{{ path('marketplace_connection_toggle', {id: connection.id}) }}" style="display:inline">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('toggle' ~ connection.id) }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                                    {{ connection.isActive ? 'Деактивировать' : 'Активировать' }}
+                                                </button>
+                                            </form>
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-danger"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#modal-delete-connection"
+                                                    data-connection-id="{{ connection.id }}"
+                                                    data-action="{{ path('marketplace_connection_delete', {id: connection.id}) }}"
+                                                    data-token="{{ csrf_token('delete' ~ connection.id) }}">
+                                                Удалить
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+{% endblock %}
+
+{% block modals %}
+    {# Modal: Добавить подключение #}
+    <div class="modal modal-blur fade" id="modal-add-connection" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <form method="post"
+                      action="{{ path('marketplace_connection_create') }}"
+                      id="form-add-connection"
+                      data-seller-action="{{ path('marketplace_connection_create') }}"
+                      data-performance-action="{{ path('marketplace_connection_performance_create') }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('marketplace_connection_create') }}">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Новое подключение</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label required">Маркетплейс</label>
+                            <select name="marketplace" id="connection-marketplace" class="form-select" required>
+                                <option value="">Выберите маркетплейс</option>
+                                {% for marketplace in availableMarketplaces %}
+                                    <option value="{{ marketplace.value }}">{{ marketplace.displayName }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        {# Блок «Тип подключения» — показывается только для Ozon (Performance API есть только у Ozon). #}
+                        <div class="mb-3" id="field-connection-type" style="display: none;">
+                            <label class="form-label required">Тип подключения</label>
+                            <div class="form-selectgroup form-selectgroup-pills" id="connection-type-group">
+                                <label class="form-selectgroup-item">
+                                    <input type="radio" name="connection_type" value="seller" class="form-selectgroup-input" id="connection-type-seller" checked>
+                                    <span class="form-selectgroup-label">Основное (Seller API)</span>
+                                </label>
+                                <label class="form-selectgroup-item">
+                                    <input type="radio" name="connection_type" value="performance" class="form-selectgroup-input" id="connection-type-performance">
+                                    <span class="form-selectgroup-label">Реклама (Performance API)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        {# --- Поля для Seller API --- #}
+                        <div data-connection-type-fields="seller">
+                            <div class="mb-3" id="field-seller-client-id" style="display: none;">
+                                <label class="form-label required">Client-Id</label>
+                                <input type="text" name="client_id" id="input-seller-client-id" class="form-control" placeholder="Например: 123456">
+                                <small class="form-hint">Найдите Client-Id в личном кабинете Ozon → Настройки → API ключи</small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label required">API ключ</label>
+                                <input type="text" name="api_key" id="input-seller-api-key" class="form-control" placeholder="Введите API ключ" required>
+                                <small class="form-hint">Получите API ключ в личном кабинете маркетплейса</small>
+                            </div>
+                        </div>
+
+                        {# --- Поля для Performance API (Ozon) --- #}
+                        <div data-connection-type-fields="performance" style="display: none;">
+                            <div class="mb-3">
+                                <label class="form-label required">Client ID</label>
+                                <input type="text" name="client_id" id="input-performance-client-id" class="form-control" placeholder="Например: ABC@advertising.performance.ozon.ru" required disabled>
+                                <small class="form-hint">Найдите Client ID в рекламном кабинете Ozon → Настройки → API ключи → Performance API</small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label required">Client Secret</label>
+                                <input type="password" name="client_secret" id="input-performance-client-secret" class="form-control" autocomplete="new-password" required disabled>
+                                <small class="form-hint">Скопируйте Client Secret при создании ключа. Он показывается только один раз.</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary">Добавить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {# Modal: Синхронизация за период #}
+    <div class="modal modal-blur fade" id="modal-sync-period" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <form method="post" id="form-sync-period" action="">
+                    <input type="hidden" name="_token" id="sync-period-token" value="">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Синхронизировать за период</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label required">Дата начала</label>
+                            <input type="date" name="date_from" class="form-control" required
+                                   value="{{ 'now'|date_modify('-7 days')|date('Y-m-d') }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label required">Дата окончания</label>
+                            <input type="date" name="date_to" class="form-control" required
+                                   value="{{ 'now'|date('Y-m-d') }}">
+                        </div>
+                        <div class="text-muted small">Максимальный период — 31 день.</div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary">Синхронизировать</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {# Modal: Подтверждение загрузки реализации Ozon #}
+    <div class="modal modal-blur fade" id="modal-sync-realization" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-body">
+                    <div class="modal-title">Загрузка реализации Ozon</div>
+                    <div class="text-muted mt-2">
+                        Если данных ещё нет — будут загружены все месяцы с начала года.<br>
+                        Если данные уже есть — будет обновлён прошлый месяц.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <div class="w-100">
+                        <div class="row">
+                            <div class="col">
+                                <button type="button" class="btn w-100" data-bs-dismiss="modal">Отмена</button>
+                            </div>
+                            <div class="col">
+                                <form method="post" id="form-sync-realization" action="">
+                                    <input type="hidden" name="_token" id="sync-realization-token" value="">
+                                    <button type="submit" class="btn btn-teal w-100">Запустить</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Modal: Переобработка за период #}
+    <div class="modal modal-blur fade" id="modal-reprocess" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <form method="post" action="{{ path('marketplace_reprocess') }}" id="form-reprocess">
+                    <input type="hidden" name="_token" value="{{ csrf_token('marketplace_reprocess') }}">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Переобработка данных за период</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" name="marketplace" id="reprocess-marketplace">
+                        <div class="mb-3">
+                            <label class="form-label required">Период — начало</label>
+                            <input type="date" name="period_from" class="form-control" required
+                                   value="{{ 'now'|date_modify('first day of last month')|date('Y-m-d') }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label required">Период — конец</label>
+                            <input type="date" name="period_to" class="form-control" required
+                                   value="{{ 'now'|date_modify('last day of last month')|date('Y-m-d') }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Тип документов</label>
+                            <select name="type" class="form-select">
+                                <option value="all">Все (продажи + возвраты + затраты + реализация)</option>
+                                <option value="sales_report">Только продажи / возвраты / затраты</option>
+                                <option value="realization">Только реализация Ozon</option>
+                            </select>
+                        </div>
+                        <div class="alert alert-warning mb-0">
+                            <div class="d-flex">
+                                <div>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9v4" /><path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.871l-8.106 -13.534a1.914 1.914 0 0 0 -3.274 0z" /><path d="M12 16h.01" /></svg>
+                                </div>
+                                <div>
+                                    Переобработка обновит существующие записи новыми данными.
+                                    Маркировка закрытия месяца <strong>не снимается</strong> — для этого используйте «Переоткрыть» в закрытии месяца.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-warning" id="btn-reprocess">
+                            Переобработать
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {# Modal: Подтверждение удаления подключения #}
+    <div class="modal modal-blur fade" id="modal-delete-connection" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-body">
+                    <div class="modal-title">Удалить подключение?</div>
+                    <div class="text-muted mt-2">
+                        Все данные синхронизации для этого подключения будут удалены. Это действие необратимо.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <div class="w-100">
+                        <div class="row">
+                            <div class="col">
+                                <button type="button" class="btn w-100" data-bs-dismiss="modal">Отмена</button>
+                            </div>
+                            <div class="col">
+                                <form method="post" id="form-delete-connection" action="">
+                                    <input type="hidden" name="_token" id="delete-connection-token" value="">
+                                    <button type="submit" class="btn btn-danger w-100">Удалить</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block body %}
+    {{ parent() }}
+
+    <script>
+        // Управление модалом «Новое подключение»: переключение типа (Seller/Performance),
+        // видимость поля Client-Id (для Seller + Ozon), подмена form.action.
+        (function () {
+            var form                 = document.getElementById('form-add-connection');
+            var marketplaceSelect    = document.getElementById('connection-marketplace');
+            var connectionTypeField  = document.getElementById('field-connection-type');
+            var perfRadio            = document.getElementById('connection-type-performance');
+            var sellerRadio          = document.getElementById('connection-type-seller');
+            var sellerBlock          = form.querySelector('[data-connection-type-fields="seller"]');
+            var perfBlock            = form.querySelector('[data-connection-type-fields="performance"]');
+            var sellerClientField    = document.getElementById('field-seller-client-id');
+            var sellerClientInput    = document.getElementById('input-seller-client-id');
+
+            function setDisabledAll(block, disabled) {
+                block.querySelectorAll('input, select, textarea').forEach(function (el) {
+                    el.disabled = disabled;
+                });
+            }
+
+            function currentType() {
+                return perfRadio.checked ? 'performance' : 'seller';
+            }
+
+            function applyConnectionType() {
+                var type = currentType();
+                if (type === 'performance') {
+                    sellerBlock.style.display = 'none';
+                    perfBlock.style.display   = '';
+                    setDisabledAll(sellerBlock, true);
+                    setDisabledAll(perfBlock, false);
+                    form.action = form.dataset.performanceAction;
+                } else {
+                    sellerBlock.style.display = '';
+                    perfBlock.style.display   = 'none';
+                    setDisabledAll(sellerBlock, false);
+                    setDisabledAll(perfBlock, true);
+                    form.action = form.dataset.sellerAction;
+                    // Для Seller поле Client-Id — только при Ozon.
+                    if (marketplaceSelect.value === 'ozon') {
+                        sellerClientField.style.display = '';
+                        sellerClientInput.required      = true;
+                    } else {
+                        sellerClientField.style.display = 'none';
+                        sellerClientInput.required      = false;
+                        sellerClientInput.value         = '';
+                    }
+                }
+            }
+
+            function applyMarketplace() {
+                // Блок «Тип подключения» показываем только для Ozon — Performance API
+                // существует только у Ozon. Для остальных маркетплейсов блок скрыт,
+                // а тип принудительно сбрасываем на Seller, чтобы форма отправляла
+                // корректные данные на правильный endpoint.
+                if (marketplaceSelect.value === 'ozon') {
+                    connectionTypeField.style.display = '';
+                } else {
+                    connectionTypeField.style.display = 'none';
+                    if (perfRadio.checked) {
+                        sellerRadio.checked = true;
+                    }
+                }
+                applyConnectionType();
+            }
+
+            marketplaceSelect.addEventListener('change', applyMarketplace);
+
+            [sellerRadio, perfRadio].forEach(function (radio) {
+                radio.addEventListener('change', applyConnectionType);
+            });
+
+            // Инициализация: маркетплейс не выбран → блок скрыт, тип = seller.
+            applyMarketplace();
+        })();
+
+        // Sync period modal — подставляем action с connectionId и CSRF-токен
+        document.getElementById('modal-sync-period').addEventListener('show.bs.modal', function (event) {
+            var connectionId = event.relatedTarget.getAttribute('data-connection-id');
+            document.getElementById('form-sync-period').action = '/marketplace/connection/' + connectionId + '/sync-period';
+            document.getElementById('sync-period-token').value = event.relatedTarget.getAttribute('data-token');
+        });
+
+        // Блокировка кнопки при отправке формы синхронизации за период
+        document.getElementById('form-sync-period').addEventListener('submit', function () {
+            var submitBtn = this.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Синхронизация...';
+        });
+
+        // modal-reprocess — подставляем marketplace из data-marketplace кнопки
+        document.getElementById('modal-reprocess').addEventListener('show.bs.modal', function (event) {
+            document.getElementById('reprocess-marketplace').value = event.relatedTarget.getAttribute('data-marketplace');
+        });
+
+        // Блокировка кнопки при отправке формы переобработки
+        document.getElementById('form-reprocess').addEventListener('submit', function () {
+            var btn = document.getElementById('btn-reprocess');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Обработка...';
+            // Закрываем модал чтобы пользователь видел страницу во время обработки
+            var BootstrapModal = window.bootstrap && window.bootstrap.Modal;
+            var modal = BootstrapModal ? BootstrapModal.getInstance(document.getElementById('modal-reprocess')) : null;
+            if (modal) { modal.hide(); }
+        });
+
+        // modal-sync-realization — подставляем action и CSRF-токен из data-атрибутов кнопки
+        document.getElementById('modal-sync-realization').addEventListener('show.bs.modal', function (event) {
+            document.getElementById('form-sync-realization').action = event.relatedTarget.getAttribute('data-action');
+            document.getElementById('sync-realization-token').value = event.relatedTarget.getAttribute('data-token');
+        });
+
+        // modal-delete-connection — подставляем action из data-action кнопки
+        document.getElementById('modal-delete-connection').addEventListener('show.bs.modal', function (event) {
+            document.getElementById('form-delete-connection').action = event.relatedTarget.getAttribute('data-action');
+            document.getElementById('delete-connection-token').value = event.relatedTarget.getAttribute('data-token');
+        });
+
+        // Опрос статуса первичной загрузки
+        (function () {
+            var pendingNodes = document.querySelectorAll('[data-status-url][data-synced="0"]');
+            if (pendingNodes.length === 0) return;
+
+            pendingNodes.forEach(function (node) {
+                var url      = node.dataset.statusUrl;
+                var interval = setInterval(function () {
+                    fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+                        .then(function (r) { return r.json(); })
+                        .then(function (data) {
+                            if (data.status === 'synced') {
+                                clearInterval(interval);
+                                node.innerHTML = '<small>Последняя синхронизация: ' + data.lastSyncAt + '</small>';
+                            } else if (data.status === 'error') {
+                                clearInterval(interval);
+                                node.innerHTML = '<small class="text-danger">Ошибка: ' + (data.lastSyncError ?? '') + '</small>';
+                            }
+                        })
+                        .catch(function () { /* сеть недоступна — продолжаем опрос */ });
+                }, 15000);
+            });
+        })();
+    </script>
+{% endblock %}

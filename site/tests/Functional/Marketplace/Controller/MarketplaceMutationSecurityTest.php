@@ -141,7 +141,7 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
         $this->loginWithActiveCompany($client, $user, $company);
 
         $client->request('POST', sprintf('/marketplace/pl-mappings/%s/toggle', $mapping->getId()), [
-            '_token' => $this->csrfToken($client, 'toggle' . $mapping->getId()),
+            '_token' => $this->csrfToken($client, 'toggle'.$mapping->getId()),
         ]);
 
         self::assertResponseRedirects('/marketplace/pl-mappings?op=sale&marketplace=all');
@@ -193,7 +193,7 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
         $this->loginWithActiveCompany($client, $user, $company);
 
         $client->request('POST', sprintf('/marketplace/pl-mappings/%s/edit', $mapping->getId()), [
-            '_token' => $this->csrfToken($client, 'marketplace_pl_mappings_edit' . $mapping->getId()),
+            '_token' => $this->csrfToken($client, 'marketplace_pl_mappings_edit'.$mapping->getId()),
         ]);
 
         self::assertResponseRedirects('/marketplace/pl-mappings?op=sale&marketplace=all');
@@ -210,10 +210,10 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
         // Подключение неактивно — ручная синхронизация заблокирована, внешние API
         // не вызываются; редирект (а не 403) доказывает, что CSRF-проверка пройдена.
         $client->request('POST', sprintf('/marketplace/connection/%s/sync', $connection->getId()), [
-            '_token' => $this->csrfToken($client, 'sync' . $connection->getId()),
+            '_token' => $this->csrfToken($client, 'sync'.$connection->getId()),
         ]);
 
-        self::assertResponseRedirects('/marketplace');
+        self::assertResponseRedirects('/marketplace/connections');
     }
 
     public function testConnectionSyncPeriodWithValidCsrfTokenPassesTokenCheck(): void
@@ -229,10 +229,10 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
         // Без date_from/date_to контроллер отвечает flash-ошибкой и редиректом,
         // а не 403 — CSRF-проверка пройдена, внешние API не вызываются.
         $client->request('POST', sprintf('/marketplace/connection/%s/sync-period', $connection->getId()), [
-            '_token' => $this->csrfToken($client, 'sync_period' . $connection->getId()),
+            '_token' => $this->csrfToken($client, 'sync_period'.$connection->getId()),
         ]);
 
-        self::assertResponseRedirects('/marketplace');
+        self::assertResponseRedirects('/marketplace/connections');
     }
 
     public function testProcessRealizationIsNotAllowedViaGet(): void
@@ -292,7 +292,7 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
             'client_id' => 'client-id',
         ]);
 
-        self::assertResponseRedirects('/marketplace');
+        self::assertResponseRedirects('/marketplace/connections');
     }
 
     public function testPerformanceConnectionCreateRejectsPostWithoutCsrfToken(): void
@@ -334,11 +334,11 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
         $this->loginWithActiveCompany($client, $user, $company);
 
         $client->request('POST', sprintf('/marketplace/connection/%s/edit', $connection->getId()), [
-            '_token' => $this->csrfToken($client, 'marketplace_connection_edit' . $connection->getId()),
+            '_token' => $this->csrfToken($client, 'marketplace_connection_edit'.$connection->getId()),
             'project_direction_id' => '',
         ]);
 
-        self::assertResponseRedirects('/marketplace');
+        self::assertResponseRedirects('/marketplace/connections');
     }
 
     public function testSyncRealizationRejectsPostWithoutCsrfToken(): void
@@ -363,10 +363,10 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
         $this->loginWithActiveCompany($client, $user, $company);
 
         $client->request('POST', sprintf('/marketplace/connection/%s/sync-realization', $connection->getId()), [
-            '_token' => $this->csrfToken($client, 'sync_realization' . $connection->getId()),
+            '_token' => $this->csrfToken($client, 'sync_realization'.$connection->getId()),
         ]);
 
-        self::assertResponseRedirects('/marketplace');
+        self::assertResponseRedirects('/marketplace/connections');
     }
 
     public function testReprocessRejectsPostWithoutCsrfToken(): void
@@ -398,7 +398,19 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
             '_token' => $this->csrfToken($client, 'marketplace_reprocess'),
         ]);
 
-        self::assertResponseRedirects('/marketplace');
+        self::assertResponseRedirects('/marketplace/connections');
+    }
+
+    public function testConnectionsIndexPageIsAccessible(): void
+    {
+        $this->resetDb();
+        $client = static::createClient();
+        [$user, $company] = $this->seedBaseData();
+        $this->loginWithActiveCompany($client, $user, $company);
+
+        $client->request('GET', '/marketplace/connections');
+
+        self::assertResponseIsSuccessful();
     }
 
     private function loginWithActiveCompany(KernelBrowser $client, User $user, Company $company): void

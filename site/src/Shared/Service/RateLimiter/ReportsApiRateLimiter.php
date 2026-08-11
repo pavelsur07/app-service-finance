@@ -2,12 +2,16 @@
 
 namespace App\Shared\Service\RateLimiter;
 
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 
 final class ReportsApiRateLimiter
 {
-    public function __construct(private readonly ?object $factory = null)
-    {
+    public function __construct(
+        private readonly ?object $factory = null,
+        private readonly LoggerInterface $logger = new NullLogger(),
+    ) {
     }
 
     public function consume(string $identifier, int $tokens = 1): bool
@@ -16,6 +20,10 @@ final class ReportsApiRateLimiter
             return $this->factory->create($identifier)->consume($tokens)->isAccepted();
         }
 
-        return true;
+        $this->logger->error('Reports API rate limiter factory is missing, request blocked', [
+            'identifier' => $identifier,
+        ]);
+
+        return false;
     }
 }

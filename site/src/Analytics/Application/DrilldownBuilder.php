@@ -22,12 +22,13 @@ final class DrilldownBuilder
     /**
      * @return array{key: string, params: array<string, mixed>}
      */
-    public function cashBalances(string $at): array
+    public function cashBalances(string $at, string $currency): array
     {
         return [
             'key' => DrilldownKey::CASH_BALANCES,
             'params' => [
                 'at' => $at,
+                'currency' => $currency,
             ],
         ];
     }
@@ -35,12 +36,13 @@ final class DrilldownBuilder
     /**
      * @return array{key: string, params: array<string, mixed>}
      */
-    public function fundsReserved(string $at): array
+    public function fundsReserved(string $at, string $currency): array
     {
         return [
             'key' => DrilldownKey::FUNDS_RESERVED,
             'params' => [
                 'at' => $at,
+                'currency' => $currency,
             ],
         ];
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\DTO;
 
+use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Company\Enum\CounterpartyType;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -27,7 +28,7 @@ class CashTransactionDTO
     #[Assert\Positive]
     public string $amount;
 
-    #[Assert\Length(3)]
+    #[Assert\Choice(callback: [FiatCurrency::class, 'values'])]
     public string $currency;
 
     #[Assert\NotNull]

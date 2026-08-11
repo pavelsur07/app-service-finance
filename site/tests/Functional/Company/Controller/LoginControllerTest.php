@@ -76,7 +76,7 @@ final class LoginControllerTest extends WebTestCaseBase
         $this->client->followRedirect();
 
         // «/» — роутер лендинга: владельца компании ведёт на финансовый дашборд.
-        self::assertResponseRedirects('/dashboard');
+        self::assertResponseRedirects('/finance');
         $this->client->followRedirect();
 
         self::assertSelectorNotExists('.alert--danger');

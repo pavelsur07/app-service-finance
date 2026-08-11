@@ -771,10 +771,105 @@ updatePLRegisterForDocument(string $documentId): void
 - Автоправила не трогают вручную разбитые операции: `CashTransactionAutoRuleService::getSkipReason()` возвращает `CashTransactionAutoRuleSkipReason::MANUAL_SPLIT`. Проверка стоит там же, где «удалено» и «закрытый период», а не в синхронизаторе строк — ранний выход в синхронизаторе оставил бы колонку и строки рассинхронизированными.
 - `CashflowCategoryRepository::findOneByIdAndCompanyId()` — выбор статьи из формы строго в пределах компании.
 
+### Cash: валютный контракт счетов и обычных транзакций
+
+- `App\Cash\Enum\FiatCurrency` — единый список поддерживаемых валют Cash:
+  `RUB`, `USD`, `EUR`, `KZT`; формы, DTO и import/write-paths не должны
+  дублировать этот список строковыми массивами.
+- Валюта `MoneyAccount` задаётся при создании и неизменяема после первого
+  сохранения. Для уже сохранённого счёта смена валюты требует отдельной
+  миграционной процедуры, а не обычного редактирования. `CRYPTO_WALLET`
+  остаётся вне fiat-контракта и сохраняет свои существующие коды валют.
+- Валюта `CashTransaction` является производной от выбранного счёта. Ручная
+  запись, `CashFacade` и импорты отклоняют неподдерживаемую валюту и mismatch
+  со счётом; при допустимой смене счёта транзакция получает его валюту.
+- Пользовательские ссылки транзакции (счёт, контрагент, статья, проект и ЦФО)
+  разрешаются только в пределах компании транзакции; переданный UUID другой
+  компании не превращается в Doctrine reference.
+- `PaymentPlan` пока не имеет собственной валюты, поэтому автоматический
+  matcher рассматривает только RUB-транзакции. Существующие сохранённые связи
+  остаются читаемыми независимо от валюты для обратной совместимости.
+
+### Cash: агрегат перевода между денежными счетами (`cash_transfer`)
+
+- `CashTransfer` связывает ровно две уникальные `CashTransaction`: исходящую
+  ногу со счёта-источника и входящую на счёт-получатель. Суммы и валюты не
+  дублируются в агрегате: источником истины остаются транзакции.
+- Обе ноги принадлежат одной компании, разным активным не-криптовалютным
+  счетам и имеют одну дату. Они помечены `isTransfer=true` и содержат по одной
+  строке разбивки: `CF_TECH_OUT` для списания и `CF_TECH_IN` для поступления.
+  Это обязательные активные системные дочерние категории корня `CF_TECH`.
+- Для перевода в одной валюте фактические суммы должны совпадать, FX-поля
+  остаются `NULL`. Кросс-валютный v1 разрешает только `RUB↔USD` и `RUB↔EUR`;
+  пользователь передаёт обе фактические суммы, а агрегат хранит производный
+  effective rate «валюта назначения за единицу валюты источника» со scale 18,
+  датой операции и источником `manual_effective`. Float не используется.
+- `CreateCashTransferAction` выполняет агрегат, ноги, разбивки, аудит и
+  пересчёт обоих счетов в одной DB-транзакции. PostgreSQL advisory lock и
+  unique `(company_id, idempotency_key)` сериализуют повторную команду;
+  duplicate-result не повторяет side effects. Snapshot cache инвалидируется
+  один раз после commit. Ключ идентифицирует первую принятую команду, не
+  является dedupe hash её полей и должен повторно отправляться только с тем же
+  payload; повтор всегда возвращает исходный агрегат.
+- Технические ноги обходят VAT, `PaymentPlanMatcher` и автоправила. Комиссия
+  банка является отдельной обычной исходящей операцией, а не третьей ногой.
+- `CashTransferLifecycleAction` удаляет или восстанавливает агрегат и обе ноги
+  только вместе, под company-scoped pessimistic lock и в одной DB-транзакции.
+  Операция повторно проверяет состояние пары и открытость периода, пишет аудит
+  агрегата и обеих ног, пересчитывает оба счёта в стабильном UUID-порядке и
+  инвалидирует snapshot cache один раз после commit.
+- Обычные edit/delete/restore, ручная разбивка и bulk-delete отвергают
+  транзакцию, если она является ногой `cash_transfer`. Legacy-транзакции с
+  `isTransfer=true`, не связанные с агрегатом, сохраняют прежнее поведение и
+  не спариваются автоматически.
+- ДДС-отчёт читает технические split-строки в исходной валюте каждой ноги:
+  same-currency перевод даёт нулевой net, а cross-currency перевод остаётся
+  двумя независимыми движениями без пересчёта и смешанного итога. Soft-delete
+  агрегата исключает из отчёта обе ноги.
+- UI агрегата расположен под `/finance/cash-transfers`: форма разрешает только
+  company-scoped активные fiat-счета, hidden UUIDv7 служит idempotency key, а
+  create/delete/restore делегируют финансовую семантику в `CashFacade`.
+  Связанная нога ведёт на show агрегата и не предоставляет отдельные edit,
+  split, delete, restore или bulk actions.
+- Read-only команда `app:cash:verify-transfers` обрабатывает детальную область
+  пакетами компаний и сверяет структуру пары, tenant/account/currency/direction,
+  обязательные `CF_TECH_OUT`/`CF_TECH_IN` split-строки, суммы same-currency,
+  effective-rate, pair deletion, idempotency и уникальное владение ногами.
+  Две проверки глобальной уникальности (`company + idempotency key` и владение
+  ногой между source/target ролями) выполняются отдельными aggregate scans,
+  чтобы не скрыть нарушение на границе company batches.
+  Вывод содержит только агрегированные счётчики; legacy `isTransfer=true` без
+  агрегата — INFO, а не ошибка. Repair/execute режима у команды нет.
+
+### Analytics dashboard: валюта Cash-виджетов
+
+- `GET /api/dashboard/v1/snapshot` принимает `currency` из `FiatCurrency` и
+  по умолчанию использует `RUB`. Ответ возвращает выбранную валюту в
+  `context.cash_currency`; cache key, telemetry, warmup и Cash drilldowns
+  содержат тот же код валюты.
+- Free cash, зарезервированные фонды, inflow/outflow, CAPEX, cashflow split и
+  top-cash фильтруются по валюте до `SUM`. Revenue, profit и top-P&L не зависят
+  от Cash currency selector и сохраняют текущую семантику ОПиУ.
+- Список операций и XLSX export используют единый `CashTransactionFilters` и
+  поддерживают `currency`; company scope применяется независимо от фильтра,
+  а пустой параметр сохраняет прежний список всех валют без их агрегации.
+- Home и dashboard UI сохраняют выбранную RUB/USD/EUR/KZT валюту в URL и
+  передают её в snapshot API. Server-rendered Home balance учитывает только
+  активные счета выбранной валюты; URL без параметра намеренно означает RUB.
+
 ### `CashFacade` (`src/Cash/Facade/CashFacade.php`)
 ```php
 // Создать ДДС-транзакцию из внешнего модуля (идемпотентно для внешних источников)
 createTransaction(CreateCashTransactionCommand $command): CreateCashTransactionResult
+
+// Атомарно создать перевод между двумя счетами (идемпотентно в пределах компании)
+createTransfer(CreateCashTransferCommand $command): CreateCashTransferResult
+
+// Атомарно soft-delete агрегат и обе ноги
+deleteTransfer(string $companyId, string $transferId, ?string $actorUserId = null, ?string $reason = null): void
+
+// Атомарно восстановить агрегат и обе ноги
+restoreTransfer(string $companyId, string $transferId, ?string $actorUserId = null): void
 
 // Чтение: постраничный список транзакций компании, per_page ≤ CashFacade::MAX_PER_PAGE (200)
 listTransactions(string $companyId, array $filters = [], int $page = 1, int $perPage = 50): array
@@ -793,7 +888,15 @@ upsertAutoRule(string $companyId, AutoRuleInput $input, ?string $actorUserId = n
 ```
 
 Все методы принимают `companyId` и бросают `\DomainException`, если компания или
-запрошенная сущность к ней не относится. Во входных DTO `null` означает «не менять».
+запрошенная сущность к ней не относится. Во входных DTO `null` означает «не менять»,
+кроме tri-state поля `CashflowCategoryInput::parentId`: `parentIdProvided=false`
+сохраняет текущего родителя, UUID меняет его, а явный `null` при
+`parentIdProvided=true` переносит обычную категорию в root.
+
+Обычные root-категории ДДС хранят собственный `flowKind`; дочерние наследуют
+его от root. Обычные категории могут быть дочерними у `CF_OP`, `CF_FIN`, `CF_INV`
+или обычной нетехнической категории. `CF_TECH`, `CF_TECH_IN`, `CF_TECH_OUT`, `CF_UNALLOC`
+не принимают обычных потомков, а `TECHNICAL` зарезервирован для системных категорий.
 
 **Назначение:** `CashFacade` — единственный публичный контракт Cash-модуля для чтения и записи данных ДДС из других модулей (в том числе из MCP-инструментов).
 
@@ -2657,6 +2760,11 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.76 | 2026-08-10 | Cash/MCP: обычные root-категории ДДС, защищённые системные ветки и tri-state `parentId` для переноса в root |
+| 1.75 | 2026-08-09 | Cash: tenant-safe UI агрегата перевода, selector валюты ДДС и read-only verifier целостности |
+| 1.74 | 2026-08-09 | Cash: атомарный lifecycle пары перевода, защищённые generic mutations, currency-safe отчёт/дашборд/list/export |
+| 1.73 | 2026-08-09 | Cash: атомарный агрегат перевода, две технические ноги, точный effective FX rate и company-scoped idempotency |
+| 1.72 | 2026-08-09 | Cash: единый fiat-контракт RUB/USD/EUR/KZT, неизменяемая валюта счёта, company-scoped transaction writers, currency-safe imports и RUB-only PaymentPlan matching |
 | 1.71 | 2026-08-04 | Company: `CompanyFacade::listAccessibleCompaniesForUser()` и `userHasAccess()` — доступ и список компаний пользователя (owned + активный CompanyMember), для межкомпанийных операций (Finance: импорт дерева ОПиУ между своими компаниями) |
 | 1.70 | 2026-08-02 | Doc sync с кодом: legacy-зона (`src/Entity|Service|Repository|Controller`) отмечена пустой — сущности уже переехали в `Finance/Entity/` и `Company/Entity/`; `Catalog` перестал считаться полностью мигрированным (`Product` всё ещё на `Company $company`); в карту модулей добавлены `Mcp` и `Report` |
 | 1.69 | 2026-07-28 | MCP/Company: read-only `company_find_by_name` глобально разрешает точное название компании без учёта регистра в единственный ID; отсутствие и дубли возвращаются как ожидаемая ошибка |

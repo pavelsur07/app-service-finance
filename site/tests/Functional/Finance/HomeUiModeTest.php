@@ -14,7 +14,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 final class HomeUiModeTest extends WebTestCaseBase
 {
-    private const DASHBOARD_URL = '/dashboard';
+    /** Финансовый дашборд: «/» отдан роутеру лендинга, «/dashboard» — React-пилоту. */
+    private const DASHBOARD_URL = '/finance';
 
     public function testDashboardUsesLegacyModeByDefault(): void
     {

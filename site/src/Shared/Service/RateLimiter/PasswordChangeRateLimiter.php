@@ -22,12 +22,12 @@ final class PasswordChangeRateLimiter
             return $this->factory->create($identifier)->consume($tokens)->isAccepted();
         }
 
-        // Fail-open, но с сигналом: без factory защитный контроль фактически отключён
-        $this->logger->warning('Password change rate limiter factory is missing, request allowed', [
+        // Fail-close: без factory защитный контроль недоступен, поэтому блокируем операцию
+        $this->logger->error('Password change rate limiter factory is missing, request blocked', [
             'identifier' => $identifier,
         ]);
 
-        return true;
+        return false;
     }
 
     public function reset(string $identifier): void

@@ -40,12 +40,21 @@ final readonly class CashflowCategoryStructureMigrator
         );
     }
 
+    /** @return list<string> */
+    public function findCompanyIdsWithMoneyAccounts(): array
+    {
+        return array_map(
+            static fn (mixed $id): string => (string) $id,
+            $this->connection->fetchFirstColumn('SELECT DISTINCT company_id FROM money_account ORDER BY company_id'),
+        );
+    }
+
     /**
      * @return array{
      *     companyId: string,
      *     conflicts: list<string>,
+     *     warnings: list<string>,
      *     categories: array<string, array{id: string, create: bool, name: string, flowKind: string, sort: int, parentId: ?string}>,
-     *     rootsToMove: list<array{id: string, flowKind: string}>
      * }
      */
     public function plan(string $companyId): array
@@ -57,6 +66,17 @@ final readonly class CashflowCategoryStructureMigrator
         );
 
         $conflicts = [];
+        $legacyTechnicalRootIds = array_fill_keys(array_map(
+            static fn (mixed $id): string => (string) $id,
+            $this->connection->fetchFirstColumn(
+                'SELECT id FROM cashflow_categories WHERE company_id = :companyId AND parent_id IS NULL AND is_system = FALSE AND flow_kind = :flowKind',
+                ['companyId' => $companyId, 'flowKind' => CashflowFlowKind::TECHNICAL->value],
+            ),
+        ), true);
+        $warnings = [] === $legacyTechnicalRootIds ? [] : [sprintf(
+            'Найдены обычные root-категории с TECHNICAL: %d. Автоматические изменения не применяются.',
+            count($legacyTechnicalRootIds),
+        )];
         $resolved = [];
         $assignedIds = [];
 
@@ -96,7 +116,8 @@ final readonly class CashflowCategoryStructureMigrator
                         static fn (array $row): bool => $row['name'] === $definition['name']
                             && $row['parent_id'] === $expectedParentId
                             && null === $row['system_code']
-                            && !isset($assignedIds[$row['id']]),
+                            && !isset($assignedIds[$row['id']])
+                            && !isset($legacyTechnicalRootIds[$row['id']]),
                     ));
                 }
             }
@@ -124,81 +145,20 @@ final readonly class CashflowCategoryStructureMigrator
             $assignedIds[$id] = true;
         }
 
-        if ([] !== $conflicts || !isset($resolved[CashflowCategory::CODE_OPERATING])) {
-            return [
-                'companyId' => $companyId,
-                'conflicts' => $conflicts,
-                'categories' => $resolved,
-                'rootsToMove' => [],
-            ];
-        }
-
-        $rootsToMove = [];
-        $childrenByParent = [];
-        foreach ($rows as $row) {
-            if (null !== $row['parent_id']) {
-                $childrenByParent[$row['parent_id']][] = $row['id'];
-            }
-        }
-
-        foreach ($rows as $row) {
-            if (null !== $row['parent_id'] || isset($assignedIds[$row['id']])) {
-                continue;
-            }
-
-            try {
-                $depth = $this->subtreeDepth($row['id'], $childrenByParent);
-            } catch (\LogicException) {
-                $conflicts[] = sprintf('Категория %s содержит цикл в иерархии.', $row['id']);
-                continue;
-            }
-
-            if ($depth >= 5) {
-                $conflicts[] = sprintf('Категория %s имеет глубину %d и после переноса превысит лимит 5.', $row['id'], $depth);
-                continue;
-            }
-
-            if (!in_array($row['flow_kind'], array_column(CashflowFlowKind::cases(), 'value'), true)) {
-                $conflicts[] = sprintf('Категория %s имеет неизвестный flow_kind %s.', $row['id'], $row['flow_kind']);
-                continue;
-            }
-
-            $rootsToMove[] = [
-                'id' => $row['id'],
-                'flowKind' => $row['flow_kind'],
-            ];
-        }
-
         return [
             'companyId' => $companyId,
             'conflicts' => $conflicts,
+            'warnings' => $warnings,
             'categories' => $resolved,
-            'rootsToMove' => $rootsToMove,
         ];
-    }
-
-    /** @param array<string, list<string>> $childrenByParent */
-    private function subtreeDepth(string $id, array $childrenByParent, array $path = []): int
-    {
-        if (isset($path[$id])) {
-            throw new \LogicException('Cycle detected.');
-        }
-
-        $path[$id] = true;
-        $maxChildDepth = 0;
-        foreach ($childrenByParent[$id] ?? [] as $childId) {
-            $maxChildDepth = max($maxChildDepth, $this->subtreeDepth($childId, $childrenByParent, $path));
-        }
-
-        return 1 + $maxChildDepth;
     }
 
     /**
      * @param array{
      *     companyId: string,
      *     conflicts: list<string>,
+     *     warnings: list<string>,
      *     categories: array<string, array{id: string, create: bool, name: string, flowKind: string, sort: int, parentId: ?string}>,
-     *     rootsToMove: list<array{id: string, flowKind: string}>
      * } $plan
      */
     public function execute(array $plan): void
@@ -261,23 +221,6 @@ final readonly class CashflowCategoryStructureMigrator
                 CashflowCategory::CODE_TECHNICAL,
             ] as $rootCode) {
                 $root = $plan['categories'][$rootCode];
-                $this->updateSubtreeFlowKind($root['id'], $plan['companyId'], $root['flowKind']);
-            }
-
-            foreach ($plan['rootsToMove'] as $root) {
-                $targetParentCode = match ($root['flowKind']) {
-                    CashflowFlowKind::FINANCING->value => CashflowCategory::CODE_FINANCING,
-                    CashflowFlowKind::INVESTING->value => CashflowCategory::CODE_INVESTING,
-                    CashflowFlowKind::TECHNICAL->value => CashflowCategory::CODE_TECHNICAL,
-                    CashflowFlowKind::OPERATING->value => CashflowCategory::CODE_OPERATING,
-                    default => throw new \LogicException(sprintf('Unknown flow kind %s.', $root['flowKind'])),
-                };
-                $parentId = $plan['categories'][$targetParentCode]['id'];
-
-                $this->connection->executeStatement(
-                    'UPDATE cashflow_categories SET parent_id = :parentId WHERE id = :rootId AND company_id = :companyId',
-                    ['parentId' => $parentId, 'rootId' => $root['id'], 'companyId' => $plan['companyId']],
-                );
                 $this->updateSubtreeFlowKind($root['id'], $plan['companyId'], $root['flowKind']);
             }
         });

@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Service\Category;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Enum\Transaction\CashflowFlowKind;
 use App\Cash\Service\Category\CashflowCategoryStructureMigrator;
 use App\Company\Entity\Company;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Tester\CommandTester;
 
 final class CashflowCategoryStructureMigratorTest extends IntegrationTestCase
 {
@@ -22,7 +27,7 @@ final class CashflowCategoryStructureMigratorTest extends IntegrationTestCase
         $financingRoot = $this->createCategory('33333333-3333-4333-8333-333333333333', $company, 'Кредитные операции', null, CashflowFlowKind::FINANCING);
         $financingChild = $this->createCategory('33333333-3333-4333-8333-333333333334', $company, 'Получение кредита', $financingRoot, CashflowFlowKind::FINANCING);
         $investingRoot = $this->createCategory('33333333-3333-4333-8333-333333333335', $company, 'Инвестиционные проекты', null, CashflowFlowKind::INVESTING);
-        $technicalRoot = $this->createCategory('33333333-3333-4333-8333-333333333336', $company, 'Служебные операции', null, CashflowFlowKind::TECHNICAL);
+        $technicalRoot = $this->createCategory('33333333-3333-4333-8333-333333333336', $company, 'Технические операции', null, CashflowFlowKind::TECHNICAL);
         $canonicalFinancing = $this->createCategory('33333333-3333-4333-8333-333333333337', $company, 'Финансовая деятельность');
         $canonicalFinancingChild = $this->createCategory('33333333-3333-4333-8333-333333333338', $company, 'Финансовая категория', $canonicalFinancing);
         $legacyUnallocated = $this->createCategory('33333333-3333-4333-8333-333333333339', $company, 'Не распределено');
@@ -36,12 +41,11 @@ final class CashflowCategoryStructureMigratorTest extends IntegrationTestCase
 
         self::assertSame([], $plan['conflicts']);
         self::assertCount(5, array_filter($plan['categories'], static fn (array $category): bool => $category['create']));
-        self::assertSame([
-            ['id' => $operatingRoot->getId(), 'flowKind' => CashflowFlowKind::OPERATING->value],
-            ['id' => $financingRoot->getId(), 'flowKind' => CashflowFlowKind::FINANCING->value],
-            ['id' => $investingRoot->getId(), 'flowKind' => CashflowFlowKind::INVESTING->value],
-            ['id' => $technicalRoot->getId(), 'flowKind' => CashflowFlowKind::TECHNICAL->value],
-        ], $plan['rootsToMove']);
+        self::assertCount(1, $plan['warnings']);
+        self::assertStringContainsString('TECHNICAL: 1', $plan['warnings'][0]);
+        self::assertStringNotContainsString((string) $technicalRoot->getId(), $plan['warnings'][0]);
+        self::assertStringNotContainsString($technicalRoot->getName(), $plan['warnings'][0]);
+        self::assertArrayNotHasKey('rootsToMove', $plan);
 
         $migrator->execute($plan);
         $this->em->clear();
@@ -69,10 +73,15 @@ final class CashflowCategoryStructureMigratorTest extends IntegrationTestCase
             $byCode[CashflowCategory::CODE_TECHNICAL_OUT]['parent_id'],
         );
 
-        $this->assertMovedTree($operatingRoot, $operatingChild, $byCode[CashflowCategory::CODE_OPERATING]['id'], CashflowFlowKind::OPERATING);
-        $this->assertMovedTree($financingRoot, $financingChild, $byCode[CashflowCategory::CODE_FINANCING]['id'], CashflowFlowKind::FINANCING);
-        $this->assertMovedTree($investingRoot, null, $byCode[CashflowCategory::CODE_INVESTING]['id'], CashflowFlowKind::INVESTING);
-        $this->assertMovedTree($technicalRoot, null, $byCode[CashflowCategory::CODE_TECHNICAL]['id'], CashflowFlowKind::TECHNICAL);
+        $this->assertPreservedTree($operatingRoot, $operatingChild, CashflowFlowKind::OPERATING);
+        $this->assertPreservedTree($financingRoot, $financingChild, CashflowFlowKind::FINANCING);
+        $this->assertPreservedTree($investingRoot, null, CashflowFlowKind::INVESTING);
+        $this->assertPreservedTree($technicalRoot, null, CashflowFlowKind::TECHNICAL);
+
+        $preservedTechnicalRoot = $this->em->find(CashflowCategory::class, $technicalRoot->getId());
+        self::assertInstanceOf(CashflowCategory::class, $preservedTechnicalRoot);
+        self::assertFalse($preservedTechnicalRoot->isSystem());
+        self::assertNull($preservedTechnicalRoot->getSystemCode());
 
         $canonicalChild = $this->connection->fetchAssociative(
             'SELECT parent_id, flow_kind FROM cashflow_categories WHERE id = :id',
@@ -83,8 +92,19 @@ final class CashflowCategoryStructureMigratorTest extends IntegrationTestCase
 
         $secondPlan = $migrator->plan((string) $company->getId());
         self::assertSame([], $secondPlan['conflicts']);
-        self::assertSame([], $secondPlan['rootsToMove']);
+        self::assertCount(1, $secondPlan['warnings']);
         self::assertCount(0, array_filter($secondPlan['categories'], static fn (array $category): bool => $category['create']));
+
+        $categoryCount = (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM cashflow_categories WHERE company_id = :companyId',
+            ['companyId' => $company->getId()],
+        );
+        $migrator->execute($secondPlan);
+        self::assertSame($categoryCount, (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM cashflow_categories WHERE company_id = :companyId',
+            ['companyId' => $company->getId()],
+        ));
+        $this->assertPreservedTree($technicalRoot, null, CashflowFlowKind::TECHNICAL);
     }
 
     public function testReportsAmbiguousRootNamesWithoutChangingData(): void
@@ -104,10 +124,54 @@ final class CashflowCategoryStructureMigratorTest extends IntegrationTestCase
         ));
     }
 
-    private function persistCompany(): Company
+    public function testReadOnlyCommandScopesCompaniesByMoneyAccountsAndDoesNotExposeIds(): void
     {
-        $user = UserBuilder::aUser()->build();
-        $company = CompanyBuilder::aCompany()->withOwner($user)->build();
+        $companyWithAccount = $this->persistCompany(1);
+        $companyWithoutAccount = $this->persistCompany(2);
+        $account = new MoneyAccount(
+            '44444444-4444-4444-8444-444444444444',
+            $companyWithAccount,
+            MoneyAccountType::BANK,
+            'Основной счёт',
+            'RUB',
+        );
+        $this->em->persist($account);
+        $legacyTechnicalRoot = $this->createCategory(
+            '55555555-5555-4555-8555-555555555555',
+            $companyWithAccount,
+            'Legacy technical category name',
+            null,
+            CashflowFlowKind::TECHNICAL,
+        );
+        $this->em->flush();
+
+        self::assertSame(
+            [(string) $companyWithAccount->getId()],
+            self::getContainer()->get(CashflowCategoryStructureMigrator::class)->findCompanyIdsWithMoneyAccounts(),
+        );
+
+        $application = new Application(self::$kernel);
+        $tester = new CommandTester($application->find('app:cashflow-categories:migrate-system-structure'));
+        $tester->execute(['--companies-with-accounts' => true]);
+        $output = $tester->getDisplay();
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $output);
+        self::assertStringContainsString('Компаний в scope', $output);
+        self::assertStringContainsString('Создать категорий', $output);
+        self::assertStringContainsString('С legacy TECHNICAL root', $output);
+        self::assertStringContainsString('изменяются автоматически', $output);
+        self::assertStringNotContainsString((string) $companyWithAccount->getId(), $output);
+        self::assertStringNotContainsString((string) $companyWithoutAccount->getId(), $output);
+        self::assertStringNotContainsString((string) $account->getId(), $output);
+        self::assertStringNotContainsString((string) $legacyTechnicalRoot->getId(), $output);
+        self::assertStringNotContainsString($legacyTechnicalRoot->getName(), $output);
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM cashflow_categories'));
+    }
+
+    private function persistCompany(int $index = 1): Company
+    {
+        $user = UserBuilder::aUser()->withIndex($index)->build();
+        $company = CompanyBuilder::aCompany()->withIndex($index)->withOwner($user)->build();
         $this->em->persist($user);
         $this->em->persist($company);
 
@@ -130,29 +194,28 @@ final class CashflowCategoryStructureMigratorTest extends IntegrationTestCase
         return $category;
     }
 
-    private function assertMovedTree(
+    private function assertPreservedTree(
         CashflowCategory $root,
         ?CashflowCategory $child,
-        string $expectedParentId,
         CashflowFlowKind $flowKind,
     ): void {
-        $movedRoot = $this->connection->fetchAssociative(
+        $preservedRoot = $this->connection->fetchAssociative(
             'SELECT parent_id, flow_kind FROM cashflow_categories WHERE id = :id',
             ['id' => $root->getId()],
         );
-        self::assertSame($expectedParentId, $movedRoot['parent_id']);
-        self::assertSame($flowKind->value, $movedRoot['flow_kind']);
+        self::assertNull($preservedRoot['parent_id']);
+        self::assertSame($flowKind->value, $preservedRoot['flow_kind']);
 
         if (null === $child) {
             return;
         }
 
-        $movedChild = $this->connection->fetchAssociative(
+        $preservedChild = $this->connection->fetchAssociative(
             'SELECT parent_id, flow_kind FROM cashflow_categories WHERE id = :id',
             ['id' => $child->getId()],
         );
-        self::assertSame($root->getId(), $movedChild['parent_id']);
-        self::assertSame($flowKind->value, $movedChild['flow_kind']);
+        self::assertSame($root->getId(), $preservedChild['parent_id']);
+        self::assertSame($flowKind->value, $preservedChild['flow_kind']);
     }
 
     /** @return list<string> */

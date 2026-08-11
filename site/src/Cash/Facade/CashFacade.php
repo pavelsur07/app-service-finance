@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace App\Cash\Facade;
 
+use App\Cash\Application\CashTransferLifecycleAction;
+use App\Cash\Application\CreateCashTransferAction;
 use App\Cash\Application\DTO\AutoRuleConditionInput;
 use App\Cash\Application\DTO\AutoRuleInput;
 use App\Cash\Application\DTO\CashflowCategoryInput;
 use App\Cash\Application\DTO\CreateCashTransactionCommand;
 use App\Cash\Application\DTO\CreateCashTransactionResult;
+use App\Cash\Application\DTO\CreateCashTransferCommand;
+use App\Cash\Application\DTO\CreateCashTransferResult;
 use App\Cash\Application\SaveCashflowCategoryAction;
 use App\Cash\Application\SaveCashTransactionAutoRuleAction;
 use App\Cash\DTO\CashTransactionDTO;
@@ -44,7 +48,28 @@ final readonly class CashFacade
         private CompanyFacade $companyFacade,
         private SaveCashflowCategoryAction $saveCategory,
         private SaveCashTransactionAutoRuleAction $saveAutoRule,
+        private CreateCashTransferAction $createCashTransfer,
+        private CashTransferLifecycleAction $cashTransferLifecycle,
     ) {
+    }
+
+    public function createTransfer(CreateCashTransferCommand $command): CreateCashTransferResult
+    {
+        return ($this->createCashTransfer)($command);
+    }
+
+    public function deleteTransfer(
+        string $companyId,
+        string $transferId,
+        ?string $actorUserId = null,
+        ?string $reason = null,
+    ): void {
+        $this->cashTransferLifecycle->delete($companyId, $transferId, $actorUserId, $reason);
+    }
+
+    public function restoreTransfer(string $companyId, string $transferId, ?string $actorUserId = null): void
+    {
+        $this->cashTransferLifecycle->restore($companyId, $transferId, $actorUserId);
     }
 
     /**
@@ -128,8 +153,8 @@ final readonly class CashFacade
         if (null !== $input->name) {
             $category->setName($input->name);
         }
-        if (null !== $input->parentId) {
-            $category->setParent($this->requireCategory($input->parentId, $company));
+        if ($input->parentIdProvided || null !== $input->parentId) {
+            $category->setParent(null === $input->parentId ? null : $this->requireCategory($input->parentId, $company));
         }
         if (null !== $input->description) {
             $category->setDescription($input->description);

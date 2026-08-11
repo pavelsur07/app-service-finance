@@ -144,7 +144,7 @@ final class ModuleAccessTest extends WebTestCaseBase
         $this->setClientSessionValue($client, 'active_company_id', $company->getId());
 
         $client->request('GET', '/');
-        self::assertResponseRedirects('/dashboard');
+        self::assertResponseRedirects('/finance');
     }
 
     public function testRootRedirectsMarketplaceOnlyMemberToMarketplace(): void

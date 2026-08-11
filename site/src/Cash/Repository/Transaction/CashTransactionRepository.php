@@ -8,6 +8,7 @@ use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashflowFlowKind;
 use App\Company\Entity\Company;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
@@ -30,6 +31,52 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->setParameter('companyId', $companyId)
             ->getQuery()
             ->getOneOrNullResult();
+    }
+
+    /**
+     * @param list<string> $ids
+     *
+     * @return list<CashTransaction>
+     */
+    public function findActiveByIdsAndCompanyId(array $ids, string $companyId): array
+    {
+        if ([] === $ids) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('t')
+            ->addSelect('moneyAccount')
+            ->innerJoin('t.moneyAccount', 'moneyAccount')
+            ->andWhere('t.id IN (:ids)')
+            ->andWhere('IDENTITY(t.company) = :companyId')
+            ->andWhere('t.deletedAt IS NULL')
+            ->setParameter('ids', $ids)
+            ->setParameter('companyId', $companyId)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * @param list<string> $transactionIds
+     */
+    public function hasAnyTransferAggregateByIdsAndCompanyId(array $transactionIds, string $companyId): bool
+    {
+        if ([] === $transactionIds) {
+            return false;
+        }
+
+        return (bool) $this->getEntityManager()->getConnection()->fetchOne(
+            'SELECT EXISTS ('
+            .' SELECT 1 FROM cash_transfer transfer'
+            .' INNER JOIN cash_transaction transaction'
+            .' ON (transaction.id = transfer.source_transaction_id OR transaction.id = transfer.target_transaction_id)'
+            .' WHERE transfer.company_id = :companyId'
+            .' AND transaction.company_id = :companyId'
+            .' AND transaction.id IN (:transactionIds)'
+            .')',
+            ['companyId' => $companyId, 'transactionIds' => $transactionIds],
+            ['transactionIds' => ArrayParameterType::STRING],
+        );
     }
 
     /** @return iterable<CashTransaction> */
@@ -382,6 +429,9 @@ class CashTransactionRepository extends ServiceEntityRepository
         if ($filters['direction'] ?? null) {
             $qb->andWhere('t.direction = :dir')->setParameter('dir', $filters['direction']);
         }
+        if ($filters['currency'] ?? null) {
+            $qb->andWhere('t.currency = :currency')->setParameter('currency', $filters['currency']);
+        }
         if ($filters['amountMin'] ?? null) {
             $qb->andWhere('t.amount >= :amin')->setParameter('amin', $filters['amountMin']);
         }
@@ -442,7 +492,7 @@ class CashTransactionRepository extends ServiceEntityRepository
         return $byAccountId;
     }
 
-    public function sumInflowByCompanyAndPeriodExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): string
+    public function sumInflowByCompanyAndPeriodExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to, string $currency): string
     {
         $result = $this->createQueryBuilder('t')
             ->select('COALESCE(SUM(t.amount), 0) as inflow')
@@ -450,6 +500,7 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->where('t.company = :company')
             ->andWhere('t.direction = :inflow')
             ->andWhere('t.currency = ma.currency')
+            ->andWhere('t.currency = :currency')
             ->andWhere('t.occurredAt BETWEEN :from AND :to')
             ->andWhere('t.isTransfer = :isTransfer')
             ->andWhere('t.deletedAt IS NULL')
@@ -458,6 +509,7 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->setParameter('to', $to->setTime(23, 59, 59))
             ->setParameter('inflow', CashDirection::INFLOW)
             ->setParameter('isTransfer', false)
+            ->setParameter('currency', $currency)
             ->getQuery()
             ->getSingleScalarResult();
 
@@ -467,7 +519,7 @@ class CashTransactionRepository extends ServiceEntityRepository
     /**
      * @return list<array{date:string,value:string}>
      */
-    public function sumInflowByDayExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    public function sumInflowByDayExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to, string $currency): array
     {
         $rows = $this->createQueryBuilder('t')
             ->select('t.occurredAt as date', 'COALESCE(SUM(t.amount), 0) as value')
@@ -475,6 +527,7 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->where('t.company = :company')
             ->andWhere('t.direction = :inflow')
             ->andWhere('t.currency = ma.currency')
+            ->andWhere('t.currency = :currency')
             ->andWhere('t.occurredAt BETWEEN :from AND :to')
             ->andWhere('t.isTransfer = :isTransfer')
             ->andWhere('t.deletedAt IS NULL')
@@ -485,6 +538,7 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->setParameter('to', $to->setTime(23, 59, 59))
             ->setParameter('inflow', CashDirection::INFLOW)
             ->setParameter('isTransfer', false)
+            ->setParameter('currency', $currency)
             ->getQuery()
             ->getArrayResult();
 
@@ -507,7 +561,7 @@ class CashTransactionRepository extends ServiceEntityRepository
     /**
      * @return array{OPERATING: float, INVESTING: float, FINANCING: float}
      */
-    public function sumNetByFlowKindExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    public function sumNetByFlowKindExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to, string $currency): array
     {
         $rows = $this->createQueryBuilder('t')
             ->select('category.flowKind as flowKind', 'COALESCE(SUM(split.amount), 0) as net')
@@ -516,6 +570,7 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->where('t.company = :company')
             ->andWhere('t.occurredAt BETWEEN :from AND :to')
             ->andWhere('t.isTransfer = :isTransfer')
+            ->andWhere('t.currency = :currency')
             ->andWhere('t.deletedAt IS NULL')
             ->andWhere('category.flowKind IS NOT NULL')
             ->groupBy('category.flowKind')
@@ -523,6 +578,7 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->setParameter('from', $from->setTime(0, 0))
             ->setParameter('to', $to->setTime(23, 59, 59))
             ->setParameter('isTransfer', false)
+            ->setParameter('currency', $currency)
             ->getQuery()
             ->getArrayResult();
 
@@ -548,7 +604,7 @@ class CashTransactionRepository extends ServiceEntityRepository
         return $result;
     }
 
-    public function sumOutflowExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): float
+    public function sumOutflowExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to, string $currency): float
     {
         $result = $this->createQueryBuilder('t')
             ->select('COALESCE(SUM(t.amount), 0) as outflow')
@@ -556,12 +612,14 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->andWhere('t.direction = :outflow')
             ->andWhere('t.occurredAt BETWEEN :from AND :to')
             ->andWhere('t.isTransfer = :isTransfer')
+            ->andWhere('t.currency = :currency')
             ->andWhere('t.deletedAt IS NULL')
             ->setParameter('company', $company)
             ->setParameter('from', $from->setTime(0, 0))
             ->setParameter('to', $to->setTime(23, 59, 59))
             ->setParameter('outflow', CashDirection::OUTFLOW)
             ->setParameter('isTransfer', false)
+            ->setParameter('currency', $currency)
             ->getQuery()
             ->getSingleScalarResult();
 
@@ -571,7 +629,7 @@ class CashTransactionRepository extends ServiceEntityRepository
     /**
      * @return list<array{categoryId:?string,categoryName:string,sumAbs:float}>
      */
-    public function sumOutflowByCategoryExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    public function sumOutflowByCategoryExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to, string $currency): array
     {
         $rows = $this->createQueryBuilder('t')
             // COALESCE по сумме обязателен: у транзакции без категории строк нет, и без него
@@ -583,6 +641,7 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->andWhere('t.direction = :outflow')
             ->andWhere('t.occurredAt BETWEEN :from AND :to')
             ->andWhere('t.isTransfer = :isTransfer')
+            ->andWhere('t.currency = :currency')
             ->andWhere('t.deletedAt IS NULL')
             ->groupBy('split.cashflowCategory', 'category.name')
             ->orderBy('sumAbs', 'DESC')
@@ -591,6 +650,7 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->setParameter('to', $to->setTime(23, 59, 59))
             ->setParameter('outflow', CashDirection::OUTFLOW)
             ->setParameter('isTransfer', false)
+            ->setParameter('currency', $currency)
             ->setParameter('uncategorized', 'Без категории')
             ->getQuery()
             ->getArrayResult();
@@ -605,7 +665,7 @@ class CashTransactionRepository extends ServiceEntityRepository
     /**
      * @return list<array{date:string,value:float}>
      */
-    public function sumOutflowByDayExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    public function sumOutflowByDayExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to, string $currency): array
     {
         $rows = $this->createQueryBuilder('t')
             ->select('t.occurredAt as date', 'COALESCE(SUM(t.amount), 0) as value')
@@ -613,6 +673,7 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->andWhere('t.direction = :outflow')
             ->andWhere('t.occurredAt BETWEEN :from AND :to')
             ->andWhere('t.isTransfer = :isTransfer')
+            ->andWhere('t.currency = :currency')
             ->andWhere('t.deletedAt IS NULL')
             ->groupBy('date')
             ->orderBy('date', 'ASC')
@@ -621,6 +682,7 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->setParameter('to', $to->setTime(23, 59, 59))
             ->setParameter('outflow', CashDirection::OUTFLOW)
             ->setParameter('isTransfer', false)
+            ->setParameter('currency', $currency)
             ->getQuery()
             ->getArrayResult();
 
@@ -640,7 +702,7 @@ class CashTransactionRepository extends ServiceEntityRepository
         return $series;
     }
 
-    public function sumCapexOutflowExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): float
+    public function sumCapexOutflowExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to, string $currency): float
     {
         $result = $this->createQueryBuilder('t')
             ->select('COALESCE(SUM(split.amount), 0) as outflow')
@@ -650,6 +712,7 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->andWhere('t.direction = :outflow')
             ->andWhere('t.occurredAt BETWEEN :from AND :to')
             ->andWhere('t.isTransfer = :isTransfer')
+            ->andWhere('t.currency = :currency')
             ->andWhere('category.systemCode = :systemCode')
             ->andWhere('t.deletedAt IS NULL')
             ->setParameter('company', $company)
@@ -657,6 +720,7 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->setParameter('to', $to->setTime(23, 59, 59))
             ->setParameter('outflow', CashDirection::OUTFLOW)
             ->setParameter('isTransfer', false)
+            ->setParameter('currency', $currency)
             ->setParameter('systemCode', 'CAPEX')
             ->getQuery()
             ->getSingleScalarResult();

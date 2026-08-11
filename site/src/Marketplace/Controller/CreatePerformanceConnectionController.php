@@ -55,13 +55,13 @@ final class CreatePerformanceConnectionController extends AbstractController
             throw $this->createAccessDeniedException('Недействительный CSRF-токен');
         }
 
-        $clientId     = trim((string) $request->request->get('client_id', ''));
+        $clientId = trim((string) $request->request->get('client_id', ''));
         $clientSecret = trim((string) $request->request->get('client_secret', ''));
 
         if ('' === $clientId || '' === $clientSecret) {
             $this->addFlash('error', 'Укажите client_id и client_secret Ozon Performance API.');
 
-            return $this->redirectToRoute('marketplace_index');
+            return $this->redirectToRoute('marketplace_connections_index');
         }
 
         $existing = $this->connectionRepository->findByCompanyMarketplaceAndType(
@@ -73,7 +73,7 @@ final class CreatePerformanceConnectionController extends AbstractController
         if (null !== $existing) {
             $this->addFlash('error', 'Подключение Ozon Performance API уже существует.');
 
-            return $this->redirectToRoute('marketplace_index');
+            return $this->redirectToRoute('marketplace_connections_index');
         }
 
         try {
@@ -81,7 +81,7 @@ final class CreatePerformanceConnectionController extends AbstractController
         } catch (OzonPerformanceValidationException $e) {
             $this->addFlash('error', $e->getMessage());
 
-            return $this->redirectToRoute('marketplace_index');
+            return $this->redirectToRoute('marketplace_connections_index');
         }
 
         $connection = new MarketplaceConnection(
@@ -98,6 +98,6 @@ final class CreatePerformanceConnectionController extends AbstractController
 
         $this->addFlash('success', 'Подключение Ozon Performance API создано.');
 
-        return $this->redirectToRoute('marketplace_index');
+        return $this->redirectToRoute('marketplace_connections_index');
     }
 }

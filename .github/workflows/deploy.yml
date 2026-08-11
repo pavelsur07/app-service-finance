@@ -61,10 +61,12 @@ jobs:
                       landing:
                         - 'landing/**'
 
-            # Собираем матрицу образов ровно под то, что изменилось:
+            # В PR собираем матрицу образов ровно под то, что изменилось:
             #   frontend        → site-nginx + site-php-fpm (оба пекут public/build)
             #   backend         → site-nginx + site-php-fpm + site-php-cli
             #   landing         → land-nginx
+            # На push в master с deployable-изменениями собираем полный набор:
+            # rolling deploy тянет все образы по единому commit SHA.
             - name: 🧩 Build image matrix
               id: matrix
               env:
@@ -73,6 +75,13 @@ jobs:
                   be='${{ steps.f.outputs.backend }}'
                   fe='${{ steps.f.outputs.frontend }}'
                   la='${{ steps.f.outputs.landing }}'
+
+                  if [ "$GITHUB_EVENT_NAME" = 'push' ] && [ "$GITHUB_REF" = 'refs/heads/master' ]; then
+                    if [ "$be" = 'true' ] || [ "$fe" = 'true' ] || [ "$la" = 'true' ]; then
+                      be=true
+                      la=true
+                    fi
+                  fi
 
                   if [ "$GITHUB_EVENT_NAME" = 'workflow_dispatch' ]; then
                     be=false
@@ -180,11 +189,53 @@ jobs:
                   cache-from: type=gha,scope=${{ matrix.service }}
                   cache-to: type=gha,scope=${{ matrix.service }},mode=max
 
-    # 2. ЭТАП ДЕПЛОЯ (rolling update — минимальный даунтайм)
-    #    Идёт только если что-то реально собралось (build success).
-    deploy:
+    # 2. ПРОВЕРКА СХЕМЫ — перед автоматическим или ручным deploy.
+    schema-ready:
+        name: 🔍 Verify production schema is ready
         needs: [ build-and-push, migrations-empty-db, api-types-check ]
-        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.production_action == 'deploy' && needs.build-and-push.result == 'success' && needs.migrations-empty-db.result == 'success' && needs.api-types-check.result == 'success' }}
+        if: ${{ !cancelled() && github.ref == 'refs/heads/master' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.production_action == 'deploy')) && needs.build-and-push.result == 'success' && needs.migrations-empty-db.result == 'success' && needs.api-types-check.result == 'success' }}
+        concurrency:
+            group: production-release
+            cancel-in-progress: false
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        steps:
+            - name: 🔐 Setup SSH key
+              uses: webfactory/ssh-agent@v0.8.0
+              with:
+                  ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+            - name: 🔍 Verify production schema is ready
+              run: |
+                  ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+                    set -e
+                    cd ${{ secrets.SERVER_DIR }}/current
+
+                    export APP_ENV="${{ secrets.APP_ENV }}"
+                    export APP_SECRET="${{ secrets.APP_SECRET }}"
+                    export DATABASE_URL="${{ secrets.DATABASE_URL }}"
+                    export POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
+                    export SITE_MAILER_DSN="${{ secrets.SITE_MAILER_DSN }}"
+                    export SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
+                    export SENTRY_RELEASE="${{ github.sha }}"
+                    export IMAGE_TAG="${{ github.sha }}"
+                    export HEALTH_CHECK_TOKEN="${{ secrets.HEALTH_CHECK_TOKEN }}"
+                    export APP_OBJECT_STORAGE_S3_ACCESS_KEY="${{ secrets.APP_OBJECT_STORAGE_S3_ACCESS_KEY }}"
+                    export APP_OBJECT_STORAGE_S3_SECRET_KEY="${{ secrets.APP_OBJECT_STORAGE_S3_SECRET_KEY }}"
+                    export APP_ENCRYPTION_FALLBACK_KEY="${{ secrets.APP_ENCRYPTION_FALLBACK_KEY }}"
+                    export APP_ENCRYPTION_KEYS_JSON='${{ secrets.APP_ENCRYPTION_KEYS_JSON }}'
+                    export APP_ENCRYPTION_CURRENT_KEY_VERSION="${{ secrets.APP_ENCRYPTION_CURRENT_KEY_VERSION }}"
+
+                    docker compose -f docker-compose.prod.yml pull site-php-cli
+                    docker compose -f docker-compose.prod.yml run --rm --no-deps -T site-php-cli bin/console doctrine:migrations:up-to-date --no-interaction
+                  EOF
+
+    # 3. ЭТАП ДЕПЛОЯ (rolling update — минимальный даунтайм).
+    #    Автоматически после push в master или вручную через production_action=deploy.
+    #    Всегда только после schema-ready.
+    deploy:
+        needs: schema-ready
+        if: ${{ !cancelled() && github.ref == 'refs/heads/master' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.production_action == 'deploy')) && needs.schema-ready.result == 'success' }}
         concurrency:
             group: production-release
             cancel-in-progress: false
@@ -276,7 +327,7 @@ jobs:
                     echo "✅ Деплой завершён без даунтайма"
                   EOF
 
-    # 3. ЭТАП МИГРАЦИЙ — отдельный ручной gate для уже развёрнутого commit SHA.
+    # 4. ЭТАП МИГРАЦИЙ — отдельный ручной gate до deploy нового commit SHA.
     migrations:
         needs: changes
         if: ${{ !cancelled() && needs.changes.result == 'success' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.production_action == 'migrations' }}
@@ -296,29 +347,6 @@ jobs:
                     set -e
                     cd ${{ secrets.SERVER_DIR }}/current
 
-                    echo "⏳ Ожидаем готовности site-php-fpm (до 90с)..."
-                    for i in $(seq 1 30); do
-                      STATUS=$(docker inspect --format='{{.State.Health.Status}}' site-php-fpm 2>/dev/null || echo "not_found")
-                      if [ "$STATUS" = "healthy" ]; then
-                        echo "✅ site-php-fpm healthy"
-                        break
-                      fi
-                      echo "  попытка $i/30: status=$STATUS"
-                      sleep 3
-                    done
-                    if [ "$STATUS" != "healthy" ]; then
-                      echo "❌ site-php-fpm не стал healthy за 90с"
-                      exit 1
-                    fi
-
-                    DEPLOYED_RELEASE=$(docker inspect --format='{{range .Config.Env}}{{println .}}{{end}}' site-php-fpm | sed -n 's/^SENTRY_RELEASE=//p')
-                    DEPLOYED_IMAGE=$(docker inspect --format='{{.Config.Image}}' site-php-fpm)
-                    EXPECTED_IMAGE="ghcr.io/pavelsur07/site-php-fpm:${{ github.sha }}"
-                    if [ "$DEPLOYED_RELEASE" != "${{ github.sha }}" ] || [ "$DEPLOYED_IMAGE" != "$EXPECTED_IMAGE" ]; then
-                      echo "❌ Deployed release does not match the selected migration ref"
-                      exit 1
-                    fi
-
                     echo "🚧 Выполняем миграции"
                     export APP_ENV="${{ secrets.APP_ENV }}"
                     export APP_SECRET="${{ secrets.APP_SECRET }}"
@@ -335,11 +363,12 @@ jobs:
                     export APP_ENCRYPTION_KEYS_JSON='${{ secrets.APP_ENCRYPTION_KEYS_JSON }}'
                     export APP_ENCRYPTION_CURRENT_KEY_VERSION="${{ secrets.APP_ENCRYPTION_CURRENT_KEY_VERSION }}"
 
-                    docker compose -f docker-compose.prod.yml run --rm site-php-cli bin/console doctrine:migrations:migrate --no-interaction
+                    docker compose -f docker-compose.prod.yml pull site-php-cli
+                    docker compose -f docker-compose.prod.yml run --rm --no-deps -T site-php-cli bin/console doctrine:migrations:migrate --no-interaction
                     echo "✅ Миграции применены"
                   EOF
 
-    # 4. ТЕСТЫ НА ПУСТОЙ БД — только при изменении бэкенда.
+    # 5. ТЕСТЫ НА ПУСТОЙ БД — только при изменении бэкенда.
     migrations-empty-db:
         needs: changes
         if: ${{ needs.changes.outputs.backend == 'true' }}
@@ -409,7 +438,7 @@ jobs:
                   MESSENGER_TRANSPORT_DSN: "redis://127.0.0.1:6379/messages"
               run: php bin/console doctrine:migrations:migrate --no-interaction
 
-    # 5. ПРОВЕРКА СИНХРОНИЗАЦИИ API-ТИПОВ — при изменении бэкенда или фронта.
+    # 6. ПРОВЕРКА СИНХРОНИЗАЦИИ API-ТИПОВ — при изменении бэкенда или фронта.
     api-types-check:
         name: 🔍 Check API types sync
         needs: changes

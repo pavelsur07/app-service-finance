@@ -42,8 +42,11 @@ openssl rand -base64 32
 
 ### 3. Деплой
 
-Вручную запустить workflow `🚀 Deploy to Production` с action `deploy` на
-текущем `master`. Обычный push и re-run CI production не меняют. После деплоя:
+После обновления secrets вручную запустить workflow `🚀 Deploy to Production`
+с action `deploy` на текущем `master`, если нового deployable-коммита нет.
+Push deployable-изменений в `master` запускает тот же production deploy
+автоматически; ручной action нужен для повторного deploy без нового коммита.
+После деплоя:
 - старые строки (`v1`) читаются через карту — ничего не ломается;
 - новые/изменённые подключения шифруются уже `v2`.
 

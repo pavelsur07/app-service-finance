@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Cash\Service\Import\Bank;
 
 use App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver;
@@ -7,6 +9,7 @@ use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Bank\BankConnection;
 use App\Cash\Entity\Import\ImportLog;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Bank\BankImportCursorRepository;
@@ -19,7 +22,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 
-class BankImportService
+final class BankImportService
 {
     public function __construct(
         private readonly BankImportCursorRepository $cursorRepository,
@@ -41,7 +44,8 @@ class BankImportService
         $totalAccountsFound = 0;
         $matchedAccounts = 0;
         $transactionsCreated = 0;
-        $transactionsSkipped = 0;
+        $transactionsSkippedDuplicates = 0;
+        $transactionsErrors = 0;
 
         $importLog = $this->importLogger->start($company, 'bank:'.$bankCode, false, null, null);
 
@@ -102,7 +106,7 @@ class BankImportService
                             }
 
                             if ($this->cashTransactionRepository->findOneByImport($company->getId(), $bankCode, $externalId)) {
-                                ++$transactionsSkipped;
+                                ++$transactionsSkippedDuplicates;
                                 continue;
                             }
 
@@ -129,6 +133,18 @@ class BankImportService
                             }
 
                             $currency = $this->resolveCurrency($transaction, $moneyAccount->getCurrency());
+                            if (null === FiatCurrency::tryFrom($currency) || $currency !== $moneyAccount->getCurrency()) {
+                                ++$transactionsErrors;
+                                $this->importLogger->incError($importLog);
+                                $this->logger->warning('Bank import skipped transaction with invalid currency', [
+                                    'company' => $company->getId(),
+                                    'bank_code' => $bankCode,
+                                    'external_id' => $externalId,
+                                    'expected_currency' => $moneyAccount->getCurrency(),
+                                    'actual_currency' => $currency,
+                                ]);
+                                continue;
+                            }
                             $direction = $this->resolveDirection($transaction);
                             if (!$direction instanceof CashDirection) {
                                 continue;
@@ -173,12 +189,12 @@ class BankImportService
                 'accounts_found' => $totalAccountsFound,
                 'accounts_matched' => $matchedAccounts,
                 'transactions_created' => $transactionsCreated,
-                'transactions_skipped_duplicates' => $transactionsSkipped,
-            ], $transactionsCreated, $transactionsSkipped, 0);
+                'transactions_skipped_duplicates' => $transactionsSkippedDuplicates,
+            ], $transactionsCreated, $transactionsSkippedDuplicates, $transactionsErrors);
         } catch (\Throwable $exception) {
             $this->finishImportLog($importLog, [
                 'error' => $exception->getMessage(),
-            ], $transactionsCreated, $transactionsSkipped, 1);
+            ], $transactionsCreated, $transactionsSkippedDuplicates, $transactionsErrors + 1);
 
             throw $exception;
         }
@@ -299,7 +315,7 @@ class BankImportService
         }
 
         if (is_string($currency) && '' !== $currency) {
-            return strtoupper($currency);
+            return strtoupper(trim($currency));
         }
 
         return strtoupper($fallback);

@@ -1,10 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Cash\Service\PaymentPlan;
 
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\PaymentPlan\PaymentPlanMatch;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Cash\Repository\PaymentPlan\PaymentPlanMatchRepository;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
@@ -28,6 +31,10 @@ final class PaymentPlanMatcher
         $existingMatch = $this->paymentPlanMatchRepository->findOneByTransaction($transaction);
         if (null !== $existingMatch) {
             return $existingMatch->getPlan();
+        }
+
+        if (FiatCurrency::RUB->value !== $transaction->getCurrency()) {
+            return null;
         }
 
         $company = $transaction->getCompany();
