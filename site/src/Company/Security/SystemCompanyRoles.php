@@ -6,7 +6,7 @@ namespace App\Company\Security;
 
 /**
  * Системные шаблоны ролей (company_id IS NULL в company_role).
- * UUID фиксированы: миграция Version20260808120000 вставляет те же значения.
+ * UUID фиксированы: миграция Version20260811120000 вставляет те же значения.
  */
 final class SystemCompanyRoles
 {

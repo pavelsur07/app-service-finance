@@ -18,7 +18,7 @@ use Doctrine\Migrations\AbstractMigration;
  * Имена индексов/FK — по Doctrine-конвенции (см. doctrine:schema:create --dump-sql),
  * чтобы schema:validate не показывал расхождений.
  */
-final class Version20260808120000 extends AbstractMigration
+final class Version20260811120000 extends AbstractMigration
 {
     public function isTransactional(): bool
     {

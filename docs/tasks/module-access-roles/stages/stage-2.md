@@ -14,7 +14,7 @@
 #### What was done
 
 - `CompanyInvite.accessRole` (ManyToOne → `CompanyRole`, nullable), getter/setter, builder `withAccessRole`.
-- Миграция `Version20260808130000` — `company_invites.role_id` + индекс + FK `ON DELETE SET NULL` (идемпотентный DO-блок).
+- Миграция `Version20260811130000` (перенумерована в Stage 3) — `company_invites.role_id` + индекс + FK `ON DELETE SET NULL` (идемпотентный DO-блок).
 - CRUD `CompanyRoleController` (`/company/roles`) только для владельца компании:
   - `index` — системные шаблоны (read-only) + шаблоны компании;
   - `new`/`create` и `edit`/`update` — форма с матрицей прав «нет/чтение/запись» по 5 модулям;
@@ -35,7 +35,7 @@
 
 #### Files changed
 
-- `site/migrations/Version20260808130000.php` — new
+- `site/migrations/Version20260811130000.php` — new
 - `site/src/Company/Controller/CompanyRoleController.php` — new
 - `site/src/Company/Form/CompanyRoleType.php` — new
 - `site/templates/company/role/index.html.twig` — new
@@ -80,7 +80,7 @@
 - `docker compose run --rm site-php-cli php bin/phpunit tests/Functional/Company tests/Functional/Analytics` — OK (63 tests, 406 assertions)
 - `docker compose run --rm -e COMPOSER_PROCESS_TIMEOUT=0 site-php-cli composer test:functional` — OK (447 tests, 2637 assertions)
 - `docker compose run --rm -e COMPOSER_PROCESS_TIMEOUT=0 site-php-cli composer test:integration` — 8 pre-existing failures (Verified on base `77325276`; unrelated to Stage 2)
-- `make site-test-db-rebuild` — OK, миграции до `Version20260808130000`
+- `make site-test-db-rebuild` — OK, миграции до `Version20260811130000` (перенумерована в Stage 3)
 - `doctrine:schema:update --dump-sql --env=test` — по новым объектам чисто
 
 #### Internal automatic review

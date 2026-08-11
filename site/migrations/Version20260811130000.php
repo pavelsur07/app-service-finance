@@ -14,7 +14,7 @@ use Doctrine\Migrations\AbstractMigration;
  *
  * Имена индекса/FK — по Doctrine-конвенции (см. doctrine:schema:create --dump-sql).
  */
-final class Version20260808130000 extends AbstractMigration
+final class Version20260811130000 extends AbstractMigration
 {
     public function isTransactional(): bool
     {

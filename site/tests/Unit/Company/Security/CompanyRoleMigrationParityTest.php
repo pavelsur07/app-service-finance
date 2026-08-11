@@ -9,13 +9,13 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Защита от дрейфа между SystemCompanyRoles::definitions() и SQL-сидером миграции.
- * Миграция Version20260808120000 дублирует значения definitions; этот тест проверяет идентичность.
+ * Миграция Version20260811120000 дублирует значения definitions; этот тест проверяет идентичность.
  */
 final class CompanyRoleMigrationParityTest extends TestCase
 {
     public function testMigrationSeedMatchesSystemCompanyRolesDefinitions(): void
     {
-        $migrationPath = \dirname(__DIR__, 4).'/migrations/Version20260808120000.php';
+        $migrationPath = \dirname(__DIR__, 4).'/migrations/Version20260811120000.php';
         self::assertFileExists($migrationPath);
 
         $migrationSource = file_get_contents($migrationPath);

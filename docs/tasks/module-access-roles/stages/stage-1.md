@@ -14,7 +14,7 @@
 #### What was done
 
 - Введена матрица доступа «модуль × уровень» (Module/AccessLevel enums) и атрибуты `module.<group>.(read|write)`.
-- Создана сущность `CompanyRole` (шаблон прав) + `CompanyRoleRepository`, миграция `Version20260808120000`.
+- Создана сущность `CompanyRole` (шаблон прав) + `CompanyRoleRepository`, миграция `Version20260811120000` (перенумерована в Stage 3).
 - Добавлена связь `CompanyMember.accessRole → CompanyRole` (`role_id` nullable, ON DELETE SET NULL); строковая роль `company_members.role` сохранена как BC-fallback.
 - Системные шаблоны: «Владелец», «Полный доступ», «Финансист», «Менеджер маркетплейсов», «Менеджер по продажам» (UUID фиксированы, совпадают в SQL и `SystemCompanyRoles`).
 - `ActiveCompanyService` получил `getActiveMembership()` + per-request мемоизацию с инвалидацией по ключу (пользователь, active_company_id) и `ResetInterface`.
@@ -31,7 +31,7 @@
 - `site/src/Company/Entity/CompanyRole.php` — new
 - `site/src/Company/Repository/CompanyRoleRepository.php` — new
 - `site/src/Shared/Controller/HomeRedirectController.php` — new
-- `site/migrations/Version20260808120000.php` — new
+- `site/migrations/Version20260811120000.php` — new
 - `site/tests/Unit/Company/Security/{AccessLevelTest,ModuleAccessTest,ModuleAccessMapTest,ModuleAccessResolverTest,ModuleAccessVoterTest,ControllerAccessCoverageTest,CompanyRoleMigrationParityTest}.php` — new
 - `site/tests/Functional/Company/{ModuleAccessTest,SystemCompanyRolesTest}.php` — new
 - `site/tests/Support/Db/SystemCompanyRolesSeeder.php` — new
