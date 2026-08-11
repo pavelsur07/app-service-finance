@@ -30,6 +30,7 @@
             </li>
 
             <!-- Деньги -->
+            {% if is_granted('module.finance.read') %}
             <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle" href="#navbar-base" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
                     <span class="nav-link-icon"><i class="ti ti-wallet"></i></span>
@@ -51,9 +52,11 @@
                 </div>
             </li>
             <!-- Деньги -->
+            {% endif %}
 
             <!-- ОПиУ -->
             {% set documents_active = current_route == 'document_index' %}
+            {% if is_granted('module.finance.read') %}
             <li class="nav-item {{ documents_active ? 'active' : '' }}">
                 <a class="nav-link {{ documents_active ? 'active' : '' }}" href="{{ path('document_index') }}" title="Документы ОПиУ">
                     <span class="nav-link-icon"><i class="ti ti-file-invoice"></i></span>
@@ -61,6 +64,7 @@
                 </a>
             </li>
             <!-- ОПиУ -->
+            {% endif %}
 
             {#  <!-- Сделки -->
             {% set deals_path = app.request ? app.request.pathinfo : '' %}
@@ -139,6 +143,9 @@
             {% include "partials/_sidebar_report.html.twig" %}
 
             <!-- Справочники -->
+            {# Блок смешанный: справочники финансов и каталог товаров. Показываем, если доступен
+               хотя бы один из модулей, а пункты внутри гейтим по своему модулю. #}
+            {% if is_granted('module.finance.read') or is_granted('module.catalog.read') %}
             {% set responsibility_centers_active = current_route starts with 'financial_responsibility_center_' %}
             <li class="nav-item dropdown {{ responsibility_centers_active ? 'show' : '' }}">
                 <a class="nav-link dropdown-toggle {{ responsibility_centers_active ? 'show active' : '' }}" href="#navbar-base" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ responsibility_centers_active ? 'true' : 'false' }}">
@@ -148,6 +155,7 @@
                 <div class="dropdown-menu {{ responsibility_centers_active ? 'show' : '' }}">
                     <div class="dropdown-menu-columns">
                         <div class="dropdown-menu-column">
+                            {% if is_granted('module.finance.read') %}
                             <a class="dropdown-item" href="{{ path('cashflow_category_index') }}">Категории ДДС</a>
                             <a class="dropdown-item" href="{{ path('pl_category_index') }}">Категории ОПиУ</a>
                             <a class="dropdown-item" href="{{ path('balance_structure_index') }}">Настройка баланса</a>
@@ -155,13 +163,19 @@
                             <a class="dropdown-item" href="{{ path('counterparty_index') }}">Контрагенты</a>
                             <a class="dropdown-item" href="{{ path('project_direction_index') }}">Проекты</a>
                             <a class="dropdown-item {{ responsibility_centers_active ? 'active' : '' }}" href="{{ path('financial_responsibility_center_index') }}">ЦФО</a>
+                            {% endif %}
+                            {% if is_granted('module.catalog.read') %}
                             {% set catalog_products_active = current_route starts with 'catalog_products_' %}
                             <a class="dropdown-item {{ catalog_products_active ? 'active' : '' }}" href="{{ path('catalog_products_index') }}">Каталог / Товары</a>
+                            {% endif %}
+                            {% if is_granted('module.finance.read') %}
                             <a class="dropdown-item" href="{{ path('cash_transaction_auto_rule_index') }}">Автоправила ДДС</a>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
             </li>
+            {% endif %}
             <!-- Справочники -->
 
 
@@ -177,6 +191,7 @@
             %}
 
 
+            {% if is_granted('module.finance.read') %}
             <!-- Импорт -->
             <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle" href="#navbar-base" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
@@ -197,10 +212,13 @@
                     </div>
                 </div>
             </li>
+            {% endif %}
 
 
 
 
+            {# Блок смешанный: Telegram — admin, банки — finance, маркетплейс — marketplace. #}
+            {% if is_granted('module.admin.read') or is_granted('module.finance.read') or is_granted('module.marketplace.read') %}
             {% set integrations_active =
                 current_route starts with 'ozon_'
                 or current_route starts with 'wildberries_'
@@ -216,23 +234,32 @@
                 {% set integrations_show = integrations_active ? 'show' : '' %}
                     <div class="dropdown-menu {{ integrations_show }}">
                         <div class="dropdown-menu-column">
+                            {% if is_granted('module.admin.read') %}
                             {% set telegram_finance_active = current_route starts with 'telegram_integration_' %}
                             <a class="dropdown-item {{ telegram_finance_active ? 'active' : '' }}" href="{{ path('telegram_integration_index') }}">
                                 <span>Telegram / Финансы</span>
                             </a>
+                            {% endif %}
+                            {% if is_granted('module.finance.read') %}
                             {% set bank_connections_active = current_route starts with 'cash_bank_connection_' %}
                             <a class="dropdown-item {{ bank_connections_active ? 'active' : '' }}" href="{{ path('cash_bank_connection_index') }}">
                                 <span>Банки / Подключения</span>
                             </a>
+                            {% endif %}
 
+                            {% if is_granted('module.marketplace.read') %}
                             {% set marketplace_active = current_route starts with 'integrations_marketplace_' %}
                             <a class="dropdown-item {{ marketplace_active ? 'active' : '' }}" href="{{ path('integrations_marketplace_index') }}">
                                 <span>Маркетплейс интеграций</span>
                             </a>
+                            {% endif %}
                     </div>
                 </div>
             </li>
+            {% endif %}
 
+            {# Компания и доступы — модуль admin. Вложенная «Отладка» — финансовые отчёты. #}
+            {% if is_granted('module.admin.read') %}
             {% set company_users_active =
                 current_route starts with 'company_users_'
                 or current_route starts with 'company_member_'
@@ -266,6 +293,7 @@
                             <span>Настройки отчётов (API-ключ)</span>
                         </a>
 
+                        {% if is_granted('module.finance.read') %}
                         {% set reports_debug_active =
                             current_route starts with 'report_transactions_statement_'
                             or current_route starts with 'report_transactions_debug_'
@@ -311,9 +339,11 @@
                                 </a>
                             </div>
                         </div>
+                        {% endif %}
                     </div>
                 </div>
             </li>
+            {% endif %}
         </ul>
         </div>
 
