@@ -80,8 +80,10 @@ final class ModuleWriteGateTest extends WebTestCaseBase
         $client->request('POST', $writeUrl);
 
         // Гейт пропустил: дальше может быть невалидная форма (200), редирект или ошибка CSRF,
-        // но не 403. Именно отсутствие 403 и означает, что право на запись признано.
-        self::assertNotSame(403, $client->getResponse()->getStatusCode());
+        // но не 403. Отдельно исключаем 5xx — иначе сломанный endpoint формально прошёл бы тест.
+        $status = $client->getResponse()->getStatusCode();
+        self::assertNotSame(403, $status);
+        self::assertLessThan(500, $status, 'write-endpoint не должен падать: статус '.$status);
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('moduleGateProvider')]

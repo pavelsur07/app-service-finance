@@ -9,6 +9,7 @@ use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
 use App\Company\Entity\CompanyRole;
 use App\Company\Entity\User;
+use App\Company\Exception\CompanyRoleNotAvailableException;
 use App\Company\Form\CompanyInviteOperatorType;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Repository\CompanyInviteRepository;
@@ -286,7 +287,15 @@ class CompanyMemberController extends AbstractController
         }
 
         $oldRole = $member->getAccessRole();
-        $assignAccessRole($member, $newRole);
+
+        try {
+            $assignAccessRole($member, $newRole);
+        } catch (CompanyRoleNotAvailableException) {
+            // Шаблон удалили между проверкой выше и назначением — отказ пришёл от FK.
+            $this->addFlash('danger', 'Выбранный шаблон больше недоступен.');
+
+            return $this->redirectToRoute('company_users_index');
+        }
 
         $logger->info('Company member access role changed', [
             'companyId' => (string) $company->getId(),

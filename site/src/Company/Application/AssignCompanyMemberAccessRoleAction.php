@@ -6,6 +6,8 @@ namespace App\Company\Application;
 
 use App\Company\Entity\CompanyMember;
 use App\Company\Entity\CompanyRole;
+use App\Company\Exception\CompanyRoleNotAvailableException;
+use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -24,9 +26,18 @@ final readonly class AssignCompanyMemberAccessRoleAction
 
     public function __invoke(CompanyMember $member, CompanyRole $role): void
     {
+        $roleId = (string) $role->getId();
+
         $member->setAccessRole($role);
 
         $this->em->persist($member);
-        $this->em->flush();
+
+        try {
+            $this->em->flush();
+        } catch (ForeignKeyConstraintViolationException $exception) {
+            // Обратное направление гонки: шаблон удалили между проверкой в контроллере
+            // и этим flush. Ожидаемое условие, не инцидент — 500 отдавать нельзя.
+            throw new CompanyRoleNotAvailableException($roleId, $exception);
+        }
     }
 }
