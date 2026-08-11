@@ -68,7 +68,7 @@ class MarketplaceController extends AbstractController
     ) {
     }
 
-    #[Route('', name: 'marketplace_index')]
+    #[Route('', name: 'marketplace_index', methods: ['GET'])]
     public function index(Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
@@ -450,7 +450,7 @@ class MarketplaceController extends AbstractController
         return $this->redirectToRoute('marketplace_connections_index');
     }
 
-    #[Route('/raw/{id}/view', name: 'marketplace_raw_view')]
+    #[Route('/raw/{id}/view', name: 'marketplace_raw_view', methods: ['GET'])]
     public function viewRaw(string $id): Response
     {
         $company = $this->companyService->getActiveCompany();
@@ -646,7 +646,7 @@ class MarketplaceController extends AbstractController
         return $this->redirectToRoute('marketplace_connections_index');
     }
 
-    #[Route('/costs', name: 'marketplace_costs_index')]
+    #[Route('/costs', name: 'marketplace_costs_index', methods: ['GET'])]
     public function costsIndex(Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
@@ -711,7 +711,7 @@ class MarketplaceController extends AbstractController
         ]);
     }
 
-    #[Route('/products', name: 'marketplace_products_index')]
+    #[Route('/products', name: 'marketplace_products_index', methods: ['GET'])]
     public function productsIndex(Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();

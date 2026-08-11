@@ -22,7 +22,7 @@ class MarketplaceConnectionController extends AbstractController
     ) {
     }
 
-    #[Route('/connections', name: 'marketplace_connections_index')]
+    #[Route('/connections', name: 'marketplace_connections_index', methods: ['GET'])]
     public function index(): Response
     {
         $company = $this->companyService->getActiveCompany();

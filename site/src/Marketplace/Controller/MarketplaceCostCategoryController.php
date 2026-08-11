@@ -29,7 +29,7 @@ class MarketplaceCostCategoryController extends AbstractController
     ) {
     }
 
-    #[Route('', name: 'marketplace_cost_categories_index')]
+    #[Route('', name: 'marketplace_cost_categories_index', methods: ['GET'])]
     public function index(): Response
     {
         $company = $this->companyContext->getCompany();

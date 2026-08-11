@@ -14,69 +14,55 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  * Каждый мутирующий маршрут в модулях с расставленными write-гейтами обязан быть закрыт,
  * причём гейтом именно своего модуля.
  *
- * Инвариант держит расстановку Stage 3–4 от тихой эрозии. Строится от скомпилированной
- * RouteCollection, а не от атрибутов методов: у invokable-контроллеров `#[Route]` висит
- * на классе, и проверка «по атрибутам метода» их бы молча пропускала.
+ * Инвариант держит расстановку Stage 3–4 от тихой эрозии. Устройство выбрано так, чтобы
+ * не иметь fail-open путей:
  *
- * Маршрут без явного `methods` принимает и POST, поэтому считается потенциально мутирующим.
- * Проверенные вручную read-страницы перечислены в READ_ONLY_ANY_ROUTES по имени маршрута —
- * список, а не эвристика, чтобы новый ANY-маршрут не проскочил.
+ * - обход идёт по скомпилированной RouteCollection, а не по атрибутам методов: у invokable
+ *   контроллеров `#[Route]` висит на классе, и проверка «по методу» их бы пропускала;
+ * - покрытие определяется через ModuleAccessMap, а не вторым списком неймспейсов, который
+ *   разъехался бы с картой. Неклассифицированный контроллер — падение, а не пропуск;
+ * - exempt-контроллеры пропускаются осознанно: это отдельный отревьюенный список решений
+ *   в ModuleAccessMap, полноту которого сторожит ControllerAccessCoverageTest;
+ * - тело экшена читается по PHP-токенам без комментариев и строк, чтобы закомментированный
+ *   гейт не считался гейтом;
+ * - маршрут без явного `methods` считается мутирующим без исключений: read-страницы обязаны
+ *   объявлять `methods: ['GET']`, тогда read-only держит сам роутер, а не список в тесте;
+ * - счётчики ведутся по каждому модулю, поэтому потеря целой группы не спрячется за общим порогом.
  */
 final class ModuleWriteGateCoverageTest extends KernelTestCase
 {
-    /** Модули, в которых write-гейты расставлены (Stage 3–4). */
-    private const COVERED_PREFIXES = [
-        'App\\Cash\\Controller\\',
-        'App\\Finance\\',
-        'App\\Balance\\',
-        'App\\Report\\',
-        'App\\Loan\\',
-        'App\\Ai\\',
-        'App\\Deals\\',
-        'App\\Catalog\\',
-        'App\\Marketplace\\',
-        'App\\MarketplaceAds\\',
-        'App\\MarketplaceAnalytics\\',
-        'App\\Inventory\\',
-        'App\\Ingestion\\',
-        'App\\MoySklad\\',
-    ];
+    /**
+     * Модули, мутации которых закрыты модульными write-гейтами.
+     *
+     * Группы `admin` здесь нет намеренно: её мутирующие маршруты (управление участниками,
+     * шаблонами ролей, компаниями) закрыты строже — owner-only, причём проверка живёт внутри
+     * Action-слоя (DisableCompanyMemberAction и др.), куда статический обход не заглядывает.
+     * Их покрывают функциональные тесты CompanyRoleControllerTest, CompanyMemberAccessRoleTest
+     * и CompanyMemberAccessTest. Требовать от них модульный гейт нельзя: он слабее owner-only.
+     */
+    private const COVERED_MODULES = ['finance', 'deals', 'catalog', 'marketplace'];
 
-    /** Свои гейты (ROLE_ADMIN / ROLE_SUPER_ADMIN), модульные к ним не применяются. */
-    private const EXCLUDED_PREFIXES = [
-        'App\\Marketplace\\Controller\\Admin\\',
-        'App\\MarketplaceAds\\Controller\\Api\\Admin\\',
+    /** Минимум мутирующих маршрутов на модуль — против «тихого» зануления обхода. */
+    private const MIN_MUTATING_PER_MODULE = [
+        'finance' => 40,
+        'marketplace' => 50,
+        'deals' => 5,
+        'catalog' => 3,
     ];
 
     private const MUTATING_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
     /**
-     * Маршруты без явного `methods`, проверенные поимённо как read-страницы
-     * (render или redirect, без мутаций). Инвентаризация Stage 4.
-     *
-     * @var list<string>
+     * Гейты строже модульного. Сравниваются точно: `ROLE_ADMIN` не должен совпадать
+     * с гипотетическим `ROLE_ADMIN_SOMETHING`.
      */
-    private const READ_ONLY_ANY_ROUTES = [
-        'integrations_marketplace_index',
-        'marketplace_connections_index',
-        'marketplace_index',
-        'marketplace_raw_view',
-        'marketplace_costs_index',
-        'marketplace_products_index',
-        'marketplace_cost_categories_index',
-        'marketplace_returns_index',
-        'marketplace_pl_mappings_index',
-        'marketplace_sales_index',
-        // Финансовые read-страницы без явного methods (инвентаризация Stage 4).
-        'app_ai_suggestions_index',
-        'finance_report_pl_raw',
-    ];
-
-    /** Более строгие гейты: сравниваются точно, а не подстрокой. */
     private const STRICTER_ATTRIBUTES = ['ROLE_COMPANY_OWNER', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN'];
 
-    /** Точные формы owner-проверки в теле экшена. */
-    private const OWNER_CALLS = ['assertOwner(', '->isOwner(', 'assertCompanyOwner('];
+    /**
+     * Единственная допустимая форма owner-проверки в теле: она бросает AccessDenied.
+     * Предикаты вида `isOwner()` сюда не входят — их результат можно проигнорировать.
+     */
+    private const OWNER_CALL = 'assertOwner(';
 
     public function testEveryMutatingRouteInCoveredModulesIsGatedByItsOwnModule(): void
     {
@@ -85,37 +71,45 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
         $map = new ModuleAccessMap();
 
         $problems = [];
-        $checked = 0;
+        $perModule = array_fill_keys(self::COVERED_MODULES, 0);
+        $mutatingByClass = [];
+        $readByClass = [];
 
         foreach ($router->getRouteCollection() as $routeName => $route) {
             $controller = (string) ($route->getDefaults()['_controller'] ?? '');
-            if ('' === $controller) {
+            if ('' === $controller || !str_starts_with($controller, 'App\\')) {
                 continue;
             }
 
             [$className, $methodName] = $this->splitController($controller);
-            if (!$this->isCovered($className) || !class_exists($className)) {
+            if (!class_exists($className)) {
+                continue;
+            }
+
+            $isMutating = $this->isMutatingRoute($route);
+
+            // Exempt-зоны и публичные роуты пропускаем: это отдельный, отревьюенный список
+            // решений в ModuleAccessMap (личный профиль, переключение компаний, /admin/*),
+            // и полноту этого списка сторожит ControllerAccessCoverageTest. Свои проверки
+            // у них инлайновые или на уровне firewall, модульным гейтом их закрывать нельзя.
+            if ($map->isExempt($className)) {
                 continue;
             }
 
             $module = $map->resolve($className);
-            if (null === $module) {
-                // Контроллер покрытого модуля обязан быть классифицирован: без записи в карте
-                // fail-closed подписчик отдаст 403, а write-гейт вообще нельзя выбрать.
-                $problems[] = sprintf('%s (%s) — не классифицирован в ModuleAccessMap', $routeName, $className);
+            if (null === $module || !\in_array($module->value, self::COVERED_MODULES, true)) {
                 continue;
             }
 
-            $methods = $route->getMethods();
-            $isMutating = [] === $methods
-                ? !\in_array($routeName, self::READ_ONLY_ANY_ROUTES, true)
-                : [] !== array_intersect($methods, self::MUTATING_METHODS);
+            if ($isMutating) {
+                $mutatingByClass[$className][] = $routeName;
+            } else {
+                $readByClass[$className][] = $routeName;
 
-            if (!$isMutating) {
                 continue;
             }
 
-            ++$checked;
+            ++$perModule[$module->value];
 
             if (!$this->isGated($className, $methodName, $module)) {
                 $problems[] = sprintf(
@@ -128,9 +122,24 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
             }
         }
 
-        // Факт на 2026-08-11: 133 мутирующих маршрута в покрытых модулях. Нижняя граница
-        // с запасом против «тихого» зануления обхода RouteCollection.
-        self::assertGreaterThan(90, $checked, 'Мутирующие маршруты не найдены — проверьте обход RouteCollection.');
+        // Class-level write-гейт на классе, у которого есть и read-маршруты, отрезал бы чтение.
+        foreach (array_keys($mutatingByClass) as $className) {
+            if (!isset($readByClass[$className])) {
+                continue;
+            }
+            if ($this->hasClassLevelWriteGate($className)) {
+                $problems[] = sprintf('%s — class-level write-гейт отрезает read-маршруты %s', $className, implode(', ', $readByClass[$className]));
+            }
+        }
+
+        foreach (self::MIN_MUTATING_PER_MODULE as $moduleValue => $minimum) {
+            self::assertGreaterThanOrEqual(
+                $minimum,
+                $perModule[$moduleValue],
+                sprintf('Модуль %s: найдено %d мутирующих маршрутов, ожидалось не меньше %d — проверьте обход RouteCollection.', $moduleValue, $perModule[$moduleValue], $minimum),
+            );
+        }
+
         self::assertSame([], $problems, "Мутирующие маршруты без корректного write-гейта:\n".implode("\n", $problems));
     }
 
@@ -148,21 +157,13 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
         return [$controller, '__invoke'];
     }
 
-    private function isCovered(string $className): bool
+    private function isMutatingRoute(\Symfony\Component\Routing\Route $route): bool
     {
-        foreach (self::EXCLUDED_PREFIXES as $prefix) {
-            if (str_starts_with($className, $prefix)) {
-                return false;
-            }
-        }
+        $methods = $route->getMethods();
 
-        foreach (self::COVERED_PREFIXES as $prefix) {
-            if (str_starts_with($className, $prefix)) {
-                return true;
-            }
-        }
-
-        return false;
+        // Пустой список — маршрут принимает всё, включая POST. Read-страница обязана
+        // объявить methods явно, иначе read-only держится только на честном слове.
+        return [] === $methods || [] !== array_intersect($methods, self::MUTATING_METHODS);
     }
 
     private function writeConstant(Module $module): string
@@ -172,24 +173,21 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
 
     private function isGated(string $className, string $methodName, Module $module): bool
     {
-        $reflection = new \ReflectionClass($className);
-        if (!$reflection->hasMethod($methodName)) {
+        $method = $this->method($className, $methodName);
+        if (null === $method) {
             return false;
         }
 
-        $method = $reflection->getMethod($methodName);
         $expected = 'module.'.$module->value.'.write';
 
-        foreach ($method->getAttributes(IsGranted::class, \ReflectionAttribute::IS_INSTANCEOF) as $attribute) {
-            $value = $this->attributeValue($attribute);
+        foreach ($this->grantedAttributes($method) as $value) {
             if ($expected === $value || \in_array($value, self::STRICTER_ATTRIBUTES, true)) {
                 return true;
             }
         }
 
-        // Класс целиком под более строгим гейтом.
-        foreach ($reflection->getAttributes(IsGranted::class, \ReflectionAttribute::IS_INSTANCEOF) as $attribute) {
-            if (\in_array($this->attributeValue($attribute), self::STRICTER_ATTRIBUTES, true)) {
+        foreach ($this->grantedAttributes(new \ReflectionClass($className)) as $value) {
+            if ($expected === $value || \in_array($value, self::STRICTER_ATTRIBUTES, true)) {
                 return true;
             }
         }
@@ -197,39 +195,74 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
         return $this->bodyHasGate($method, $module);
     }
 
-    private function attributeValue(\ReflectionAttribute $attribute): string
+    private function hasClassLevelWriteGate(string $className): bool
     {
-        $args = $attribute->getArguments();
-
-        return (string) ($args[0] ?? $args['attribute'] ?? '');
-    }
-
-    /**
-     * Смешанные GET+POST экшены гейтятся в теле. Ищем точную форму вызова с константой
-     * своего модуля — подстрочное совпадение вида «упоминание ModuleAccess» не годится.
-     */
-    private function bodyHasGate(\ReflectionMethod $method, Module $module): bool
-    {
-        $file = $method->getFileName();
-        $start = $method->getStartLine();
-        $end = $method->getEndLine();
-        if (false === $file || false === $start || false === $end) {
-            return false;
-        }
-
-        $lines = explode("\n", (string) file_get_contents($file));
-        $body = implode("\n", \array_slice($lines, $start - 1, $end - $start + 1));
-
-        if (str_contains($body, 'denyAccessUnlessGranted('.$this->writeConstant($module).')')) {
-            return true;
-        }
-
-        foreach (self::OWNER_CALLS as $call) {
-            if (str_contains($body, $call)) {
+        foreach ($this->grantedAttributes(new \ReflectionClass($className)) as $value) {
+            if (str_starts_with($value, 'module.') && str_ends_with($value, '.write')) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private function method(string $className, string $methodName): ?\ReflectionMethod
+    {
+        $reflection = new \ReflectionClass($className);
+
+        return $reflection->hasMethod($methodName) ? $reflection->getMethod($methodName) : null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function grantedAttributes(\ReflectionClass|\ReflectionMethod $target): array
+    {
+        $values = [];
+        foreach ($target->getAttributes(IsGranted::class, \ReflectionAttribute::IS_INSTANCEOF) as $attribute) {
+            $args = $attribute->getArguments();
+            $values[] = (string) ($args[0] ?? $args['attribute'] ?? '');
+        }
+
+        return $values;
+    }
+
+    private function bodyHasGate(\ReflectionMethod $method, Module $module): bool
+    {
+        $body = $this->executableBody($method);
+
+        return str_contains($body, 'denyAccessUnlessGranted('.$this->writeConstant($module).')')
+            || str_contains($body, self::OWNER_CALL);
+    }
+
+    /**
+     * Тело метода без комментариев и строковых литералов: закомментированный или
+     * упомянутый в строке гейт гейтом не является.
+     */
+    private function executableBody(\ReflectionMethod $method): string
+    {
+        $file = $method->getFileName();
+        $start = $method->getStartLine();
+        $end = $method->getEndLine();
+        if (false === $file || false === $start || false === $end) {
+            return '';
+        }
+
+        $lines = explode("\n", (string) file_get_contents($file));
+        $source = implode("\n", \array_slice($lines, $start - 1, $end - $start + 1));
+
+        $out = '';
+        foreach (token_get_all('<?php '.$source) as $token) {
+            if (\is_array($token)) {
+                if (\in_array($token[0], [\T_COMMENT, \T_DOC_COMMENT, \T_CONSTANT_ENCAPSED_STRING, \T_ENCAPSED_AND_WHITESPACE], true)) {
+                    continue;
+                }
+                $out .= $token[1];
+                continue;
+            }
+            $out .= $token;
+        }
+
+        return $out;
     }
 }

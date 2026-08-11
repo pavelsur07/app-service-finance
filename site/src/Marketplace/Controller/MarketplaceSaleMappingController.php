@@ -33,7 +33,7 @@ final class MarketplaceSaleMappingController extends AbstractController
     ) {
     }
 
-    #[Route('', name: 'marketplace_pl_mappings_index')]
+    #[Route('', name: 'marketplace_pl_mappings_index', methods: ['GET'])]
     public function index(Request $request): Response
     {
         $company = $this->companyContext->getCompany();
