@@ -16,100 +16,89 @@ use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 
 /**
- * Write-гейты Stage 3 по HTTP: read проходит, write без права — 403, отсутствие
- * модуля — 403 уже на чтении.
+ * Write-гейты Stage 3 по HTTP, по одному репрезентативному эндпоинту на группу.
  *
- * Проверяется сквозной путь, а не голосование voter'а (это делает ModuleAccessTest):
- * важно, что гейт срабатывает раньше обработки формы и CSRF, поэтому POST без тела
- * обязан получить 403, а не 422 и не 500.
+ * Матрица на каждую группу:
+ * - `read`  → GET 200, POST 403 (изолирует именно write-гейт: read-гейт подписчика пропускает);
+ * - `write` → POST проходит гейт;
+ * - пустой шаблон → GET 403 уже на чтении.
+ *
+ * Роль всегда получает `<module>:read`, иначе POST отклонил бы read-гейт подписчика и тест
+ * остался бы зелёным даже без write-гейта.
+ *
+ * Проверяется и то, что гейт срабатывает раньше обработки формы и CSRF: POST без тела
+ * обязан дать 403, а не 422 и не 500.
  */
 final class ModuleWriteGateTest extends WebTestCaseBase
 {
-    private const FINANCE_READ_URL = '/counterparties/';
-    private const FINANCE_WRITE_URL = '/counterparties/new';
-    private const DEALS_WRITE_URL = '/deals/new';
-    private const CATALOG_WRITE_URL = '/catalog/products/new';
+    /**
+     * @return iterable<string, array{0: Module, 1: string, 2: string}>
+     */
+    public static function moduleGateProvider(): iterable
+    {
+        yield 'finance' => [Module::FINANCE, '/counterparties/', '/counterparties/new'];
+        yield 'deals' => [Module::DEALS, '/deals', '/deals/new'];
+        yield 'catalog' => [Module::CATALOG, '/catalog/products', '/catalog/products/new'];
+        yield 'admin' => [Module::ADMIN, '/integrations/telegram', '/integrations/telegram/generate-link'];
+    }
 
-    public function testReadOnlyFinanceRoleReadsButCannotWrite(): void
+    #[\PHPUnit\Framework\Attributes\DataProvider('moduleGateProvider')]
+    public function testReadOnlyRoleReadsButCannotWrite(Module $module, string $readUrl, string $writeUrl): void
     {
         $client = static::createClient();
         $this->resetDb();
 
-        [$company, $memberUser] = $this->seedMemberWithPermissions('finance-read', [
-            Module::FINANCE->value => AccessLevel::READ->value,
-        ]);
+        [$company, $memberUser] = $this->seedMemberWithPermissions(
+            $module->value.'-read',
+            [$module->value => AccessLevel::READ->value],
+        );
 
         $client->loginUser($memberUser);
         $this->setClientSessionValue($client, 'active_company_id', $company->getId());
 
-        $client->request('GET', self::FINANCE_READ_URL);
+        $client->request('GET', $readUrl);
         self::assertResponseIsSuccessful();
 
-        $client->request('POST', self::FINANCE_WRITE_URL);
+        $client->request('POST', $writeUrl);
         self::assertResponseStatusCodeSame(403);
     }
 
-    public function testFinanceWriteRoleCanReachWriteEndpoint(): void
+    #[\PHPUnit\Framework\Attributes\DataProvider('moduleGateProvider')]
+    public function testWriteRolePassesTheGate(Module $module, string $readUrl, string $writeUrl): void
     {
         $client = static::createClient();
         $this->resetDb();
 
-        [$company, $memberUser] = $this->seedMemberWithPermissions('finance-write', [
-            Module::FINANCE->value => AccessLevel::WRITE->value,
-        ]);
+        [$company, $memberUser] = $this->seedMemberWithPermissions(
+            $module->value.'-write',
+            [$module->value => AccessLevel::WRITE->value],
+        );
 
         $client->loginUser($memberUser);
         $this->setClientSessionValue($client, 'active_company_id', $company->getId());
 
-        // Гейт пропускает; форма с пустым телом невалидна и рендерится заново — но это 200, не 403.
-        $client->request('POST', self::FINANCE_WRITE_URL);
-        self::assertResponseIsSuccessful();
+        $client->request('POST', $writeUrl);
+
+        // Гейт пропустил: дальше может быть невалидная форма (200), редирект или ошибка CSRF,
+        // но не 403. Именно отсутствие 403 и означает, что право на запись признано.
+        self::assertNotSame(403, $client->getResponse()->getStatusCode());
     }
 
-    public function testRoleWithoutDealsCannotWriteDeals(): void
+    #[\PHPUnit\Framework\Attributes\DataProvider('moduleGateProvider')]
+    public function testEmptyPermissionsRoleIsDeniedEvenOnRead(Module $module, string $readUrl, string $writeUrl): void
     {
         $client = static::createClient();
         $this->resetDb();
 
-        [$company, $memberUser] = $this->seedMemberWithPermissions('finance-only', [
-            Module::FINANCE->value => AccessLevel::WRITE->value,
-        ]);
+        [$company, $memberUser] = $this->seedMemberWithPermissions($module->value.'-none', []);
 
         $client->loginUser($memberUser);
         $this->setClientSessionValue($client, 'active_company_id', $company->getId());
 
-        // Модуля deals в шаблоне нет — read-гейт подписчика отказывает раньше write-гейта.
-        $client->request('POST', self::DEALS_WRITE_URL);
+        $client->request('GET', $readUrl);
         self::assertResponseStatusCodeSame(403);
-    }
 
-    public function testReadOnlyCatalogRoleCannotWriteCatalog(): void
-    {
-        $client = static::createClient();
-        $this->resetDb();
-
-        [$company, $memberUser] = $this->seedMemberWithPermissions('catalog-read', [
-            Module::CATALOG->value => AccessLevel::READ->value,
-        ]);
-
-        $client->loginUser($memberUser);
-        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
-
-        $client->request('POST', self::CATALOG_WRITE_URL);
-        self::assertResponseStatusCodeSame(403);
-    }
-
-    public function testEmptyPermissionsRoleIsDeniedEvenOnRead(): void
-    {
-        $client = static::createClient();
-        $this->resetDb();
-
-        [$company, $memberUser] = $this->seedMemberWithPermissions('no-access', []);
-
-        $client->loginUser($memberUser);
-        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
-
-        $client->request('GET', self::FINANCE_READ_URL);
+        $client->request('POST', $writeUrl);
         self::assertResponseStatusCodeSame(403);
     }
 
@@ -133,8 +122,8 @@ final class ModuleWriteGateTest extends WebTestCaseBase
             '77777777-7777-4777-8777-777777777777',
             'Шаблон '.$slug,
             $permissions,
+            $company,
         );
-        $role->setCompany($company);
 
         $memberUser = UserBuilder::aUser()
             ->withIndex(2)

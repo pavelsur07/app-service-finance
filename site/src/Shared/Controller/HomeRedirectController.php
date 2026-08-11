@@ -6,6 +6,7 @@ namespace App\Shared\Controller;
 
 use App\Company\Security\ModuleAccess;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
@@ -30,11 +31,20 @@ final class HomeRedirectController extends AbstractController
     ];
 
     #[Route('/', name: 'app_home_index', methods: ['GET'])]
-    public function __invoke(AuthorizationCheckerInterface $authorizationChecker): Response
+    public function __invoke(Request $request, AuthorizationCheckerInterface $authorizationChecker): Response
     {
+        // «/» раньше отдавал финансовый дашборд, поэтому старые ссылки и закладки вида
+        // /?currency=USD должны продолжать работать. Валюту переносим как есть —
+        // валидация остаётся в HomeController, он же вернёт RUB при мусорном значении.
+        $query = [];
+        $currency = $request->query->get('currency');
+        if (is_string($currency) && '' !== $currency) {
+            $query['currency'] = $currency;
+        }
+
         foreach (self::LANDING_BY_MODULE as [$attribute, $route]) {
             if ($authorizationChecker->isGranted($attribute)) {
-                return $this->redirectToRoute($route);
+                return $this->redirectToRoute($route, $query);
             }
         }
 

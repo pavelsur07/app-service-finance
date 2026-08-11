@@ -45,7 +45,7 @@ final class ModuleAccessTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
     }
 
-    public function testLegacyOperatorMemberWithoutAccessRoleKeepsFullAccess(): void
+    public function testOperatorWithoutAccessRoleIsDenied(): void
     {
         $client = static::createClient();
         $this->resetDb();
@@ -56,11 +56,14 @@ final class ModuleAccessTest extends WebTestCaseBase
         $client->loginUser($memberUser);
         $this->setClientSessionValue($client, 'active_company_id', $company->getId());
 
+        // До Stage 2 здесь был BC-fallback: OPERATOR без шаблона считался полноправным.
+        // Срок fallback истёк, и он был fail-open: любое обнуление role_id повышало права.
+        // Теперь отсутствие шаблона — отсутствие доступа.
         $client->request('GET', self::FINANCE_URL);
-        self::assertResponseIsSuccessful();
+        self::assertResponseStatusCodeSame(403);
 
         $client->request('GET', self::MARKETPLACE_URL);
-        self::assertResponseIsSuccessful();
+        self::assertResponseStatusCodeSame(403);
     }
 
     public function testMemberWithFinanceOnlyRoleCanOpenFinanceButNotMarketplace(): void
@@ -145,6 +148,21 @@ final class ModuleAccessTest extends WebTestCaseBase
 
         $client->request('GET', '/');
         self::assertResponseRedirects('/finance');
+    }
+
+    public function testRootRedirectKeepsSelectedCashCurrency(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        [$company, $owner] = $this->seedCompanyWithOwner();
+
+        $client->loginUser($owner);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+
+        // «/» раньше сам отдавал финансовый дашборд: старые ссылки с валютой обязаны работать.
+        $client->request('GET', '/?currency=USD');
+        self::assertResponseRedirects('/finance?currency=USD');
     }
 
     public function testRootRedirectsMarketplaceOnlyMemberToMarketplace(): void

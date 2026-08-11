@@ -129,21 +129,24 @@ final class ModuleAccessResolverTest extends TestCase
         self::assertFalse($resolver->allows(Module::FINANCE, AccessLevel::READ));
     }
 
-    public function testLegacyOperatorWithoutAccessRoleKeepsFullAccess(): void
+    public function testOperatorWithoutAccessRoleIsDenied(): void
     {
         [$user, $company] = $this->memberUserAndCompany();
         $member = $this->buildMember($company, $user, null);
 
         $resolver = $this->createResolver($user, $company, $member);
 
-        self::assertTrue($resolver->allows(Module::FINANCE, AccessLevel::WRITE));
-        self::assertTrue($resolver->allows(Module::ADMIN, AccessLevel::WRITE));
+        // BC-fallback снят: раньше OPERATOR без шаблона получал полный доступ, и любое
+        // обнуление role_id повышало права вместо их снятия.
+        self::assertFalse($resolver->allows(Module::FINANCE, AccessLevel::READ));
+        self::assertFalse($resolver->allows(Module::FINANCE, AccessLevel::WRITE));
+        self::assertFalse($resolver->allows(Module::ADMIN, AccessLevel::WRITE));
     }
 
     public function testResultIsMemoized(): void
     {
         [$user, $company] = $this->memberUserAndCompany();
-        $member = $this->buildMember($company, $user, null);
+        $member = $this->buildMember($company, $user, $this->fullAccessRole($company));
 
         $security = $this->createMock(Security::class);
         $security->expects(self::atLeastOnce())->method('getUser')->willReturn($user);
@@ -161,7 +164,7 @@ final class ModuleAccessResolverTest extends TestCase
     public function testLevelsAreInvalidatedWhenActiveCompanyChanges(): void
     {
         [$user, $company] = $this->memberUserAndCompany();
-        $member = $this->buildMember($company, $user, null);
+        $member = $this->buildMember($company, $user, $this->fullAccessRole($company));
 
         $otherCompany = CompanyBuilder::aCompany()
             ->withIndex(9)
@@ -184,7 +187,7 @@ final class ModuleAccessResolverTest extends TestCase
 
         $resolver = new ModuleAccessResolver($security, $activeCompanyService, new NullLogger());
 
-        // Первая компания: legacy OPERATOR — полный доступ.
+        // Первая компания: шаблон с полным доступом.
         self::assertTrue($resolver->allows(Module::FINANCE, AccessLevel::WRITE));
         // Компания сменилась, членства в ней нет — уровни пересчитаны, доступа нет.
         self::assertFalse($resolver->allows(Module::FINANCE, AccessLevel::READ));
@@ -204,7 +207,7 @@ final class ModuleAccessResolverTest extends TestCase
     public function testFailurePathDoesNotPoisonCache(): void
     {
         [$user, $company] = $this->memberUserAndCompany();
-        $member = $this->buildMember($company, $user, null);
+        $member = $this->buildMember($company, $user, $this->fullAccessRole($company));
 
         $security = $this->createMock(Security::class);
         $security->method('getUser')->willReturn($user);
@@ -245,6 +248,16 @@ final class ModuleAccessResolverTest extends TestCase
         $user = UserBuilder::aUser()->withIndex(2)->build();
 
         return [$user, $company];
+    }
+
+    private function fullAccessRole(Company $company): CompanyRole
+    {
+        $permissions = [];
+        foreach (Module::cases() as $module) {
+            $permissions[$module->value] = AccessLevel::WRITE->value;
+        }
+
+        return new CompanyRole('44444444-4444-4444-8444-444444444444', 'Полный доступ', $permissions, $company);
     }
 
     private function buildMember(Company $company, User $user, ?CompanyRole $accessRole): CompanyMember

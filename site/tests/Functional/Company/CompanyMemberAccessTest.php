@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Company;
 
 use App\Company\Entity\CompanyMember;
+use App\Company\Entity\CompanyRole;
+use App\Company\Security\AccessLevel;
+use App\Company\Security\Module;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\CompanyMemberBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -58,16 +61,25 @@ final class CompanyMemberAccessTest extends WebTestCaseBase
             ->withOwner($owner)
             ->withName('Access Company')
             ->build();
+        // Участнику нужен шаблон с admin:read — BC-fallback «нет шаблона = полный доступ» снят.
+        $accessRole = new CompanyRole(
+            'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+            'Участники компании',
+            [Module::ADMIN->value => AccessLevel::READ->value],
+            $company,
+        );
         $member = CompanyMemberBuilder::aMember()
             ->withCompany($company)
             ->withUser($memberUser)
             ->withStatus($memberStatus)
+            ->withAccessRole($accessRole)
             ->build();
 
         $em = $this->em();
         $em->persist($owner);
         $em->persist($memberUser);
         $em->persist($company);
+        $em->persist($accessRole);
         $em->persist($member);
         $em->flush();
 

@@ -11,9 +11,9 @@ namespace App\Company\Exception;
  */
 final class CompanyRoleNameAlreadyExistsException extends \RuntimeException
 {
-    public function __construct(private readonly string $roleName)
+    public function __construct(private readonly string $roleName, ?\Throwable $previous = null)
     {
-        parent::__construct(sprintf('Company role "%s" already exists.', $roleName));
+        parent::__construct(sprintf('Company role "%s" already exists.', $roleName), 0, $previous);
     }
 
     public function getRoleName(): string

@@ -114,6 +114,25 @@ final class DashboardSnapshotServiceTest extends TestCase
         self::assertSame(1, $cache->snapshotMissesCount);
     }
 
+    public function testCacheKeySeparatesFinanceReadFromDenied(): void
+    {
+        // Один и тот же кэш: если из ключа убрать сегмент finance_1/finance_0, второй вызов
+        // попадёт в кэш пустого снапшота и полноправный пользователь потеряет виджеты.
+        $cache = new InMemoryCacheSpy();
+        $company = $this->createCompany('76f4b0c3-6fd3-41bb-b426-0ea2fd21ae12');
+        $period = new Period(new \DateTimeImmutable('2026-03-01'), new \DateTimeImmutable('2026-03-31'));
+
+        $denied = $this->buildService($cache, false, (string) $company->getId());
+        $allowed = $this->buildService($cache, true, (string) $company->getId());
+
+        $withoutFinance = $denied->getSnapshot($company, $period)->toArray();
+        $withFinance = $allowed->getSnapshot($company, $period)->toArray();
+
+        self::assertSame(2, $cache->snapshotMissesCount);
+        self::assertArrayNotHasKey('free_cash', $withoutFinance['widgets']);
+        self::assertArrayHasKey('free_cash', $withFinance['widgets']);
+    }
+
     public function testSystemContextBuildsFullSnapshotRegardlessOfUserPermissions(): void
     {
         $cache = new InMemoryCacheSpy();

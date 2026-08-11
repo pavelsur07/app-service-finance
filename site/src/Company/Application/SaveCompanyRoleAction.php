@@ -8,6 +8,7 @@ use App\Company\Entity\Company;
 use App\Company\Entity\CompanyRole;
 use App\Company\Exception\CompanyRoleNameAlreadyExistsException;
 use App\Company\Repository\CompanyRoleRepository;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -39,7 +40,14 @@ final readonly class SaveCompanyRoleAction
         $role->setPermissions($permissions);
 
         $this->em->persist($role);
-        $this->em->flush();
+
+        try {
+            $this->em->flush();
+        } catch (UniqueConstraintViolationException $exception) {
+            // Гонка между проверкой выше и flush: последнее слово за частичным индексом
+            // uniq_company_role_company_name. Ожидаемое условие, не инцидент.
+            throw new CompanyRoleNameAlreadyExistsException($role->getName(), $exception);
+        }
 
         return $role;
     }

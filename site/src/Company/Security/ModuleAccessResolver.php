@@ -120,11 +120,18 @@ final class ModuleAccessResolver implements ResetInterface
             return $this->levelsFromRole($accessRole->getPermissions());
         }
 
-        // BC до полной миграции на шаблоны: участники без accessRole
-        // сохраняют прежний доступ по строковой роли (OWNER/OPERATOR — полный).
-        if (\in_array($membership->getRole(), [CompanyMember::ROLE_OWNER, CompanyMember::ROLE_OPERATOR], true)) {
-            return $this->allModules(AccessLevel::WRITE);
-        }
+        // Участник без шаблона доступа не получает ничего.
+        //
+        // До Stage 2 здесь стоял BC-fallback: OPERATOR без accessRole считался полноправным.
+        // Срок fallback истёк — миграция Version20260811120000 проставила шаблоны всем
+        // существующим участникам, а оба пути создания участника (CompanyInviteManager,
+        // CompanyOwnerMembershipCreator) назначают шаблон сразу. Fallback остался бы
+        // fail-open: любое обнуление role_id (гонка при удалении шаблона, прямой SQL)
+        // повышало бы права вместо их снятия.
+        $this->logger->warning('Module access: member has no access role, denying.', [
+            'companyId' => (string) $company->getId(),
+            'membershipRole' => $membership->getRole(),
+        ]);
 
         return [];
     }

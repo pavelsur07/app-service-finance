@@ -422,6 +422,43 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
         self::assertCount(0, $roleRepository->findBy(['company' => $company]));
     }
 
+    public function testCompanyDeletionStillCascadesUnassignedRoles(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
+        $customRole = new CompanyRole(
+            'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+            'Бухгалтер',
+            [Module::FINANCE->value => AccessLevel::WRITE->value],
+            $company,
+        );
+
+        $em = $this->em();
+        $em->persist($owner);
+        $em->persist($company);
+        $em->persist($customRole);
+        $em->flush();
+        $companyId = (string) $company->getId();
+        $roleId = (string) $customRole->getId();
+
+        $client->loginUser($owner);
+        $this->setClientSessionValue($client, 'active_company_id', $companyId);
+
+        // company_members.role_id переведён в RESTRICT, но company_role.company_id остаётся
+        // CASCADE: удаление компании без участников обязано по-прежнему сносить её шаблоны.
+        $client->request('POST', sprintf('/company/%s/delete', $companyId), [
+            '_token' => $this->csrfToken($client, 'delete'.$companyId),
+        ]);
+
+        self::assertTrue($client->getResponse()->isRedirect());
+
+        $this->em()->clear();
+        self::assertNull($this->em()->find(CompanyRole::class, $roleId));
+    }
+
     public function testOwnerCannotCreateRoleWithDuplicateName(): void
     {
         $client = static::createClient();

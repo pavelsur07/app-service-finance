@@ -16,6 +16,11 @@ use Doctrine\Migrations\AbstractMigration;
  * с фиксированными UUID, их уникальность обеспечена seed'ом, а не индексом —
  * в Postgres NULL-ы в уникальном индексе считаются различными, поэтому обычный
  * unique по (company_id, name) системные строки всё равно не ограничил бы.
+ *
+ * Индекс функциональный, по `LOWER(name)`: приложение сравнивает имена регистронезависимо
+ * (CompanyRoleRepository::findOneByCompanyAndName), и правило должно совпадать с БД —
+ * иначе гонка двух запросов с «Финансист»/«финансист» прошла бы индекс, а точный индекс
+ * при одинаковых именах давал бы необработанный UniqueConstraintViolationException.
  */
 final class Version20260811140000 extends AbstractMigration
 {
@@ -26,7 +31,7 @@ final class Version20260811140000 extends AbstractMigration
 
     public function getDescription(): string
     {
-        return 'Add partial unique index on company_role (company_id, name) for company-owned templates';
+        return 'Add partial case-insensitive unique index on company_role (company_id, LOWER(name)) for company-owned templates';
     }
 
     public function up(Schema $schema): void
@@ -34,7 +39,7 @@ final class Version20260811140000 extends AbstractMigration
         $this->abortIf(!$this->connection->getDatabasePlatform() instanceof PostgreSQLPlatform, 'PostgreSQL only.');
 
         $this->addSql(
-            'CREATE UNIQUE INDEX uniq_company_role_company_name ON company_role (company_id, name) WHERE company_id IS NOT NULL'
+            'CREATE UNIQUE INDEX uniq_company_role_company_name ON company_role (company_id, LOWER(name)) WHERE company_id IS NOT NULL'
         );
     }
 
