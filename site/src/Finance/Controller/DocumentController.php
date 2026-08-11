@@ -18,6 +18,7 @@ use App\Finance\Enum\PlNature;
 use App\Finance\Form\DocumentType;
 use App\Finance\Repository\DocumentRepository;
 use App\Finance\Repository\PLCategoryRepository;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -67,6 +68,11 @@ class DocumentController extends AbstractController
     public function new(Request $request, DocumentRepository $repo, PLCategoryRepository $catRepo, ProjectDirectionRepository $projectDirectionRepo, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
+
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         $document = new Document(Uuid::uuid4()->toString(), $company);
         $document->setStatus(DocumentStatus::ACTIVE);
 
@@ -112,6 +118,11 @@ class DocumentController extends AbstractController
         ActiveCompanyService $companyService,
     ): Response {
         $company = $companyService->getActiveCompany();
+
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         if ($document->getCompany() !== $company) {
             throw $this->createNotFoundException();
         }
@@ -185,6 +196,11 @@ class DocumentController extends AbstractController
     public function edit(Request $request, Document $document, PLCategoryRepository $catRepo, ProjectDirectionRepository $projectDirectionRepo, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
+
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         if ($document->getCompany() !== $company) {
             throw $this->createNotFoundException();
         }
@@ -318,6 +334,7 @@ class DocumentController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'document_delete', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function delete(Request $request, Document $document, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();

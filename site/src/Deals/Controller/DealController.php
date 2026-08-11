@@ -11,6 +11,7 @@ use App\Deals\DTO\DealItemFormData;
 use App\Deals\Entity\Deal;
 use App\Deals\Enum\DealChannel;
 use App\Deals\Enum\DealStatus;
+use App\Company\Security\ModuleAccess;
 use App\Deals\Exception\AccessDenied as DealAccessDenied;
 use App\Deals\Exception\DealNotFound;
 use App\Deals\Exception\InvalidDealState;
@@ -86,6 +87,9 @@ final class DealController extends AbstractController
     public function new(Request $request, DealManager $dealManager): Response
     {
         $company = $this->companyService->getActiveCompany();
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::DEALS_WRITE);
+        }
         $formData = new CreateDealFormData();
         $form = $this->createForm(CreateDealType::class, $formData, ['company' => $company]);
         $form->handleRequest($request);
@@ -139,6 +143,7 @@ final class DealController extends AbstractController
     }
 
     #[Route('/{id}/confirm', name: 'deal_confirm', requirements: ['id' => '[0-9a-fA-F-]{36}'], methods: ['POST'])]
+    #[IsGranted(ModuleAccess::DEALS_WRITE)]
     public function confirm(
         Request $request,
         string $id,
@@ -171,6 +176,7 @@ final class DealController extends AbstractController
     }
 
     #[Route('/{id}/cancel', name: 'deal_cancel', requirements: ['id' => '[0-9a-fA-F-]{36}'], methods: ['POST'])]
+    #[IsGranted(ModuleAccess::DEALS_WRITE)]
     public function cancel(
         Request $request,
         string $id,
@@ -203,6 +209,7 @@ final class DealController extends AbstractController
     }
 
     #[Route('/{id}/items/add', name: 'deal_item_add', requirements: ['id' => '[0-9a-fA-F-]{36}'], methods: ['POST'])]
+    #[IsGranted(ModuleAccess::DEALS_WRITE)]
     public function addItem(
         Request $request,
         string $id,
@@ -253,6 +260,7 @@ final class DealController extends AbstractController
     }
 
     #[Route('/{id}/charges/add', name: 'deal_charge_add', requirements: ['id' => '[0-9a-fA-F-]{36}'], methods: ['POST'])]
+    #[IsGranted(ModuleAccess::DEALS_WRITE)]
     public function addCharge(
         Request $request,
         string $id,
@@ -314,6 +322,7 @@ final class DealController extends AbstractController
     }
 
     #[Route('/{id}/adjustments/add', name: 'deal_adjustment_add', requirements: ['id' => '[0-9a-fA-F-]{36}'], methods: ['POST'])]
+    #[IsGranted(ModuleAccess::DEALS_WRITE)]
     public function addAdjustment(
         Request $request,
         string $id,
@@ -369,6 +378,7 @@ final class DealController extends AbstractController
     }
 
     #[Route('/{id}/items/{itemId}/remove', name: 'deal_item_remove', requirements: ['id' => '[0-9a-fA-F-]{36}'], methods: ['POST'])]
+    #[IsGranted(ModuleAccess::DEALS_WRITE)]
     public function removeItem(
         Request $request,
         string $id,
@@ -402,6 +412,7 @@ final class DealController extends AbstractController
     }
 
     #[Route('/{id}/charges/{chargeId}/remove', name: 'deal_charge_remove', requirements: ['id' => '[0-9a-fA-F-]{36}'], methods: ['POST'])]
+    #[IsGranted(ModuleAccess::DEALS_WRITE)]
     public function removeCharge(
         Request $request,
         string $id,

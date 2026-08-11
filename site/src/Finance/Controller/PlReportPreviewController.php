@@ -7,6 +7,7 @@ namespace App\Finance\Controller;
 use App\Company\Application\Service\AccountBootstrapper;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Company\Repository\ProjectDirectionRepository;
+use App\Company\Security\ModuleAccess;
 use App\Finance\Application\Service\PLRegisterUpdater;
 use App\Finance\Report\PlReportGridBuilder;
 use App\Finance\Report\PlReportPeriod;
@@ -307,6 +308,7 @@ final class PlReportPreviewController extends AbstractController
     }
 
     #[Route('/finance/report/preview/recalc', name: 'finance_report_preview_recalc', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function recalc(
         Request $request,
         ActiveCompanyService $activeCompany,

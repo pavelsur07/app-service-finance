@@ -13,6 +13,7 @@ use App\Cash\Form\Transaction\CashTransactionSplitsType;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Repository\Transfer\CashTransferRepository;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -34,6 +35,11 @@ final class CashTransactionSplitsController extends AbstractController
         SaveCashTransactionSplitsAction $saveSplits,
     ): Response {
         $company = $companyService->getActiveCompany();
+
+        // Один экшен на GET и POST: read покрыт ModuleAccessSubscriber, write гейтим здесь.
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
 
         $transaction = $transactionRepository->findOneByIdAndCompanyId($id, (string) $company->getId());
         if (!$transaction instanceof CashTransaction) {

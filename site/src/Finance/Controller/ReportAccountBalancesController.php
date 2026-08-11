@@ -7,6 +7,7 @@ use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -118,6 +119,7 @@ class ReportAccountBalancesController extends AbstractController
     }
 
     #[Route('/recalc', name: 'report_account_balances_recalc', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function recalc(Request $request): RedirectResponse
     {
         if (!$this->isCsrfTokenValid('recalc_balances', (string) $request->request->get('_token'))) {

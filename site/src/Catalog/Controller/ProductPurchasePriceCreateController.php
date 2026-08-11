@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Controller;
 
 use App\Catalog\Application\SetPurchasePriceAction;
+use App\Company\Security\ModuleAccess;
 use App\Catalog\DTO\SetPurchasePriceCommand;
 use App\Catalog\Form\ProductPurchasePriceType;
 use App\Catalog\Infrastructure\Query\ProductPurchasePriceQuery;
@@ -27,6 +28,7 @@ final class ProductPurchasePriceCreateController extends AbstractController
     }
 
     #[Route('/catalog/products/{id}/purchase-price', name: 'catalog_products_purchase_price_create', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::CATALOG_WRITE)]
     public function __invoke(
         string $id,
         Request $request,

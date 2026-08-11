@@ -7,6 +7,7 @@ use App\Deals\DTO\ChargeTypeFormData;
 use App\Deals\Exception\AccessDenied as DealAccessDenied;
 use App\Deals\Exception\ValidationFailed;
 use App\Deals\Form\ChargeTypeType;
+use App\Company\Security\ModuleAccess;
 use App\Deals\Repository\ChargeTypeRepository;
 use App\Deals\Service\ChargeTypeManager;
 use App\Shared\Service\ActiveCompanyService;
@@ -51,6 +52,9 @@ final class ChargeTypeController extends AbstractController
     public function new(Request $request, ChargeTypeManager $chargeTypeManager): Response
     {
         $company = $this->companyService->getActiveCompany();
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::DEALS_WRITE);
+        }
         $formData = new ChargeTypeFormData();
         $form = $this->createForm(ChargeTypeType::class, $formData);
         $form->handleRequest($request);
@@ -88,6 +92,9 @@ final class ChargeTypeController extends AbstractController
         ChargeTypeManager $chargeTypeManager,
     ): Response {
         $company = $this->companyService->getActiveCompany();
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::DEALS_WRITE);
+        }
         $chargeType = $chargeTypeRepository->findOneByIdForCompany($id, $company);
         if (!$chargeType) {
             return $this->renderErrorResponse('Тип начислений не найден.', Response::HTTP_NOT_FOUND);
@@ -125,6 +132,7 @@ final class ChargeTypeController extends AbstractController
     }
 
     #[Route('/{id}/toggle', name: 'deal_charge_type_toggle', requirements: ['id' => '[0-9a-fA-F-]{36}'], methods: ['POST'])]
+    #[IsGranted(ModuleAccess::DEALS_WRITE)]
     public function toggle(
         Request $request,
         string $id,

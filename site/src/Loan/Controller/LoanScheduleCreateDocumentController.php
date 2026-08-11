@@ -8,6 +8,7 @@ use App\Loan\Application\CreateDocumentFromLoanScheduleAction;
 use App\Loan\Entity\LoanPaymentSchedule;
 use App\Loan\Repository\LoanPaymentScheduleRepository;
 use App\Loan\Repository\LoanRepository;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -23,6 +24,7 @@ final class LoanScheduleCreateDocumentController extends AbstractController
         name: 'loan_schedule_create_document',
         methods: ['POST']
     )]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function __invoke(
         string $loanId,
         string $itemId,

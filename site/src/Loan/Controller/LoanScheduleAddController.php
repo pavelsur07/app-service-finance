@@ -9,6 +9,7 @@ use App\Loan\Entity\Loan;
 use App\Loan\Entity\LoanPaymentSchedule;
 use App\Loan\Form\LoanPaymentScheduleType;
 use App\Loan\Repository\LoanPaymentScheduleRepository;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -28,6 +29,12 @@ final class LoanScheduleAddController extends AbstractController
         AddLoanScheduleItemAction $addAction,
     ): Response {
         $company = $activeCompanyService->getActiveCompany();
+
+        // Один экшен на GET и POST: read покрыт ModuleAccessSubscriber, write гейтим здесь.
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         if ($loan->getCompany() !== $company) {
             throw $this->createNotFoundException();
         }

@@ -6,6 +6,7 @@ namespace App\Catalog\Controller\Api;
 
 use App\Catalog\Application\Command\ImportProductsCommand;
 use App\Catalog\Application\ImportProductsFromXlsAction;
+use App\Company\Security\ModuleAccess;
 use App\Catalog\Entity\ProductImport;
 use App\Catalog\Infrastructure\Repository\ProductImportRepository;
 use App\Catalog\Message\ImportProductsMessage;
@@ -22,7 +23,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class ProductImportController extends AbstractController
 {
     #[Route('/api/catalog/products/import', name: 'api_catalog_products_import', methods: ['POST'])]
-    #[IsGranted('ROLE_USER')]
+    #[IsGranted(ModuleAccess::CATALOG_WRITE)]
     public function import(
         Request $request,
         ActiveCompanyService $activeCompanyService,

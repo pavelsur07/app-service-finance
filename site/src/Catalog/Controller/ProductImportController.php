@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Controller;
 
 use App\Catalog\Entity\ProductImport;
+use App\Company\Security\ModuleAccess;
 use App\Catalog\Infrastructure\Repository\ProductImportRepository;
 use App\Catalog\Message\ImportProductsMessage;
 use App\Shared\Service\ActiveCompanyService;
@@ -33,6 +34,9 @@ final class ProductImportController extends AbstractController
     ): Response {
         // ✅ ActiveCompanyService — только в Controller
         $companyId = $activeCompanyService->getActiveCompany()->getId();
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::CATALOG_WRITE);
+        }
 
         if (!$request->isMethod('POST')) {
             return $this->render('catalog/product/import.html.twig');

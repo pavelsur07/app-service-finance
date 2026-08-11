@@ -24,6 +24,7 @@ use App\Cash\Service\Transaction\CashTransactionSplitSynchronizer;
 use App\Company\Application\DTO\FinancialResponsibilityCenterDTO;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Company\Repository\ProjectDirectionRepository;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Audit\AuditContextProvider;
 use App\Shared\Entity\AuditLog;
 use App\Shared\Enum\AuditLogAction;
@@ -183,6 +184,11 @@ class CashTransactionAutoRuleController extends AbstractController
         CashTransactionAutoRulePrefiller $prefiller,
     ): Response {
         $company = $companyService->getActiveCompany();
+
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         $companyId = (string) $company->getId();
         $categories = $categoryRepo->findTreeByCompany($company);
         $moneyAccounts = $moneyAccountRepo->findBy(['company' => $company], ['name' => 'ASC']);
@@ -259,6 +265,11 @@ class CashTransactionAutoRuleController extends AbstractController
         AuditContextProvider $auditContextProvider,
     ): Response {
         $company = $companyService->getActiveCompany();
+
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         $companyId = (string) $company->getId();
         $rule = $repo->findOneByIdAndCompanyId($id, (string) $company->getId());
         if (!$rule) {
@@ -403,6 +414,7 @@ class CashTransactionAutoRuleController extends AbstractController
     }
 
     #[Route('/apply/{transactionId}', name: 'cash_transaction_auto_rule_apply_one', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function applyOne(
         string $transactionId,
         Request $request,
@@ -491,6 +503,7 @@ class CashTransactionAutoRuleController extends AbstractController
     }
 
     #[Route('/{id}/disable', name: 'cash_transaction_auto_rule_disable', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function disable(
         string $id,
         Request $request,
@@ -514,6 +527,7 @@ class CashTransactionAutoRuleController extends AbstractController
     }
 
     #[Route('/{id}/enable', name: 'cash_transaction_auto_rule_enable', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function enable(
         string $id,
         Request $request,
@@ -537,6 +551,7 @@ class CashTransactionAutoRuleController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'cash_transaction_auto_rule_delete', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function delete(
         string $id,
         Request $request,

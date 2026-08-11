@@ -10,6 +10,7 @@ use App\Cash\Repository\Accounts\MoneyFundRepository;
 use App\Cash\Service\Accounts\FundBalanceService;
 use App\Cash\Service\Accounts\FundService;
 use App\Company\Entity\User;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\FeatureFlagService;
 use App\Shared\Service\ActiveCompanyService;
 use Ramsey\Uuid\Uuid;
@@ -57,6 +58,10 @@ class FundController extends AbstractController
         $this->assertFeatureEnabled();
         $company = $this->activeCompanyService->getActiveCompany();
 
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         $fund = new MoneyFund(Uuid::uuid4()->toString(), $company, '', 'RUB');
         $form = $this->createForm(MoneyFundType::class, $fund);
         $form->handleRequest($request);
@@ -83,6 +88,10 @@ class FundController extends AbstractController
     ): Response {
         $this->assertFeatureEnabled();
         $company = $this->activeCompanyService->getActiveCompany();
+
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
 
         if ($fund->getCompany()->getId() !== $company->getId()) {
             throw $this->createNotFoundException();

@@ -8,6 +8,7 @@ use App\Loan\Application\DeleteLoanScheduleItemAction;
 use App\Loan\Entity\LoanPaymentSchedule;
 use App\Loan\Repository\LoanPaymentScheduleRepository;
 use App\Loan\Repository\LoanRepository;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -19,6 +20,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class LoanScheduleDeleteController extends AbstractController
 {
     #[Route('/loans/{loanId}/schedule/{itemId}/delete', name: 'loan_schedule_delete', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function __invoke(
         string $loanId,
         string $itemId,

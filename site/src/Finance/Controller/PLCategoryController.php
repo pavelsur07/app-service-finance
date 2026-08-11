@@ -14,6 +14,7 @@ use App\Finance\Entity\PLCategory;
 use App\Finance\Form\PLCategoryFormType;
 use App\Finance\Repository\PLCategoryRepository;
 use App\Finance\Repository\PLDailyTotalRepository;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -118,6 +119,7 @@ class PLCategoryController extends AbstractController
     }
 
     #[Route('/import/upload', name: 'pl_category_import_upload', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function importUpload(
         Request $request,
         ActiveCompanyService $companyService,
@@ -194,6 +196,7 @@ class PLCategoryController extends AbstractController
     }
 
     #[Route('/import/apply', name: 'pl_category_import_apply', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function importApply(
         Request $request,
         ActiveCompanyService $companyService,
@@ -260,6 +263,11 @@ class PLCategoryController extends AbstractController
     public function new(Request $request, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
+
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         $category = new PLCategory(Uuid::uuid4()->toString(), $company);
 
         $availableCategories = $this->categoryRepository->findTreeByCompany($company);
@@ -299,6 +307,11 @@ class PLCategoryController extends AbstractController
     public function edit(Request $request, PLCategory $category, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
+
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         if ($category->getCompany() !== $company) {
             throw $this->createNotFoundException();
         }
@@ -334,6 +347,7 @@ class PLCategoryController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'pl_category_delete', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function delete(Request $request, PLCategory $category, EntityManagerInterface $em, ActiveCompanyService $companyService, PLDailyTotalRepository $dailyTotalRepository): Response
     {
         $company = $companyService->getActiveCompany();

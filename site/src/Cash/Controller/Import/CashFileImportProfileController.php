@@ -5,6 +5,7 @@ namespace App\Cash\Controller\Import;
 use App\Cash\Entity\Import\CashFileImportProfile;
 use App\Cash\Repository\Import\CashFileImportProfileRepository;
 use App\Cash\Service\Import\File\CashFileImportFacade;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -37,6 +38,11 @@ class CashFileImportProfileController extends AbstractController
     public function new(Request $request): Response
     {
         $company = $this->activeCompanyService->getActiveCompany();
+
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         $formData = [
             'name' => '',
             'mapping' => '',
@@ -89,6 +95,11 @@ class CashFileImportProfileController extends AbstractController
         CashFileImportProfileRepository $repository,
     ): Response {
         $company = $this->activeCompanyService->getActiveCompany();
+
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         $profile = $repository->find($id);
 
         if (!$profile || $profile->getCompany()->getId() !== $company->getId()) {
@@ -142,6 +153,7 @@ class CashFileImportProfileController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'cash_file_import_profile_delete', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function delete(
         Request $request,
         string $id,

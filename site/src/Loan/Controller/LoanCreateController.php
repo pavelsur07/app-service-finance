@@ -8,6 +8,7 @@ use App\Finance\Facade\PLCategoryFacade;
 use App\Loan\Application\CreateLoanAction;
 use App\Loan\Entity\Loan;
 use App\Loan\Form\LoanType;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -26,6 +27,12 @@ final class LoanCreateController extends AbstractController
         CreateLoanAction $createLoanAction,
     ): Response {
         $company = $activeCompanyService->getActiveCompany();
+
+        // Один экшен на GET и POST: read покрыт ModuleAccessSubscriber, write гейтим здесь.
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         $loan = new Loan($company, '', '0.00', new \DateTimeImmutable());
         $categories = $plCategoryFacade->findTreeEntitiesByCompanyId((string) $company->getId());
 

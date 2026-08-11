@@ -16,6 +16,7 @@ use App\Company\Form\FinancialResponsibilityCenterType;
 use App\Company\Repository\FinancialResponsibilityCenterProjectRepository;
 use App\Company\Repository\FinancialResponsibilityCenterRepository;
 use App\Company\Repository\ProjectDirectionRepository;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormInterface;
@@ -49,6 +50,11 @@ final class FinancialResponsibilityCenterController extends AbstractController
         ActiveCompanyService $activeCompanyService,
         CreateFinancialResponsibilityCenterAction $createAction,
     ): Response {
+        // Один экшен на GET и POST: read покрыт ModuleAccessSubscriber, write гейтим здесь.
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         $form = $this->createForm(FinancialResponsibilityCenterType::class, [
             'name' => '',
             'sort' => 0,
@@ -81,6 +87,11 @@ final class FinancialResponsibilityCenterController extends AbstractController
         ProjectDirectionRepository $projectRepository,
         UpdateFinancialResponsibilityCenterAction $updateAction,
     ): Response {
+        // Один экшен на GET и POST: read покрыт ModuleAccessSubscriber, write гейтим здесь.
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
+
         $company = $activeCompanyService->getActiveCompany();
         $companyId = (string) $company->getId();
         $center = $centerRepository->findOneByIdAndCompanyId($id, $companyId)
@@ -122,6 +133,7 @@ final class FinancialResponsibilityCenterController extends AbstractController
     }
 
     #[Route('/{id}/projects', name: 'financial_responsibility_center_projects', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function projects(
         string $id,
         Request $request,
@@ -156,6 +168,7 @@ final class FinancialResponsibilityCenterController extends AbstractController
     }
 
     #[Route('/{id}/archive', name: 'financial_responsibility_center_archive', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function archive(
         string $id,
         Request $request,

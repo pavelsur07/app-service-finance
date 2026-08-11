@@ -7,6 +7,7 @@ use App\Cash\Service\Accounts\AccountMasker;
 use App\Cash\Service\Import\ClientBank1CImportService;
 use App\Cash\Service\Import\ImportLogger;
 use App\Company\Entity\User;
+use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -117,6 +118,7 @@ class Bank1CImportController extends AbstractController
      * POST обработчик формы. Готовит превью и кладёт в сессию → PRG на GET превью.
      */
     #[Route('/preview/upload', name: 'cash_bank1c_import_preview_upload', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function previewUpload(Request $request, MoneyAccountRepository $accountRepository): Response
     {
         $session = $request->getSession();
@@ -314,6 +316,7 @@ class Bank1CImportController extends AbstractController
     }
 
     #[Route('/commit', name: 'cash_bank1c_import_commit', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function commit(Request $request, MoneyAccountRepository $accountRepository): Response
     {
         if (!$this->isCsrfTokenValid('bank1c_import_commit', (string) $request->request->get('_token'))) {

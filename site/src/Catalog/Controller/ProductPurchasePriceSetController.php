@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Controller;
 
 use App\Catalog\Application\SetPurchasePriceAction;
+use App\Company\Security\ModuleAccess;
 use App\Catalog\DTO\SetPurchasePriceCommand;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -17,6 +18,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class ProductPurchasePriceSetController extends AbstractController
 {
     #[Route('/catalog/products/{id}/purchase-prices', name: 'catalog_products_purchase_prices_set', methods: ['POST'])]
+    #[IsGranted(ModuleAccess::CATALOG_WRITE)]
     public function __invoke(
         string $id,
         Request $request,
