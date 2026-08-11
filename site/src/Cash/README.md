@@ -105,8 +105,7 @@ idempotency key и владения ногами проверяется двум
    системную структуру категорий read-only командой
    `app:cashflow-categories:migrate-system-structure --companies-with-accounts`
    без `--execute`. Команда выбирает только компании со счетами ДДС и выводит
-   агрегированные счётчики без UUID и реквизитов. В production этот dry-run
-   запускается ручным workflow action `category-plan`. Обычные root-категории не входят
+   агрегированные счётчики без UUID и реквизитов. Обычные root-категории не входят
    в execute-план; warning о legacy `TECHNICAL` root остаётся read-only.
 2. Применить expand-only migration `cash_transfer`, затем развернуть application
    code. Backfill и автоматическое спаривание legacy-операций не нужны.
