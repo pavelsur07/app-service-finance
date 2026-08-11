@@ -7,7 +7,10 @@ Per-member override НЕ делаем (решение владельца): не�
 ## Решённые вопросы (зафиксированы с owner)
 
 - Per-member override: нет, только шаблоны (`company_role`).
-- Группы модулей: `finance / marketplace / deals / catalog / admin` + `system` (SUPER_ADMIN).
+- Группы модулей: `finance / marketplace / deals / catalog / admin`. Шестой группы `system`
+  в `Module` enum нет: Admin, Mcp, Telegram `/admin/*` и debug-роуты попали в `EXEMPT_PREFIXES`
+  и остаются под `ROLE_ADMIN`/`ROLE_SUPER_ADMIN`. Модуль, который нельзя выдать шаблоном,
+  в enum не нужен — иначе «Полный доступ» формально грантил бы `system:write`, который никто не проверяет.
 - «Аналитика и остатки» слиты в `marketplace` (Marketplace, MarketplaceAds, MarketplaceAnalytics,
   Inventory, Ingestion, MoySklad).
 - `Ai` → `finance`. `/counterparties`, `/financial-responsibility-centers` (внутри Company) → `finance`;
@@ -22,7 +25,7 @@ Per-member override НЕ делаем (решение владельца): не�
 | `deals` | Deals |
 | `catalog` | Catalog |
 | `admin` | Company (прочее), Billing, Telegram (пользовательские интеграции) |
-| `system` | Admin, Mcp, Telegram `/admin/*`, debug-роуты |
+| exempt (не модуль) | Admin, Mcp, Analytics, Notification, Telegram `/admin/*`, Marketplace `/admin/*` — свои гейты `ROLE_ADMIN`/`ROLE_SUPER_ADMIN` |
 | public | логин/регистрация/инвайт, `/telegram/webhook`, `/_health`, `/api/health/*`, `/api/public/*` |
 
 ## Архитектура
@@ -88,7 +91,11 @@ Definition of Done:
 - Инвайт: выбор шаблона при приглашении (CompanyInvite получает role_id).
 - Защита «последний admin:write»: нельзя понизить/отключить последнего участника с admin:write.
 - Аудит: лог изменений шаблона/назначения (через logger, контекст company/user/role).
-- Только для владельца компании (assertOwner-паттерн → module.admin.write в Stage 3).
+- Только для владельца компании (`assertOwner`). **Исправлено 2026-08-11:** исходный план обещал
+  заменить `assertOwner` на `module.admin.write` в Stage 3 — это дало бы self-escalation. Участник
+  с `admin:write` отредактировал бы собственный шаблон и выдал себе `finance:write`, то есть поднял
+  бы себя до полного доступа. Управление шаблонами и назначение ролей остаются owner-only;
+  `module.admin.write` для этих экранов не применяется ни в Stage 3, ни позже.
 - Functional-тесты UI-флоу.
 
 Work items:
@@ -118,14 +125,30 @@ Definition of Done:
 - На всех мутирующих контроллерах/экшенах Cash, Finance, Balance, Report, Loan, Ai, Deals, Catalog,
   Company(admin), Billing, Telegram стоит `module.*.write` (class-level для write-контроллеров,
   method-level для смешанных).
-- Существующие `ROLE_COMPANY_OWNER`-гейты в этих модулях сохранены либо осознанно заменены на
-  `module.admin.write` (решение фиксируется в Stage Report).
+- Существующие owner-гейты **сохраняются, а не заменяются**. `module.admin.write` слабее owner-only,
+  поэтому подмена расширила бы доступ. Явные случаи, которые нельзя ослабить:
+  - `CompanyRoleController` и назначение шаблонов в `CompanyMemberController` — owner-only
+    (иначе self-escalation, см. Stage 2);
+  - `ReportApiKeyController` — master ограничил generate/revoke владельцем компании в `c45a9f74`
+    (CRITICAL); гейт сохранить как есть.
+- Миграции ветки перенумерованы выше последней задеплоенной на прод (`Version20260809120000`),
+  чтобы merge не приводил к out-of-order прогону.
+- `company_role` получает unique index по `(company_id, name)` — follow-up, дважды перенесённый
+  из Stage 1 и Stage 2.
+- `flush()` вынесен из `CompanyRoleRepository` и `CompanyMemberRepository` в Action-слой
+  (`src/Company/Application/` уже существует, так что основания для отсрочки нет —
+  «Глобальные запреты» CLAUDE.md).
 - Functional-тесты: read=200, write без права=403, none=403 — по репрезентативному эндпоинту на группу.
 
 Work items:
-- 3.1 — инвентаризация контроллеров групп (классификация read/write)
-- 3.2 — расстановка write-гейтов
-- 3.3 — тесты, прогон, self-review
+- 3.1 — merge master в ветку, резолюция коллизии роутов (сделано: `bc030ed4`)
+- 3.2 — правки плана по итогам ревизии (этот коммит)
+- 3.3 — перенумерация миграций выше задеплоенной
+- 3.4 — инвентаризация контроллеров групп (классификация read/write)
+- 3.5 — расстановка write-гейтов
+- 3.6 — unique index `company_role(company_id, name)`
+- 3.7 — `flush()` из репозиториев в Action
+- 3.8 — тесты, прогон, self-review
 
 ## Stage 4: Write-гейты — marketplace
 
@@ -141,9 +164,9 @@ Work items:
 - 4.1 — инвентаризация
 - 4.2 — расстановка гейтов
 - 4.3 — тесты, прогон, self-review
-- 4.4 — оценить Debug*-контроллеры marketplace (например `DebugWipeCompanyDataController` — GET,
-  удаляющий данные компании, сейчас под ROLE_COMPANY_USER): либо вынести разрушительные
-  debug-эндпоинты под ROLE_ADMIN, либо зафиксировать сознательное отклонение от плана в Stage Report.
+- ~~4.4 — оценить Debug*-контроллеры marketplace~~ — **снят 2026-08-11**: master удалил
+  `DebugWipeCompanyDataController` коммитом `c45a9f74` как CRITICAL (GET, удаляющий данные компании
+  под ROLE_COMPANY_USER). Делать нечего, файл ушёл при мерже.
 
 ## Stage 5: Меню и дашборд
 
@@ -164,6 +187,24 @@ Work items:
 - 5.1 — сайдбары
 - 5.2 — дашборд
 - 5.3 — тесты, прогон, self-review
+
+## Решение по роутам лендинга (принято при мерже master, `bc030ed4`)
+
+Stage 1 забрал `/dashboard` под легаси финансовый дашборд и удалил `home/dashboard.html.twig`.
+Пока ветка лежала в стороне, master развивал именно этот шаблон: React DashboardGrid на snapshot API
+(`d58acc31`) и UI мультивалютных переводов (`0e646cb4`). Прямой мерж уничтожил бы работу master.
+
+Итоговое распределение:
+
+| Роут | Имя | Что отдаёт |
+|---|---|---|
+| `/` | `app_home_index` | `HomeRedirectController` — редирект на первый доступный модуль |
+| `/finance` | `app_finance_index` | легаси финансовый дашборд (`HomeController::index`) |
+| `/dashboard` | `app_dashboard_index` | React-пилот (`HomeController::dashboard`), сохранён от master |
+
+`app_home_index` намеренно оставлен за `/`: на него ссылается десяток шаблонов, и переименование
+сломало бы их без нужды. Легаси-дашборд переехал на новый роут, потому что ветка уже согласилась
+увести его с `/`, а `/dashboard` занят пилотом.
 
 ## Чего НЕ меняем
 
