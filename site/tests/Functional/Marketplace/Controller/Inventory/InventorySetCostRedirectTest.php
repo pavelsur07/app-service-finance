@@ -6,12 +6,14 @@ namespace App\Tests\Functional\Marketplace\Controller\Inventory;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
+use App\Marketplace\Entity\Inventory\MarketplaceInventoryCostPrice;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 
 final class InventorySetCostRedirectTest extends WebTestCaseBase
@@ -140,6 +142,60 @@ final class InventorySetCostRedirectTest extends WebTestCaseBase
         );
 
         self::assertResponseRedirects(sprintf('/marketplace/inventory/%s/history', $listingId));
+    }
+
+    public function testOverwritesExistingPriceAndShowsWarning(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        [$owner, $company, $listing] = $this->seedCompanyAndListing('overwrite-cost@example.test', 'sku-overwrite');
+        $effectiveFrom = new \DateTimeImmutable('2026-04-20');
+        $existing = new MarketplaceInventoryCostPrice(
+            Uuid::uuid4()->toString(),
+            self::COMPANY_ID,
+            $listing,
+            $effectiveFrom,
+            '100.00',
+            'RUB',
+            'old note',
+        );
+        $this->em()->persist($existing);
+        $this->em()->flush();
+        $this->loginWithActiveCompany($client, $owner, $company);
+
+        $client->request(
+            'POST',
+            sprintf('/marketplace/inventory/%s/set-cost', $listing->getId()),
+            [
+                '_token' => $this->csrfToken($client, 'marketplace_inventory_set_cost'.$listing->getId()),
+                'price_amount' => '125.00',
+                'effective_from' => $effectiveFrom->format('Y-m-d'),
+                'note' => 'new note',
+            ],
+            [],
+            ['HTTP_REFERER' => 'http://localhost/marketplace/inventory'],
+        );
+
+        self::assertResponseRedirects('/marketplace/inventory');
+        $client->followRedirect();
+        self::assertSelectorTextContains(
+            '.toast.text-bg-warning',
+            'Себестоимость на 20.04.2026 уже существовала и была перезаписана.',
+        );
+
+        $rows = $this->em()->getConnection()->fetchAllAssociative(
+            'SELECT id, price_amount, note FROM marketplace_inventory_cost_prices WHERE company_id = :companyId AND listing_id = :listingId AND effective_from = :effectiveFrom',
+            [
+                'companyId' => self::COMPANY_ID,
+                'listingId' => $listing->getId(),
+                'effectiveFrom' => $effectiveFrom->format('Y-m-d'),
+            ],
+        );
+        self::assertCount(1, $rows);
+        self::assertSame($existing->getId(), $rows[0]['id']);
+        self::assertSame('125.00', $rows[0]['price_amount']);
+        self::assertSame('new note', $rows[0]['note']);
     }
 
     /**

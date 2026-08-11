@@ -99,4 +99,9 @@ class MarketplaceJobLog
 
         return ($this->summary['errors'] ?? 0) > 0;
     }
+
+    public function hasWarnings(): bool
+    {
+        return ($this->summary['overwritten_listings'] ?? 0) > 0;
+    }
 }

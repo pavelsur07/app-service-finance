@@ -27,7 +27,7 @@ use Psr\Log\LoggerInterface;
  *
  * Строки с ненайденным идентификатором пропускаются и логируются.
  *
- * @return array{imported: int, updated_listings: int, skipped: int, errors: string[]}
+ * @return array{imported: int, updated_listings: int, overwritten_listings: int, skipped: int, errors: string[]}
  */
 final class ImportInventoryCostPriceFromFileAction
 {
@@ -47,6 +47,7 @@ final class ImportInventoryCostPriceFromFileAction
 
         $imported = 0;
         $updatedListings = 0;
+        $overwrittenListings = 0;
         $skipped = 0;
         $errors = [];
 
@@ -94,7 +95,7 @@ final class ImportInventoryCostPriceFromFileAction
             $updatedForRow = 0;
             foreach ($listings as $listing) {
                 try {
-                    ($this->setAction)(new SetInventoryCostPriceCommand(
+                    $setResult = ($this->setAction)(new SetInventoryCostPriceCommand(
                         companyId: $command->companyId,
                         listingId: $listing->getId(),
                         effectiveFrom: $command->effectiveFrom,
@@ -104,6 +105,9 @@ final class ImportInventoryCostPriceFromFileAction
                     ));
 
                     ++$updatedForRow;
+                    if ($setResult->wasOverwritten) {
+                        ++$overwrittenListings;
+                    }
                 } catch (\DomainException $e) {
                     $errors[] = count($listings) > 1
                         ? sprintf(
@@ -137,6 +141,7 @@ final class ImportInventoryCostPriceFromFileAction
             'identifier_type' => $command->identifierType,
             'imported' => $imported,
             'updated_listings' => $updatedListings,
+            'overwritten_listings' => $overwrittenListings,
             'skipped' => $skipped,
             'errors' => count($errors),
         ]);
@@ -144,6 +149,7 @@ final class ImportInventoryCostPriceFromFileAction
         return [
             'imported' => $imported,
             'updated_listings' => $updatedListings,
+            'overwritten_listings' => $overwrittenListings,
             'skipped' => $skipped,
             'errors' => $errors,
         ];

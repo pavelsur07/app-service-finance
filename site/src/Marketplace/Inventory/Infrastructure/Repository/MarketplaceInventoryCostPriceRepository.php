@@ -81,23 +81,19 @@ class MarketplaceInventoryCostPriceRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
-    /**
-     * Найти следующую запись после даты.
-     * Используется в SetInventoryCostPriceAction для проверки перекрытий.
-     */
-    public function findNextAfterDate(
+    /** Найти цену, которая начинается точно в указанную дату. */
+    public function findAtExactDate(
         string $companyId,
         string $listingId,
-        \DateTimeImmutable $from,
+        \DateTimeImmutable $effectiveFrom,
     ): ?MarketplaceInventoryCostPrice {
         return $this->createQueryBuilder('p')
             ->where('p.companyId = :companyId')
             ->andWhere('IDENTITY(p.listing) = :listingId')
-            ->andWhere('p.effectiveFrom > :from')
+            ->andWhere('p.effectiveFrom = :effectiveFrom')
             ->setParameter('companyId', $companyId)
             ->setParameter('listingId', $listingId)
-            ->setParameter('from', $from)
-            ->orderBy('p.effectiveFrom', 'ASC')
+            ->setParameter('effectiveFrom', $effectiveFrom)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();

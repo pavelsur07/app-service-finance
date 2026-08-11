@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Marketplace\Controller\Inventory;
 
+use App\Marketplace\Entity\MarketplaceJobLog;
+use App\Marketplace\Enum\JobType;
 use App\Marketplace\Message\ImportInventoryCostPriceMessage;
 use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
@@ -174,6 +177,39 @@ final class InventoryImportControllerTest extends WebTestCaseBase
         self::assertStringContainsString('регистр букв не учитывается', $client->getResponse()->getContent());
         self::assertStringContainsString('Одна цена будет применена ко всем размерам', $client->getResponse()->getContent());
         self::assertStringContainsString('отличающиеся только регистром, будут пропущены с ошибкой', $client->getResponse()->getContent());
+    }
+
+    public function testInventoryPageShowsSuccessfulOverwriteImportAsWarning(): void
+    {
+        $client = $this->authenticatedClient('overwrite-cost-import-ui@example.test');
+        $companyId = (string) $this->em()->getConnection()->fetchOne('SELECT id FROM companies LIMIT 1');
+        $jobLog = new MarketplaceJobLog(
+            Uuid::uuid4()->toString(),
+            $companyId,
+            JobType::COST_PRICE_IMPORT,
+        );
+        $jobLog->complete([
+            'imported' => 2,
+            'updated_listings' => 2,
+            'overwritten_listings' => 1,
+            'skipped' => 0,
+            'errors' => 0,
+            'file' => 'costs.xlsx',
+            'marketplace' => 'ozon',
+        ]);
+        $this->em()->persist($jobLog);
+        $this->em()->flush();
+
+        $crawler = $client->request('GET', '/marketplace/inventory');
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('.alert.alert-warning');
+        self::assertStringContainsString(
+            'перезаписано цен на ту же дату 1',
+            $crawler->filter('.alert.alert-warning')->text(),
+        );
+        self::assertFalse($jobLog->hasErrors());
+        self::assertTrue($jobLog->hasWarnings());
     }
 
     private function authenticatedClient(string $email): KernelBrowser
