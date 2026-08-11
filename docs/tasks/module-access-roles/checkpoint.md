@@ -2,10 +2,10 @@
 
 ## Current checkpoint
 
-**Phase:** Stage 3
-**Status:** implementing
+**Phase:** Stage 3 — DONE
+**Status:** done
 **Stage base commit:** 32d181ae (Stage 2 committed and pushed)
-**Current Work item:** 3.3 — перенумерация миграций выше задеплоенной
+**Current Work item:** none (Stage 3 закрыт, REVIEW_GREEN)
 **Owner gate:** no
 
 ### Completed
@@ -19,6 +19,9 @@
   а легаси-дашборд переехал на `/finance` (см. plan.md, раздел «Решение по роутам лендинга»).
   `DashboardSnapshotService` сложил валюту ДДС от master и гейтинг от ветки; ключ кэша разделён
   по обоим измерениям.
+- Work items 3.3–3.8 — перенумерация миграций, write-гейты (89 шт.), unique index,
+  flush в Action-слой, тесты. Внешнее ревью Codex: REVIEW_GREEN за 3 итерации
+  (3+1 IMPORTANT и 2+3+2 MINOR — все исправлены). Stage Report: stages/stage-3.md.
 - Work item 3.2 — правки плана по итогам ревизии: снят self-escalation в Stage 2/3 (управление
   шаблонами остаётся owner-only), снят Work item 4.4 (master удалил DebugWipeCompanyDataController),
   зафиксирован owner-гейт `ReportApiKeyController`, приведена в соответствие карта модулей
@@ -59,9 +62,10 @@ Merge `bc030ed4` — resolved:
 
 ### Exact next action
 
-- Work item 3.3: перенумеровать `Version20260808120000` и `Version20260808130000` выше
-  `Version20260809120000` (последняя применённая на проде), пересобрать тестовую БД, прогнать миграции.
-- Далее 3.4–3.8 по plan.md.
+- Stage 4: write-гейты marketplace (Marketplace, MarketplaceAds, MarketplaceAnalytics, Inventory,
+  Ingestion, MoySklad), включая подпапки `Api/` и `Marketplace/Controller/Inventory`.
+  Work item 4.4 снят — master удалил DebugWipeCompanyDataController.
+- Затем Stage 5: сайдбары по `is_granted('module.<group>.read')`.
 
 ### Files to inspect first on resume
 
