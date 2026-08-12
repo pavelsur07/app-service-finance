@@ -136,6 +136,17 @@ class MarketplaceInventoryCostPrice
         return $this->createdAt;
     }
 
+    public function overwrite(string $priceAmount, string $priceCurrency, ?string $note): void
+    {
+        Assert::numeric($priceAmount);
+        Assert::greaterThanEq((float) $priceAmount, 0.0);
+        Assert::length($priceCurrency, 3);
+
+        $this->priceAmount = $priceAmount;
+        $this->priceCurrency = strtoupper($priceCurrency);
+        $this->note = $note;
+    }
+
     /**
      * Закрыть период действия цены.
      * Вызывается из SetInventoryCostPriceAction при добавлении новой записи.

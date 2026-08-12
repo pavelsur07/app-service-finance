@@ -74,11 +74,12 @@
         {% if job_logs is not empty %}
             <div class="mb-3 d-flex flex-column gap-2">
                 {% for job_type, log in job_logs %}
-                    <div class="alert {{ log.hasErrors ? 'alert-warning' : (log.status.value == 'running' ? 'alert-info' : 'alert-success') }} alert-dismissible mb-0 py-2">
+                    {% set has_warnings = log.hasErrors or log.hasWarnings %}
+                    <div class="alert {{ has_warnings ? 'alert-warning' : (log.status.value == 'running' ? 'alert-info' : 'alert-success') }} alert-dismissible mb-0 py-2">
                         <div class="d-flex align-items-center gap-2">
                             {% if log.status.value == 'running' %}
                                 <div class="spinner-border spinner-border-sm" role="status"></div>
-                            {% elseif log.hasErrors %}
+                            {% elseif has_warnings %}
                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9v4m0 4h.01"/><path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.871l-8.106 -13.534a1.914 1.914 0 0 0 -3.274 0z"/></svg>
                             {% else %}
                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l5 5l10 -10"/></svg>
@@ -102,6 +103,9 @@
                                     импортировано строк {{ log.summary.imported ?? 0 }},
                                     {% if log.summary.updated_listings is defined %}
                                         обновлено листингов {{ log.summary.updated_listings }},
+                                    {% endif %}
+                                    {% if (log.summary.overwritten_listings ?? 0) > 0 %}
+                                        перезаписано цен на ту же дату {{ log.summary.overwritten_listings }},
                                     {% endif %}
                                     пропущено {{ log.summary.skipped ?? 0 }},
                                     ошибок {{ log.summary.errors ?? 0 }}

@@ -70,6 +70,7 @@ final class ImportInventoryCostPriceHandler
             $summary = [
                 'imported'  => $result['imported'],
                 'updated_listings' => $result['updated_listings'],
+                'overwritten_listings' => $result['overwritten_listings'],
                 'skipped'   => $result['skipped'],
                 'errors'    => count($result['errors']),
                 'file'      => $message->originalFilename,
@@ -84,6 +85,7 @@ final class ImportInventoryCostPriceHandler
                 'company_id' => $message->companyId,
                 'imported'   => $result['imported'],
                 'updated_listings' => $result['updated_listings'],
+                'overwritten_listings' => $result['overwritten_listings'],
                 'skipped'    => $result['skipped'],
                 'errors'     => count($result['errors']),
             ]);

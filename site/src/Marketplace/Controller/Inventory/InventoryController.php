@@ -116,18 +116,26 @@ final class InventoryController extends AbstractController
         $note = (string) $request->request->get('note', '') ?: null;
 
         try {
+            $effectiveFromDate = new \DateTimeImmutable($effectiveFrom);
             $command = new SetInventoryCostPriceCommand(
                 companyId: $companyId,
                 listingId: $id,
-                effectiveFrom: new \DateTimeImmutable($effectiveFrom),
+                effectiveFrom: $effectiveFromDate,
                 priceAmount: $priceAmount,
                 currency: 'RUB',
                 note: $note,
             );
 
-            ($this->setAction)($command);
+            $result = ($this->setAction)($command);
 
-            $this->addFlash('success', 'Себестоимость сохранена.');
+            if ($result->wasOverwritten) {
+                $this->addFlash('warning', sprintf(
+                    'Себестоимость на %s уже существовала и была перезаписана.',
+                    $effectiveFromDate->format('d.m.Y'),
+                ));
+            } else {
+                $this->addFlash('success', 'Себестоимость сохранена.');
+            }
         } catch (\DomainException $e) {
             $this->addFlash('error', $e->getMessage());
         } catch (\Exception $e) {
