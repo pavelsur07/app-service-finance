@@ -218,7 +218,8 @@ Eligible work:
 - read-only inspection, explanation, status, or diagnostics that does not
   require a production check;
 - explicitly requested post-merge Git housekeeping after verifying the exact
-  target is merged, such as deleting its local and remote task branch;
+  target is merged, such as deleting its local task branch — the remote one is
+  reported to the owner, never deleted by the agent (see "Branch deletion");
 - documentation, comments, formatting, or prose-only UI copy with no change to
   code paths, template control flow, variables, configuration, contracts, or
   generated artifacts;
@@ -332,6 +333,63 @@ Prefer:
 top-level Stages may be separate focused commits in the same Draft PR
 Work items do not create separate PRs and do not mark the PR Ready
 ```
+
+PR base branch
+
+Create every PR with `master` explicitly selected as its base; when using
+`gh pr create`, pass `--base master`. Then verify the stored value with
+`gh pr view <n> --json baseRefName`. A base other than `master` is a defect, not
+a variation: the PR merges into a feature branch and GitHub reports `MERGED`
+truthfully, while this PR on its own delivers nothing to `master`. The change may
+still arrive by another route — the feature branch merged later, a cherry-pick,
+a separate PR — but each of those needs its own proof, and absent one the work is
+silently lost. The branch list and the PR state do not distinguish this from a
+real merge,
+so `baseRefName` has to be checked explicitly. Fix with
+`gh pr edit <n> --base master` before merging, then re-check the full PR diff and
+CI — changing the base changes what the PR contains.
+
+Branch deletion
+
+Delete a branch only after establishing that the merge GitHub recorded for it is
+in the current `master` history — which is a claim about history, not about the
+working tree, since a later revert can undo the content while the merge stays an
+ancestor.
+
+Read the facts from the PR:
+
+```bash
+gh pr view <n> --json state,baseRefName,headRefName,mergeCommit,headRefOid \
+  -q '[.state, .baseRefName, .headRefName, .mergeCommit.oid, .headRefOid] | @tsv'
+```
+
+Deletion is authorized only when `state` is `MERGED`, `baseRefName` is `master`,
+`headRefName` is the branch about to be deleted, `mergeCommit` is an ancestor of
+a freshly fetched `refs/remotes/origin/master`, and `headRefOid` still equals the
+branch tip. The tip check is the trap: a branch written to after its merge keeps
+the PR at `MERGED` while those newer commits never reached `master`. If the PR
+head lives in another repository, `origin` does not hold that branch — do not
+delete anything there on the strength of this PR.
+
+Delete with `git branch`, never with plumbing: `git update-ref -d` destroys a
+branch checked out in a worktree and leaves that worktree's `HEAD` pointing at a
+ref that no longer exists. Prefer `-d`, but read neither its success nor its
+refusal as evidence: it tests the tip against the configured upstream, or against
+`HEAD` when none is configured, and says nothing about `master` either way. With
+an upstream pointing at the branch's own `origin/<branch>`, `-d` cheerfully
+deletes a branch that never landed; with no upstream and `HEAD` on `master`, it
+refuses squash-merged branches whose content did land, their original commits not
+being ancestors of the squash commit. The facts above are the evidence, `-d` only
+the tool. When they all hold and `-d` still refuses, `git branch -D` is correct —
+it keeps the same worktree protection. Reaching for `-D` without those facts is
+what is forbidden.
+
+The agent does not delete remote branches at all — the owner does. Checking the
+live tip and deleting it are separate steps, and a plain `git push --delete`
+removes the branch by name regardless of what landed in between, so the recipe
+cannot promise what it claims. Report which remote branches qualify and leave the
+deletion to the owner. Revisit only once an atomic conditional delete, refusing
+on a changed tip, has actually been verified in this repository.
 
 Do not mix a large backend implementation and a large frontend implementation in the same top-level Stage unless explicitly requested.
 
