@@ -75,9 +75,22 @@ traefik. Поэтому мониторинг почты — отдельный �
 1. Посмотреть код ответа в issue: `535` — креды, `421`/`450` — временный лимит провайдера,
    `Connection refused`/timeout — сеть или порт.
 2. Для `535` на mail.ru: перевыпустить **пароль приложения** в личном кабинете почты.
-3. Обновить `SITE_MAILER_DSN` в host-env прода.
-4. Перезапустить потребителей: `site-php-fpm`, `worker`, `scheduler`.
-5. Проверить руками: `sudo /usr/local/bin/codex-console app:mailer:healthcheck --no-interaction`.
+3. Обновить **GitHub secret** `SITE_MAILER_DSN`, а не host-env прода. Деплой прокидывает
+   переменную в ssh-сессию `export`-ом из `secrets.*` (`.github/workflows/deploy.yml:282`), и
+   она перебивает файл `.env` рядом с compose. Пароль, положенный только в host-env, до
+   работающих контейнеров не доедет.
+4. Передеплоить. Годится и re-run последнего деплоя: секреты резолвятся заново, на текущие
+   значения. `docker compose up -d` пересоздаёт контейнер при смене env — а вот `docker restart`
+   нет, env запечён в момент создания контейнера.
+5. Проверить руками **внутри работающего контейнера-потребителя**:
+
+   ```
+   docker compose -f docker-compose.prod.yml exec -T scheduler php bin/console app:mailer:healthcheck --no-interaction
+   ```
+
+   `sudo /usr/local/bin/codex-console app:mailer:healthcheck` для этой проверки не годится:
+   wrapper поднимает свежий контейнер через `compose run --rm`, тот читает `.env` с хоста и
+   остаётся зелёным даже когда у работающих контейнеров запечён протухший пароль.
 6. Разобрать `failed`-очередь: письма, упавшие за время поломки, лежат там и не переотправятся
    сами (`messenger:failed:show` → `messenger:failed:retry`, только с явного разрешения владельца).
 

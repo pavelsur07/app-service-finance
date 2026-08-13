@@ -322,6 +322,14 @@ jobs:
                     echo "🐳 [5/5] Поднимаем остальные сервисы (если есть новые)"
                     docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
+                    # Проба SMTP из env, который реально запечён в контейнер (письмо не шлём — только AUTH).
+                    # Ловит протухший секрет сразу, а не через час кроном. Деплой не валим: мёртвая
+                    # почта — не повод красить выкатку несвязанного кода, а logger->error внутри
+                    # команды уже заводит issue в GlitchTip.
+                    echo "📧 Проверяем SMTP-транспорт"
+                    docker compose -f docker-compose.prod.yml exec -T scheduler php bin/console app:mailer:healthcheck --no-interaction \
+                      || echo "⚠️ SMTP не отвечает — проверь GitHub secret SITE_MAILER_DSN (см. docs/maintenance/mailer-monitoring.md)"
+
                     echo "🧹 Очистка старых образов Docker"
                     docker image prune -af --filter "until=336h"
                     echo "✅ Деплой завершён без даунтайма"
