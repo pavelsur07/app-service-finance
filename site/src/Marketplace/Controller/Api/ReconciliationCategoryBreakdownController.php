@@ -16,12 +16,16 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * TEMPORARY: debug-эндпоинт для диагностики расхождений по категориям.
+ * Детализация расхождений по категориям для страницы сверки.
  *
  * Возвращает детализацию marketplace_costs по category_code за период сессии,
  * сгруппированную по serviceGroup из OzonXlsxServiceGroupMap.
  *
- * Удалить после завершения отладки сверки.
+ * НЕ временный, несмотря на `debug` в пути. Вызывается боевым кодом:
+ * assets/react/_legacy/reconciliation/components/ReconciliationTable.tsx —
+ * страница сверки, точка входа Vite `reconciliation_page`. Удаление ломает её.
+ * Прежний докблок обещал удаление «после завершения отладки»; эндпоинт с тех пор
+ * стал частью интерфейса, а пометка осталась.
  */
 #[IsGranted('ROLE_USER')]
 final class ReconciliationCategoryBreakdownController extends AbstractController

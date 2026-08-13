@@ -12,8 +12,14 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Doctrine\DBAL\Connection;
 
 /**
- * ВРЕМЕННЫЙ контроллер для диагностики Ozon Performance API.
- * УДАЛИТЬ после решения инцидента с застрявшими pending_reports в state=REQUESTED.
+ * Диагностика Ozon Performance API: список отчётов.
+ *
+ * НЕ временный, несмотря на прежнюю пометку. Вызывается боевым кодом:
+ * templates/marketplace_ads/admin_debug.html.twig дёргает
+ * `/debug/ozon-ads/list-reports` через fetch. Сама страница висит в сайдбаре под
+ * `is_granted('ROLE_SUPER_ADMIN')`. Удаление ломает её.
+ * Прежний докблок предписывал удалить контроллер после инцидента с застрявшими
+ * pending_reports в state=REQUESTED; страницу с тех пор оставили в интерфейсе.
  */
 #[Route('/debug/ozon-ads', name: 'debug_ozon_ads_')]
 final class OzonDebugController extends AbstractController

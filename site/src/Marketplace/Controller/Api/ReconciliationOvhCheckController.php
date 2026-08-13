@@ -12,9 +12,13 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * TEMPORARY — удалить после проверки миграции OVH.
+ * Проверяет, что категория ozon_ovh_processing создана и записи мигрированы.
  *
- * Проверяет что категория ozon_ovh_processing создана и записи мигрированы.
+ * НЕ временный, несмотря на `debug` в пути. Вызывается боевым кодом:
+ * assets/react/_legacy/reconciliation/widgets/ReconciliationWidget.tsx —
+ * страница сверки, точка входа Vite `reconciliation_page`. Удаление ломает её.
+ * Прежний докблок обещал удаление «после проверки миграции OVH»; эндпоинт с тех
+ * пор стал частью интерфейса, а пометка осталась.
  */
 #[IsGranted('ROLE_USER')]
 final class ReconciliationOvhCheckController extends AbstractController
