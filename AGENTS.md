@@ -218,8 +218,8 @@ Eligible work:
 - read-only inspection, explanation, status, or diagnostics that does not
   require a production check;
 - explicitly requested post-merge Git housekeeping after verifying the exact
-  target is merged, such as deleting its local task branch — the remote one is
-  reported to the owner, never deleted by the agent (see "Branch deletion");
+  target is merged, such as deleting its local task branch, and its remote branch
+  when the owner asked for that branch by name (see "Branch deletion");
 - documentation, comments, formatting, or prose-only UI copy with no change to
   code paths, template control flow, variables, configuration, contracts, or
   generated artifacts;
@@ -384,12 +384,18 @@ the tool. When they all hold and `-d` still refuses, `git branch -D` is correct 
 it keeps the same worktree protection. Reaching for `-D` without those facts is
 what is forbidden.
 
-The agent does not delete remote branches at all — the owner does. Checking the
-live tip and deleting it are separate steps, and a plain `git push --delete`
-removes the branch by name regardless of what landed in between, so the recipe
-cannot promise what it claims. Report which remote branches qualify and leave the
-deletion to the owner. Revisit only once an atomic conditional delete, refusing
-on a changed tip, has actually been verified in this repository.
+Deleting the remote branch is never part of autonomous cleanup: it takes an
+explicit owner instruction naming that branch. Immediately before deleting,
+re-read the live tip — the first field of
+`git ls-remote --heads origin refs/heads/<branch>`, never a possibly stale
+`origin/<branch>` — and require it to still equal `headRefOid`. Any mismatch
+aborts the deletion.
+
+That check and the delete are two steps, so in principle a push landing between
+them is lost. Accepted knowingly: this repository has a single person pushing,
+and that person is the one issuing the delete instruction, so there is no second
+writer to race. Never script or batch remote deletion — running it unattended or
+over a list is what would turn that window into a real one.
 
 Do not mix a large backend implementation and a large frontend implementation in the same top-level Stage unless explicitly requested.
 
