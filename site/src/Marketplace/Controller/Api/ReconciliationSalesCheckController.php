@@ -14,10 +14,13 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * TEMPORARY — удалить после диагностики расхождения в продажах.
+ * Итоги продаж из marketplace_sales за период, разбивка по дням, граничные дни.
  *
- * Диагностика: итоги продаж из marketplace_sales за период,
- * разбивка по дням, граничные дни.
+ * НЕ временный, несмотря на `debug` в пути. Вызывается боевым кодом:
+ * assets/react/_legacy/reconciliation/widgets/ReconciliationWidget.tsx —
+ * страница сверки, точка входа Vite `reconciliation_page`. Удаление ломает её.
+ * Прежний докблок обещал удаление «после диагностики расхождения»; эндпоинт с тех
+ * пор стал частью интерфейса, а пометка осталась.
  */
 #[IsGranted('ROLE_USER')]
 final class ReconciliationSalesCheckController extends AbstractController

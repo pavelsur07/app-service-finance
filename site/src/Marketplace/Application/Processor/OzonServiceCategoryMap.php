@@ -11,17 +11,19 @@ use Psr\Log\LoggerInterface;
  * Тонкий адаптер над OzonCostCategory для обратной совместимости.
  *
  * Единственный источник истины — OzonCostCategory::all().
- * Этот класс сохраняет прежние сигнатуры методов, чтобы не менять вызывающий код.
+ * Класс сохраняет прежние сигнатуры тех методов, которые ещё используются:
+ * getMapStats() удалён вместе с единственным своим потребителем, эндпоинтом
+ * /marketplace/costs/debug/map-version.
  *
- * Используется в: OzonCostsRawProcessor, RestoreMarketplaceCostCategoriesAction,
- *                 CostsDebugController, ReconciliationCreateOvhCategoryController,
- *                 DebugUnknownOperationsController.
+ * Используется в: OzonCostsRawProcessor, RestoreMarketplaceCostCategoriesAction.
  */
 final class OzonServiceCategoryMap
 {
     /**
      * Версия словаря — обновлять при любом изменении маппинга.
-     * Используется в /marketplace/costs/debug/map-version для проверки деплоя.
+     * Кодом не читается: маркер для человека, чтобы по diff'у было видно, что
+     * маппинг менялся. Прежде отдавалась эндпоинтом /marketplace/costs/debug/map-version,
+     * удалённым как неиспользуемый.
      */
     public const VERSION = '2026-08-06.1';
 
@@ -62,26 +64,6 @@ final class OzonServiceCategoryMap
         ]);
 
         return $fallback;
-    }
-
-    /**
-     * Статистика справочника для debug-эндпоинта.
-     */
-    public static function getMapStats(): array
-    {
-        $allCategories = OzonCostCategory::all();
-        $totalEntries  = count(self::ZERO_MARKERS);
-
-        foreach ($allCategories as $c) {
-            $totalEntries += count($c->serviceNames) + count($c->operationTypes);
-        }
-
-        return [
-            'version'           => self::VERSION,
-            'total_entries'     => $totalEntries,
-            'zero_markers'      => count(self::ZERO_MARKERS),
-            'unique_categories' => count($allCategories),
-        ];
     }
 
     /**
