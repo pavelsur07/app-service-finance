@@ -157,8 +157,29 @@
 
 ---
 
-## Следующие шаги
+## Git
 
-1. Закоммитить task-owned изменения.
-2. Запушить ветку без force.
-3. Создать/обновить Draft PR с base `master`.
+- **Branch:** `balance-compliance`
+- **Commit:** `15dabd37`
+- **Base:** `master` (`5297dcf4f4a7a0f333e0efb424e89a24337cee3a`)
+- **Push:** заблокирован отсутствием GitHub credentials.
+
+## Blocker
+
+**Push и создание Draft PR невозможны без действующих GitHub credentials.**
+
+Попытки:
+- `git push -u origin balance-compliance` через HTTPS → `could not read Username for 'https://github.com'`.
+- `git push git@github.com:pavelsur07/app-service-finance.git balance-compliance` через SSH → `Permission denied (publickey)` для обоих ключей (`~/.ssh/id_ed25519`, `~/.ssh/github_actions_vashfindir`).
+- `gh` CLI и `GITHUB_TOKEN` недоступны.
+
+Для продолжения требуется одно из:
+1. Настроить авторизованный SSH-ключ для GitHub.
+2. Создать Personal Access Token и использовать HTTPS.
+3. Установить и аутентифицировать `gh` CLI.
+
+## Следующие шаги (после разблокировки)
+
+1. Запушить ветку без force: `git push -u origin balance-compliance`.
+2. Создать/обновить Draft PR с base `master`.
+3. (Опционально) Перезапустить полный `make site-test-unit`, чтобы убедиться, что flaky `WbFinanceSalesReportClientTest` не воспроизводится.
