@@ -18,6 +18,7 @@
                 <span class="wz-sub">Ключевые показатели компании на текущую дату</span>
             </h1>
             <form method="get" class="wz-head-actions">
+                <input type="hidden" name="activity" value="{{ cashflowActivity }}">
                 <label class="sr-only" for="app-dashboard-currency">Валюта ДДС</label>
                 <select id="app-dashboard-currency" name="currency" class="select">
                     {% for currency in cashCurrencies %}
@@ -28,28 +29,46 @@
             </form>
         </header>
 
+        <div class="wz-row">
+            <div class="tabs-row">
+                <form method="get" class="tabs" aria-label="Вид деятельности" data-dashboard-activity-filter data-selected-activity="{{ cashflowActivity }}">
+                    <input type="hidden" name="currency" value="{{ cashCurrency.value }}">
+                    {% for activity, label in cashflowActivities %}
+                        {% set activity_tab_class = activity == cashflowActivity ? ' is-active' : '' %}
+                        <button
+                            type="submit"
+                            name="activity"
+                            value="{{ activity }}"
+                            class="tab{{ activity_tab_class }}"
+                            aria-pressed="{{ activity == cashflowActivity ? 'true' : 'false' }}"
+                        >{{ label }}</button>
+                    {% endfor %}
+                </form>
+            </div>
+        </div>
+
         <div class="wz-row" aria-label="Ключевые финансовые показатели">
             <article class="kpi kpi--dark">
                 <div class="kpi-label">Остаток на сегодня</div>
-                <div class="kpi-value kpi-value--hero money">{{ _self.money(kpi.todayBalance, cashCurrency.value) }}</div>
+                <div class="kpi-value kpi-value--hero money" data-dashboard-kpi="todayBalance">{{ _self.money(kpi.todayBalance, cashCurrency.value) }}</div>
                 <div class="kpi-meta">По активным денежным счетам</div>
             </article>
 
             <article class="kpi kpi--accent-success">
                 <div class="kpi-label">Приход</div>
-                <div class="kpi-value money">{{ _self.money(kpi.inflow30, cashCurrency.value) }}</div>
+                <div class="kpi-value money" data-dashboard-kpi="inflow30">{{ _self.money(kpi.inflow30, cashCurrency.value) }}</div>
                 <div class="kpi-meta">Последние 30 дней</div>
             </article>
 
             <article class="kpi kpi--accent-danger">
                 <div class="kpi-label">Расход</div>
-                <div class="kpi-value money">{{ _self.money(kpi.outflow30, cashCurrency.value) }}</div>
+                <div class="kpi-value money" data-dashboard-kpi="outflow30">{{ _self.money(kpi.outflow30, cashCurrency.value) }}</div>
                 <div class="kpi-meta">Последние 30 дней</div>
             </article>
 
             <article class="kpi kpi--accent-primary">
                 <div class="kpi-label">Чистый поток</div>
-                <div class="kpi-value money">{{ _self.money(net_flow, cashCurrency.value) }}</div>
+                <div class="kpi-value money" data-dashboard-kpi="netFlow30">{{ _self.money(net_flow, cashCurrency.value) }}</div>
                 <div class="kpi-meta">Приход минус расход за 30 дней</div>
             </article>
         </div>
