@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Balance\ReadModel;
 
 use App\Balance\DTO\BalanceRowView;
@@ -9,7 +11,7 @@ final class BalanceReport
     /**
      * @param list<string> $currencies
      * @param list<BalanceRowView> $roots
-     * @param array<string,float> $totals
+     * @param array<string, string> $totals currency => decimal string
      */
     public function __construct(
         private \DateTimeImmutable $date,
@@ -41,7 +43,7 @@ final class BalanceReport
     }
 
     /**
-     * @return array<string,float>
+     * @return array<string, string>
      */
     public function getTotals(): array
     {

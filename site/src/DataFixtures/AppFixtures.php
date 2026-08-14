@@ -2,7 +2,7 @@
 
 namespace App\DataFixtures;
 
-use App\Balance\Service\BalanceStructureSeeder;
+use App\Balance\Application\SeedBalanceStructureAction;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Service\Accounts\AccountBalanceService;
@@ -28,7 +28,7 @@ class AppFixtures extends Fixture
         private UserPasswordHasherInterface $passwordHasher,
         private CounterpartyNameNormalizer $counterpartyNameNormalizer,
         private AccountBalanceService $accountBalanceService,
-        private BalanceStructureSeeder $balanceStructureSeeder,
+        private SeedBalanceStructureAction $seedBalanceStructureAction,
     ) {
     }
 
@@ -54,7 +54,7 @@ class AppFixtures extends Fixture
         $manager->persist($company);
         $this->addReference(self::REF_COMPANY_ROMASHKA, $company);
 
-        $this->balanceStructureSeeder->seedDefaultIfEmpty($company);
+        ($this->seedBalanceStructureAction)($company->getId());
 
         // --- Контрагенты для ООО "Ромашка" (добавлены Wildberries и Ozon + сервисные контрагенты)
         $counterpartiesData = [

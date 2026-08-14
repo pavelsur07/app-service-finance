@@ -1,10 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Balance\Entity;
 
 use App\Balance\Enum\BalanceLinkSourceType;
 use App\Balance\Repository\BalanceCategoryLinkRepository;
-use App\Company\Entity\Company;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
@@ -13,45 +15,55 @@ use Webmozart\Assert\Assert;
 class BalanceCategoryLink
 {
     #[ORM\Id]
-    #[ORM\Column(type: 'guid', unique: true)]
-    private ?string $id = null;
+    #[ORM\Column(type: Types::GUID, unique: true)]
+    private string $id;
 
-    #[ORM\ManyToOne(targetEntity: Company::class)]
-    #[ORM\JoinColumn(nullable: false)]
-    private Company $company;
+    #[ORM\Column(type: Types::GUID)]
+    private string $companyId;
 
     #[ORM\ManyToOne(targetEntity: BalanceCategory::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     private BalanceCategory $category;
 
-    #[ORM\Column(enumType: BalanceLinkSourceType::class)]
+    #[ORM\Column(type: Types::STRING, length: 50, enumType: BalanceLinkSourceType::class)]
     private BalanceLinkSourceType $sourceType;
 
-    #[ORM\Column(type: 'guid', nullable: true)]
+    #[ORM\Column(type: Types::GUID, nullable: true)]
     private ?string $sourceId = null;
 
-    #[ORM\Column(type: 'integer', options: ['default' => 1])]
+    #[ORM\Column(type: Types::INTEGER, options: ['default' => 1])]
     private int $sign = 1;
 
-    #[ORM\Column(type: 'integer', options: ['default' => 0])]
+    #[ORM\Column(type: Types::INTEGER, options: ['default' => 0])]
     private int $position = 0;
 
-    public function __construct(string $id, Company $company, BalanceCategory $category)
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    private \DateTimeImmutable $createdAt;
+
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    private \DateTimeImmutable $updatedAt;
+
+    public function __construct(string $id, string $companyId, BalanceCategory $category)
     {
         Assert::uuid($id);
+        Assert::uuid($companyId);
+
         $this->id = $id;
-        $this->company = $company;
+        $this->companyId = $companyId;
         $this->category = $category;
+        $now = new \DateTimeImmutable();
+        $this->createdAt = $now;
+        $this->updatedAt = $now;
     }
 
-    public function getId(): ?string
+    public function getId(): string
     {
         return $this->id;
     }
 
-    public function getCompany(): Company
+    public function getCompanyId(): string
     {
-        return $this->company;
+        return $this->companyId;
     }
 
     public function getCategory(): BalanceCategory
@@ -67,6 +79,7 @@ class BalanceCategoryLink
     public function setSourceType(BalanceLinkSourceType $sourceType): self
     {
         $this->sourceType = $sourceType;
+        $this->touch();
 
         return $this;
     }
@@ -83,6 +96,7 @@ class BalanceCategoryLink
         }
 
         $this->sourceId = $sourceId;
+        $this->touch();
 
         return $this;
     }
@@ -95,6 +109,7 @@ class BalanceCategoryLink
     public function setSign(int $sign): self
     {
         $this->sign = $sign;
+        $this->touch();
 
         return $this;
     }
@@ -107,7 +122,23 @@ class BalanceCategoryLink
     public function setPosition(int $position): self
     {
         $this->position = $position;
+        $this->touch();
 
         return $this;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    public function getUpdatedAt(): \DateTimeImmutable
+    {
+        return $this->updatedAt;
+    }
+
+    private function touch(): void
+    {
+        $this->updatedAt = new \DateTimeImmutable();
     }
 }

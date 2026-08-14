@@ -1,6 +1,8 @@
 <?php
 
-namespace App\Balance\Service;
+declare(strict_types=1);
+
+namespace App\Balance\Infrastructure\Query;
 
 use App\Balance\DTO\BalanceRowView;
 use App\Balance\Entity\BalanceCategory;
@@ -9,43 +11,58 @@ use App\Balance\Enum\BalanceLinkSourceType;
 use App\Balance\Provider\BalanceValueProviderRegistry;
 use App\Balance\ReadModel\BalanceReport;
 use App\Balance\Repository\BalanceCategoryLinkRepository;
-use App\Balance\Repository\BalanceCategoryRepository;
-use App\Company\Entity\Company;
+use App\Balance\Repository\BalanceCategoryRepositoryInterface;
 
-class BalanceBuilder
+final class BalanceReportQuery
 {
-    /** @var array<string, array<string,float>> */
+    private const MONEY_SCALE = 2;
+
+    /** @var array<string, array<string, string>> */
     private array $totalsCache = [];
 
     public function __construct(
-        private readonly BalanceCategoryRepository $balanceCategoryRepository,
+        private readonly BalanceCategoryRepositoryInterface $balanceCategoryRepository,
         private readonly BalanceCategoryLinkRepository $balanceCategoryLinkRepository,
         private readonly BalanceValueProviderRegistry $registry,
     ) {
     }
 
-    /**
-     * @return array{date:\DateTimeImmutable, currencies:list<string>, roots:list<BalanceRowView>, totals: array<string,float>}
-     */
-    public function buildForCompanyAndDate(Company $company, \DateTimeImmutable $date): array
+    public function buildForCompanyAndDate(string $companyId, \DateTimeImmutable $date): BalanceReport
     {
-        $report = $this->buildReportForCompanyAndDate($company, $date);
+        $this->totalsCache = [];
 
-        return [
-            'date' => $report->getDate(),
-            'currencies' => $report->getCurrencies(),
-            'roots' => $report->getRoots(),
-            'totals' => $report->getTotals(),
-        ];
-    }
+        $roots = $this->balanceCategoryRepository->findRootByCompany($companyId);
+        $cashTotals = $this->getTotalsCached(BalanceLinkSourceType::MONEY_ACCOUNTS_TOTAL, $companyId, $date);
+        $fundTotals = $this->getTotalsCached(BalanceLinkSourceType::MONEY_FUNDS_TOTAL, $companyId, $date);
 
-    public function buildReportForCompanyAndDate(Company $company, \DateTimeImmutable $date): BalanceReport
-    {
-        [
-            'currencies' => $currencies,
-            'roots' => $rootViews,
-            'totals' => $totals,
-        ] = $this->collectReportData($company, $date);
+        $currencies = array_unique(array_merge(array_keys($cashTotals), array_keys($fundTotals)));
+        sort($currencies);
+
+        $linksByCategoryId = $this->groupLinksByCategoryId(
+            $this->balanceCategoryLinkRepository->findByCompany($companyId)
+        );
+
+        $rootViews = [];
+        foreach ($roots as $root) {
+            $rootViews[] = $this->buildRow(
+                $root,
+                $companyId,
+                $date,
+                $currencies,
+                $linksByCategoryId,
+            );
+        }
+
+        $totals = $this->initializeAmounts($currencies);
+        foreach ($rootViews as $view) {
+            foreach ($currencies as $currency) {
+                $totals[$currency] = bcadd(
+                    $totals[$currency],
+                    $view->amountsByCurrency[$currency] ?? '0',
+                    self::MONEY_SCALE,
+                );
+            }
+        }
 
         return new BalanceReport(
             date: $date,
@@ -56,63 +73,15 @@ class BalanceBuilder
     }
 
     /**
-     * @return array{currencies:list<string>, roots:list<BalanceRowView>, totals: array<string,float>}
-     */
-    private function collectReportData(Company $company, \DateTimeImmutable $date): array
-    {
-        $this->totalsCache = [];
-
-        $roots = $this->balanceCategoryRepository->findRootByCompany($company);
-        /** @var array<string,float> $cashTotals */
-        $cashTotals = $this->getTotalsCached(BalanceLinkSourceType::MONEY_ACCOUNTS_TOTAL, $company, $date);
-        /** @var array<string,float> $fundTotals */
-        $fundTotals = $this->getTotalsCached(BalanceLinkSourceType::MONEY_FUNDS_TOTAL, $company, $date);
-
-        $currencies = array_unique(array_merge(array_keys($cashTotals), array_keys($fundTotals)));
-        sort($currencies);
-
-        $linksByCategoryId = $this->groupLinksByCategoryId(
-            $this->balanceCategoryLinkRepository->findByCompany($company)
-        );
-
-        $rootViews = [];
-        foreach ($roots as $root) {
-            $rootViews[] = $this->buildRow(
-                $root,
-                $company,
-                $date,
-                $currencies,
-                $linksByCategoryId,
-            );
-        }
-
-        $totals = $this->initializeAmounts($currencies);
-        foreach ($rootViews as $view) {
-            foreach ($currencies as $currency) {
-                $totals[$currency] += $view->amountsByCurrency[$currency] ?? 0.0;
-            }
-        }
-
-        return [
-            'currencies' => $currencies,
-            'roots' => $rootViews,
-            'totals' => $totals,
-        ];
-    }
-
-    /**
      * @param list<BalanceCategoryLink> $links
      *
-     * @return array<string,list<BalanceCategoryLink>>
+     * @return array<string, list<BalanceCategoryLink>>
      */
     private function groupLinksByCategoryId(array $links): array
     {
         $grouped = [];
         foreach ($links as $link) {
             $categoryId = $link->getCategory()->getId();
-            if (null === $categoryId) {
-                continue;
-            }
             $grouped[$categoryId][] = $link;
         }
 
@@ -120,18 +89,18 @@ class BalanceBuilder
     }
 
     /**
-     * @param array<string,list<BalanceCategoryLink>> $linksByCategoryId
+     * @param array<string, list<BalanceCategoryLink>> $linksByCategoryId
      * @param list<string> $currencies
      */
     private function buildRow(
         BalanceCategory $category,
-        Company $company,
+        string $companyId,
         \DateTimeImmutable $date,
         array $currencies,
         array $linksByCategoryId,
     ): BalanceRowView {
         $ownAmounts = $this->calculateOwnAmounts(
-            $company,
+            $companyId,
             $date,
             $currencies,
             $linksByCategoryId[$category->getId()] ?? [],
@@ -142,7 +111,7 @@ class BalanceBuilder
         foreach ($category->getChildren() as $child) {
             $childView = $this->buildRow(
                 $child,
-                $company,
+                $companyId,
                 $date,
                 $currencies,
                 $linksByCategoryId,
@@ -150,14 +119,18 @@ class BalanceBuilder
             $childrenViews[] = $childView;
 
             foreach ($currencies as $currency) {
-                $childrenTotals[$currency] += $childView->amountsByCurrency[$currency] ?? 0.0;
+                $childrenTotals[$currency] = bcadd(
+                    $childrenTotals[$currency],
+                    $childView->amountsByCurrency[$currency] ?? '0',
+                    self::MONEY_SCALE,
+                );
             }
         }
 
         $amountsByCurrency = $this->mergeAmounts($currencies, $ownAmounts, $childrenTotals);
 
         return new BalanceRowView(
-            id: $category->getId() ?? '',
+            id: $category->getId(),
             name: $category->getName(),
             type: $category->getType()->value,
             level: $category->getLevel(),
@@ -171,13 +144,13 @@ class BalanceBuilder
     /**
      * @param list<string> $currencies
      *
-     * @return array<string,float>
+     * @return array<string, string>
      */
     private function initializeAmounts(array $currencies): array
     {
         $amounts = [];
         foreach ($currencies as $currency) {
-            $amounts[$currency] = 0.0;
+            $amounts[$currency] = '0';
         }
 
         return $amounts;
@@ -187,10 +160,10 @@ class BalanceBuilder
      * @param list<string> $currencies
      * @param list<BalanceCategoryLink> $links
      *
-     * @return array<string,float>
+     * @return array<string, string>
      */
     private function calculateOwnAmounts(
-        Company $company,
+        string $companyId,
         \DateTimeImmutable $date,
         array $currencies,
         array $links,
@@ -199,10 +172,12 @@ class BalanceBuilder
 
         foreach ($links as $link) {
             $sign = $link->getSign();
-            $totals = $this->getTotalsCached($link->getSourceType(), $company, $date);
+            $totals = $this->getTotalsCached($link->getSourceType(), $companyId, $date);
 
             foreach ($currencies as $currency) {
-                $amounts[$currency] += $sign * ($totals[$currency] ?? 0.0);
+                $amount = $totals[$currency] ?? '0';
+                $signedAmount = $sign < 0 ? '-' . $amount : $amount;
+                $amounts[$currency] = bcadd($amounts[$currency], $signedAmount, self::MONEY_SCALE);
             }
         }
 
@@ -210,18 +185,18 @@ class BalanceBuilder
     }
 
     /**
-     * @return array<string,float>
+     * @return array<string, string>
      */
     private function getTotalsCached(
         BalanceLinkSourceType $type,
-        Company $company,
+        string $companyId,
         \DateTimeImmutable $date,
     ): array {
-        $key = $type->value;
+        $key = $type->value . ':' . $companyId . ':' . $date->format('Y-m-d');
 
         if (!isset($this->totalsCache[$key])) {
             $provider = $this->registry->get($type);
-            $this->totalsCache[$key] = $provider->getTotalsForCompanyUpToDate($company, $date);
+            $this->totalsCache[$key] = $provider->getTotalsForCompanyUpToDate($companyId, $date);
         }
 
         return $this->totalsCache[$key];
@@ -229,16 +204,20 @@ class BalanceBuilder
 
     /**
      * @param list<string> $currencies
-     * @param array<string,float> $left
-     * @param array<string,float> $right
+     * @param array<string, string> $left
+     * @param array<string, string> $right
      *
-     * @return array<string,float>
+     * @return array<string, string>
      */
     private function mergeAmounts(array $currencies, array $left, array $right): array
     {
         $amounts = [];
         foreach ($currencies as $currency) {
-            $amounts[$currency] = ($left[$currency] ?? 0.0) + ($right[$currency] ?? 0.0);
+            $amounts[$currency] = bcadd(
+                $left[$currency] ?? '0',
+                $right[$currency] ?? '0',
+                self::MONEY_SCALE,
+            );
         }
 
         return $amounts;

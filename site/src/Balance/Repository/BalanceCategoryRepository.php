@@ -1,13 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Balance\Repository;
 
 use App\Balance\Entity\BalanceCategory;
-use App\Company\Entity\Company;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
-class BalanceCategoryRepository extends ServiceEntityRepository
+final class BalanceCategoryRepository extends ServiceEntityRepository implements BalanceCategoryRepositoryInterface
 {
     private const SORT_ORDER_STEP = 10;
 
@@ -16,15 +17,20 @@ class BalanceCategoryRepository extends ServiceEntityRepository
         parent::__construct($registry, BalanceCategory::class);
     }
 
+    public function findByIdAndCompany(string $id, string $companyId): ?BalanceCategory
+    {
+        return $this->findOneBy(['id' => $id, 'companyId' => $companyId]);
+    }
+
     /**
      * @return BalanceCategory[]
      */
-    public function findRootByCompany(Company $company): array
+    public function findRootByCompany(string $companyId): array
     {
         return $this->createQueryBuilder('c')
-            ->andWhere('c.company = :company')
+            ->andWhere('c.companyId = :companyId')
             ->andWhere('c.parent IS NULL')
-            ->setParameter('company', $company)
+            ->setParameter('companyId', $companyId)
             ->orderBy('c.sortOrder', 'ASC')
             ->getQuery()
             ->getResult();
@@ -33,23 +39,23 @@ class BalanceCategoryRepository extends ServiceEntityRepository
     /**
      * @return BalanceCategory[]
      */
-    public function findTreeByCompany(Company $company): array
+    public function findTreeByCompany(string $companyId): array
     {
         return $this->createQueryBuilder('c')
-            ->andWhere('c.company = :company')
-            ->setParameter('company', $company)
+            ->andWhere('c.companyId = :companyId')
+            ->setParameter('companyId', $companyId)
             ->orderBy('c.level', 'ASC')
             ->addOrderBy('c.sortOrder', 'ASC')
             ->getQuery()
             ->getResult();
     }
 
-    public function getNextSortOrder(Company $company, ?BalanceCategory $parent): int
+    public function getNextSortOrder(string $companyId, ?BalanceCategory $parent): int
     {
         $qb = $this->createQueryBuilder('c')
             ->select('MAX(c.sortOrder) as maxSortOrder')
-            ->andWhere('c.company = :company')
-            ->setParameter('company', $company);
+            ->andWhere('c.companyId = :companyId')
+            ->setParameter('companyId', $companyId);
 
         if ($parent) {
             $qb->andWhere('c.parent = :parent')
@@ -67,11 +73,11 @@ class BalanceCategoryRepository extends ServiceEntityRepository
     /**
      * @return BalanceCategory[]
      */
-    public function findSiblings(Company $company, ?BalanceCategory $parent): array
+    public function findSiblings(string $companyId, ?BalanceCategory $parent): array
     {
         $qb = $this->createQueryBuilder('c')
-            ->andWhere('c.company = :company')
-            ->setParameter('company', $company)
+            ->andWhere('c.companyId = :companyId')
+            ->setParameter('companyId', $companyId)
             ->orderBy('c.sortOrder', 'ASC');
 
         if (null !== $parent) {
@@ -91,5 +97,22 @@ class BalanceCategoryRepository extends ServiceEntityRepository
 
         $a->setSortOrder($bSort);
         $b->setSortOrder($aSort);
+    }
+
+    public function existsWithCode(string $companyId, string $code, ?string $excludeId = null): bool
+    {
+        $qb = $this->createQueryBuilder('c')
+            ->select('COUNT(c.id)')
+            ->andWhere('c.companyId = :companyId')
+            ->andWhere('c.code = :code')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('code', $code);
+
+        if (null !== $excludeId) {
+            $qb->andWhere('c.id != :excludeId')
+                ->setParameter('excludeId', $excludeId);
+        }
+
+        return (int) $qb->getQuery()->getSingleScalarResult() > 0;
     }
 }

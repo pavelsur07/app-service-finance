@@ -1,10 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Balance\Provider;
 
 use App\Balance\Enum\BalanceLinkSourceType;
 use App\Cash\Service\Accounts\FundBalanceService;
-use App\Company\Entity\Company;
+use App\Shared\Domain\ValueObject\Money;
 
 final class FundsTotalsProvider implements BalanceValueProviderInterface
 {
@@ -18,14 +20,16 @@ final class FundsTotalsProvider implements BalanceValueProviderInterface
         return BalanceLinkSourceType::MONEY_FUNDS_TOTAL === $type;
     }
 
-    /** @return array<string,float> */
-    public function getTotalsForCompanyUpToDate(Company $company, \DateTimeImmutable $date): array
+    /**
+     * @return array<string, string> currency => decimal string
+     */
+    public function getTotalsForCompanyUpToDate(string $companyId, \DateTimeImmutable $date): array
     {
-        $fundTotalsMinor = $this->fundBalanceService->getTotals($company->getId());
+        $fundTotalsMinor = $this->fundBalanceService->getTotals($companyId);
 
         $fundTotals = [];
         foreach ($fundTotalsMinor as $currency => $amountMinor) {
-            $fundTotals[$currency] = $this->fundBalanceService->convertMinorToDecimal($amountMinor, $currency);
+            $fundTotals[$currency] = Money::fromMinor($amountMinor, $currency)->toDecimalString();
         }
 
         return $fundTotals;
