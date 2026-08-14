@@ -86,6 +86,7 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
             self::assertResponseIsSuccessful();
             $this->assertActivityState($defaultCrawler, 'all');
             $this->assertKpis($defaultCrawler, self::EXPECTED_BY_ACTIVITY['all']);
+            $this->assertTabsComposition($defaultCrawler, $uiMode);
 
             $invalidCrawler = $client->request('GET', '/finance?currency=RUB&activity=unknown');
             self::assertResponseIsSuccessful();
@@ -150,6 +151,25 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
                 $activity,
             )));
         }
+    }
+
+    private function assertTabsComposition(Crawler $crawler, string $uiMode): void
+    {
+        if (UiModeResolver::LEGACY === $uiMode) {
+            self::assertCount(0, $crawler->filter('.tabs-meta'));
+
+            return;
+        }
+
+        $tabsRow = $crawler->filter('.wz-row > .tabs-row');
+        self::assertCount(1, $tabsRow);
+        self::assertCount(1, $tabsRow->children('form.tabs + .u-flex-1'));
+        self::assertCount(1, $tabsRow->children('.u-flex-1 + .tabs-meta'));
+        self::assertCount(1, $tabsRow->filter('.tabs-meta > svg[aria-hidden="true"]'));
+        self::assertSame(
+            'Данные на '.(new \DateTimeImmutable('today'))->format('d.m.Y'),
+            $tabsRow->filter('.tabs-meta')->text(),
+        );
     }
 
     private function normalizedKpi(Crawler $crawler, string $name): string
