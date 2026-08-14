@@ -5,7 +5,7 @@
     {% for item in items %}
         {% if item.isVisible %}
             <tr>
-                <td style="padding-left: {{ (item.level - 1) * 16 }}px;">
+                <td class="ps-{{ (item.level - 1) * 4 }}">
                     <span class="fw-semibold">{{ item.name }}</span>
                 </td>
                 {% for currency in currencies %}

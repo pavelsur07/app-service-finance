@@ -1,8 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Balance\Controller;
 
-use App\Balance\Service\BalanceBuilder;
+use App\Balance\Facade\BalanceFacade;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -12,22 +14,28 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_USER')]
 #[Route('/balance')]
-class BalanceController extends AbstractController
+final class BalanceController extends AbstractController
 {
-    #[Route('/', name: 'balance_index', methods: ['GET'])]
-    public function index(Request $request, ActiveCompanyService $companyService, BalanceBuilder $builder): Response
-    {
-        $company = $companyService->getActiveCompany();
-        $dateParam = $request->query->get('date');
-        $date = $dateParam ? new \DateTimeImmutable($dateParam) : new \DateTimeImmutable('today');
+    public function __construct(
+        private readonly ActiveCompanyService $activeCompanyService,
+        private readonly BalanceFacade $balanceFacade,
+    ) {
+    }
 
-        $result = $builder->buildForCompanyAndDate($company, $date);
+    #[Route('/', name: 'balance_index', methods: ['GET'])]
+    public function index(Request $request): Response
+    {
+        $companyId = $this->activeCompanyService->getActiveCompany()->getId();
+        $dateParam = $request->query->getString('date');
+        $date = $dateParam !== '' ? new \DateTimeImmutable($dateParam) : new \DateTimeImmutable('today');
+
+        $report = $this->balanceFacade->getReportForCompany($companyId, $date);
 
         return $this->render('balance/index.html.twig', [
-            'date' => $date,
-            'currencies' => $result['currencies'],
-            'roots' => $result['roots'],
-            'totals' => $result['totals'],
+            'date' => $report->getDate(),
+            'currencies' => $report->getCurrencies(),
+            'roots' => $report->getRoots(),
+            'totals' => $report->getTotals(),
         ]);
     }
 }

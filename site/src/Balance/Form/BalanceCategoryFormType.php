@@ -1,8 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Balance\Form;
 
-use App\Balance\Entity\BalanceCategory;
 use App\Balance\Enum\BalanceCategoryType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
@@ -11,7 +12,7 @@ use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
-class BalanceCategoryFormType extends AbstractType
+final class BalanceCategoryFormType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
@@ -27,13 +28,9 @@ class BalanceCategoryFormType extends AbstractType
                     'Капитал' => BalanceCategoryType::EQUITY,
                 ],
             ])
-            ->add('parent', ChoiceType::class, [
+            ->add('parentId', ChoiceType::class, [
                 'label' => 'Родитель',
-                'choices' => $options['parents'],
-                'choice_value' => 'id',
-                'choice_label' => function (BalanceCategory $item): string {
-                    return str_repeat('—', max($item->getLevel() - 1, 0)).' '.$item->getName();
-                },
+                'choices' => $options['parent_choices'],
                 'required' => false,
                 'placeholder' => 'Корень',
             ])
@@ -50,9 +47,9 @@ class BalanceCategoryFormType extends AbstractType
     public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
-            'data_class' => BalanceCategory::class,
-            'parents' => [],
+            'parent_choices' => [],
         ]);
-        $resolver->setRequired('parents');
+        $resolver->setRequired('parent_choices');
+        $resolver->setAllowedTypes('parent_choices', 'array');
     }
 }
