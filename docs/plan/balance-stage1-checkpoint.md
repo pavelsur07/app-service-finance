@@ -1,10 +1,10 @@
 # Checkpoint: Balance Compliance
 
-**Phase:** Stage 1 + Stage 2 + Stage 3 complete, commit сделан, push заблокирован  
-**Status:** blocked  
+**Phase:** Stage 1 + Stage 2 + Stage 3 complete, handoff владельцу для push/PR  
+**Status:** done  
 **Stage base commit:** `5297dcf4f4a7a0f333e0efb424e89a24337cee3a`  
 **Current Work item:** none  
-**Owner gate:** yes (push / Draft PR)
+**Owner gate:** yes (push / Draft PR) — действие берёт на себя владелец
 
 ### Completed
 - Анализ модуля Balance и правил проекта.
@@ -14,10 +14,10 @@
 - Stage 3: ReadModel, Facade, Form, Providers, Twig, тесты (Unit/Integration/Functional).
 - Исправления по результатам проверок: интерфейс репозитория, in-memory репозиторий для тестов, корректировка теста timestamps, миграция восстановления FK и длин enum-колонок, trailing slash в functional URL.
 - Все Balance-проверки зелёные; полный `make site-test-unit` зелёный (кроме flaky pre-existing теста Marketplace).
-- Коммит `15dabd37` создан в ветке `balance-compliance`.
+- Коммиты `15dabd37`, `286e9800` созданы в ветке `balance-compliance`.
 
 ### Current diff / affected files
-Все task-owned изменения закоммичены в `15dabd37`. В рабочей копии остались несвязанные файлы:
+Все task-owned изменения закоммичены. В рабочей копии остались несвязанные файлы:
 - `docs/plan/my_paln_app.md` — изменён до работы
 - `docs/plan/skills.md` — не task-owned
 - `App\Marketplace\Wildberries\Message\WbFinanceReportImportMessage,` — pre-existing untracked
@@ -37,12 +37,11 @@
 - External Claude Code review заменён самостоятельным review по инструкции владельца.
 
 ### Exact next action
-- Разблокировать push, предоставив GitHub credentials (SSH-ключ, Personal Access Token или `gh` CLI).
-- Запушить ветку `balance-compliance`.
-- Создать Draft PR с base `master`.
+- Владелец запушит ветку `balance-compliance` и создаст Draft PR с base `master`.
 
-### Blocker
-**Push невозможен:** отсутствуют действующие GitHub credentials. SSH-ключи `~/.ssh/id_ed25519` и `~/.ssh/github_actions_vashfindir` не авторизованы для `git@github.com`; HTTPS требует логина; `gh` CLI и `GITHUB_TOKEN` недоступны.
+### Handoff notes
+- Не включать в коммит/PR: `docs/plan/my_paln_app.md`, `docs/plan/skills.md`, `App\...`, `Symfony\...`.
+- При создании PR через `gh pr create` явно указать `--base master`.
 
 ### Files to inspect first on resume
 - `docs/plan/balance-stage-report.md`

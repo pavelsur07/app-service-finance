@@ -160,26 +160,30 @@
 ## Git
 
 - **Branch:** `balance-compliance`
-- **Commit:** `15dabd37`
+- **Commits:** `15dabd37`, `286e9800`
 - **Base:** `master` (`5297dcf4f4a7a0f333e0efb424e89a24337cee3a`)
-- **Push:** заблокирован отсутствием GitHub credentials.
+- **Push / Draft PR:** действие берёт на себя владелец (GitHub credentials недоступны в текущей среде Codex).
 
-## Blocker
+## Owner handoff
 
-**Push и создание Draft PR невозможны без действующих GitHub credentials.**
+Владелец запушит ветку и создаст Draft PR. Команды:
 
-Попытки:
-- `git push -u origin balance-compliance` через HTTPS → `could not read Username for 'https://github.com'`.
-- `git push git@github.com:pavelsur07/app-service-finance.git balance-compliance` через SSH → `Permission denied (publickey)` для обоих ключей (`~/.ssh/id_ed25519`, `~/.ssh/github_actions_vashfindir`).
-- `gh` CLI и `GITHUB_TOKEN` недоступны.
+```bash
+git checkout balance-compliance
+git push -u origin balance-compliance
+gh pr create --base master --title "refactor(balance): приведение модуля Balance к правилам проекта" --draft
+```
 
-Для продолжения требуется одно из:
-1. Настроить авторизованный SSH-ключ для GitHub.
-2. Создать Personal Access Token и использовать HTTPS.
-3. Установить и аутентифицировать `gh` CLI.
+Если `gh` недоступен — создать Draft PR вручную через GitHub UI с base `master`.
 
-## Следующие шаги (после разблокировки)
+**Не включать в PR:**
+- `docs/plan/my_paln_app.md`
+- `docs/plan/skills.md`
+- `App\Marketplace\Wildberries\Message\WbFinanceReportImportMessage,`
+- `Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport`
 
-1. Запушить ветку без force: `git push -u origin balance-compliance`.
-2. Создать/обновить Draft PR с base `master`.
-3. (Опционально) Перезапустить полный `make site-test-unit`, чтобы убедиться, что flaky `WbFinanceSalesReportClientTest` не воспроизводится.
+## Следующие шаги (после создания PR)
+
+1. Проверить, что PR base = `master` (`gh pr view <n> --json baseRefName`).
+2. Перезапустить полный `make site-test-unit`, чтобы убедиться, что flaky `WbFinanceSalesReportClientTest` не воспроизводится.
+3. Перевести PR из Draft в Ready по готовности.
