@@ -12,7 +12,7 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: BalanceCategoryLinkRepository::class)]
 #[ORM\Table(name: 'balance_category_links')]
-final class BalanceCategoryLink
+class BalanceCategoryLink
 {
     #[ORM\Id]
     #[ORM\Column(type: Types::GUID, unique: true)]

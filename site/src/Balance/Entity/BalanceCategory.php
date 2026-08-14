@@ -15,7 +15,7 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: BalanceCategoryRepository::class)]
 #[ORM\Table(name: 'balance_categories')]
-final class BalanceCategory
+class BalanceCategory
 {
     #[ORM\Id]
     #[ORM\Column(type: Types::GUID, unique: true)]
