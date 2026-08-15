@@ -27,10 +27,10 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
      * @var array<string, array{inflow30: string, outflow30: string, netFlow30: string}>
      */
     private const EXPECTED_BY_ACTIVITY = [
-        'operating' => ['inflow30' => '10RUB', 'outflow30' => '4RUB', 'netFlow30' => '6RUB'],
+        'operating' => ['inflow30' => '11RUB', 'outflow30' => '4RUB', 'netFlow30' => '7RUB'],
         'financing' => ['inflow30' => '20RUB', 'outflow30' => '5RUB', 'netFlow30' => '15RUB'],
         'investing' => ['inflow30' => '30RUB', 'outflow30' => '6RUB', 'netFlow30' => '24RUB'],
-        'all' => ['inflow30' => '100RUB', 'outflow30' => '22RUB', 'netFlow30' => '78RUB'],
+        'all' => ['inflow30' => '101RUB', 'outflow30' => '22RUB', 'netFlow30' => '79RUB'],
     ];
 
     public function testCashflowActivityFilterInBothUiModes(): void
@@ -52,9 +52,17 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
         $categories = self::getContainer()->get(CashflowSystemCategoryService::class)->ensureStructure($company);
         $today = new \DateTimeImmutable('today');
         $yesterday = $today->modify('-1 day');
+        $currentPeriodStart = $today->modify('-29 days');
+        $previousPeriodEnd = $today->modify('-30 days');
+        $previousPeriodStart = $today->modify('-59 days');
+        $outsideComparisonPeriods = $today->modify('-60 days');
         foreach ([
             [CashflowCategory::CODE_OPERATING, CashDirection::INFLOW, '10.00', $today],
             [CashflowCategory::CODE_OPERATING, CashDirection::OUTFLOW, '4.00', $yesterday],
+            [CashflowCategory::CODE_OPERATING, CashDirection::INFLOW, '1.00', $currentPeriodStart],
+            [CashflowCategory::CODE_OPERATING, CashDirection::INFLOW, '70.00', $previousPeriodEnd],
+            [CashflowCategory::CODE_OPERATING, CashDirection::INFLOW, '700.00', $previousPeriodStart],
+            [CashflowCategory::CODE_OPERATING, CashDirection::INFLOW, '7000.00', $outsideComparisonPeriods],
             [CashflowCategory::CODE_FINANCING, CashDirection::INFLOW, '20.00', $today],
             [CashflowCategory::CODE_FINANCING, CashDirection::OUTFLOW, '5.00', $yesterday],
             [CashflowCategory::CODE_INVESTING, CashDirection::INFLOW, '30.00', $today],

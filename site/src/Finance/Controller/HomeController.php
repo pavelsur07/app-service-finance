@@ -4,13 +4,8 @@ declare(strict_types=1);
 
 namespace App\Finance\Controller;
 
-use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\FiatCurrency;
-use App\Cash\Enum\Transaction\CashflowFlowKind;
-use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
-use App\Cash\Repository\Accounts\MoneyAccountRepository;
-use App\Report\Cashflow\CashflowReportBuilder;
-use App\Report\Cashflow\CashflowReportParams;
+use App\Finance\Application\Service\FinanceDashboardKpiProvider;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\UiModeResolver;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -33,9 +28,7 @@ class HomeController extends AbstractController
 
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
-        private readonly MoneyAccountDailyBalanceRepository $dailyBalanceRepository,
-        private readonly CashflowReportBuilder $cashflowReportBuilder,
-        private readonly MoneyAccountRepository $moneyAccountRepository,
+        private readonly FinanceDashboardKpiProvider $kpiProvider,
         private readonly UiModeResolver $uiModeResolver,
     ) {
     }
@@ -55,45 +48,17 @@ class HomeController extends AbstractController
 
         $company = $this->activeCompanyService->getActiveCompany();
         $today = (new \DateTimeImmutable('today'))->setTime(0, 0);
-
-        $accounts = $this->moneyAccountRepository->findByFilters(
+        $uiMode = $this->uiModeResolver->current();
+        $cashflowActivity = $this->resolveCashflowActivity($request);
+        $dashboardKpis = $this->kpiProvider->build(
             $company,
-            null,
-            [$cashCurrency->value],
-            true,
-            null,
-            ['name' => 'ASC'],
+            $cashCurrency,
+            $cashflowActivity,
+            UiModeResolver::APP === $uiMode,
+            $today,
         );
 
-        $todayBalance = 0.0;
-        foreach ($accounts as $account) {
-            $snapshot = $this->dailyBalanceRepository->findOneBy([
-                'company' => $company,
-                'moneyAccount' => $account,
-                'date' => $today,
-            ]);
-
-            if (null !== $snapshot) {
-                $opening = (float) $snapshot->getOpeningBalance();
-            } else {
-                $previous = $this->dailyBalanceRepository->findLastBefore($company, $account, $today);
-                if (null !== $previous) {
-                    $opening = (float) $previous->getClosingBalance();
-                } else {
-                    $opening = (float) $account->getOpeningBalance();
-                }
-            }
-
-            $todayBalance += $opening;
-        }
-
-        $from = $today->modify('-30 days');
-        $params = new CashflowReportParams($company, 'day', $from, $today);
-        $report = $this->cashflowReportBuilder->build($params);
-        $cashflowActivity = $this->resolveCashflowActivity($request);
-        [$inflow30, $outflow30] = $this->cashflowTotalsForActivity($report, $cashCurrency, $cashflowActivity);
-
-        $template = UiModeResolver::APP === $this->uiModeResolver->current()
+        $template = UiModeResolver::APP === $uiMode
             ? 'app/home/index.html.twig'
             : 'home/index.html.twig';
 
@@ -103,11 +68,8 @@ class HomeController extends AbstractController
             'cashCurrencies' => FiatCurrency::cases(),
             'cashflowActivity' => $cashflowActivity,
             'cashflowActivities' => self::CASHFLOW_ACTIVITIES,
-            'kpi' => [
-                'todayBalance' => $todayBalance,
-                'inflow30' => $inflow30,
-                'outflow30' => $outflow30,
-            ],
+            'kpi' => $dashboardKpis['kpi'],
+            'kpiComparisons' => $dashboardKpis['comparisons'],
         ]);
     }
 
@@ -143,80 +105,5 @@ class HomeController extends AbstractController
         return is_string($activity) && array_key_exists($activity, self::CASHFLOW_ACTIVITIES)
             ? $activity
             : self::ACTIVITY_ALL;
-    }
-
-    /**
-     * @param array<string, mixed> $report
-     *
-     * @return array{float, float}
-     */
-    private function cashflowTotalsForActivity(array $report, FiatCurrency $cashCurrency, string $activity): array
-    {
-        $selectedFlowKind = match ($activity) {
-            'operating' => CashflowFlowKind::OPERATING,
-            'financing' => CashflowFlowKind::FINANCING,
-            'investing' => CashflowFlowKind::INVESTING,
-            default => null,
-        };
-        $inflow30 = 0.0;
-        $outflow30 = 0.0;
-        $categoryTotals = $report['categoryTotals'];
-        $accumulate = static function (array $node, bool $insideUnallocated = false) use (
-            &$accumulate,
-            &$inflow30,
-            &$outflow30,
-            $cashCurrency,
-            $categoryTotals,
-            $selectedFlowKind,
-        ): array {
-            /** @var CashflowCategory $category */
-            $category = $categoryTotals[$node['id']]['entity'];
-            $insideUnallocated = $insideUnallocated || in_array($category->getSystemCode(), [
-                CashflowCategory::CODE_UNALLOCATED,
-                CashflowCategory::SYSTEM_UNALLOCATED,
-            ], true);
-            $childrenInflow = 0.0;
-            $childrenOutflow = 0.0;
-
-            foreach ($node['children'] ?? [] as $child) {
-                [$childInflow, $childOutflow] = $accumulate($child, $insideUnallocated);
-                $childrenInflow += $childInflow;
-                $childrenOutflow += $childOutflow;
-            }
-
-            $nodeInflow = 0.0;
-            $nodeOutflow = 0.0;
-            foreach (($node['totals'] ?? [])[$cashCurrency->value] ?? [] as $amount) {
-                if ($amount > 0) {
-                    $nodeInflow += $amount;
-                } elseif ($amount < 0) {
-                    $nodeOutflow += abs($amount);
-                }
-            }
-
-            $ownInflow = $nodeInflow - $childrenInflow;
-            $ownOutflow = $nodeOutflow - $childrenOutflow;
-            $flowKind = $category->getEffectiveFlowKind();
-            $include = CashflowFlowKind::TECHNICAL !== $flowKind
-                && (null === $selectedFlowKind || (!$insideUnallocated && $selectedFlowKind === $flowKind));
-
-            if ($include) {
-                if ($ownInflow > 0) {
-                    $inflow30 += $ownInflow;
-                }
-
-                if ($ownOutflow > 0) {
-                    $outflow30 += $ownOutflow;
-                }
-            }
-
-            return [$nodeInflow, $nodeOutflow];
-        };
-
-        foreach ($report['tree'] as $node) {
-            $accumulate($node);
-        }
-
-        return [$inflow30, $outflow30];
     }
 }
