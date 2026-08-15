@@ -7,7 +7,7 @@ COPY . .
 RUN yarn build
 
 # --- ЭТАП 2: Сборка PHP (Composer) ---
-FROM php:8.3-cli-alpine AS builder
+FROM php:8.4.24-cli-alpine AS builder
 
 # После ("щадящий" вариант):
 ENV MAKEFLAGS="-j1"
@@ -42,7 +42,7 @@ RUN composer install --no-dev --prefer-dist --no-progress --no-scripts --optimiz
 
 
 # --- ЭТАП 3: Финальный FPM ---
-FROM php:8.3-fpm-alpine
+FROM php:8.4.24-fpm-alpine
 
 RUN apk add --no-cache libpq-dev libzip-dev libpng-dev libjpeg-turbo-dev freetype-dev fcgi tzdata \
     && cp /usr/share/zoneinfo/Europe/Moscow /etc/localtime \
