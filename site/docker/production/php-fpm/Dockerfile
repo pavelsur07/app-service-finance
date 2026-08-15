@@ -1,5 +1,5 @@
 # --- ЭТАП 1: Сборка фронтенда (Vite) ---
-FROM node:20-alpine AS frontend_builder
+FROM node:24-alpine AS frontend_builder
 WORKDIR /app
 COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile

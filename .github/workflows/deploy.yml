@@ -30,10 +30,10 @@ jobs:
             matrix: ${{ steps.matrix.outputs.matrix }}
         steps:
             - name: 📦 Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
             - name: 🔎 Path filter
-              uses: dorny/paths-filter@v3
+              uses: dorny/paths-filter@v4
               id: f
               if: ${{ github.event_name != 'workflow_dispatch' }}
               with:
@@ -127,7 +127,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: 📦 Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
             - name: 🐳 Build site-php-cli
               run: docker compose build site-php-cli
@@ -165,20 +165,20 @@ jobs:
             packages: write
         steps:
             - name: 📦 Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
             - name: 🔐 Login to GHCR
-              uses: docker/login-action@v3
+              uses: docker/login-action@v4
               with:
                   registry: ghcr.io
                   username: ${{ github.actor }}
                   password: ${{ secrets.GITHUB_TOKEN }}
 
             - name: 🛠 Set up Docker Buildx
-              uses: docker/setup-buildx-action@v3
+              uses: docker/setup-buildx-action@v4
 
             - name: 🛠 Build and Push ${{ matrix.service }}
-              uses: docker/build-push-action@v5
+              uses: docker/build-push-action@v7
               with:
                   context: ${{ matrix.context }}
                   file: ${{ matrix.file }}
@@ -201,7 +201,7 @@ jobs:
         timeout-minutes: 10
         steps:
             - name: 🔐 Setup SSH key
-              uses: webfactory/ssh-agent@v0.8.0
+              uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555 # v0.10.0
               with:
                   ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
@@ -242,13 +242,13 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: 📦 Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
             - name: 🛠 Install zip
               run: sudo apt-get install -y zip
 
             - name: 🔐 Setup SSH key
-              uses: webfactory/ssh-agent@v0.8.0
+              uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555 # v0.10.0
               with:
                   ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
@@ -345,7 +345,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: 🔐 Setup SSH key
-              uses: webfactory/ssh-agent@v0.8.0
+              uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555 # v0.10.0
               with:
                   ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
@@ -407,7 +407,7 @@ jobs:
 
         steps:
             - name: 📦 Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
             - name: 🐘 Setup PHP
               uses: shivammathur/setup-php@v2
@@ -478,7 +478,7 @@ jobs:
 
         steps:
             - name: 📦 Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
             - name: 🐘 Setup PHP
               uses: shivammathur/setup-php@v2
@@ -491,9 +491,9 @@ jobs:
               run: composer install --no-interaction --prefer-dist --no-progress --no-scripts
 
             - name: 📦 Setup Node
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@v6
               with:
-                  node-version: '20'
+                  node-version: '24'
                   cache: 'yarn'
                   cache-dependency-path: site/yarn.lock
 
