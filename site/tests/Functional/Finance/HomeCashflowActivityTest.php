@@ -27,10 +27,36 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
      * @var array<string, array{inflow30: string, outflow30: string, netFlow30: string}>
      */
     private const EXPECTED_BY_ACTIVITY = [
-        'operating' => ['inflow30' => '10RUB', 'outflow30' => '4RUB', 'netFlow30' => '6RUB'],
+        'operating' => ['inflow30' => '11RUB', 'outflow30' => '4RUB', 'netFlow30' => '7RUB'],
         'financing' => ['inflow30' => '20RUB', 'outflow30' => '5RUB', 'netFlow30' => '15RUB'],
-        'investing' => ['inflow30' => '30RUB', 'outflow30' => '6RUB', 'netFlow30' => '24RUB'],
-        'all' => ['inflow30' => '100RUB', 'outflow30' => '22RUB', 'netFlow30' => '78RUB'],
+        'investing' => ['inflow30' => '30RUB', 'outflow30' => '40RUB', 'netFlow30' => '−10RUB'],
+        'all' => ['inflow30' => '101RUB', 'outflow30' => '56RUB', 'netFlow30' => '45RUB'],
+    ];
+
+    /**
+     * @var array<string, array<string, array{state:string,variant:string,badge:string,previous:string}>>
+     */
+    private const EXPECTED_COMPARISONS_BY_ACTIVITY = [
+        'operating' => [
+            'inflow30' => ['state' => 'percent', 'variant' => 'down', 'badge' => '−98,6%', 'previous' => '770RUB'],
+            'outflow30' => ['state' => 'percent', 'variant' => 'up', 'badge' => '−99,5%', 'previous' => '800RUB'],
+            'netFlow30' => ['state' => 'cross_up', 'variant' => 'up', 'badge' => 'Изминусавплюс', 'previous' => '−30RUB'],
+        ],
+        'financing' => [
+            'inflow30' => ['state' => 'percent', 'variant' => 'up', 'badge' => '+100,0%', 'previous' => '10RUB'],
+            'outflow30' => ['state' => 'no_base', 'variant' => 'neutral', 'badge' => 'Нетбазы', 'previous' => '0RUB'],
+            'netFlow30' => ['state' => 'percent', 'variant' => 'up', 'badge' => '+50,0%', 'previous' => '10RUB'],
+        ],
+        'investing' => [
+            'inflow30' => ['state' => 'percent', 'variant' => 'down', 'badge' => '−40,0%', 'previous' => '50RUB'],
+            'outflow30' => ['state' => 'no_base', 'variant' => 'neutral', 'badge' => 'Нетбазы', 'previous' => '0RUB'],
+            'netFlow30' => ['state' => 'cross_down', 'variant' => 'down', 'badge' => 'Изплюсавминус', 'previous' => '50RUB'],
+        ],
+        'all' => [
+            'inflow30' => ['state' => 'percent', 'variant' => 'down', 'badge' => '−87,8%', 'previous' => '830RUB'],
+            'outflow30' => ['state' => 'percent', 'variant' => 'up', 'badge' => '−93,0%', 'previous' => '800RUB'],
+            'netFlow30' => ['state' => 'percent', 'variant' => 'up', 'badge' => '+50,0%', 'previous' => '30RUB'],
+        ],
     ];
 
     public function testCashflowActivityFilterInBothUiModes(): void
@@ -52,13 +78,25 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
         $categories = self::getContainer()->get(CashflowSystemCategoryService::class)->ensureStructure($company);
         $today = new \DateTimeImmutable('today');
         $yesterday = $today->modify('-1 day');
+        $currentPeriodStart = $today->modify('-29 days');
+        $previousPeriodEnd = $today->modify('-30 days');
+        $previousPeriodStart = $today->modify('-59 days');
+        $previousPeriodMiddle = $today->modify('-45 days');
+        $outsideComparisonPeriods = $today->modify('-60 days');
         foreach ([
             [CashflowCategory::CODE_OPERATING, CashDirection::INFLOW, '10.00', $today],
             [CashflowCategory::CODE_OPERATING, CashDirection::OUTFLOW, '4.00', $yesterday],
+            [CashflowCategory::CODE_OPERATING, CashDirection::INFLOW, '1.00', $currentPeriodStart],
+            [CashflowCategory::CODE_OPERATING, CashDirection::INFLOW, '70.00', $previousPeriodEnd],
+            [CashflowCategory::CODE_OPERATING, CashDirection::INFLOW, '700.00', $previousPeriodStart],
+            [CashflowCategory::CODE_OPERATING, CashDirection::OUTFLOW, '800.00', $previousPeriodMiddle],
+            [CashflowCategory::CODE_OPERATING, CashDirection::INFLOW, '7000.00', $outsideComparisonPeriods],
             [CashflowCategory::CODE_FINANCING, CashDirection::INFLOW, '20.00', $today],
             [CashflowCategory::CODE_FINANCING, CashDirection::OUTFLOW, '5.00', $yesterday],
+            [CashflowCategory::CODE_FINANCING, CashDirection::INFLOW, '10.00', $previousPeriodMiddle],
             [CashflowCategory::CODE_INVESTING, CashDirection::INFLOW, '30.00', $today],
-            [CashflowCategory::CODE_INVESTING, CashDirection::OUTFLOW, '6.00', $yesterday],
+            [CashflowCategory::CODE_INVESTING, CashDirection::OUTFLOW, '40.00', $yesterday],
+            [CashflowCategory::CODE_INVESTING, CashDirection::INFLOW, '50.00', $previousPeriodMiddle],
             [CashflowCategory::CODE_UNALLOCATED, CashDirection::INFLOW, '40.00', $today],
             [CashflowCategory::CODE_UNALLOCATED, CashDirection::OUTFLOW, '7.00', $yesterday],
             [CashflowCategory::CODE_TECHNICAL_IN, CashDirection::INFLOW, '50.00', $today],
@@ -80,6 +118,7 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
                 self::assertResponseIsSuccessful();
                 $this->assertActivityState($crawler, $activity);
                 $this->assertKpis($crawler, self::EXPECTED_BY_ACTIVITY[$activity]);
+                $this->assertKpiComparisons($crawler, $uiMode, $activity);
             }
 
             $defaultCrawler = $client->request('GET', '/finance?currency=RUB');
@@ -153,6 +192,48 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
         }
     }
 
+    private function assertKpiComparisons(Crawler $crawler, string $uiMode, string $activity): void
+    {
+        if (UiModeResolver::LEGACY === $uiMode) {
+            self::assertCount(0, $crawler->filter('[data-dashboard-kpi-comparison]'));
+
+            return;
+        }
+
+        self::assertCount(4, $crawler->filter('[data-dashboard-kpi-comparison]'));
+        $balanceCard = $crawler->filter('[data-dashboard-kpi="todayBalance"]')->closest('article.kpi');
+        self::assertNotNull($balanceCard);
+        $balance = $balanceCard->filter('[data-dashboard-kpi-comparison="todayBalance"]');
+        self::assertCount(1, $balance);
+        self::assertSame('percent', $balance->attr('data-comparison-state'));
+        self::assertSame('neutral', $balance->attr('data-comparison-variant'));
+        self::assertCount(1, $balance->filter('.delta.delta--neutral'));
+        self::assertSame('0,0%', $this->normalizedText($balance->filter('.delta')));
+        self::assertStringContainsString('30днейназад:1000RUB', $this->normalizedText($balance));
+
+        foreach (self::EXPECTED_COMPARISONS_BY_ACTIVITY[$activity] as $name => $expected) {
+            $card = $crawler->filter(sprintf('[data-dashboard-kpi="%s"]', $name))->closest('article.kpi');
+            self::assertNotNull($card);
+            $comparison = $card->filter(sprintf('[data-dashboard-kpi-comparison="%s"]', $name));
+            self::assertCount(1, $comparison);
+            self::assertSame($expected['state'], $comparison->attr('data-comparison-state'));
+            self::assertSame($expected['variant'], $comparison->attr('data-comparison-variant'));
+            self::assertCount(1, $comparison->filter('.delta.delta--'.$expected['variant']));
+            self::assertStringContainsString($expected['badge'], $this->normalizedText($comparison));
+            if ('percent' === $expected['state']) {
+                self::assertStringContainsString(
+                    str_starts_with($expected['badge'], '+') ? 'Ростна' : 'Снижениена',
+                    $this->normalizedText($comparison->filter('.delta')),
+                );
+                self::assertCount(1, $comparison->filter('.delta [aria-hidden="true"]'));
+            }
+            self::assertStringContainsString(
+                'Предыдущие30дней:'.$expected['previous'],
+                $this->normalizedText($comparison),
+            );
+        }
+    }
+
     private function assertTabsComposition(Crawler $crawler, string $uiMode): void
     {
         if (UiModeResolver::LEGACY === $uiMode) {
@@ -177,6 +258,12 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
         $value = $crawler->filter(sprintf('[data-dashboard-kpi="%s"]', $name));
         self::assertCount(1, $value);
 
-        return (string) preg_replace('/\s+/u', '', $value->text());
+        return $this->normalizedText($value);
+    }
+
+    private function normalizedText(Crawler $crawler): string
+    {
+        // Legacy number_format emits ASCII '-', while the app money macro uses U+2212.
+        return str_replace('-', '−', (string) preg_replace('/\s+/u', '', $crawler->text()));
     }
 }
