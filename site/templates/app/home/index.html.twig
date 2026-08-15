@@ -7,10 +7,32 @@
     {% if value < 0 %}−{% endif %}{{ value|abs|number_format(0, ',', ' ') }} {{ currency }}
 {% endmacro %}
 
+{% macro comparison(name, data, currency, previousLabel) %}
+    <div
+        class="kpi-meta"
+        data-dashboard-kpi-comparison="{{ name }}"
+        data-comparison-state="{{ data.state }}"
+        data-comparison-variant="{{ data.variant }}"
+    >
+        <span class="delta delta--{{ data.variant }}">
+            {% if data.state == 'percent' %}
+                {% set formattedPercent = data.percent|abs|number_format(1, ',', ' ') %}
+                {% if data.percent > 0 %}<span class="sr-only">Рост на {{ formattedPercent }}%</span><span aria-hidden="true">+{{ formattedPercent }}%</span>{% elseif data.percent < 0 %}<span class="sr-only">Снижение на {{ formattedPercent }}%</span><span aria-hidden="true">−{{ formattedPercent }}%</span>{% else %}{{ formattedPercent }}%{% endif %}
+            {% elseif data.state == 'cross_up' %}
+                Из минуса в плюс
+            {% elseif data.state == 'cross_down' %}
+                Из плюса в минус
+            {% elseif data.state == 'no_base' %}
+                Нет базы
+            {% endif %}
+        </span>
+        {{ previousLabel }}: {{ _self.money(data.previous, currency) }}
+    </div>
+{% endmacro %}
+
 {% block title %}Финансовый обзор{% endblock %}
 
 {% block content %}
-    {% set net_flow = kpi.inflow30 - kpi.outflow30 %}
     <section class="app-dashboard" data-dashboard-mode="app" aria-labelledby="dashboard-title">
         <header class="wz-head">
             <h1 class="wz-title" id="dashboard-title">
@@ -57,24 +79,28 @@
                 <div class="kpi-label">Остаток на сегодня</div>
                 <div class="kpi-value kpi-value--hero money" data-dashboard-kpi="todayBalance">{{ _self.money(kpi.todayBalance, cashCurrency.value) }}</div>
                 <div class="kpi-meta">По активным денежным счетам</div>
+                {{ _self.comparison('todayBalance', kpiComparisons.todayBalance, cashCurrency.value, '30 дней назад') }}
             </article>
 
             <article class="kpi kpi--accent-success">
                 <div class="kpi-label">Приход</div>
                 <div class="kpi-value money" data-dashboard-kpi="inflow30">{{ _self.money(kpi.inflow30, cashCurrency.value) }}</div>
                 <div class="kpi-meta">Последние 30 дней</div>
+                {{ _self.comparison('inflow30', kpiComparisons.inflow30, cashCurrency.value, 'Предыдущие 30 дней') }}
             </article>
 
             <article class="kpi kpi--accent-danger">
                 <div class="kpi-label">Расход</div>
                 <div class="kpi-value money" data-dashboard-kpi="outflow30">{{ _self.money(kpi.outflow30, cashCurrency.value) }}</div>
                 <div class="kpi-meta">Последние 30 дней</div>
+                {{ _self.comparison('outflow30', kpiComparisons.outflow30, cashCurrency.value, 'Предыдущие 30 дней') }}
             </article>
 
             <article class="kpi kpi--accent-primary">
                 <div class="kpi-label">Чистый поток</div>
-                <div class="kpi-value money" data-dashboard-kpi="netFlow30">{{ _self.money(net_flow, cashCurrency.value) }}</div>
+                <div class="kpi-value money" data-dashboard-kpi="netFlow30">{{ _self.money(kpi.netFlow30, cashCurrency.value) }}</div>
                 <div class="kpi-meta">Приход минус расход за 30 дней</div>
+                {{ _self.comparison('netFlow30', kpiComparisons.netFlow30, cashCurrency.value, 'Предыдущие 30 дней') }}
             </article>
         </div>
     </section>
