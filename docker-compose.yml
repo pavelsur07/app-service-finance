@@ -86,7 +86,7 @@ services:
             - ./site:/app
         command: php bin/console
     site-frontend:
-        image: node:20-alpine
+        image: node:24-alpine
         container_name: symfony-frontend
         working_dir: /app
         environment:
