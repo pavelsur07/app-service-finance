@@ -1,4 +1,4 @@
-FROM php:8.3-fpm-alpine AS builder
+FROM php:8.4.24-fpm-alpine AS builder
 
 RUN apk add --no-cache libpq-dev libzip-dev libpng-dev libjpeg-turbo-dev freetype-dev \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
@@ -32,7 +32,7 @@ RUN composer install --no-dev --prefer-dist --no-progress --no-scripts --optimiz
 
 ### CLI (runtime) ###
 
-FROM php:8.3-cli-alpine
+FROM php:8.4.24-cli-alpine
 
 # su-exec нужен, чтобы стартовать контейнер как root (инициализация volume),
 # а затем "уронить" права до пользователя app для запуска воркера
