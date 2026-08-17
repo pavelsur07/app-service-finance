@@ -28,30 +28,34 @@ final readonly class SeedBalanceStructureAction
     {
         Assert::uuid($companyId);
 
-        if ($this->balanceCategoryRepository->count(['companyId' => $companyId]) > 0) {
-            return false;
-        }
+        // Дерево строится серией flush (см. ensureCategory), поэтому сбой на середине
+        // без транзакции оставил бы половину структуры и заблокировал повторный запуск.
+        return (bool) $this->entityManager->wrapInTransaction(function () use ($companyId): bool {
+            if ($this->balanceCategoryRepository->count(['companyId' => $companyId]) > 0) {
+                return false;
+            }
 
-        $assets = $this->ensureCategory($companyId, 'Активы', BalanceCategoryType::ASSET, null, 10, 'ASSETS');
+            $assets = $this->ensureCategory($companyId, 'Активы', BalanceCategoryType::ASSET, null, 10, 'ASSETS');
 
-        $cash = $this->ensureCategory($companyId, 'Деньги', BalanceCategoryType::ASSET, $assets, 10, 'CASH');
-        ($this->linkBalanceCategoryAction)($companyId, new LinkBalanceCategoryCommand(
-            categoryId: $cash->getId(),
-            sourceType: BalanceLinkSourceType::MONEY_ACCOUNTS_TOTAL,
-            sourceId: null,
-        ));
+            $cash = $this->ensureCategory($companyId, 'Деньги', BalanceCategoryType::ASSET, $assets, 10, 'CASH');
+            ($this->linkBalanceCategoryAction)($companyId, new LinkBalanceCategoryCommand(
+                categoryId: $cash->getId(),
+                sourceType: BalanceLinkSourceType::MONEY_ACCOUNTS_TOTAL,
+                sourceId: null,
+            ));
 
-        $funds = $this->ensureCategory($companyId, 'Фонды и резервы', BalanceCategoryType::ASSET, $assets, 20, 'FUNDS');
-        ($this->linkBalanceCategoryAction)($companyId, new LinkBalanceCategoryCommand(
-            categoryId: $funds->getId(),
-            sourceType: BalanceLinkSourceType::MONEY_FUNDS_TOTAL,
-            sourceId: null,
-        ));
+            $funds = $this->ensureCategory($companyId, 'Фонды и резервы', BalanceCategoryType::ASSET, $assets, 20, 'FUNDS');
+            ($this->linkBalanceCategoryAction)($companyId, new LinkBalanceCategoryCommand(
+                categoryId: $funds->getId(),
+                sourceType: BalanceLinkSourceType::MONEY_FUNDS_TOTAL,
+                sourceId: null,
+            ));
 
-        $this->ensureCategory($companyId, 'Обязательства', BalanceCategoryType::LIABILITY, null, 20, 'LIABILITIES');
-        $this->ensureCategory($companyId, 'Капитал', BalanceCategoryType::EQUITY, null, 30, 'EQUITY');
+            $this->ensureCategory($companyId, 'Обязательства', BalanceCategoryType::LIABILITY, null, 20, 'LIABILITIES');
+            $this->ensureCategory($companyId, 'Капитал', BalanceCategoryType::EQUITY, null, 30, 'EQUITY');
 
-        return true;
+            return true;
+        });
     }
 
     private function ensureCategory(
@@ -80,6 +84,9 @@ final readonly class SeedBalanceStructureAction
         $category->setCode($code);
 
         $this->entityManager->persist($category);
+        // Категорию ищут через findOneBy (SQL) в LinkBalanceCategoryAction — без flush
+        // она не видна и линк падает BalanceCategoryNotFoundException.
+        $this->entityManager->flush();
 
         return $category;
     }

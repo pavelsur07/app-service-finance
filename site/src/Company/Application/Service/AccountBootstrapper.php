@@ -4,56 +4,18 @@ declare(strict_types=1);
 
 namespace App\Company\Application\Service;
 
-use App\Balance\Service\BalanceStructureSeeder;
-use App\Cash\Entity\Accounts\MoneyAccount;
-use App\Cash\Entity\Transaction\CashflowCategory;
-use App\Cash\Enum\Accounts\MoneyAccountType;
-use App\Cash\Repository\Accounts\MoneyAccountRepository;
-use App\Cash\Repository\Transaction\CashflowCategoryRepository;
-use App\Cash\Service\Category\CashflowSystemCategoryService;
 use App\Company\Entity\Company;
-use App\Company\Entity\User;
-use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Repository\PLCategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Ramsey\Uuid\Uuid;
 
 final class AccountBootstrapper
 {
     public function __construct(
         private readonly EntityManagerInterface $em,
-        private readonly CompanyRepository $companies,
-        private readonly CashflowCategoryRepository $cashflowCategories,
-        private readonly CashflowSystemCategoryService $cashflowSystemCategories,
         private readonly PLCategoryRepository $plCategories,
-        private readonly MoneyAccountRepository $moneyAccounts,
-        private readonly BalanceStructureSeeder $balanceSeeder,
-        private readonly CompanyOwnerMembershipCreator $companyOwnerMembershipCreator,
     ) {
-    }
-
-    public function bootstrapForUser(User $user): ?Company
-    {
-        if ($this->companies->count(['user' => $user]) > 0) {
-            return null;
-        }
-
-        /** @var Company $company */
-        $company = $this->em->transactional(function (EntityManagerInterface $em) use ($user): Company {
-            $company = $this->createCompanyFor($user, 'Новая компания');
-
-            $structure = $this->cashflowSystemCategories->ensureStructure($company);
-            $this->seedCashflow($company, $structure[CashflowCategory::CODE_OPERATING]);
-            $this->seedPL($company);
-            $this->seedAccounts($company);
-            $this->balanceSeeder->seedDefaultIfEmpty($company);
-
-            $em->flush();
-
-            return $company;
-        });
-
-        return $company;
     }
 
     public function ensurePlSeeded(Company $company): bool
@@ -66,70 +28,6 @@ final class AccountBootstrapper
         $this->em->flush();
 
         return true;
-    }
-
-    private function createCompanyFor(User $user, string $name): Company
-    {
-        return $this->companyOwnerMembershipCreator->createCompany($user, $name);
-    }
-
-    private function seedCashflow(Company $company, CashflowCategory $operating): void
-    {
-        $roots = [
-            'Поступления (операционные)' => [
-                'Продажи',
-                'Прочие поступления',
-            ],
-            'Списания (операционные)' => [
-                'Себестоимость/Закупки',
-                'Зарплата',
-                'Аренда/Склад',
-                'Маркетинг',
-                'Налоги/Взносы',
-                'Прочие расходы',
-            ],
-        ];
-
-        $rootSort = 10;
-        foreach ($roots as $rootName => $children) {
-            $root = $this->ensureCashflow($company, $rootName, $operating, $rootSort);
-            $rootSort += 10;
-
-            $childSort = 10;
-            foreach ($children as $childName) {
-                $this->ensureCashflow($company, $childName, $root, $childSort);
-                $childSort += 10;
-            }
-        }
-    }
-
-    private function ensureCashflow(
-        Company $company,
-        string $name,
-        ?CashflowCategory $parent,
-        int $sort,
-    ): CashflowCategory {
-        $existing = $this->cashflowCategories->findOneBy([
-            'company' => $company,
-            'name' => $name,
-            'parent' => $parent,
-        ]);
-
-        if (null !== $existing) {
-            return $existing;
-        }
-
-        $category = new CashflowCategory(
-            id: Uuid::uuid4()->toString(),
-            company: $company,
-        );
-        $category->setName($name);
-        $category->setParent($parent);
-        $category->setSort($sort);
-
-        $this->em->persist($category);
-
-        return $category;
     }
 
     private function seedPL(Company $company): void
@@ -182,35 +80,5 @@ final class AccountBootstrapper
         $this->em->persist($category);
 
         return $category;
-    }
-
-    private function seedAccounts(Company $company): void
-    {
-        $this->ensureAccount($company, 'Основная касса', MoneyAccountType::CASH);
-    }
-
-    private function ensureAccount(Company $company, string $name, MoneyAccountType $type): MoneyAccount
-    {
-        $existing = $this->moneyAccounts->findOneBy([
-            'company' => $company,
-            'name' => $name,
-        ]);
-
-        if (null !== $existing) {
-            return $existing;
-        }
-
-        $account = new MoneyAccount(
-            id: Uuid::uuid4()->toString(),
-            company: $company,
-            type: $type,
-            name: $name,
-            currency: 'RUB',
-        );
-        $account->setIsActive(true);
-
-        $this->em->persist($account);
-
-        return $account;
     }
 }

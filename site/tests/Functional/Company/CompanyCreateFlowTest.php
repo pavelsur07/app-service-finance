@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Company;
 
+use App\Balance\Facade\BalanceFacade;
 use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
@@ -47,6 +48,17 @@ final class CompanyCreateFlowTest extends WebTestCaseBase
         self::assertNotNull($company);
         self::assertSame($owner->getId(), $company->getUser()?->getId());
         self::assertSame('1234567890', $company->getInn());
+
+        /** @var BalanceFacade $balance */
+        $balance = $client->getContainer()->get(BalanceFacade::class);
+        $balanceTree = $balance->getCategoriesForCompany((string) $company->getId());
+        self::assertSame(
+            ['Активы', 'Обязательства', 'Капитал'],
+            array_column($balanceTree, 'name'),
+        );
+        // «Деньги» создаётся после первого линка — доказывает, что seeder дошёл дальше него.
+        self::assertSame(['Деньги', 'Фонды и резервы'], array_column($balanceTree[0]['children'], 'name'));
+        self::assertFalse($balance->seedDefaultStructure((string) $company->getId()));
 
         $member = $em->getRepository(CompanyMember::class)->findOneByCompanyAndUser($company, $owner);
         self::assertNotNull($member);
