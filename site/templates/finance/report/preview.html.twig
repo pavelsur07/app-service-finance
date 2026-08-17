@@ -1,5 +1,77 @@
 {% extends 'base.html.twig' %}
 {% block title %}P&L Preview{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        /* Таблица P&L: «Строка» закреплена слева, остальные колонки фиксированной ширины и
+           прокручиваются вместе с .table-responsive. Рецепт тот же, что в отчёте ДДС
+           (templates/report/cashflow.html.twig).
+           Селекторы .table.pl-table — чтобы правила не перебивались .table из legacy_app,
+           который грузится до этого блока. */
+        .table.pl-table {
+            --pl-col-name: 280px;
+            --pl-col-meta-code: 110px;
+            --pl-col-meta-type: 120px;
+            --pl-col-period: 120px;
+            --pl-col-project: 160px;
+            --pl-col-total: 140px;
+            /* table-layout: fixed работает только при определённой ширине таблицы;
+               при width:auto браузер молча откатывается на auto-раскладку.
+               Ширину даёт .table (width:100%), а min-width задаётся инлайном по числу колонок. */
+            table-layout: fixed;
+        }
+        .table.pl-table th,
+        .table.pl-table td {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .table.pl-table col.pl-col-name { width: var(--pl-col-name); }
+        .table.pl-table col.pl-col-meta-code { width: var(--pl-col-meta-code); }
+        .table.pl-table col.pl-col-meta-type { width: var(--pl-col-meta-type); }
+        .table.pl-table col.pl-col-period { width: var(--pl-col-period); }
+        .table.pl-table col.pl-col-project { width: var(--pl-col-project); }
+        .table.pl-table col.pl-col-total { width: var(--pl-col-total); }
+        /* строки данных, а не ячейка пустого состояния с colspan: её нельзя залипать целиком */
+        .table.pl-table thead th:first-child,
+        .table.pl-table tbody tr.pl-row > td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 2;
+            background: var(--tblr-bg-surface);
+            /* при border-collapse граница залипшей ячейки не рисуется поверх уезжающих — подменяем тенью */
+            box-shadow: inset -1px 0 0 var(--tblr-border-color);
+        }
+        .table.pl-table th.pl-cell-total,
+        .table.pl-table td.pl-cell-total {
+            position: sticky;
+            right: 0;
+            z-index: 2;
+            background: var(--tblr-bg-surface);
+            box-shadow: inset 1px 0 0 var(--tblr-border-color);
+        }
+        .table.pl-table .text-end { font-variant-numeric: tabular-nums; }
+        .table.pl-table .pl-name-wrap {
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+        }
+        /* min-width:0 — иначе flex-элемент не сжимается и ellipsis не срабатывает */
+        .table.pl-table .pl-name {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .table.pl-table .pl-toggle {
+            flex: none;
+            width: 16px;
+            margin-right: 4px;
+            text-align: center;
+        }
+    </style>
+{% endblock %}
+
 {% block body %}
     <div class="page-body">
         <div class="container-xl">
@@ -149,10 +221,29 @@
                 </div>
             {% endif %}
 
+            {# Ширины колонок фиксированные: table-layout:fixed + colgroup. min-width считается по
+               числу колонок, иначе таблица сожмётся до контейнера вместо горизонтальной прокрутки. #}
+            {% set meta_width = showMetaColumns ? ' + var(--pl-col-meta-code) + var(--pl-col-meta-type)' : '' %}
+            {% set period_col_width = grouping == 'week' ? '210px' : (grouping == 'day' ? '110px' : '120px') %}
+            {% if layout == 'projects' %}
+                {% set table_min_width = 'calc(var(--pl-col-name)' ~ meta_width ~ ' + ' ~ compareProjects|length ~ ' * var(--pl-col-project) + var(--pl-col-total))' %}
+            {% else %}
+                {% set table_min_width = 'calc(var(--pl-col-name)' ~ meta_width ~ ' + ' ~ periods|length ~ ' * var(--pl-col-period))' %}
+            {% endif %}
+
             <div class="card">
                 <div class="table-responsive">
-                    <table class="table table-vcenter">
+                    <table class="table table-vcenter pl-table" style="--pl-col-period: {{ period_col_width }}; min-width: {{ table_min_width }};">
                         {% if layout == 'projects' %}
+                            <colgroup>
+                                <col class="pl-col-name">
+                                {% if showMetaColumns %}
+                                    <col class="pl-col-meta-code">
+                                    <col class="pl-col-meta-type">
+                                {% endif %}
+                                {% for p in compareProjects %}<col class="pl-col-project">{% endfor %}
+                                <col class="pl-col-total">
+                            </colgroup>
                             <thead>
                             <tr>
                                 <th>Строка</th>
@@ -161,19 +252,21 @@
                                     <th>Тип</th>
                                 {% endif %}
                                 {% for p in compareProjects %}
-                                    <th class="text-end">
+                                    <th class="text-end" title="{{ p.name }}{% if p.isOverhead %} (Shared){% endif %}">
                                         {{ p.name }}{% if p.isOverhead %} <span class="text-muted">(Shared)</span>{% endif %}
                                     </th>
                                 {% endfor %}
-                                <th class="text-end">Итого</th>
+                                <th class="text-end pl-cell-total">Итого</th>
                             </tr>
                             </thead>
                             <tbody>
                             {% for r in rows %}
                                 <tr class="pl-row" data-row-id="{{ r.id }}" data-level="{{ r.level }}">
-                                    <td style="padding-left: {{ (r.level - 1) * 20 }}px; white-space: nowrap;">
-                                        <span class="pl-toggle" style="display:inline-block; width:16px; text-align:center; margin-right:4px;"></span>
-                                        {{ r.name }}
+                                    <td style="padding-left: {{ (r.level - 1) * 20 }}px;">
+                                        <div class="pl-name-wrap">
+                                            <span class="pl-toggle"></span>
+                                            <span class="pl-name" title="{{ r.name }}">{{ r.name }}</span>
+                                        </div>
                                     </td>
                                     {% if showMetaColumns %}
                                         <td><code>{{ r.code ?? '—' }}</code></td>
@@ -182,7 +275,7 @@
                                     {% for p in compareProjects %}
                                         <td class="text-end">{{ r.values[p.id] ?? '—' }}</td>
                                     {% endfor %}
-                                    <td class="text-end fw-bold">{{ r.values['_total'] ?? '—' }}</td>
+                                    <td class="text-end fw-bold pl-cell-total">{{ r.values['_total'] ?? '—' }}</td>
                                 </tr>
                             {% else %}
                                 <tr>
@@ -191,6 +284,14 @@
                             {% endfor %}
                             </tbody>
                         {% else %}
+                            <colgroup>
+                                <col class="pl-col-name">
+                                {% if showMetaColumns %}
+                                    <col class="pl-col-meta-code">
+                                    <col class="pl-col-meta-type">
+                                {% endif %}
+                                {% for period in periods %}<col class="pl-col-period">{% endfor %}
+                            </colgroup>
                             <thead>
                             <tr>
                                 <th>Строка</th>
@@ -199,16 +300,18 @@
                                     <th>Тип</th>
                                 {% endif %}
                                 {% for period in periods %}
-                                    <th class="text-end">{{ period.label }}</th>
+                                    <th class="text-end" title="{{ period.label }}">{{ period.label }}</th>
                                 {% endfor %}
                             </tr>
                             </thead>
                             <tbody>
                             {% for r in rows %}
                                 <tr class="pl-row" data-row-id="{{ r.id }}" data-level="{{ r.level }}">
-                                    <td style="padding-left: {{ (r.level - 1) * 20 }}px; white-space: nowrap;">
-                                        <span class="pl-toggle" style="display:inline-block; width:16px; text-align:center; margin-right:4px;"></span>
-                                        {{ r.name }}
+                                    <td style="padding-left: {{ (r.level - 1) * 20 }}px;">
+                                        <div class="pl-name-wrap">
+                                            <span class="pl-toggle"></span>
+                                            <span class="pl-name" title="{{ r.name }}">{{ r.name }}</span>
+                                        </div>
                                     </td>
                                     {% if showMetaColumns %}
                                         <td><code>{{ r.code ?? '—' }}</code></td>
