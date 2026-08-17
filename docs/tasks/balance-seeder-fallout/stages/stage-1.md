@@ -75,9 +75,14 @@ Symfony делает такой сервис «errored» и бросает ис�
   `balance_categories.company_id`, о прогонах тестов и о красном CS-baseline переданы в промпте.
 
 ### Команды для проверки
-- `docker compose run --rm site-php-cli php bin/phpunit --testsuite functional --filter "PlReportPreviewControllerTest|CompanyCreateFlowTest"`
-- `make site-test`
-- `docker compose run --rm site-php-cli php bin/console lint:container`
+- `docker compose run --rm site-php-cli php bin/phpunit --testsuite functional --filter "PlReportPreviewControllerTest|CompanyCreateFlowTest"` — `OK (3 tests, 23 assertions)`
+- `make site-test` — `Tests: 3368, Assertions: 18591, Deprecations: 5`, ошибок и падений нет
+- `docker compose run --rm site-php-cli php bin/console lint:container` — OK
+
+Первый полный прогон дал 167 errors / 27 failures в модулях Cash и Marketplace — это был не регресс,
+а не поднятый в локальном стеке `site-redis`: `framework.lock` держит блокировки в Redis
+(`config/packages/lock.yaml`), и `DebouncedRangeEnqueuer` падал `LockAcquiringException`. После
+`docker compose up -d site-redis` прогон зелёный.
 
 ### Риски / на что обратить внимание ревьюеру
 - Удаление `bootstrapForUser()` необратимо ломает внешний вызов, если такой появится вне репозитория;
