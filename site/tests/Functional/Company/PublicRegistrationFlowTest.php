@@ -82,6 +82,71 @@ final class PublicRegistrationFlowTest extends WebTestCaseBase
         ));
     }
 
+    /**
+     * Регрессия: кривой email маппился в User::setEmail() до валидации и ронял запрос в 500.
+     */
+    public function testInvalidEmailIsRejectedByFormInsteadOfCrashing(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        $client->getContainer()->set(RegistrationRateLimiter::class, new RegistrationRateLimiter());
+
+        foreach (['not-an-email', 'ivan@company', ''] as $email) {
+            $client->setServerParameter('REMOTE_ADDR', $this->uniqueClientIp());
+            $crawler = $client->request('GET', '/register');
+
+            $form = $crawler->selectButton('Создать аккаунт')->form([
+                'registration_form[companyName]' => 'Invalid Email LLC',
+                'registration_form[email]' => $email,
+                'registration_form[plainPassword]' => 'password123',
+                'registration_form[agreeTerms]' => 1,
+                'registration_form[website]' => '',
+            ]);
+            $crawler = $client->submit($form);
+
+            self::assertSame(422, $client->getResponse()->getStatusCode(), sprintf('email "%s"', $email));
+            // #<id>_error1 — блок ошибки, привязанный именно к полю email (bootstrap_5_layout),
+            // а не статический invalid-feedback, который лежит в шаблоне всегда.
+            $error = $crawler->filter('#registration_form_email_error1');
+            self::assertSame('Введите корректный email', trim($error->text()), sprintf('email "%s"', $email));
+        }
+
+        self::assertSame(0, $this->em()->getRepository(User::class)->count([]));
+    }
+
+    /**
+     * Клиентский гейт не должен быть строже серверного предиката: Assert::email() с
+     * FILTER_FLAG_EMAIL_UNICODE принимает unicode в локальной части, а HTML5-валидация
+     * type="email" — нет. BrowserKit HTML5 не исполняет, поэтому тип поля проверяем явно.
+     */
+    public function testUnicodeEmailIsAcceptedAndFieldIsNotHtml5Constrained(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        $client->getContainer()->set(RegistrationRateLimiter::class, new RegistrationRateLimiter());
+        $client->setServerParameter('REMOTE_ADDR', $this->uniqueClientIp());
+
+        $crawler = $client->request('GET', '/register');
+
+        self::assertSame(
+            'text',
+            $crawler->filter('#registration_form_email')->attr('type'),
+            'type="email" отрезал бы unicode-адреса, которые сервер принимает',
+        );
+
+        $form = $crawler->selectButton('Создать аккаунт')->form([
+            'registration_form[companyName]' => 'Unicode Email LLC',
+            'registration_form[email]' => 'иван@example.com',
+            'registration_form[plainPassword]' => 'password123',
+            'registration_form[agreeTerms]' => 1,
+            'registration_form[website]' => '',
+        ]);
+        $client->submit($form);
+
+        self::assertTrue($client->getResponse()->isRedirect());
+        self::assertNotNull($this->em()->getRepository(User::class)->findOneBy(['email' => 'иван@example.com']));
+    }
+
     private function uniqueClientIp(): string
     {
         return sprintf(
