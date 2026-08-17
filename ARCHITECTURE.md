@@ -735,6 +735,24 @@ createDocumentFromCashTransaction(
 updatePLRegisterForDocument(string $documentId): void
 ```
 
+### `BalanceFacade` (`src/Balance/Facade/BalanceFacade.php`)
+```php
+// Дерево категорий баланса компании (вложенные children)
+// @return list<array{id: string, name: string, level: int, type: string, children: list<mixed>}>
+getCategoriesForCompany(string $companyId): array
+
+// Плоский список категорий для ChoiceType: "— Название" => id
+// @return array<string, string>
+getCategoryChoicesForCompany(string $companyId, array $excludeCategoryIds = []): array
+
+// Отчёт «Баланс» на дату
+getReportForCompany(string $companyId, \DateTimeImmutable $date): BalanceReport
+
+// Создать дефолтную структуру баланса, если у компании её ещё нет.
+// Вызывать после flush компании. true — структура создана, false — уже была.
+seedDefaultStructure(string $companyId): bool
+```
+
 > **Остальные Facade** добавлять сюда по мере реализации модулей.
 
 ### Cash transaction auto-rule governance

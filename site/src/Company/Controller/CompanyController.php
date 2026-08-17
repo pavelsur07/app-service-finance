@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Company\Controller;
 
-use App\Balance\Service\BalanceStructureSeeder;
+use App\Balance\Facade\BalanceFacade;
 use App\Cash\Service\Category\CashflowSystemCategoryService;
 use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Entity\Company;
@@ -62,7 +62,7 @@ class CompanyController extends AbstractController
     public function new(
         Request $request,
         EntityManagerInterface $em,
-        BalanceStructureSeeder $balanceSeeder,
+        BalanceFacade $balance,
         CashflowSystemCategoryService $cashflowSystemCategories,
         CompanyOwnerMembershipCreator $companyOwnerMembershipCreator,
     ): Response {
@@ -78,10 +78,14 @@ class CompanyController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $companyOwnerMembershipCreator->persistCompanyWithOwnerMembership($company, $user);
-            $cashflowSystemCategories->ensureStructure($company);
-            $balanceSeeder->seedDefaultIfEmpty($company);
-            $em->flush();
+            // Балансовый seeder ищет свои категории через SQL, поэтому ему нужен flush
+            // до себя и внутри себя. Общая транзакция держит создание компании атомарным.
+            $em->wrapInTransaction(function () use ($company, $user, $em, $balance, $companyOwnerMembershipCreator, $cashflowSystemCategories): void {
+                $companyOwnerMembershipCreator->persistCompanyWithOwnerMembership($company, $user);
+                $cashflowSystemCategories->ensureStructure($company);
+                $em->flush();
+                $balance->seedDefaultStructure((string) $company->getId());
+            });
 
             return $this->redirectToRoute('company_index');
         }

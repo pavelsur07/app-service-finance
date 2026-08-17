@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Balance\Facade;
 
+use App\Balance\Application\SeedBalanceStructureAction;
 use App\Balance\Infrastructure\Query\BalanceReportQuery;
 use App\Balance\ReadModel\BalanceReport;
 use App\Balance\Repository\BalanceCategoryRepositoryInterface;
@@ -13,7 +14,16 @@ final readonly class BalanceFacade
     public function __construct(
         private BalanceCategoryRepositoryInterface $balanceCategoryRepository,
         private BalanceReportQuery $balanceReportQuery,
+        private SeedBalanceStructureAction $seedBalanceStructureAction,
     ) {
+    }
+
+    /**
+     * @return bool true, если структура была создана; false, если она уже есть
+     */
+    public function seedDefaultStructure(string $companyId): bool
+    {
+        return ($this->seedBalanceStructureAction)($companyId);
     }
 
     /**
