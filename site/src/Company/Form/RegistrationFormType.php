@@ -32,7 +32,7 @@ class RegistrationFormType extends AbstractType
         }
 
         $builder
-            ->add('email')
+            ->add('email', UserEmailType::class)
             ->add('agreeTerms', CheckboxType::class, [
                 'label' => 'Я принимаю Пользовательское соглашение и Политику конфиденциальности',
                 'mapped' => false,
