@@ -79,6 +79,7 @@ export interface TagSummaryRow {
     returnsTotal: number;
     returnsQuantity: number;
     costPriceTotal: number;
+    stockCapitalRub: number;
     commission: number;
     commissionAverageRub: number | null;
     adSpend: number;

@@ -52,3 +52,9 @@ XLSX-экспорт `/api/marketplace-analytics/unit-extended/export`.
 
 - Колонки `stockQty` и `stockCapitalRub` в строке итогов (`totals`) **не агрегируются**.
 - В UI и XLSX для них всегда отображается `—` (плейсхолдер), по аналогии с `costPriceUnit`.
+
+## Свод по тегам
+
+При запросе `withTagSummary=1` поле `tagSummary[].stockCapitalRub` содержит сумму
+`stockCapitalRub` всех листингов соответствующего тега. Листинг с несколькими тегами
+учитывается в каждом из них; листинги без тегов агрегируются в строке «Без тегов».
