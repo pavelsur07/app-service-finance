@@ -74,6 +74,10 @@ final class UnitExtendedTagFilterControllerTest extends WebTestCaseBase
         $tagIds = array_column($data['tagSummary'], 'tagId');
         self::assertContains($tagId, $tagIds);
         self::assertContains(null, $tagIds, 'Ожидается бакет «Без тегов»');
+        foreach ($data['tagSummary'] as $row) {
+            self::assertArrayHasKey('stockCapitalRub', $row);
+            self::assertTrue(\is_int($row['stockCapitalRub']) || \is_float($row['stockCapitalRub']));
+        }
     }
 
     public function testRejectsNonUuidTag(): void

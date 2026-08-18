@@ -265,6 +265,11 @@ final class UnitExtendedQueryTest extends TestCase
             new ListingSalesAggregateDTO('l-none', 'Без тегов', 'SKU-N', 'ozon', '200.00', 1, '50.00', 1),
         ]);
         $this->stubAdSpend(['l-both' => '100.00']);
+        $this->stubStockQty([
+            'l-both' => 10.0,
+            'l-a' => 4.0,
+            'l-none' => 3.0,
+        ]);
         $this->stubTags([
             'l-both' => ['t-a', 't-b'],
             'l-a' => ['t-a'],
@@ -283,14 +288,17 @@ final class UnitExtendedQueryTest extends TestCase
         // t-a = l-both + l-a: revenue 1400, две позиции.
         self::assertSame(2, $tagA['listingsCount']);
         self::assertSame(1400.0, $tagA['revenue']);
+        self::assertSame(800.0, $tagA['stockCapitalRub']);
 
         // t-b = только l-both: revenue 1000. Двойной счёт: l-both учтён и в t-a, и в t-b.
         self::assertSame(1, $tagB['listingsCount']);
         self::assertSame(1000.0, $tagB['revenue']);
+        self::assertSame(600.0, $tagB['stockCapitalRub']);
 
         // Untagged = l-none отдельно.
         self::assertSame(1, $untagged['listingsCount']);
         self::assertSame(200.0, $untagged['revenue']);
+        self::assertSame(150.0, $untagged['stockCapitalRub']);
         self::assertNull($untagged['tagId']);
 
         // profit t-b = 1000 - 0 - 300 - 0 - 0 - 0 - adSpend(100) = 600; margin = 60%.
@@ -577,12 +585,16 @@ final class UnitExtendedQueryTest extends TestCase
         $this->stubAdSpend([]);
         $this->stubTotalAdSpend('0');
         $this->stubStockQty(['l-zero' => 7.0]);
+        $this->stubTags(['l-zero' => ['t-zero']]);
 
-        $result = $this->execute();
+        $result = $this->execute(withTagSummary: true);
         $row = $this->findRow($result['items'], 'l-zero');
+        $summary = $this->findTagSummaryRow($result['tagSummary'], 't-zero');
         self::assertNotNull($row);
+        self::assertNotNull($summary);
         self::assertSame(0.0, $row['costPriceUnit']);
         self::assertSame(0.0, $row['stockCapitalRub']);
+        self::assertSame(0.0, $summary['stockCapitalRub']);
     }
 
     public function testEmptyEverythingProducesZeroTotals(): void

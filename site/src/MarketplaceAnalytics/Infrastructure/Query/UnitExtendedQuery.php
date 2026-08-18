@@ -238,6 +238,7 @@ final readonly class UnitExtendedQuery
                     'returnsQuantity' => $returnsQuantity,
                     'returnsTotal' => $returnsTotal,
                     'costPriceTotal' => $costPriceTotal,
+                    'stockCapitalRub' => $stockCapitalRub,
                     'commission' => $commission,
                     'logistics' => $logistics,
                     'otherCosts' => $otherCosts,
@@ -339,6 +340,7 @@ final readonly class UnitExtendedQuery
             $revenue = round($bucket['revenue'], 2);
             $returnsTotal = round($bucket['returnsTotal'], 2);
             $costPriceTotal = round($bucket['costPriceTotal'], 2);
+            $stockCapitalRub = round($bucket['stockCapitalRub'], 2);
             $commission = round($bucket['commission'], 2);
             $logistics = round($bucket['logistics'], 2);
             $otherCosts = round($bucket['otherCosts'], 2);
@@ -356,6 +358,7 @@ final readonly class UnitExtendedQuery
                 'returnsTotal' => $returnsTotal,
                 'returnsQuantity' => $bucket['returnsQuantity'],
                 'costPriceTotal' => $costPriceTotal,
+                'stockCapitalRub' => $stockCapitalRub,
                 'commission' => $commission,
                 'commissionAverageRub' => $this->averagePerNetSoldQty($commission, $netSoldQty),
                 'adSpend' => $adSpend,
@@ -387,7 +390,7 @@ final readonly class UnitExtendedQuery
 
     /**
      * @param array<string, array<string, mixed>> $buckets
-     * @param array<string, mixed>                $row
+     * @param array<string, mixed> $row
      */
     private function accumulateSummaryBucket(array &$buckets, string $key, ?string $tagId, string $name, array $row): void
     {
@@ -401,6 +404,7 @@ final readonly class UnitExtendedQuery
                 'returnsQuantity' => 0,
                 'returnsTotal' => 0.0,
                 'costPriceTotal' => 0.0,
+                'stockCapitalRub' => 0.0,
                 'commission' => 0.0,
                 'logistics' => 0.0,
                 'otherCosts' => 0.0,
@@ -414,6 +418,7 @@ final readonly class UnitExtendedQuery
         $buckets[$key]['returnsQuantity'] += $row['returnsQuantity'];
         $buckets[$key]['returnsTotal'] += $row['returnsTotal'];
         $buckets[$key]['costPriceTotal'] += $row['costPriceTotal'];
+        $buckets[$key]['stockCapitalRub'] += $row['stockCapitalRub'];
         $buckets[$key]['commission'] += $row['commission'];
         $buckets[$key]['logistics'] += $row['logistics'];
         $buckets[$key]['otherCosts'] += $row['otherCosts'];
