@@ -1,5 +1,5 @@
 {% extends 'base.html.twig' %}
-{% block title %}P&L Preview{% endblock %}
+{% block title %}Отчёт о прибылях и убытках{% endblock %}
 
 {% block stylesheets %}
     {{ parent() }}
@@ -323,7 +323,6 @@
 {% block body %}
     <div class="page-body">
         <div class="container-xl">
-            {% set groupingLabels = {'day': 'по дням', 'week': 'по неделям', 'month': 'по месяцам', 'quarter': 'по кварталам'} %}
             {% set availableProjectIds = [] %}
             {% for projectDirection in projectDirections %}
                 {% set availableProjectIds = availableProjectIds|merge([projectDirection.id]) %}
@@ -362,14 +361,69 @@
                 }) %}
             {% endif %}
 
-            <div class="d-flex align-items-center mb-3">
-                <h2 class="page-title mb-0">P&L Preview — {{ company.name }} — {{ from|date('d.m.Y') }} — {{ to|date('d.m.Y') }}
-                    {% if layout == 'projects' %}
-                        (по проектам)
-                    {% else %}
-                        ({{ groupingLabels[grouping] ?? grouping }})
-                    {% endif %}
-                </h2>
+            {% set previewState = {
+                'from': from|date('Y-m-d'),
+                'to': to|date('Y-m-d'),
+                'grouping': grouping,
+                'layout': layout,
+                'show_meta': showMetaColumns ? 1 : 0
+            } %}
+            {% if dimensionFiltersPresent %}
+                {% if projectFilterTracked %}
+                    {% set previewState = previewState|merge({
+                        'projectFiltersPresent': 1,
+                        'projectDirectionIds': submittedProjectIds
+                    }) %}
+                {% endif %}
+                {% if responsibilityCenterFilterTracked %}
+                    {% set previewState = previewState|merge({
+                        'responsibilityCenterFiltersPresent': 1,
+                        'responsibilityCenterIds': submittedResponsibilityCenterIds
+                    }) %}
+                {% endif %}
+            {% else %}
+                {% if selectedProjectDirectionId %}
+                    {% set previewState = previewState|merge({'projectDirectionId': selectedProjectDirectionId}) %}
+                {% endif %}
+                {% if selectedResponsibilityCenterId %}
+                    {% set previewState = previewState|merge({'responsibilityCenterId': selectedResponsibilityCenterId}) %}
+                {% endif %}
+            {% endif %}
+
+            {% set monthNames = {
+                1: 'Январь', 2: 'Февраль', 3: 'Март', 4: 'Апрель',
+                5: 'Май', 6: 'Июнь', 7: 'Июль', 8: 'Август',
+                9: 'Сентябрь', 10: 'Октябрь', 11: 'Ноябрь', 12: 'Декабрь'
+            } %}
+            {% set fromYear = from|date('Y') %}
+            {% set toYear = to|date('Y') %}
+            {% set fromMonth = from|date('n') %}
+            {% set toMonth = to|date('n') %}
+            {% if fromYear == toYear %}
+                {% set reportPeriodLabel = fromMonth == toMonth
+                    ? monthNames[fromMonth] ~ ' ' ~ fromYear
+                    : monthNames[fromMonth] ~ ' – ' ~ monthNames[toMonth] ~ ' ' ~ toYear %}
+            {% else %}
+                {% set reportPeriodLabel = monthNames[fromMonth] ~ ' ' ~ fromYear ~ ' – ' ~ monthNames[toMonth] ~ ' ' ~ toYear %}
+            {% endif %}
+
+            <div class="page-header mb-3">
+                <div class="row g-2 align-items-start">
+                    <div class="col">
+                        <h2 class="page-title">Отчёт о прибылях и убытках</h2>
+                        <div class="text-secondary">{{ reportPeriodLabel }}</div>
+                    </div>
+                    <div class="col-auto ms-auto d-print-none">
+                        <a
+                            href="{{ path('finance_report_preview_json', previewState) }}"
+                            class="btn btn-outline-secondary"
+                            title="Скачать отчёт в формате JSON для проверки"
+                        >
+                            <i class="ti ti-download"></i>
+                            JSON
+                        </a>
+                    </div>
+                </div>
             </div>
 
             <div class="card pl-preview-controls-card mb-3">
@@ -576,86 +630,6 @@
                             </a>
                         {% endif %}
                     </div>
-                </form>
-            </div>
-
-            {% set previewState = {
-                'from': from|date('Y-m-d'),
-                'to': to|date('Y-m-d'),
-                'grouping': grouping,
-                'layout': layout,
-                'show_meta': showMetaColumns ? 1 : 0
-            } %}
-            {% if dimensionFiltersPresent %}
-                {% if projectFilterTracked %}
-                    {% set previewState = previewState|merge({
-                        'projectFiltersPresent': 1,
-                        'projectDirectionIds': submittedProjectIds
-                    }) %}
-                {% endif %}
-                {% if responsibilityCenterFilterTracked %}
-                    {% set previewState = previewState|merge({
-                        'responsibilityCenterFiltersPresent': 1,
-                        'responsibilityCenterIds': submittedResponsibilityCenterIds
-                    }) %}
-                {% endif %}
-            {% else %}
-                {% if selectedProjectDirectionId %}
-                    {% set previewState = previewState|merge({'projectDirectionId': selectedProjectDirectionId}) %}
-                {% endif %}
-                {% if selectedResponsibilityCenterId %}
-                    {% set previewState = previewState|merge({'responsibilityCenterId': selectedResponsibilityCenterId}) %}
-                {% endif %}
-            {% endif %}
-
-            <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
-                <a
-                    href="{{ path('finance_report_preview_json', previewState) }}"
-                    class="btn btn-outline-secondary"
-                    title="Скачать отчёт в формате JSON для проверки"
-                >
-                    <i class="ti ti-download"></i>
-                    JSON
-                </a>
-
-                <form
-                    class="d-flex align-items-center gap-2 flex-nowrap"
-                    method="post"
-                    action="{{ path('finance_report_preview_recalc') }}"
-                >
-                    <input type="hidden" name="_token" value="{{ csrf_token('recalc_pl_preview') }}">
-                    <input type="hidden" name="grouping" value="{{ grouping }}">
-                    <input type="hidden" name="from" value="{{ from|date('Y-m-d') }}">
-                    <input type="hidden" name="to" value="{{ to|date('Y-m-d') }}">
-                    <input type="hidden" name="recalc_to" value="{{ to|date('Y-m-d') }}">
-                    <input type="hidden" name="layout" value="{{ layout }}">
-                    <input type="hidden" name="show_meta" value="{{ showMetaColumns ? 1 : 0 }}">
-                    {% if dimensionFiltersPresent %}
-                        {% if projectFilterTracked %}
-                            <input type="hidden" name="projectFiltersPresent" value="1">
-                            {% for projectDirectionId in submittedProjectIds %}
-                                <input type="hidden" name="projectDirectionIds[]" value="{{ projectDirectionId }}">
-                            {% endfor %}
-                        {% endif %}
-                        {% if responsibilityCenterFilterTracked %}
-                            <input type="hidden" name="responsibilityCenterFiltersPresent" value="1">
-                            {% for responsibilityCenterId in submittedResponsibilityCenterIds %}
-                                <input type="hidden" name="responsibilityCenterIds[]" value="{{ responsibilityCenterId }}">
-                            {% endfor %}
-                        {% endif %}
-                    {% else %}
-                        <input type="hidden" name="projectDirectionId" value="{{ selectedProjectDirectionId ?? '' }}">
-                        <input type="hidden" name="responsibilityCenterId" value="{{ selectedResponsibilityCenterId ?? '' }}">
-                    {% endif %}
-                    <label class="form-label mb-0" for="recalc_from">Пересчитать с</label>
-                    <input
-                        class="form-control"
-                        type="date"
-                        id="recalc_from"
-                        name="recalc_from"
-                        value="{{ from|date('Y-m-d') }}"
-                    >
-                    <button class="btn btn-outline-primary" type="submit">Пересчитать</button>
                 </form>
             </div>
 
