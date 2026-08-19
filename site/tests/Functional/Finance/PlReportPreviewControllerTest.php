@@ -112,7 +112,7 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
         }
     }
 
-    public function testPreviewRendersFilterCardAndPreservesPluralStateInActions(): void
+    public function testPreviewRendersHeaderAndFilterCardAndPreservesPluralStateInJsonAction(): void
     {
         $client = static::createClient();
         $company = $this->loginWithCompany($client, 'pl-report-preview-filter-card@example.test');
@@ -139,6 +139,10 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
         ]);
 
         self::assertResponseIsSuccessful();
+        self::assertSame('Отчёт о прибылях и убытках', $crawler->filter('title')->text());
+        $pageHeader = $crawler->filter('.page-header');
+        self::assertSame('Отчёт о прибылях и убытках', trim($pageHeader->filter('h2.page-title')->text()));
+        self::assertSame('Февраль – Июль 2026', trim($pageHeader->filter('.text-secondary')->text()));
         self::assertCount(1, $crawler->filter('.pl-preview-controls-card #pl-preview-filter-form'));
         self::assertCount(0, $crawler->filter('#pl-preview-filters-offcanvas'));
         self::assertSame(
@@ -169,31 +173,22 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
         self::assertCount(1, $crawler->filter('input[name="responsibilityCenterIds[]"][checked]'));
         self::assertCount(1, $crawler->filter('input[name="show_meta"][checked]'));
 
-        $jsonQuery = $this->queryFromHref((string) $crawler->filter('a[title="Скачать отчёт в формате JSON для проверки"]')->attr('href'));
+        $jsonAction = $pageHeader->filter('a[title="Скачать отчёт в формате JSON для проверки"]');
+        self::assertCount(1, $jsonAction);
+        self::assertSame('JSON', trim($jsonAction->text()));
+        $jsonQuery = $this->queryFromHref((string) $jsonAction->attr('href'));
         self::assertSame('2026-02-10', $jsonQuery['from']);
         self::assertSame('2026-07-15', $jsonQuery['to']);
         self::assertSame('quarter', $jsonQuery['grouping']);
+        self::assertSame('periods', $jsonQuery['layout']);
         self::assertSame('1', $jsonQuery['show_meta']);
         self::assertSame('1', $jsonQuery['projectFiltersPresent']);
         self::assertSame('1', $jsonQuery['responsibilityCenterFiltersPresent']);
         self::assertSame([$projectA->getId()], $jsonQuery['projectDirectionIds']);
         self::assertSame([$centerA->getId()], $jsonQuery['responsibilityCenterIds']);
 
-        $recalcForm = $crawler->filter('form[action$="/finance/report/preview/recalc"]');
-        self::assertSame('1', $recalcForm->filter('input[name="projectFiltersPresent"]')->attr('value'));
-        self::assertSame('1', $recalcForm->filter('input[name="responsibilityCenterFiltersPresent"]')->attr('value'));
-        self::assertSame(
-            [$projectA->getId()],
-            $recalcForm->filter('input[name="projectDirectionIds[]"]')->each(
-                static fn (Crawler $input): ?string => $input->attr('value'),
-            ),
-        );
-        self::assertSame(
-            [$centerA->getId()],
-            $recalcForm->filter('input[name="responsibilityCenterIds[]"]')->each(
-                static fn (Crawler $input): ?string => $input->attr('value'),
-            ),
-        );
+        self::assertCount(0, $crawler->filter('form[action$="/finance/report/preview/recalc"]'));
+        self::assertCount(0, $crawler->filter('#recalc_from'));
 
         $availableProjectIds = $crawler->filter('#pl-preview-filter-form input[name="projectDirectionIds[]"]')->each(
             static fn (Crawler $input): ?string => $input->attr('value'),
@@ -248,6 +243,30 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
         self::assertArrayNotHasKey('projectFiltersPresent', $legacyJsonQuery);
     }
 
+    public function testPreviewHeaderFormatsPeriodWithRussianMonthNames(): void
+    {
+        $client = static::createClient();
+        $this->loginWithCompany($client, 'pl-report-preview-header-period@example.test');
+
+        foreach ([
+            ['2026-02-10', '2026-02-28', 'Февраль 2026'],
+            ['2026-02-10', '2026-07-15', 'Февраль – Июль 2026'],
+            ['2025-12-15', '2026-02-10', 'Декабрь 2025 – Февраль 2026'],
+            ['2025-02-01', '2026-02-28', 'Февраль 2025 – Февраль 2026'],
+        ] as [$from, $to, $expectedLabel]) {
+            $crawler = $client->request('GET', '/finance/report/preview', [
+                'from' => $from,
+                'to' => $to,
+            ]);
+
+            self::assertResponseIsSuccessful(sprintf('%s..%s', $from, $to));
+            self::assertSame(
+                $expectedLabel,
+                trim($crawler->filter('.page-header .text-secondary')->text()),
+            );
+        }
+    }
+
     public function testLegacyDayAndWeekRangesStayExactUntilMonthControlsChange(): void
     {
         $client = static::createClient();
@@ -283,9 +302,7 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
             self::assertArrayNotHasKey('projectDirectionIds', $jsonQuery);
             self::assertArrayNotHasKey('responsibilityCenterIds', $jsonQuery);
 
-            $recalcForm = $crawler->filter('form[action$="/finance/report/preview/recalc"]');
-            self::assertCount(0, $recalcForm->filter('input[name="projectFiltersPresent"]'));
-            self::assertCount(0, $recalcForm->filter('input[name="responsibilityCenterFiltersPresent"]'));
+            self::assertCount(0, $crawler->filter('form[action$="/finance/report/preview/recalc"]'));
         }
     }
 
