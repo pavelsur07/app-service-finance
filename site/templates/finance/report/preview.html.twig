@@ -13,9 +13,9 @@
             --pl-col-name: 280px;
             --pl-col-meta-code: 110px;
             --pl-col-meta-type: 120px;
-            --pl-col-period: 120px;
-            --pl-col-project: 160px;
-            --pl-col-total: 140px;
+            --pl-col-period: 160px;
+            --pl-col-project: 200px;
+            --pl-col-total: 180px;
             /* table-layout: fixed работает только при определённой ширине таблицы;
                при width:auto браузер молча откатывается на auto-раскладку.
                Ширину даёт .table (width:100%), а min-width задаётся инлайном по числу колонок. */
@@ -224,7 +224,8 @@
             {# Ширины колонок фиксированные: table-layout:fixed + colgroup. min-width считается по
                числу колонок, иначе таблица сожмётся до контейнера вместо горизонтальной прокрутки. #}
             {% set meta_width = showMetaColumns ? ' + var(--pl-col-meta-code) + var(--pl-col-meta-type)' : '' %}
-            {% set period_col_width = grouping == 'week' ? '210px' : (grouping == 'day' ? '110px' : '120px') %}
+            {# Инлайн-значение — источник истины для группировки; объявление в CSS выше остаётся fallback. #}
+            {% set period_col_width = grouping == 'week' ? '220px' : '160px' %}
             {% if layout == 'projects' %}
                 {% set table_min_width = 'calc(var(--pl-col-name)' ~ meta_width ~ ' + ' ~ compareProjects|length ~ ' * var(--pl-col-project) + var(--pl-col-total))' %}
             {% else %}
@@ -273,9 +274,11 @@
                                         <td>{{ r.type }}</td>
                                     {% endif %}
                                     {% for p in compareProjects %}
-                                        <td class="text-end">{{ r.values[p.id] ?? '—' }}</td>
+                                        {% set cell_value = r.values[p.id] ?? '—' %}
+                                        <td class="text-end" title="{{ cell_value }}">{{ cell_value }}</td>
                                     {% endfor %}
-                                    <td class="text-end fw-bold pl-cell-total">{{ r.values['_total'] ?? '—' }}</td>
+                                    {% set total_value = r.values['_total'] ?? '—' %}
+                                    <td class="text-end fw-bold pl-cell-total" title="{{ total_value }}">{{ total_value }}</td>
                                 </tr>
                             {% else %}
                                 <tr>
@@ -318,7 +321,8 @@
                                         <td>{{ r.type }}</td>
                                     {% endif %}
                                     {% for period in periods %}
-                                        <td class="text-end">{{ r.values[period.id] ?? '—' }}</td>
+                                        {% set cell_value = r.values[period.id] ?? '—' %}
+                                        <td class="text-end" title="{{ cell_value }}">{{ cell_value }}</td>
                                     {% endfor %}
                                 </tr>
                             {% else %}
