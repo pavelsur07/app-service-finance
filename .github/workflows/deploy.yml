@@ -419,23 +419,6 @@ jobs:
               working-directory: site
               run: composer install --no-interaction --prefer-dist --no-progress --no-scripts
 
-            - name: Install psql client
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y postgresql-client
-
-            - name: Create test database (app_test)
-              env:
-                  PGPASSWORD: app
-              run: |
-                  set -e
-                  if psql -h 127.0.0.1 -p 5432 -U app -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='app_test'" | grep -q 1; then
-                    echo "Database app_test already exists"
-                  else
-                    echo "Creating database app_test"
-                    psql -h 127.0.0.1 -p 5432 -U app -d postgres -c "CREATE DATABASE app_test"
-                  fi
-
             - name: 🧬 Run Doctrine migrations
               working-directory: site
               env:
