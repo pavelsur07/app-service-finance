@@ -126,6 +126,7 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
         }
         $this->em()->flush();
 
+        $firstOfThisMonth = (new \DateTimeImmutable('today'))->modify('first day of this month');
         $crawler = $client->request('GET', '/finance/report/preview', [
             'from' => '2026-02-10',
             'to' => '2026-07-15',
@@ -162,7 +163,20 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
             $crawler->filter('button[data-pl-set="grouping"][data-pl-value="quarter"].is-active'),
         );
         self::assertCount(1, $crawler->filter('button[data-pl-set="grouping"][data-pl-value="month"]'));
-        self::assertCount(3, $crawler->filter('button[data-pl-period-from][data-pl-period-to]'));
+        $periodPresets = $crawler->filter('button[data-pl-period-from][data-pl-period-to]');
+        self::assertCount(4, $periodPresets);
+        $previousMonthPreset = $periodPresets->reduce(
+            static fn (Crawler $button): bool => 'Предыдущий месяц' === trim($button->text()),
+        );
+        self::assertCount(1, $previousMonthPreset);
+        self::assertSame(
+            $firstOfThisMonth->modify('-1 month')->format('Y-m-d'),
+            $previousMonthPreset->attr('data-pl-period-from'),
+        );
+        self::assertSame(
+            $firstOfThisMonth->modify('-1 day')->format('Y-m-d'),
+            $previousMonthPreset->attr('data-pl-period-to'),
+        );
         self::assertGreaterThanOrEqual(2, $crawler->filter('input[name="projectDirectionIds[]"]')->count());
         self::assertCount(1, $crawler->filter('input[name="projectDirectionIds[]"][checked]'));
         self::assertSame(

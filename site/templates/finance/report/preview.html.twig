@@ -466,6 +466,14 @@
                                 <button
                                     class="pl-preview-preset"
                                     type="button"
+                                    data-pl-period-from="{{ date('first day of last month')|date('Y-m-d') }}"
+                                    data-pl-period-to="{{ date('last day of last month')|date('Y-m-d') }}"
+                                >
+                                    Предыдущий месяц
+                                </button>
+                                <button
+                                    class="pl-preview-preset"
+                                    type="button"
                                     data-pl-period-from="{{ date('first day of this month')|date('Y-m-d') }}"
                                     data-pl-period-to="{{ date('last day of this month')|date('Y-m-d') }}"
                                 >
