@@ -27,8 +27,8 @@ final class PlReportGridBuilder
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
         string $grouping,
-        ?ProjectDirection $projectDirection = null,
-        ?string $responsibilityCenterId = null,
+        ProjectDirection|array|null $projectDirection = null,
+        string|array|null $responsibilityCenterId = null,
     ): array {
         if ($from > $to) {
             [$from, $to] = [$to, $from];
@@ -94,6 +94,14 @@ final class PlReportGridBuilder
                     $candidateEnd = $periodStart->modify('sunday this week');
                     $label = '';
                     break;
+                case 'quarter':
+                    $quarter = (int) ceil((int) $periodStart->format('n') / 3);
+                    $quarterLastMonth = $quarter * 3;
+                    $candidateEnd = $periodStart
+                        ->setDate((int) $periodStart->format('Y'), $quarterLastMonth, 1)
+                        ->modify('last day of this month');
+                    $label = '';
+                    break;
                 case 'month':
                 default:
                     $candidateEnd = $periodStart->modify('last day of this month');
@@ -115,6 +123,27 @@ final class PlReportGridBuilder
                     $periodStart->format('d.m.Y'),
                     $periodEnd->format('d.m.Y')
                 );
+            } elseif ('quarter' === $grouping) {
+                $quarter = (int) ceil((int) $periodStart->format('n') / 3);
+                $quarterStart = $periodStart->setDate(
+                    (int) $periodStart->format('Y'),
+                    ($quarter * 3) - 2,
+                    1,
+                )->setTime(0, 0, 0);
+                $quarterEnd = $quarterStart->modify('+2 months')->modify('last day of this month')->setTime(23, 59, 59);
+                $quarterLabels = [1 => 'I', 2 => 'II', 3 => 'III', 4 => 'IV'];
+                $label = sprintf('%s кв. %s', $quarterLabels[$quarter], $periodStart->format('Y'));
+
+                if (
+                    $periodStart->format('Y-m-d') !== $quarterStart->format('Y-m-d')
+                    || $periodEnd->format('Y-m-d') !== $quarterEnd->format('Y-m-d')
+                ) {
+                    $label .= sprintf(
+                        ' (%s — %s)',
+                        $periodStart->format('d.m.Y'),
+                        $periodEnd->format('d.m.Y'),
+                    );
+                }
             }
 
             $periods[] = new PlReportPeriod($periodStart, $periodEnd, $label);

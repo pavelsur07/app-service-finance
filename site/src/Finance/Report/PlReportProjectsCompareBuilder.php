@@ -35,7 +35,8 @@ final class PlReportProjectsCompareBuilder
         \DateTimeImmutable $to,
         array $projects,
         ?ProjectDirection $overheadProject = null,
-        ?string $responsibilityCenterId = null,
+        string|array|null $responsibilityCenterId = null,
+        bool $deduplicateTotal = false,
     ): array {
         if ($from > $to) {
             [$from, $to] = [$to, $from];
@@ -90,23 +91,44 @@ final class PlReportProjectsCompareBuilder
             }
         }
 
-        // добавляем колонку "_total"
-        foreach ($rowsById as $rowId => &$row) {
-            $sum = 0.0;
-            foreach (($rawValues[$rowId] ?? []) as $v) {
-                $sum += (float) $v;
+        if ($deduplicateTotal) {
+            $totalResult = $this->calc->calculate($company, $period, $projects, $responsibilityCenterId);
+            $warnings = array_merge($warnings, $totalResult->warnings);
+            foreach ($totalResult->rows as $resultRow) {
+                $rowId = (string) $resultRow->id;
+                if (!isset($rowsById[$rowId])) {
+                    $rowsById[$rowId] = [
+                        'id' => $resultRow->id,
+                        'code' => $resultRow->code,
+                        'name' => $resultRow->name,
+                        'level' => $resultRow->level,
+                        'type' => $resultRow->type,
+                        'values' => [],
+                    ];
+                    $rawValues[$rowId] = [];
+                }
+                $rowsById[$rowId]['values']['_total'] = $resultRow->formatted;
+                $rawValues[$rowId]['_total'] = $resultRow->rawValue;
             }
-            $rawValues[$rowId]['_total'] = $sum;
+        } else {
+            // Legacy/public contract: total is the sum of rendered project columns.
+            foreach ($rowsById as $rowId => &$row) {
+                $sum = 0.0;
+                foreach (($rawValues[$rowId] ?? []) as $v) {
+                    $sum += (float) $v;
+                }
+                $rawValues[$rowId]['_total'] = $sum;
 
-            $format = $formatById[$rowId] ?? null;
-            if ($format) {
-                $row['values']['_total'] = $this->fmt->format($sum, $format);
-            } else {
-                // fallback безопасно: деньги
-                $row['values']['_total'] = $this->fmt->format($sum, \App\Finance\Enum\PLValueFormat::MONEY);
+                $format = $formatById[$rowId] ?? null;
+                if ($format) {
+                    $row['values']['_total'] = $this->fmt->format($sum, $format);
+                } else {
+                    // fallback безопасно: деньги
+                    $row['values']['_total'] = $this->fmt->format($sum, \App\Finance\Enum\PLValueFormat::MONEY);
+                }
             }
+            unset($row);
         }
-        unset($row);
 
         $projectsPayload = [];
         foreach ($projects as $p) {

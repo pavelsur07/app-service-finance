@@ -10,11 +10,15 @@ use App\Finance\Report\PlReportPeriod;
 
 interface FactsProviderInterface
 {
+    /**
+     * @param ProjectDirection|list<ProjectDirection>|null $projectDirection
+     * @param string|list<string>|null $responsibilityCenterId
+     */
     public function value(
         Company $company,
         PlReportPeriod $period,
         string $code,
-        ?ProjectDirection $projectDirection = null,
-        ?string $responsibilityCenterId = null,
+        ProjectDirection|array|null $projectDirection = null,
+        string|array|null $responsibilityCenterId = null,
     ): float;
 }

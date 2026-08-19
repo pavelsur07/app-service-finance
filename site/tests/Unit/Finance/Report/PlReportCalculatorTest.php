@@ -30,8 +30,8 @@ final class PlReportCalculatorTest extends TestCase
                 Company $company,
                 PlReportPeriod $period,
                 string $code,
-                ?ProjectDirection $projectDirection = null,
-                ?string $responsibilityCenterId = null,
+                ProjectDirection|array|null $projectDirection = null,
+                string|array|null $responsibilityCenterId = null,
             ): float {
                 return match ($code) {
                     'REV_WB' => 500.0,
@@ -77,8 +77,8 @@ final class PlReportCalculatorTest extends TestCase
                 Company $company,
                 PlReportPeriod $period,
                 string $code,
-                ?ProjectDirection $projectDirection = null,
-                ?string $responsibilityCenterId = null,
+                ProjectDirection|array|null $projectDirection = null,
+                string|array|null $responsibilityCenterId = null,
             ): float {
                 $this->calls[] = [
                     'code' => $code,

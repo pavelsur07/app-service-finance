@@ -69,13 +69,298 @@
             margin-right: 4px;
             text-align: center;
         }
+
+        .pl-preview-controls-card {
+            border-color: #e6e9ef;
+            box-shadow: none;
+        }
+        .pl-preview-controls-card .card-body {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            padding: 16px 20px;
+        }
+        .pl-preview-controls-row {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            row-gap: 12px;
+            flex-wrap: wrap;
+        }
+        .pl-preview-filters-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            padding-top: 14px;
+            border-top: 1px solid #eef0f4;
+        }
+        .pl-preview-control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .pl-preview-control-label {
+            color: #8a94a6;
+            font-size: 12.5px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .pl-preview-dropdown {
+            position: relative;
+        }
+        .pl-preview-dropdown > summary {
+            list-style: none;
+        }
+        .pl-preview-dropdown > summary::-webkit-details-marker {
+            display: none;
+        }
+        .pl-preview-period-button,
+        .pl-preview-filter-chip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 34px;
+            padding: 7px 11px;
+            border: 1px solid #dfe3ea;
+            border-radius: 6px;
+            background: #fff;
+            color: #1a2233;
+            font-size: 13px;
+            font-weight: 600;
+            line-height: 1.2;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .pl-preview-period-button:hover,
+        .pl-preview-period-button:focus-visible,
+        .pl-preview-filter-chip:hover,
+        .pl-preview-filter-chip:focus-visible {
+            border-color: #b8c2d1;
+        }
+        .pl-preview-filter-chip.is-active {
+            border-color: #90b8e8;
+            background: #edf5ff;
+            color: #206bc4;
+        }
+        .pl-preview-period-button .ti,
+        .pl-preview-filter-chip .ti-chevron-down {
+            color: #8a94a6;
+        }
+        .pl-preview-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            z-index: 30;
+            width: min(280px, calc(100vw - 32px));
+            padding: 12px;
+            border: 1px solid #e6e9ef;
+            border-radius: 8px;
+            background: #fff;
+            box-shadow: 0 8px 24px rgb(20 30 50 / 12%);
+        }
+        .pl-preview-filter-menu {
+            width: min(260px, calc(100vw - 32px));
+            max-height: min(420px, calc(100vh - 120px));
+            padding: 8px;
+            overflow-y: auto;
+        }
+        .pl-preview-preset {
+            display: block;
+            width: 100%;
+            padding: 7px 8px;
+            border: 0;
+            border-radius: 5px;
+            background: transparent;
+            color: #1a2233;
+            font-size: 13px;
+            text-align: left;
+        }
+        .pl-preview-preset:hover,
+        .pl-preview-preset:focus-visible,
+        .pl-preview-filter-option:hover {
+            background: #f4f6fa;
+        }
+        .pl-preview-month-range {
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #eef0f4;
+        }
+        .pl-preview-month-field {
+            flex: 1;
+            min-width: 0;
+        }
+        .pl-preview-month-field label {
+            display: block;
+            margin-bottom: 4px;
+            color: #98a2b3;
+            font-size: 11px;
+        }
+        .pl-preview-month-field .form-control {
+            min-height: 32px;
+            padding: 5px 7px;
+            font-size: 12.5px;
+        }
+        .pl-preview-segmented {
+            display: flex;
+            gap: 2px;
+            padding: 3px;
+            border-radius: 6px;
+            background: #f4f6fa;
+        }
+        .pl-preview-segmented button {
+            padding: 5px 10px;
+            border: 0;
+            border-radius: 4px;
+            background: transparent;
+            color: #667085;
+            font-size: 12.5px;
+            font-weight: 600;
+            line-height: 1.35;
+            white-space: nowrap;
+        }
+        .pl-preview-segmented button.is-active {
+            background: #fff;
+            color: #1a2233;
+            box-shadow: 0 1px 3px rgb(20 30 50 / 12%);
+        }
+        .pl-preview-segmented.is-disabled {
+            opacity: .5;
+        }
+        .pl-preview-filter-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0;
+            padding: 7px 8px;
+            border-radius: 5px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .pl-preview-filter-option input {
+            width: 14px;
+            height: 14px;
+            margin: 0;
+            accent-color: #206bc4;
+            cursor: pointer;
+        }
+        .pl-preview-filter-menu-footer {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 6px;
+            padding: 6px 8px 0;
+            border-top: 1px solid #eef0f4;
+        }
+        .pl-preview-filter-menu-footer button {
+            padding: 0;
+            border: 0;
+            background: transparent;
+            color: #206bc4;
+            font-size: 12.5px;
+            font-weight: 600;
+        }
+        .pl-preview-filter-menu-empty {
+            padding: 7px 8px;
+            color: #8a94a6;
+            font-size: 13px;
+        }
+        .pl-preview-meta-chip {
+            position: relative;
+            margin: 0;
+        }
+        .pl-preview-meta-chip input {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+        }
+        .pl-preview-meta-chip input:focus-visible + .pl-preview-filter-chip {
+            outline: 2px solid #90b8e8;
+            outline-offset: 2px;
+        }
+        .pl-preview-reset {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            color: #d63939;
+            font-size: 12.5px;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .pl-preview-reset:hover {
+            color: #b42318;
+            text-decoration: none;
+        }
+        @media (max-width: 767.98px) {
+            .pl-preview-controls-card .card-body {
+                padding: 14px;
+            }
+            .pl-preview-controls-row {
+                align-items: flex-start;
+                gap: 12px;
+            }
+            .pl-preview-control-group {
+                flex-wrap: wrap;
+            }
+        }
+        @media (min-width: 768px) {
+            .pl-preview-dropdown-align-end .pl-preview-dropdown-menu {
+                right: 0;
+                left: auto;
+            }
+        }
     </style>
 {% endblock %}
 
 {% block body %}
     <div class="page-body">
         <div class="container-xl">
-            {% set groupingLabels = {'day': 'по дням', 'week': 'по неделям', 'month': 'по месяцам'} %}
+            {% set groupingLabels = {'day': 'по дням', 'week': 'по неделям', 'month': 'по месяцам', 'quarter': 'по кварталам'} %}
+            {% set availableProjectIds = [] %}
+            {% for projectDirection in projectDirections %}
+                {% set availableProjectIds = availableProjectIds|merge([projectDirection.id]) %}
+            {% endfor %}
+            {% set availableResponsibilityCenterIds = [] %}
+            {% for responsibilityCenter in responsibilityCenters %}
+                {% set availableResponsibilityCenterIds = availableResponsibilityCenterIds|merge([responsibilityCenter.id]) %}
+            {% endfor %}
+            {# Legacy project-layout URLs never scoped columns by singular projectDirectionId. #}
+            {% set uiSelectedProjectDirectionIds = layout == 'projects' and not dimensionFiltersPresent
+                ? null
+                : selectedProjectDirectionIds %}
+            {% set submittedProjectIds = uiSelectedProjectDirectionIds ?? availableProjectIds %}
+            {% set submittedResponsibilityCenterIds = selectedResponsibilityCenterIds ?? availableResponsibilityCenterIds %}
+            {% set projectFilterTracked = projectDirections is not empty or selectedProjectDirectionIds is not null %}
+            {% set responsibilityCenterFilterTracked = responsibilityCenters is not empty or selectedResponsibilityCenterIds is not null %}
+            {% set projectFilterActive = uiSelectedProjectDirectionIds is not null %}
+            {% set responsibilityCenterFilterActive = selectedResponsibilityCenterIds is not null %}
+            {% set filtersActive = projectFilterActive or responsibilityCenterFilterActive or showMetaColumns %}
+            {% set resetState = {
+                'from': from|date('Y-m-d'),
+                'to': to|date('Y-m-d'),
+                'grouping': grouping,
+                'layout': layout
+            } %}
+            {% if availableProjectIds is not empty %}
+                {% set resetState = resetState|merge({
+                    'projectFiltersPresent': 1,
+                    'projectDirectionIds': availableProjectIds
+                }) %}
+            {% endif %}
+            {% if availableResponsibilityCenterIds is not empty %}
+                {% set resetState = resetState|merge({
+                    'responsibilityCenterFiltersPresent': 1,
+                    'responsibilityCenterIds': availableResponsibilityCenterIds
+                }) %}
+            {% endif %}
 
             <div class="d-flex align-items-center mb-3">
                 <h2 class="page-title mb-0">P&L Preview — {{ company.name }} — {{ from|date('d.m.Y') }} — {{ to|date('d.m.Y') }}
@@ -87,33 +372,245 @@
                 </h2>
             </div>
 
-            <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
-                <form id="pl-preview-filter-form" class="d-flex align-items-center gap-2 flex-nowrap" method="get">
-                    <input class="form-control" type="date" name="from" value="{{ from|date('Y-m-d') }}">
-                    <input class="form-control" type="date" name="to" value="{{ to|date('Y-m-d') }}">
-                    <button
-                        type="button"
-                        class="btn"
-                        data-bs-toggle="offcanvas"
-                        data-bs-target="#pl-preview-filters-offcanvas"
-                        aria-controls="pl-preview-filters-offcanvas"
-                    >
-                        <i class="ti ti-filter"></i>
-                        Фильтр
-                    </button>
-                    <button class="btn btn-primary">Показать</button>
-                </form>
+            <div class="card pl-preview-controls-card mb-3">
+                <form id="pl-preview-filter-form" class="card-body" method="get">
+                    <input type="hidden" name="from" value="{{ from|date('Y-m-d') }}" data-pl-exact-from>
+                    <input type="hidden" name="to" value="{{ to|date('Y-m-d') }}" data-pl-exact-to>
+                    <input type="hidden" name="grouping" value="{{ grouping }}" data-pl-grouping>
+                    <input type="hidden" name="layout" value="{{ layout }}" data-pl-layout>
+                    {% if projectFilterTracked %}
+                        <input type="hidden" name="projectFiltersPresent" value="1">
+                    {% endif %}
+                    {% if responsibilityCenterFilterTracked %}
+                        <input type="hidden" name="responsibilityCenterFiltersPresent" value="1">
+                    {% endif %}
 
-                {# Кнопка скачивания JSON — передаёт те же параметры, что и текущий фильтр #}
+                    <div class="pl-preview-controls-row">
+                        <details class="pl-preview-dropdown">
+                            <summary class="pl-preview-period-button">
+                                <i class="ti ti-calendar" aria-hidden="true"></i>
+                                <span>{{ from|date('d.m.Y') }} — {{ to|date('d.m.Y') }}</span>
+                                <i class="ti ti-chevron-down" aria-hidden="true"></i>
+                            </summary>
+                            <div class="pl-preview-dropdown-menu">
+                                <button
+                                    class="pl-preview-preset"
+                                    type="button"
+                                    data-pl-period-from="{{ date('now')|date('Y') }}-01-01"
+                                    data-pl-period-to="{{ date('last day of this month')|date('Y-m-d') }}"
+                                >
+                                    С начала года
+                                </button>
+                                <button
+                                    class="pl-preview-preset"
+                                    type="button"
+                                    data-pl-period-from="{{ date('first day of -2 months')|date('Y-m-d') }}"
+                                    data-pl-period-to="{{ date('last day of this month')|date('Y-m-d') }}"
+                                >
+                                    Последние 3 месяца
+                                </button>
+                                <button
+                                    class="pl-preview-preset"
+                                    type="button"
+                                    data-pl-period-from="{{ date('first day of this month')|date('Y-m-d') }}"
+                                    data-pl-period-to="{{ date('last day of this month')|date('Y-m-d') }}"
+                                >
+                                    Текущий месяц
+                                </button>
+                                <div class="pl-preview-month-range">
+                                    <div class="pl-preview-month-field">
+                                        <label for="pl-preview-month-from">С</label>
+                                        <input
+                                            class="form-control"
+                                            id="pl-preview-month-from"
+                                            type="month"
+                                            value="{{ from|date('Y-m') }}"
+                                            data-pl-month-from
+                                        >
+                                    </div>
+                                    <div class="pl-preview-month-field">
+                                        <label for="pl-preview-month-to">По</label>
+                                        <input
+                                            class="form-control"
+                                            id="pl-preview-month-to"
+                                            type="month"
+                                            value="{{ to|date('Y-m') }}"
+                                            data-pl-month-to
+                                        >
+                                    </div>
+                                </div>
+                            </div>
+                        </details>
+
+                        <div class="pl-preview-control-group">
+                            <span class="pl-preview-control-label">Группировка</span>
+                            <div class="pl-preview-segmented{{ layout == 'projects' ? ' is-disabled' }}" role="group" aria-label="Группировка">
+                                <button
+                                    class="{{ grouping == 'month' ? 'is-active' }}"
+                                    type="button"
+                                    data-pl-set="grouping"
+                                    data-pl-value="month"
+                                    {% if layout == 'projects' %}disabled aria-disabled="true"{% endif %}
+                                >Месяц</button>
+                                <button
+                                    class="{{ grouping == 'quarter' ? 'is-active' }}"
+                                    type="button"
+                                    data-pl-set="grouping"
+                                    data-pl-value="quarter"
+                                    {% if layout == 'projects' %}disabled aria-disabled="true"{% endif %}
+                                >Квартал</button>
+                            </div>
+                        </div>
+
+                        <div class="pl-preview-control-group">
+                            <span class="pl-preview-control-label">Режим</span>
+                            <div class="pl-preview-segmented" role="group" aria-label="Режим отображения">
+                                <button
+                                    class="{{ layout == 'periods' ? 'is-active' }}"
+                                    type="button"
+                                    data-pl-set="layout"
+                                    data-pl-value="periods"
+                                >По периодам</button>
+                                <button
+                                    class="{{ layout == 'projects' ? 'is-active' }}"
+                                    type="button"
+                                    data-pl-set="layout"
+                                    data-pl-value="projects"
+                                >По проектам</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pl-preview-filters-row">
+                        <span class="pl-preview-control-label">Фильтры:</span>
+
+                        <details class="pl-preview-dropdown">
+                            <summary class="pl-preview-filter-chip{{ projectFilterActive ? ' is-active' }}">
+                                <i class="ti ti-briefcase" aria-hidden="true"></i>
+                                {% if uiSelectedProjectDirectionIds is null %}
+                                    Проекты: Все
+                                {% else %}
+                                    Проекты: {{ uiSelectedProjectDirectionIds|length }}
+                                {% endif %}
+                                <i class="ti ti-chevron-down" aria-hidden="true"></i>
+                            </summary>
+                            <div class="pl-preview-dropdown-menu pl-preview-filter-menu">
+                                {% for projectDirection in projectDirections %}
+                                    <label class="pl-preview-filter-option" for="pl-preview-project-{{ projectDirection.id }}">
+                                        <input
+                                            id="pl-preview-project-{{ projectDirection.id }}"
+                                            type="checkbox"
+                                            name="projectDirectionIds[]"
+                                            value="{{ projectDirection.id }}"
+                                            data-pl-filter-input="projects"
+                                            {{ uiSelectedProjectDirectionIds is null or projectDirection.id in uiSelectedProjectDirectionIds ? 'checked' }}
+                                        >
+                                        <span>{{ projectDirection.name }}</span>
+                                    </label>
+                                {% else %}
+                                    <div class="pl-preview-filter-menu-empty">Нет доступных проектов</div>
+                                {% endfor %}
+                                {% if projectDirections is not empty %}
+                                    <div class="pl-preview-filter-menu-footer">
+                                        <button type="button" data-pl-select-all="projects">Выбрать все</button>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </details>
+
+                        <details class="pl-preview-dropdown pl-preview-dropdown-align-end">
+                            <summary class="pl-preview-filter-chip{{ responsibilityCenterFilterActive ? ' is-active' }}">
+                                <i class="ti ti-building-warehouse" aria-hidden="true"></i>
+                                {% if selectedResponsibilityCenterIds is null %}
+                                    ЦФО: Все
+                                {% else %}
+                                    ЦФО: {{ selectedResponsibilityCenterIds|length }}
+                                {% endif %}
+                                <i class="ti ti-chevron-down" aria-hidden="true"></i>
+                            </summary>
+                            <div class="pl-preview-dropdown-menu pl-preview-filter-menu">
+                                {% for responsibilityCenter in responsibilityCenters %}
+                                    <label class="pl-preview-filter-option" for="pl-preview-cfo-{{ responsibilityCenter.id }}">
+                                        <input
+                                            id="pl-preview-cfo-{{ responsibilityCenter.id }}"
+                                            type="checkbox"
+                                            name="responsibilityCenterIds[]"
+                                            value="{{ responsibilityCenter.id }}"
+                                            data-pl-filter-input="responsibility-centers"
+                                            {{ selectedResponsibilityCenterIds is null or responsibilityCenter.id in selectedResponsibilityCenterIds ? 'checked' }}
+                                        >
+                                        <span>{{ responsibilityCenter.name }}</span>
+                                    </label>
+                                {% else %}
+                                    <div class="pl-preview-filter-menu-empty">Нет доступных ЦФО</div>
+                                {% endfor %}
+                                {% if responsibilityCenters is not empty %}
+                                    <div class="pl-preview-filter-menu-footer">
+                                        <button type="button" data-pl-select-all="responsibility-centers">Выбрать все</button>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </details>
+
+                        <label class="pl-preview-meta-chip">
+                            <input
+                                type="checkbox"
+                                name="show_meta"
+                                value="1"
+                                data-pl-auto-submit
+                                {{ showMetaColumns ? 'checked' }}
+                            >
+                            <span class="pl-preview-filter-chip{{ showMetaColumns ? ' is-active' }}">
+                                <i class="ti ti-code" aria-hidden="true"></i>
+                                Код и тип
+                            </span>
+                        </label>
+
+                        {% if filtersActive %}
+                            <a
+                                class="pl-preview-reset"
+                                href="{{ path('finance_report_preview', resetState) }}"
+                            >
+                                <i class="ti ti-x" aria-hidden="true"></i>
+                                Сбросить фильтры
+                            </a>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+
+            {% set previewState = {
+                'from': from|date('Y-m-d'),
+                'to': to|date('Y-m-d'),
+                'grouping': grouping,
+                'layout': layout,
+                'show_meta': showMetaColumns ? 1 : 0
+            } %}
+            {% if dimensionFiltersPresent %}
+                {% if projectFilterTracked %}
+                    {% set previewState = previewState|merge({
+                        'projectFiltersPresent': 1,
+                        'projectDirectionIds': submittedProjectIds
+                    }) %}
+                {% endif %}
+                {% if responsibilityCenterFilterTracked %}
+                    {% set previewState = previewState|merge({
+                        'responsibilityCenterFiltersPresent': 1,
+                        'responsibilityCenterIds': submittedResponsibilityCenterIds
+                    }) %}
+                {% endif %}
+            {% else %}
+                {% if selectedProjectDirectionId %}
+                    {% set previewState = previewState|merge({'projectDirectionId': selectedProjectDirectionId}) %}
+                {% endif %}
+                {% if selectedResponsibilityCenterId %}
+                    {% set previewState = previewState|merge({'responsibilityCenterId': selectedResponsibilityCenterId}) %}
+                {% endif %}
+            {% endif %}
+
+            <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
                 <a
-                    href="{{ path('finance_report_preview_json', {
-                        'from': from|date('Y-m-d'),
-                        'to': to|date('Y-m-d'),
-                        'grouping': grouping,
-                        'layout': layout,
-                        'projectDirectionId': selectedProjectDirectionId ?? '',
-                        'responsibilityCenterId': selectedResponsibilityCenterId ?? ''
-                    }) }}"
+                    href="{{ path('finance_report_preview_json', previewState) }}"
                     class="btn btn-outline-secondary"
                     title="Скачать отчёт в формате JSON для проверки"
                 >
@@ -133,8 +630,23 @@
                     <input type="hidden" name="recalc_to" value="{{ to|date('Y-m-d') }}">
                     <input type="hidden" name="layout" value="{{ layout }}">
                     <input type="hidden" name="show_meta" value="{{ showMetaColumns ? 1 : 0 }}">
-                    <input type="hidden" name="projectDirectionId" value="{{ selectedProjectDirectionId ?? '' }}">
-                    <input type="hidden" name="responsibilityCenterId" value="{{ selectedResponsibilityCenterId ?? '' }}">
+                    {% if dimensionFiltersPresent %}
+                        {% if projectFilterTracked %}
+                            <input type="hidden" name="projectFiltersPresent" value="1">
+                            {% for projectDirectionId in submittedProjectIds %}
+                                <input type="hidden" name="projectDirectionIds[]" value="{{ projectDirectionId }}">
+                            {% endfor %}
+                        {% endif %}
+                        {% if responsibilityCenterFilterTracked %}
+                            <input type="hidden" name="responsibilityCenterFiltersPresent" value="1">
+                            {% for responsibilityCenterId in submittedResponsibilityCenterIds %}
+                                <input type="hidden" name="responsibilityCenterIds[]" value="{{ responsibilityCenterId }}">
+                            {% endfor %}
+                        {% endif %}
+                    {% else %}
+                        <input type="hidden" name="projectDirectionId" value="{{ selectedProjectDirectionId ?? '' }}">
+                        <input type="hidden" name="responsibilityCenterId" value="{{ selectedResponsibilityCenterId ?? '' }}">
+                    {% endif %}
                     <label class="form-label mb-0" for="recalc_from">Пересчитать с</label>
                     <input
                         class="form-control"
@@ -145,71 +657,6 @@
                     >
                     <button class="btn btn-outline-primary" type="submit">Пересчитать</button>
                 </form>
-            </div>
-
-            <div class="offcanvas offcanvas-end" tabindex="-1" id="pl-preview-filters-offcanvas" aria-labelledby="pl-preview-filters-offcanvas-label">
-                <div class="offcanvas-header">
-                    <h2 class="offcanvas-title" id="pl-preview-filters-offcanvas-label">Фильтры</h2>
-                    <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-                </div>
-                <div class="offcanvas-body">
-                    <div class="d-flex flex-column gap-4">
-                        <div>
-                            <label class="form-label" for="pl-preview-filter-grouping">Группировка</label>
-                            <select id="pl-preview-filter-grouping" class="form-select" name="grouping" form="pl-preview-filter-form">
-                                <option value="day" {{ grouping == 'day' ? 'selected' }}>
-                                    По дням
-                                </option>
-                                <option value="week" {{ grouping == 'week' ? 'selected' }}>
-                                    По неделям
-                                </option>
-                                <option value="month" {{ grouping == 'month' ? 'selected' }}>
-                                    По месяцам
-                                </option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="form-label" for="pl-preview-filter-layout">Режим</label>
-                            <select id="pl-preview-filter-layout" class="form-select" name="layout" form="pl-preview-filter-form">
-                                <option value="periods" {{ layout == 'periods' ? 'selected' }}>По периодам</option>
-                                <option value="projects" {{ layout == 'projects' ? 'selected' }}>По проектам (Direct)</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="form-label" for="pl-preview-filter-project">Проект</label>
-                            <select id="pl-preview-filter-project" class="form-select" name="projectDirectionId" form="pl-preview-filter-form">
-                                <option value="">Все проекты</option>
-                                {% for p in projectDirections %}
-                                    <option value="{{ p.id }}" {{ selectedProjectDirectionId == p.id ? 'selected' }}>{{ p.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div>
-                            <label class="form-label" for="pl-preview-filter-responsibility-center">ЦФО</label>
-                            <select id="pl-preview-filter-responsibility-center" class="form-select" name="responsibilityCenterId" form="pl-preview-filter-form">
-                                <option value="">Все ЦФО</option>
-                                {% for center in responsibilityCenters %}
-                                    <option value="{{ center.id }}" {{ selectedResponsibilityCenterId == center.id ? 'selected' }}>{{ center.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <label class="form-check mb-0">
-                            <input
-                                class="form-check-input"
-                                type="checkbox"
-                                name="show_meta"
-                                value="1"
-                                form="pl-preview-filter-form"
-                                {{ showMetaColumns ? 'checked' }}
-                            >
-                            <span class="form-check-label">Показывать код и тип</span>
-                        </label>
-                        <div class="d-flex justify-content-between mt-2">
-                            <a class="btn" href="{{ path('finance_report_preview', {'from': from|date('Y-m-d'), 'to': to|date('Y-m-d')}) }}">Сбросить</a>
-                            <button type="submit" class="btn btn-primary" form="pl-preview-filter-form" data-bs-dismiss="offcanvas">Применить</button>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             {% if warnings is not empty %}
@@ -337,6 +784,113 @@
             </div>
         </div>
     </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var form = document.getElementById('pl-preview-filter-form');
+    if (!form) return;
+
+    var exactFrom = form.querySelector('[data-pl-exact-from]');
+    var exactTo = form.querySelector('[data-pl-exact-to]');
+    var monthFrom = form.querySelector('[data-pl-month-from]');
+    var monthTo = form.querySelector('[data-pl-month-to]');
+
+    function submitFilters() {
+        if (typeof form.requestSubmit === 'function') {
+            form.requestSubmit();
+        } else {
+            form.submit();
+        }
+    }
+
+    function monthEnd(month) {
+        var parts = month.split('-');
+        var year = Number(parts[0]);
+        var monthNumber = Number(parts[1]);
+        var day = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+
+        return month + '-' + String(day).padStart(2, '0');
+    }
+
+    function validMonth(month) {
+        return /^\d{4}-(0[1-9]|1[0-2])$/.test(month);
+    }
+
+    form.querySelectorAll('[data-pl-period-from][data-pl-period-to]').forEach(function (button) {
+        button.addEventListener('click', function () {
+            exactFrom.value = button.getAttribute('data-pl-period-from');
+            exactTo.value = button.getAttribute('data-pl-period-to');
+            submitFilters();
+        });
+    });
+
+    monthFrom.addEventListener('change', function () {
+        if (!validMonth(monthFrom.value)) return;
+
+        exactFrom.value = monthFrom.value + '-01';
+        if (exactFrom.value > exactTo.value) {
+            monthTo.value = monthFrom.value;
+            exactTo.value = monthEnd(monthFrom.value);
+        }
+        submitFilters();
+    });
+
+    monthTo.addEventListener('change', function () {
+        if (!validMonth(monthTo.value)) return;
+
+        exactTo.value = monthEnd(monthTo.value);
+        if (exactTo.value < exactFrom.value) {
+            monthFrom.value = monthTo.value;
+            exactFrom.value = monthTo.value + '-01';
+        }
+        submitFilters();
+    });
+
+    form.querySelectorAll('[data-pl-set]').forEach(function (button) {
+        button.addEventListener('click', function () {
+            var target = button.getAttribute('data-pl-set');
+            var input = form.querySelector('[data-pl-' + target + ']');
+            if (!input) return;
+
+            input.value = button.getAttribute('data-pl-value');
+            submitFilters();
+        });
+    });
+
+    form.querySelectorAll('[data-pl-filter-input], [data-pl-auto-submit]').forEach(function (input) {
+        input.addEventListener('change', submitFilters);
+    });
+
+    form.querySelectorAll('[data-pl-select-all]').forEach(function (button) {
+        button.addEventListener('click', function () {
+            var group = button.getAttribute('data-pl-select-all');
+            form.querySelectorAll('[data-pl-filter-input="' + group + '"]').forEach(function (input) {
+                input.checked = true;
+            });
+            submitFilters();
+        });
+    });
+
+    var dropdowns = Array.from(form.querySelectorAll('details.pl-preview-dropdown'));
+    dropdowns.forEach(function (dropdown) {
+        dropdown.addEventListener('toggle', function () {
+            if (!dropdown.open) return;
+
+            dropdowns.forEach(function (otherDropdown) {
+                if (otherDropdown !== dropdown) otherDropdown.open = false;
+            });
+        });
+    });
+
+    document.addEventListener('click', function (event) {
+        if (event.target.closest('.pl-preview-dropdown')) return;
+
+        dropdowns.forEach(function (dropdown) {
+            dropdown.open = false;
+        });
+    });
+});
+</script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
