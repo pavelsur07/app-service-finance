@@ -21,6 +21,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[Route('/project-directions')]
 class ProjectDirectionController extends AbstractController
 {
+    private const SORT_STEP = 10;
+
     #[Route('/', name: 'project_direction_index', methods: ['GET'])]
     public function index(ProjectDirectionRepository $repo, ActiveCompanyService $companyService): Response
     {
@@ -43,7 +45,9 @@ class ProjectDirectionController extends AbstractController
         }
 
         $parents = $repo->findTreeByCompany($company);
-        $direction = new ProjectDirection(Uuid::uuid4()->toString(), $company, '');
+        $nextSortByParent = $this->buildNextSortByParent($parents);
+        $direction = (new ProjectDirection(Uuid::uuid4()->toString(), $company, ''))
+            ->setSort($nextSortByParent['']);
         $form = $this->createForm(ProjectDirectionType::class, $direction, [
             'parents' => $parents,
         ]);
@@ -57,6 +61,7 @@ class ProjectDirectionController extends AbstractController
 
         return $this->render('project_direction/new.html.twig', [
             'form' => $form->createView(),
+            'next_sort_by_parent' => $nextSortByParent,
         ]);
     }
 
@@ -125,5 +130,31 @@ class ProjectDirectionController extends AbstractController
         }
 
         return $this->redirectToRoute('project_direction_index');
+    }
+
+    /**
+     * @param list<ProjectDirection> $directions
+     *
+     * @return array<string, int>
+     */
+    private function buildNextSortByParent(array $directions): array
+    {
+        $maxSortByParent = [];
+        foreach ($directions as $direction) {
+            $parentId = (string) $direction->getParent()?->getId();
+            if (!isset($maxSortByParent[$parentId]) || $direction->getSort() > $maxSortByParent[$parentId]) {
+                $maxSortByParent[$parentId] = $direction->getSort();
+            }
+        }
+
+        $nextSortByParent = [
+            '' => ($maxSortByParent[''] ?? 0) + self::SORT_STEP,
+        ];
+        foreach ($directions as $direction) {
+            $id = (string) $direction->getId();
+            $nextSortByParent[$id] = ($maxSortByParent[$id] ?? 0) + self::SORT_STEP;
+        }
+
+        return $nextSortByParent;
     }
 }
