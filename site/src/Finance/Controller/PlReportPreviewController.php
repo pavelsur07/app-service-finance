@@ -408,6 +408,12 @@ final class PlReportPreviewController extends AbstractController
         if ($request->request->getBoolean('dimensionFiltersPresent')) {
             $parameters['dimensionFiltersPresent'] = 1;
         }
+        if ($request->request->getBoolean('projectFiltersPresent')) {
+            $parameters['projectFiltersPresent'] = 1;
+        }
+        if ($request->request->getBoolean('responsibilityCenterFiltersPresent')) {
+            $parameters['responsibilityCenterFiltersPresent'] = 1;
+        }
         if ($request->request->has('projectDirectionIds')) {
             $parameters['projectDirectionIds'] = $this->listParameter($submitted['projectDirectionIds'] ?? []);
         }
@@ -448,13 +454,19 @@ final class PlReportPreviewController extends AbstractController
         }
 
         $markerPresent = $request->query->getBoolean('dimensionFiltersPresent');
+        $projectMarkerPresent = $markerPresent || $request->query->getBoolean('projectFiltersPresent');
+        $responsibilityCenterMarkerPresent = $markerPresent
+            || $request->query->getBoolean('responsibilityCenterFiltersPresent');
         $projectListPresent = $request->query->has('projectDirectionIds');
         $responsibilityCenterListPresent = $request->query->has('responsibilityCenterIds');
-        $plural = $markerPresent || $projectListPresent || $responsibilityCenterListPresent;
+        $plural = $projectMarkerPresent
+            || $responsibilityCenterMarkerPresent
+            || $projectListPresent
+            || $responsibilityCenterListPresent;
 
         if ($plural) {
             $query = $request->query->all();
-            if (!$markerPresent && !$projectListPresent) {
+            if (!$projectMarkerPresent && !$projectListPresent) {
                 $legacyProjectId = (string) $request->query->get('projectDirectionId', '');
                 $selectedProjectIds = isset($projectById[$legacyProjectId]) ? [$legacyProjectId] : null;
             } else {
@@ -463,7 +475,7 @@ final class PlReportPreviewController extends AbstractController
                     array_keys($projectById),
                 );
             }
-            if (!$markerPresent && !$responsibilityCenterListPresent) {
+            if (!$responsibilityCenterMarkerPresent && !$responsibilityCenterListPresent) {
                 $legacyResponsibilityCenterId = $this->resolveResponsibilityCenterId(
                     (string) $request->query->get('responsibilityCenterId', ''),
                     $responsibilityCenters,

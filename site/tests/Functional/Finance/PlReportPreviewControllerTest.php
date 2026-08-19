@@ -112,6 +112,183 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
         }
     }
 
+    public function testPreviewRendersFilterCardAndPreservesPluralStateInActions(): void
+    {
+        $client = static::createClient();
+        $company = $this->loginWithCompany($client, 'pl-report-preview-filter-card@example.test');
+        $projectA = new ProjectDirection('33333333-3333-3333-3333-000000000931', $company, 'Project A');
+        $projectB = new ProjectDirection('33333333-3333-3333-3333-000000000932', $company, 'Project B');
+        $centerA = new FinancialResponsibilityCenter((string) $company->getId(), 'CENTER_A', 'Center A');
+        $centerB = new FinancialResponsibilityCenter((string) $company->getId(), 'CENTER_B', 'Center B');
+
+        foreach ([$projectA, $projectB, $centerA, $centerB] as $entity) {
+            $this->em()->persist($entity);
+        }
+        $this->em()->flush();
+
+        $crawler = $client->request('GET', '/finance/report/preview', [
+            'from' => '2026-02-10',
+            'to' => '2026-07-15',
+            'grouping' => 'quarter',
+            'layout' => 'periods',
+            'show_meta' => '1',
+            'projectFiltersPresent' => '1',
+            'responsibilityCenterFiltersPresent' => '1',
+            'projectDirectionIds' => [$projectA->getId()],
+            'responsibilityCenterIds' => [$centerA->getId()],
+        ]);
+
+        self::assertResponseIsSuccessful();
+        self::assertCount(1, $crawler->filter('.pl-preview-controls-card #pl-preview-filter-form'));
+        self::assertCount(0, $crawler->filter('#pl-preview-filters-offcanvas'));
+        self::assertSame(
+            '2026-02-10',
+            $crawler->filter('#pl-preview-filter-form input[data-pl-exact-from]')->attr('value'),
+        );
+        self::assertSame(
+            '2026-07-15',
+            $crawler->filter('#pl-preview-filter-form input[data-pl-exact-to]')->attr('value'),
+        );
+        self::assertSame(
+            'quarter',
+            $crawler->filter('#pl-preview-filter-form input[data-pl-grouping]')->attr('value'),
+        );
+        self::assertCount(
+            1,
+            $crawler->filter('button[data-pl-set="grouping"][data-pl-value="quarter"].is-active'),
+        );
+        self::assertCount(1, $crawler->filter('button[data-pl-set="grouping"][data-pl-value="month"]'));
+        self::assertCount(3, $crawler->filter('button[data-pl-period-from][data-pl-period-to]'));
+        self::assertGreaterThanOrEqual(2, $crawler->filter('input[name="projectDirectionIds[]"]')->count());
+        self::assertCount(1, $crawler->filter('input[name="projectDirectionIds[]"][checked]'));
+        self::assertSame(
+            $projectA->getId(),
+            $crawler->filter('input[name="projectDirectionIds[]"][checked]')->attr('value'),
+        );
+        self::assertGreaterThanOrEqual(2, $crawler->filter('input[name="responsibilityCenterIds[]"]')->count());
+        self::assertCount(1, $crawler->filter('input[name="responsibilityCenterIds[]"][checked]'));
+        self::assertCount(1, $crawler->filter('input[name="show_meta"][checked]'));
+
+        $jsonQuery = $this->queryFromHref((string) $crawler->filter('a[title="Скачать отчёт в формате JSON для проверки"]')->attr('href'));
+        self::assertSame('2026-02-10', $jsonQuery['from']);
+        self::assertSame('2026-07-15', $jsonQuery['to']);
+        self::assertSame('quarter', $jsonQuery['grouping']);
+        self::assertSame('1', $jsonQuery['show_meta']);
+        self::assertSame('1', $jsonQuery['projectFiltersPresent']);
+        self::assertSame('1', $jsonQuery['responsibilityCenterFiltersPresent']);
+        self::assertSame([$projectA->getId()], $jsonQuery['projectDirectionIds']);
+        self::assertSame([$centerA->getId()], $jsonQuery['responsibilityCenterIds']);
+
+        $recalcForm = $crawler->filter('form[action$="/finance/report/preview/recalc"]');
+        self::assertSame('1', $recalcForm->filter('input[name="projectFiltersPresent"]')->attr('value'));
+        self::assertSame('1', $recalcForm->filter('input[name="responsibilityCenterFiltersPresent"]')->attr('value'));
+        self::assertSame(
+            [$projectA->getId()],
+            $recalcForm->filter('input[name="projectDirectionIds[]"]')->each(
+                static fn (Crawler $input): ?string => $input->attr('value'),
+            ),
+        );
+        self::assertSame(
+            [$centerA->getId()],
+            $recalcForm->filter('input[name="responsibilityCenterIds[]"]')->each(
+                static fn (Crawler $input): ?string => $input->attr('value'),
+            ),
+        );
+
+        $availableProjectIds = $crawler->filter('#pl-preview-filter-form input[name="projectDirectionIds[]"]')->each(
+            static fn (Crawler $input): ?string => $input->attr('value'),
+        );
+        $availableCenterIds = $crawler->filter('#pl-preview-filter-form input[name="responsibilityCenterIds[]"]')->each(
+            static fn (Crawler $input): ?string => $input->attr('value'),
+        );
+        $resetQuery = $this->queryFromHref((string) $crawler->filter('a.pl-preview-reset')->attr('href'));
+        self::assertSame('2026-02-10', $resetQuery['from']);
+        self::assertSame('2026-07-15', $resetQuery['to']);
+        self::assertSame('quarter', $resetQuery['grouping']);
+        self::assertSame('periods', $resetQuery['layout']);
+        self::assertSame('1', $resetQuery['projectFiltersPresent']);
+        self::assertSame('1', $resetQuery['responsibilityCenterFiltersPresent']);
+        self::assertEqualsCanonicalizing($availableProjectIds, $resetQuery['projectDirectionIds']);
+        self::assertEqualsCanonicalizing($availableCenterIds, $resetQuery['responsibilityCenterIds']);
+        self::assertArrayNotHasKey('show_meta', $resetQuery);
+
+        $noneSelected = $client->request('GET', '/finance/report/preview', [
+            'projectFiltersPresent' => '1',
+            'responsibilityCenterFiltersPresent' => '1',
+        ]);
+
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString(
+            'Проекты: 0',
+            $noneSelected->filter('.pl-preview-filters-row details')->eq(0)->filter('summary')->text(),
+        );
+        self::assertStringContainsString(
+            'ЦФО: 0',
+            $noneSelected->filter('.pl-preview-filters-row details')->eq(1)->filter('summary')->text(),
+        );
+        self::assertCount(0, $noneSelected->filter('input[name="projectDirectionIds[]"][checked]'));
+        self::assertCount(0, $noneSelected->filter('input[name="responsibilityCenterIds[]"][checked]'));
+
+        $legacyProjects = $client->request('GET', '/finance/report/preview', [
+            'layout' => 'projects',
+            'projectDirectionId' => $projectA->getId(),
+        ]);
+
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString(
+            'Проекты: Все',
+            $legacyProjects->filter('.pl-preview-filters-row details')->eq(0)->filter('summary')->text(),
+        );
+        self::assertSame(
+            $legacyProjects->filter('input[name="projectDirectionIds[]"]')->count(),
+            $legacyProjects->filter('input[name="projectDirectionIds[]"][checked]')->count(),
+        );
+        $legacyJsonQuery = $this->queryFromHref((string) $legacyProjects->filter('a[title="Скачать отчёт в формате JSON для проверки"]')->attr('href'));
+        self::assertSame($projectA->getId(), $legacyJsonQuery['projectDirectionId']);
+        self::assertArrayNotHasKey('projectFiltersPresent', $legacyJsonQuery);
+    }
+
+    public function testLegacyDayAndWeekRangesStayExactUntilMonthControlsChange(): void
+    {
+        $client = static::createClient();
+        $this->loginWithCompany($client, 'pl-report-preview-legacy-range@example.test');
+
+        foreach (['day', 'week'] as $grouping) {
+            $crawler = $client->request('GET', '/finance/report/preview', [
+                'from' => '2026-02-10',
+                'to' => '2026-03-15',
+                'grouping' => $grouping,
+            ]);
+
+            self::assertResponseIsSuccessful($grouping);
+            self::assertSame(
+                '2026-02-10',
+                $crawler->filter('#pl-preview-filter-form input[data-pl-exact-from]')->attr('value'),
+            );
+            self::assertSame(
+                '2026-03-15',
+                $crawler->filter('#pl-preview-filter-form input[data-pl-exact-to]')->attr('value'),
+            );
+            self::assertSame(
+                $grouping,
+                $crawler->filter('#pl-preview-filter-form input[data-pl-grouping]')->attr('value'),
+            );
+            self::assertCount(0, $crawler->filter('button[data-pl-set="grouping"].is-active'));
+            self::assertSame('2026-02', $crawler->filter('input[data-pl-month-from]')->attr('value'));
+            self::assertSame('2026-03', $crawler->filter('input[data-pl-month-to]')->attr('value'));
+
+            $jsonQuery = $this->queryFromHref((string) $crawler->filter('a[title="Скачать отчёт в формате JSON для проверки"]')->attr('href'));
+            self::assertArrayNotHasKey('projectFiltersPresent', $jsonQuery);
+            self::assertArrayNotHasKey('responsibilityCenterFiltersPresent', $jsonQuery);
+            self::assertArrayNotHasKey('projectDirectionIds', $jsonQuery);
+            self::assertArrayNotHasKey('responsibilityCenterIds', $jsonQuery);
+
+            $recalcForm = $crawler->filter('form[action$="/finance/report/preview/recalc"]');
+            self::assertCount(0, $recalcForm->filter('input[name="projectFiltersPresent"]'));
+            self::assertCount(0, $recalcForm->filter('input[name="responsibilityCenterFiltersPresent"]'));
+        }
+    }
+
     public function testQuarterGroupingAndPluralFiltersAreValidatedForActiveCompany(): void
     {
         $client = static::createClient();
@@ -207,6 +384,16 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
         $mixedPayload = $this->responsePayload($client);
         self::assertSame([$projectA->getId()], $mixedPayload['meta']['project_direction_ids']);
         self::assertSame([$centerA->getId()], $mixedPayload['meta']['responsibility_center_ids']);
+
+        $client->request('GET', '/finance/report/preview/json', [
+            'projectFiltersPresent' => '1',
+            'responsibilityCenterId' => $centerA->getId(),
+        ]);
+
+        self::assertResponseIsSuccessful();
+        $perDimensionPayload = $this->responsePayload($client);
+        self::assertSame([], $perDimensionPayload['meta']['project_direction_ids']);
+        self::assertSame([$centerA->getId()], $perDimensionPayload['meta']['responsibility_center_ids']);
 
         $client->request('GET', '/finance/report/preview/json', [
             'dimensionFiltersPresent' => '1',
@@ -315,6 +502,20 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
         self::assertArrayNotHasKey('responsibilityCenterIds', $mixedQuery);
         self::assertSame($projectIds, $mixedQuery['projectDirectionIds']);
         self::assertSame($centerIds[0], $mixedQuery['responsibilityCenterId']);
+
+        $client->request('POST', '/finance/report/preview/recalc', [
+            '_token' => 'invalid',
+            'projectFiltersPresent' => '1',
+            'responsibilityCenterFiltersPresent' => '1',
+        ]);
+
+        self::assertResponseRedirects();
+        $location = (string) $client->getResponse()->headers->get('Location');
+        parse_str((string) parse_url($location, \PHP_URL_QUERY), $perDimensionQuery);
+        self::assertSame('1', $perDimensionQuery['projectFiltersPresent']);
+        self::assertSame('1', $perDimensionQuery['responsibilityCenterFiltersPresent']);
+        self::assertArrayNotHasKey('projectDirectionIds', $perDimensionQuery);
+        self::assertArrayNotHasKey('responsibilityCenterIds', $perDimensionQuery);
     }
 
     private function tableStyle(KernelBrowser $client, string $url): string
@@ -333,6 +534,14 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
         self::assertIsArray($payload);
 
         return $payload;
+    }
+
+    /** @return array<string, mixed> */
+    private function queryFromHref(string $href): array
+    {
+        parse_str((string) parse_url($href, \PHP_URL_QUERY), $query);
+
+        return $query;
     }
 
     private function loginWithCompany(KernelBrowser $client, string $email): object

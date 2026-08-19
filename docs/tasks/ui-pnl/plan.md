@@ -57,7 +57,7 @@ Risk: MEDIUM
 owner_gate: yes
 release_candidate: yes
 independently_deployable: yes
-stage_base_commit: recorded immediately before Stage 2 implementation
+stage_base_commit: `ae1c8855f51344235113c252780d21d2f8688b11`
 
 Definition of Done:
 - The old date/filter offcanvas is replaced by a separate card matching the
