@@ -257,6 +257,57 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
         self::assertArrayNotHasKey('projectFiltersPresent', $legacyJsonQuery);
     }
 
+    public function testProjectsLayoutUsesDirectoryOrderForSelectedProjects(): void
+    {
+        $client = static::createClient();
+        $company = $this->loginWithCompany($client, 'pl-report-preview-project-order@example.test');
+        $parent = new ProjectDirection('33333333-3333-3333-3333-000000000941', $company, 'Parent project');
+        // Names oppose sort values so sorting alphabetically would fail this regression test.
+        $laterProject = (new ProjectDirection(
+            '33333333-3333-3333-3333-000000000942',
+            $company,
+            'Alpha project',
+        ))
+            ->setParent($parent)
+            ->setSort(20);
+        $earlierProject = (new ProjectDirection(
+            '33333333-3333-3333-3333-000000000943',
+            $company,
+            'Zulu project',
+        ))
+            ->setParent($parent)
+            ->setSort(10);
+
+        foreach ([$parent, $laterProject, $earlierProject] as $project) {
+            $this->em()->persist($project);
+        }
+        $this->em()->flush();
+
+        $query = [
+            'layout' => 'projects',
+            'projectFiltersPresent' => '1',
+            'projectDirectionIds' => [$laterProject->getId(), $earlierProject->getId()],
+        ];
+        $crawler = $client->request('GET', '/finance/report/preview', $query);
+
+        self::assertResponseIsSuccessful();
+        $headers = $crawler->filter('table.pl-table thead th')->each(
+            static fn (Crawler $header): string => trim($header->text()),
+        );
+        self::assertSame(
+            ['Zulu project', 'Alpha project'],
+            array_slice($headers, 1, -1),
+        );
+
+        $client->request('GET', '/finance/report/preview/json', $query);
+
+        self::assertResponseIsSuccessful();
+        $payload = $this->responsePayload($client);
+        $expectedProjectIds = [$earlierProject->getId(), $laterProject->getId()];
+        self::assertSame($expectedProjectIds, array_column($payload['projects'], 'id'));
+        self::assertSame($expectedProjectIds, $payload['meta']['project_direction_ids']);
+    }
+
     public function testPreviewHeaderFormatsPeriodWithRussianMonthNames(): void
     {
         $client = static::createClient();

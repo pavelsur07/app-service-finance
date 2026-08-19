@@ -475,6 +475,10 @@ final class PlReportPreviewController extends AbstractController
                     array_keys($projectById),
                 );
             }
+            if (null !== $selectedProjectIds) {
+                // projectById preserves the repository's sorted tree order.
+                $selectedProjectIds = array_values(array_intersect(array_keys($projectById), $selectedProjectIds));
+            }
             if (!$responsibilityCenterMarkerPresent && !$responsibilityCenterListPresent) {
                 $legacyResponsibilityCenterId = $this->resolveResponsibilityCenterId(
                     (string) $request->query->get('responsibilityCenterId', ''),
