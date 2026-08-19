@@ -25,16 +25,23 @@ final class PLDailyTotalFactsProvider implements FactsProviderInterface
     /**
      * Возвращает сумму за период по коду категории:
      * SUM(amountIncome) - SUM(amountExpense) из PLDailyTotal по company + category + date ∈ [from; to]
+     *
+     * @param ProjectDirection|list<ProjectDirection>|null $projectDirection
+     * @param string|list<string>|null $responsibilityCenterId
      */
     public function value(
         Company $company,
         PlReportPeriod $period,
         string $code,
-        ?ProjectDirection $projectDirection = null,
-        ?string $responsibilityCenterId = null,
+        ProjectDirection|array|null $projectDirection = null,
+        string|array|null $responsibilityCenterId = null,
     ): float {
         $code = trim((string) $code);
         if ('' === $code) {
+            return 0.0;
+        }
+
+        if ([] === $projectDirection || [] === $responsibilityCenterId) {
             return 0.0;
         }
 
@@ -62,14 +69,33 @@ final class PLDailyTotalFactsProvider implements FactsProviderInterface
             ->setParameter('from', $from)
             ->setParameter('to', $to);
 
-        if ($projectDirection instanceof ProjectDirection) {
-            $nodes = $this->projectDirections->collectSelfAndDescendants($projectDirection);
+        if (null !== $projectDirection) {
+            $selectedProjects = $projectDirection instanceof ProjectDirection ? [$projectDirection] : $projectDirection;
+            $nodesById = [];
+            foreach ($selectedProjects as $selectedProject) {
+                foreach ($this->projectDirections->collectSelfAndDescendants($selectedProject) as $node) {
+                    $nodesById[(string) $node->getId()] = $node;
+                }
+            }
+
             $qb
                 ->andWhere('dt.projectDirection IN (:pds)')
-                ->setParameter('pds', $nodes);
+                ->setParameter('pds', array_values($nodesById));
         }
 
-        if (null !== $responsibilityCenterId && '' !== $responsibilityCenterId) {
+        if (\is_array($responsibilityCenterId)) {
+            $responsibilityCenterIds = array_values(array_unique(array_filter(
+                $responsibilityCenterId,
+                static fn (mixed $id): bool => \is_string($id) && '' !== $id,
+            )));
+            if ([] === $responsibilityCenterIds) {
+                return 0.0;
+            }
+
+            $qb
+                ->andWhere('dt.responsibilityCenterId IN (:responsibilityCenterIds)')
+                ->setParameter('responsibilityCenterIds', $responsibilityCenterIds);
+        } elseif (null !== $responsibilityCenterId && '' !== $responsibilityCenterId) {
             $qb
                 ->andWhere('dt.responsibilityCenterId = :responsibilityCenterId')
                 ->setParameter('responsibilityCenterId', $responsibilityCenterId);

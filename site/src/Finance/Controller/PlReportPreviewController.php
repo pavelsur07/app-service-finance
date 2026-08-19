@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Finance\Controller;
 
 use App\Company\Application\Service\AccountBootstrapper;
+use App\Company\Entity\ProjectDirection;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Company\Security\ModuleAccess;
@@ -46,7 +47,7 @@ final class PlReportPreviewController extends AbstractController
         }
 
         $grouping = $request->query->get('grouping', 'month');
-        if (!\in_array($grouping, ['day', 'week', 'month'], true)) {
+        if (!\in_array($grouping, ['day', 'week', 'month', 'quarter'], true)) {
             $grouping = 'month';
         }
 
@@ -57,11 +58,9 @@ final class PlReportPreviewController extends AbstractController
 
         $showMetaColumns = $request->query->getBoolean('show_meta');
 
-        $projectDirectionId = (string) $request->query->get('projectDirectionId', '');
         $projectDirectionsList = $projectDirections->findByCompany($company);
         $responsibilityCenterChoices = $responsibilityCenters->getActiveChoices($companyId);
-        $responsibilityCenterId = (string) $request->query->get('responsibilityCenterId', '');
-        $selectedResponsibilityCenterId = $this->resolveResponsibilityCenterId($responsibilityCenterId, $responsibilityCenterChoices);
+        $filters = $this->resolveDimensionFilters($request, $projectDirectionsList, $responsibilityCenterChoices);
         $overheadProject = null;
 
         foreach ($projectDirectionsList as $pd) {
@@ -73,28 +72,22 @@ final class PlReportPreviewController extends AbstractController
             }
         }
 
-        $selectedProject = null;
-        if ('' !== $projectDirectionId) {
-            foreach ($projectDirectionsList as $projectDirection) {
-                if ((string) $projectDirection->getId() === $projectDirectionId) {
-                    $selectedProject = $projectDirection;
-
-                    break;
-                }
-            }
-        }
-
         [$from, $to] = $this->resolveDateRange($request->query->get('from'), $request->query->get('to'));
 
         if ('projects' === $layout) {
+            $compareProjects = $filters['plural']
+                ? ($filters['projectFilter'] ?? $projectDirectionsList)
+                : $projectDirectionsList;
+
             try {
                 $compare = $projectsCompareBuilder->build(
                     $company,
                     $from,
                     $to,
-                    $projectDirectionsList,
+                    $compareProjects,
                     $overheadProject,
-                    $selectedResponsibilityCenterId,
+                    $filters['responsibilityCenterFilter'],
+                    $filters['plural'],
                 );
 
                 return $this->render('finance/report/preview.html.twig', [
@@ -102,9 +95,12 @@ final class PlReportPreviewController extends AbstractController
                     'grouping' => $grouping,
                     'showMetaColumns' => $showMetaColumns,
                     'projectDirections' => $projectDirectionsList,
-                    'selectedProjectDirectionId' => $selectedProject?->getId(),
+                    'selectedProjectDirectionId' => $this->singleId($filters['selectedProjectIds']),
+                    'selectedProjectDirectionIds' => $filters['selectedProjectIds'],
                     'responsibilityCenters' => $responsibilityCenterChoices,
-                    'selectedResponsibilityCenterId' => $selectedResponsibilityCenterId,
+                    'selectedResponsibilityCenterId' => $this->singleId($filters['selectedResponsibilityCenterIds']),
+                    'selectedResponsibilityCenterIds' => $filters['selectedResponsibilityCenterIds'],
+                    'dimensionFiltersPresent' => $filters['plural'],
                     'from' => $from,
                     'to' => $to,
                     'layout' => $layout,
@@ -124,9 +120,12 @@ final class PlReportPreviewController extends AbstractController
                     'grouping' => $grouping,
                     'showMetaColumns' => $showMetaColumns,
                     'projectDirections' => $projectDirectionsList,
-                    'selectedProjectDirectionId' => $selectedProject?->getId(),
+                    'selectedProjectDirectionId' => $this->singleId($filters['selectedProjectIds']),
+                    'selectedProjectDirectionIds' => $filters['selectedProjectIds'],
                     'responsibilityCenters' => $responsibilityCenterChoices,
-                    'selectedResponsibilityCenterId' => $selectedResponsibilityCenterId,
+                    'selectedResponsibilityCenterId' => $this->singleId($filters['selectedResponsibilityCenterIds']),
+                    'selectedResponsibilityCenterIds' => $filters['selectedResponsibilityCenterIds'],
+                    'dimensionFiltersPresent' => $filters['plural'],
                     'from' => $from,
                     'to' => $to,
                     'layout' => 'projects',
@@ -138,16 +137,26 @@ final class PlReportPreviewController extends AbstractController
             }
         }
 
-        $grid = $gridBuilder->build($company, $from, $to, $grouping, $selectedProject, $selectedResponsibilityCenterId);
+        $grid = $gridBuilder->build(
+            $company,
+            $from,
+            $to,
+            $grouping,
+            $filters['projectFilter'],
+            $filters['responsibilityCenterFilter'],
+        );
 
         return $this->render('finance/report/preview.html.twig', [
             'company' => $company,
             'grouping' => $grouping,
             'showMetaColumns' => $showMetaColumns,
             'projectDirections' => $projectDirectionsList,
-            'selectedProjectDirectionId' => $selectedProject?->getId(),
+            'selectedProjectDirectionId' => $this->singleId($filters['selectedProjectIds']),
+            'selectedProjectDirectionIds' => $filters['selectedProjectIds'],
             'responsibilityCenters' => $responsibilityCenterChoices,
-            'selectedResponsibilityCenterId' => $selectedResponsibilityCenterId,
+            'selectedResponsibilityCenterId' => $this->singleId($filters['selectedResponsibilityCenterIds']),
+            'selectedResponsibilityCenterIds' => $filters['selectedResponsibilityCenterIds'],
+            'dimensionFiltersPresent' => $filters['plural'],
             'from' => $from,
             'to' => $to,
             'layout' => $layout,
@@ -183,7 +192,7 @@ final class PlReportPreviewController extends AbstractController
         $companyId = (string) $company->getId();
 
         $grouping = $request->query->get('grouping', 'month');
-        if (!\in_array($grouping, ['day', 'week', 'month'], true)) {
+        if (!\in_array($grouping, ['day', 'week', 'month', 'quarter'], true)) {
             $grouping = 'month';
         }
 
@@ -192,11 +201,10 @@ final class PlReportPreviewController extends AbstractController
             $layout = 'periods';
         }
 
-        $projectDirectionId = (string) $request->query->get('projectDirectionId', '');
         $projectDirectionsList = $projectDirections->findByCompany($company);
-        $responsibilityCenterId = (string) $request->query->get('responsibilityCenterId', '');
-        $selectedResponsibilityCenterId = $this->resolveResponsibilityCenterId(
-            $responsibilityCenterId,
+        $filters = $this->resolveDimensionFilters(
+            $request,
+            $projectDirectionsList,
             $responsibilityCenters->getActiveChoices($companyId),
         );
         $overheadProject = null;
@@ -209,21 +217,23 @@ final class PlReportPreviewController extends AbstractController
             }
         }
 
-        $selectedProject = null;
-        if ('' !== $projectDirectionId) {
-            foreach ($projectDirectionsList as $projectDirection) {
-                if ((string) $projectDirection->getId() === $projectDirectionId) {
-                    $selectedProject = $projectDirection;
-                    break;
-                }
-            }
-        }
-
         [$from, $to] = $this->resolveDateRange($request->query->get('from'), $request->query->get('to'));
 
         if ('projects' === $layout) {
+            $compareProjects = $filters['plural']
+                ? ($filters['projectFilter'] ?? $projectDirectionsList)
+                : $projectDirectionsList;
+
             try {
-                $compare = $projectsCompareBuilder->build($company, $from, $to, $projectDirectionsList, $overheadProject, $selectedResponsibilityCenterId);
+                $compare = $projectsCompareBuilder->build(
+                    $company,
+                    $from,
+                    $to,
+                    $compareProjects,
+                    $overheadProject,
+                    $filters['responsibilityCenterFilter'],
+                    $filters['plural'],
+                );
                 $payload = [
                     'meta' => [
                         'company' => (string) $company->getName(),
@@ -231,7 +241,9 @@ final class PlReportPreviewController extends AbstractController
                         'from' => $from->format('Y-m-d'),
                         'to' => $to->format('Y-m-d'),
                         'layout' => 'projects',
-                        'responsibility_center_id' => $selectedResponsibilityCenterId,
+                        'responsibility_center_id' => $filters['legacyResponsibilityCenterId'],
+                        'project_direction_ids' => $filters['plural'] ? $filters['selectedProjectIds'] : null,
+                        'responsibility_center_ids' => $filters['plural'] ? $filters['selectedResponsibilityCenterIds'] : null,
                         'generated_at' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
                     ],
                     'projects' => $compare['projects'],
@@ -246,7 +258,9 @@ final class PlReportPreviewController extends AbstractController
                         'from' => $from->format('Y-m-d'),
                         'to' => $to->format('Y-m-d'),
                         'layout' => 'projects',
-                        'responsibility_center_id' => $selectedResponsibilityCenterId,
+                        'responsibility_center_id' => $filters['legacyResponsibilityCenterId'],
+                        'project_direction_ids' => $filters['plural'] ? $filters['selectedProjectIds'] : null,
+                        'responsibility_center_ids' => $filters['plural'] ? $filters['selectedResponsibilityCenterIds'] : null,
                         'generated_at' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
                     ],
                     'error' => $e->getMessage(),
@@ -255,7 +269,14 @@ final class PlReportPreviewController extends AbstractController
                 ];
             }
         } else {
-            $grid = $gridBuilder->build($company, $from, $to, $grouping, $selectedProject, $selectedResponsibilityCenterId);
+            $grid = $gridBuilder->build(
+                $company,
+                $from,
+                $to,
+                $grouping,
+                $filters['projectFilter'],
+                $filters['responsibilityCenterFilter'],
+            );
 
             $payload = [
                 'meta' => [
@@ -265,8 +286,10 @@ final class PlReportPreviewController extends AbstractController
                     'to' => $to->format('Y-m-d'),
                     'grouping' => $grouping,
                     'layout' => 'periods',
-                    'project_direction_id' => $projectDirectionId ?: null,
-                    'responsibility_center_id' => $selectedResponsibilityCenterId,
+                    'project_direction_id' => $filters['legacyProjectId'],
+                    'responsibility_center_id' => $filters['legacyResponsibilityCenterId'],
+                    'project_direction_ids' => $filters['plural'] ? $filters['selectedProjectIds'] : null,
+                    'responsibility_center_ids' => $filters['plural'] ? $filters['selectedResponsibilityCenterIds'] : null,
                     'generated_at' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
                 ],
                 'periods' => array_map(
@@ -317,15 +340,7 @@ final class PlReportPreviewController extends AbstractController
         if (!$this->isCsrfTokenValid('recalc_pl_preview', (string) $request->request->get('_token'))) {
             $this->addFlash('danger', 'Неверный CSRF-токен.');
 
-            return $this->redirectToRoute('finance_report_preview', [
-                'grouping' => $request->request->get('grouping', 'month'),
-                'from' => $request->request->get('from'),
-                'to' => $request->request->get('to'),
-                'layout' => $request->request->get('layout', 'periods'),
-                'show_meta' => $request->request->getBoolean('show_meta'),
-                'projectDirectionId' => $request->request->get('projectDirectionId'),
-                'responsibilityCenterId' => $request->request->get('responsibilityCenterId'),
-            ]);
+            return $this->redirectToRoute('finance_report_preview', $this->previewRedirectParameters($request));
         }
 
         $company = $activeCompany->getActiveCompany();
@@ -338,15 +353,7 @@ final class PlReportPreviewController extends AbstractController
         } catch (\Throwable) {
             $this->addFlash('danger', 'Неверная дата начала пересчёта.');
 
-            return $this->redirectToRoute('finance_report_preview', [
-                'grouping' => $request->request->get('grouping', 'month'),
-                'from' => $request->request->get('from'),
-                'to' => $request->request->get('to'),
-                'layout' => $request->request->get('layout', 'periods'),
-                'show_meta' => $request->request->getBoolean('show_meta'),
-                'projectDirectionId' => $request->request->get('projectDirectionId'),
-                'responsibilityCenterId' => $request->request->get('responsibilityCenterId'),
-            ]);
+            return $this->redirectToRoute('finance_report_preview', $this->previewRedirectParameters($request));
         }
 
         try {
@@ -356,15 +363,7 @@ final class PlReportPreviewController extends AbstractController
         } catch (\Throwable) {
             $this->addFlash('danger', 'Неверная дата окончания пересчёта.');
 
-            return $this->redirectToRoute('finance_report_preview', [
-                'grouping' => $request->request->get('grouping', 'month'),
-                'from' => $request->request->get('from'),
-                'to' => $request->request->get('to'),
-                'layout' => $request->request->get('layout', 'periods'),
-                'show_meta' => $request->request->getBoolean('show_meta'),
-                'projectDirectionId' => $request->request->get('projectDirectionId'),
-                'responsibilityCenterId' => $request->request->get('responsibilityCenterId'),
-            ]);
+            return $this->redirectToRoute('finance_report_preview', $this->previewRedirectParameters($request));
         }
 
         if ($from > $to) {
@@ -382,15 +381,171 @@ final class PlReportPreviewController extends AbstractController
             $this->addFlash('danger', 'Ошибка пересчёта: '.$exception->getMessage());
         }
 
-        return $this->redirectToRoute('finance_report_preview', [
+        return $this->redirectToRoute('finance_report_preview', $this->previewRedirectParameters(
+            $request,
+            $from->format('Y-m-d'),
+            $to->format('Y-m-d'),
+        ));
+    }
+
+    /** @return array<string, mixed> */
+    private function previewRedirectParameters(
+        Request $request,
+        ?string $defaultFrom = null,
+        ?string $defaultTo = null,
+    ): array {
+        $parameters = [
             'grouping' => $request->request->get('grouping', 'month'),
-            'from' => $request->request->get('from', $from->format('Y-m-d')),
-            'to' => $request->request->get('to', $to->format('Y-m-d')),
+            'from' => $request->request->get('from', $defaultFrom),
+            'to' => $request->request->get('to', $defaultTo),
             'layout' => $request->request->get('layout', 'periods'),
             'show_meta' => $request->request->getBoolean('show_meta'),
             'projectDirectionId' => $request->request->get('projectDirectionId'),
             'responsibilityCenterId' => $request->request->get('responsibilityCenterId'),
-        ]);
+        ];
+
+        $submitted = $request->request->all();
+        if ($request->request->getBoolean('dimensionFiltersPresent')) {
+            $parameters['dimensionFiltersPresent'] = 1;
+        }
+        if ($request->request->has('projectDirectionIds')) {
+            $parameters['projectDirectionIds'] = $this->listParameter($submitted['projectDirectionIds'] ?? []);
+        }
+        if ($request->request->has('responsibilityCenterIds')) {
+            $parameters['responsibilityCenterIds'] = $this->listParameter($submitted['responsibilityCenterIds'] ?? []);
+        }
+
+        return $parameters;
+    }
+
+    /**
+     * @param list<ProjectDirection> $projectDirections
+     * @param list<object> $responsibilityCenters
+     *
+     * @return array{
+     *     plural: bool,
+     *     projectFilter: ProjectDirection|list<ProjectDirection>|null,
+     *     responsibilityCenterFilter: string|list<string>|null,
+     *     selectedProjectIds: list<string>|null,
+     *     selectedResponsibilityCenterIds: list<string>|null,
+     *     legacyProjectId: ?string,
+     *     legacyResponsibilityCenterId: ?string,
+     * }
+     */
+    private function resolveDimensionFilters(
+        Request $request,
+        array $projectDirections,
+        array $responsibilityCenters,
+    ): array {
+        $projectById = [];
+        foreach ($projectDirections as $projectDirection) {
+            $projectById[(string) $projectDirection->getId()] = $projectDirection;
+        }
+
+        $responsibilityCenterIds = [];
+        foreach ($responsibilityCenters as $responsibilityCenter) {
+            $responsibilityCenterIds[] = (string) $responsibilityCenter->id;
+        }
+
+        $markerPresent = $request->query->getBoolean('dimensionFiltersPresent');
+        $projectListPresent = $request->query->has('projectDirectionIds');
+        $responsibilityCenterListPresent = $request->query->has('responsibilityCenterIds');
+        $plural = $markerPresent || $projectListPresent || $responsibilityCenterListPresent;
+
+        if ($plural) {
+            $query = $request->query->all();
+            if (!$markerPresent && !$projectListPresent) {
+                $legacyProjectId = (string) $request->query->get('projectDirectionId', '');
+                $selectedProjectIds = isset($projectById[$legacyProjectId]) ? [$legacyProjectId] : null;
+            } else {
+                $selectedProjectIds = $this->resolveSelectedIds(
+                    $this->listParameter($query['projectDirectionIds'] ?? []),
+                    array_keys($projectById),
+                );
+            }
+            if (!$markerPresent && !$responsibilityCenterListPresent) {
+                $legacyResponsibilityCenterId = $this->resolveResponsibilityCenterId(
+                    (string) $request->query->get('responsibilityCenterId', ''),
+                    $responsibilityCenters,
+                );
+                $selectedResponsibilityCenterIds = $legacyResponsibilityCenterId
+                    ? [$legacyResponsibilityCenterId]
+                    : null;
+            } else {
+                $selectedResponsibilityCenterIds = $this->resolveSelectedIds(
+                    $this->listParameter($query['responsibilityCenterIds'] ?? []),
+                    $responsibilityCenterIds,
+                );
+            }
+
+            return [
+                'plural' => true,
+                'projectFilter' => null === $selectedProjectIds
+                    ? null
+                    : array_map(static fn (string $id): ProjectDirection => $projectById[$id], $selectedProjectIds),
+                'responsibilityCenterFilter' => $selectedResponsibilityCenterIds,
+                'selectedProjectIds' => $selectedProjectIds,
+                'selectedResponsibilityCenterIds' => $selectedResponsibilityCenterIds,
+                'legacyProjectId' => $this->singleId($selectedProjectIds),
+                'legacyResponsibilityCenterId' => $this->singleId($selectedResponsibilityCenterIds),
+            ];
+        }
+
+        $projectDirectionId = (string) $request->query->get('projectDirectionId', '');
+        $selectedProject = $projectById[$projectDirectionId] ?? null;
+        $selectedResponsibilityCenterId = $this->resolveResponsibilityCenterId(
+            (string) $request->query->get('responsibilityCenterId', ''),
+            $responsibilityCenters,
+        );
+
+        return [
+            'plural' => false,
+            'projectFilter' => $selectedProject,
+            'responsibilityCenterFilter' => $selectedResponsibilityCenterId,
+            'selectedProjectIds' => $selectedProject ? [(string) $selectedProject->getId()] : null,
+            'selectedResponsibilityCenterIds' => $selectedResponsibilityCenterId ? [$selectedResponsibilityCenterId] : null,
+            // Keep the historical Preview JSON metadata behavior for an invalid singular project ID.
+            'legacyProjectId' => '' !== $projectDirectionId ? $projectDirectionId : null,
+            'legacyResponsibilityCenterId' => $selectedResponsibilityCenterId,
+        ];
+    }
+
+    /**
+     * @param list<mixed> $requestedIds
+     * @param list<string> $availableIds
+     *
+     * @return list<string>|null null means no restriction (all choices)
+     */
+    private function resolveSelectedIds(array $requestedIds, array $availableIds): ?array
+    {
+        $available = array_fill_keys($availableIds, true);
+        $selected = [];
+        foreach ($requestedIds as $requestedId) {
+            if (!\is_string($requestedId) || !isset($available[$requestedId])) {
+                continue;
+            }
+            $selected[$requestedId] = $requestedId;
+        }
+        $selectedIds = array_values($selected);
+
+        if ([] === $availableIds) {
+            return $selectedIds;
+        }
+
+        // Selecting every visible choice is the unfiltered state, which also includes legacy unallocated facts.
+        return \count($selectedIds) === \count($availableIds) ? null : $selectedIds;
+    }
+
+    /** @param list<string>|null $ids */
+    private function singleId(?array $ids): ?string
+    {
+        return 1 === \count($ids ?? []) ? $ids[0] : null;
+    }
+
+    /** @return list<mixed> */
+    private function listParameter(mixed $value): array
+    {
+        return \is_array($value) ? array_values($value) : [$value];
     }
 
     /**

@@ -40,8 +40,8 @@ final class PlReportCalculator
     public function calculate(
         Company $company,
         PlReportPeriod $period,
-        ?ProjectDirection $projectDirection = null,
-        ?string $responsibilityCenterId = null,
+        ProjectDirection|array|null $projectDirection = null,
+        string|array|null $responsibilityCenterId = null,
     ): PlReportResult {
         $all = $this->categories->findBy(['company' => $company], ['parent' => 'ASC', 'sortOrder' => 'ASC']);
         $displayOrder = $this->orderByTree($all);
@@ -94,8 +94,8 @@ final class PlReportCalculator
                 private array $all,
                 private Company $company,
                 private PlReportPeriod $period,
-                private ?ProjectDirection $projectDirection,
-                private ?string $responsibilityCenterId,
+                private ProjectDirection|array|null $projectDirection,
+                private string|array|null $responsibilityCenterId,
                 private FactsProviderInterface $facts,
                 private array &$warnings,
             ) {

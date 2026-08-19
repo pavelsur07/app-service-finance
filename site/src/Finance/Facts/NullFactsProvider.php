@@ -14,8 +14,8 @@ final class NullFactsProvider implements FactsProviderInterface
         Company $company,
         PlReportPeriod $period,
         string $code,
-        ?ProjectDirection $projectDirection = null,
-        ?string $responsibilityCenterId = null,
+        ProjectDirection|array|null $projectDirection = null,
+        string|array|null $responsibilityCenterId = null,
     ): float {
         return 0.0;
     }

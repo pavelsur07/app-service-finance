@@ -31,6 +31,9 @@ final class PLDailyTotalFactsProviderTest extends IntegrationTestCase
             ->build();
 
         $projectA = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Project A');
+        $projectAChild = (new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Project A child'))
+            ->setParent($projectA);
+        $projectA->getChildren()->add($projectAChild);
         $projectB = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Project B');
         $centerA = new FinancialResponsibilityCenter((string) $company->getId(), 'CFO_A', 'CFO A');
         $centerB = new FinancialResponsibilityCenter((string) $company->getId(), 'CFO_B', 'CFO B');
@@ -39,7 +42,7 @@ final class PLDailyTotalFactsProviderTest extends IntegrationTestCase
             ->setCode('REV_CFO')
             ->setFlow(PLFlow::INCOME);
 
-        foreach ([$owner, $company, $projectA, $projectB, $centerA, $centerB, $category] as $entity) {
+        foreach ([$owner, $company, $projectA, $projectAChild, $projectB, $centerA, $centerB, $category] as $entity) {
             $this->em->persist($entity);
         }
         $this->em->persist(new FinancialResponsibilityCenterProject((string) $company->getId(), $projectA, $centerA));
@@ -49,6 +52,7 @@ final class PLDailyTotalFactsProviderTest extends IntegrationTestCase
         $this->persistTotal($company, $projectA, $category, '100.00', $centerA->getId());
         $this->persistTotal($company, $projectA, $category, '40.00', $centerB->getId());
         $this->persistTotal($company, $projectA, $category, '5.00', null);
+        $this->persistTotal($company, $projectAChild, $category, '10.00', $centerA->getId());
         $this->persistTotal($company, $projectB, $category, '7.00', $centerA->getId());
         $this->em->flush();
 
@@ -59,10 +63,20 @@ final class PLDailyTotalFactsProviderTest extends IntegrationTestCase
             new \DateTimeImmutable('2026-07-31'),
         );
 
-        self::assertSame(145.0, $facts->value($company, $period, 'REV_CFO', $projectA));
-        self::assertSame(100.0, $facts->value($company, $period, 'REV_CFO', $projectA, $centerA->getId()));
+        self::assertSame(155.0, $facts->value($company, $period, 'REV_CFO', $projectA));
+        self::assertSame(110.0, $facts->value($company, $period, 'REV_CFO', $projectA, $centerA->getId()));
         self::assertSame(40.0, $facts->value($company, $period, 'REV_CFO', $projectA, $centerB->getId()));
-        self::assertSame(107.0, $facts->value($company, $period, 'REV_CFO', null, $centerA->getId()));
+        self::assertSame(117.0, $facts->value($company, $period, 'REV_CFO', null, $centerA->getId()));
+        self::assertSame(
+            150.0,
+            $facts->value($company, $period, 'REV_CFO', [$projectA, $projectAChild], [$centerA->getId(), $centerB->getId()]),
+        );
+        self::assertSame(
+            117.0,
+            $facts->value($company, $period, 'REV_CFO', [$projectA, $projectB], [$centerA->getId()]),
+        );
+        self::assertSame(0.0, $facts->value($company, $period, 'REV_CFO', []));
+        self::assertSame(0.0, $facts->value($company, $period, 'REV_CFO', null, []));
     }
 
     private function persistTotal(
