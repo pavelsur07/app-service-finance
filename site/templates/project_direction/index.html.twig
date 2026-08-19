@@ -21,6 +21,7 @@
                     <thead>
                         <tr>
                             <th>Наименование</th>
+                            <th>Сортировка</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -28,6 +29,7 @@
                     {% for item in items %}
                         <tr>
                             <td>{{ item.indentedName }}</td>
+                            <td>{{ item.sort }}</td>
                             <td class="text-end">
                                 <a href="{{ path('project_direction_edit', {id: item.id}) }}" class="btn btn-sm btn-warning">✏️</a>
                                 <form method="post" action="{{ path('project_direction_delete', {id: item.id}) }}" style="display:inline;" onsubmit="return confirm('Удалить?');">
@@ -37,7 +39,7 @@
                             </td>
                         </tr>
                     {% else %}
-                        <tr><td colspan="2" class="text-center">Нет данных</td></tr>
+                        <tr><td colspan="3" class="text-center">Нет данных</td></tr>
                     {% endfor %}
                     </tbody>
                 </table>
