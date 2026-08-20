@@ -2,7 +2,9 @@
 
 namespace App\Report\Cashflow;
 
+use App\Company\Application\DTO\FinancialResponsibilityCenterDTO;
 use App\Company\Entity\Company;
+use App\Company\Entity\ProjectDirection;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Company\Repository\ProjectDirectionRepository;
 use Ramsey\Uuid\Uuid;
@@ -16,8 +18,16 @@ final class CashflowReportRequestMapper
     ) {
     }
 
-    public function fromRequest(Request $request, Company $company): CashflowReportParams
-    {
+    /**
+     * @param list<ProjectDirection>|null $projectDirections
+     * @param list<FinancialResponsibilityCenterDTO>|null $responsibilityCenters
+     */
+    public function fromRequest(
+        Request $request,
+        Company $company,
+        ?array $projectDirections = null,
+        ?array $responsibilityCenters = null,
+    ): CashflowReportParams {
         $group = $request->query->get('group', 'month');
         $fromParam = $request->query->get('from');
         $toParam = $request->query->get('to');
@@ -44,7 +54,7 @@ final class CashflowReportRequestMapper
         $projectDirectionIds = null;
         $availableProjectDirections = null;
         if ($projectFilterPresent) {
-            $availableProjectDirections = $this->projectDirections->findByCompany($company);
+            $availableProjectDirections = $projectDirections ?? $this->projectDirections->findByCompany($company);
             $availableProjectIds = array_map(
                 static fn ($project): string => (string) $project->getId(),
                 $availableProjectDirections,
@@ -62,7 +72,7 @@ final class CashflowReportRequestMapper
         if ($responsibilityCenterFilterPresent) {
             $availableResponsibilityCenterIds = array_map(
                 static fn ($center): string => (string) $center->id,
-                $this->responsibilityCenters->getActiveChoices((string) $company->getId()),
+                $responsibilityCenters ?? $this->responsibilityCenters->getActiveChoices((string) $company->getId()),
             );
             $responsibilityCenterIds = $this->resolveSelectedIds(
                 $this->listParameter($query['responsibilityCenterIds'] ?? []),

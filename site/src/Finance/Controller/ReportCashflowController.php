@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Finance\Controller;
 
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
+use App\Company\Repository\ProjectDirectionRepository;
 use App\Finance\Infrastructure\Normalizer\CashflowReportJsonFormatter;
 use App\Report\Cashflow\CashflowReportBuilder;
 use App\Report\Cashflow\CashflowReportParams;
@@ -26,6 +27,7 @@ class ReportCashflowController extends AbstractController
         private CashflowReportBuilder $builder,
         private CashflowReportJsonFormatter $jsonFormatter,
         private FinancialResponsibilityCenterFacade $responsibilityCenters,
+        private ProjectDirectionRepository $projectDirections,
     ) {
     }
 
@@ -59,13 +61,25 @@ class ReportCashflowController extends AbstractController
     public function index(Request $request): Response
     {
         $company = $this->activeCompanyService->getActiveCompany();
+        $projectDirections = $this->projectDirections->findByCompany($company);
+        $responsibilityCenters = $this->responsibilityCenters->getActiveChoices((string) $company->getId());
         /** @var CashflowReportParams $params */
-        $params = $this->mapper->fromRequest($request, $company);
+        $params = $this->mapper->fromRequest($request, $company, $projectDirections, $responsibilityCenters);
         $payload = $this->builder->build($params);
+        $legacyResponsibilityCenterFilter = null === $params->responsibilityCenterIds
+            && null !== $params->responsibilityCenterId;
+        $selectedResponsibilityCenterIds = $params->responsibilityCenterIds;
+        if ($legacyResponsibilityCenterFilter) {
+            $selectedResponsibilityCenterIds = [$params->responsibilityCenterId];
+        }
 
         return $this->render('finance/report/cashflow.html.twig', $payload + [
-            'responsibilityCenters' => $this->responsibilityCenters->getActiveChoices((string) $company->getId()),
+            'projectDirections' => $projectDirections,
+            'responsibilityCenters' => $responsibilityCenters,
+            'selectedProjectDirectionIds' => $params->projectDirectionIds,
+            'selectedResponsibilityCenterIds' => $selectedResponsibilityCenterIds,
             'selectedResponsibilityCenterId' => $params->responsibilityCenterId,
+            'legacyResponsibilityCenterFilter' => $legacyResponsibilityCenterFilter,
         ]);
     }
 }

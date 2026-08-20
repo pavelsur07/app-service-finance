@@ -51,7 +51,7 @@ Risk: MEDIUM
 owner_gate: yes
 release_candidate: yes
 independently_deployable: yes
-stage_base_commit: record after Stage 1
+stage_base_commit: `c8f01a6e5ad4174505ad308850964d5117eea498`
 
 Definition of Done:
 
