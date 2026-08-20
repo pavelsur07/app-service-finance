@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Application\Processor;
 
 use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Enum\ProcessingKind;
 use App\Marketplace\Enum\StagingRecordType;
-use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
 
 final readonly class MarketplaceRawProcessorRegistry implements MarketplaceRawProcessorRegistryInterface
@@ -20,7 +18,6 @@ final readonly class MarketplaceRawProcessorRegistry implements MarketplaceRawPr
      */
     public function __construct(
         #[TaggedIterator('app.marketplace.raw_processor')] iterable $processors,
-        private MarketplaceRawDocumentRepository $rawDocumentRepository,
     ) {
         $this->processors = $processors instanceof \Traversable ? iterator_to_array($processors, false) : (array) $processors;
     }
@@ -35,28 +32,5 @@ final readonly class MarketplaceRawProcessorRegistry implements MarketplaceRawPr
 
         $typeName = $type instanceof StagingRecordType ? $type->value : $type;
         throw new \RuntimeException(sprintf('Processor not found for type "%s", marketplace "%s", kind "%s"', $typeName, $marketplace->value, $kind));
-    }
-
-    public function process(
-        string $companyId,
-        MarketplaceType $marketplace,
-        ProcessingKind $kind,
-    ): int {
-        // Baseline: ретраи и повторные запуски используют тот же registry-контракт,
-        // без переключения на альтернативные processor-реализации.
-        $docs = $this->rawDocumentRepository->findByCompanyAndMarketplace($companyId, $marketplace);
-
-        if ($docs === []) {
-            return 0;
-        }
-
-        $processor = $this->get($marketplace->value, $marketplace, $kind->value);
-
-        $total = 0;
-        foreach ($docs as $doc) {
-            $total += $processor->process($companyId, $doc->getId());
-        }
-
-        return $total;
     }
 }
