@@ -235,7 +235,22 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
         ]);
 
         self::assertResponseIsSuccessful();
-        self::assertSame('Отчёт ДДС', trim($crawler->filter('.page-header h2.page-title')->text()));
+        self::assertSame(
+            'Отчёт о движении денежных средств',
+            trim($crawler->filter('.page-header h2.page-title')->text()),
+        );
+        $cashflowTables = $crawler->filter('table.cf-table');
+        self::assertCount(1, $cashflowTables);
+        self::assertSame(
+            'Сальдо на начало',
+            trim($cashflowTables->first()->filter('tbody tr')->first()->filter('td')->first()->text()),
+        );
+        // Шапка матрицы остаётся; запрещена только шапка карточки основной таблицы ДДС.
+        self::assertCount(0, $crawler->filterXPath(
+            '//div[contains(concat(" ", normalize-space(@class), " "), " card ")]'
+            .'[.//table[contains(concat(" ", normalize-space(@class), " "), " cf-table ")]]'
+            .'/div[contains(concat(" ", normalize-space(@class), " "), " card-header ")]',
+        ));
         self::assertSame('Февраль – Июль 2026', trim($crawler->filter('.page-header .text-secondary')->text()));
         self::assertCount(1, $crawler->filter('.pl-preview-controls-card #cashflow-filter-form'));
         self::assertCount(1, $crawler->filter('[role="group"][aria-label="Режим отображения"]'));
