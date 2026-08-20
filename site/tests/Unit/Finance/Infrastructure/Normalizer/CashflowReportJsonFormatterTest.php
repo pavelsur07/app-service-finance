@@ -157,6 +157,39 @@ final class CashflowReportJsonFormatterTest extends TestCase
         ], $formatted['filters']);
     }
 
+    public function testFormatAddsPluralFiltersOnlyWhenTheyAreApplied(): void
+    {
+        $formatter = new CashflowReportJsonFormatter();
+        $company = new Company('55555555-5555-4555-8555-555555555555', $this->createUser());
+        $projectIds = ['66666666-6666-4666-8666-666666666666'];
+        $centerIds = [
+            '77777777-7777-4777-8777-777777777777',
+            '88888888-8888-4888-8888-888888888888',
+        ];
+
+        $formatted = $formatter->format([
+            'company' => $company,
+            'group' => 'quarter',
+            'responsibility_center_id' => null,
+            'project_direction_ids' => $projectIds,
+            'responsibility_center_ids' => $centerIds,
+            'date_from' => new \DateTimeImmutable('2026-01-01'),
+            'date_to' => new \DateTimeImmutable('2026-03-31'),
+            'periods' => [],
+            'categories' => [],
+            'categoryTotals' => [],
+            'openings' => [],
+            'closings' => [],
+            'tree' => [],
+            'categoryTree' => [],
+        ], ['include_filters' => true]);
+
+        self::assertSame($projectIds, $formatted['filters']['project_direction_ids']);
+        self::assertSame($centerIds, $formatted['filters']['responsibility_center_ids']);
+        self::assertArrayNotHasKey('project_direction_ids', $formatted);
+        self::assertArrayNotHasKey('responsibility_center_ids', $formatted);
+    }
+
     private function createUser(): User
     {
         $user = new User(Uuid::uuid4()->toString());
