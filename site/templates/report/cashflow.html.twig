@@ -131,7 +131,7 @@
 <div class="page-header mb-3">
     <div class="row g-2 align-items-start">
         <div class="col">
-            <h2 class="page-title">Отчёт ДДС</h2>
+            <h2 class="page-title">Отчёт о движении денежных средств</h2>
             <div class="text-secondary">{{ report_period_label }}</div>
         </div>
         <div class="col-auto ms-auto d-print-none">
@@ -410,9 +410,6 @@
 
 {% for currency, values in openings %}
     <div class="card mb-4">
-        <div class="card-header">
-            <h3 class="card-title">Валюта: {{ currency }}</h3>
-        </div>
         <div class="table-responsive">
             <table class="table table-bordered cf-table" style="min-width: calc(var(--cf-col-name) + {{ periodCount }} * var(--cf-col-period));">
                 <colgroup>
