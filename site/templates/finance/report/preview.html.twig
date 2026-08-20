@@ -691,7 +691,9 @@
                             </thead>
                             <tbody>
                             {% for r in rows %}
-                                <tr class="pl-row" data-row-id="{{ r.id }}" data-level="{{ r.level }}">
+                                {# rows отсортированы depth-first, поэтому более глубокая следующая строка означает наличие вложенных строк. #}
+                                {% set has_children = rows[loop.index] is defined and rows[loop.index].level > r.level %}
+                                <tr class="pl-row{{ has_children ? ' fw-bold' : '' }}" data-row-id="{{ r.id }}" data-level="{{ r.level }}">
                                     <td style="padding-left: {{ (r.level - 1) * 20 }}px;">
                                         <div class="pl-name-wrap">
                                             <span class="pl-toggle"></span>
@@ -738,7 +740,9 @@
                             </thead>
                             <tbody>
                             {% for r in rows %}
-                                <tr class="pl-row" data-row-id="{{ r.id }}" data-level="{{ r.level }}">
+                                {# rows отсортированы depth-first, поэтому более глубокая следующая строка означает наличие вложенных строк. #}
+                                {% set has_children = rows[loop.index] is defined and rows[loop.index].level > r.level %}
+                                <tr class="pl-row{{ has_children ? ' fw-bold' : '' }}" data-row-id="{{ r.id }}" data-level="{{ r.level }}">
                                     <td style="padding-left: {{ (r.level - 1) * 20 }}px;">
                                         <div class="pl-name-wrap">
                                             <span class="pl-toggle"></span>
