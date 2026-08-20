@@ -113,6 +113,80 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
         }
     }
 
+    public function testTableUsesAccountingFormatOnlyForNegativeValues(): void
+    {
+        $client = static::createClient();
+        $company = $this->loginWithCompany($client, 'pl-report-preview-accounting-format@example.test');
+        $project = new ProjectDirection(
+            '33333333-3333-3333-3333-000000000961',
+            $company,
+            'Project',
+        );
+        $negativeCategory = (new PLCategory('33333333-3333-3333-3333-000000000962', $company))
+            ->setName('Negative row')
+            ->setCode('NEGATIVE_ROW')
+            ->setFlow(PLFlow::EXPENSE);
+        $positiveCategory = (new PLCategory('33333333-3333-3333-3333-000000000963', $company))
+            ->setName('Positive row')
+            ->setCode('POSITIVE_ROW')
+            ->setFlow(PLFlow::INCOME);
+        $zeroCategory = (new PLCategory('33333333-3333-3333-3333-000000000964', $company))
+            ->setName('Zero row')
+            ->setCode('ZERO_ROW')
+            ->setFlow(PLFlow::INCOME);
+        $negativeTotal = (new PLDailyTotal(
+            '33333333-3333-3333-3333-000000000965',
+            $company,
+            $project,
+            new \DateTimeImmutable('2026-08-10'),
+            $negativeCategory,
+        ))->setAmountExpense('1234.50');
+        $positiveTotal = (new PLDailyTotal(
+            '33333333-3333-3333-3333-000000000966',
+            $company,
+            $project,
+            new \DateTimeImmutable('2026-08-10'),
+            $positiveCategory,
+        ))->setAmountIncome('1234.50');
+
+        foreach ([$project, $negativeCategory, $positiveCategory, $zeroCategory, $negativeTotal, $positiveTotal] as $entity) {
+            $this->em()->persist($entity);
+        }
+        $this->em()->flush();
+
+        $query = 'grouping=month&from=2026-08-01&to=2026-08-31';
+        foreach ([
+            '/finance/report/preview?'.$query => 1,
+            '/finance/report/preview?layout=projects&'.$query => 2,
+        ] as $url => $expectedCellCount) {
+            $crawler = $client->request('GET', $url);
+
+            self::assertResponseIsSuccessful($url);
+            foreach ([
+                (string) $negativeCategory->getId() => '(1 234.50)',
+                (string) $positiveCategory->getId() => '1 234.50',
+                (string) $zeroCategory->getId() => '0.00',
+            ] as $rowId => $expected) {
+                $cells = $crawler->filter(sprintf('tr.pl-row[data-row-id="%s"] td.text-end', $rowId));
+                self::assertCount($expectedCellCount, $cells, $url);
+                $cells->each(static function (Crawler $cell) use ($expected, $url): void {
+                    self::assertSame($expected, trim($cell->text()), $url);
+                    self::assertSame($expected, $cell->attr('title'), $url);
+                });
+            }
+        }
+
+        $client->request('GET', '/finance/report/preview/json?'.$query);
+        self::assertResponseIsSuccessful();
+        $payload = $this->responsePayload($client);
+        $negativeRow = array_values(array_filter(
+            $payload['rows'],
+            static fn (array $row): bool => $negativeCategory->getId() === $row['id'],
+        ));
+        self::assertCount(1, $negativeRow);
+        self::assertSame('-1 234.50', array_values($negativeRow[0]['values'])[0]);
+    }
+
     public function testRowsWithChildrenAreBoldAndLeafRowsKeepRegularWeight(): void
     {
         $client = static::createClient();

@@ -663,6 +663,7 @@
 
             <div class="card">
                 <div class="table-responsive">
+                    {# Для этой таблицы согласован бухгалтерский формат: отрицательные значения в скобках вместо UI Kit U+2212. #}
                     <table class="table table-vcenter pl-table" style="--pl-col-period: {{ period_col_width }}; min-width: {{ table_min_width }};">
                         {% if layout == 'projects' %}
                             <colgroup>
@@ -706,9 +707,11 @@
                                     {% endif %}
                                     {% for p in compareProjects %}
                                         {% set cell_value = r.values[p.id] ?? '—' %}
+                                        {% set cell_value = cell_value starts with '-' ? '(' ~ cell_value|slice(1) ~ ')' : cell_value %}
                                         <td class="text-end" title="{{ cell_value }}">{{ cell_value }}</td>
                                     {% endfor %}
                                     {% set total_value = r.values['_total'] ?? '—' %}
+                                    {% set total_value = total_value starts with '-' ? '(' ~ total_value|slice(1) ~ ')' : total_value %}
                                     <td class="text-end fw-bold pl-cell-total" title="{{ total_value }}">{{ total_value }}</td>
                                 </tr>
                             {% else %}
@@ -755,6 +758,7 @@
                                     {% endif %}
                                     {% for period in periods %}
                                         {% set cell_value = r.values[period.id] ?? '—' %}
+                                        {% set cell_value = cell_value starts with '-' ? '(' ~ cell_value|slice(1) ~ ')' : cell_value %}
                                         <td class="text-end" title="{{ cell_value }}">{{ cell_value }}</td>
                                     {% endfor %}
                                 </tr>
