@@ -4,6 +4,7 @@ namespace App\Report\Cashflow;
 
 use App\Company\Entity\Company;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
+use App\Company\Repository\ProjectDirectionRepository;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -11,6 +12,7 @@ final class CashflowReportRequestMapper
 {
     public function __construct(
         private readonly FinancialResponsibilityCenterFacade $responsibilityCenters,
+        private readonly ProjectDirectionRepository $projectDirections,
     ) {
     }
 
@@ -32,13 +34,103 @@ final class CashflowReportRequestMapper
             [$from, $to] = [$to, $from];
         }
 
+        $projectListPresent = $request->query->has('projectDirectionIds');
+        $projectFilterPresent = $projectListPresent || $request->query->getBoolean('projectFiltersPresent');
+        $responsibilityCenterListPresent = $request->query->has('responsibilityCenterIds');
+        $responsibilityCenterFilterPresent = $responsibilityCenterListPresent
+            || $request->query->getBoolean('responsibilityCenterFiltersPresent');
+        $query = $request->query->all();
+
+        $projectDirectionIds = null;
+        $availableProjectDirections = null;
+        if ($projectFilterPresent) {
+            $availableProjectDirections = $this->projectDirections->findByCompany($company);
+            $availableProjectIds = array_map(
+                static fn ($project): string => (string) $project->getId(),
+                $availableProjectDirections,
+            );
+            $projectDirectionIds = $this->resolveSelectedIds(
+                $this->listParameter($query['projectDirectionIds'] ?? []),
+                $availableProjectIds,
+            );
+            if (null !== $projectDirectionIds) {
+                $projectDirectionIds = array_values(array_intersect($availableProjectIds, $projectDirectionIds));
+            }
+        }
+
+        $responsibilityCenterIds = null;
+        if ($responsibilityCenterFilterPresent) {
+            $availableResponsibilityCenterIds = array_map(
+                static fn ($center): string => (string) $center->id,
+                $this->responsibilityCenters->getActiveChoices((string) $company->getId()),
+            );
+            $responsibilityCenterIds = $this->resolveSelectedIds(
+                $this->listParameter($query['responsibilityCenterIds'] ?? []),
+                $availableResponsibilityCenterIds,
+            );
+            if (null !== $responsibilityCenterIds) {
+                $responsibilityCenterIds = array_values(array_intersect(
+                    $availableResponsibilityCenterIds,
+                    $responsibilityCenterIds,
+                ));
+            }
+        }
+
+        $responsibilityCenterId = $responsibilityCenterFilterPresent
+            ? $this->singleId($responsibilityCenterIds)
+            : $this->resolveResponsibilityCenterId(
+                (string) $request->query->get('responsibilityCenterId', ''),
+                $company,
+            );
+
         return new CashflowReportParams(
             $company,
             $group,
             $from,
             $to,
-            $this->resolveResponsibilityCenterId((string) $request->query->get('responsibilityCenterId', ''), $company),
+            $responsibilityCenterId,
+            $projectDirectionIds,
+            $responsibilityCenterIds,
+            $availableProjectDirections,
         );
+    }
+
+    /**
+     * @param list<mixed> $requestedIds
+     * @param list<string> $availableIds
+     *
+     * @return list<string>|null null means no restriction (all choices)
+     */
+    private function resolveSelectedIds(array $requestedIds, array $availableIds): ?array
+    {
+        $available = array_fill_keys($availableIds, true);
+        $selected = [];
+        foreach ($requestedIds as $requestedId) {
+            if (!\is_string($requestedId) || !isset($available[$requestedId])) {
+                continue;
+            }
+
+            $selected[$requestedId] = $requestedId;
+        }
+        $selectedIds = array_values($selected);
+
+        if ([] === $availableIds) {
+            return $selectedIds;
+        }
+
+        return \count($selectedIds) === \count($availableIds) ? null : $selectedIds;
+    }
+
+    /** @return list<mixed> */
+    private function listParameter(mixed $value): array
+    {
+        return \is_array($value) ? array_values($value) : [$value];
+    }
+
+    /** @param list<string>|null $ids */
+    private function singleId(?array $ids): ?string
+    {
+        return 1 === \count($ids ?? []) ? $ids[0] : null;
     }
 
     private function resolveResponsibilityCenterId(string $responsibilityCenterId, Company $company): ?string

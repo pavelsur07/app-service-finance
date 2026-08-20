@@ -11,7 +11,9 @@ use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Company\Entity\Company;
+use App\Company\Entity\ProjectDirection;
 use App\Company\Entity\User;
+use App\Company\Repository\ProjectDirectionRepository;
 use App\Report\Cashflow\CashflowReportBuilder;
 use App\Report\Cashflow\CashflowReportParams;
 use Doctrine\ORM\Query;
@@ -39,12 +41,15 @@ final class CashflowReportBuilderTest extends TestCase
             ->disableOriginalConstructor()
             ->onlyMethods(['findOneBy', 'findLastBefore'])
             ->getMock();
+        $projectDirectionRepository = $this->createMock(ProjectDirectionRepository::class);
+        $projectDirectionRepository->expects(self::never())->method('findByCompany');
 
         $builder = new CashflowReportBuilder(
             $categoryRepository,
             $transactionRepository,
             $accountRepository,
             $balanceRepository,
+            $projectDirectionRepository,
         );
 
         $user = new User(Uuid::uuid4()->toString());
@@ -129,12 +134,15 @@ final class CashflowReportBuilderTest extends TestCase
             ->disableOriginalConstructor()
             ->onlyMethods(['findOneBy', 'findLastBefore'])
             ->getMock();
+        $projectDirectionRepository = $this->createMock(ProjectDirectionRepository::class);
+        $projectDirectionRepository->expects(self::never())->method('findByCompany');
 
         $builder = new CashflowReportBuilder(
             $categoryRepository,
             $transactionRepository,
             $accountRepository,
             $balanceRepository,
+            $projectDirectionRepository,
         );
 
         $user = new User(Uuid::uuid4()->toString());
@@ -256,5 +264,252 @@ final class CashflowReportBuilderTest extends TestCase
         self::assertSame($centerId, $payload['projectCenterMatrix']['rowsByProject'][0]['responsibility_center_id']);
         self::assertSame(100.0, $payload['projectCenterMatrix']['rowsByProject'][0]['totals']['RUB'][0]);
         self::assertCount(1, $payload['projectCenterMatrix']['rowsByProject']);
+    }
+
+    public function testBuildCombinesPluralProjectSubtreeAndResponsibilityCenterFilters(): void
+    {
+        $categoryRepository = $this->createMock(CashflowCategoryRepository::class);
+        $categoryRepository->method('findTreeByCompany')->willReturn([]);
+        $transactionRepository = $this->createMock(CashTransactionRepository::class);
+        $accountRepository = $this->createMock(MoneyAccountRepository::class);
+        $accountRepository->method('findBy')->willReturn([]);
+        $balanceRepository = $this->createMock(MoneyAccountDailyBalanceRepository::class);
+        $projectDirectionRepository = $this->createMock(ProjectDirectionRepository::class);
+
+        $user = new User(Uuid::uuid4()->toString());
+        $user->setEmail('cashflow-plural-filter@example.com');
+        $user->setPassword('pass');
+        $company = new Company(Uuid::uuid4()->toString(), $user);
+        $parent = new ProjectDirection('11111111-1111-4111-8111-111111111111', $company, 'Parent');
+        $child = (new ProjectDirection('22222222-2222-4222-8222-222222222222', $company, 'Child'))
+            ->setParent($parent);
+        $other = new ProjectDirection('33333333-3333-4333-8333-333333333333', $company, 'Other');
+        $projectDirectionRepository->expects(self::once())
+            ->method('findByCompany')
+            ->with($company)
+            ->willReturn([$parent, $child, $other]);
+
+        $whereExpressions = [];
+        $parameters = [];
+        $filteredBuilder = $this->queryBuilder([], $whereExpressions, $parameters);
+        $companyWhereExpressions = [];
+        $companyParameters = [];
+        $companyBuilder = $this->queryBuilder([], $companyWhereExpressions, $companyParameters);
+        $transactionRepository->expects(self::exactly(2))
+            ->method('createQueryBuilder')
+            ->with('t')
+            ->willReturnOnConsecutiveCalls($filteredBuilder, $companyBuilder);
+
+        $centerIds = [
+            '44444444-4444-4444-8444-444444444444',
+            '55555555-5555-4555-8555-555555555555',
+        ];
+        $builder = new CashflowReportBuilder(
+            $categoryRepository,
+            $transactionRepository,
+            $accountRepository,
+            $balanceRepository,
+            $projectDirectionRepository,
+        );
+        $payload = $builder->build(new CashflowReportParams(
+            $company,
+            'month',
+            new \DateTimeImmutable('2026-01-01'),
+            new \DateTimeImmutable('2026-01-31'),
+            null,
+            [(string) $parent->getId()],
+            $centerIds,
+        ));
+
+        self::assertContains('IDENTITY(t.projectDirection) IN (:projectDirectionIds)', $whereExpressions);
+        self::assertContains('t.responsibilityCenterId IN (:responsibilityCenterIds)', $whereExpressions);
+        self::assertSame([$parent->getId(), $child->getId()], $parameters['projectDirectionIds']);
+        self::assertSame($centerIds, $parameters['responsibilityCenterIds']);
+        self::assertSame([$parent->getId()], $payload['project_direction_ids']);
+        self::assertSame($centerIds, $payload['responsibility_center_ids']);
+    }
+
+    public function testBuildDoesNotIssueInvalidQueryForExplicitEmptyFilter(): void
+    {
+        $categoryRepository = $this->createMock(CashflowCategoryRepository::class);
+        $categoryRepository->method('findTreeByCompany')->willReturn([]);
+        $transactionRepository = $this->createMock(CashTransactionRepository::class);
+        $accountRepository = $this->createMock(MoneyAccountRepository::class);
+        $accountRepository->method('findBy')->willReturn([]);
+        $balanceRepository = $this->createMock(MoneyAccountDailyBalanceRepository::class);
+        $projectDirectionRepository = $this->createMock(ProjectDirectionRepository::class);
+        $projectDirectionRepository->expects(self::never())->method('findByCompany');
+
+        $whereExpressions = [];
+        $parameters = [];
+        $companyBuilder = $this->queryBuilder([], $whereExpressions, $parameters);
+        $transactionRepository->expects(self::once())
+            ->method('createQueryBuilder')
+            ->with('t')
+            ->willReturn($companyBuilder);
+
+        $user = new User(Uuid::uuid4()->toString());
+        $user->setEmail('cashflow-empty-filter@example.com');
+        $user->setPassword('pass');
+        $company = new Company(Uuid::uuid4()->toString(), $user);
+        $builder = new CashflowReportBuilder(
+            $categoryRepository,
+            $transactionRepository,
+            $accountRepository,
+            $balanceRepository,
+            $projectDirectionRepository,
+        );
+        $payload = $builder->build(new CashflowReportParams(
+            $company,
+            'month',
+            new \DateTimeImmutable('2026-01-01'),
+            new \DateTimeImmutable('2026-01-31'),
+            null,
+            [],
+        ));
+
+        self::assertSame([], $payload['project_direction_ids']);
+        self::assertSame([], $payload['projectCenterMatrix']['rowsByProject']);
+        self::assertNotContains('IDENTITY(t.projectDirection) IN (:projectDirectionIds)', $whereExpressions);
+    }
+
+    public function testBuildCombinesPluralProjectFilterWithLegacyResponsibilityCenter(): void
+    {
+        $categoryRepository = $this->createMock(CashflowCategoryRepository::class);
+        $categoryRepository->method('findTreeByCompany')->willReturn([]);
+        $transactionRepository = $this->createMock(CashTransactionRepository::class);
+        $accountRepository = $this->createMock(MoneyAccountRepository::class);
+        $accountRepository->method('findBy')->willReturn([]);
+        $balanceRepository = $this->createMock(MoneyAccountDailyBalanceRepository::class);
+        $projectDirectionRepository = $this->createMock(ProjectDirectionRepository::class);
+        $projectDirectionRepository->expects(self::never())->method('findByCompany');
+
+        $user = new User(Uuid::uuid4()->toString());
+        $user->setEmail('cashflow-mixed-filter@example.com');
+        $user->setPassword('pass');
+        $company = new Company(Uuid::uuid4()->toString(), $user);
+        $projectA = new ProjectDirection('66666666-6666-4666-8666-666666666661', $company, 'Project A');
+        $projectB = new ProjectDirection('66666666-6666-4666-8666-666666666662', $company, 'Project B');
+        $centerId = '66666666-6666-4666-8666-666666666663';
+
+        $whereExpressions = [];
+        $parameters = [];
+        $filteredBuilder = $this->queryBuilder([], $whereExpressions, $parameters);
+        $companyWhereExpressions = [];
+        $companyParameters = [];
+        $companyBuilder = $this->queryBuilder([], $companyWhereExpressions, $companyParameters);
+        $transactionRepository->expects(self::exactly(2))
+            ->method('createQueryBuilder')
+            ->with('t')
+            ->willReturnOnConsecutiveCalls($filteredBuilder, $companyBuilder);
+
+        $builder = new CashflowReportBuilder(
+            $categoryRepository,
+            $transactionRepository,
+            $accountRepository,
+            $balanceRepository,
+            $projectDirectionRepository,
+        );
+        $builder->build(new CashflowReportParams(
+            $company,
+            'month',
+            new \DateTimeImmutable('2026-01-01'),
+            new \DateTimeImmutable('2026-01-31'),
+            $centerId,
+            [(string) $projectA->getId()],
+            null,
+            [$projectA, $projectB],
+        ));
+
+        self::assertContains('IDENTITY(t.projectDirection) IN (:projectDirectionIds)', $whereExpressions);
+        self::assertContains('t.responsibilityCenterId = :responsibilityCenterId', $whereExpressions);
+        self::assertSame([$projectA->getId()], $parameters['projectDirectionIds']);
+        self::assertSame($centerId, $parameters['responsibilityCenterId']);
+    }
+
+    public function testBuildRejectsForeignProjectFromSuppliedCatalogue(): void
+    {
+        $categoryRepository = $this->createMock(CashflowCategoryRepository::class);
+        $categoryRepository->method('findTreeByCompany')->willReturn([]);
+        $transactionRepository = $this->createMock(CashTransactionRepository::class);
+        $accountRepository = $this->createMock(MoneyAccountRepository::class);
+        $accountRepository->method('findBy')->willReturn([]);
+        $balanceRepository = $this->createMock(MoneyAccountDailyBalanceRepository::class);
+        $projectDirectionRepository = $this->createMock(ProjectDirectionRepository::class);
+        $projectDirectionRepository->expects(self::never())->method('findByCompany');
+
+        $companyUser = new User(Uuid::uuid4()->toString());
+        $companyUser->setEmail('cashflow-company@example.com');
+        $companyUser->setPassword('pass');
+        $company = new Company(Uuid::uuid4()->toString(), $companyUser);
+        $foreignUser = new User(Uuid::uuid4()->toString());
+        $foreignUser->setEmail('cashflow-foreign@example.com');
+        $foreignUser->setPassword('pass');
+        $foreignCompany = new Company(Uuid::uuid4()->toString(), $foreignUser);
+        $foreignProject = new ProjectDirection(
+            '77777777-7777-4777-8777-777777777771',
+            $foreignCompany,
+            'Foreign Project',
+        );
+
+        $companyWhereExpressions = [];
+        $companyParameters = [];
+        $companyBuilder = $this->queryBuilder([], $companyWhereExpressions, $companyParameters);
+        $transactionRepository->expects(self::once())
+            ->method('createQueryBuilder')
+            ->with('t')
+            ->willReturn($companyBuilder);
+
+        $builder = new CashflowReportBuilder(
+            $categoryRepository,
+            $transactionRepository,
+            $accountRepository,
+            $balanceRepository,
+            $projectDirectionRepository,
+        );
+        $payload = $builder->build(new CashflowReportParams(
+            $company,
+            'month',
+            new \DateTimeImmutable('2026-01-01'),
+            new \DateTimeImmutable('2026-01-31'),
+            null,
+            [(string) $foreignProject->getId()],
+            null,
+            [$foreignProject],
+        ));
+
+        self::assertSame([], $payload['projectCenterMatrix']['rowsByProject']);
+        self::assertSame([$foreignProject->getId()], $payload['project_direction_ids']);
+    }
+
+    /**
+     * @param list<array<string,mixed>> $rows
+     * @param list<string> $whereExpressions
+     * @param array<string,mixed> $parameters
+     */
+    private function queryBuilder(array $rows, array &$whereExpressions, array &$parameters): QueryBuilder
+    {
+        $query = $this->createMock(Query::class);
+        $query->expects(self::once())->method('getArrayResult')->willReturn($rows);
+
+        $builder = $this->createMock(QueryBuilder::class);
+        $builder->method('select')->willReturnSelf();
+        $builder->method('leftJoin')->willReturnSelf();
+        $builder->method('where')->willReturnSelf();
+        $builder->method('andWhere')
+            ->willReturnCallback(static function (string $expression) use (&$whereExpressions, $builder): QueryBuilder {
+                $whereExpressions[] = $expression;
+
+                return $builder;
+            });
+        $builder->method('setParameter')
+            ->willReturnCallback(static function (string $name, mixed $value) use (&$parameters, $builder): QueryBuilder {
+                $parameters[$name] = $value;
+
+                return $builder;
+            });
+        $builder->method('getQuery')->willReturn($query);
+
+        return $builder;
     }
 }

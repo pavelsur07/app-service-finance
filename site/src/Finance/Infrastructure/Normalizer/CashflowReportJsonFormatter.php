@@ -31,12 +31,19 @@ final readonly class CashflowReportJsonFormatter
             $result['dataset'] = $options['dataset'];
         }
         if ($options['include_filters'] ?? false) {
-            $result['filters'] = [
+            $filters = [
                 'group' => $payload['group'],
                 'responsibility_center_id' => $payload['responsibility_center_id'] ?? null,
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
             ];
+            if (null !== ($payload['project_direction_ids'] ?? null)) {
+                $filters['project_direction_ids'] = $payload['project_direction_ids'];
+            }
+            if (null !== ($payload['responsibility_center_ids'] ?? null)) {
+                $filters['responsibility_center_ids'] = $payload['responsibility_center_ids'];
+            }
+            $result['filters'] = $filters;
         }
 
         return $result + [

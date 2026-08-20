@@ -15,11 +15,13 @@ use App\Company\Entity\Company;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Entity\User;
+use App\Company\Service\ReportApiKeyManager;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class CashflowJsonExportControllerTest extends WebTestCaseBase
 {
@@ -207,6 +209,88 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
         self::assertArrayNotHasKey($categoryB->getId(), $payload['categoryTotals']);
         self::assertEquals([100.0], $payload['categoryTotals'][$categoryA->getId()]['totals']['RUB']);
         self::assertEquals([100.0], $payload['closings']['RUB']);
+    }
+
+    public function testPluralFiltersUseProjectSubtreesAndKeepBalancesCompanyWide(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        [$user, $company] = $this->seedCompanyContext('a7');
+        $parent = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Consulting');
+        $child = (new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Implementation'))->setParent($parent);
+        $other = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Retail');
+        $centerA = new FinancialResponsibilityCenter((string) $company->getId(), 'CFO_A', 'Center A');
+        $centerB = new FinancialResponsibilityCenter((string) $company->getId(), 'CFO_B', 'Center B');
+        foreach ([$parent, $child, $other, $centerA, $centerB] as $entity) {
+            $this->em()->persist($entity);
+        }
+
+        $selectedCategory = $this->seedCashflowData($company, '100.00', '2026-04-10', $child, $centerA->getId());
+        $otherProjectCategory = $this->seedCashflowData($company, '200.00', '2026-04-11', $other, $centerA->getId());
+        $otherCenterCategory = $this->seedCashflowData($company, '300.00', '2026-04-12', $child, $centerB->getId());
+        $unassignedCategory = $this->seedCashflowData($company, '400.00', '2026-04-13');
+        $this->em()->flush();
+        $this->loginWithActiveCompany($client, $user, $company);
+
+        $client->request('GET', self::EXPORT_URL.'?'.http_build_query([
+            'from' => '2026-04-01',
+            'to' => '2026-04-30',
+            'group' => 'month',
+            'projectFiltersPresent' => 1,
+            'projectDirectionIds' => [$parent->getId()],
+            'responsibilityCenterFiltersPresent' => 1,
+            'responsibilityCenterIds' => [$centerA->getId()],
+        ]));
+
+        self::assertResponseIsSuccessful();
+        $payload = $this->decodeJson($client);
+
+        self::assertSame([$parent->getId()], $payload['filters']['project_direction_ids']);
+        self::assertSame([$centerA->getId()], $payload['filters']['responsibility_center_ids']);
+        self::assertSame($centerA->getId(), $payload['responsibility_center_id']);
+        self::assertEquals([100.0], $payload['categoryTotals'][$selectedCategory->getId()]['totals']['RUB']);
+        self::assertSame([], $payload['categoryTotals'][$otherProjectCategory->getId()]['totals']);
+        self::assertSame([], $payload['categoryTotals'][$otherCenterCategory->getId()]['totals']);
+        self::assertSame([], $payload['categoryTotals'][$unassignedCategory->getId()]['totals']);
+        self::assertEquals([1000.0], $payload['closings']['RUB']);
+        self::assertCount(1, $payload['projectCenterMatrix']['rowsByProject']);
+        self::assertSame($child->getId(), $payload['projectCenterMatrix']['rowsByProject'][0]['project_id']);
+        self::assertEquals([100.0], $payload['projectCenterMatrix']['rowsByProject'][0]['totals']['RUB']);
+    }
+
+    public function testPublicJsonAndCsvKeepLegacyRequestContracts(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        [, $company] = $this->seedCompanyContext('a8');
+        $category = $this->seedCashflowData($company, '125.00', '2026-04-15');
+        $this->em()->flush();
+        $token = self::getContainer()->get(ReportApiKeyManager::class)->createOrRegenerateForCompany($company);
+        $query = http_build_query([
+            'token' => $token,
+            'from' => '2026-04-01',
+            'to' => '2026-04-30',
+            'group' => 'month',
+        ]);
+
+        $client->request('GET', '/api/public/reports/cashflow.json?'.$query);
+        self::assertResponseIsSuccessful();
+        $payload = $this->decodeJson($client);
+        self::assertSame('month', $payload['group']);
+        self::assertEquals([125.0], $payload['categoryTotals'][$category->getId()]['totals']['RUB']);
+        self::assertArrayNotHasKey('project_direction_ids', $payload);
+        self::assertArrayNotHasKey('responsibility_center_ids', $payload);
+
+        $client->request('GET', '/api/public/reports/cashflow.csv?'.$query);
+        self::assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertInstanceOf(StreamedResponse::class, $response);
+        $csv = (string) $client->getInternalResponse()->getContent();
+        $lines = preg_split('/\R/', trim($csv));
+        self::assertSame('Период,КатегорияID,Валюта,"Сальдо нач.",Нетто,"Сальдо кон."', $lines[0]);
+        self::assertStringContainsString((string) $category->getId(), $lines[1]);
     }
 
     /** @return array{0: User, 1: Company} */

@@ -8,6 +8,8 @@ use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Company\Entity\Company;
+use App\Company\Entity\ProjectDirection;
+use App\Company\Repository\ProjectDirectionRepository;
 use Doctrine\ORM\QueryBuilder;
 
 final class CashflowReportBuilder
@@ -20,6 +22,7 @@ final class CashflowReportBuilder
         private CashTransactionRepository $transactionRepository,
         private MoneyAccountRepository $accountRepository,
         private MoneyAccountDailyBalanceRepository $balanceRepository,
+        private ProjectDirectionRepository $projectDirectionRepository,
     ) {
     }
 
@@ -43,22 +46,45 @@ final class CashflowReportBuilder
             ];
         }
 
-        $transactionQueryBuilder = $this->createTransactionRowsQueryBuilder($company, $from, $to);
+        $projectDirectionIds = null === $params->projectDirectionIds
+            ? null
+            : $this->expandProjectDirectionIds(
+                $params->projectDirectionIds,
+                $company,
+                $params->availableProjectDirections,
+            );
+        $responsibilityCenterIds = $params->responsibilityCenterIds;
+        $filtersActive = null !== $projectDirectionIds
+            || null !== $responsibilityCenterIds
+            || null !== $params->responsibilityCenterId;
+        $emptyFilter = [] === $projectDirectionIds || [] === $responsibilityCenterIds;
 
-        if (null !== $params->responsibilityCenterId) {
-            $transactionQueryBuilder
-                ->andWhere('t.responsibilityCenterId = :responsibilityCenterId')
-                ->setParameter('responsibilityCenterId', $params->responsibilityCenterId);
+        if ($emptyFilter) {
+            $rows = [];
+        } else {
+            $transactionQueryBuilder = $this->createTransactionRowsQueryBuilder($company, $from, $to);
+
+            if (null !== $projectDirectionIds) {
+                $transactionQueryBuilder
+                    ->andWhere('IDENTITY(t.projectDirection) IN (:projectDirectionIds)')
+                    ->setParameter('projectDirectionIds', $projectDirectionIds);
+            }
+            if (null !== $responsibilityCenterIds) {
+                $transactionQueryBuilder
+                    ->andWhere('t.responsibilityCenterId IN (:responsibilityCenterIds)')
+                    ->setParameter('responsibilityCenterIds', $responsibilityCenterIds);
+            } elseif (null !== $params->responsibilityCenterId) {
+                $transactionQueryBuilder
+                    ->andWhere('t.responsibilityCenterId = :responsibilityCenterId')
+                    ->setParameter('responsibilityCenterId', $params->responsibilityCenterId);
+            }
+
+            $rows = $transactionQueryBuilder->getQuery()->getArrayResult();
         }
 
-        $rows = $transactionQueryBuilder
-            ->getQuery()
-            ->getArrayResult();
-        $companyRows = null === $params->responsibilityCenterId
-            ? $rows
-            : $this->createTransactionRowsQueryBuilder($company, $from, $to)
-                ->getQuery()
-                ->getArrayResult();
+        $companyRows = $filtersActive
+            ? $this->createTransactionRowsQueryBuilder($company, $from, $to)->getQuery()->getArrayResult()
+            : $rows;
 
         foreach ($rows as $row) {
             $catId = $row['category'];
@@ -169,6 +195,8 @@ final class CashflowReportBuilder
             'company' => $company,
             'group' => $group,
             'responsibility_center_id' => $params->responsibilityCenterId,
+            'project_direction_ids' => $params->projectDirectionIds,
+            'responsibility_center_ids' => $params->responsibilityCenterIds,
             'date_from' => $from,
             'date_to' => $to,
             'periods' => $periods,
@@ -180,6 +208,55 @@ final class CashflowReportBuilder
             'categoryTree' => $categoryTree,
             'projectCenterMatrix' => $this->buildProjectCenterMatrix($rows, $periods),
         ];
+    }
+
+    /**
+     * @param list<string> $selectedIds
+     * @param list<ProjectDirection>|null $availableProjectDirections
+     *
+     * @return list<string>
+     */
+    private function expandProjectDirectionIds(
+        array $selectedIds,
+        Company $company,
+        ?array $availableProjectDirections,
+    ): array {
+        if ([] === $selectedIds) {
+            return [];
+        }
+
+        $available = [];
+        $children = [];
+        $projects = $availableProjectDirections ?? $this->projectDirectionRepository->findByCompany($company);
+        foreach ($projects as $project) {
+            if ($project->getCompany()->getId() !== $company->getId()) {
+                continue;
+            }
+
+            $projectId = (string) $project->getId();
+            $available[$projectId] = true;
+            $parentId = $project->getParent()?->getId();
+            if (null !== $parentId) {
+                $children[(string) $parentId][] = $projectId;
+            }
+        }
+
+        $expanded = [];
+        $collect = static function (string $projectId) use (&$collect, &$expanded, $available, $children): void {
+            if (!isset($available[$projectId]) || isset($expanded[$projectId])) {
+                return;
+            }
+
+            $expanded[$projectId] = $projectId;
+            foreach ($children[$projectId] ?? [] as $childId) {
+                $collect($childId);
+            }
+        };
+        foreach ($selectedIds as $selectedId) {
+            $collect($selectedId);
+        }
+
+        return array_values($expanded);
     }
 
     private function createTransactionRowsQueryBuilder(
