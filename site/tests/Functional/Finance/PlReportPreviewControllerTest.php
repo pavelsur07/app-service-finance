@@ -8,6 +8,7 @@ use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\ProjectDirection;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Entity\PLDailyTotal;
+use App\Finance\Enum\PLCategoryType;
 use App\Finance\Enum\PLFlow;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -109,6 +110,53 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
             $cells->each(static function (Crawler $cell) use ($url): void {
                 self::assertSame(trim($cell->text()), $cell->attr('title'), $url);
             });
+        }
+    }
+
+    public function testRowsWithChildrenAreBoldAndLeafRowsKeepRegularWeight(): void
+    {
+        $client = static::createClient();
+        $company = $this->loginWithCompany($client, 'pl-report-preview-row-weight@example.test');
+        $parent = (new PLCategory('33333333-3333-3333-3333-000000000951', $company))
+            ->setName('Parent row')
+            ->setCode('PARENT_ROW')
+            ->setType(PLCategoryType::SUBTOTAL)
+            ->setFlow(PLFlow::EXPENSE);
+        $middle = (new PLCategory('33333333-3333-3333-3333-000000000952', $company))
+            ->setName('Middle row')
+            ->setCode('MIDDLE_ROW')
+            ->setType(PLCategoryType::SUBTOTAL)
+            ->setParent($parent)
+            ->setFlow(PLFlow::EXPENSE);
+        $leaf = (new PLCategory('33333333-3333-3333-3333-000000000953', $company))
+            ->setName('Leaf row')
+            ->setCode('LEAF_ROW')
+            ->setParent($middle)
+            ->setFlow(PLFlow::EXPENSE);
+        $project = new ProjectDirection(
+            '33333333-3333-3333-3333-000000000954',
+            $company,
+            'Project',
+        );
+
+        foreach ([$parent, $middle, $leaf, $project] as $entity) {
+            $this->em()->persist($entity);
+        }
+        $this->em()->flush();
+
+        foreach (['/finance/report/preview', '/finance/report/preview?layout=projects'] as $url) {
+            $crawler = $client->request('GET', $url);
+
+            self::assertResponseIsSuccessful($url);
+            $parentRow = $crawler->filter(sprintf('tr.pl-row[data-row-id="%s"]', $parent->getId()));
+            $middleRow = $crawler->filter(sprintf('tr.pl-row[data-row-id="%s"]', $middle->getId()));
+            $leafRow = $crawler->filter(sprintf('tr.pl-row[data-row-id="%s"]', $leaf->getId()));
+            self::assertCount(1, $parentRow, $url);
+            self::assertCount(1, $middleRow, $url);
+            self::assertCount(1, $leafRow, $url);
+            self::assertStringContainsString('fw-bold', (string) $parentRow->attr('class'), $url);
+            self::assertStringContainsString('fw-bold', (string) $middleRow->attr('class'), $url);
+            self::assertStringNotContainsString('fw-bold', (string) $leafRow->attr('class'), $url);
         }
     }
 
