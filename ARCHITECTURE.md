@@ -2098,18 +2098,6 @@ enum SnapshotRecalcScope: string
 }
 ```
 
-### `src/Marketplace/Enum/ProcessingKind.php`
-```php
-enum ProcessingKind: string
-{
-    case SALES   = 'sales';
-    case RETURNS = 'returns';
-    case COSTS   = 'costs';
-
-    public function getLabel(): string; // Продажи / Возвраты / Затраты
-}
-```
-
 ### `src/Marketplace/Enum/PipelineStatus.php`
 ```php
 enum PipelineStatus: string
