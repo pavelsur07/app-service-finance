@@ -41,7 +41,16 @@
                 <h2 class="page-title">Операции ОПиУ</h2>
             </div>
             <div class="col-auto ms-auto d-print-none">
-                <a href="{{ path('document_new') }}" class="btn btn-primary">+ Добавить документ</a>
+                <div class="btn-list">
+                    <a href="{{ path('document_operations_export_json') }}"
+                       class="btn btn-outline-secondary"
+                       title="Скачать все операции ОПиУ в формате JSON"
+                       download>
+                        <i class="ti ti-download"></i>
+                        Выгрузить JSON
+                    </a>
+                    <a href="{{ path('document_new') }}" class="btn btn-primary">+ Добавить документ</a>
+                </div>
             </div>
         </div>
     </div>

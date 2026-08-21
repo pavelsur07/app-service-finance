@@ -186,6 +186,13 @@
 - Импорт всегда идёт в активную компанию; из файла не читается ни идентификатор компании, ни идентификаторы категорий. Ограничения читателя: 1 МБ, 1000 узлов, 5 уровней, уникальность `code` внутри файла (иначе нарушается `uniq_plcat_company_code` уже в середине транзакции).
 - Формулы переносятся как есть. `ImportPLCategoryTreeResult::$unresolvedFormulaCodes` — предупреждение о токенах формул, которых не будет в целевой компании после импорта; это эвристика на токенах, парсера формул в проекте нет.
 
+### Finance: выгрузка операций ОПиУ в JSON
+
+- `App\Finance\Infrastructure\Export\PlOperationJsonExporter::export(companyId, companyName, exportedAt)` — единственное место сборки плоской выгрузки операций ОПиУ. Строка результата = одна `DocumentOperation` с продублированными полями своего документа; конверт `{exported_at, company, count, operations[]}`.
+- Маршрут `document_operations_export_json` (`GET /documents/operations/export.json`, `PlOperationJsonExportController`) — кнопка «Выгрузить JSON» в шапке страницы «Операции ОПиУ». Путь намеренно из двух сегментов: `/documents/export.json` перехватил бы `document_show` (`/documents/{id}`).
+- Выгрузка отдаёт все операции активной компании: фильтры страницы `document_index` не применяются, потому что контроллер списка их тоже не применяет. Изоляция компании — `WHERE d.company_id` плюс `company_id = d.company_id` в каждом JOIN справочника: FK на `pl_categories`, `"counterparty"` и `project_directions` компанию не несут, поэтому строка с чужой ссылкой отдаёт `NULL` вместо чужого названия. Закреплено тестами `testExcludesOtherCompanyOperations` и `testDoesNotLeakForeignCompanyReferenceNames`.
+- `amount` остаётся строкой (`NUMERIC(15,2)`); `counterparty` и `project` — значения операции с фоллбэком на документ, как их показывает экран.
+
 ### Finance: responsibility-center fact-schema expansion
 
 - Stage 7.5 adds nullable scalar `responsibility_center_id` UUID columns to `cash_transaction`, `documents`, `document_operations`, and `pl_daily_totals`. Each column has a restrictive FK to Company-owned `financial_responsibility_centers`.
