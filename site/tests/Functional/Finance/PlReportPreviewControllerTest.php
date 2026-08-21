@@ -231,6 +231,25 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
             self::assertStringContainsString('fw-bold', (string) $parentRow->attr('class'), $url);
             self::assertStringContainsString('fw-bold', (string) $middleRow->attr('class'), $url);
             self::assertStringNotContainsString('fw-bold', (string) $leafRow->attr('class'), $url);
+            self::assertCount(
+                1,
+                $parentRow->filter(sprintf(
+                    'button.pl-name.pl-toggle[data-target="%s"][aria-expanded="true"]',
+                    $parent->getId(),
+                )),
+                $url,
+            );
+            self::assertCount(
+                1,
+                $middleRow->filter(sprintf(
+                    'button.pl-name.pl-toggle[data-target="%s"][aria-expanded="true"]',
+                    $middle->getId(),
+                )),
+                $url,
+            );
+            self::assertCount(0, $leafRow->filter('.pl-toggle'), $url);
+            self::assertCount(1, $leafRow->filter('span.pl-name'), $url);
+            self::assertCount(0, $crawler->filter('.pl-name-wrap'), $url);
         }
     }
 
@@ -266,7 +285,10 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
         $pageHeader = $crawler->filter('.page-header');
         self::assertSame('Отчёт о прибылях и убытках', trim($pageHeader->filter('h2.page-title')->text()));
         self::assertSame('Февраль – Июль 2026', trim($pageHeader->filter('.text-secondary')->text()));
-        self::assertCount(1, $crawler->filter('.pl-preview-controls-card #pl-preview-filter-form'));
+        self::assertCount(1, $crawler->filter('main.container-xl'));
+        self::assertCount(0, $crawler->filter('.page-body .page-body'));
+        self::assertCount(1, $crawler->filter('form#pl-preview-filter-form.card.card-body.pl-preview-controls-card'));
+        self::assertCount(1, $crawler->filter('div.card.table-responsive > table.pl-table'));
         self::assertCount(0, $crawler->filter('#pl-preview-filters-offcanvas'));
         self::assertSame(
             '2026-02-10',
