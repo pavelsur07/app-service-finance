@@ -90,6 +90,114 @@ final class DocumentSoftDeleteReadBoundaryControllerTest extends WebTestCaseBase
         self::assertStringNotContainsString('DELETED-PNL-DOCUMENT', $content);
     }
 
+    public function testTabsSeparateActiveAndDeletedDocumentsByCompany(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        [$user, $company] = $this->createCompanyContext();
+        [, $foreignCompany] = $this->createCompanyContext();
+        $this->createDocument($company, 'ACTIVE-OWN');
+        $deleted = $this->createDocument($company, 'DELETED-OWN');
+        $foreignDeleted = $this->createDocument($foreignCompany, 'DELETED-FOREIGN');
+        $deleted->markDeleted((string) $user->getId(), 'manual-ui');
+        $foreignDeleted->markDeleted(null, 'manual-ui');
+        $this->em()->flush();
+
+        $this->loginWithActiveCompany($client, $user, $company);
+
+        $crawler = $client->request('GET', '/documents/');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.nav-tabs', 'Операции ОПиУ');
+        self::assertSelectorTextContains('.nav-tabs', 'Удалённые');
+        self::assertStringContainsString('ACTIVE-OWN', (string) $client->getResponse()->getContent());
+        self::assertStringNotContainsString('DELETED-OWN', (string) $client->getResponse()->getContent());
+        self::assertCount(1, $crawler->filter('.nav-tabs .nav-link.active:contains("Операции ОПиУ")'));
+
+        $crawler = $client->request('GET', '/documents/deleted');
+        self::assertResponseIsSuccessful();
+        $content = (string) $client->getResponse()->getContent();
+        self::assertStringContainsString('DELETED-OWN', $content);
+        self::assertStringNotContainsString('ACTIVE-OWN', $content);
+        self::assertStringNotContainsString('DELETED-FOREIGN', $content);
+        self::assertCount(1, $crawler->filter('.nav-tabs .nav-link.active:contains("Удалённые")'));
+        self::assertCount(1, $crawler->filter(sprintf('form[action="/documents/%s/restore"]', $deleted->getId())));
+    }
+
+    public function testManualDeleteAndRestoreLifecycle(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        [$user, $company] = $this->createCompanyContext();
+        $document = $this->createDocument($company, 'LIFECYCLE-DOCUMENT');
+        $documentId = (string) $document->getId();
+        $this->em()->flush();
+
+        $this->loginWithActiveCompany($client, $user, $company);
+        $client->request('POST', sprintf('/documents/%s/delete', $documentId), [
+            '_token' => $this->csrfToken($client, 'delete'.$documentId),
+        ]);
+
+        self::assertResponseRedirects('/documents/');
+        $deleted = $this->reloadDocument($documentId);
+        self::assertTrue($deleted->isDeleted());
+        self::assertSame($user->getId(), $deleted->getDeletedBy());
+        self::assertSame('manual-ui', $deleted->getDeleteReason());
+        self::assertCount(1, $deleted->getOperations());
+
+        $client->request('POST', sprintf('/documents/%s/restore', $documentId), [
+            '_token' => $this->csrfToken($client, 'document_restore'.$documentId),
+        ]);
+
+        self::assertResponseRedirects('/documents/deleted');
+        $restored = $this->reloadDocument($documentId);
+        self::assertFalse($restored->isDeleted());
+        self::assertNull($restored->getDeletedBy());
+        self::assertNull($restored->getDeleteReason());
+        self::assertCount(1, $restored->getOperations());
+    }
+
+    public function testInvalidCsrfDoesNotChangeDeletionState(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        [$user, $company] = $this->createCompanyContext();
+        $active = $this->createDocument($company, 'ACTIVE-CSRF');
+        $deleted = $this->createDocument($company, 'DELETED-CSRF');
+        $deleted->markDeleted((string) $user->getId(), 'manual-ui');
+        $this->em()->flush();
+        $activeId = (string) $active->getId();
+        $deletedId = (string) $deleted->getId();
+
+        $this->loginWithActiveCompany($client, $user, $company);
+        $client->request('POST', sprintf('/documents/%s/delete', $activeId), ['_token' => 'invalid']);
+        self::assertResponseRedirects('/documents/');
+        self::assertFalse($this->reloadDocument($activeId)->isDeleted());
+
+        $client->request('POST', sprintf('/documents/%s/restore', $deletedId), ['_token' => 'invalid']);
+        self::assertResponseRedirects('/documents/deleted');
+        self::assertTrue($this->reloadDocument($deletedId)->isDeleted());
+    }
+
+    public function testForeignDeletedDocumentCannotBeRestored(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        [$user, $company] = $this->createCompanyContext();
+        [, $foreignCompany] = $this->createCompanyContext();
+        $foreignDocument = $this->createDocument($foreignCompany, 'FOREIGN-RESTORE');
+        $foreignDocument->markDeleted(null, 'manual-ui');
+        $this->em()->flush();
+        $foreignDocumentId = (string) $foreignDocument->getId();
+
+        $this->loginWithActiveCompany($client, $user, $company);
+        $client->request('POST', sprintf('/documents/%s/restore', $foreignDocumentId), [
+            '_token' => $this->csrfToken($client, 'document_restore'.$foreignDocumentId),
+        ]);
+
+        self::assertResponseStatusCodeSame(404);
+        self::assertTrue($this->reloadDocument($foreignDocumentId)->isDeleted());
+    }
+
     /** @return array{0: User, 1: Company} */
     private function createCompanyContext(): array
     {
@@ -128,5 +236,13 @@ final class DocumentSoftDeleteReadBoundaryControllerTest extends WebTestCaseBase
     {
         $client->loginUser($user);
         $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+    }
+
+    private function reloadDocument(string $id): Document
+    {
+        $this->em()->clear();
+
+        return $this->em()->find(Document::class, $id)
+            ?? throw new \RuntimeException('Document not found.');
     }
 }

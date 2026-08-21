@@ -67,7 +67,8 @@ class DocumentRepository extends ServiceEntityRepository
             ->andWhere('IDENTITY(d.company) = :companyId')
             ->andWhere('d.deletedAt IS NOT NULL')
             ->setParameter('companyId', $companyId)
-            ->orderBy('d.deletedAt', 'DESC');
+            ->orderBy('d.deletedAt', 'DESC')
+            ->addOrderBy('d.id', 'ASC');
 
         $pager = new Pagerfanta(new QueryAdapter($queryBuilder));
         $pager->setMaxPerPage($perPage);

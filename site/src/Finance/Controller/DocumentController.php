@@ -8,9 +8,11 @@ use App\Cash\Entity\Transaction\CashTransaction;
 use App\Company\Entity\Company;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Company\Security\ModuleAccess;
+use App\Finance\Application\RestoreDocumentAction;
 use App\Finance\Application\Service\FinanceDocumentResponsibilityCenterNormalizer;
 use App\Finance\Application\Service\PlNatureResolver;
 use App\Finance\Application\Service\PLRegisterUpdater;
+use App\Finance\Application\SoftDeleteDocumentAction;
 use App\Finance\DTO\DocumentListDTO;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
@@ -19,6 +21,7 @@ use App\Finance\Enum\PlNature;
 use App\Finance\Form\DocumentType;
 use App\Finance\Repository\DocumentRepository;
 use App\Finance\Repository\PLCategoryRepository;
+use App\Shared\Audit\AuditContextProvider;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -28,6 +31,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Routing\Requirement\Requirement;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_USER')]
@@ -59,6 +63,23 @@ class DocumentController extends AbstractController
         return $this->render('document/index.html.twig', [
             'items' => $items,
             'documentNatures' => $documentNatures,
+            'pager' => $pager,
+            'limit' => $pager->getMaxPerPage(),
+        ]);
+    }
+
+    #[Route('/deleted', name: 'document_deleted_index', methods: ['GET'])]
+    public function deletedIndex(Request $request, DocumentRepository $repo, ActiveCompanyService $companyService): Response
+    {
+        $company = $companyService->getActiveCompany();
+        $page = max(1, (int) $request->query->get('page', 1));
+        $requestedLimit = (int) $request->query->get('limit', 20);
+        $limit = in_array($requestedLimit, [20, 30, 50], true) ? $requestedLimit : 20;
+
+        $pager = $repo->paginateDeletedByCompany((string) $company->getId(), $page, $limit);
+
+        return $this->render('document/deleted_index.html.twig', [
+            'items' => iterator_to_array($pager->getCurrentPageResults()),
             'pager' => $pager,
             'limit' => $pager->getMaxPerPage(),
         ]);
@@ -339,22 +360,63 @@ class DocumentController extends AbstractController
 
     #[Route('/{id}/delete', name: 'document_delete', methods: ['POST'])]
     #[IsGranted(ModuleAccess::FINANCE_WRITE)]
-    public function delete(Request $request, Document $document, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
-    {
+    public function delete(
+        Request $request,
+        Document $document,
+        ActiveCompanyService $companyService,
+        SoftDeleteDocumentAction $softDeleteDocument,
+        AuditContextProvider $auditContextProvider,
+    ): Response {
         $company = $companyService->getActiveCompany();
         if ($document->getCompany() !== $company) {
             throw $this->createNotFoundException();
         }
 
         if ($this->isCsrfTokenValid('delete'.$document->getId(), $request->request->get('_token'))) {
-            $documentDate = $document->getDate()->setTime(0, 0);
-            $em->remove($document);
-            $em->flush();
-
-            $this->plRegisterUpdater->recalcRange($company, $documentDate, $documentDate);
+            $softDeleteDocument(
+                (string) $company->getId(),
+                (string) $document->getId(),
+                $auditContextProvider->getActorUserId(),
+                'manual-ui',
+            );
+            $this->addFlash('success', 'Операция ОПиУ перемещена в «Удалённые».');
+        } else {
+            $this->addFlash('danger', 'Неверный CSRF токен.');
         }
 
         return $this->redirectToRoute('document_index');
+    }
+
+    #[Route('/{id}/restore', name: 'document_restore', requirements: ['id' => Requirement::UUID], methods: ['POST'])]
+    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
+    public function restore(
+        string $id,
+        Request $request,
+        DocumentRepository $repo,
+        ActiveCompanyService $companyService,
+        RestoreDocumentAction $restoreDocument,
+    ): Response {
+        $company = $companyService->getActiveCompany();
+        $document = $repo->findByIdAndCompany($id, (string) $company->getId());
+
+        if (null === $document || !$document->isDeleted()) {
+            throw $this->createNotFoundException();
+        }
+
+        if (!$this->isCsrfTokenValid('document_restore'.$id, $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Неверный CSRF токен.');
+
+            return $this->redirectToRoute('document_deleted_index');
+        }
+
+        try {
+            $restoreDocument((string) $company->getId(), $id);
+            $this->addFlash('success', 'Операция ОПиУ восстановлена.');
+        } catch (\DomainException $exception) {
+            $this->addFlash('danger', $exception->getMessage());
+        }
+
+        return $this->redirectToRoute('document_deleted_index');
     }
 
     /**
