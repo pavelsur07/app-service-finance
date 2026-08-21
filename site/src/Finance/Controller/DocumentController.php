@@ -126,6 +126,7 @@ class DocumentController extends AbstractController
         if ($document->getCompany() !== $company) {
             throw $this->createNotFoundException();
         }
+        $this->denyDeletedDocument($document);
 
         $copy = $this->duplicateDocument($document, $company);
 
@@ -167,6 +168,7 @@ class DocumentController extends AbstractController
         if ($document->getCompany() !== $company) {
             throw $this->createNotFoundException();
         }
+        $this->denyDeletedDocument($document);
 
         $documentNature = $this->buildNatureView($natureResolver->forDocument($document));
         $operationViews = [];
@@ -204,6 +206,7 @@ class DocumentController extends AbstractController
         if ($document->getCompany() !== $company) {
             throw $this->createNotFoundException();
         }
+        $this->denyDeletedDocument($document);
 
         $categories = $catRepo->findTreeByCompany($company);
         $projectDirections = $projectDirectionRepo->findByCompany($company);
@@ -284,6 +287,7 @@ class DocumentController extends AbstractController
         if ($document->getCompany() !== $company) {
             throw $this->createNotFoundException();
         }
+        $this->denyDeletedDocument($document);
 
         $payload = [
             'id' => $document->getId(),
@@ -422,5 +426,12 @@ class DocumentController extends AbstractController
             'allocatedAmount' => $transaction->getAllocatedAmount(),
             'remainingAmount' => $transaction->getRemainingAmount(),
         ];
+    }
+
+    private function denyDeletedDocument(Document $document): void
+    {
+        if ($document->isDeleted()) {
+            throw $this->createNotFoundException();
+        }
     }
 }
