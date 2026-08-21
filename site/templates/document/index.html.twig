@@ -1,5 +1,5 @@
 {% extends 'base.html.twig' %}
-{% block title %}Документы{% endblock %}
+{% block title %}Операции ОПиУ{% endblock %}
 {#{% block breadcrumbs %}
     {% include 'partials/_breadcrumbs.html.twig' with {
         breadcrumbs: [
@@ -56,9 +56,17 @@
     </div>
     <div class="mt-3">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header card-head d-flex align-items-center gap-3 flex-wrap">
+                <ul class="nav nav-tabs card-header-tabs">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ path('document_index') }}">Операции ОПиУ</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ path('document_deleted_index') }}">Удалённые</a>
+                    </li>
+                </ul>
                 <button type="button"
-                        class="btn"
+                        class="btn ms-auto"
                         data-bs-toggle="offcanvas"
                         data-bs-target="#document-filters-offcanvas"
                         aria-controls="document-filters-offcanvas">
@@ -142,7 +150,7 @@
                                                 <i class="ti ti-pencil me-2"></i> Редактировать
                                             </a>
                                             <div class="dropdown-divider"></div>
-                                            <form method="post" action="{{ path('document_delete', {'id': item.id}) }}" class="m-0" onsubmit="return confirm('Вы уверены?');">
+                                            <form method="post" action="{{ path('document_delete', {'id': item.id}) }}" class="m-0" onsubmit="return confirm('Переместить операцию ОПиУ в «Удалённые»? Её можно будет восстановить.');">
                                                 <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ item.id) }}">
                                                 <button type="submit" class="dropdown-item text-danger d-flex align-items-center gap-2">
                                                     <i class="ti ti-trash"></i> Удалить

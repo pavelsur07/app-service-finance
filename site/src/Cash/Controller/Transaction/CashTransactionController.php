@@ -264,7 +264,10 @@ class CashTransactionController extends AbstractController
      */
     private function getDocumentsForTransaction(CashTransaction $transaction): array
     {
-        $documents = $transaction->getDocuments()->toArray();
+        $documents = array_values(array_filter(
+            $transaction->getDocuments()->toArray(),
+            static fn (Document $document): bool => !$document->isDeleted(),
+        ));
 
         usort(
             $documents,

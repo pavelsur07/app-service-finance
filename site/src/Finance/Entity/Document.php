@@ -21,6 +21,7 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: DocumentRepository::class)]
 #[ORM\Table(name: 'documents')]
+#[ORM\Index(name: 'idx_documents_company_deleted_at', columns: ['company_id', 'deleted_at'])]
 class Document
 {
     #[ORM\Id]
@@ -72,6 +73,15 @@ class Document
 
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
     private bool $createdWithViolation = false;
+
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $deletedAt = null;
+
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $deletedBy = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $deleteReason = null;
 
     public function __construct(string $id, Company $company)
     {
@@ -280,5 +290,43 @@ class Document
     public function markAsCreatedWithViolation(): void
     {
         $this->createdWithViolation = true;
+    }
+
+    public function isDeleted(): bool
+    {
+        return null !== $this->deletedAt;
+    }
+
+    public function getDeletedAt(): ?\DateTimeImmutable
+    {
+        return $this->deletedAt;
+    }
+
+    public function getDeletedBy(): ?string
+    {
+        return $this->deletedBy;
+    }
+
+    public function getDeleteReason(): ?string
+    {
+        return $this->deleteReason;
+    }
+
+    public function markDeleted(?string $userId, ?string $reason = null): void
+    {
+        if ($this->isDeleted()) {
+            return;
+        }
+
+        $this->deletedAt = new \DateTimeImmutable();
+        $this->deletedBy = $userId;
+        $this->deleteReason = $reason;
+    }
+
+    public function restore(): void
+    {
+        $this->deletedAt = null;
+        $this->deletedBy = null;
+        $this->deleteReason = null;
     }
 }

@@ -611,7 +611,7 @@ class CashTransaction
         $allocated = 0.0;
 
         foreach ($this->documents as $document) {
-            if ($document instanceof Document) {
+            if ($document instanceof Document && !$document->isDeleted()) {
                 $allocated += $document->getTotalAmount();
             }
         }
@@ -716,7 +716,9 @@ class CashTransaction
 
         $allocated = (float) $this->allocatedAmount;
 
-        if ($excludingDocument instanceof Document && $this->documents->contains($excludingDocument)) {
+        if ($excludingDocument instanceof Document
+            && !$excludingDocument->isDeleted()
+            && $this->documents->contains($excludingDocument)) {
             $allocated -= $excludingDocument->getTotalAmount();
         }
 

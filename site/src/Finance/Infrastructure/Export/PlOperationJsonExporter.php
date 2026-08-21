@@ -54,6 +54,7 @@ final readonly class PlOperationJsonExporter
                 -- counterparty и project_directions не несут компанию, поэтому строка с чужой
                 -- ссылкой отдаст NULL вместо чужого названия
                 WHERE d.company_id = :companyId
+                  AND d.deleted_at IS NULL
                 ORDER BY d.date DESC, d.number, o.id
                 SQL,
             ['companyId' => $companyId],

@@ -36,6 +36,33 @@ final class DocumentTest extends TestCase
         self::assertNull($document->getCounterparty());
     }
 
+    public function testSoftDeleteLifecycleIsIdempotent(): void
+    {
+        $document = $this->createDocument();
+
+        $document->markDeleted('user-id', 'manual');
+        $deletedAt = $document->getDeletedAt();
+
+        self::assertTrue($document->isDeleted());
+        self::assertInstanceOf(\DateTimeImmutable::class, $deletedAt);
+        self::assertSame('user-id', $document->getDeletedBy());
+        self::assertSame('manual', $document->getDeleteReason());
+
+        $document->markDeleted('other-user', 'other-reason');
+
+        self::assertSame($deletedAt, $document->getDeletedAt());
+        self::assertSame('user-id', $document->getDeletedBy());
+        self::assertSame('manual', $document->getDeleteReason());
+
+        $document->restore();
+        $document->restore();
+
+        self::assertFalse($document->isDeleted());
+        self::assertNull($document->getDeletedAt());
+        self::assertNull($document->getDeletedBy());
+        self::assertNull($document->getDeleteReason());
+    }
+
     private function createDocument(): Document
     {
         $user = new User(Uuid::uuid4()->toString());
