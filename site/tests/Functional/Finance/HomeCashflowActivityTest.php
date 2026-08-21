@@ -194,33 +194,67 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
 
     private function assertKpiComparisons(Crawler $crawler, string $uiMode, string $activity): void
     {
-        if (UiModeResolver::LEGACY === $uiMode) {
-            self::assertCount(0, $crawler->filter('[data-dashboard-kpi-comparison]'));
-
-            return;
-        }
-
         self::assertCount(4, $crawler->filter('[data-dashboard-kpi-comparison]'));
-        $balanceCard = $crawler->filter('[data-dashboard-kpi="todayBalance"]')->closest('article.kpi');
+        $cardSelector = UiModeResolver::LEGACY === $uiMode ? '.card' : 'article.kpi';
+        $balanceCard = $crawler->filter('[data-dashboard-kpi="todayBalance"]')->closest($cardSelector);
         self::assertNotNull($balanceCard);
         $balance = $balanceCard->filter('[data-dashboard-kpi-comparison="todayBalance"]');
         self::assertCount(1, $balance);
         self::assertSame('percent', $balance->attr('data-comparison-state'));
         self::assertSame('neutral', $balance->attr('data-comparison-variant'));
-        self::assertCount(1, $balance->filter('.delta.delta--neutral'));
-        self::assertSame('0,0%', $this->normalizedText($balance->filter('.delta')));
+        self::assertCount(1, $balance->filter(
+            UiModeResolver::LEGACY === $uiMode ? '.kpi-trend.text-muted' : '.delta.delta--neutral',
+        ));
+        $balanceText = $this->normalizedText($balance);
+        self::assertStringContainsString('0,0%', $balanceText);
+        self::assertStringNotContainsString('+0,0%', $balanceText);
+        self::assertStringNotContainsString('−0,0%', $balanceText);
+        if (UiModeResolver::APP === $uiMode) {
+            self::assertSame('0,0%', $this->normalizedText($balance->filter('.delta')));
+        } else {
+            self::assertCount(0, $balance->filter('.visually-hidden'));
+        }
         self::assertStringContainsString('30днейназад:1000RUB', $this->normalizedText($balance));
 
         foreach (self::EXPECTED_COMPARISONS_BY_ACTIVITY[$activity] as $name => $expected) {
-            $card = $crawler->filter(sprintf('[data-dashboard-kpi="%s"]', $name))->closest('article.kpi');
+            $card = $crawler->filter(sprintf('[data-dashboard-kpi="%s"]', $name))->closest($cardSelector);
             self::assertNotNull($card);
             $comparison = $card->filter(sprintf('[data-dashboard-kpi-comparison="%s"]', $name));
             self::assertCount(1, $comparison);
             self::assertSame($expected['state'], $comparison->attr('data-comparison-state'));
             self::assertSame($expected['variant'], $comparison->attr('data-comparison-variant'));
-            self::assertCount(1, $comparison->filter('.delta.delta--'.$expected['variant']));
-            self::assertStringContainsString($expected['badge'], $this->normalizedText($comparison));
-            if ('percent' === $expected['state']) {
+            if (UiModeResolver::LEGACY === $uiMode) {
+                $variantClass = match ($expected['variant']) {
+                    'up' => 'text-success',
+                    'down' => 'text-danger',
+                    default => 'text-muted',
+                };
+                $variantSelector = '.kpi-trend.'.$variantClass;
+            } else {
+                $variantSelector = '.delta.delta--'.$expected['variant'];
+            }
+            self::assertCount(1, $comparison->filter($variantSelector));
+            $expectedBadge = $expected['badge'];
+            if (UiModeResolver::LEGACY === $uiMode) {
+                if ('no_base' === $expected['state']) {
+                    $expectedBadge = 'Изменение:—';
+                    self::assertSame('Нетбазы', $this->normalizedText($comparison->filter('.visually-hidden')));
+                } elseif ('percent' === $expected['state']) {
+                    self::assertStringContainsString('Изменение:', $this->normalizedText($comparison));
+                    if ('neutral' !== $expected['variant']) {
+                        self::assertCount(1, $comparison->filter('.visually-hidden'));
+                        self::assertCount(1, $comparison->filter('[aria-hidden="true"]'));
+                        self::assertStringContainsString(
+                            str_starts_with($expected['badge'], '+') ? 'ростна' : 'снижениена',
+                            $this->normalizedText($comparison->filter('.visually-hidden')),
+                        );
+                    }
+                } elseif (str_starts_with($expected['state'], 'cross_')) {
+                    $expectedBadge = 'Изменение:'.$expectedBadge;
+                }
+            }
+            self::assertStringContainsString($expectedBadge, $this->normalizedText($comparison));
+            if ('percent' === $expected['state'] && UiModeResolver::APP === $uiMode) {
                 self::assertStringContainsString(
                     str_starts_with($expected['badge'], '+') ? 'Ростна' : 'Снижениена',
                     $this->normalizedText($comparison->filter('.delta')),

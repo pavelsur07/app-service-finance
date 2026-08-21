@@ -54,8 +54,8 @@ class HomeController extends AbstractController
             $company,
             $cashCurrency,
             $cashflowActivity,
-            UiModeResolver::APP === $uiMode,
-            $today,
+            withComparisons: true,
+            today: $today,
         );
 
         $template = UiModeResolver::APP === $uiMode
