@@ -208,6 +208,33 @@ final class PlOperationJsonExportControllerTest extends WebTestCaseBase
         self::assertSame(['A-2', 'A-1'], array_column($payload['operations'], 'number'));
     }
 
+    public function testExcludesSoftDeletedDocumentOperations(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        [$user, $company] = $this->seedCompanyContext('a1');
+        $category = $this->seedCategory($company, 'Выручка', 'REVENUE');
+        $active = $this->addOperation(
+            $this->seedDocument($company, '2026-04-01', 'ACTIVE'),
+            $category,
+            '100.00',
+        );
+        $deletedDocument = $this->seedDocument($company, '2026-04-02', 'DELETED');
+        $deleted = $this->addOperation($deletedDocument, $category, '200.00');
+        $deletedDocument->markDeleted('test-user', 'manual-ui');
+        $this->em()->flush();
+
+        $this->loginWithActiveCompany($client, $user, $company);
+        $client->request('GET', self::EXPORT_URL);
+
+        self::assertResponseIsSuccessful();
+        $payload = $this->decodeJson($client);
+        self::assertSame(1, $payload['count']);
+        self::assertSame([$active->getId()], array_column($payload['operations'], 'operation_id'));
+        self::assertNotContains($deleted->getId(), array_column($payload['operations'], 'operation_id'));
+    }
+
     /**
      * @return array{0: User, 1: Company}
      */

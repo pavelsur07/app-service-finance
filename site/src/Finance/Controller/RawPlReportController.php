@@ -50,6 +50,7 @@ class RawPlReportController extends AbstractController
             ->leftJoin('o.category', 'c')
             ->andWhere('d.company = :company')
             ->andWhere('d.date BETWEEN :from AND :to')
+            ->andWhere('d.deletedAt IS NULL')
             ->setParameter('company', $company)
             ->setParameter('from', $from)
             ->setParameter('to', $to)

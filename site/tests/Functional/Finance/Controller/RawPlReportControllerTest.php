@@ -68,6 +68,23 @@ final class RawPlReportControllerTest extends WebTestCaseBase
         self::assertStringContainsString('mixed-rostov-op', $content);
     }
 
+    public function testSoftDeletedDocumentsAreExcluded(): void
+    {
+        [$client, $em, $graph] = $this->bootClientWithGraph();
+
+        $this->createDocument($em, $graph, 'DOC-ACTIVE', $graph['krasnodarProject'], null, null);
+        $deleted = $this->createDocument($em, $graph, 'DOC-DELETED', $graph['krasnodarProject'], null, null);
+        $deleted->markDeleted('test-user', 'manual-ui');
+        $em->flush();
+
+        $client->request('GET', '/finance/reports/pl-raw?from=2026-07-01&to=2026-07-31');
+
+        self::assertResponseIsSuccessful();
+        $content = $client->getResponse()->getContent() ?: '';
+        self::assertStringContainsString('№DOC-ACTIVE', $content);
+        self::assertStringNotContainsString('№DOC-DELETED', $content);
+    }
+
     /**
      * @return array{0: KernelBrowser, 1: EntityManagerInterface, 2: array<string, mixed>}
      */
