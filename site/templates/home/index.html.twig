@@ -1,5 +1,36 @@
 {% extends 'base.html.twig' %}
 
+{% macro comparison(name, data, currency, previous_label) %}
+  {% set trend_class = data.variant == 'up' ? 'text-success' : (data.variant == 'down' ? 'text-danger' : 'text-muted') %}
+  <div
+    class="small text-muted mt-2"
+    data-dashboard-kpi-comparison="{{ name }}"
+    data-comparison-state="{{ data.state }}"
+    data-comparison-variant="{{ data.variant }}"
+  >
+    <div>{{ previous_label }}: {{ data.previous|number_format(0, '.', ' ') }} {{ currency }}</div>
+    <div class="kpi-trend {{ trend_class }}">
+      {% if data.state == 'percent' %}
+        {% set formatted_percent = data.percent|abs|number_format(1, ',', ' ') %}
+        Изменение:
+        {% if data.percent > 0 %}
+          <span class="visually-hidden">рост на {{ formatted_percent }}%</span><span aria-hidden="true">+{{ formatted_percent }}%</span>
+        {% elseif data.percent < 0 %}
+          <span class="visually-hidden">снижение на {{ formatted_percent }}%</span><span aria-hidden="true">-{{ formatted_percent }}%</span>
+        {% else %}
+          {{ formatted_percent }}%
+        {% endif %}
+      {% elseif data.state == 'cross_up' %}
+        Изменение: Из минуса в плюс
+      {% elseif data.state == 'cross_down' %}
+        Изменение: Из плюса в минус
+      {% elseif data.state == 'no_base' %}
+        Изменение: <span aria-hidden="true">—</span><span class="visually-hidden">Нет базы</span>
+      {% endif %}
+    </div>
+  </div>
+{% endmacro %}
+
 {% block title %}Главная{% endblock %}
 
 {% block importmap %}
@@ -73,6 +104,7 @@
       <div class="card-body">
         <div class="subheader">Остаток на сегодня</div>
         <div class="h1 mb-0" data-dashboard-kpi="todayBalance">{{ kpi.todayBalance|number_format(0, '.', ' ') }} {{ cashCurrency.value }}</div>
+        {{ _self.comparison('todayBalance', kpiComparisons.todayBalance, cashCurrency.value, '30 дней назад') }}
       </div>
     </div>
   </div>
@@ -81,6 +113,7 @@
       <div class="card-body">
         <div class="subheader">Приход (30 дней)</div>
         <div class="h1 mb-0" data-dashboard-kpi="inflow30">{{ kpi.inflow30|number_format(0, '.', ' ') }} {{ cashCurrency.value }}</div>
+        {{ _self.comparison('inflow30', kpiComparisons.inflow30, cashCurrency.value, 'Предыдущие 30 дней') }}
       </div>
     </div>
   </div>
@@ -89,6 +122,7 @@
       <div class="card-body">
         <div class="subheader">Расход (30 дней)</div>
         <div class="h1 mb-0" data-dashboard-kpi="outflow30">{{ kpi.outflow30|number_format(0, '.', ' ') }} {{ cashCurrency.value }}</div>
+        {{ _self.comparison('outflow30', kpiComparisons.outflow30, cashCurrency.value, 'Предыдущие 30 дней') }}
       </div>
     </div>
   </div>
@@ -96,7 +130,8 @@
     <div class="card">
       <div class="card-body">
         <div class="subheader">Чистый поток (30 дней)</div>
-        <div class="h1 mb-0" data-dashboard-kpi="netFlow30">{{ (kpi.inflow30 - kpi.outflow30)|number_format(0, '.', ' ') }} {{ cashCurrency.value }}</div>
+        <div class="h1 mb-0" data-dashboard-kpi="netFlow30">{{ kpi.netFlow30|number_format(0, '.', ' ') }} {{ cashCurrency.value }}</div>
+        {{ _self.comparison('netFlow30', kpiComparisons.netFlow30, cashCurrency.value, 'Предыдущие 30 дней') }}
       </div>
     </div>
   </div>
