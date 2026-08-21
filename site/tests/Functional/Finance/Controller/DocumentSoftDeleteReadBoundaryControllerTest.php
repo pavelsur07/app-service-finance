@@ -123,6 +123,50 @@ final class DocumentSoftDeleteReadBoundaryControllerTest extends WebTestCaseBase
         self::assertCount(1, $crawler->filter(sprintf('form[action="/documents/%s/restore"]', $deleted->getId())));
     }
 
+    public function testIndexRendersModalDeleteConfirmationWithCsrfData(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        [$user, $company] = $this->createCompanyContext();
+        $document = $this->createDocument($company, 'DELETE-CONFIRMATION');
+        $longLabelDocument = $this->createDocument($company, str_repeat('X', 81));
+        $this->em()->flush();
+
+        $this->loginWithActiveCompany($client, $user, $company);
+        $crawler = $client->request('GET', '/documents/');
+
+        self::assertResponseIsSuccessful();
+        $trigger = $crawler->filter(sprintf(
+            'button[type="button"][data-document-delete-trigger][data-delete-action="/documents/%s/delete"]',
+            $document->getId(),
+        ));
+        self::assertCount(1, $trigger);
+        self::assertCount(1, $crawler->filter('#document-delete-modal'));
+        self::assertSame('modal', $trigger->attr('data-bs-toggle'));
+        self::assertSame('#document-delete-modal', $trigger->attr('data-bs-target'));
+        $deleteAction = $trigger->attr('data-delete-action');
+        $deleteToken = $trigger->attr('data-delete-token');
+        self::assertNotEmpty($deleteAction);
+        self::assertNotEmpty($deleteToken);
+        self::assertCount(1, $crawler->filter('#document-delete-modal form#document-delete-form input[name="_token"]'));
+        self::assertNull($crawler->filter('#document-delete-form')->attr('action'));
+        self::assertCount(1, $crawler->filter('#document-delete-submit[disabled]'));
+        self::assertCount(0, $crawler->filter(sprintf('form[action="/documents/%s/delete"]', $document->getId())));
+        self::assertStringNotContainsString('confirm(', $crawler->filter('table.card-table')->html());
+
+        $longLabelTrigger = $crawler->filter(sprintf(
+            '[data-document-delete-trigger][data-delete-action="/documents/%s/delete"]',
+            $longLabelDocument->getId(),
+        ));
+        self::assertCount(1, $longLabelTrigger);
+        self::assertSame('№ '.str_repeat('X', 78).'…', $longLabelTrigger->attr('data-delete-label'));
+
+        $client->request('POST', (string) $deleteAction, ['_token' => $deleteToken]);
+
+        self::assertResponseRedirects('/documents/');
+        self::assertTrue($this->reloadDocument((string) $document->getId())->isDeleted());
+    }
+
     public function testManualDeleteAndRestoreLifecycle(): void
     {
         $client = static::createClient();

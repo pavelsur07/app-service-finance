@@ -103,6 +103,7 @@
                                 {% endif %}
                             {% endfor %}
                             {% set total = income - expense %}
+                            {% set deleteLabel = item.number ? '№ ' ~ item.number : (item.description ?: 'Выбранная операция') %}
                             <tr>
                                 {% set statusValue = item.status.value %}
                                 {% set statusLabel = statusLabels[statusValue] ?? statusValue %}
@@ -150,12 +151,16 @@
                                                 <i class="ti ti-pencil me-2"></i> Редактировать
                                             </a>
                                             <div class="dropdown-divider"></div>
-                                            <form method="post" action="{{ path('document_delete', {'id': item.id}) }}" class="m-0" onsubmit="return confirm('Переместить операцию ОПиУ в «Удалённые»? Её можно будет восстановить.');">
-                                                <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ item.id) }}">
-                                                <button type="submit" class="dropdown-item text-danger d-flex align-items-center gap-2">
-                                                    <i class="ti ti-trash"></i> Удалить
-                                                </button>
-                                            </form>
+                                            <button type="button"
+                                                    class="dropdown-item text-danger d-flex align-items-center gap-2"
+                                                    data-document-delete-trigger
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#document-delete-modal"
+                                                    data-delete-action="{{ path('document_delete', {'id': item.id}) }}"
+                                                    data-delete-token="{{ csrf_token('delete' ~ item.id) }}"
+                                                    data-delete-label="{{ deleteLabel|length > 80 ? deleteLabel|slice(0, 80) ~ '…' : deleteLabel }}">
+                                                <i class="ti ti-trash"></i> Удалить
+                                            </button>
                                         </div>
                                     </div>
                                 </td>
@@ -237,4 +242,81 @@
             </form>
         </div>
     </div>
+
+    <div class="modal modal-blur fade"
+         id="document-delete-modal"
+         tabindex="-1"
+         role="dialog"
+         aria-labelledby="document-delete-modal-title"
+         aria-describedby="document-delete-modal-description"
+         aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <form method="post" id="document-delete-form">
+                    <input type="hidden" name="_token" id="document-delete-token" value="">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="document-delete-modal-title">Удалить операцию ОПиУ?</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                    </div>
+                    <div class="modal-body" id="document-delete-modal-description">
+                        Операция «<strong id="document-delete-label" class="text-break">Выбранная операция</strong>» будет перемещена
+                        в раздел «Удалённые». Её можно будет восстановить.
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-danger" id="document-delete-submit" disabled>
+                            Переместить в удалённые
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            var modal = document.getElementById('document-delete-modal');
+            var form = document.getElementById('document-delete-form');
+            var token = document.getElementById('document-delete-token');
+            var label = document.getElementById('document-delete-label');
+            var submit = document.getElementById('document-delete-submit');
+            var lastTrigger = null;
+
+            modal.addEventListener('show.bs.modal', function (event) {
+                var trigger = event.relatedTarget;
+                var action = trigger && trigger.getAttribute('data-delete-action');
+                var csrfToken = trigger && trigger.getAttribute('data-delete-token');
+
+                if (!action || !csrfToken) {
+                    event.preventDefault();
+                    return;
+                }
+
+                form.action = action;
+                token.value = csrfToken;
+                label.textContent = trigger.getAttribute('data-delete-label') || 'Выбранная операция';
+                submit.disabled = false;
+                lastTrigger = trigger;
+            });
+
+            modal.addEventListener('hidden.bs.modal', function () {
+                var dropdown = lastTrigger && lastTrigger.closest('.dropdown');
+                var dropdownToggle = dropdown && dropdown.querySelector('[data-bs-toggle="dropdown"]');
+
+                form.removeAttribute('action');
+                token.value = '';
+                label.textContent = 'Выбранная операция';
+                submit.disabled = true;
+
+                if (dropdownToggle) {
+                    dropdownToggle.focus();
+                }
+                lastTrigger = null;
+            });
+
+            form.addEventListener('submit', function () {
+                submit.disabled = true;
+            });
+        })();
+    </script>
 {% endblock %}
