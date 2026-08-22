@@ -3,6 +3,7 @@
 namespace App\Cash\Repository\Transaction;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashflowFlowKind;
@@ -514,6 +515,59 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
 
         return bcadd((string) $result, '0', 2);
+    }
+
+    /**
+     * Returns gross turnover from positive split amounts split by transaction direction.
+     * Transfers and technical categories are excluded; unallocated is excluded for a selected flow kind.
+     *
+     * @return array{inflow:string,outflow:string}
+     */
+    public function sumGrossTurnoverByPeriodExcludeTransfers(
+        Company $company,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+        string $currency,
+        ?CashflowFlowKind $flowKind,
+    ): array {
+        $qb = $this->createQueryBuilder('t')
+            ->select(
+                'COALESCE(SUM(CASE WHEN t.direction = :inflow THEN split.amount ELSE 0 END), 0) AS inflow',
+                'COALESCE(SUM(CASE WHEN t.direction = :outflow THEN split.amount ELSE 0 END), 0) AS outflow',
+            )
+            ->innerJoin('t.splits', 'split')
+            ->innerJoin('split.cashflowCategory', 'category')
+            ->where('t.company = :company')
+            ->andWhere('t.occurredAt BETWEEN :from AND :to')
+            ->andWhere('t.currency = :currency')
+            ->andWhere('t.isTransfer = :isTransfer')
+            ->andWhere('t.deletedAt IS NULL')
+            ->andWhere('category.flowKind != :technicalFlowKind')
+            ->setParameter('company', $company)
+            ->setParameter('from', $from->setTime(0, 0))
+            ->setParameter('to', $to->setTime(23, 59, 59))
+            ->setParameter('currency', $currency)
+            ->setParameter('isTransfer', false)
+            ->setParameter('technicalFlowKind', CashflowFlowKind::TECHNICAL)
+            ->setParameter('inflow', CashDirection::INFLOW)
+            ->setParameter('outflow', CashDirection::OUTFLOW);
+
+        if (null !== $flowKind) {
+            $qb->andWhere('category.flowKind = :flowKind')
+                ->andWhere('(category.systemCode IS NULL OR category.systemCode NOT IN (:unallocatedCodes))')
+                ->setParameter('flowKind', $flowKind)
+                ->setParameter('unallocatedCodes', [
+                    CashflowCategory::CODE_UNALLOCATED,
+                    CashflowCategory::SYSTEM_UNALLOCATED,
+                ]);
+        }
+
+        $row = $qb->getQuery()->getSingleResult(Query::HYDRATE_ARRAY);
+
+        return [
+            'inflow' => bcadd((string) ($row['inflow'] ?? '0'), '0', 2),
+            'outflow' => bcadd((string) ($row['outflow'] ?? '0'), '0', 2),
+        ];
     }
 
     /**
