@@ -25,7 +25,12 @@ final readonly class FinanceDashboardKpiProvider
     /**
      * @return array{
      *     kpi: array{todayBalance:string,inflow30:string,outflow30:string,netFlow30:string},
-     *     comparisons: array<string,array{previous:string,state:string,percent:?string,variant:string}>
+     *     comparisons: array<string,array{previous:string,state:string,percent:?string,variant:string}>,
+     *     periods: array{
+     *         current:array{from:\DateTimeImmutable,to:\DateTimeImmutable},
+     *         previous:array{from:\DateTimeImmutable,to:\DateTimeImmutable},
+     *         balanceComparisonDate:\DateTimeImmutable
+     *     }
      * }
      */
     public function build(
@@ -73,9 +78,14 @@ final readonly class FinanceDashboardKpiProvider
             'outflow30' => $outflow30,
             'netFlow30' => $netFlow30,
         ];
+        $periods = [
+            'current' => ['from' => $currentFrom, 'to' => $today],
+            'previous' => ['from' => $previousFrom, 'to' => $previousTo],
+            'balanceComparisonDate' => $previousTo,
+        ];
 
         if (!$withComparisons) {
-            return ['kpi' => $kpi, 'comparisons' => []];
+            return ['kpi' => $kpi, 'comparisons' => [], 'periods' => $periods];
         }
 
         $previousBalance = $this->cashBalanceAtDate($company, $accounts, $previousTo, $scale);
@@ -98,6 +108,7 @@ final readonly class FinanceDashboardKpiProvider
                 'outflow30' => $this->comparison($outflow30, $previousOutflow30, false, $scale),
                 'netFlow30' => $this->comparison($netFlow30, $previousNetFlow30, true, $scale),
             ],
+            'periods' => $periods,
         ];
     }
 

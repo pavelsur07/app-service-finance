@@ -93,6 +93,43 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
         self::assertSame('2026-04-14', $payload['periods'][1]['end']);
     }
 
+    public function testAuthorizedExportSupportsDashboardReconciliationScope(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        [$user, $company] = $this->seedCompanyContext('c1');
+        $this->seedCashflowData($company, '125.00', '2026-08-15');
+        $this->em()->flush();
+        $this->loginWithActiveCompany($client, $user, $company);
+
+        $client->request('GET', self::EXPORT_URL.'?'.http_build_query([
+            'from' => '2026-07-24',
+            'to' => '2026-08-22',
+            'group' => 'month',
+            'reconcile' => 'dashboard',
+            'activity' => 'operating',
+            'currency' => 'RUB',
+        ]));
+
+        self::assertResponseIsSuccessful();
+        $payload = $this->decodeJson($client);
+
+        self::assertSame([
+            'mode' => 'dashboard',
+            'activity' => 'operating',
+            'currency' => 'RUB',
+            'inflow' => '125.00',
+            'outflow' => '0.00',
+            'net' => '125.00',
+        ], $payload['dashboard_reconciliation']);
+        self::assertSame('dashboard', $payload['filters']['reconcile']);
+        self::assertSame('operating', $payload['filters']['activity']);
+        self::assertSame('RUB', $payload['filters']['currency']);
+        self::assertArrayNotHasKey('project_direction_ids', $payload['filters']);
+        self::assertArrayNotHasKey('responsibility_center_ids', $payload['filters']);
+    }
+
     public function testPayloadContainsRequiredTopLevelKeys(): void
     {
         $client = static::createClient();
@@ -124,6 +161,8 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
         ] as $key) {
             self::assertArrayHasKey($key, $payload);
         }
+        self::assertArrayNotHasKey('dashboard_reconciliation', $payload);
+        self::assertArrayNotHasKey('reconcile', $payload['filters']);
     }
 
     public function testPayloadContainsProjectCenterMatrix(): void
@@ -471,6 +510,9 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
             'from' => '2026-04-01',
             'to' => '2026-04-30',
             'group' => 'month',
+            'reconcile' => 'dashboard',
+            'activity' => 'operating',
+            'currency' => 'RUB',
         ]);
 
         $client->request('GET', '/api/public/reports/cashflow.json?'.$query);
@@ -480,6 +522,7 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
         self::assertEquals([125.0], $payload['categoryTotals'][$category->getId()]['totals']['RUB']);
         self::assertArrayNotHasKey('project_direction_ids', $payload);
         self::assertArrayNotHasKey('responsibility_center_ids', $payload);
+        self::assertArrayNotHasKey('dashboard_reconciliation', $payload);
 
         $client->request('GET', '/api/public/reports/cashflow.csv?'.$query);
         self::assertResponseIsSuccessful();

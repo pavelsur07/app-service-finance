@@ -120,6 +120,11 @@ final class FinanceDashboardKpiProviderTest extends IntegrationTestCase
             'outflow30' => ['previous' => '80.00', 'state' => 'percent', 'percent' => '-25.0', 'variant' => 'up'],
             'netFlow30' => ['previous' => '-40.00', 'state' => 'cross_up', 'percent' => null, 'variant' => 'up'],
         ], $operating['comparisons']);
+        self::assertSame('2026-07-17', $operating['periods']['current']['from']->format('Y-m-d'));
+        self::assertSame('2026-08-15', $operating['periods']['current']['to']->format('Y-m-d'));
+        self::assertSame('2026-06-17', $operating['periods']['previous']['from']->format('Y-m-d'));
+        self::assertSame('2026-07-16', $operating['periods']['previous']['to']->format('Y-m-d'));
+        self::assertSame('2026-07-16', $operating['periods']['balanceComparisonDate']->format('Y-m-d'));
 
         $financing = $provider->build($company, FiatCurrency::RUB, 'financing', true, $today);
         self::assertSame(
@@ -155,6 +160,7 @@ final class FinanceDashboardKpiProviderTest extends IntegrationTestCase
         $legacy = $provider->build($company, FiatCurrency::RUB, 'all', false, $today);
         self::assertSame($all['kpi'], $legacy['kpi']);
         self::assertSame([], $legacy['comparisons']);
+        self::assertEquals($all['periods'], $legacy['periods']);
     }
 
     public function testBuildKeepsGrossTurnoverWhenParentAndChildHaveOppositeDirections(): void
@@ -219,7 +225,7 @@ final class FinanceDashboardKpiProviderTest extends IntegrationTestCase
         self::assertSame($result['kpi']['netFlow30'], number_format($reportNet, 2, '.', ''));
     }
 
-    public function testBuildFiltersTurnoverBySplitActivityAndTransactionScope(): void
+    public function testBuildFiltersTurnoverAndCashflowReconciliationBySplitActivityAndTransactionScope(): void
     {
         $today = new \DateTimeImmutable('2026-08-15');
         $user = UserBuilder::aUser()->withEmail('finance-dashboard-filters@example.test')->build();
@@ -357,6 +363,84 @@ final class FinanceDashboardKpiProviderTest extends IntegrationTestCase
         self::assertSame('230.00', $all['kpi']['inflow30']);
         self::assertSame('0.00', $all['kpi']['outflow30']);
         self::assertSame('230.00', $all['kpi']['netFlow30']);
+
+        $reportBuilder = self::getContainer()->get(CashflowReportBuilder::class);
+        $operatingReport = $reportBuilder->build(new CashflowReportParams(
+            company: $company,
+            group: 'month',
+            from: $operating['periods']['current']['from'],
+            to: $operating['periods']['current']['to'],
+            dashboardActivity: 'operating',
+            dashboardCurrency: FiatCurrency::RUB,
+        ));
+        self::assertSame([
+            'mode' => 'dashboard',
+            'activity' => 'operating',
+            'currency' => 'RUB',
+            'inflow' => $operating['kpi']['inflow30'],
+            'outflow' => $operating['kpi']['outflow30'],
+            'net' => $operating['kpi']['netFlow30'],
+        ], $operatingReport['dashboardReconciliation']);
+        self::assertArrayHasKey(
+            (string) $categories[CashflowCategory::CODE_OPERATING]->getId(),
+            $operatingReport['categoryTotals'],
+        );
+        self::assertArrayNotHasKey(
+            (string) $categories[CashflowCategory::CODE_UNALLOCATED]->getId(),
+            $operatingReport['categoryTotals'],
+        );
+        self::assertArrayNotHasKey(
+            (string) $categories[CashflowCategory::CODE_TECHNICAL_IN]->getId(),
+            $operatingReport['categoryTotals'],
+        );
+        $operatingCategoryId = (string) $categories[CashflowCategory::CODE_OPERATING]->getId();
+        self::assertSame(
+            [0.0, 160.0],
+            $operatingReport['categoryTotals'][$operatingCategoryId]['totals']['RUB'],
+        );
+        self::assertSame(
+            ['RUB'],
+            array_keys($operatingReport['categoryTotals'][$operatingCategoryId]['totals']),
+        );
+        self::assertCount(1, $operatingReport['projectCenterMatrix']['rowsByProject']);
+        self::assertSame(
+            [0.0, 160.0],
+            $operatingReport['projectCenterMatrix']['rowsByProject'][0]['totals']['RUB'],
+        );
+        self::assertSame([0.0, 3230.0], $operatingReport['closings']['RUB']);
+        self::assertArrayNotHasKey('USD', $operatingReport['closings']);
+
+        $allReport = $reportBuilder->build(new CashflowReportParams(
+            company: $company,
+            group: 'month',
+            from: $all['periods']['current']['from'],
+            to: $all['periods']['current']['to'],
+            dashboardActivity: 'all',
+            dashboardCurrency: FiatCurrency::RUB,
+        ));
+        self::assertSame($all['kpi']['inflow30'], $allReport['dashboardReconciliation']['inflow']);
+        self::assertSame($all['kpi']['outflow30'], $allReport['dashboardReconciliation']['outflow']);
+        self::assertSame($all['kpi']['netFlow30'], $allReport['dashboardReconciliation']['net']);
+        self::assertArrayHasKey(
+            (string) $categories[CashflowCategory::CODE_UNALLOCATED]->getId(),
+            $allReport['categoryTotals'],
+        );
+        self::assertArrayNotHasKey(
+            (string) $categories[CashflowCategory::CODE_TECHNICAL_IN]->getId(),
+            $allReport['categoryTotals'],
+        );
+        self::assertSame(
+            [0.0, 160.0],
+            $allReport['categoryTotals'][$operatingCategoryId]['totals']['RUB'],
+        );
+        self::assertSame(
+            [0.0, 40.0],
+            $allReport['categoryTotals'][(string) $categories[CashflowCategory::CODE_FINANCING]->getId()]['totals']['RUB'],
+        );
+        self::assertSame(
+            [0.0, 30.0],
+            $allReport['categoryTotals'][(string) $categories[CashflowCategory::CODE_UNALLOCATED]->getId()]['totals']['RUB'],
+        );
     }
 
     private function persistTransaction(

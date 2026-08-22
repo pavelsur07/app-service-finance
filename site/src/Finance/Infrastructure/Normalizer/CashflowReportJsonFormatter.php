@@ -43,7 +43,15 @@ final readonly class CashflowReportJsonFormatter
             if (null !== ($payload['responsibility_center_ids'] ?? null)) {
                 $filters['responsibility_center_ids'] = $payload['responsibility_center_ids'];
             }
+            if (null !== ($payload['dashboardReconciliation'] ?? null)) {
+                $filters['reconcile'] = $payload['dashboardReconciliation']['mode'];
+                $filters['activity'] = $payload['dashboardReconciliation']['activity'];
+                $filters['currency'] = $payload['dashboardReconciliation']['currency'];
+            }
             $result['filters'] = $filters;
+        }
+        if (null !== ($payload['dashboardReconciliation'] ?? null)) {
+            $result['dashboard_reconciliation'] = $payload['dashboardReconciliation'];
         }
 
         return $result + [

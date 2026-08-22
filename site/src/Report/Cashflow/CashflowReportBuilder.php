@@ -2,7 +2,10 @@
 
 namespace App\Report\Cashflow;
 
+use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Enum\Transaction\CashflowFlowKind;
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
@@ -38,6 +41,12 @@ final class CashflowReportBuilder
         $periodCount = count($periods);
 
         $categories = $this->categoryRepository->findTreeByCompany($company);
+        if ($params->isDashboardReconciliation()) {
+            $categories = array_values(array_filter(
+                $categories,
+                fn (CashflowCategory $category): bool => $this->categoryMatchesDashboardScope($category, $params),
+            ));
+        }
         $categoryMap = [];
         foreach ($categories as $cat) {
             $categoryMap[$cat->getId()] = [
@@ -54,7 +63,8 @@ final class CashflowReportBuilder
                 $params->availableProjectDirections,
             );
         $responsibilityCenterIds = $params->responsibilityCenterIds;
-        $filtersActive = null !== $projectDirectionIds
+        $filtersActive = $params->isDashboardReconciliation()
+            || null !== $projectDirectionIds
             || null !== $responsibilityCenterIds
             || null !== $params->responsibilityCenterId;
         $emptyFilter = [] === $projectDirectionIds || [] === $responsibilityCenterIds;
@@ -63,6 +73,10 @@ final class CashflowReportBuilder
             $rows = [];
         } else {
             $transactionQueryBuilder = $this->createTransactionRowsQueryBuilder($company, $from, $to);
+
+            if ($params->isDashboardReconciliation()) {
+                $this->applyDashboardScope($transactionQueryBuilder, $params);
+            }
 
             if (null !== $projectDirectionIds) {
                 $transactionQueryBuilder
@@ -82,9 +96,17 @@ final class CashflowReportBuilder
             $rows = $transactionQueryBuilder->getQuery()->getArrayResult();
         }
 
-        $companyRows = $filtersActive
-            ? $this->createTransactionRowsQueryBuilder($company, $from, $to)->getQuery()->getArrayResult()
-            : $rows;
+        if ($filtersActive) {
+            $companyQueryBuilder = $this->createTransactionRowsQueryBuilder($company, $from, $to);
+            if ($params->isDashboardReconciliation()) {
+                $companyQueryBuilder
+                    ->andWhere('t.currency = :companyCurrency')
+                    ->setParameter('companyCurrency', $params->dashboardCurrency?->value);
+            }
+            $companyRows = $companyQueryBuilder->getQuery()->getArrayResult();
+        } else {
+            $companyRows = $rows;
+        }
 
         foreach ($rows as $row) {
             $catId = $row['category'];
@@ -109,7 +131,7 @@ final class CashflowReportBuilder
         $companyTotals = [];
         foreach ($companyRows as $row) {
             $catId = $row['category'];
-            if (!$catId || !isset($categoryMap[$catId])) {
+            if (!$catId || (!$params->isDashboardReconciliation() && !isset($categoryMap[$catId]))) {
                 continue;
             }
 
@@ -148,7 +170,16 @@ final class CashflowReportBuilder
 
         $categoryTree = $this->buildCategoryTree($categories);
 
-        $accounts = $this->accountRepository->findBy(['company' => $company]);
+        $accounts = $params->isDashboardReconciliation()
+            ? $this->accountRepository->findByFilters(
+                $company,
+                null,
+                [$params->dashboardCurrency?->value],
+                null,
+                null,
+                ['name' => 'ASC'],
+            )
+            : $this->accountRepository->findBy(['company' => $company]);
         $openingByCurrency = [];
         foreach ($accounts as $account) {
             $date = $from->setTime(0, 0);
@@ -191,6 +222,11 @@ final class CashflowReportBuilder
 
         $tree = $this->buildCategoryTotalsTree($categories, $categoryMap);
 
+        $dashboardReconciliation = null;
+        if ($params->isDashboardReconciliation()) {
+            $dashboardReconciliation = $this->buildDashboardReconciliation($params);
+        }
+
         return [
             'company' => $company,
             'group' => $group,
@@ -207,6 +243,7 @@ final class CashflowReportBuilder
             'tree' => $tree,
             'categoryTree' => $categoryTree,
             'projectCenterMatrix' => $this->buildProjectCenterMatrix($rows, $periods),
+            'dashboardReconciliation' => $dashboardReconciliation,
         ];
     }
 
@@ -287,8 +324,78 @@ final class CashflowReportBuilder
             ->setParameter('to', $to->setTime(23, 59, 59));
     }
 
+    private function applyDashboardScope(QueryBuilder $queryBuilder, CashflowReportParams $params): void
+    {
+        // Keep this scope identical to CashTransactionRepository::sumGrossTurnoverByPeriodExcludeTransfers().
+        $queryBuilder
+            ->innerJoin('split.cashflowCategory', 'cashflowCategory')
+            ->andWhere('t.currency = :dashboardCurrency')
+            ->andWhere('t.isTransfer = :dashboardTransfer')
+            ->andWhere('cashflowCategory.flowKind != :technicalFlowKind')
+            ->setParameter('dashboardCurrency', $params->dashboardCurrency?->value)
+            ->setParameter('dashboardTransfer', false)
+            ->setParameter('technicalFlowKind', CashflowFlowKind::TECHNICAL);
+
+        $flowKind = $params->dashboardFlowKind();
+        if (null !== $flowKind) {
+            $queryBuilder
+                ->andWhere('cashflowCategory.flowKind = :dashboardFlowKind')
+                ->andWhere('(cashflowCategory.systemCode IS NULL OR cashflowCategory.systemCode NOT IN (:dashboardUnallocatedCodes))')
+                ->setParameter('dashboardFlowKind', $flowKind)
+                ->setParameter('dashboardUnallocatedCodes', [
+                    CashflowCategory::CODE_UNALLOCATED,
+                    CashflowCategory::SYSTEM_UNALLOCATED,
+                ]);
+        }
+    }
+
+    private function categoryMatchesDashboardScope(
+        CashflowCategory $category,
+        CashflowReportParams $params,
+    ): bool {
+        // Presentation categories mirror the same aggregator scope as applyDashboardScope().
+        if (CashflowFlowKind::TECHNICAL === $category->getFlowKind()) {
+            return false;
+        }
+
+        $flowKind = $params->dashboardFlowKind();
+        if (null === $flowKind) {
+            return true;
+        }
+
+        return $flowKind === $category->getFlowKind()
+            && !\in_array($category->getSystemCode(), [
+                CashflowCategory::CODE_UNALLOCATED,
+                CashflowCategory::SYSTEM_UNALLOCATED,
+            ], true);
+    }
+
+    /** @return array{mode:string,activity:string,currency:string,inflow:string,outflow:string,net:string} */
+    private function buildDashboardReconciliation(CashflowReportParams $params): array
+    {
+        $currency = $params->dashboardCurrency ?? FiatCurrency::RUB;
+        $turnover = $this->transactionRepository->sumGrossTurnoverByPeriodExcludeTransfers(
+            $params->company,
+            $params->from,
+            $params->to,
+            $currency->value,
+            $params->dashboardFlowKind(),
+        );
+        $inflow = bcadd($turnover['inflow'], '0', $currency->scale());
+        $outflow = bcadd($turnover['outflow'], '0', $currency->scale());
+
+        return [
+            'mode' => 'dashboard',
+            'activity' => $params->dashboardActivity ?? 'all',
+            'currency' => $currency->value,
+            'inflow' => $inflow,
+            'outflow' => $outflow,
+            'net' => bcsub($inflow, $outflow, $currency->scale()),
+        ];
+    }
+
     /**
-     * @param list<array<string,mixed>>                                                 $rows
+     * @param list<array<string,mixed>> $rows
      * @param list<array{label:string,start:\DateTimeInterface,end:\DateTimeInterface}> $periods
      *
      * @return array{
@@ -382,7 +489,7 @@ final class CashflowReportBuilder
     }
 
     /**
-     * @param \App\Cash\Entity\Transaction\CashflowCategory[] $categories // полный список, как вернул findTreeByCompany()
+     * @param CashflowCategory[] $categories // полный список, как вернул findTreeByCompany()
      *
      * @return array<int, array{id:string,name:string,parentId:?string,level:int,order:int}>
      */
@@ -410,7 +517,9 @@ final class CashflowReportBuilder
             $result[] = [
                 'id' => $c->getId(),
                 'name' => (string) $c->getName(),
-                'parentId' => $c->getParent() ? $c->getParent()->getId() : null,
+                'parentId' => null !== $c->getParent() && isset($byId[$c->getParent()->getId()])
+                    ? $c->getParent()->getId()
+                    : null,
                 'level' => $level,
                 'order' => $order++,
             ];
@@ -430,8 +539,8 @@ final class CashflowReportBuilder
      *   'children'=> array<node>
      * ].
      *
-     * @param \App\Cash\Entity\Transaction\CashflowCategory[]                                                                  $allCategories // полный список (findTreeByCompany)
-     * @param array<string,array{entity:\App\Cash\Entity\Transaction\CashflowCategory, totals:array<string,array<int,float>>}> $categoryMap
+     * @param CashflowCategory[] $allCategories // полный список (findTreeByCompany)
+     * @param array<string,array{entity:CashflowCategory, totals:array<string,array<int,float>>}> $categoryMap
      *
      * @return array<int,array>
      */
@@ -439,16 +548,22 @@ final class CashflowReportBuilder
     {
         // Индексы
         $byId = [];
+        foreach ($allCategories as $cat) {
+            $byId[$cat->getId()] = $cat;
+        }
+
         $children = [];
         foreach ($allCategories as $cat) {
             $id = $cat->getId();
-            $byId[$id] = $cat;
             $pid = $cat->getParent() ? $cat->getParent()->getId() : null;
+            if (null !== $pid && !isset($byId[$pid])) {
+                $pid = null;
+            }
             $children[$pid][] = $id; // pid=null → корни
         }
 
         // Рекурсивный сбор узла
-        $makeNode = function (string $id, int $level) use (&$makeNode, $children, $byId, $categoryMap): array {
+        $makeNode = static function (string $id, int $level) use (&$makeNode, $children, $byId, $categoryMap): array {
             $cat = $byId[$id];
             // уровень ограничим 0..4
             $lvl = max(0, min(4, $level));
