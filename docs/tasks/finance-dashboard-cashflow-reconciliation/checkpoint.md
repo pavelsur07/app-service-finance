@@ -1,7 +1,7 @@
 ## Current checkpoint
 
 **Phase:** Stage 2
-**Status:** done — Release Gate delivery pending
+**Status:** done — Release Gate reached
 **Stage base commit:** `353ed3b1256bf34752f0ef1a6ca2c495d5c1fd01`
 **Current Work item:** none — Stage 2 reviewed green
 **Owner gate:** yes
@@ -29,6 +29,9 @@
 - Independent internal Stage 2 review green; safe MINOR fixes removed unused Twig context and completed the summary ARIA group.
 - External Claude Code review (2.1.238) completed `REVIEW_GREEN`; no BLOCKER/IMPORTANT and no must-fix MINOR.
 - Final relevant suite green after review: 39 tests, 963 assertions, 2 pre-existing deprecations; Twig/PHP syntax, changed-file PHP CS and `git diff --check` green.
+- Stage 2 committed as `a1f6aa8d` and pushed to `origin/task/finance-dashboard-cashflow-reconciliation`.
+- Draft PR #2358 created with base `master`; stored base/head verified, PR is mergeable/CLEAN.
+- GitHub CI green: detect changes, unit tests, empty-DB migrations, API type sync and three image builds passed; production schema verification and deploy were skipped.
 
 ### Current diff / affected files
 
@@ -62,7 +65,7 @@
 
 ### Exact next action
 
-- Commit and push the reviewed Stage 2 diff, retry Draft PR creation with base `master`, verify delivery facts, then stop at the declared Release Gate.
+- Await explicit owner approval to mark PR #2358 Ready, merge into `master`, and allow the automatic production deploy.
 
 ### Files to inspect first on resume
 
