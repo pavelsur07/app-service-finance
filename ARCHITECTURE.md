@@ -929,6 +929,13 @@ seedDefaultStructure(string $companyId): bool
   unallocated строк. Потоки сохраняют исторические операции неактивных счетов,
   как отчёт ДДС; фильтр active применяется только к линии текущих остатков. Все
   суммы API — decimal strings, без FX и float arithmetic.
+- Legacy `/finance` монтирует React-виджет в
+  `#finance-balance-dynamics-root` через отдельный Vite entry
+  `finance_balance_dynamics`; app-mode `/finance` и `/dashboard` этот entry не
+  подключают.
+- Виджет имеет независимый от KPI период 30/60/90 дней, строит native SVG без
+  chart-зависимости и подключает переиспользуемые стили
+  `assets/styles/components/financial-chart.css`.
 
 ### `CashFacade` (`src/Cash/Facade/CashFacade.php`)
 ```php

@@ -70,7 +70,7 @@ Risk: MEDIUM
 owner_gate: yes
 release_candidate: yes
 independently_deployable: yes
-stage_base_commit: commit Stage 2
+stage_base_commit: `3de320c0ae74583a61b225185bdfdf1ce6e74b69`
 
 Definition of Done:
 - Виджет под четырьмя legacy KPI, только на `/finance`; новый UI и `/dashboard` не меняются.
@@ -105,3 +105,13 @@ Reviewer focus:
 - Настройка порога — в карточке компании, не внутри графика.
 - Период графика независим от фильтра legacy KPI.
 - Нет FX-конвертации, cache, chart dependency и изменения account-level threshold.
+- Одобренный план требует реализацию React-компонентов именно в legacy-разделе;
+  поэтому Stage 3 осознанно добавляет entry/components в `_legacy/`, несмотря на
+  общее quarantine-правило. Размещение в `modules/` потребовало бы сначала
+  перенести Tabler/vf-классы виджета в UI Kit и расширило бы текущий scope.
+- Обязательный follow-up после поставки: перенести виджет в
+  `assets/react/modules/finance-dashboard/` и тонкий
+  `assets/react/entrypoints/` одновременно с готовностью соответствующих UI Kit
+  компонентов, затем удалить Stage 3 файлы из `_legacy/`.
+- Порог `0 RUB` — явное валидное значение Company и показывается как нулевая
+  линия; скрытие нуля означало бы отдельную бизнес-семантику «не настроено».

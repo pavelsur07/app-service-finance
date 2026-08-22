@@ -30,6 +30,9 @@ final class HomeUiModeTest extends WebTestCaseBase
         self::assertStringContainsString('@tabler/core@1.2.0', (string) $client->getResponse()->getContent());
         self::assertSelectorNotExists('[data-dashboard-mode="app"]');
         self::assertSelectorCount(4, '[data-dashboard-kpi-comparison]');
+        self::assertSelectorExists(
+            '#finance-balance-dynamics-root[data-endpoint="/api/finance/dashboard/balance-dynamics"][data-currency="RUB"]',
+        );
     }
 
     public function testUserCookieRendersAppDashboardWithoutTablerAssets(): void
@@ -52,6 +55,7 @@ final class HomeUiModeTest extends WebTestCaseBase
         self::assertSelectorTextContains('.ui-mode-switch button[aria-pressed="true"]', 'Новый');
         self::assertStringNotContainsString('@tabler/core', (string) $client->getResponse()->getContent());
         self::assertSelectorNotExists('#react-dashboard-started');
+        self::assertSelectorNotExists('#finance-balance-dynamics-root');
     }
 
     public function testAdminCookieStillRendersAppDashboard(): void

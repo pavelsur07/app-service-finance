@@ -73,6 +73,7 @@ final class HomeCashCurrencyTest extends WebTestCaseBase
             ['50 USD', '5 USD', '0 USD', '5 USD'],
             $crawler->filter('.row-deck .h1')->each(static fn ($node): string => trim($node->text())),
         );
+        self::assertCount(1, $crawler->filter('#finance-balance-dynamics-root[data-currency="USD"]'));
     }
 
     public function testHomeRejectsUnsupportedCashCurrency(): void
