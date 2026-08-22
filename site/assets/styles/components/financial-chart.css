@@ -164,7 +164,7 @@
 
 .vf-financial-chart__body {
     min-height: 22rem;
-    padding: 0.75rem 1rem 0.25rem;
+    padding: 0.75rem 1.25rem 0.25rem;
 }
 
 .vf-financial-chart__plot {
@@ -332,8 +332,6 @@
 
     .vf-financial-chart__body {
         min-height: 18rem;
-        padding-right: 0.5rem;
-        padding-left: 0.25rem;
     }
 
     .vf-financial-chart__plot {
