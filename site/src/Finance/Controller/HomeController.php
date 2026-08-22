@@ -19,6 +19,14 @@ class HomeController extends AbstractController
 {
     private const ACTIVITY_ALL = 'all';
 
+    private const DEFAULT_DASHBOARD_PERIOD_DAYS = 30;
+
+    private const DASHBOARD_PERIODS = [
+        7 => '7 дней',
+        14 => '14 дней',
+        self::DEFAULT_DASHBOARD_PERIOD_DAYS => '30 дней',
+    ];
+
     private const CASHFLOW_ACTIVITIES = [
         'operating' => 'Операционная',
         'financing' => 'Финансовая',
@@ -50,12 +58,16 @@ class HomeController extends AbstractController
         $today = (new \DateTimeImmutable('today'))->setTime(0, 0);
         $uiMode = $this->uiModeResolver->current();
         $cashflowActivity = $this->resolveCashflowActivity($request);
+        $dashboardPeriodDays = UiModeResolver::LEGACY === $uiMode
+            ? $this->resolveDashboardPeriodDays($request)
+            : self::DEFAULT_DASHBOARD_PERIOD_DAYS;
         $dashboardKpis = $this->kpiProvider->build(
             $company,
             $cashCurrency,
             $cashflowActivity,
             withComparisons: true,
             today: $today,
+            periodDays: $dashboardPeriodDays,
         );
         $kpiPeriodLabels = $this->kpiPeriodLabels($dashboardKpis['periods']);
         $cashflowReconciliationQuery = [
@@ -71,7 +83,7 @@ class HomeController extends AbstractController
             ? 'app/home/index.html.twig'
             : 'home/index.html.twig';
 
-        return $this->render($template, [
+        $templateParameters = [
             'activeCompany' => $company,
             'cashCurrency' => $cashCurrency,
             'cashCurrencies' => FiatCurrency::cases(),
@@ -81,7 +93,13 @@ class HomeController extends AbstractController
             'kpiComparisons' => $dashboardKpis['comparisons'],
             'kpiPeriodLabels' => $kpiPeriodLabels,
             'cashflowReconciliationQuery' => $cashflowReconciliationQuery,
-        ]);
+        ];
+        if (UiModeResolver::LEGACY === $uiMode) {
+            $templateParameters['dashboardPeriodDays'] = $dashboardPeriodDays;
+            $templateParameters['dashboardPeriods'] = self::DASHBOARD_PERIODS;
+        }
+
+        return $this->render($template, $templateParameters);
     }
 
     #[Route('/dashboard', name: 'app_dashboard_index', methods: ['GET'])]
@@ -116,6 +134,15 @@ class HomeController extends AbstractController
         return is_string($activity) && array_key_exists($activity, self::CASHFLOW_ACTIVITIES)
             ? $activity
             : self::ACTIVITY_ALL;
+    }
+
+    private function resolveDashboardPeriodDays(Request $request): int
+    {
+        $period = $request->query->all()['period'] ?? null;
+
+        return is_string($period) && array_key_exists($period, self::DASHBOARD_PERIODS)
+            ? (int) $period
+            : self::DEFAULT_DASHBOARD_PERIOD_DAYS;
     }
 
     /**
