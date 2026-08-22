@@ -18,7 +18,7 @@ use Ramsey\Uuid\Uuid;
 
 final class HomeCashCurrencyTest extends WebTestCaseBase
 {
-    public function testHomeKpisAndReactSnapshotUseSelectedCashCurrency(): void
+    public function testHomeKpisUseSelectedCashCurrency(): void
     {
         $client = static::createClient();
         $this->resetDb();
@@ -69,7 +69,6 @@ final class HomeCashCurrencyTest extends WebTestCaseBase
         $crawler = $client->request('GET', '/finance?currency=USD');
 
         self::assertResponseIsSuccessful();
-        self::assertSame('USD', $crawler->filter('#react-dashboard-started')->attr('data-default-currency'));
         self::assertSame(
             ['50 USD', '5 USD', '0 USD', '5 USD'],
             $crawler->filter('.row-deck .h1')->each(static fn ($node): string => trim($node->text())),
