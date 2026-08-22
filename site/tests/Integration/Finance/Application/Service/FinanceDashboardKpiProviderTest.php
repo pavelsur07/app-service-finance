@@ -15,6 +15,8 @@ use App\Cash\Enum\Transaction\CashTransactionSplitSource;
 use App\Cash\Service\Category\CashflowSystemCategoryService;
 use App\Company\Entity\Company;
 use App\Finance\Application\Service\FinanceDashboardKpiProvider;
+use App\Report\Cashflow\CashflowReportBuilder;
+use App\Report\Cashflow\CashflowReportParams;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -155,6 +157,208 @@ final class FinanceDashboardKpiProviderTest extends IntegrationTestCase
         self::assertSame([], $legacy['comparisons']);
     }
 
+    public function testBuildKeepsGrossTurnoverWhenParentAndChildHaveOppositeDirections(): void
+    {
+        $today = new \DateTimeImmutable('2026-08-15');
+        $user = UserBuilder::aUser()->withEmail('finance-dashboard-mixed-directions@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withOwner($user)->build();
+        $account = MoneyAccountBuilder::aMoneyAccount()
+            ->withId(Uuid::uuid4()->toString())
+            ->forCompany($company)
+            ->withName('Mixed directions account')
+            ->build()
+            ->setOpeningBalance('0.00');
+
+        foreach ([$user, $company, $account] as $entity) {
+            $this->em->persist($entity);
+        }
+        $this->em->flush();
+
+        $categories = self::getContainer()->get(CashflowSystemCategoryService::class)->ensureStructure($company);
+        $child = (new CashflowCategory(Uuid::uuid4()->toString(), $company))
+            ->setName('Operating child')
+            ->setParent($categories[CashflowCategory::CODE_OPERATING])
+            ->syncFlowKindWithParent();
+        $this->em->persist($child);
+
+        $this->persistTransaction(
+            $company,
+            $account,
+            $categories[CashflowCategory::CODE_OPERATING],
+            CashDirection::INFLOW,
+            '100.00',
+            $today,
+        );
+        $this->persistTransaction(
+            $company,
+            $account,
+            $child,
+            CashDirection::OUTFLOW,
+            '80.00',
+            $today,
+        );
+        $this->em->flush();
+
+        $result = self::getContainer()->get(FinanceDashboardKpiProvider::class)->build(
+            $company,
+            FiatCurrency::RUB,
+            'operating',
+            false,
+            $today,
+        );
+
+        self::assertSame('100.00', $result['kpi']['inflow30']);
+        self::assertSame('80.00', $result['kpi']['outflow30']);
+        self::assertSame('20.00', $result['kpi']['netFlow30']);
+
+        $report = self::getContainer()->get(CashflowReportBuilder::class)->build(
+            new CashflowReportParams($company, 'day', $today, $today),
+        );
+        $reportNet = $report['categoryTotals'][(string) $categories[CashflowCategory::CODE_OPERATING]->getId()]['totals']['RUB'][0];
+        self::assertSame(20.0, $reportNet);
+        self::assertSame($result['kpi']['netFlow30'], number_format($reportNet, 2, '.', ''));
+    }
+
+    public function testBuildFiltersTurnoverBySplitActivityAndTransactionScope(): void
+    {
+        $today = new \DateTimeImmutable('2026-08-15');
+        $user = UserBuilder::aUser()->withEmail('finance-dashboard-filters@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withOwner($user)->build();
+        $rubAccount = MoneyAccountBuilder::aMoneyAccount()
+            ->withId(Uuid::uuid4()->toString())
+            ->forCompany($company)
+            ->withName('RUB account')
+            ->build()
+            ->setOpeningBalance('0.00');
+        $usdAccount = MoneyAccountBuilder::aMoneyAccount()
+            ->withId(Uuid::uuid4()->toString())
+            ->forCompany($company)
+            ->withName('USD account')
+            ->withCurrency('USD')
+            ->build()
+            ->setOpeningBalance('0.00');
+        $foreignUser = UserBuilder::aUser()->withIndex(2)->build();
+        $foreignCompany = CompanyBuilder::aCompany()->withIndex(2)->withOwner($foreignUser)->build();
+        $foreignAccount = MoneyAccountBuilder::aMoneyAccount()
+            ->withId(Uuid::uuid4()->toString())
+            ->forCompany($foreignCompany)
+            ->withName('Foreign company account')
+            ->build()
+            ->setOpeningBalance('0.00');
+
+        foreach ([$user, $company, $rubAccount, $usdAccount, $foreignUser, $foreignCompany, $foreignAccount] as $entity) {
+            $this->em->persist($entity);
+        }
+        $this->em->flush();
+
+        $categories = self::getContainer()->get(CashflowSystemCategoryService::class)->ensureStructure($company);
+        $this->persistTransaction(
+            $company,
+            $rubAccount,
+            $categories[CashflowCategory::CODE_OPERATING],
+            CashDirection::INFLOW,
+            '100.00',
+            $today,
+        );
+        $this->persistTransaction(
+            $company,
+            $rubAccount,
+            $categories[CashflowCategory::CODE_OPERATING],
+            CashDirection::INFLOW,
+            '1000.00',
+            $today,
+        )->setIsTransfer(true);
+        $this->persistTransaction(
+            $company,
+            $rubAccount,
+            $categories[CashflowCategory::CODE_TECHNICAL_IN],
+            CashDirection::INFLOW,
+            '2000.00',
+            $today,
+        );
+        $this->persistTransaction(
+            $company,
+            $rubAccount,
+            $categories[CashflowCategory::CODE_UNALLOCATED],
+            CashDirection::INFLOW,
+            '30.00',
+            $today,
+        );
+        $this->persistTransaction(
+            $company,
+            $rubAccount,
+            $categories[CashflowCategory::CODE_OPERATING],
+            CashDirection::OUTFLOW,
+            '500.00',
+            $today,
+        )->markDeleted(null);
+        $this->persistTransaction(
+            $company,
+            $usdAccount,
+            $categories[CashflowCategory::CODE_OPERATING],
+            CashDirection::INFLOW,
+            '700.00',
+            $today,
+            'USD',
+        );
+        $foreignCategories = self::getContainer()->get(CashflowSystemCategoryService::class)->ensureStructure($foreignCompany);
+        $this->persistTransaction(
+            $foreignCompany,
+            $foreignAccount,
+            $foreignCategories[CashflowCategory::CODE_OPERATING],
+            CashDirection::INFLOW,
+            '900.00',
+            $today,
+        );
+        $this->em->persist(new CashTransaction(
+            Uuid::uuid4()->toString(),
+            $company,
+            $rubAccount,
+            CashDirection::INFLOW,
+            '800.00',
+            'RUB',
+            $today,
+        ));
+
+        $splitTransaction = new CashTransaction(
+            Uuid::uuid4()->toString(),
+            $company,
+            $rubAccount,
+            CashDirection::INFLOW,
+            '100.00',
+            'RUB',
+            $today,
+        );
+        $splitTransaction->replaceSplits([
+            new CashTransactionSplit(
+                $splitTransaction,
+                $categories[CashflowCategory::CODE_OPERATING],
+                '60.00',
+                CashTransactionSplitSource::MANUAL,
+            ),
+            new CashTransactionSplit(
+                $splitTransaction,
+                $categories[CashflowCategory::CODE_FINANCING],
+                '40.00',
+                CashTransactionSplitSource::MANUAL,
+            ),
+        ]);
+        $this->em->persist($splitTransaction);
+        $this->em->flush();
+
+        $provider = self::getContainer()->get(FinanceDashboardKpiProvider::class);
+        $operating = $provider->build($company, FiatCurrency::RUB, 'operating', false, $today);
+        $financing = $provider->build($company, FiatCurrency::RUB, 'financing', false, $today);
+        $all = $provider->build($company, FiatCurrency::RUB, 'all', false, $today);
+
+        self::assertSame('160.00', $operating['kpi']['inflow30']);
+        self::assertSame('0.00', $operating['kpi']['outflow30']);
+        self::assertSame('40.00', $financing['kpi']['inflow30']);
+        self::assertSame('230.00', $all['kpi']['inflow30']);
+        self::assertSame('0.00', $all['kpi']['outflow30']);
+        self::assertSame('230.00', $all['kpi']['netFlow30']);
+    }
+
     private function persistTransaction(
         Company $company,
         MoneyAccount $account,
@@ -162,14 +366,15 @@ final class FinanceDashboardKpiProviderTest extends IntegrationTestCase
         CashDirection $direction,
         string $amount,
         \DateTimeImmutable $occurredAt,
-    ): void {
+        string $currency = 'RUB',
+    ): CashTransaction {
         $transaction = new CashTransaction(
             Uuid::uuid4()->toString(),
             $company,
             $account,
             $direction,
             $amount,
-            'RUB',
+            $currency,
             $occurredAt,
         );
         $transaction->setCashflowCategory($category);
@@ -180,5 +385,7 @@ final class FinanceDashboardKpiProviderTest extends IntegrationTestCase
             CashTransactionSplitSource::MANUAL,
         )]);
         $this->em->persist($transaction);
+
+        return $transaction;
     }
 }

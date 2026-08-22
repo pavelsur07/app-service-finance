@@ -5,23 +5,19 @@ declare(strict_types=1);
 namespace App\Finance\Application\Service;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
-use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\Transaction\CashflowFlowKind;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
+use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceProvider;
 use App\Company\Entity\Company;
-use App\Report\Cashflow\CashflowReportBuilder;
-use App\Report\Cashflow\CashflowReportParams;
 use App\Shared\Domain\ValueObject\RoundingMode;
 
 final readonly class FinanceDashboardKpiProvider
 {
-    private const PERIOD_DAYS = 30;
-
     public function __construct(
         private AccountBalanceProvider $accountBalanceProvider,
-        private CashflowReportBuilder $cashflowReportBuilder,
+        private CashTransactionRepository $cashTransactionRepository,
         private MoneyAccountRepository $moneyAccountRepository,
     ) {
     }
@@ -55,17 +51,21 @@ final readonly class FinanceDashboardKpiProvider
         );
 
         $todayBalance = $this->cashBalanceAtDate($company, $accounts, $today, $scale);
-        $reportFrom = $withComparisons ? $previousFrom : $currentFrom;
-        $report = $this->cashflowReportBuilder->build(
-            new CashflowReportParams($company, 'day', $reportFrom, $today),
+        $selectedFlowKind = match ($activity) {
+            'operating' => CashflowFlowKind::OPERATING,
+            'financing' => CashflowFlowKind::FINANCING,
+            'investing' => CashflowFlowKind::INVESTING,
+            default => null,
+        };
+        $currentTurnover = $this->cashTransactionRepository->sumGrossTurnoverByPeriodExcludeTransfers(
+            $company,
+            $currentFrom,
+            $today,
+            $cashCurrency->value,
+            $selectedFlowKind,
         );
-        $currentPeriodIndexes = $this->periodIndexes($report['periods'], $currentFrom, $today);
-        [$inflow30, $outflow30] = $this->cashflowTotalsForActivity(
-            $report,
-            $cashCurrency,
-            $activity,
-            $currentPeriodIndexes,
-        );
+        $inflow30 = bcadd($currentTurnover['inflow'], '0', $scale);
+        $outflow30 = bcadd($currentTurnover['outflow'], '0', $scale);
         $netFlow30 = bcsub($inflow30, $outflow30, $scale);
         $kpi = [
             'todayBalance' => $todayBalance,
@@ -79,12 +79,15 @@ final readonly class FinanceDashboardKpiProvider
         }
 
         $previousBalance = $this->cashBalanceAtDate($company, $accounts, $previousTo, $scale);
-        [$previousInflow30, $previousOutflow30] = $this->cashflowTotalsForActivity(
-            $report,
-            $cashCurrency,
-            $activity,
-            $this->periodIndexes($report['periods'], $previousFrom, $previousTo),
+        $previousTurnover = $this->cashTransactionRepository->sumGrossTurnoverByPeriodExcludeTransfers(
+            $company,
+            $previousFrom,
+            $previousTo,
+            $cashCurrency->value,
+            $selectedFlowKind,
         );
+        $previousInflow30 = bcadd($previousTurnover['inflow'], '0', $scale);
+        $previousOutflow30 = bcadd($previousTurnover['outflow'], '0', $scale);
         $previousNetFlow30 = bcsub($previousInflow30, $previousOutflow30, $scale);
 
         return [
@@ -96,99 +99,6 @@ final readonly class FinanceDashboardKpiProvider
                 'netFlow30' => $this->comparison($netFlow30, $previousNetFlow30, true, $scale),
             ],
         ];
-    }
-
-    /**
-     * @param array<string, mixed> $report
-     * @param list<int>            $periodIndexes
-     *
-     * @return array{string, string}
-     */
-    private function cashflowTotalsForActivity(
-        array $report,
-        FiatCurrency $cashCurrency,
-        string $activity,
-        array $periodIndexes,
-    ): array {
-        $selectedFlowKind = match ($activity) {
-            'operating' => CashflowFlowKind::OPERATING,
-            'financing' => CashflowFlowKind::FINANCING,
-            'investing' => CashflowFlowKind::INVESTING,
-            default => null,
-        };
-        $scale = $cashCurrency->scale();
-        $zero = bcadd('0', '0', $scale);
-        $selectedPeriods = array_fill_keys($periodIndexes, true);
-        $inflow = $zero;
-        $outflow = $zero;
-        $categoryTotals = $report['categoryTotals'];
-        $accumulate = static function (array $node, bool $insideUnallocated = false) use (
-            &$accumulate,
-            &$inflow,
-            &$outflow,
-            $cashCurrency,
-            $categoryTotals,
-            $selectedFlowKind,
-            $selectedPeriods,
-            $scale,
-            $zero,
-        ): array {
-            /** @var CashflowCategory $category */
-            $category = $categoryTotals[$node['id']]['entity'];
-            $insideUnallocated = $insideUnallocated || in_array($category->getSystemCode(), [
-                CashflowCategory::CODE_UNALLOCATED,
-                CashflowCategory::SYSTEM_UNALLOCATED,
-            ], true);
-            $childrenInflow = $zero;
-            $childrenOutflow = $zero;
-
-            foreach ($node['children'] ?? [] as $child) {
-                [$childInflow, $childOutflow] = $accumulate($child, $insideUnallocated);
-                $childrenInflow = bcadd($childrenInflow, $childInflow, $scale);
-                $childrenOutflow = bcadd($childrenOutflow, $childOutflow, $scale);
-            }
-
-            $nodeInflow = $zero;
-            $nodeOutflow = $zero;
-            foreach (($node['totals'] ?? [])[$cashCurrency->value] ?? [] as $periodIndex => $amount) {
-                if (!isset($selectedPeriods[$periodIndex])) {
-                    continue;
-                }
-
-                // CashflowReportBuilder currently exposes float totals; normalize that legacy boundary once.
-                $decimalAmount = number_format((float) $amount, $scale, '.', '');
-                $amountSign = bccomp($decimalAmount, '0', $scale);
-                if ($amountSign > 0) {
-                    $nodeInflow = bcadd($nodeInflow, $decimalAmount, $scale);
-                } elseif ($amountSign < 0) {
-                    $nodeOutflow = bcadd($nodeOutflow, ltrim($decimalAmount, '-'), $scale);
-                }
-            }
-
-            $ownInflow = bcsub($nodeInflow, $childrenInflow, $scale);
-            $ownOutflow = bcsub($nodeOutflow, $childrenOutflow, $scale);
-            $flowKind = $category->getEffectiveFlowKind();
-            $include = CashflowFlowKind::TECHNICAL !== $flowKind
-                && (null === $selectedFlowKind || (!$insideUnallocated && $selectedFlowKind === $flowKind));
-
-            if ($include) {
-                if (bccomp($ownInflow, '0', $scale) > 0) {
-                    $inflow = bcadd($inflow, $ownInflow, $scale);
-                }
-
-                if (bccomp($ownOutflow, '0', $scale) > 0) {
-                    $outflow = bcadd($outflow, $ownOutflow, $scale);
-                }
-            }
-
-            return [$nodeInflow, $nodeOutflow];
-        };
-
-        foreach ($report['tree'] as $node) {
-            $accumulate($node);
-        }
-
-        return [$inflow, $outflow];
     }
 
     /**
@@ -282,27 +192,5 @@ final readonly class FinanceDashboardKpiProvider
         }
 
         return ($deltaSign > 0) === $increaseIsPositive ? 'up' : 'down';
-    }
-
-    /**
-     * @param list<array{start:\DateTimeInterface,end:\DateTimeInterface}> $periods
-     *
-     * @return list<int>
-     */
-    private function periodIndexes(array $periods, \DateTimeImmutable $from, \DateTimeImmutable $to): array
-    {
-        $indexes = [];
-        foreach ($periods as $index => $period) {
-            $start = \DateTimeImmutable::createFromInterface($period['start'])->setTime(0, 0);
-            if ($start >= $from && $start <= $to) {
-                $indexes[] = $index;
-            }
-        }
-
-        if (self::PERIOD_DAYS !== count($indexes)) {
-            throw new \LogicException(sprintf('Finance dashboard period %s..%s must contain exactly %d days, got %d.', $from->format('Y-m-d'), $to->format('Y-m-d'), self::PERIOD_DAYS, count($indexes)));
-        }
-
-        return $indexes;
     }
 }
