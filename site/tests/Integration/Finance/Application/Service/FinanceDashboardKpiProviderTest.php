@@ -163,6 +163,118 @@ final class FinanceDashboardKpiProviderTest extends IntegrationTestCase
         self::assertEquals($all['periods'], $legacy['periods']);
     }
 
+    public function testBuildSupportsSevenFourteenAndThirtyDayPeriods(): void
+    {
+        $today = new \DateTimeImmutable('2026-08-15');
+        $user = UserBuilder::aUser()->withEmail('finance-dashboard-periods@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withOwner($user)->build();
+        $account = MoneyAccountBuilder::aMoneyAccount()
+            ->withId(Uuid::uuid4()->toString())
+            ->forCompany($company)
+            ->build()
+            ->setOpeningBalance('0.00');
+
+        foreach ([$user, $company, $account] as $entity) {
+            $this->em->persist($entity);
+        }
+        foreach ([0 => '100.00', -7 => '7.00', -14 => '14.00', -30 => '30.00'] as $days => $balance) {
+            $this->em->persist(new MoneyAccountDailyBalance(
+                Uuid::uuid4()->toString(),
+                $company,
+                $account,
+                $today->modify($days.' days'),
+                $balance,
+                '0.00',
+                '0.00',
+                $balance,
+                'RUB',
+            ));
+        }
+        $this->em->flush();
+
+        $categories = self::getContainer()->get(CashflowSystemCategoryService::class)->ensureStructure($company);
+        foreach ([
+            0 => '1.00',
+            -6 => '2.00',
+            -7 => '4.00',
+            -13 => '8.00',
+            -14 => '16.00',
+            -27 => '32.00',
+            -28 => '64.00',
+            -29 => '128.00',
+            -30 => '256.00',
+            -59 => '512.00',
+            -60 => '1024.00',
+        ] as $days => $amount) {
+            $this->persistTransaction(
+                $company,
+                $account,
+                $categories[CashflowCategory::CODE_OPERATING],
+                CashDirection::INFLOW,
+                $amount,
+                $today->modify($days.' days'),
+            );
+        }
+        $this->em->flush();
+
+        $provider = self::getContainer()->get(FinanceDashboardKpiProvider::class);
+        $expectations = [
+            7 => ['2026-08-09', '2026-08-02', '2026-08-08', '3.00', '12.00', '7.00'],
+            14 => ['2026-08-02', '2026-07-19', '2026-08-01', '15.00', '48.00', '14.00'],
+            30 => ['2026-07-17', '2026-06-17', '2026-07-16', '255.00', '768.00', '30.00'],
+        ];
+
+        foreach ($expectations as $periodDays => [$currentFrom, $previousFrom, $previousTo, $inflow, $previousInflow, $previousBalance]) {
+            $result = $provider->build(
+                $company,
+                FiatCurrency::RUB,
+                'operating',
+                true,
+                $today,
+                periodDays: $periodDays,
+            );
+
+            self::assertSame('100.00', $result['kpi']['todayBalance']);
+            self::assertSame($inflow, $result['kpi']['inflow30']);
+            self::assertSame($previousInflow, $result['comparisons']['inflow30']['previous']);
+            self::assertSame($previousBalance, $result['comparisons']['todayBalance']['previous']);
+            self::assertSame($currentFrom, $result['periods']['current']['from']->format('Y-m-d'));
+            self::assertSame('2026-08-15', $result['periods']['current']['to']->format('Y-m-d'));
+            self::assertSame($previousFrom, $result['periods']['previous']['from']->format('Y-m-d'));
+            self::assertSame($previousTo, $result['periods']['previous']['to']->format('Y-m-d'));
+            self::assertSame($previousTo, $result['periods']['balanceComparisonDate']->format('Y-m-d'));
+        }
+
+        $default = $provider->build($company, FiatCurrency::RUB, 'operating', true, $today);
+        self::assertEquals($default, $provider->build(
+            $company,
+            FiatCurrency::RUB,
+            'operating',
+            true,
+            $today,
+            periodDays: 30,
+        ));
+
+        foreach ([0, -1] as $invalidPeriodDays) {
+            try {
+                $provider->build(
+                    $company,
+                    FiatCurrency::RUB,
+                    'operating',
+                    true,
+                    $today,
+                    periodDays: $invalidPeriodDays,
+                );
+                self::fail(sprintf('Period %d should be rejected.', $invalidPeriodDays));
+            } catch (\InvalidArgumentException $exception) {
+                self::assertSame(
+                    sprintf('Period days must be positive, got %d.', $invalidPeriodDays),
+                    $exception->getMessage(),
+                );
+            }
+        }
+    }
+
     public function testBuildKeepsGrossTurnoverWhenParentAndChildHaveOppositeDirections(): void
     {
         $today = new \DateTimeImmutable('2026-08-15');

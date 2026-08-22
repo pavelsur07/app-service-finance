@@ -23,6 +23,8 @@ final readonly class FinanceDashboardKpiProvider
     }
 
     /**
+     * KPI keys keep the historical `30` suffix for compatibility; turnover values cover `$periodDays`.
+     *
      * @return array{
      *     kpi: array{todayBalance:string,inflow30:string,outflow30:string,netFlow30:string},
      *     comparisons: array<string,array{previous:string,state:string,percent:?string,variant:string}>,
@@ -39,11 +41,16 @@ final readonly class FinanceDashboardKpiProvider
         string $activity,
         bool $withComparisons,
         \DateTimeImmutable $today,
+        int $periodDays = 30,
     ): array {
+        if ($periodDays < 1) {
+            throw new \InvalidArgumentException(sprintf('Period days must be positive, got %d.', $periodDays));
+        }
+
         $today = $today->setTime(0, 0);
-        $currentFrom = $today->modify('-29 days');
-        $previousFrom = $today->modify('-59 days');
-        $previousTo = $today->modify('-30 days');
+        $currentFrom = $today->modify(sprintf('-%d days', $periodDays - 1));
+        $previousTo = $currentFrom->modify('-1 day');
+        $previousFrom = $previousTo->modify(sprintf('-%d days', $periodDays - 1));
         $scale = $cashCurrency->scale();
 
         $accounts = $this->moneyAccountRepository->findByFilters(

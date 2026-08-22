@@ -135,6 +135,84 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
         }
     }
 
+    public function testLegacyDashboardUsesSelectedPeriodWhileAppKeepsThirtyDays(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        $user = UserBuilder::aUser()->withEmail('home-cashflow-period@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withOwner($user)->build();
+        $account = MoneyAccountBuilder::aMoneyAccount()
+            ->withId(Uuid::uuid4()->toString())
+            ->forCompany($company)
+            ->build()
+            ->setOpeningBalance('1000.00');
+        foreach ([$user, $company, $account] as $entity) {
+            $this->em()->persist($entity);
+        }
+        $this->em()->flush();
+
+        $today = new \DateTimeImmutable('today');
+        $categories = self::getContainer()->get(CashflowSystemCategoryService::class)->ensureStructure($company);
+        foreach ([
+            0 => '1.00',
+            -6 => '2.00',
+            -7 => '4.00',
+            -13 => '8.00',
+            -14 => '16.00',
+            -27 => '32.00',
+            -28 => '64.00',
+            -29 => '128.00',
+            -30 => '256.00',
+            -59 => '512.00',
+            -60 => '1024.00',
+        ] as $days => $amount) {
+            $this->persistTransaction(
+                $company,
+                $account,
+                $categories[CashflowCategory::CODE_OPERATING],
+                CashDirection::INFLOW,
+                $amount,
+                $today->modify($days.' days'),
+            );
+        }
+        $this->em()->flush();
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+
+        $client->getCookieJar()->set(new Cookie(UiModeResolver::COOKIE_NAME, UiModeResolver::LEGACY));
+        foreach ([7 => ['3RUB', '12RUB'], 14 => ['15RUB', '48RUB'], 30 => ['255RUB', '768RUB']] as $periodDays => [$current, $previous]) {
+            $crawler = $client->request('GET', '/finance?currency=RUB&activity=operating&period='.$periodDays);
+            self::assertResponseIsSuccessful();
+            $this->assertPeriodState($crawler, $periodDays, $current, $previous);
+        }
+
+        foreach ([
+            '/finance?currency=RUB&activity=operating',
+            '/finance?currency=RUB&activity=operating&period=invalid',
+            '/finance?currency=RUB&activity=operating&period=07',
+            '/finance?currency=RUB&activity=operating&period=7.0',
+            '/finance?currency=RUB&activity=operating&period=0',
+            '/finance?currency=RUB&activity=operating&period=31',
+            '/finance?currency=RUB&activity=operating&period=',
+        ] as $url) {
+            $crawler = $client->request('GET', $url);
+            self::assertResponseIsSuccessful();
+            $this->assertPeriodState($crawler, 30, '255RUB', '768RUB');
+        }
+        $arrayPeriod = $client->request('GET', '/finance', [
+            'currency' => 'RUB',
+            'activity' => 'operating',
+            'period' => ['7'],
+        ]);
+        self::assertResponseIsSuccessful();
+        $this->assertPeriodState($arrayPeriod, 30, '255RUB', '768RUB');
+
+        $client->getCookieJar()->set(new Cookie(UiModeResolver::COOKIE_NAME, UiModeResolver::APP));
+        $app = $client->request('GET', '/finance?currency=RUB&activity=operating&period=7');
+        self::assertResponseIsSuccessful();
+        $this->assertPeriodState($app, 30, '255RUB', '768RUB', UiModeResolver::APP);
+    }
+
     private function persistTransaction(
         Company $company,
         MoneyAccount $account,
@@ -204,8 +282,9 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
         );
 
         self::assertCount(4, $crawler->filter('[data-dashboard-kpi-comparison]'));
-        self::assertCount(3, $crawler->filter('[data-dashboard-kpi-period="current"]'));
-        foreach ($crawler->filter('[data-dashboard-kpi-period="current"]') as $periodNode) {
+        $periodNodes = $crawler->filter('[data-dashboard-kpi-period="current"]');
+        self::assertCount(3, $periodNodes);
+        foreach ($periodNodes as $periodNode) {
             self::assertStringContainsString($currentPeriodLabel, $periodNode->textContent);
         }
         $cardSelector = UiModeResolver::LEGACY === $uiMode ? '.card' : 'article.kpi';
@@ -291,8 +370,48 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
         return $from->format($format).'–'.$to->format($format);
     }
 
-    private function assertReconciliationLinks(Crawler $crawler, string $uiMode, string $activity): void
-    {
+    private function assertPeriodState(
+        Crawler $crawler,
+        int $periodDays,
+        string $current,
+        string $previous,
+        string $uiMode = UiModeResolver::LEGACY,
+    ): void {
+        $today = new \DateTimeImmutable('today');
+        $currentFrom = $today->modify(sprintf('-%d days', $periodDays - 1));
+        $previousTo = $today->modify(sprintf('-%d days', $periodDays));
+        $previousFrom = $today->modify(sprintf('-%d days', 2 * $periodDays - 1));
+
+        self::assertSame($current, $this->normalizedKpi($crawler, 'inflow30'));
+        self::assertStringContainsString(
+            $this->dateRangeLabel($previousFrom, $previousTo).':'.$previous,
+            $this->normalizedText($crawler->filter('[data-dashboard-kpi-comparison="inflow30"]')),
+        );
+        $periodNodes = $crawler->filter('[data-dashboard-kpi-period="current"]');
+        self::assertCount(3, $periodNodes);
+        foreach ($periodNodes as $periodNode) {
+            self::assertStringContainsString(
+                $this->dateRangeLabel($currentFrom, $today),
+                $periodNode->textContent,
+            );
+        }
+        $balanceComparisonDate = 'На '.$previousTo->format(
+            $previousTo->format('Y') === $today->format('Y') ? 'd.m' : 'd.m.Y',
+        );
+        self::assertStringContainsString(
+            str_replace(' ', '', $balanceComparisonDate).':1000RUB',
+            $this->normalizedText($crawler->filter('[data-dashboard-kpi-comparison="todayBalance"]')),
+        );
+
+        $this->assertReconciliationLinks($crawler, $uiMode, 'operating', $periodDays);
+    }
+
+    private function assertReconciliationLinks(
+        Crawler $crawler,
+        string $uiMode,
+        string $activity,
+        int $periodDays = 30,
+    ): void {
         $links = $crawler->filter('[data-dashboard-reconcile-link]');
         self::assertCount(3, $links);
         self::assertSame(['inflow30', 'outflow30', 'netFlow30'], $links->each(
@@ -309,7 +428,7 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
 
         $today = new \DateTimeImmutable('today');
         $expectedQuery = [
-            'from' => $today->modify('-29 days')->format('Y-m-d'),
+            'from' => $today->modify(sprintf('-%d days', $periodDays - 1))->format('Y-m-d'),
             'to' => $today->format('Y-m-d'),
             'group' => 'month',
             'reconcile' => 'dashboard',
