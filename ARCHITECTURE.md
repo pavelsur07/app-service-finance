@@ -911,6 +911,25 @@ seedDefaultStructure(string $companyId): bool
 - Порог сравнивается с остатком только при совпадении валют; автоматической
   FX-конвертации нет.
 
+### Legacy dashboard: динамика остатка
+
+- `GET /api/finance/dashboard/balance-dynamics` принимает `period=30|60|90`
+  (default `30`) и `currency=RUB|USD|EUR|KZT` (default `RUB`). Компания всегда
+  берётся из authenticated active-company context.
+- Остаток каждого дня — сумма активных счетов выбранной валюты на конец дня:
+  последний snapshot не позже даты либо opening balance, если snapshot ещё не
+  создан. До даты открытия счёт в сумму и проверку порога не входит. Fallback на
+  opening balance нужен только до первого snapshot; актуальность snapshot-ов
+  обеспечивает штатный cash balance recalculation.
+- Если за весь период нет ни одного активного счёта выбранной валюты, endpoint
+  возвращает `points: []`: это empty state графика, и линии потоков также не
+  строятся.
+- Потоки агрегируются по `CashTransactionSplit` со знаком transaction direction
+  и тем же dashboard scope, что сверка ДДС: без transfer, deleted, technical и
+  unallocated строк. Потоки сохраняют исторические операции неактивных счетов,
+  как отчёт ДДС; фильтр active применяется только к линии текущих остатков. Все
+  суммы API — decimal strings, без FX и float arithmetic.
+
 ### `CashFacade` (`src/Cash/Facade/CashFacade.php`)
 ```php
 // Создать ДДС-транзакцию из внешнего модуля (идемпотентно для внешних источников)

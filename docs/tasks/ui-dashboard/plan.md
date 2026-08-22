@@ -42,7 +42,7 @@ Risk: HIGH-LOCAL
 owner_gate: no
 release_candidate: no
 independently_deployable: no
-stage_base_commit: commit Stage 1
+stage_base_commit: `db4e36b491b735dd1b6d63f7f903cfd21764bd8b`
 
 Definition of Done:
 - `GET /api/finance/dashboard/balance-dynamics` принимает DTO `period=30|60|90`, `currency=FiatCurrency`.
