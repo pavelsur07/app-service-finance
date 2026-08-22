@@ -789,6 +789,7 @@ A top-level Stage is complete only when:
 - repeat checks were run,
 - no unresolved BLOCKER or IMPORTANT findings remain,
 - acceptance criteria for the stage are met,
+- `ARCHITECTURE.md` is updated when the Stage added a Facade, a Facade method, an Enum, or a new Entity — it is the source of truth for Projects chats, and without the update they invent interfaces,
 - the Stage Report is prepared,
 - the checkpoint is updated,
 - task-owned Stage changes are committed and pushed,
@@ -1037,6 +1038,7 @@ Do not run destructive git commands unless explicitly requested.
 Record the exact `stage_base_commit` before the first Work item of each top-level Stage.
 Work items do not create separate branches or PRs. A local checkpoint commit after a checked Work item is allowed when it materially improves recoverability, but it must remain part of the complete Stage diff and does not make the Work item a Stage gate. Do not push solely to announce a Work item completion.
 After the top-level Stage internal automatic review is green and the external Claude Code review returns `REVIEW_GREEN`, commit any remaining task-owned Stage files, push the task branch without force, and create or update the single task Draft PR without asking for another confirmation.
+Use a Conventional Commits prefix for the Stage commit; the message must state the goal of the Stage rather than list the touched files.
 Keep the PR in Draft across Stages. Do not mark it Ready until the declared Release Gate and explicit owner instruction.
 If unrelated uncommitted changes exist, stage only the files or hunks owned by the current task. STOP only when changes overlap and cannot be separated safely.
 Never commit secrets, generated local artifacts, unrelated owner changes, or files outside the task scope.
