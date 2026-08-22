@@ -18,6 +18,75 @@ use Symfony\Component\HttpFoundation\Request;
 
 final class CashflowReportRequestMapperTest extends TestCase
 {
+    public function testMapsAllowedDashboardReconciliationAndIgnoresIncompatibleFilters(): void
+    {
+        $company = $this->createCompany();
+        $facade = $this->createMock(FinancialResponsibilityCenterFacade::class);
+        $facade->expects(self::never())->method('findByIdAndCompany');
+        $facade->expects(self::never())->method('getActiveChoices');
+        $projects = $this->createMock(ProjectDirectionRepository::class);
+        $projects->expects(self::never())->method('findByCompany');
+
+        $params = (new CashflowReportRequestMapper($facade, $projects))->fromRequest(
+            new Request([
+                'from' => '2026-08-22',
+                'to' => '2026-07-24',
+                'group' => 'day',
+                'reconcile' => 'dashboard',
+                'activity' => 'operating',
+                'currency' => 'rub',
+                'projectFiltersPresent' => '1',
+                'responsibilityCenterId' => '11111111-1111-4111-8111-111111111111',
+            ]),
+            $company,
+            allowDashboardReconciliation: true,
+        );
+
+        self::assertTrue($params->isDashboardReconciliation());
+        self::assertSame('operating', $params->dashboardActivity);
+        self::assertSame('RUB', $params->dashboardCurrency?->value);
+        self::assertSame('OPERATING', $params->dashboardFlowKind()?->value);
+        self::assertSame('2026-07-24', $params->from->format('Y-m-d'));
+        self::assertSame('2026-08-22', $params->to->format('Y-m-d'));
+        self::assertNull($params->projectDirectionIds);
+        self::assertNull($params->responsibilityCenterIds);
+        self::assertNull($params->responsibilityCenterId);
+    }
+
+    public function testIgnoresDashboardReconciliationUnlessExplicitlyAllowed(): void
+    {
+        $params = (new CashflowReportRequestMapper(
+            $this->createMock(FinancialResponsibilityCenterFacade::class),
+            $this->unusedProjectRepository(),
+        ))->fromRequest(new Request([
+            'reconcile' => 'dashboard',
+            'activity' => 'all',
+            'currency' => 'RUB',
+        ]), $this->createCompany());
+
+        self::assertFalse($params->isDashboardReconciliation());
+        self::assertNull($params->dashboardActivity);
+        self::assertNull($params->dashboardCurrency);
+    }
+
+    public function testRejectsIncompleteDashboardReconciliationScope(): void
+    {
+        $params = (new CashflowReportRequestMapper(
+            $this->createMock(FinancialResponsibilityCenterFacade::class),
+            $this->unusedProjectRepository(),
+        ))->fromRequest(
+            new Request([
+                'reconcile' => 'dashboard',
+                'activity' => 'unknown',
+                'currency' => 'RUB',
+            ]),
+            $this->createCompany(),
+            allowDashboardReconciliation: true,
+        );
+
+        self::assertFalse($params->isDashboardReconciliation());
+    }
+
     public function testMapsActiveCompanyResponsibilityCenterFilter(): void
     {
         $company = $this->createCompany();

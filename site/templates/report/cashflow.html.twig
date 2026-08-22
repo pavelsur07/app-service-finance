@@ -53,6 +53,14 @@
 
 {% block content %}
 {% set available_project_ids = [] %}
+{% set dashboard_reconciliation = dashboardReconciliation|default(null) %}
+{% set dashboard_reconciliation_active = dashboard_reconciliation is not null %}
+{% set dashboard_activity_labels = {
+    'operating': 'Операционная деятельность',
+    'financing': 'Финансовая деятельность',
+    'investing': 'Инвестиционная деятельность',
+    'all': 'Все виды деятельности'
+} %}
 {% for project_direction in projectDirections|default([]) %}
     {% set available_project_ids = available_project_ids|merge([project_direction.id]) %}
 {% endfor %}
@@ -62,10 +70,10 @@
 {% endfor %}
 {% set submitted_project_ids = selectedProjectDirectionIds ?? available_project_ids %}
 {% set submitted_responsibility_center_ids = selectedResponsibilityCenterIds ?? available_responsibility_center_ids %}
-{% set project_filter_tracked = available_project_ids is not empty or selectedProjectDirectionIds is not null %}
-{% set responsibility_center_filter_tracked = available_responsibility_center_ids is not empty or selectedResponsibilityCenterIds is not null %}
-{% set project_filter_active = selectedProjectDirectionIds is not null %}
-{% set responsibility_center_filter_active = selectedResponsibilityCenterIds is not null %}
+{% set project_filter_tracked = not dashboard_reconciliation_active and (available_project_ids is not empty or selectedProjectDirectionIds is not null) %}
+{% set responsibility_center_filter_tracked = not dashboard_reconciliation_active and (available_responsibility_center_ids is not empty or selectedResponsibilityCenterIds is not null) %}
+{% set project_filter_active = not dashboard_reconciliation_active and selectedProjectDirectionIds is not null %}
+{% set responsibility_center_filter_active = not dashboard_reconciliation_active and selectedResponsibilityCenterIds is not null %}
 {% set filters_active = project_filter_active or responsibility_center_filter_active %}
 {% set legacy_responsibility_center_filter = legacyResponsibilityCenterFilter|default(false) %}
 
@@ -74,13 +82,13 @@
     'to': date_to|date('Y-m-d'),
     'group': group
 } %}
-{% if available_project_ids is not empty %}
+{% if not dashboard_reconciliation_active and available_project_ids is not empty %}
     {% set reset_state = reset_state|merge({
         'projectFiltersPresent': 1,
         'projectDirectionIds': available_project_ids
     }) %}
 {% endif %}
-{% if available_responsibility_center_ids is not empty %}
+{% if not dashboard_reconciliation_active and available_responsibility_center_ids is not empty %}
     {% set reset_state = reset_state|merge({
         'responsibilityCenterFiltersPresent': 1,
         'responsibilityCenterIds': available_responsibility_center_ids
@@ -92,13 +100,19 @@
     'to': date_to|date('Y-m-d'),
     'group': group
 } %}
-{% if project_filter_tracked %}
+{% if dashboard_reconciliation_active %}
+    {% set export_state = export_state|merge({
+        'reconcile': dashboard_reconciliation.mode,
+        'activity': dashboard_reconciliation.activity,
+        'currency': dashboard_reconciliation.currency
+    }) %}
+{% elseif project_filter_tracked %}
     {% set export_state = export_state|merge({
         'projectFiltersPresent': 1,
         'projectDirectionIds': submitted_project_ids
     }) %}
 {% endif %}
-{% if legacy_responsibility_center_filter %}
+{% if not dashboard_reconciliation_active and legacy_responsibility_center_filter %}
     {% set export_state = export_state|merge({
         'responsibilityCenterId': selectedResponsibilityCenterId
     }) %}
@@ -127,6 +141,9 @@
 {% else %}
     {% set report_period_label = month_names[from_month] ~ ' ' ~ from_year ~ ' – ' ~ month_names[to_month] ~ ' ' ~ to_year %}
 {% endif %}
+{% if dashboard_reconciliation_active %}
+    {% set report_period_label = date_from|date('d.m.Y') ~ ' – ' ~ date_to|date('d.m.Y') %}
+{% endif %}
 
 <div class="page-header mb-3">
     <div class="row g-2 align-items-start">
@@ -152,6 +169,11 @@
         <input type="hidden" name="from" value="{{ date_from|date('Y-m-d') }}" data-pl-exact-from>
         <input type="hidden" name="to" value="{{ date_to|date('Y-m-d') }}" data-pl-exact-to>
         <input type="hidden" name="group" value="{{ group }}" data-pl-group>
+        {% if dashboard_reconciliation_active %}
+            <input type="hidden" name="reconcile" value="{{ dashboard_reconciliation.mode }}">
+            <input type="hidden" name="activity" value="{{ dashboard_reconciliation.activity }}">
+            <input type="hidden" name="currency" value="{{ dashboard_reconciliation.currency }}">
+        {% endif %}
         {% if project_filter_tracked %}
             <input type="hidden" name="projectFiltersPresent" value="1">
         {% endif %}
@@ -255,6 +277,7 @@
             </div>
         </div>
 
+        {% if not dashboard_reconciliation_active %}
         <div class="pl-preview-filters-row">
             <span class="pl-preview-control-label">Фильтры:</span>
 
@@ -337,8 +360,63 @@
                 </a>
             {% endif %}
         </div>
+        {% endif %}
     </form>
 </div>
+
+{% if dashboard_reconciliation_active %}
+    <div class="alert alert-info" data-cashflow-reconciliation>
+        <div class="d-flex justify-content-between align-items-start gap-3">
+            <div>
+                <div class="fw-bold mb-1">Сверка с показателями дашборда</div>
+                <div>
+                    Период: {{ date_from|date('d.m.Y') }} – {{ date_to|date('d.m.Y') }} ·
+                    Вид деятельности: {{ dashboard_activity_labels[dashboard_reconciliation.activity]|default(dashboard_reconciliation.activity) }} ·
+                    Валюта: {{ dashboard_reconciliation.currency }}
+                </div>
+                <div class="mt-2">
+                    Движения рассчитаны по тем же правилам, что и оборотные виджеты: переводы, удалённые операции и технические статьи исключены.
+                    {% if dashboard_reconciliation.activity == 'all' %}
+                        Нераспределённые статьи включены.
+                    {% else %}
+                        Нераспределённые статьи исключены для выбранного вида деятельности.
+                    {% endif %}
+                </div>
+                <div class="mt-2">
+                    Сальдо ДДС остаётся общим по компании: учитывает в выбранной валюте архивные счета, переводы и технические статьи. Поэтому оно может отличаться от остатка дашборда, где учитываются только активные счета.
+                </div>
+            </div>
+            <a href="{{ path('report_cashflow_index', reset_state) }}" class="btn btn-outline-secondary btn-sm" data-cashflow-reconciliation-exit>Обычный ДДС</a>
+        </div>
+    </div>
+
+    <div class="row row-cards mb-3" role="group" aria-label="Показатели для сверки с дашбордом">
+        <div class="col-sm-4">
+            <div class="card">
+                <div class="card-body">
+                    <div class="text-secondary">Приход</div>
+                    <div class="h2 mb-0" data-cashflow-reconciliation-kpi="inflow" data-value="{{ dashboard_reconciliation.inflow }}">{{ dashboard_reconciliation.inflow|number_format(2, ',', ' ') }} {{ dashboard_reconciliation.currency }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-4">
+            <div class="card">
+                <div class="card-body">
+                    <div class="text-secondary">Расход</div>
+                    <div class="h2 mb-0" data-cashflow-reconciliation-kpi="outflow" data-value="{{ dashboard_reconciliation.outflow }}">{{ dashboard_reconciliation.outflow|number_format(2, ',', ' ') }} {{ dashboard_reconciliation.currency }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-4">
+            <div class="card">
+                <div class="card-body">
+                    <div class="text-secondary">Чистый поток</div>
+                    <div class="h2 mb-0" data-cashflow-reconciliation-kpi="net" data-value="{{ dashboard_reconciliation.net }}">{{ dashboard_reconciliation.net|number_format(2, ',', ' ') }} {{ dashboard_reconciliation.currency }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
 
 {% if filters_active %}
     <div class="alert alert-info">

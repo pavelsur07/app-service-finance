@@ -2,6 +2,8 @@
 
 namespace App\Report\Cashflow;
 
+use App\Cash\Enum\FiatCurrency;
+use App\Cash\Enum\Transaction\CashflowFlowKind;
 use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
 
@@ -21,6 +23,23 @@ final class CashflowReportParams
         public readonly ?array $projectDirectionIds = null,
         public readonly ?array $responsibilityCenterIds = null,
         public readonly ?array $availableProjectDirections = null,
+        public readonly ?string $dashboardActivity = null,
+        public readonly ?FiatCurrency $dashboardCurrency = null,
     ) {
+    }
+
+    public function isDashboardReconciliation(): bool
+    {
+        return null !== $this->dashboardActivity && null !== $this->dashboardCurrency;
+    }
+
+    public function dashboardFlowKind(): ?CashflowFlowKind
+    {
+        return match ($this->dashboardActivity) {
+            'operating' => CashflowFlowKind::OPERATING,
+            'financing' => CashflowFlowKind::FINANCING,
+            'investing' => CashflowFlowKind::INVESTING,
+            default => null,
+        };
     }
 }

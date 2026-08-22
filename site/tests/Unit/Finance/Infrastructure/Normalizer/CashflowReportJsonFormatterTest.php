@@ -190,6 +190,40 @@ final class CashflowReportJsonFormatterTest extends TestCase
         self::assertArrayNotHasKey('responsibility_center_ids', $formatted);
     }
 
+    public function testFormatAddsDashboardReconciliationOnlyForOptInPayload(): void
+    {
+        $formatter = new CashflowReportJsonFormatter();
+        $company = new Company('99999999-9999-4999-8999-999999999999', $this->createUser());
+        $reconciliation = [
+            'mode' => 'dashboard',
+            'activity' => 'operating',
+            'currency' => 'RUB',
+            'inflow' => '100.00',
+            'outflow' => '60.00',
+            'net' => '40.00',
+        ];
+
+        $formatted = $formatter->format([
+            'company' => $company,
+            'group' => 'month',
+            'date_from' => new \DateTimeImmutable('2026-07-24'),
+            'date_to' => new \DateTimeImmutable('2026-08-22'),
+            'periods' => [],
+            'categories' => [],
+            'categoryTotals' => [],
+            'openings' => [],
+            'closings' => [],
+            'tree' => [],
+            'categoryTree' => [],
+            'dashboardReconciliation' => $reconciliation,
+        ], ['include_filters' => true]);
+
+        self::assertSame($reconciliation, $formatted['dashboard_reconciliation']);
+        self::assertSame('dashboard', $formatted['filters']['reconcile']);
+        self::assertSame('operating', $formatted['filters']['activity']);
+        self::assertSame('RUB', $formatted['filters']['currency']);
+    }
+
     private function createUser(): User
     {
         $user = new User(Uuid::uuid4()->toString());

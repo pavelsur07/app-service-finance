@@ -36,7 +36,7 @@ class ReportCashflowController extends AbstractController
     {
         $company = $this->activeCompanyService->getActiveCompany();
         /** @var CashflowReportParams $params */
-        $params = $this->mapper->fromRequest($request, $company);
+        $params = $this->mapper->fromRequest($request, $company, allowDashboardReconciliation: true);
         $payload = $this->builder->build($params);
 
         $formatted = $this->jsonFormatter->format($payload, [
@@ -64,7 +64,13 @@ class ReportCashflowController extends AbstractController
         $projectDirections = $this->projectDirections->findByCompany($company);
         $responsibilityCenters = $this->responsibilityCenters->getActiveChoices((string) $company->getId());
         /** @var CashflowReportParams $params */
-        $params = $this->mapper->fromRequest($request, $company, $projectDirections, $responsibilityCenters);
+        $params = $this->mapper->fromRequest(
+            $request,
+            $company,
+            $projectDirections,
+            $responsibilityCenters,
+            allowDashboardReconciliation: true,
+        );
         $payload = $this->builder->build($params);
         $legacyResponsibilityCenterFilter = null === $params->responsibilityCenterIds
             && null !== $params->responsibilityCenterId;

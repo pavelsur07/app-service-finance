@@ -57,6 +57,15 @@ class HomeController extends AbstractController
             withComparisons: true,
             today: $today,
         );
+        $kpiPeriodLabels = $this->kpiPeriodLabels($dashboardKpis['periods']);
+        $cashflowReconciliationQuery = [
+            'from' => $dashboardKpis['periods']['current']['from']->format('Y-m-d'),
+            'to' => $dashboardKpis['periods']['current']['to']->format('Y-m-d'),
+            'group' => 'month',
+            'reconcile' => 'dashboard',
+            'activity' => $cashflowActivity,
+            'currency' => $cashCurrency->value,
+        ];
 
         $template = UiModeResolver::APP === $uiMode
             ? 'app/home/index.html.twig'
@@ -70,6 +79,8 @@ class HomeController extends AbstractController
             'cashflowActivities' => self::CASHFLOW_ACTIVITIES,
             'kpi' => $dashboardKpis['kpi'],
             'kpiComparisons' => $dashboardKpis['comparisons'],
+            'kpiPeriodLabels' => $kpiPeriodLabels,
+            'cashflowReconciliationQuery' => $cashflowReconciliationQuery,
         ]);
     }
 
@@ -105,5 +116,35 @@ class HomeController extends AbstractController
         return is_string($activity) && array_key_exists($activity, self::CASHFLOW_ACTIVITIES)
             ? $activity
             : self::ACTIVITY_ALL;
+    }
+
+    /**
+     * @param array{
+     *     current:array{from:\DateTimeImmutable,to:\DateTimeImmutable},
+     *     previous:array{from:\DateTimeImmutable,to:\DateTimeImmutable},
+     *     balanceComparisonDate:\DateTimeImmutable
+     * } $periods
+     *
+     * @return array{current:string,previous:string,balanceComparison:string}
+     */
+    private function kpiPeriodLabels(array $periods): array
+    {
+        $currentTo = $periods['current']['to'];
+        $balanceComparisonDate = $periods['balanceComparisonDate'];
+
+        return [
+            'current' => $this->dateRangeLabel($periods['current']['from'], $currentTo),
+            'previous' => $this->dateRangeLabel($periods['previous']['from'], $periods['previous']['to']),
+            'balanceComparison' => 'На '.$balanceComparisonDate->format(
+                $balanceComparisonDate->format('Y') === $currentTo->format('Y') ? 'd.m' : 'd.m.Y',
+            ),
+        ];
+    }
+
+    private function dateRangeLabel(\DateTimeImmutable $from, \DateTimeImmutable $to): string
+    {
+        $format = $from->format('Y') === $to->format('Y') ? 'd.m' : 'd.m.Y';
+
+        return $from->format($format).'–'.$to->format($format);
     }
 }

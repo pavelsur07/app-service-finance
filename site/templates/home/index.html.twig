@@ -104,34 +104,37 @@
       <div class="card-body">
         <div class="subheader">Остаток на сегодня</div>
         <div class="h1 mb-0" data-dashboard-kpi="todayBalance">{{ kpi.todayBalance|number_format(0, '.', ' ') }} {{ cashCurrency.value }}</div>
-        {{ _self.comparison('todayBalance', kpiComparisons.todayBalance, cashCurrency.value, '30 дней назад') }}
+        {{ _self.comparison('todayBalance', kpiComparisons.todayBalance, cashCurrency.value, kpiPeriodLabels.balanceComparison) }}
       </div>
     </div>
   </div>
   <div class="col-sm-6 col-lg-3">
     <div class="card">
       <div class="card-body">
-        <div class="subheader">Приход (30 дней)</div>
+        <div class="subheader" data-dashboard-kpi-period="current">Приход ({{ kpiPeriodLabels.current }})</div>
         <div class="h1 mb-0" data-dashboard-kpi="inflow30">{{ kpi.inflow30|number_format(0, '.', ' ') }} {{ cashCurrency.value }}</div>
-        {{ _self.comparison('inflow30', kpiComparisons.inflow30, cashCurrency.value, 'Предыдущие 30 дней') }}
+        <a href="{{ path('report_cashflow_index', cashflowReconciliationQuery) }}" data-dashboard-reconcile-link="inflow30">Сверить в ДДС</a>
+        {{ _self.comparison('inflow30', kpiComparisons.inflow30, cashCurrency.value, kpiPeriodLabels.previous) }}
       </div>
     </div>
   </div>
   <div class="col-sm-6 col-lg-3">
     <div class="card">
       <div class="card-body">
-        <div class="subheader">Расход (30 дней)</div>
+        <div class="subheader" data-dashboard-kpi-period="current">Расход ({{ kpiPeriodLabels.current }})</div>
         <div class="h1 mb-0" data-dashboard-kpi="outflow30">{{ kpi.outflow30|number_format(0, '.', ' ') }} {{ cashCurrency.value }}</div>
-        {{ _self.comparison('outflow30', kpiComparisons.outflow30, cashCurrency.value, 'Предыдущие 30 дней') }}
+        <a href="{{ path('report_cashflow_index', cashflowReconciliationQuery) }}" data-dashboard-reconcile-link="outflow30">Сверить в ДДС</a>
+        {{ _self.comparison('outflow30', kpiComparisons.outflow30, cashCurrency.value, kpiPeriodLabels.previous) }}
       </div>
     </div>
   </div>
   <div class="col-sm-6 col-lg-3">
     <div class="card">
       <div class="card-body">
-        <div class="subheader">Чистый поток (30 дней)</div>
+        <div class="subheader" data-dashboard-kpi-period="current">Чистый поток ({{ kpiPeriodLabels.current }})</div>
         <div class="h1 mb-0" data-dashboard-kpi="netFlow30">{{ kpi.netFlow30|number_format(0, '.', ' ') }} {{ cashCurrency.value }}</div>
-        {{ _self.comparison('netFlow30', kpiComparisons.netFlow30, cashCurrency.value, 'Предыдущие 30 дней') }}
+        <a href="{{ path('report_cashflow_index', cashflowReconciliationQuery) }}" data-dashboard-reconcile-link="netFlow30">Сверить в ДДС</a>
+        {{ _self.comparison('netFlow30', kpiComparisons.netFlow30, cashCurrency.value, kpiPeriodLabels.previous) }}
       </div>
     </div>
   </div>

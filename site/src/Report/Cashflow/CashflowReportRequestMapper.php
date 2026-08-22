@@ -2,6 +2,7 @@
 
 namespace App\Report\Cashflow;
 
+use App\Cash\Enum\FiatCurrency;
 use App\Company\Application\DTO\FinancialResponsibilityCenterDTO;
 use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
@@ -12,6 +13,9 @@ use Symfony\Component\HttpFoundation\Request;
 
 final class CashflowReportRequestMapper
 {
+    private const DASHBOARD_RECONCILIATION = 'dashboard';
+    private const DASHBOARD_ACTIVITIES = ['operating', 'financing', 'investing', 'all'];
+
     public function __construct(
         private readonly FinancialResponsibilityCenterFacade $responsibilityCenters,
         private readonly ProjectDirectionRepository $projectDirections,
@@ -27,6 +31,7 @@ final class CashflowReportRequestMapper
         Company $company,
         ?array $projectDirections = null,
         ?array $responsibilityCenters = null,
+        bool $allowDashboardReconciliation = false,
     ): CashflowReportParams {
         $group = $request->query->get('group', 'month');
         $fromParam = $request->query->get('from');
@@ -42,6 +47,21 @@ final class CashflowReportRequestMapper
         $to = $toParam ? new \DateTimeImmutable($toParam) : $defaultTo;
         if ($from > $to) {
             [$from, $to] = [$to, $from];
+        }
+
+        [$dashboardActivity, $dashboardCurrency] = $this->dashboardReconciliation(
+            $request,
+            $allowDashboardReconciliation,
+        );
+        if (null !== $dashboardActivity && null !== $dashboardCurrency) {
+            return new CashflowReportParams(
+                company: $company,
+                group: $group,
+                from: $from,
+                to: $to,
+                dashboardActivity: $dashboardActivity,
+                dashboardCurrency: $dashboardCurrency,
+            );
         }
 
         $projectListPresent = $request->query->has('projectDirectionIds');
@@ -103,6 +123,28 @@ final class CashflowReportRequestMapper
             $responsibilityCenterIds,
             $availableProjectDirections,
         );
+    }
+
+    /** @return array{?string,?FiatCurrency} */
+    private function dashboardReconciliation(Request $request, bool $allowed): array
+    {
+        if (!$allowed || self::DASHBOARD_RECONCILIATION !== $request->query->get('reconcile')) {
+            return [null, null];
+        }
+
+        $activity = $request->query->get('activity');
+        $currency = $request->query->get('currency');
+        if (!\is_string($activity) || !\in_array($activity, self::DASHBOARD_ACTIVITIES, true) || !\is_string($currency)) {
+            return [null, null];
+        }
+
+        try {
+            $dashboardCurrency = FiatCurrency::fromCode($currency);
+        } catch (\InvalidArgumentException) {
+            return [null, null];
+        }
+
+        return [$activity, $dashboardCurrency];
     }
 
     /**

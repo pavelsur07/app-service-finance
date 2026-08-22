@@ -119,6 +119,7 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
                 $this->assertActivityState($crawler, $activity);
                 $this->assertKpis($crawler, self::EXPECTED_BY_ACTIVITY[$activity]);
                 $this->assertKpiComparisons($crawler, $uiMode, $activity);
+                $this->assertReconciliationLinks($crawler, $uiMode, $activity);
             }
 
             $defaultCrawler = $client->request('GET', '/finance?currency=RUB');
@@ -194,7 +195,19 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
 
     private function assertKpiComparisons(Crawler $crawler, string $uiMode, string $activity): void
     {
+        $today = new \DateTimeImmutable('today');
+        $currentPeriodLabel = $this->dateRangeLabel($today->modify('-29 days'), $today);
+        $previousPeriodLabel = $this->dateRangeLabel($today->modify('-59 days'), $today->modify('-30 days'));
+        $balanceComparisonDate = $today->modify('-30 days');
+        $balanceComparisonLabel = 'На '.$balanceComparisonDate->format(
+            $balanceComparisonDate->format('Y') === $today->format('Y') ? 'd.m' : 'd.m.Y',
+        );
+
         self::assertCount(4, $crawler->filter('[data-dashboard-kpi-comparison]'));
+        self::assertCount(3, $crawler->filter('[data-dashboard-kpi-period="current"]'));
+        foreach ($crawler->filter('[data-dashboard-kpi-period="current"]') as $periodNode) {
+            self::assertStringContainsString($currentPeriodLabel, $periodNode->textContent);
+        }
         $cardSelector = UiModeResolver::LEGACY === $uiMode ? '.card' : 'article.kpi';
         $balanceCard = $crawler->filter('[data-dashboard-kpi="todayBalance"]')->closest($cardSelector);
         self::assertNotNull($balanceCard);
@@ -214,7 +227,10 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
         } else {
             self::assertCount(0, $balance->filter('.visually-hidden'));
         }
-        self::assertStringContainsString('30днейназад:1000RUB', $this->normalizedText($balance));
+        self::assertStringContainsString(
+            str_replace(' ', '', $balanceComparisonLabel).':1000RUB',
+            $this->normalizedText($balance),
+        );
 
         foreach (self::EXPECTED_COMPARISONS_BY_ACTIVITY[$activity] as $name => $expected) {
             $card = $crawler->filter(sprintf('[data-dashboard-kpi="%s"]', $name))->closest($cardSelector);
@@ -262,10 +278,51 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
                 self::assertCount(1, $comparison->filter('.delta [aria-hidden="true"]'));
             }
             self::assertStringContainsString(
-                'Предыдущие30дней:'.$expected['previous'],
+                $previousPeriodLabel.':'.$expected['previous'],
                 $this->normalizedText($comparison),
             );
         }
+    }
+
+    private function dateRangeLabel(\DateTimeImmutable $from, \DateTimeImmutable $to): string
+    {
+        $format = $from->format('Y') === $to->format('Y') ? 'd.m' : 'd.m.Y';
+
+        return $from->format($format).'–'.$to->format($format);
+    }
+
+    private function assertReconciliationLinks(Crawler $crawler, string $uiMode, string $activity): void
+    {
+        $links = $crawler->filter('[data-dashboard-reconcile-link]');
+        self::assertCount(3, $links);
+        self::assertSame(['inflow30', 'outflow30', 'netFlow30'], $links->each(
+            static fn (Crawler $link): string => (string) $link->attr('data-dashboard-reconcile-link'),
+        ));
+        self::assertSame(['Сверить в ДДС', 'Сверить в ДДС', 'Сверить в ДДС'], $links->each(
+            static fn (Crawler $link): string => trim($link->text()),
+        ));
+
+        $cardSelector = UiModeResolver::LEGACY === $uiMode ? '.card' : 'article.kpi';
+        $balanceCard = $crawler->filter('[data-dashboard-kpi="todayBalance"]')->closest($cardSelector);
+        self::assertNotNull($balanceCard);
+        self::assertCount(0, $balanceCard->filter('[data-dashboard-reconcile-link]'));
+
+        $today = new \DateTimeImmutable('today');
+        $expectedQuery = [
+            'from' => $today->modify('-29 days')->format('Y-m-d'),
+            'to' => $today->format('Y-m-d'),
+            'group' => 'month',
+            'reconcile' => 'dashboard',
+            'activity' => $activity,
+            'currency' => 'RUB',
+        ];
+        $hrefs = $links->each(static fn (Crawler $link): string => (string) $link->attr('href'));
+        self::assertCount(1, array_unique($hrefs));
+
+        $url = parse_url($hrefs[0]);
+        self::assertSame('/finance/reports/cashflow', $url['path'] ?? null);
+        parse_str($url['query'] ?? '', $query);
+        self::assertSame($expectedQuery, $query);
     }
 
     private function assertTabsComposition(Crawler $crawler, string $uiMode): void
