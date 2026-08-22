@@ -40,7 +40,7 @@ Risk: MEDIUM
 owner_gate: yes
 release_candidate: yes
 independently_deployable: yes
-stage_base_commit: будет зафиксирован после Stage 1
+stage_base_commit: `353ed3b1256bf34752f0ef1a6ca2c495d5c1fd01`
 
 Definition of Done:
 - В legacy и app UI текущий период отображается точными датами, например `24.07–22.08`.

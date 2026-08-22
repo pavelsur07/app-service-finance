@@ -79,28 +79,31 @@
                 <div class="kpi-label">Остаток на сегодня</div>
                 <div class="kpi-value kpi-value--hero money" data-dashboard-kpi="todayBalance">{{ _self.money(kpi.todayBalance, cashCurrency.value) }}</div>
                 <div class="kpi-meta">По активным денежным счетам</div>
-                {{ _self.comparison('todayBalance', kpiComparisons.todayBalance, cashCurrency.value, '30 дней назад') }}
+                {{ _self.comparison('todayBalance', kpiComparisons.todayBalance, cashCurrency.value, kpiPeriodLabels.balanceComparison) }}
             </article>
 
             <article class="kpi kpi--accent-success">
                 <div class="kpi-label">Приход</div>
                 <div class="kpi-value money" data-dashboard-kpi="inflow30">{{ _self.money(kpi.inflow30, cashCurrency.value) }}</div>
-                <div class="kpi-meta">Последние 30 дней</div>
-                {{ _self.comparison('inflow30', kpiComparisons.inflow30, cashCurrency.value, 'Предыдущие 30 дней') }}
+                <div class="kpi-meta" data-dashboard-kpi-period="current">{{ kpiPeriodLabels.current }}</div>
+                <div class="kpi-meta"><a href="{{ path('report_cashflow_index', cashflowReconciliationQuery) }}" data-dashboard-reconcile-link="inflow30">Сверить в ДДС</a></div>
+                {{ _self.comparison('inflow30', kpiComparisons.inflow30, cashCurrency.value, kpiPeriodLabels.previous) }}
             </article>
 
             <article class="kpi kpi--accent-danger">
                 <div class="kpi-label">Расход</div>
                 <div class="kpi-value money" data-dashboard-kpi="outflow30">{{ _self.money(kpi.outflow30, cashCurrency.value) }}</div>
-                <div class="kpi-meta">Последние 30 дней</div>
-                {{ _self.comparison('outflow30', kpiComparisons.outflow30, cashCurrency.value, 'Предыдущие 30 дней') }}
+                <div class="kpi-meta" data-dashboard-kpi-period="current">{{ kpiPeriodLabels.current }}</div>
+                <div class="kpi-meta"><a href="{{ path('report_cashflow_index', cashflowReconciliationQuery) }}" data-dashboard-reconcile-link="outflow30">Сверить в ДДС</a></div>
+                {{ _self.comparison('outflow30', kpiComparisons.outflow30, cashCurrency.value, kpiPeriodLabels.previous) }}
             </article>
 
             <article class="kpi kpi--accent-primary">
                 <div class="kpi-label">Чистый поток</div>
                 <div class="kpi-value money" data-dashboard-kpi="netFlow30">{{ _self.money(kpi.netFlow30, cashCurrency.value) }}</div>
-                <div class="kpi-meta">Приход минус расход за 30 дней</div>
-                {{ _self.comparison('netFlow30', kpiComparisons.netFlow30, cashCurrency.value, 'Предыдущие 30 дней') }}
+                <div class="kpi-meta" data-dashboard-kpi-period="current">{{ kpiPeriodLabels.current }}</div>
+                <div class="kpi-meta"><a href="{{ path('report_cashflow_index', cashflowReconciliationQuery) }}" data-dashboard-reconcile-link="netFlow30">Сверить в ДДС</a></div>
+                {{ _self.comparison('netFlow30', kpiComparisons.netFlow30, cashCurrency.value, kpiPeriodLabels.previous) }}
             </article>
         </div>
     </section>

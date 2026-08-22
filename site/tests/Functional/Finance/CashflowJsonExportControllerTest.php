@@ -130,6 +130,80 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
         self::assertArrayNotHasKey('responsibility_center_ids', $payload['filters']);
     }
 
+    public function testCashflowPageRendersDashboardReconciliationAndPreservesScope(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        [$user, $company] = $this->seedCompanyContext('c2');
+        $this->seedCashflowData($company, '125.00', '2026-08-15');
+        $this->em()->flush();
+        $this->loginWithActiveCompany($client, $user, $company);
+
+        $expectedQuery = [
+            'from' => '2026-07-24',
+            'to' => '2026-08-22',
+            'group' => 'month',
+            'reconcile' => 'dashboard',
+            'activity' => 'operating',
+            'currency' => 'RUB',
+        ];
+        $crawler = $client->request('GET', self::INDEX_URL, $expectedQuery + [
+            'projectFiltersPresent' => '1',
+            'responsibilityCenterFiltersPresent' => '1',
+        ]);
+
+        self::assertResponseIsSuccessful();
+        self::assertSame(
+            '24.07.2026 – 22.08.2026',
+            trim($crawler->filter('.page-header .text-secondary')->text()),
+        );
+        $reconciliation = $crawler->filter('[data-cashflow-reconciliation]');
+        self::assertCount(1, $reconciliation);
+        $reconciliationText = $reconciliation->text();
+        self::assertStringContainsString('Операционная деятельность', $reconciliationText);
+        self::assertStringContainsString('RUB', $reconciliationText);
+        self::assertStringContainsString('24.07.2026', $reconciliationText);
+        self::assertStringContainsString('22.08.2026', $reconciliationText);
+        self::assertStringContainsString('переводы, удалённые операции и технические статьи исключены', $reconciliationText);
+        self::assertStringContainsString('архивные счета', $reconciliationText);
+        self::assertStringContainsString('только активные счета', $reconciliationText);
+
+        self::assertSame('125.00', $crawler
+            ->filter('[data-cashflow-reconciliation-kpi="inflow"]')
+            ->attr('data-value'));
+        self::assertSame('0.00', $crawler
+            ->filter('[data-cashflow-reconciliation-kpi="outflow"]')
+            ->attr('data-value'));
+        self::assertSame('125.00', $crawler
+            ->filter('[data-cashflow-reconciliation-kpi="net"]')
+            ->attr('data-value'));
+
+        foreach ($expectedQuery as $name => $value) {
+            self::assertSame(
+                $value,
+                $crawler->filter(sprintf('#cashflow-filter-form input[name="%s"]', $name))->attr('value'),
+            );
+        }
+        self::assertCount(0, $crawler->filter('.pl-preview-filters-row'));
+        self::assertCount(0, $crawler->filter('input[name="projectFiltersPresent"]'));
+        self::assertCount(0, $crawler->filter('input[name="responsibilityCenterFiltersPresent"]'));
+
+        $exportQuery = $this->queryFromHref((string) $crawler
+            ->filter('a[title="Скачать отчёт в формате JSON для проверки"]')
+            ->attr('href'));
+        self::assertSame($expectedQuery, $exportQuery);
+
+        $exitQuery = $this->queryFromHref((string) $crawler
+            ->filter('[data-cashflow-reconciliation-exit]')
+            ->attr('href'));
+        self::assertSame([
+            'from' => '2026-07-24',
+            'to' => '2026-08-22',
+            'group' => 'month',
+        ], $exitQuery);
+    }
+
     public function testPayloadContainsRequiredTopLevelKeys(): void
     {
         $client = static::createClient();
@@ -413,6 +487,8 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
         self::assertCount(2, $crawler->filter('.pl-preview-filter-menu-empty'));
         self::assertCount(0, $crawler->filter('a.pl-preview-reset'));
         self::assertCount(0, $crawler->filter('.alert-info'));
+        self::assertCount(0, $crawler->filter('[data-cashflow-reconciliation]'));
+        self::assertCount(0, $crawler->filter('[data-cashflow-reconciliation-kpi]'));
 
         $jsonQuery = $this->queryFromHref((string) $crawler
             ->filter('a[title="Скачать отчёт в формате JSON для проверки"]')

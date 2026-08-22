@@ -1,10 +1,10 @@
 ## Current checkpoint
 
-**Phase:** Stage 1
-**Status:** done
-**Stage base commit:** `3fc4e02f427e042d801186fc3bbcaa63f315359f`
-**Current Work item:** none — integrated Stage review
-**Owner gate:** no
+**Phase:** Stage 2
+**Status:** done — Release Gate delivery pending
+**Stage base commit:** `353ed3b1256bf34752f0ef1a6ca2c495d5c1fd01`
+**Current Work item:** none — Stage 2 reviewed green
+**Owner gate:** yes
 
 ### Completed
 
@@ -16,6 +16,19 @@
 - Internal Stage review completed green before external review.
 - External review iteration 1 hit the recoverable 40-turn limit; iteration 2 found one IMPORTANT missing row-total assertion and safe MINOR improvements.
 - Confirmed IMPORTANT and safe MINOR fixes implemented: row-derived totals, default-export negative assertions, orphan-safe filtered tree, architecture contract note, resumable checkpoint format.
+- Stage 1 committed as `353ed3b1` and pushed to `origin/task/finance-dashboard-cashflow-reconciliation`.
+- Draft PR creation attempted twice and blocked before GitHub by local execution policy (`approval required`, approval mode `never`); implementation continues per repository rules.
+- 2.1 implemented: one controller formatter supplies exact current/previous/balance labels to both Twig modes, including cross-year years.
+- 2.1 targeted checks green: dashboard functional test (1 test, 518 assertions) and Twig lint (2 files).
+- 2.2 implemented: one controller-owned reconciliation query is reused by the three turnover cards in both UI modes; the balance card has no link.
+- 2.2 targeted checks green: dashboard functional test (1 test, 582 assertions) and Twig lint (2 files).
+- 2.3 implemented: opt-in ДДС presentation preserves reconciliation scope, hides incompatible filters, exposes exact summary and explains balance semantics with an exit to normal ДДС.
+- 2.3 targeted checks green: cashflow functional test (13 tests, 185 assertions; 2 pre-existing deprecations) and report Twig lint.
+- 2.4 integrated suite green: 39 tests, 963 assertions; full changed Twig/PHP syntax lint and PHP CS Fixer dry run green.
+- `check:ui-kit` remains globally red with 9,085 legacy violations across 234 files; the Stage adds no CSS class to the app UI and changes no UI Kit source.
+- Independent internal Stage 2 review green; safe MINOR fixes removed unused Twig context and completed the summary ARIA group.
+- External Claude Code review (2.1.238) completed `REVIEW_GREEN`; no BLOCKER/IMPORTANT and no must-fix MINOR.
+- Final relevant suite green after review: 39 tests, 963 assertions, 2 pre-existing deprecations; Twig/PHP syntax, changed-file PHP CS and `git diff --check` green.
 
 ### Current diff / affected files
 
@@ -38,19 +51,23 @@
 
 ### Review status
 
-- iteration: 4; final external review `REVIEW_GREEN`.
+- Stage 1 iteration: 4; final external review `REVIEW_GREEN`.
+- Stage 2 iteration: 1; final external review `REVIEW_GREEN`.
 - unresolved findings: no BLOCKER/IMPORTANT.
 - rejected MINOR: enum/value-object extraction is unnecessary for an allowlisted internal string and would add speculative abstraction; mapper validation remains the HTTP invariant.
 - rejected MINOR: archived accounts remain included in company-wide report balances by approved report semantics; Stage 2 will state that balances are not scoped like movement rows.
+- accepted advisory MINOR without code change: keep Project × ЦФО matrix visible in reconciliation mode because it is a useful breakdown of the already-scoped rows; only incompatible filters are hidden by the approved plan.
+- FOLLOW-UP: deterministic cross-year formatter coverage, explicit `all` presentation coverage, and shared activity-label vocabulary if another consumer appears.
 - FOLLOW-UP: shared dashboard activity mapping may be consolidated in a separate task if further consumers appear.
 
 ### Exact next action
 
-- Commit/push the reviewed Stage 1 task-owned diff, create/update the Draft PR with base `master`, then record the Stage 2 base and continue automatically.
+- Commit and push the reviewed Stage 2 diff, retry Draft PR creation with base `master`, verify delivery facts, then stop at the declared Release Gate.
 
 ### Files to inspect first on resume
 
-- `site/src/Report/Cashflow/CashflowReportBuilder.php`
-- `site/tests/Integration/Finance/Application/Service/FinanceDashboardKpiProviderTest.php`
-- `site/tests/Functional/Finance/CashflowJsonExportControllerTest.php`
+- `site/src/Finance/Controller/HomeController.php`
+- `site/templates/home/index.html.twig`
+- `site/templates/app/home/index.html.twig`
+- `site/templates/report/cashflow.html.twig`
 - `docs/tasks/finance-dashboard-cashflow-reconciliation/plan.md`
