@@ -13,6 +13,7 @@ use App\Company\Entity\ProjectDirection;
 use App\Company\Repository\FinancialResponsibilityCenterProjectRepository;
 use App\Company\Repository\FinancialResponsibilityCenterRepository;
 use App\Company\Repository\ProjectDirectionRepository;
+use App\Shared\Domain\ValueObject\Money;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 
@@ -48,6 +49,7 @@ final class CompanyCreateFlowTest extends WebTestCaseBase
         self::assertNotNull($company);
         self::assertSame($owner->getId(), $company->getUser()?->getId());
         self::assertSame('1234567890', $company->getInn());
+        self::assertTrue($company->getMinimumBalance()->equals(Money::fromMinor(0, 'RUB')));
 
         /** @var BalanceFacade $balance */
         $balance = $client->getContainer()->get(BalanceFacade::class);
@@ -82,6 +84,33 @@ final class CompanyCreateFlowTest extends WebTestCaseBase
             (string) $project->getId(),
             $center->getId(),
         ));
+    }
+
+    public function testInvalidMinimumBalanceShowsValidationError(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $owner = UserBuilder::aUser()
+            ->withEmail('invalid-balance-owner@example.test')
+            ->withRoles(['ROLE_COMPANY_OWNER'])
+            ->build();
+        $em = $this->em();
+        $em->persist($owner);
+        $em->flush();
+
+        $client->loginUser($owner);
+        $crawler = $client->request('GET', '/company/new');
+        $form = $crawler->selectButton('Создать')->form([
+            'company[name]' => 'Invalid Balance Company',
+            'company[minimumBalance][amount]' => '-0.01',
+        ]);
+
+        $client->submit($form);
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.invalid-feedback', 'Минимальный остаток не может быть отрицательным.');
+        self::assertNull($em->getRepository(Company::class)->findOneBy(['name' => 'Invalid Balance Company']));
     }
 
     public function testSystemProjectCannotBeDeletedThroughController(): void
