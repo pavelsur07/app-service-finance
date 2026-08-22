@@ -184,6 +184,7 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
             $crawler = $client->request('GET', '/finance?currency=RUB&activity=operating&period='.$periodDays);
             self::assertResponseIsSuccessful();
             $this->assertPeriodState($crawler, $periodDays, $current, $previous);
+            $this->assertLegacyFilterControls($crawler, $periodDays, 'operating');
         }
 
         foreach ([
@@ -198,6 +199,7 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
             $crawler = $client->request('GET', $url);
             self::assertResponseIsSuccessful();
             $this->assertPeriodState($crawler, 30, '255RUB', '768RUB');
+            $this->assertLegacyFilterControls($crawler, 30, 'operating');
         }
         $arrayPeriod = $client->request('GET', '/finance', [
             'currency' => 'RUB',
@@ -206,11 +208,21 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
         ]);
         self::assertResponseIsSuccessful();
         $this->assertPeriodState($arrayPeriod, 30, '255RUB', '768RUB');
+        $this->assertLegacyFilterControls($arrayPeriod, 30, 'operating');
+
+        $interactive = $client->request('GET', '/finance?currency=RUB&activity=operating&period=7');
+        $financing = $client->submit($interactive->selectButton('Финансовая')->form());
+        self::assertResponseIsSuccessful();
+        $this->assertLegacyFilterControls($financing, 7, 'financing');
+        $fourteenDays = $client->submit($financing->selectButton('14 дней')->form());
+        self::assertResponseIsSuccessful();
+        $this->assertLegacyFilterControls($fourteenDays, 14, 'financing');
 
         $client->getCookieJar()->set(new Cookie(UiModeResolver::COOKIE_NAME, UiModeResolver::APP));
         $app = $client->request('GET', '/finance?currency=RUB&activity=operating&period=7');
         self::assertResponseIsSuccessful();
         $this->assertPeriodState($app, 30, '255RUB', '768RUB', UiModeResolver::APP);
+        $this->assertActivityState($app, 'operating');
     }
 
     private function persistTransaction(
@@ -251,8 +263,14 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
         }
     }
 
-    private function assertActivityState(Crawler $crawler, string $activity): void
+    private function assertActivityState(Crawler $crawler, string $activity, int $periodDays = 30): void
     {
+        if (0 === $crawler->filter('html[data-ui-mode="app"]')->count()) {
+            $this->assertLegacyFilterControls($crawler, $periodDays, $activity);
+
+            return;
+        }
+
         $filter = $crawler->filter('[data-dashboard-activity-filter]');
         self::assertCount(1, $filter);
         self::assertSame($activity, $filter->attr('data-selected-activity'));
@@ -262,13 +280,54 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
         );
         self::assertCount(1, $filter->filter(sprintf('button[value="%s"][aria-pressed="true"]', $activity)));
         self::assertCount(1, $filter->filter('input[name="currency"][value="RUB"]'));
+        self::assertCount(0, $crawler->filter('[data-dashboard-filter-controls]'));
+        self::assertCount(0, $crawler->filter('[data-dashboard-period-filter]'));
+        self::assertCount(1, $crawler->filter(sprintf(
+            'form.wz-head-actions input[name="activity"][value="%s"]',
+            $activity,
+        )));
+    }
 
-        if (1 === $crawler->filter('html[data-ui-mode="app"]')->count()) {
-            self::assertCount(1, $crawler->filter(sprintf(
-                'form.wz-head-actions input[name="activity"][value="%s"]',
-                $activity,
-            )));
-        }
+    private function assertLegacyFilterControls(Crawler $crawler, int $periodDays, string $activity): void
+    {
+        $controls = $crawler->filter('[data-dashboard-filter-controls].card.pl-preview-controls-card');
+        self::assertCount(1, $controls);
+        self::assertCount(1, $controls->filter('.card-body > .pl-preview-controls-row'));
+        self::assertCount(2, $controls->filter('.pl-preview-control-group'));
+
+        $activityFilter = $controls->filter('form[data-dashboard-activity-filter].pl-preview-control-group');
+        self::assertCount(1, $activityFilter);
+        self::assertSame($activity, $activityFilter->attr('data-selected-activity'));
+        self::assertSame('Вид деятельности', trim($activityFilter->filter('.pl-preview-control-label')->text()));
+        self::assertSame(
+            ['Операционная', 'Финансовая', 'Инвестиционная', 'Общая'],
+            $activityFilter->filter('.pl-preview-segmented button[name="activity"]')
+                ->each(static fn ($node): string => trim($node->text())),
+        );
+        self::assertCount(1, $activityFilter->filter(sprintf(
+            'button[name="activity"][value="%s"].is-active[aria-pressed="true"]',
+            $activity,
+        )));
+        self::assertCount(1, $activityFilter->filter('.pl-preview-segmented[role="group"][aria-label="Вид деятельности"]'));
+        self::assertCount(1, $activityFilter->filter('input[name="currency"][value="RUB"]'));
+        self::assertCount(1, $activityFilter->filter(sprintf('input[name="period"][value="%d"]', $periodDays)));
+
+        $periodFilter = $controls->filter('form[data-dashboard-period-filter].pl-preview-control-group');
+        self::assertCount(1, $periodFilter);
+        self::assertSame((string) $periodDays, $periodFilter->attr('data-selected-period'));
+        self::assertSame('Период', trim($periodFilter->filter('.pl-preview-control-label')->text()));
+        self::assertSame(
+            ['7 дней', '14 дней', '30 дней'],
+            $periodFilter->filter('.pl-preview-segmented button[name="period"]')
+                ->each(static fn ($node): string => trim($node->text())),
+        );
+        self::assertCount(1, $periodFilter->filter(sprintf(
+            'button[name="period"][value="%d"].is-active[aria-pressed="true"]',
+            $periodDays,
+        )));
+        self::assertCount(1, $periodFilter->filter('.pl-preview-segmented[role="group"][aria-label="Период"]'));
+        self::assertCount(1, $periodFilter->filter('input[name="currency"][value="RUB"]'));
+        self::assertCount(1, $periodFilter->filter(sprintf('input[name="activity"][value="%s"]', $activity)));
     }
 
     private function assertKpiComparisons(Crawler $crawler, string $uiMode, string $activity): void

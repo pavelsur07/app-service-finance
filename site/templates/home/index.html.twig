@@ -69,23 +69,67 @@
     .kpi-trend i {
       font-size: 1rem;
     }
+
+    {% include 'finance/report/_filter_controls_styles.html.twig' %}
+
+    @media (max-width: 767.98px) {
+      [data-dashboard-filter-controls] .pl-preview-segmented {
+        flex-wrap: wrap;
+      }
+    }
   </style>
 {% endblock %}
 
 {% block content %}
-<form method="get" class="d-flex flex-wrap gap-2 mb-3" role="group" aria-label="Вид деятельности" data-dashboard-activity-filter data-selected-activity="{{ cashflowActivity }}">
-  <input type="hidden" name="currency" value="{{ cashCurrency.value }}">
-  {% for activity, label in cashflowActivities %}
-    {% set activity_button_class = activity == cashflowActivity ? 'btn-primary active' : 'btn-outline-secondary' %}
-    <button
-      type="submit"
-      name="activity"
-      value="{{ activity }}"
-      class="btn {{ activity_button_class }}"
-      aria-pressed="{{ activity == cashflowActivity ? 'true' : 'false' }}"
-    >{{ label }}</button>
-  {% endfor %}
-</form>
+<div class="card pl-preview-controls-card mb-3" data-dashboard-filter-controls>
+  <div class="card-body">
+    <div class="pl-preview-controls-row">
+      <form
+        method="get"
+        class="pl-preview-control-group"
+        data-dashboard-activity-filter
+        data-selected-activity="{{ cashflowActivity }}"
+      >
+        <input type="hidden" name="currency" value="{{ cashCurrency.value }}">
+        <input type="hidden" name="period" value="{{ dashboardPeriodDays }}">
+        <span class="pl-preview-control-label">Вид деятельности</span>
+        <div class="pl-preview-segmented" role="group" aria-label="Вид деятельности">
+          {% for activity, label in cashflowActivities %}
+            <button
+              type="submit"
+              name="activity"
+              value="{{ activity }}"
+              class="{{ activity == cashflowActivity ? 'is-active' }}"
+              aria-pressed="{{ activity == cashflowActivity ? 'true' : 'false' }}"
+            >{{ label }}</button>
+          {% endfor %}
+        </div>
+      </form>
+
+      <form
+        method="get"
+        class="pl-preview-control-group"
+        data-dashboard-period-filter
+        data-selected-period="{{ dashboardPeriodDays }}"
+      >
+        <input type="hidden" name="currency" value="{{ cashCurrency.value }}">
+        <input type="hidden" name="activity" value="{{ cashflowActivity }}">
+        <span class="pl-preview-control-label">Период</span>
+        <div class="pl-preview-segmented" role="group" aria-label="Период">
+          {% for periodDays, label in dashboardPeriods %}
+            <button
+              type="submit"
+              name="period"
+              value="{{ periodDays }}"
+              class="{{ periodDays == dashboardPeriodDays ? 'is-active' }}"
+              aria-pressed="{{ periodDays == dashboardPeriodDays ? 'true' : 'false' }}"
+            >{{ label }}</button>
+          {% endfor %}
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
 <div class="row row-deck row-cards mb-4 ">
   <div class="col-sm-6 col-lg-3">
