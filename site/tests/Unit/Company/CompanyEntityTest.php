@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Company;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\Company\Enum\CompanyTaxSystem;
+use App\Shared\Domain\ValueObject\Money;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use PHPUnit\Framework\TestCase;
@@ -120,5 +121,24 @@ final class CompanyEntityTest extends TestCase
 
         // Then
         self::assertNull($company->getTaxSystem());
+    }
+
+    public function testMinimumBalanceDefaultsToZeroRubAndCanBeChanged(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+
+        self::assertTrue($company->getMinimumBalance()->equals(Money::fromMinor(0, 'RUB')));
+
+        $company->setMinimumBalance(Money::fromString('150000.00', 'USD'));
+
+        self::assertTrue($company->getMinimumBalance()->equals(Money::fromString('150000.00', 'USD')));
+    }
+
+    public function testMinimumBalanceCannotBeNegative(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+
+        $this->expectException(\DomainException::class);
+        $company->setMinimumBalance(Money::fromString('-0.01', 'RUB'));
     }
 }

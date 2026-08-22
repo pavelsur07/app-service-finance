@@ -4,6 +4,7 @@ namespace App\Company\Form;
 
 use App\Company\Entity\Company;
 use App\Company\Enum\CompanyTaxSystem;
+use App\Shared\Form\Type\MoneyValueType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
@@ -37,7 +38,8 @@ class CompanyType extends AbstractType
                 'required' => false,
                 'label' => 'Дата запрета редактирования',
                 'attr' => ['class' => 'form-control'],
-            ]);
+            ])
+            ->add('minimumBalance', MoneyValueType::class);
     }
 
     public function configureOptions(OptionsResolver $resolver): void

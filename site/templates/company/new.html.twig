@@ -22,6 +22,14 @@
                 <div class="mb-3">
                     {{ form_row(form.financeLockBefore) }}
                 </div>
+                <fieldset class="mb-3">
+                    <legend class="form-label">Минимальный остаток</legend>
+                    {{ form_errors(form.minimumBalance) }}
+                    <div class="row g-2">
+                        <div class="col-md-8">{{ form_row(form.minimumBalance.amount) }}</div>
+                        <div class="col-md-4">{{ form_row(form.minimumBalance.currency) }}</div>
+                    </div>
+                </fieldset>
                 <button class="btn btn-primary">{{ company is defined ? 'Сохранить' : 'Создать' }}</button>
                 <a href="{{ path('company_index') }}" class="btn btn-secondary">Назад</a>
                 {{ form_end(form) }}

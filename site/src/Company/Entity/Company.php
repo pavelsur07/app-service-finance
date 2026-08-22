@@ -3,6 +3,7 @@
 namespace App\Company\Entity;
 
 use App\Company\Enum\CompanyTaxSystem;
+use App\Shared\Domain\ValueObject\Money;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
@@ -30,11 +31,15 @@ class Company
     #[ORM\Column(nullable: true, enumType: CompanyTaxSystem::class)]
     private ?CompanyTaxSystem $taxSystem = null;
 
+    #[ORM\Embedded(class: Money::class, columnPrefix: 'minimum_balance_')]
+    private Money $minimumBalance;
+
     public function __construct(string $id, User $user)
     {
         Assert::uuid($id);
         $this->id = $id;
         $this->user = $user;
+        $this->minimumBalance = Money::fromMinor(0, 'RUB');
     }
 
     public function getId(): ?string
@@ -98,6 +103,22 @@ class Company
     public function setTaxSystem(?CompanyTaxSystem $taxSystem): self
     {
         $this->taxSystem = $taxSystem;
+
+        return $this;
+    }
+
+    public function getMinimumBalance(): Money
+    {
+        return $this->minimumBalance;
+    }
+
+    public function setMinimumBalance(Money $minimumBalance): self
+    {
+        if ($minimumBalance->isNegative()) {
+            throw new \DomainException('Минимальный остаток не может быть отрицательным.');
+        }
+
+        $this->minimumBalance = $minimumBalance;
 
         return $this;
     }

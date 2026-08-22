@@ -33,8 +33,14 @@
 
 {% block title %}Главная{% endblock %}
 
+{% block importmap %}
+  {{ parent() }}
+  {{ vite_entry_script_tags('finance_balance_dynamics') }}
+{% endblock %}
+
 {% block stylesheets %}
   {{ parent() }}
+  {{ vite_entry_link_tags('finance_balance_dynamics') }}
   <style>
     .card-title {
       font-weight: 600;
@@ -172,6 +178,12 @@
     </div>
   </div>
 </div>
+
+<div
+  id="finance-balance-dynamics-root"
+  data-endpoint="{{ path('api_finance_dashboard_balance_dynamics')|e('html_attr') }}"
+  data-currency="{{ cashCurrency.value|e('html_attr') }}"
+></div>
 
 {#<div class="row g-3 mb-4">
   <div class="card mt-3">
