@@ -26,7 +26,7 @@ final class HomeUiModeTest extends WebTestCaseBase
 
         self::assertResponseIsSuccessful();
         self::assertSelectorExists('html[data-ui-mode="legacy"]');
-        self::assertSelectorExists('#react-dashboard-started');
+        self::assertSelectorNotExists('#react-dashboard-started');
         self::assertStringContainsString('@tabler/core@1.2.0', (string) $client->getResponse()->getContent());
         self::assertSelectorNotExists('[data-dashboard-mode="app"]');
         self::assertSelectorCount(4, '[data-dashboard-kpi-comparison]');
