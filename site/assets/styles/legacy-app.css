@@ -123,7 +123,7 @@ aside.navbar.navbar-vertical .navbar-brand {
     display: flex;
     flex-direction: row;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: flex-start;
     padding-inline: .75rem;
     margin-bottom: 0;
 }
