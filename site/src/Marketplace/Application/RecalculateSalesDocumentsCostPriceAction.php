@@ -13,10 +13,10 @@ use Doctrine\ORM\EntityManagerInterface;
 final class RecalculateSalesDocumentsCostPriceAction
 {
     public function __construct(
-        private readonly MarketplaceSaleRepository    $saleRepository,
-        private readonly MarketplaceReturnRepository  $returnRepository,
+        private readonly MarketplaceSaleRepository $saleRepository,
+        private readonly MarketplaceReturnRepository $returnRepository,
         private readonly MarketplaceCostPriceResolver $costPriceResolver,
-        private readonly EntityManagerInterface       $em,
+        private readonly EntityManagerInterface $em,
     ) {
     }
 
@@ -25,7 +25,7 @@ final class RecalculateSalesDocumentsCostPriceAction
      */
     public function __invoke(RecalculateSalesCostPriceCommand $cmd): array
     {
-        $salesCount   = 0;
+        $salesCount = 0;
         $returnsCount = 0;
 
         // --- Пересчёт продаж ---
@@ -35,6 +35,7 @@ final class RecalculateSalesDocumentsCostPriceAction
             $cmd->dateFrom,
             $cmd->dateTo,
             $cmd->onlyZeroCost,
+            $cmd->listingIds,
         );
 
         foreach ($sales as $sale) {
@@ -54,10 +55,11 @@ final class RecalculateSalesDocumentsCostPriceAction
             $cmd->dateFrom,
             $cmd->dateTo,
             $cmd->onlyZeroCost,
+            $cmd->listingIds,
         );
 
         foreach ($returns as $return) {
-            $costPrice = $this->costPriceResolver->resolveForReturn(
+            $costPrice = $this->costPriceResolver->resolveForReturnRecalculation(
                 $return->getListing(),
                 $return->getSale(),
                 $return->getRawData(),

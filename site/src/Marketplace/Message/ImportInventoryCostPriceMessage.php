@@ -10,6 +10,8 @@ namespace App\Marketplace\Message;
  */
 final readonly class ImportInventoryCostPriceMessage
 {
+    public const SYSTEM_ACTOR_USER_ID = '00000000-0000-0000-0000-000000000001';
+
     public function __construct(
         public string $companyId,
         public string $storagePath,
@@ -17,6 +19,7 @@ final readonly class ImportInventoryCostPriceMessage
         public string $effectiveFrom,  // Y-m-d
         public string $marketplace,    // MarketplaceType::value
         public string $identifierType = 'barcode',
+        public string $actorUserId = self::SYSTEM_ACTOR_USER_ID,
     ) {
     }
 }

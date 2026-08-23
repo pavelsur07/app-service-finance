@@ -48,13 +48,13 @@ final class MarketplaceCostPriceResolver
         ?\DateTimeImmutable $returnDate = null,
     ): string {
         // Шаг 1: берём из продажи если есть реальная себестоимость
-        if ($sale !== null && $sale->getCostPrice() !== null && bccomp($sale->getCostPrice(), '0.00', 2) > 0) {
+        if (null !== $sale && null !== $sale->getCostPrice() && bccomp($sale->getCostPrice(), '0.00', 2) > 0) {
             return $sale->getCostPrice();
         }
 
         // Шаг 2: ищем по order_dt из rawData
         $orderDt = $rawData['order_dt'] ?? null;
-        if ($orderDt !== null && $orderDt !== '') {
+        if (null !== $orderDt && '' !== $orderDt) {
             try {
                 $orderDate = new \DateTimeImmutable($orderDt);
 
@@ -65,7 +65,7 @@ final class MarketplaceCostPriceResolver
         }
 
         // Шаг 3: резолвим по дате возврата если передана
-        if ($returnDate !== null) {
+        if (null !== $returnDate) {
             return $this->resolve($listing, $returnDate);
         }
 
@@ -73,12 +73,29 @@ final class MarketplaceCostPriceResolver
         return '0.00';
     }
 
+    /**
+     * Re-resolve from the cost history instead of trusting a value cached on
+     * the linked sale. This also covers current-month returns of older sales.
+     */
+    public function resolveForReturnRecalculation(
+        MarketplaceListing $listing,
+        ?MarketplaceSale $sale,
+        ?array $rawData,
+        ?\DateTimeImmutable $returnDate = null,
+    ): string {
+        if (null !== $sale) {
+            return $this->resolve($listing, $sale->getSaleDate());
+        }
+
+        return $this->resolveForReturn($listing, null, $rawData, $returnDate);
+    }
+
     private function resolve(MarketplaceListing $listing, \DateTimeImmutable $date): string
     {
         return $this->costPriceResolver->resolve(
             companyId: (string) $listing->getCompany()->getId(),
             listingId: $listing->getId(),
-            date:      $date,
+            date: $date,
         );
     }
 }

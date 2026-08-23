@@ -68,6 +68,11 @@ final class ImportInventoryCostPriceFromFileActionTest extends IntegrationTestCa
         self::assertSame(0, $result['overwritten_listings']);
         self::assertSame(0, $result['skipped']);
         self::assertSame([], $result['errors']);
+        $affectedListingIds = $result['affected_listing_ids'];
+        sort($affectedListingIds);
+        $expectedListingIds = [$sizeS->getId(), $sizeM->getId()];
+        sort($expectedListingIds);
+        self::assertSame($expectedListingIds, $affectedListingIds);
 
         $prices = $this->pricesByListing(self::COMPANY_A_ID);
         self::assertSame('850.00', $prices[$sizeS->getId()] ?? null);
@@ -170,6 +175,7 @@ final class ImportInventoryCostPriceFromFileActionTest extends IntegrationTestCa
         self::assertSame(1, $result['skipped']);
         self::assertCount(1, $result['errors']);
         self::assertStringContainsString('неоднозначный supplier_sku "DUPLICATE"', $result['errors'][0]);
+        self::assertSame([], $result['affected_listing_ids']);
         self::assertSame([], $this->pricesByListing(self::COMPANY_A_ID));
     }
 

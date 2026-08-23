@@ -10,20 +10,25 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Inventory\Application\Command\ImportInventoryCostPriceFromFileCommand;
 use App\Marketplace\Inventory\Application\ImportInventoryCostPriceFromFileAction;
 use App\Marketplace\Message\ImportInventoryCostPriceMessage;
+use App\Marketplace\Message\RecalculateListingCostPriceMessage;
 use App\Marketplace\Repository\MarketplaceJobLogRepository;
 use App\Shared\Service\Storage\TemporaryLocalFile;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 #[AsMessageHandler]
 final class ImportInventoryCostPriceHandler
 {
     public function __construct(
         private readonly ImportInventoryCostPriceFromFileAction $action,
-        private readonly TemporaryLocalFile                    $temporaryLocalFile,
-        private readonly MarketplaceJobLogRepository           $jobLogRepository,
-        private readonly LoggerInterface                       $logger,
+        private readonly TemporaryLocalFile $temporaryLocalFile,
+        private readonly MarketplaceJobLogRepository $jobLogRepository,
+        private readonly LoggerInterface $logger,
+        private readonly MessageBusInterface $messageBus,
+        private readonly ClockInterface $clock,
     ) {
     }
 
@@ -38,10 +43,10 @@ final class ImportInventoryCostPriceHandler
         $this->jobLogRepository->save($jobLog);
 
         $this->logger->info('[InventoryImport] Handler started', [
-            'company_id'        => $message->companyId,
-            'marketplace'       => $message->marketplace,
+            'company_id' => $message->companyId,
+            'marketplace' => $message->marketplace,
             'original_filename' => $message->originalFilename,
-            'effective_from'    => $message->effectiveFrom,
+            'effective_from' => $message->effectiveFrom,
         ]);
 
         try {
@@ -49,31 +54,45 @@ final class ImportInventoryCostPriceHandler
                 $message->storagePath,
                 function (string $absolutePath) use ($message): array {
                     $command = new ImportInventoryCostPriceFromFileCommand(
-                        companyId:        $message->companyId,
+                        companyId: $message->companyId,
                         absoluteFilePath: $absolutePath,
                         originalFilename: $message->originalFilename,
-                        effectiveFrom:    new \DateTimeImmutable($message->effectiveFrom),
-                        marketplace:      MarketplaceType::from($message->marketplace),
-                        identifierType:   $message->identifierType,
+                        effectiveFrom: new \DateTimeImmutable($message->effectiveFrom),
+                        marketplace: MarketplaceType::from($message->marketplace),
+                        identifierType: $message->identifierType,
                     );
 
                     return ($this->action)($command);
                 },
             );
 
+            if ([] !== $result['affected_listing_ids']) {
+                $today = $this->clock->now();
+                $this->messageBus->dispatch(new RecalculateListingCostPriceMessage(
+                    companyId: $message->companyId,
+                    marketplace: $message->marketplace,
+                    listingIds: $result['affected_listing_ids'],
+                    dateFrom: $today->modify('first day of this month')->format('Y-m-d'),
+                    dateTo: $today->format('Y-m-d'),
+                    // Native unserialize() does not initialize a promoted
+                    // property that is absent from a pre-deploy queue payload.
+                    actorUserId: $message->actorUserId ?? ImportInventoryCostPriceMessage::SYSTEM_ACTOR_USER_ID,
+                ));
+            }
+
             // Формируем details из ошибок
             $details = array_map(
-                static fn(string $error): array => ['reason' => $error],
+                static fn (string $error): array => ['reason' => $error],
                 $result['errors'],
             );
 
             $summary = [
-                'imported'  => $result['imported'],
+                'imported' => $result['imported'],
                 'updated_listings' => $result['updated_listings'],
                 'overwritten_listings' => $result['overwritten_listings'],
-                'skipped'   => $result['skipped'],
-                'errors'    => count($result['errors']),
-                'file'      => $message->originalFilename,
+                'skipped' => $result['skipped'],
+                'errors' => count($result['errors']),
+                'file' => $message->originalFilename,
                 'marketplace' => $message->marketplace,
                 'identifier_type' => $message->identifierType,
             ];
@@ -83,11 +102,11 @@ final class ImportInventoryCostPriceHandler
 
             $this->logger->info('[InventoryImport] Handler completed', [
                 'company_id' => $message->companyId,
-                'imported'   => $result['imported'],
+                'imported' => $result['imported'],
                 'updated_listings' => $result['updated_listings'],
                 'overwritten_listings' => $result['overwritten_listings'],
-                'skipped'    => $result['skipped'],
-                'errors'     => count($result['errors']),
+                'skipped' => $result['skipped'],
+                'errors' => count($result['errors']),
             ]);
         } catch (\Throwable $e) {
             $jobLog->fail($e->getMessage());
@@ -95,7 +114,7 @@ final class ImportInventoryCostPriceHandler
 
             $this->logger->error('[InventoryImport] Handler failed', [
                 'company_id' => $message->companyId,
-                'error'      => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
 
             throw $e;

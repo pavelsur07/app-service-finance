@@ -15,6 +15,8 @@ use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceCostCategory;
 use App\Marketplace\Entity\MarketplaceCostPLMapping;
 use App\Marketplace\Entity\MarketplaceMonthClose;
+use App\Marketplace\Entity\MarketplaceSaleMapping;
+use App\Marketplace\Enum\AmountSource;
 use App\Marketplace\Enum\CloseStage;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
@@ -22,6 +24,8 @@ use App\Marketplace\Enum\MonthCloseStageStatus;
 use App\Marketplace\Repository\MarketplaceMonthCloseRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Builders\Marketplace\MarketplaceListingBuilder;
+use App\Tests\Builders\Marketplace\MarketplaceSaleBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
 
@@ -148,34 +152,7 @@ final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
 
     public function testSkipsWhenPreflightFails(): void
     {
-        // Создаём затрату с маппингом, помеченным include_in_pl=true,
-        // но категорию делаем «ozon_other_service» — это блокирующий preflight error.
-        $plCategory = new PLCategory(Uuid::uuid4()->toString(), $this->company);
-        $plCategory->setName('Прочее Ozon');
-        $plCategory->setFlow(PLFlow::EXPENSE);
-        $this->em->persist($plCategory);
-
-        $costCategory = new MarketplaceCostCategory(
-            Uuid::uuid4()->toString(),
-            $this->company,
-            self::MARKETPLACE,
-        );
-        $costCategory->setCode('ozon_other_service'); // ← блокирующий код
-        $costCategory->setName('Прочая услуга Ozon');
-        $this->em->persist($costCategory);
-
-        $mapping = new MarketplaceCostPLMapping(
-            Uuid::uuid4()->toString(),
-            self::COMPANY_ID,
-            $costCategory,
-            $plCategory->getId(),
-            true,
-        );
-        $this->em->persist($mapping);
-
-        $this->createCost($costCategory, '100.00', MarketplaceCostOperationType::CHARGE, '2026-03-15');
-        $this->em->flush();
-        $this->em->clear();
+        $this->seedBlockingOtherServiceCost();
 
         $this->rebuild();
 
@@ -194,6 +171,79 @@ final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
             ['c' => self::COMPANY_ID],
         );
         self::assertSame(0, $documentRows, 'PLDocument не должен создаваться при провальном preflight.');
+    }
+
+    public function testPreservesExistingPreliminaryWhenPreflightFailsBeforeReopen(): void
+    {
+        $this->seedCostsForCosts();
+        $this->rebuild();
+
+        $before = $this->reloadMonthClose();
+        self::assertNotNull($before);
+        $documentIds = $before->getStagePLDocumentIds(CloseStage::COSTS);
+        self::assertNotSame([], $documentIds);
+
+        /** @var Company $managedCompany */
+        $managedCompany = $this->em->find(Company::class, self::COMPANY_ID);
+        $this->company = $managedCompany;
+        $this->seedBlockingOtherServiceCost();
+
+        $this->rebuild();
+
+        $after = $this->reloadMonthClose();
+        self::assertNotNull($after);
+        self::assertSame(MonthCloseStageStatus::CLOSED, $after->getStageStatus(CloseStage::COSTS));
+        self::assertTrue($after->isStageLastCloseWasPreliminary(CloseStage::COSTS));
+        self::assertSame($documentIds, $after->getStagePLDocumentIds(CloseStage::COSTS));
+
+        $documentRows = (int) $this->em->getConnection()->fetchOne(
+            'SELECT COUNT(*) FROM documents WHERE company_id = :c',
+            ['c' => self::COMPANY_ID],
+        );
+        self::assertSame(1, $documentRows, 'Существующий PLDocument должен сохраниться при провальном preflight.');
+    }
+
+    public function testSalesReturnsPreliminaryReopensDespiteExpectedClosedStageErrors(): void
+    {
+        $plCategory = new PLCategory(Uuid::uuid4()->toString(), $this->company);
+        $plCategory->setName('Себестоимость продаж Ozon');
+        $plCategory->setFlow(PLFlow::EXPENSE);
+        $listing = MarketplaceListingBuilder::aListing()
+            ->forCompany($this->company)
+            ->withMarketplace(self::MARKETPLACE)
+            ->withMarketplaceSku('sales-rebuild-listing')
+            ->build();
+        $mapping = new MarketplaceSaleMapping(
+            Uuid::uuid4()->toString(),
+            $this->company,
+            self::MARKETPLACE,
+            AmountSource::SALE_COST_PRICE,
+            $plCategory,
+        );
+        $sale = MarketplaceSaleBuilder::aSale()
+            ->forCompany($this->company)
+            ->forListing($listing)
+            ->withSaleDate(new \DateTimeImmutable('2026-03-10'))
+            ->withCostPrice('100.00')
+            ->build();
+        foreach ([$plCategory, $listing, $mapping, $sale] as $entity) {
+            $this->em->persist($entity);
+        }
+        $this->em->flush();
+        $this->em->clear();
+
+        $this->rebuild([CloseStage::SALES_RETURNS->value]);
+        $first = $this->reloadMonthClose();
+        self::assertNotNull($first);
+        $firstDocumentIds = $first->getStagePLDocumentIds(CloseStage::SALES_RETURNS);
+        self::assertNotSame([], $firstDocumentIds);
+
+        $this->rebuild([CloseStage::SALES_RETURNS->value]);
+        $second = $this->reloadMonthClose();
+        self::assertNotNull($second);
+        self::assertSame(MonthCloseStageStatus::CLOSED, $second->getStageStatus(CloseStage::SALES_RETURNS));
+        self::assertTrue($second->isStageLastCloseWasPreliminary(CloseStage::SALES_RETURNS));
+        self::assertNotSame($firstDocumentIds, $second->getStagePLDocumentIds(CloseStage::SALES_RETURNS));
     }
 
     // --- helpers ---
@@ -230,7 +280,41 @@ final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
         $this->em->clear();
     }
 
-    private function rebuild(): void
+    private function seedBlockingOtherServiceCost(): void
+    {
+        // include_in_pl=true + ozon_other_service is a blocking preflight error.
+        $plCategory = new PLCategory(Uuid::uuid4()->toString(), $this->company);
+        $plCategory->setName('Прочее Ozon');
+        $plCategory->setFlow(PLFlow::EXPENSE);
+        $this->em->persist($plCategory);
+
+        $costCategory = new MarketplaceCostCategory(
+            Uuid::uuid4()->toString(),
+            $this->company,
+            self::MARKETPLACE,
+        );
+        $costCategory->setCode('ozon_other_service');
+        $costCategory->setName('Прочая услуга Ozon');
+        $this->em->persist($costCategory);
+
+        $mapping = new MarketplaceCostPLMapping(
+            Uuid::uuid4()->toString(),
+            self::COMPANY_ID,
+            $costCategory,
+            $plCategory->getId(),
+            true,
+        );
+        $this->em->persist($mapping);
+
+        $this->createCost($costCategory, '100.00', MarketplaceCostOperationType::CHARGE, '2026-03-15');
+        $this->em->flush();
+        $this->em->clear();
+    }
+
+    /**
+     * @param list<string>|null $stages
+     */
+    private function rebuild(?array $stages = null): void
     {
         /** @var RebuildPreliminaryForPeriodAction $action */
         $action = self::getContainer()->get(RebuildPreliminaryForPeriodAction::class);
@@ -241,6 +325,7 @@ final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
             year: self::YEAR,
             month: self::MONTH,
             actorUserId: self::OWNER_ID,
+            stages: $stages,
         ));
 
         $this->em->clear();

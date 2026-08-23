@@ -234,6 +234,38 @@ final class SnapshotCalculationPolicyTest extends TestCase
         $this->assertSame(3, $snapshot->getSalesQuantity());
     }
 
+    public function testUsesInventoryHistoryInsteadOfStaleRawCostPrice(): void
+    {
+        $sale = new SaleData(
+            marketplace: MarketplaceType::WILDBERRIES,
+            externalOrderId: 'ord-stale-cost',
+            saleDate: $this->date,
+            marketplaceSku: 'SKU-1',
+            quantity: 2,
+            pricePerUnit: '500.00',
+            totalRevenue: '1000.00',
+            rawData: ['cost_price' => '10.00'],
+        );
+
+        $this->marketplaceFacade->method('getSalesForListingAndDate')->willReturn([$sale]);
+        $this->marketplaceFacade->method('getReturnsForListingAndDate')->willReturn([]);
+        $this->marketplaceFacade->method('getCostPriceForListing')->willReturn('125.00');
+        $this->marketplaceFacade->method('getCostsForListingAndDate')->willReturn([]);
+        $this->marketplaceFacade->method('getOrdersForListingAndDate')->willReturn([]);
+        $this->marketplaceFacade->method('getAdvertisingCostsForListingAndDate')->willReturn([]);
+        $this->snapshotRepository->method('findOneByUniqueKey')->willReturn(null);
+
+        $snapshot = $this->policy->calculateForListingDay(
+            self::COMPANY_ID,
+            self::LISTING_ID,
+            $this->date,
+            MarketplaceType::WILDBERRIES->value,
+        );
+
+        $this->assertSame('125.00', $snapshot->getCostPrice());
+        $this->assertSame('250.00', $snapshot->getTotalCostPrice());
+    }
+
     public function testAdvertisingSpendConsistency(): void
     {
         $sale = $this->makeMinimalSale();

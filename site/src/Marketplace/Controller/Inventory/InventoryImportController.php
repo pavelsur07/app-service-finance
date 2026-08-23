@@ -34,6 +34,7 @@ final class InventoryImportController extends AbstractController
     {
         $company = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
+        $user = $this->getUser();
 
         if (!$this->isCsrfTokenValid('marketplace_inventory_import_cost_price', (string) $request->request->get('_token', ''))) {
             throw $this->createAccessDeniedException('Недействительный CSRF-токен');
@@ -118,6 +119,7 @@ final class InventoryImportController extends AbstractController
             effectiveFrom: $effectiveFrom,
             marketplace: $marketplaceType->value,
             identifierType: $identifierType,
+            actorUserId: (string) $user->getId(),
         ));
 
         $this->addFlash('success', sprintf(

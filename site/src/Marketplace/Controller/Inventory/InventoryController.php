@@ -9,6 +9,7 @@ use App\Marketplace\Enum\JobType;
 use App\Marketplace\Inventory\Application\Command\SetInventoryCostPriceCommand;
 use App\Marketplace\Inventory\Application\SetInventoryCostPriceAction;
 use App\Marketplace\Inventory\Infrastructure\Query\InventoryCostListingQuery;
+use App\Marketplace\Message\RecalculateListingCostPriceMessage;
 use App\Marketplace\Message\SyncOzonListingBarcodesMessage;
 use App\Marketplace\Repository\MarketplaceJobLogRepository;
 use App\Shared\Service\ActiveCompanyService;
@@ -16,6 +17,7 @@ use Doctrine\DBAL\Query\QueryBuilder;
 use Pagerfanta\Doctrine\DBAL\QueryAdapter;
 use Pagerfanta\Pagerfanta;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -32,6 +34,7 @@ final class InventoryController extends AbstractController
         private readonly SetInventoryCostPriceAction $setAction,
         private readonly MarketplaceJobLogRepository $jobLogRepository,
         private readonly MessageBusInterface $messageBus,
+        private readonly ClockInterface $clock,
     ) {
     }
 
@@ -106,6 +109,7 @@ final class InventoryController extends AbstractController
     {
         $company = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
+        $user = $this->getUser();
 
         if (!$this->isCsrfTokenValid('marketplace_inventory_set_cost'.$id, (string) $request->request->get('_token', ''))) {
             throw $this->createAccessDeniedException('Недействительный CSRF-токен');
@@ -127,14 +131,23 @@ final class InventoryController extends AbstractController
             );
 
             $result = ($this->setAction)($command);
+            $today = $this->clock->now();
+            $this->messageBus->dispatch(new RecalculateListingCostPriceMessage(
+                companyId: $companyId,
+                marketplace: $result->marketplace->value,
+                listingIds: [$id],
+                dateFrom: $today->modify('first day of this month')->format('Y-m-d'),
+                dateTo: $today->format('Y-m-d'),
+                actorUserId: (string) $user->getId(),
+            ));
 
             if ($result->wasOverwritten) {
                 $this->addFlash('warning', sprintf(
-                    'Себестоимость на %s уже существовала и была перезаписана.',
+                    'Себестоимость на %s уже существовала и была перезаписана. Пересчёт текущего месяца запущен.',
                     $effectiveFromDate->format('d.m.Y'),
                 ));
             } else {
-                $this->addFlash('success', 'Себестоимость сохранена.');
+                $this->addFlash('success', 'Себестоимость сохранена. Пересчёт текущего месяца запущен.');
             }
         } catch (\DomainException $e) {
             $this->addFlash('error', $e->getMessage());
