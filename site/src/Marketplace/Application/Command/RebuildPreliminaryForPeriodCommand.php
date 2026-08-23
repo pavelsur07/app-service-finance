@@ -10,12 +10,16 @@ namespace App\Marketplace\Application\Command;
  */
 final class RebuildPreliminaryForPeriodCommand
 {
+    /**
+     * @param list<string>|null $stages null rebuilds all stages
+     */
     public function __construct(
         public readonly string $companyId,
         public readonly string $marketplace,   // MarketplaceType::value
-        public readonly int    $year,
-        public readonly int    $month,
+        public readonly int $year,
+        public readonly int $month,
         public readonly string $actorUserId,   // системный UUID (cron) или UUID реального пользователя (ручной запуск)
+        public readonly ?array $stages = null,
     ) {
     }
 }

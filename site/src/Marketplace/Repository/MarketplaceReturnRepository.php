@@ -67,9 +67,10 @@ class MarketplaceReturnRepository extends ServiceEntityRepository
     }
 
     /**
-     * Массовая проверка существующих SRID возвратов (для bulk import)
+     * Массовая проверка существующих SRID возвратов (для bulk import).
      *
      * @param string[] $srids
+     *
      * @return array<string, true>
      */
     public function getExistingExternalIds(string $companyId, array $srids): array
@@ -102,9 +103,13 @@ class MarketplaceReturnRepository extends ServiceEntityRepository
         \DateTimeImmutable $dateFrom,
         \DateTimeImmutable $dateTo,
         bool $onlyZeroCost,
+        array $listingIds = [],
     ): array {
         $qb = $this->createQueryBuilder('r')
             ->join('r.listing', 'l')
+            ->addSelect('l')
+            ->leftJoin('r.sale', 's')
+            ->addSelect('s')
             ->where('r.company = :companyId')
             ->andWhere('r.marketplace = :marketplace')
             ->andWhere('r.returnDate >= :dateFrom')
@@ -114,13 +119,17 @@ class MarketplaceReturnRepository extends ServiceEntityRepository
             ->setParameter('dateFrom', $dateFrom)
             ->setParameter('dateTo', $dateTo);
 
+        if ([] !== $listingIds) {
+            $qb->andWhere('l.id IN (:listingIds)')
+                ->setParameter('listingIds', array_values(array_unique($listingIds)));
+        }
+
         if ($onlyZeroCost) {
             $qb->andWhere('r.costPrice IS NULL OR r.costPrice = 0');
         }
 
         return $qb->getQuery()->getResult();
     }
-
 
     public function countDocumentLinkedByRawDocument(
         Company $company,

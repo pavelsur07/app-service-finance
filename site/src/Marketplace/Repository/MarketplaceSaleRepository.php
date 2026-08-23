@@ -183,9 +183,11 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
         \DateTimeImmutable $dateFrom,
         \DateTimeImmutable $dateTo,
         bool $onlyZeroCost,
+        array $listingIds = [],
     ): array {
         $qb = $this->createQueryBuilder('s')
             ->join('s.listing', 'l')
+            ->addSelect('l')
             ->where('s.company = :companyId')
             ->andWhere('s.marketplace = :marketplace')
             ->andWhere('s.saleDate >= :dateFrom')
@@ -194,6 +196,11 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
             ->setParameter('marketplace', $marketplace)
             ->setParameter('dateFrom', $dateFrom)
             ->setParameter('dateTo', $dateTo);
+
+        if ([] !== $listingIds) {
+            $qb->andWhere('l.id IN (:listingIds)')
+                ->setParameter('listingIds', array_values(array_unique($listingIds)));
+        }
 
         if ($onlyZeroCost) {
             $qb->andWhere('s.costPrice IS NULL OR s.costPrice = 0');

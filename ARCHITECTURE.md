@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.81 / 2026-08-21
+> Версия: 1.82 / 2026-08-23
 
 ---
 
@@ -1090,6 +1090,11 @@ getPortfolioSummary(string $companyId, AnalysisPeriod $period, ?string $marketpl
 
 // Запросить async пересчёт снапшотов за период, возвращает jobId
 requestRecalc(string $companyId, AnalysisPeriod $period): string
+
+// Синхронно пересчитать дневные снапшоты заданных листингов в пределах периода.
+// Публичная cross-module точка для каскадов после изменения себестоимости.
+// @param list<string> $listingIds
+recalculateSnapshotsForListings(string $companyId, array $listingIds, \DateTimeImmutable $dateFrom, \DateTimeImmutable $dateTo, string $marketplace): void
 
 // Создать маппинг категории затрат МП → статья юнит-экономики
 // Выбрасывает DomainException если маппинг для данной категории уже существует
@@ -2923,6 +2928,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.82 | 2026-08-23 | MarketplaceAnalytics: добавлен facade-контракт пакетного пересчёта дневных снапшотов листингов для tenant-safe каскада после изменения себестоимости |
 | 1.81 | 2026-08-21 | Finance: ручное удаление операций ОПиУ переведено на company-scoped soft delete с отдельной вкладкой удалённых, восстановлением и пересчётом связанных ДДС/ОПиУ агрегатов |
 | 1.80 | 2026-08-20 | Finance: ДДС принимает tenant-safe мультифильтры Проекты/ЦФО при сохранении legacy UI, JSON и CSV contracts |
 | 1.79 | 2026-08-11 | Company: меню скрывает разделы недоступных модулей — модульные роли доступа закрыты по всем этапам |

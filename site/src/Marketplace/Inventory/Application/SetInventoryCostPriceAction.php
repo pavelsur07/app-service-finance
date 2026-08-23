@@ -62,7 +62,7 @@ final class SetInventoryCostPriceAction
             if (null !== $existingPrice) {
                 $existingPrice->overwrite($command->priceAmount, $command->currency, $command->note);
 
-                return new SetInventoryCostPriceResult($existingPrice->getId(), true);
+                return new SetInventoryCostPriceResult($existingPrice->getId(), true, $listing->getMarketplace());
             }
 
             // Закрываем предыдущую активную запись
@@ -91,17 +91,17 @@ final class SetInventoryCostPriceAction
 
             $this->em->persist($newPrice);
 
-            return new SetInventoryCostPriceResult($newPrice->getId(), false);
+            return new SetInventoryCostPriceResult($newPrice->getId(), false, $listing->getMarketplace());
         });
     }
 
     private function assertCommandIsValid(SetInventoryCostPriceCommand $command): void
     {
-        if (trim($command->companyId) === '') {
+        if ('' === trim($command->companyId)) {
             throw new \DomainException('companyId обязателен.');
         }
 
-        if (trim($command->listingId) === '') {
+        if ('' === trim($command->listingId)) {
             throw new \DomainException('listingId обязателен.');
         }
 
@@ -109,7 +109,7 @@ final class SetInventoryCostPriceAction
             throw new \DomainException('priceAmount должен быть неотрицательным числом.');
         }
 
-        if (mb_strlen(trim($command->currency)) !== 3) {
+        if (3 !== mb_strlen(trim($command->currency))) {
             throw new \DomainException('currency должен содержать 3 символа.');
         }
     }

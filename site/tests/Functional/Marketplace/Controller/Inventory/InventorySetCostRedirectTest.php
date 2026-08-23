@@ -9,12 +9,14 @@ use App\Company\Entity\User;
 use App\Marketplace\Entity\Inventory\MarketplaceInventoryCostPrice;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Message\RecalculateListingCostPriceMessage;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 final class InventorySetCostRedirectTest extends WebTestCaseBase
 {
@@ -32,7 +34,7 @@ final class InventorySetCostRedirectTest extends WebTestCaseBase
             'POST',
             sprintf('/marketplace/inventory/%s/set-cost', $listing->getId()),
             [
-                '_token' => $this->csrfToken($client, 'marketplace_inventory_set_cost' . $listing->getId()),
+                '_token' => $this->csrfToken($client, 'marketplace_inventory_set_cost'.$listing->getId()),
                 'price_amount' => '850.00',
                 'effective_from' => '2026-04-15',
                 'note' => 'unit test',
@@ -42,6 +44,19 @@ final class InventorySetCostRedirectTest extends WebTestCaseBase
         );
 
         self::assertResponseRedirects('/marketplace/inventory');
+
+        /** @var InMemoryTransport $transport */
+        $transport = $client->getContainer()->get('messenger.transport.async_pipeline');
+        $sent = $transport->getSent();
+        self::assertCount(1, $sent);
+        $message = $sent[0]->getMessage();
+        self::assertInstanceOf(RecalculateListingCostPriceMessage::class, $message);
+        self::assertSame(self::COMPANY_ID, $message->companyId);
+        self::assertSame(MarketplaceType::OZON->value, $message->marketplace);
+        self::assertSame([$listing->getId()], $message->listingIds);
+        self::assertSame((new \DateTimeImmutable())->format('Y-m-01'), $message->dateFrom);
+        self::assertSame((new \DateTimeImmutable())->format('Y-m-d'), $message->dateTo);
+        self::assertSame((string) $owner->getId(), $message->actorUserId);
     }
 
     public function testRedirectsToInventoryIndexWithQueryWhenRefererHasFilter(): void
@@ -56,7 +71,7 @@ final class InventorySetCostRedirectTest extends WebTestCaseBase
             'POST',
             sprintf('/marketplace/inventory/%s/set-cost', $listing->getId()),
             [
-                '_token' => $this->csrfToken($client, 'marketplace_inventory_set_cost' . $listing->getId()),
+                '_token' => $this->csrfToken($client, 'marketplace_inventory_set_cost'.$listing->getId()),
                 'price_amount' => '999.50',
                 'effective_from' => '2026-04-16',
             ],
@@ -79,7 +94,7 @@ final class InventorySetCostRedirectTest extends WebTestCaseBase
             'POST',
             sprintf('/marketplace/inventory/%s/set-cost', $listing->getId()),
             [
-                '_token' => $this->csrfToken($client, 'marketplace_inventory_set_cost' . $listing->getId()),
+                '_token' => $this->csrfToken($client, 'marketplace_inventory_set_cost'.$listing->getId()),
                 'price_amount' => '500.00',
                 'effective_from' => '2026-04-19',
             ],
@@ -109,7 +124,7 @@ final class InventorySetCostRedirectTest extends WebTestCaseBase
             'POST',
             sprintf('/marketplace/inventory/%s/set-cost', $listingId),
             [
-                '_token' => $this->csrfToken($client, 'marketplace_inventory_set_cost' . $listingId),
+                '_token' => $this->csrfToken($client, 'marketplace_inventory_set_cost'.$listingId),
                 'price_amount' => '1234.56',
                 'effective_from' => '2026-04-17',
             ],
@@ -134,7 +149,7 @@ final class InventorySetCostRedirectTest extends WebTestCaseBase
             'POST',
             sprintf('/marketplace/inventory/%s/set-cost', $listingId),
             [
-                '_token' => $this->csrfToken($client, 'marketplace_inventory_set_cost' . $listingId),
+                '_token' => $this->csrfToken($client, 'marketplace_inventory_set_cost'.$listingId),
                 'price_amount' => '777.00',
                 'effective_from' => '2026-04-18',
                 'return_to' => 'history',

@@ -9,6 +9,7 @@ use App\MarketplaceAnalytics\Application\DeleteCostMappingAction;
 use App\MarketplaceAnalytics\Application\GetPortfolioSummaryAction;
 use App\MarketplaceAnalytics\Application\GetUnitEconomicsAction;
 use App\MarketplaceAnalytics\Application\RecalcSnapshotAction;
+use App\MarketplaceAnalytics\Application\RecalculateListingSnapshotsAction;
 use App\MarketplaceAnalytics\Application\RemapCostMappingAction;
 use App\MarketplaceAnalytics\Domain\ValueObject\AnalysisPeriod;
 use App\MarketplaceAnalytics\DTO\ListingUnitEconomics;
@@ -22,10 +23,12 @@ final readonly class MarketplaceAnalyticsFacade
         private GetUnitEconomicsAction $getUnitEconomicsAction,
         private GetPortfolioSummaryAction $getPortfolioSummaryAction,
         private RecalcSnapshotAction $recalcSnapshotAction,
+        private RecalculateListingSnapshotsAction $recalculateListingSnapshotsAction,
         private AddCostMappingAction $addCostMappingAction,
         private DeleteCostMappingAction $deleteCostMappingAction,
         private RemapCostMappingAction $remapCostMappingAction,
-    ) {}
+    ) {
+    }
 
     /**
      * @return ListingUnitEconomics[]
@@ -49,6 +52,25 @@ final readonly class MarketplaceAnalyticsFacade
     public function requestRecalc(string $companyId, AnalysisPeriod $period): string
     {
         return ($this->recalcSnapshotAction)($companyId, $period);
+    }
+
+    /**
+     * @param list<string> $listingIds
+     */
+    public function recalculateSnapshotsForListings(
+        string $companyId,
+        array $listingIds,
+        \DateTimeImmutable $dateFrom,
+        \DateTimeImmutable $dateTo,
+        string $marketplace,
+    ): void {
+        ($this->recalculateListingSnapshotsAction)(
+            $companyId,
+            $listingIds,
+            $dateFrom,
+            $dateTo,
+            $marketplace,
+        );
     }
 
     public function addCostMapping(

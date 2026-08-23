@@ -27,7 +27,7 @@ use Psr\Log\LoggerInterface;
  *
  * Строки с ненайденным идентификатором пропускаются и логируются.
  *
- * @return array{imported: int, updated_listings: int, overwritten_listings: int, skipped: int, errors: string[]}
+ * @return array{imported: int, updated_listings: int, overwritten_listings: int, skipped: int, errors: string[], affected_listing_ids: list<string>}
  */
 final class ImportInventoryCostPriceFromFileAction
 {
@@ -50,6 +50,7 @@ final class ImportInventoryCostPriceFromFileAction
         $overwrittenListings = 0;
         $skipped = 0;
         $errors = [];
+        $affectedListingIds = [];
 
         foreach ($rows as $rowNum => $row) {
             $identifier = trim((string) ($row[0] ?? ''));
@@ -105,6 +106,7 @@ final class ImportInventoryCostPriceFromFileAction
                     ));
 
                     ++$updatedForRow;
+                    $affectedListingIds[$listing->getId()] = true;
                     if ($setResult->wasOverwritten) {
                         ++$overwrittenListings;
                     }
@@ -152,6 +154,7 @@ final class ImportInventoryCostPriceFromFileAction
             'overwritten_listings' => $overwrittenListings,
             'skipped' => $skipped,
             'errors' => $errors,
+            'affected_listing_ids' => array_keys($affectedListingIds),
         ];
     }
 
@@ -185,7 +188,7 @@ final class ImportInventoryCostPriceFromFileAction
                     static fn (MarketplaceListing $listing): string => (string) $listing->getSupplierSku(),
                     $matches,
                 )));
-                sort($matchedSupplierSkus, SORT_STRING);
+                sort($matchedSupplierSkus, \SORT_STRING);
 
                 if (count($matchedSupplierSkus) > 1) {
                     return [[], sprintf(
@@ -285,7 +288,7 @@ final class ImportInventoryCostPriceFromFileAction
      */
     private function parseFile(string $filePath, string $originalFilename): array
     {
-        $ext = strtolower(pathinfo($originalFilename, PATHINFO_EXTENSION));
+        $ext = strtolower(pathinfo($originalFilename, \PATHINFO_EXTENSION));
         if (!in_array($ext, ['xls', 'xlsx'], true)) {
             throw new \InvalidArgumentException(sprintf('Неподдерживаемый формат файла: %s. Ожидается xls или xlsx.', $ext));
         }

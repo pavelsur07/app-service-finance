@@ -58,6 +58,7 @@ final class InventoryImportControllerTest extends WebTestCaseBase
             self::assertInstanceOf(ImportInventoryCostPriceMessage::class, $message);
             self::assertSame('wildberries', $message->marketplace);
             self::assertSame('supplier_sku', $message->identifierType);
+            self::assertNotSame(ImportInventoryCostPriceMessage::SYSTEM_ACTOR_USER_ID, $message->actorUserId);
         } finally {
             if (null !== $storagePath) {
                 /** @var ObjectStorageInterface $storage */
