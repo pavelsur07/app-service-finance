@@ -119,7 +119,7 @@ html {
     line-height: 1;
 }
 
-aside.navbar .navbar-brand {
+aside.navbar.navbar-vertical .navbar-brand {
     display: flex;
     flex-direction: row;
     align-items: center;
