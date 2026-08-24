@@ -14,7 +14,7 @@ final readonly class PlaintextSecretCodec implements SecretCodec
     {
         return (string) json_encode(
             $payload,
-            JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION,
+            \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES | \JSON_PRESERVE_ZERO_FRACTION,
         );
     }
 
@@ -32,7 +32,7 @@ final readonly class PlaintextSecretCodec implements SecretCodec
     private function decodePlaintext(string $stored): array
     {
         try {
-            $decoded = json_decode($stored, true, 512, JSON_THROW_ON_ERROR);
+            $decoded = json_decode($stored, true, 512, \JSON_THROW_ON_ERROR);
         } catch (\JsonException $exception) {
             throw new \InvalidArgumentException('Stored plaintext secret payload is not valid JSON.', 0, $exception);
         }

@@ -31,7 +31,7 @@ final class RawDocumentsDuplicatesAuditCommand extends Command
 
         $io->title('Marketplace raw documents duplicates audit (read-only)');
 
-        if ($rows === []) {
+        if ([] === $rows) {
             $io->success('Конфликтов не найдено: дублей по будущему unique key нет среди активных raw documents.');
 
             return Command::SUCCESS;
@@ -47,7 +47,7 @@ final class RawDocumentsDuplicatesAuditCommand extends Command
                     (string) $row['period_from'],
                     (string) $row['period_to'],
                     (string) $row['duplicate_count'],
-                    is_array($row['raw_document_ids']) ? json_encode($row['raw_document_ids'], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) : (string) $row['raw_document_ids'],
+                    is_array($row['raw_document_ids']) ? json_encode($row['raw_document_ids'], \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR) : (string) $row['raw_document_ids'],
                 ];
             },
             $rows,

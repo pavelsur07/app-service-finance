@@ -244,7 +244,6 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
         $syncHandler($message);
         $this->runDispatchedPipeline($bus, $dayHandler, $stepHandler);
 
-
         // Закрываем период: одна строка попадает в финансовый документ и становится неизменяемой.
         $document = new Document(Uuid::uuid4()->toString(), $this->em->getReference(Company::class, $company->getId()));
         $this->em->persist($document);
@@ -266,12 +265,11 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
         );
         self::assertIsArray($rawRow);
         self::assertSame('completed', $rawRow['processing_status']);
-        self::assertSame([], json_decode((string) $rawRow['failed_steps'], true, 512, JSON_THROW_ON_ERROR));
+        self::assertSame([], json_decode((string) $rawRow['failed_steps'], true, 512, \JSON_THROW_ON_ERROR));
         self::assertEqualsCanonicalizing(
             ['sales', 'returns', 'costs'],
-            json_decode((string) $rawRow['succeeded_steps'], true, 512, JSON_THROW_ON_ERROR),
+            json_decode((string) $rawRow['succeeded_steps'], true, 512, \JSON_THROW_ON_ERROR),
         );
-
 
         // Дублей нет, закрытая строка сохранила старую сумму, открытая пересоздана с новой.
         self::assertSame(1, $this->countSales($company->getId(), 'SR-LINKED'));

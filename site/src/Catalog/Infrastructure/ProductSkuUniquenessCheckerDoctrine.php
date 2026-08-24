@@ -22,4 +22,3 @@ final class ProductSkuUniquenessCheckerDoctrine implements ProductSkuUniquenessC
         return $this->productRepository->existsSkuForCompanyExcludingProductId($sku, $companyId, $excludeProductId);
     }
 }
-

@@ -103,12 +103,12 @@ final class RunUserReconciliationAction
         $groupComparison = $reconcileResult['group_comparison'] ?? [];
 
         foreach ($groupComparison as &$group) {
-            if ($group['service_group'] === 'Продажи') {
+            if ('Продажи' === $group['service_group']) {
                 $group['api_net'] = (float) $salesTotal;
                 $group['delta'] = round(abs($group['xlsx_net']) - abs((float) $salesTotal), 2);
                 $group['status'] = abs($group['delta']) < 0.01 ? 'matched' : 'mismatch';
             }
-            if ($group['service_group'] === 'Возвраты') {
+            if ('Возвраты' === $group['service_group']) {
                 $group['api_net'] = (float) $returnsTotal;
                 $group['delta'] = round(abs($group['xlsx_net']) - abs((float) $returnsTotal), 2);
                 $group['status'] = abs($group['delta']) < 0.01 ? 'matched' : 'mismatch';
@@ -129,13 +129,14 @@ final class RunUserReconciliationAction
      * итоги как сумму дельт по всем группам — если каждая группа совпала, итог тоже 0.
      *
      * @param array<string, mixed> $reconcileResult
+     *
      * @return array<string, mixed>
      */
     private function recalculateTotals(array $reconcileResult): array
     {
         $groupComparison = $reconcileResult['group_comparison'] ?? [];
 
-        $totalDelta  = 0.0;
+        $totalDelta = 0.0;
         $hasMismatch = false;
 
         foreach ($groupComparison as $group) {
@@ -145,7 +146,7 @@ final class RunUserReconciliationAction
             }
         }
 
-        $reconcileResult['delta']  = round($totalDelta, 2);
+        $reconcileResult['delta'] = round($totalDelta, 2);
         $reconcileResult['status'] = $hasMismatch ? 'mismatch' : 'matched';
 
         return $reconcileResult;

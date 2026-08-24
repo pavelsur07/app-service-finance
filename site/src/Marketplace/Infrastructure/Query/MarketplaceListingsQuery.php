@@ -35,13 +35,13 @@ final class MarketplaceListingsQuery
             ->orderBy('l.createdAt', 'DESC')
             ->setParameter('companyId', $companyId);
 
-        if ($mapped === true) {
+        if (true === $mapped) {
             $qb->andWhere('l.product IS NOT NULL');
-        } elseif ($mapped === false) {
+        } elseif (false === $mapped) {
             $qb->andWhere('l.product IS NULL');
         }
 
-        if ($marketplace !== null) {
+        if (null !== $marketplace) {
             $qb->andWhere('l.marketplace = :marketplace')
                 ->setParameter('marketplace', $marketplace);
         }

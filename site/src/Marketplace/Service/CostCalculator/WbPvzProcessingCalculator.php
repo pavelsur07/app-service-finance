@@ -22,7 +22,7 @@ class WbPvzProcessingCalculator implements CostCalculatorInterface
 
     public function supports(array $item): bool
     {
-        return $this->normalizer->sellerOperName($item) === 'Возмещение за выдачу и возврат товаров на ПВЗ';
+        return 'Возмещение за выдачу и возврат товаров на ПВЗ' === $this->normalizer->sellerOperName($item);
     }
 
     public function requiresListing(): bool
@@ -39,7 +39,7 @@ class WbPvzProcessingCalculator implements CostCalculatorInterface
         }
 
         $externalId = $this->externalIdBuilder->build($item, 'pvz_processing');
-        if ($externalId === null) {
+        if (null === $externalId) {
             return [];
         }
 
@@ -48,7 +48,7 @@ class WbPvzProcessingCalculator implements CostCalculatorInterface
         return [
             [
                 'category_code' => 'pvz_processing',
-                'amount' => (string)abs($ppvzReward),
+                'amount' => (string) abs($ppvzReward),
                 'external_id' => $externalId,
                 'cost_date' => $saleDate,
                 'description' => 'Логистика обработка на ПВЗ',

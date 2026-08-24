@@ -23,14 +23,14 @@ use App\Marketplace\Repository\MarketplaceOzonRealizationRepository;
 final class RealizationDataSource implements MarketplaceDataSourceInterface
 {
     public function __construct(
-        private readonly UnprocessedRealizationQuery          $realizationQuery,
+        private readonly UnprocessedRealizationQuery $realizationQuery,
         private readonly MarketplaceOzonRealizationRepository $realizationRepository,
     ) {
     }
 
     public function supports(MarketplaceType $marketplace): bool
     {
-        return $marketplace === MarketplaceType::OZON;
+        return MarketplaceType::OZON === $marketplace;
     }
 
     public function getStage(): CloseStage

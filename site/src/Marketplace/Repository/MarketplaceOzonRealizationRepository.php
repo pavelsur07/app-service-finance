@@ -45,7 +45,7 @@ class MarketplaceOzonRealizationRepository extends ServiceEntityRepository
      * Если на один SKU несколько строк (разные quantity) — возвращается первая.
      * Это покрывает 99% случаев: один возврат привязан к одной строке реализации.
      *
-     * @return array<string, MarketplaceOzonRealization>  [sku => entity]
+     * @return array<string, MarketplaceOzonRealization> [sku => entity]
      */
     public function findByPeriodIndexedBySku(
         string $companyId,
@@ -110,7 +110,7 @@ class MarketplaceOzonRealizationRepository extends ServiceEntityRepository
      */
     public function unmarkProcessedByDocumentIds(string $companyId, array $plDocumentIds): int
     {
-        if ($plDocumentIds === []) {
+        if ([] === $plDocumentIds) {
             return 0;
         }
 
@@ -122,7 +122,7 @@ class MarketplaceOzonRealizationRepository extends ServiceEntityRepository
                  WHERE company_id = :companyId
                    AND pl_document_id IN (:plDocumentIds)',
                 [
-                    'companyId'    => $companyId,
+                    'companyId' => $companyId,
                     'plDocumentIds' => $plDocumentIds,
                 ],
                 [
@@ -146,9 +146,9 @@ class MarketplaceOzonRealizationRepository extends ServiceEntityRepository
                    AND period_to = :periodTo
                    AND pl_document_id IS NOT NULL',
                 [
-                    'companyId'  => $companyId,
+                    'companyId' => $companyId,
                     'periodFrom' => $periodFrom,
-                    'periodTo'   => $periodTo,
+                    'periodTo' => $periodTo,
                 ],
             );
     }

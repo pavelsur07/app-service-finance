@@ -79,7 +79,7 @@ final class OzonReportParserFacadeStorageTest extends TestCase
 
             public function readStream(string $path)
             {
-                $stream = fopen('php://memory', 'r+b');
+                $stream = fopen('php://memory', 'r+');
                 fwrite($stream, $this->contents);
                 rewind($stream);
 

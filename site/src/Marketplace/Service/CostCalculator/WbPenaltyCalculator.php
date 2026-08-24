@@ -22,7 +22,7 @@ class WbPenaltyCalculator implements CostCalculatorInterface
 
     public function supports(array $item): bool
     {
-        return $this->normalizer->sellerOperName($item) === 'Штраф';
+        return 'Штраф' === $this->normalizer->sellerOperName($item);
     }
 
     public function requiresListing(): bool
@@ -32,13 +32,13 @@ class WbPenaltyCalculator implements CostCalculatorInterface
 
     public function calculate(array $item, ?MarketplaceListing $listing): array
     {
-        $penalty = (float)($item['penalty'] ?? 0);
+        $penalty = (float) ($item['penalty'] ?? 0);
         if (abs($penalty) < 0.01) {
             return [];
         }
 
         $externalId = $this->externalIdBuilder->build($item, 'penalty');
-        if ($externalId === null) {
+        if (null === $externalId) {
             return [];
         }
 
@@ -50,7 +50,7 @@ class WbPenaltyCalculator implements CostCalculatorInterface
         return [
             [
                 'category_code' => 'penalty',
-                'amount' => (string)abs($penalty),
+                'amount' => (string) abs($penalty),
                 'external_id' => $externalId,
                 'cost_date' => $saleDate,
                 'description' => 'Штраф WB',

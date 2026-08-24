@@ -13,13 +13,13 @@ use App\Marketplace\Domain\ValueObject\ListingKey;
 final class ListingSeedDTO
 {
     /**
-     * @param ListingKey        $key             Уникальный ключ листинга
-     * @param string            $marketplaceSku  Артикул маркетплейса (основной идентификатор листинга)
-     * @param string|null       $supplierSku     SKU поставщика (вспомогательная информация)
-     * @param string|null       $name            Наименование листинга
-     * @param string|null       $price           Базовая цена
-     * @param string|null       $discountPrice   Цена со скидкой
-     * @param bool              $isActive        Признак активности листинга
+     * @param ListingKey $key Уникальный ключ листинга
+     * @param string $marketplaceSku Артикул маркетплейса (основной идентификатор листинга)
+     * @param string|null $supplierSku SKU поставщика (вспомогательная информация)
+     * @param string|null $name Наименование листинга
+     * @param string|null $price Базовая цена
+     * @param string|null $discountPrice Цена со скидкой
+     * @param bool $isActive Признак активности листинга
      * @param array<mixed>|null $marketplaceData Нормализованные дополнительные данные маркетплейса
      */
     public function __construct(

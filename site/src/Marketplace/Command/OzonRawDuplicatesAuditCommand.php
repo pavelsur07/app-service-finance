@@ -43,7 +43,7 @@ final class OzonRawDuplicatesAuditCommand extends Command
         $companyIdOption = $input->getOption('company-id');
         $format = (string) $input->getOption('format');
 
-        if (!is_string($fromOption) || $fromOption === '' || !is_string($toOption) || $toOption === '') {
+        if (!is_string($fromOption) || '' === $fromOption || !is_string($toOption) || '' === $toOption) {
             $io->error('Опции --from и --to обязательны. Используйте формат YYYY-MM-DD.');
 
             return Command::FAILURE;
@@ -52,7 +52,7 @@ final class OzonRawDuplicatesAuditCommand extends Command
         $from = $this->parseStrictDate($fromOption);
         $to = $this->parseStrictDate($toOption);
 
-        if ($from === null || $to === null) {
+        if (null === $from || null === $to) {
             $io->error('Неверный формат дат. Используйте реальные даты в формате YYYY-MM-DD.');
 
             return Command::FAILURE;
@@ -71,7 +71,7 @@ final class OzonRawDuplicatesAuditCommand extends Command
         }
 
         $companyId = null;
-        if (is_string($companyIdOption) && $companyIdOption !== '') {
+        if (is_string($companyIdOption) && '' !== $companyIdOption) {
             try {
                 Assert::uuid($companyIdOption);
             } catch (\InvalidArgumentException) {
@@ -101,8 +101,8 @@ final class OzonRawDuplicatesAuditCommand extends Command
             'processed_costs_duplicates' => $costsDuplicates,
         ];
 
-        if ($format === 'json') {
-            $output->writeln((string) json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+        if ('json' === $format) {
+            $output->writeln((string) json_encode($payload, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR));
 
             return Command::SUCCESS;
         }
@@ -129,7 +129,7 @@ final class OzonRawDuplicatesAuditCommand extends Command
     {
         $io->section($title);
 
-        if ($rows === []) {
+        if ([] === $rows) {
             $io->text('No rows found.');
 
             return;
@@ -138,7 +138,7 @@ final class OzonRawDuplicatesAuditCommand extends Command
         $headers = array_keys($rows[0]);
         $tableRows = array_map(
             static function (array $row): array {
-                return array_map(static fn (mixed $value): string => is_array($value) ? json_encode($value, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) : (string) $value, $row);
+                return array_map(static fn (mixed $value): string => is_array($value) ? json_encode($value, \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR) : (string) $value, $row);
             },
             $rows,
         );
@@ -150,7 +150,7 @@ final class OzonRawDuplicatesAuditCommand extends Command
     {
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
 
-        if ($date === false || $date->format('Y-m-d') !== $value) {
+        if (false === $date || $date->format('Y-m-d') !== $value) {
             return null;
         }
 

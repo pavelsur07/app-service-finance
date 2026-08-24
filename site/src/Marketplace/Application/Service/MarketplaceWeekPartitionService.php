@@ -9,12 +9,12 @@ final readonly class MarketplaceWeekPartitionService
     /**
      * Нарезает период [$from, $to] на партии с учётом недельных границ и границ месяца.
      *
-     * @return list<array{from: string, to: string}>  формат 'Y-m-d H:i:s', from=00:00:00, to=23:59:59
+     * @return list<array{from: string, to: string}> формат 'Y-m-d H:i:s', from=00:00:00, to=23:59:59
      */
     public function buildPartitions(\DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
         $from = $from->setTime(0, 0, 0);
-        $to   = $to->setTime(0, 0, 0);
+        $to = $to->setTime(0, 0, 0);
 
         if ($from > $to) {
             return [];
@@ -58,7 +58,7 @@ final readonly class MarketplaceWeekPartitionService
             return [
                 [
                     'from' => $start->setTime(0, 0, 0)->format('Y-m-d H:i:s'),
-                    'to'   => $end->setTime(23, 59, 59)->format('Y-m-d H:i:s'),
+                    'to' => $end->setTime(23, 59, 59)->format('Y-m-d H:i:s'),
                 ],
             ];
         }
@@ -72,11 +72,11 @@ final readonly class MarketplaceWeekPartitionService
         return [
             [
                 'from' => $start->setTime(0, 0, 0)->format('Y-m-d H:i:s'),
-                'to'   => $lastDayOfMonth->setTime(23, 59, 59)->format('Y-m-d H:i:s'),
+                'to' => $lastDayOfMonth->setTime(23, 59, 59)->format('Y-m-d H:i:s'),
             ],
             [
                 'from' => $firstDayOfNextMonth->setTime(0, 0, 0)->format('Y-m-d H:i:s'),
-                'to'   => $end->setTime(23, 59, 59)->format('Y-m-d H:i:s'),
+                'to' => $end->setTime(23, 59, 59)->format('Y-m-d H:i:s'),
             ],
         ];
     }

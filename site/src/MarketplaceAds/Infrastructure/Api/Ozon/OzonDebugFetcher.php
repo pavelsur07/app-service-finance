@@ -80,11 +80,7 @@ final class OzonDebugFetcher
         try {
             $rawBody = $response->getContent(false);
         } catch (TransportExceptionInterface $e) {
-            throw new \RuntimeException(sprintf(
-                'Ozon Performance: обрыв соединения при чтении тела (HTTP %d, token): %s',
-                $statusCode,
-                $e->getMessage(),
-            ), 0, $e);
+            throw new \RuntimeException(sprintf('Ozon Performance: обрыв соединения при чтении тела (HTTP %d, token): %s', $statusCode, $e->getMessage()), 0, $e);
         }
 
         $data = $this->decodeJsonSafe($rawBody);
@@ -139,11 +135,7 @@ final class OzonDebugFetcher
         try {
             $body = $response->getContent(false);
         } catch (TransportExceptionInterface $e) {
-            throw new \RuntimeException(sprintf(
-                'Ozon Performance: обрыв соединения при чтении тела (HTTP %d, GET /campaign): %s',
-                $statusCode,
-                $e->getMessage(),
-            ), 0, $e);
+            throw new \RuntimeException(sprintf('Ozon Performance: обрыв соединения при чтении тела (HTTP %d, GET /campaign): %s', $statusCode, $e->getMessage()), 0, $e);
         }
 
         $data = $this->decodeJsonSafe($body);
@@ -224,11 +216,7 @@ final class OzonDebugFetcher
         try {
             $body = $response->getContent(false);
         } catch (TransportExceptionInterface $e) {
-            throw new \RuntimeException(sprintf(
-                'Ozon Performance: обрыв соединения при чтении тела (HTTP %d, GET /statistics/list): %s',
-                $statusCode,
-                $e->getMessage(),
-            ), 0, $e);
+            throw new \RuntimeException(sprintf('Ozon Performance: обрыв соединения при чтении тела (HTTP %d, GET /statistics/list): %s', $statusCode, $e->getMessage()), 0, $e);
         }
 
         $data = $this->decodeJsonSafe($body);
@@ -333,11 +321,7 @@ final class OzonDebugFetcher
         try {
             $body = $response->getContent(false);
         } catch (TransportExceptionInterface $e) {
-            throw new \RuntimeException(sprintf(
-                'Ozon Performance: обрыв соединения при чтении тела (HTTP %d, POST /statistics): %s',
-                $statusCode,
-                $e->getMessage(),
-            ), 0, $e);
+            throw new \RuntimeException(sprintf('Ozon Performance: обрыв соединения при чтении тела (HTTP %d, POST /statistics): %s', $statusCode, $e->getMessage()), 0, $e);
         }
 
         $data = $this->decodeJsonSafe($body);
@@ -402,11 +386,7 @@ final class OzonDebugFetcher
         try {
             $body = $response->getContent(false);
         } catch (TransportExceptionInterface $e) {
-            throw new \RuntimeException(sprintf(
-                'Ozon Performance: обрыв соединения при чтении тела (HTTP %d, GET /statistics/{uuid}): %s',
-                $statusCode,
-                $e->getMessage(),
-            ), 0, $e);
+            throw new \RuntimeException(sprintf('Ozon Performance: обрыв соединения при чтении тела (HTTP %d, GET /statistics/{uuid}): %s', $statusCode, $e->getMessage()), 0, $e);
         }
 
         $data = $this->decodeJsonSafe($body);
@@ -481,19 +461,11 @@ final class OzonDebugFetcher
         try {
             $rawBytes = $response->getContent(false);
         } catch (TransportExceptionInterface $e) {
-            throw new \RuntimeException(sprintf(
-                'Ozon Performance: обрыв соединения при чтении тела (HTTP %d, download): %s',
-                $statusCode,
-                $e->getMessage(),
-            ), 0, $e);
+            throw new \RuntimeException(sprintf('Ozon Performance: обрыв соединения при чтении тела (HTTP %d, download): %s', $statusCode, $e->getMessage()), 0, $e);
         }
 
         if ($statusCode < 200 || $statusCode >= 300) {
-            throw new \RuntimeException(sprintf(
-                'Ozon Performance: download вернул HTTP %d, body=%s',
-                $statusCode,
-                mb_strimwidth($rawBytes, 0, 500, '...'),
-            ));
+            throw new \RuntimeException(sprintf('Ozon Performance: download вернул HTTP %d, body=%s', $statusCode, mb_strimwidth($rawBytes, 0, 500, '...')));
         }
 
         $wasZip = strlen($rawBytes) >= 4 && "PK\x03\x04" === substr($rawBytes, 0, 4);
@@ -598,10 +570,7 @@ final class OzonDebugFetcher
             $zip = new \ZipArchive();
             $opened = $zip->open($tmpPath);
             if (true !== $opened) {
-                throw new \RuntimeException(sprintf(
-                    'Ozon debug: не удалось открыть ZIP (error code=%d)',
-                    is_int($opened) ? $opened : -1,
-                ));
+                throw new \RuntimeException(sprintf('Ozon debug: не удалось открыть ZIP (error code=%d)', is_int($opened) ? $opened : -1));
             }
 
             try {

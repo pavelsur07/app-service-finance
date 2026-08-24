@@ -19,7 +19,8 @@ final readonly class OrderDTO
         public \DateTimeImmutable $orderDate,
         public int $quantity,
         public OrderStatus $status,
-    ) {}
+    ) {
+    }
 
     public static function fromEntity(MarketplaceOrder $entity): self
     {

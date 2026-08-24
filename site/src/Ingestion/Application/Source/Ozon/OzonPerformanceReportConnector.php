@@ -292,12 +292,7 @@ final readonly class OzonPerformanceReportConnector implements SourceConnectorIn
             $pollStartedAt = $this->cursorDate($cursor, 'pollStartedAt') ?? $this->clock->now();
             $elapsedSeconds = $this->clock->now()->getTimestamp() - $pollStartedAt->getTimestamp();
             if ($nextPollAttempts > self::SEARCH_PROMO_POLL_MAX_ATTEMPTS || $elapsedSeconds >= self::SEARCH_PROMO_POLL_TIMEOUT_SECONDS) {
-                throw new ConnectorTransientException(sprintf(
-                    'Ozon Search Promo report %s was not ready after %d attempts and %d seconds.',
-                    $uuid,
-                    $nextPollAttempts,
-                    max(0, $elapsedSeconds),
-                ));
+                throw new ConnectorTransientException(sprintf('Ozon Search Promo report %s was not ready after %d attempts and %d seconds.', $uuid, $nextPollAttempts, max(0, $elapsedSeconds)));
             }
 
             return new PullResult(
@@ -393,7 +388,7 @@ final readonly class OzonPerformanceReportConnector implements SourceConnectorIn
 
     /**
      * @param list<array<string, mixed>> $rows
-     * @param array<string, mixed>       $metadata
+     * @param array<string, mixed> $metadata
      */
     private function rawResult(
         PullRequest $request,
@@ -595,7 +590,7 @@ final readonly class OzonPerformanceReportConnector implements SourceConnectorIn
 
     /**
      * @param list<array<string, mixed>> $rows
-     * @param array<string, mixed>       $metadata
+     * @param array<string, mixed> $metadata
      *
      * @return list<array<string, mixed>>
      */

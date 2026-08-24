@@ -152,7 +152,7 @@ final readonly class WbProductCardsClient
 
     /**
      * @param array<string, int|string>|null $previous
-     * @param array<string, int|string>      $next
+     * @param array<string, int|string> $next
      */
     private function cursorAdvances(?array $previous, array $next, string $cursorDateField): bool
     {

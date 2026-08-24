@@ -23,10 +23,10 @@ class MarketplaceMonthCloseRepository extends ServiceEntityRepository
         int $month,
     ): ?MarketplaceMonthClose {
         return $this->findOneBy([
-            'companyId'   => $companyId,
+            'companyId' => $companyId,
             'marketplace' => $marketplace,
-            'year'        => $year,
-            'month'       => $month,
+            'year' => $year,
+            'month' => $month,
         ]);
     }
 

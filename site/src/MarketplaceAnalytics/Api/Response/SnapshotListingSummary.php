@@ -22,7 +22,8 @@ final readonly class SnapshotListingSummary
         private int $returnsQuantity,
         private int $ordersQuantity,
         private array $dataQuality,
-    ) {}
+    ) {
+    }
 
     public static function fromDTO(ListingUnitEconomics $dto): self
     {

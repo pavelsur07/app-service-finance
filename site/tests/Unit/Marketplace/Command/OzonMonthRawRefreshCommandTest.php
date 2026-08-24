@@ -179,7 +179,7 @@ final class OzonMonthRawRefreshCommandTest extends TestCase
         $dbal = $this->createMock(Connection::class);
         $dbal->method('fetchAllAssociative')
             ->willReturnCallback(function (string $sql, array $params = []) use ($connectionRows, $connectionAssert): array {
-                if ($connectionAssert !== null) {
+                if (null !== $connectionAssert) {
                     $connectionAssert($sql, $params);
                 }
 

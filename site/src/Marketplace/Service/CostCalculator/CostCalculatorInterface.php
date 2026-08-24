@@ -10,17 +10,17 @@ use App\Marketplace\Enum\MarketplaceCostOperationType;
 interface CostCalculatorInterface
 {
     /**
-     * Проверяет, может ли этот калькулятор обработать данную запись
+     * Проверяет, может ли этот калькулятор обработать данную запись.
      */
     public function supports(array $item): bool;
 
     /**
-     * Нужен ли listing для расчёта (false = общие затраты без привязки к товару)
+     * Нужен ли listing для расчёта (false = общие затраты без привязки к товару).
      */
     public function requiresListing(): bool;
 
     /**
-     * Рассчитывает затраты из записи
+     * Рассчитывает затраты из записи.
      *
      * @return array<int, array{
      *     category_code: string,

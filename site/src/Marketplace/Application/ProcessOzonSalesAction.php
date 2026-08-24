@@ -16,7 +16,7 @@ use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 
 /**
- * @deprecated Use OzonSalesRawProcessor::processBatch() via ProcessMarketplaceRawDocumentAction.
+ * @deprecated use OzonSalesRawProcessor::processBatch() via ProcessMarketplaceRawDocumentAction
  */
 final class ProcessOzonSalesAction
 {
@@ -32,11 +32,11 @@ final class ProcessOzonSalesAction
     {
         $company = $this->em->find(Company::class, $companyId);
         if (!$company instanceof Company) {
-            throw new \RuntimeException('Company not found: ' . $companyId);
+            throw new \RuntimeException('Company not found: '.$companyId);
         }
         $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
         if (!$rawDoc instanceof MarketplaceRawDocument) {
-            throw new \RuntimeException('Raw document not found: ' . $rawDocId);
+            throw new \RuntimeException('Raw document not found: '.$rawDocId);
         }
 
         $rawData = $rawDoc->getRawData();
@@ -52,6 +52,7 @@ final class ProcessOzonSalesAction
 
         if (empty($salesData)) {
             $this->logger->info('[Ozon] No sales to process');
+
             return 0;
         }
 
@@ -69,7 +70,7 @@ final class ProcessOzonSalesAction
         foreach ($salesData as $op) {
             foreach ($op['items'] ?? [] as $item) {
                 $sku = (string) ($item['sku'] ?? '');
-                if ($sku !== '') {
+                if ('' !== $sku) {
                     $allSkus[$sku] = true;
                 }
             }
@@ -89,7 +90,7 @@ final class ProcessOzonSalesAction
 
             foreach ($op['items'] ?? [] as $item) {
                 $sku = (string) ($item['sku'] ?? '');
-                if ($sku === '' || isset($listingsCache[$sku])) {
+                if ('' === $sku || isset($listingsCache[$sku])) {
                     continue;
                 }
 
@@ -105,7 +106,7 @@ final class ProcessOzonSalesAction
                 $this->em->persist($listing);
 
                 $listingsCache[$sku] = $listing;
-                $newListingsCreated++;
+                ++$newListingsCreated;
             }
         }
 
@@ -154,14 +155,14 @@ final class ProcessOzonSalesAction
                 $this->em->persist($sale);
                 $existingIdsMap[$externalOrderId] = true;
 
-                $synced++;
-                $counter++;
+                ++$synced;
+                ++$counter;
 
-                if ($counter % $batchSize === 0) {
+                if (0 === $counter % $batchSize) {
                     $this->em->flush();
                     $this->em->clear();
 
-                    $company = $this->em->find(\App\Company\Entity\Company::class, $companyId);
+                    $company = $this->em->find(Company::class, $companyId);
                     foreach ($listingsCache as $k => $cachedListing) {
                         $listingsCache[$k] = $this->em->getReference(
                             MarketplaceListing::class,
@@ -181,12 +182,13 @@ final class ProcessOzonSalesAction
             }
         }
 
-        if ($counter % $batchSize !== 0) {
+        if (0 !== $counter % $batchSize) {
             $this->em->flush();
             $this->em->clear();
         }
 
         $this->logger->info('[Ozon] Sales processing completed', ['total_synced' => $synced]);
+
         return $synced;
     }
 }

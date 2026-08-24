@@ -71,14 +71,14 @@ class ReconciliationSession
         Assert::notEmpty($originalFilename);
         Assert::notEmpty($storedFilePath);
 
-        $this->id               = Uuid::uuid7()->toString();
-        $this->companyId        = $companyId;
-        $this->marketplace      = $marketplace;
-        $this->periodFrom       = $periodFrom;
-        $this->periodTo         = $periodTo;
+        $this->id = Uuid::uuid7()->toString();
+        $this->companyId = $companyId;
+        $this->marketplace = $marketplace;
+        $this->periodFrom = $periodFrom;
+        $this->periodTo = $periodTo;
         $this->originalFilename = $originalFilename;
-        $this->storedFilePath   = $storedFilePath;
-        $this->createdAt        = new \DateTimeImmutable();
+        $this->storedFilePath = $storedFilePath;
+        $this->createdAt = new \DateTimeImmutable();
     }
 
     // --- Бизнес-методы ---
@@ -92,8 +92,8 @@ class ReconciliationSession
             throw new \DomainException('Only pending session can be completed.');
         }
 
-        $this->resultJson  = json_encode($reconcileResult, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
-        $this->status      = ReconciliationSessionStatus::COMPLETED;
+        $this->resultJson = json_encode($reconcileResult, \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR);
+        $this->status = ReconciliationSessionStatus::COMPLETED;
         $this->completedAt = new \DateTimeImmutable();
     }
 
@@ -103,9 +103,9 @@ class ReconciliationSession
             throw new \DomainException('Only pending session can be failed.');
         }
 
-        $this->status       = ReconciliationSessionStatus::FAILED;
+        $this->status = ReconciliationSessionStatus::FAILED;
         $this->errorMessage = $errorMessage;
-        $this->completedAt  = new \DateTimeImmutable();
+        $this->completedAt = new \DateTimeImmutable();
     }
 
     /**
@@ -113,25 +113,72 @@ class ReconciliationSession
      */
     public function getDecodedResult(): ?array
     {
-        if ($this->resultJson === null) {
+        if (null === $this->resultJson) {
             return null;
         }
 
-        return json_decode($this->resultJson, true, 512, JSON_THROW_ON_ERROR);
+        return json_decode($this->resultJson, true, 512, \JSON_THROW_ON_ERROR);
     }
 
     // --- Getters ---
 
-    public function getId(): string { return $this->id; }
-    public function getCompanyId(): string { return $this->companyId; }
-    public function getMarketplace(): string { return $this->marketplace; }
-    public function getPeriodFrom(): \DateTimeImmutable { return $this->periodFrom; }
-    public function getPeriodTo(): \DateTimeImmutable { return $this->periodTo; }
-    public function getOriginalFilename(): string { return $this->originalFilename; }
-    public function getStoredFilePath(): string { return $this->storedFilePath; }
-    public function getStatus(): ReconciliationSessionStatus { return $this->status; }
-    public function getResultJson(): ?string { return $this->resultJson; }
-    public function getErrorMessage(): ?string { return $this->errorMessage; }
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
-    public function getCompletedAt(): ?\DateTimeImmutable { return $this->completedAt; }
+    public function getId(): string
+    {
+        return $this->id;
+    }
+
+    public function getCompanyId(): string
+    {
+        return $this->companyId;
+    }
+
+    public function getMarketplace(): string
+    {
+        return $this->marketplace;
+    }
+
+    public function getPeriodFrom(): \DateTimeImmutable
+    {
+        return $this->periodFrom;
+    }
+
+    public function getPeriodTo(): \DateTimeImmutable
+    {
+        return $this->periodTo;
+    }
+
+    public function getOriginalFilename(): string
+    {
+        return $this->originalFilename;
+    }
+
+    public function getStoredFilePath(): string
+    {
+        return $this->storedFilePath;
+    }
+
+    public function getStatus(): ReconciliationSessionStatus
+    {
+        return $this->status;
+    }
+
+    public function getResultJson(): ?string
+    {
+        return $this->resultJson;
+    }
+
+    public function getErrorMessage(): ?string
+    {
+        return $this->errorMessage;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    public function getCompletedAt(): ?\DateTimeImmutable
+    {
+        return $this->completedAt;
+    }
 }

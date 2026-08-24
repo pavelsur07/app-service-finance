@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Balance\Entity;
 
-use App\Balance\Entity\BalanceCategory;
-use App\Balance\Enum\BalanceCategoryType;
 use App\Balance\Exception\BalanceDepthExceededException;
 use App\Tests\Builders\Balance\BalanceCategoryBuilder;
 use PHPUnit\Framework\TestCase;

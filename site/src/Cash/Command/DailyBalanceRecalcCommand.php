@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Cash\Command;
 
-use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Cash\Application\Service\DailyBalanceRecalculator;
+use App\Company\Infrastructure\Repository\CompanyRepository;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;

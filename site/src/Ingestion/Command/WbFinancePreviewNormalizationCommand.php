@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Ingestion\Command;
 
 use App\Ingestion\Application\Source\Wildberries\WbFinancePreviewResult;
-use App\Ingestion\Application\Source\Wildberries\WbFinancePreviewTransaction;
 use App\Ingestion\Application\Source\Wildberries\WbFinanceSalesReportDetailedPreviewMapper;
 use App\Ingestion\Application\Source\Wildberries\WbResourceType;
 use App\Ingestion\Enum\IngestSource;

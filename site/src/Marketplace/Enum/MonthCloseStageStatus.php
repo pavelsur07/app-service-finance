@@ -6,21 +6,21 @@ namespace App\Marketplace\Enum;
 
 enum MonthCloseStageStatus: string
 {
-    case PENDING  = 'pending';
-    case CLOSED   = 'closed';
+    case PENDING = 'pending';
+    case CLOSED = 'closed';
     case REOPENED = 'reopened';
 
     public function getLabel(): string
     {
         return match ($this) {
-            self::PENDING  => 'Не закрыт',
-            self::CLOSED   => 'Закрыт',
+            self::PENDING => 'Не закрыт',
+            self::CLOSED => 'Закрыт',
             self::REOPENED => 'Переоткрыт',
         };
     }
 
     public function isClosed(): bool
     {
-        return $this === self::CLOSED;
+        return self::CLOSED === $this;
     }
 }

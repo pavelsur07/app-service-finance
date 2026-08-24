@@ -73,7 +73,7 @@ final class MarketplaceCostAnalyticsGroupResolver
 
             foreach (OzonCostCategory::all() as $c) {
                 if ($c->code === $code) {
-                    return $c->xlsxGroup === 'Услуги доставки' ? 'logistics' : 'other';
+                    return 'Услуги доставки' === $c->xlsxGroup ? 'logistics' : 'other';
                 }
             }
 
@@ -86,7 +86,7 @@ final class MarketplaceCostAnalyticsGroupResolver
                     return 'commission';
                 }
 
-                return $c->xlsxGroup === 'Услуги доставки' ? 'logistics' : 'other';
+                return 'Услуги доставки' === $c->xlsxGroup ? 'logistics' : 'other';
             }
         }
 

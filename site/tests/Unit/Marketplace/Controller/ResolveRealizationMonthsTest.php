@@ -36,7 +36,7 @@ final class ResolveRealizationMonthsTest extends TestCase
 
     private function stubLoadedMonths(array $months): void
     {
-        $rows = array_map(static fn(string $m) => ['month' => $m], $months);
+        $rows = array_map(static fn (string $m) => ['month' => $m], $months);
 
         $this->dbalConnection
             ->method('fetchAllAssociative')
@@ -95,7 +95,7 @@ final class ResolveRealizationMonthsTest extends TestCase
         $now = new \DateTimeImmutable('2026-12-05', new \DateTimeZone('Europe/Moscow'));
 
         $expected = [];
-        for ($m = 1; $m <= 11; $m++) {
+        for ($m = 1; $m <= 11; ++$m) {
             $expected[] = [2026, $m];
         }
 

@@ -10,7 +10,8 @@ final class CounterpartyScoringMath
     public const GRACE_PERIOD_DAYS = 2;
 
     /**
-     * Вычисляет медианную задержку (исключает экстремальные выбросы форс-мажоров)
+     * Вычисляет медианную задержку (исключает экстремальные выбросы форс-мажоров).
+     *
      * * @param list<int> $delays массив задержек в днях
      */
     public function calculateMedianDelay(array $delays): ?int
@@ -19,11 +20,11 @@ final class CounterpartyScoringMath
             return null;
         }
 
-        sort($delays, SORT_NUMERIC);
+        sort($delays, \SORT_NUMERIC);
         $count = count($delays);
         $middle = (int) floor($count / 2);
 
-        if ($count % 2 === 0) {
+        if (0 === $count % 2) {
             return (int) round(($delays[$middle - 1] + $delays[$middle]) / 2);
         }
 
@@ -31,7 +32,8 @@ final class CounterpartyScoringMath
     }
 
     /**
-     * Вычисляет индекс надежности от 0 до 100%
+     * Вычисляет индекс надежности от 0 до 100%.
+     *
      * * @param list<int> $delays массив задержек в днях
      */
     public function calculateReliabilityScore(array $delays): int
@@ -43,7 +45,7 @@ final class CounterpartyScoringMath
         $onTimeCount = 0;
         foreach ($delays as $delay) {
             if ($delay <= self::GRACE_PERIOD_DAYS) {
-                $onTimeCount++;
+                ++$onTimeCount;
             }
         }
 

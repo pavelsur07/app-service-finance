@@ -56,11 +56,9 @@ final class WbFinancialReportReconciliationService
             ]);
         }
 
-        if ($canonical !== null && $this->isInFlight($canonical)) {
+        if (null !== $canonical && $this->isInFlight($canonical)) {
             if ($forceRefresh) {
-                throw new WbRawDocumentRefreshConflictException(
-                    sprintf('Cannot force refresh raw document %s while pipeline is in-flight.', $canonical->getId()),
-                );
+                throw new WbRawDocumentRefreshConflictException(sprintf('Cannot force refresh raw document %s while pipeline is in-flight.', $canonical->getId()));
             }
 
             $this->logger->info('Skipping WB raw document refresh: pipeline is still in progress', [
@@ -74,7 +72,7 @@ final class WbFinancialReportReconciliationService
             return $canonical;
         }
 
-        if ($canonical !== null) {
+        if (null !== $canonical) {
             $canonical->refreshRawData(
                 rawData: $rows,
                 apiEndpoint: self::API_ENDPOINT,
@@ -125,9 +123,9 @@ final class WbFinancialReportReconciliationService
 
         if ($rawDocument instanceof MarketplaceRawDocument) {
             if ((string) $rawDocument->getCompany()->getId() !== (string) $company->getId()
-                || $rawDocument->getMarketplace() !== MarketplaceType::WILDBERRIES
-                || $rawDocument->getDocumentType() !== self::DOCUMENT_TYPE
-                || $rawDocument->getApiEndpoint() !== self::API_ENDPOINT
+                || MarketplaceType::WILDBERRIES !== $rawDocument->getMarketplace()
+                || self::DOCUMENT_TYPE !== $rawDocument->getDocumentType()
+                || self::API_ENDPOINT !== $rawDocument->getApiEndpoint()
                 || $rawDocument->getPeriodFrom()->format('Y-m-d') !== $businessDate->format('Y-m-d')
                 || $rawDocument->getPeriodTo()->format('Y-m-d') !== $businessDate->format('Y-m-d')
             ) {

@@ -82,7 +82,6 @@ final class MarketplaceFinancialReportSyncStatusTest extends TestCase
         self::assertSame(0, $status->getRecordsCount());
     }
 
-
     public function testMarkFailedRetryableClearsPaginationCursorByDefault(): void
     {
         $status = $this->statusEntity();

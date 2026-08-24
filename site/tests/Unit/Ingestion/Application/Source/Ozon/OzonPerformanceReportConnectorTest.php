@@ -257,11 +257,7 @@ final class FakeOzonPerformanceReportClient implements OzonPerformanceReportClie
     public function fetchCampaignObjects(string $companyId, string $connectionRef, string $campaignId): OzonRawPage
     {
         if (($this->missingCampaignObjects[$campaignId] ?? false) === true) {
-            throw new OzonPerformanceCampaignNotFoundException(
-                $campaignId,
-                sprintf('/api/client/campaign/%s/objects', $campaignId),
-                '{"error":"campaign not found"}',
-            );
+            throw new OzonPerformanceCampaignNotFoundException($campaignId, sprintf('/api/client/campaign/%s/objects', $campaignId), '{"error":"campaign not found"}');
         }
 
         return new OzonRawPage([['campaign_id' => $campaignId, 'sku' => 'sku-1']], false);

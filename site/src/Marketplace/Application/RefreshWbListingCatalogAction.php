@@ -11,10 +11,10 @@ use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Api\Wildberries\WbProductCardsClient;
 use App\Marketplace\Infrastructure\Query\WbBarcodeUpsertQuery;
+use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use Doctrine\ORM\EntityManagerInterface;
-use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
 use Psr\Log\LoggerInterface;
 
 final readonly class RefreshWbListingCatalogAction
@@ -193,7 +193,7 @@ final readonly class RefreshWbListingCatalogAction
 
     private function positiveId(mixed $value, string $field): string
     {
-        $id = filter_var($value, FILTER_VALIDATE_INT);
+        $id = filter_var($value, \FILTER_VALIDATE_INT);
         if (false === $id || $id <= 0) {
             throw new \UnexpectedValueException(sprintf('WB Product Cards %s must be a positive integer.', $field));
         }

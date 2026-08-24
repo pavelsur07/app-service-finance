@@ -55,22 +55,22 @@ final readonly class SnapshotListQuery
             ->orderBy('s.snapshot_date', 'DESC')
             ->addOrderBy('l.name', 'ASC');
 
-        if ($marketplace !== null) {
+        if (null !== $marketplace) {
             $qb->andWhere('s.marketplace = :marketplace')
                 ->setParameter('marketplace', $marketplace);
         }
 
-        if ($dateFrom !== null) {
+        if (null !== $dateFrom) {
             $qb->andWhere('s.snapshot_date >= :dateFrom')
                 ->setParameter('dateFrom', $dateFrom);
         }
 
-        if ($dateTo !== null) {
+        if (null !== $dateTo) {
             $qb->andWhere('s.snapshot_date <= :dateTo')
                 ->setParameter('dateTo', $dateTo);
         }
 
-        if ($listingId !== null) {
+        if (null !== $listingId) {
             $qb->andWhere('s.listing_id = :listingId')
                 ->setParameter('listingId', $listingId);
         }

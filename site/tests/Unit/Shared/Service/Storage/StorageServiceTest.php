@@ -31,7 +31,7 @@ final class StorageServiceTest extends TestCase
     public function testStoreBytesCreatesFileAndReturnsMetadata(): void
     {
         $service = new StorageService($this->storageRoot);
-        $bytes = "raw-payload-бинарные-данные";
+        $bytes = 'raw-payload-бинарные-данные';
 
         $result = $service->storeBytes($bytes, 'companies/abc/file.bin');
 

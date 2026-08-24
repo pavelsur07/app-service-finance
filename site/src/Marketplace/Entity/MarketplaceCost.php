@@ -242,6 +242,7 @@ class MarketplaceCost
     {
         $this->document = $document;
         $this->updatedAt = new \DateTimeImmutable();
+
         return $this;
     }
 

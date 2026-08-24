@@ -10,5 +10,6 @@ final readonly class CreateCashTransactionResult
         public string $transactionId,
         public bool $created,
         public bool $duplicate,
-    ) {}
+    ) {
+    }
 }

@@ -83,7 +83,7 @@ class MoySkladConnection
     public function setName(string $name): self
     {
         $name = trim($name);
-        if ($name == '') {
+        if ('' == $name) {
             throw new \InvalidArgumentException('Connection name cannot be empty.');
         }
 
@@ -113,7 +113,7 @@ class MoySkladConnection
 
     public function setLogin(?string $login): self
     {
-        $this->login = $login !== null ? trim($login) : null;
+        $this->login = null !== $login ? trim($login) : null;
         $this->touch();
 
         return $this;

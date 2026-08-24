@@ -8,8 +8,8 @@ use App\Inventory\Entity\InventoryRawSnapshot;
 use App\Inventory\Enum\SnapshotSessionStatus;
 use App\Inventory\Exception\OzonInventoryRateLimitException;
 use App\Inventory\Infrastructure\Api\Ozon\OzonInventoryClient;
-use App\Inventory\Message\SyncOzonInventorySnapshotMessage;
 use App\Inventory\Message\NormalizeInventorySnapshotMessage;
+use App\Inventory\Message\SyncOzonInventorySnapshotMessage;
 use App\Inventory\Repository\InventorySnapshotSessionRepository;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
@@ -47,6 +47,7 @@ final class SyncOzonInventorySnapshotHandler
         $session = $this->sessionRepository->findByIdAndCompany($message->snapshotSessionId, $message->companyId);
         if (null === $session) {
             $this->logger->warning('Inventory snapshot session not found, message acknowledged.', ['snapshotSessionId' => $message->snapshotSessionId, 'companyId' => $message->companyId]);
+
             return;
         }
         if (in_array($session->getStatus(), [SnapshotSessionStatus::Completed, SnapshotSessionStatus::Partial, SnapshotSessionStatus::Failed], true)) {
@@ -64,6 +65,7 @@ final class SyncOzonInventorySnapshotHandler
             ]);
             $session->markFailed('Ozon SELLER credentials not found for inventory snapshot fetching.');
             $this->entityManager->flush();
+
             return;
         }
 
@@ -97,7 +99,7 @@ final class SyncOzonInventorySnapshotHandler
                         'page' => $page,
                         'last_id' => $lastId,
                         'limit' => self::PAGE_LIMIT,
-                        'requestedAt' => $session->getStartedAt()->format(DATE_ATOM),
+                        'requestedAt' => $session->getStartedAt()->format(\DATE_ATOM),
                         'correlationId' => $session->getCorrelationId(),
                     ], static fn (mixed $value): bool => null !== $value),
                     responseStatus: 200,

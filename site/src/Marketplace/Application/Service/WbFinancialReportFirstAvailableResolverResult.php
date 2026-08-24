@@ -13,7 +13,8 @@ final readonly class WbFinancialReportFirstAvailableResolverResult
         private ?\DateTimeImmutable $nextProbeFrom,
         private ?\DateTimeImmutable $nextProbeTo,
         private ?int $retryAfterSeconds,
-    ) {}
+    ) {
+    }
 
     public static function withStartDate(\DateTimeImmutable $startDate): self
     {
@@ -30,11 +31,38 @@ final readonly class WbFinancialReportFirstAvailableResolverResult
         return new self(null, true, $phase, $nextProbeFrom->setTime(0, 0, 0), $nextProbeTo->setTime(0, 0, 0), $retryAfterSeconds);
     }
 
-    public function hasData(): bool { return null !== $this->startDate; }
-    public function needsRetry(): bool { return $this->needsRetry; }
-    public function getStartDate(): ?\DateTimeImmutable { return $this->startDate; }
-    public function getPhase(): ?string { return $this->phase; }
-    public function getNextProbeFrom(): ?\DateTimeImmutable { return $this->nextProbeFrom; }
-    public function getNextProbeTo(): ?\DateTimeImmutable { return $this->nextProbeTo; }
-    public function getRetryAfterSeconds(): ?int { return $this->retryAfterSeconds; }
+    public function hasData(): bool
+    {
+        return null !== $this->startDate;
+    }
+
+    public function needsRetry(): bool
+    {
+        return $this->needsRetry;
+    }
+
+    public function getStartDate(): ?\DateTimeImmutable
+    {
+        return $this->startDate;
+    }
+
+    public function getPhase(): ?string
+    {
+        return $this->phase;
+    }
+
+    public function getNextProbeFrom(): ?\DateTimeImmutable
+    {
+        return $this->nextProbeFrom;
+    }
+
+    public function getNextProbeTo(): ?\DateTimeImmutable
+    {
+        return $this->nextProbeTo;
+    }
+
+    public function getRetryAfterSeconds(): ?int
+    {
+        return $this->retryAfterSeconds;
+    }
 }

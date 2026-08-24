@@ -20,7 +20,7 @@ final class DispatchCounterpartyScoringCommand extends Command
 {
     public function __construct(
         private readonly CompanyFacade $companyFacade, // Обращение к модулю Company
-        private readonly MessageBusInterface $messageBus
+        private readonly MessageBusInterface $messageBus,
     ) {
         parent::__construct();
     }

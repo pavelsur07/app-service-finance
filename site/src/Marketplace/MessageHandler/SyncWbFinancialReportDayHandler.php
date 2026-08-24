@@ -22,11 +22,11 @@ use App\Marketplace\Exception\MarketplaceRateLimitException;
 use App\Marketplace\Exception\MarketplaceTemporaryApiException;
 use App\Marketplace\Exception\WbRawDocumentRefreshConflictException;
 use App\Marketplace\Infrastructure\Api\Wildberries\WbFinanceSalesReportClient;
+use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
 use App\Marketplace\Message\ProcessDayReportMessage;
 use App\Marketplace\Message\SyncWbFinancialReportDayMessage;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use Doctrine\ORM\EntityManagerInterface;
-use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Lock\LockFactory;
@@ -309,7 +309,7 @@ final class SyncWbFinancialReportDayHandler
                 $status,
                 $rawDocument->getId(),
                 $rawDocument->getRecordsCount(),
-                hash('sha256', json_encode($rows, JSON_THROW_ON_ERROR)),
+                hash('sha256', json_encode($rows, \JSON_THROW_ON_ERROR)),
             );
             $this->syncStatusUpdater->markProcessing($status);
             $connection->markSyncSuccess();

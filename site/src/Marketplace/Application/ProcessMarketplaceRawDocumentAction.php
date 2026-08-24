@@ -54,7 +54,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
     {
         $document = $this->repository->find($command->rawDocId);
 
-        if ($document === null) {
+        if (null === $document) {
             throw new \RuntimeException(sprintf('Raw document not found: %s', $command->rawDocId));
         }
 
@@ -73,27 +73,25 @@ final readonly class ProcessMarketplaceRawDocumentAction
 
         $targetBucketKey = $kindToBucketKey[$command->kind] ?? null;
 
-        if ($targetBucketKey === null) {
-            throw new \InvalidArgumentException(
-                sprintf('Unknown kind "%s". Allowed: sales, returns, costs.', $command->kind)
-            );
+        if (null === $targetBucketKey) {
+            throw new \InvalidArgumentException(sprintf('Unknown kind "%s". Allowed: sales, returns, costs.', $command->kind));
         }
 
         $marketplace = $document->getMarketplace();
 
-        if ($command->forceReprocess && $marketplace === MarketplaceType::WILDBERRIES) {
+        if ($command->forceReprocess && MarketplaceType::WILDBERRIES === $marketplace) {
             $company = $document->getCompany();
 
-            if ($command->kind === 'sales') {
+            if ('sales' === $command->kind) {
                 $this->saleRepository->deleteByRawDocument($company, $marketplace, $command->rawDocId);
-            } elseif ($command->kind === 'returns') {
+            } elseif ('returns' === $command->kind) {
                 $this->returnRepository->deleteByRawDocument($company, $marketplace, $command->rawDocId);
             }
         }
 
         $this->appLogger->info('ProcessMarketplaceRawDocumentAction called', [
-            'rawDocId'       => $command->rawDocId,
-            'kind'           => $command->kind,
+            'rawDocId' => $command->rawDocId,
+            'kind' => $command->kind,
             'forceReprocess' => $command->forceReprocess,
         ]);
 
@@ -101,7 +99,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
         // The classifier sends type=orders rows to SALE bucket, but they contain
         // commissions, delivery charges, and logistics services that are costs.
         // process() reads ALL operations from the raw document and handles them correctly.
-        if ($command->kind === 'costs') {
+        if ('costs' === $command->kind) {
             $linkedRows = $command->forceReprocess && MarketplaceType::WILDBERRIES === $marketplace
                 ? $this->costRepository->countDocumentLinkedByRawDocument($document->getCompany(), $marketplace, $command->rawDocId)
                 : 0;
@@ -133,7 +131,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
 
         $rows = $document->getRawData();
         if (
-            $marketplace === MarketplaceType::OZON
+            MarketplaceType::OZON === $marketplace
             && isset($rows['result']['operations'])
             && is_array($rows['result']['operations'])
         ) {
@@ -143,7 +141,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
         $classifier = $this->classifierRegistry->get($marketplace);
 
         $linkedRows = 0;
-        if ($command->forceReprocess && $marketplace === MarketplaceType::WILDBERRIES) {
+        if ($command->forceReprocess && MarketplaceType::WILDBERRIES === $marketplace) {
             $linkedRows = $this->cleanupWbOpenRowsByExternalIds(
                 company: $document->getCompany(),
                 marketplace: $marketplace,
@@ -156,7 +154,6 @@ final readonly class ProcessMarketplaceRawDocumentAction
         }
 
         $totalProcessed = 0;
-
 
         // Reset per-run processor state: one raw document can be split into multiple
         // batches in this invocation, but reprocessing the same rawDocId in another
@@ -197,7 +194,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
                 continue;
             }
 
-            if ($bucketRows === []) {
+            if ([] === $bucketRows) {
                 continue;
             }
 

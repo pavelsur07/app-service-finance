@@ -21,7 +21,7 @@ final class WarningCapturingLogger extends AbstractLogger
 
     public function log(mixed $level, mixed $message, array $context = []): void
     {
-        if ($level === LogLevel::WARNING) {
+        if (LogLevel::WARNING === $level) {
             $this->warnings[] = ['level' => $level, 'message' => (string) $message];
         }
     }
@@ -109,7 +109,7 @@ final class OzonServiceCategoryMapTest extends TestCase
     {
         foreach (OzonCostCategory::all() as $category) {
             // ozon_other_service is the catch-all, its name IS 'Прочие услуги Ozon'
-            if ($category->code === 'ozon_other_service') {
+            if ('ozon_other_service' === $category->code) {
                 continue;
             }
 

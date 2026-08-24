@@ -17,10 +17,10 @@ use Webmozart\Assert\Assert;
 )]
 class ProductImport
 {
-    public const STATUS_PENDING    = 'pending';
+    public const STATUS_PENDING = 'pending';
     public const STATUS_PROCESSING = 'processing';
-    public const STATUS_DONE       = 'done';
-    public const STATUS_FAILED     = 'failed';
+    public const STATUS_DONE = 'done';
+    public const STATUS_FAILED = 'failed';
 
     #[ORM\Id]
     #[ORM\Column(type: 'guid', unique: true)]
@@ -72,11 +72,11 @@ class ProductImport
         Assert::notEmpty($filePath);
         Assert::notEmpty($originalName);
 
-        $this->id           = $id;
-        $this->companyId    = $companyId;
-        $this->filePath     = $filePath;
+        $this->id = $id;
+        $this->companyId = $companyId;
+        $this->filePath = $filePath;
         $this->originalName = $originalName;
-        $this->createdAt    = new \DateTimeImmutable();
+        $this->createdAt = new \DateTimeImmutable();
     }
 
     public function getId(): string
@@ -143,19 +143,19 @@ class ProductImport
 
     public function markDone(int $rowsTotal, int $rowsCreated, int $rowsSkipped, array $errors): self
     {
-        $this->status      = self::STATUS_DONE;
-        $this->rowsTotal   = $rowsTotal;
+        $this->status = self::STATUS_DONE;
+        $this->rowsTotal = $rowsTotal;
         $this->rowsCreated = $rowsCreated;
         $this->rowsSkipped = $rowsSkipped;
-        $this->resultJson  = $errors;
-        $this->finishedAt  = new \DateTimeImmutable();
+        $this->resultJson = $errors;
+        $this->finishedAt = new \DateTimeImmutable();
 
         return $this;
     }
 
     public function markFailed(string $errorMessage): self
     {
-        $this->status     = self::STATUS_FAILED;
+        $this->status = self::STATUS_FAILED;
         $this->resultJson = [['error' => $errorMessage]];
         $this->finishedAt = new \DateTimeImmutable();
 

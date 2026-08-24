@@ -51,7 +51,7 @@ final class OzonServiceCategoryMap
         $category = OzonCostCategory::findByServiceName($serviceName)
             ?? OzonCostCategory::findByOperationType($serviceName);
 
-        if ($category !== null) {
+        if (null !== $category) {
             return $category->code;
         }
 
@@ -59,8 +59,8 @@ final class OzonServiceCategoryMap
 
         $logger->warning('ozon_unknown_service_name', [
             'service_name' => $serviceName,
-            'resolved_to'  => $fallback,
-            'hint'         => 'Add to OzonCostCategory::all()',
+            'resolved_to' => $fallback,
+            'hint' => 'Add to OzonCostCategory::all()',
         ]);
 
         return $fallback;
@@ -79,8 +79,8 @@ final class OzonServiceCategoryMap
      */
     public static function isKnown(string $serviceName): bool
     {
-        return OzonCostCategory::findByServiceName($serviceName) !== null
-            || OzonCostCategory::findByOperationType($serviceName) !== null;
+        return null !== OzonCostCategory::findByServiceName($serviceName)
+            || null !== OzonCostCategory::findByOperationType($serviceName);
     }
 
     /**

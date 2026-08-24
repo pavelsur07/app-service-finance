@@ -27,7 +27,7 @@ final class ImportProductsMessageHandler
     {
         ($this->importAction)(new ImportProductsCommand(
             companyId: $message->companyId,
-            importId:  $message->importId,
+            importId: $message->importId,
         ));
     }
 }

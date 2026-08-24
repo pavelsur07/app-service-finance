@@ -11,7 +11,6 @@ use App\Marketplace\Enum\MarketplaceType;
 
 interface MarketplaceFinancialReportSyncStatusLookupInterface
 {
-
     public function claimForQueue(
         string $connectionId,
         string $companyId,

@@ -22,7 +22,7 @@ class HealthController extends AbstractController
         Request $request,
         Connection $connection,
         PredisClient $redisClient,
-        LoggerInterface $logger
+        LoggerInterface $logger,
     ): JsonResponse {
         // 1. ЗАЩИТА ОТ БОТОВ: Проверяем секретный токен
         // Используем getenv() — это самый надежный способ в Docker/FPM
@@ -39,7 +39,7 @@ class HealthController extends AbstractController
         $httpCode = Response::HTTP_OK;
         $components = [
             'database' => 'ok',
-            'redis'    => 'ok',
+            'redis' => 'ok',
         ];
 
         // 3. ПРОВЕРКА POSTGRESQL

@@ -27,7 +27,7 @@ final readonly class RawDocumentsListQuery
             ->addOrderBy('d.documentType', 'ASC')
             ->addOrderBy('d.syncedAt', 'DESC');
 
-        if ($marketplace !== null) {
+        if (null !== $marketplace) {
             $queryBuilder
                 ->andWhere('d.marketplace = :marketplace')
                 ->setParameter('marketplace', $marketplace);

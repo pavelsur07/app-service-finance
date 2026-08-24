@@ -13,8 +13,8 @@ use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Api\Wildberries\WbFinanceSalesReportClient;
 use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
-use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
+use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 

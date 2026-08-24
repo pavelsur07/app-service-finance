@@ -45,8 +45,8 @@ final class SyncOzonRealizationHandler
         if (!$lock->acquire()) {
             $this->logger->warning('Ozon realization sync already in progress, skipping', [
                 'company_id' => $message->companyId,
-                'year'       => $message->year,
-                'month'      => $message->month,
+                'year' => $message->year,
+                'month' => $message->month,
             ]);
 
             return;
@@ -87,35 +87,35 @@ final class SyncOzonRealizationHandler
             return;
         }
 
-        $year  = $message->year;
+        $year = $message->year;
         $month = $message->month;
 
         $this->logger->info('Ozon realization sync started', [
             'company_id' => $message->companyId,
-            'year'       => $year,
-            'month'      => $month,
+            'year' => $year,
+            'month' => $month,
         ]);
 
         try {
             $rawData = $this->fetcher->fetch($connection, $year, $month);
 
             $periodFrom = new \DateTimeImmutable(sprintf('%d-%02d-01', $year, $month));
-            $periodTo   = $periodFrom->modify('last day of this month');
+            $periodTo = $periodFrom->modify('last day of this month');
 
             // Проверяем — не загружали ли уже realization за этот месяц
             $existing = $this->em->getRepository(MarketplaceRawDocument::class)->findOneBy([
-                'company'      => $company,
-                'marketplace'  => MarketplaceType::OZON,
+                'company' => $company,
+                'marketplace' => MarketplaceType::OZON,
                 'documentType' => self::DOCUMENT_TYPE,
-                'periodFrom'   => $periodFrom,
+                'periodFrom' => $periodFrom,
             ]);
 
-            if ($existing !== null) {
+            if (null !== $existing) {
                 $this->logger->info('Ozon realization already loaded for this period, overwriting', [
-                    'company_id'    => $message->companyId,
-                    'year'          => $year,
-                    'month'         => $month,
-                    'existing_id'   => $existing->getId(),
+                    'company_id' => $message->companyId,
+                    'year' => $year,
+                    'month' => $month,
+                    'existing_id' => $existing->getId(),
                 ]);
 
                 // Обновляем существующий документ — данные могли измениться
@@ -125,8 +125,8 @@ final class SyncOzonRealizationHandler
                 $this->em->flush();
 
                 $this->logger->info('Ozon realization raw document updated', [
-                    'raw_doc_id'    => $existing->getId(),
-                    'rows_count'    => count($rawData['result']['rows'] ?? []),
+                    'raw_doc_id' => $existing->getId(),
+                    'rows_count' => count($rawData['result']['rows'] ?? []),
                 ]);
 
                 return;
@@ -150,19 +150,19 @@ final class SyncOzonRealizationHandler
             $this->em->flush();
 
             $this->logger->info('Ozon realization raw document saved', [
-                'company_id'    => $message->companyId,
-                'raw_doc_id'    => $rawDoc->getId(),
-                'year'          => $year,
-                'month'         => $month,
-                'rows_count'    => count($rows),
+                'company_id' => $message->companyId,
+                'raw_doc_id' => $rawDoc->getId(),
+                'year' => $year,
+                'month' => $month,
+                'rows_count' => count($rows),
             ]);
         } catch (\Throwable $e) {
             $this->logger->error('Ozon realization sync failed', [
-                'company_id'    => $message->companyId,
+                'company_id' => $message->companyId,
                 'connection_id' => $message->connectionId,
-                'year'          => $year,
-                'month'         => $month,
-                'error'         => $e->getMessage(),
+                'year' => $year,
+                'month' => $month,
+                'error' => $e->getMessage(),
             ]);
 
             throw $e;

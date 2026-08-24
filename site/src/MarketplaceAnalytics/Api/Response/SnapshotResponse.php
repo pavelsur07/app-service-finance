@@ -99,7 +99,8 @@ final readonly class SnapshotResponse
         private array $advertisingDetails,
         private array $dataQuality,
         private string $calculatedAt,
-    ) {}
+    ) {
+    }
 
     public static function fromEntity(
         ListingDailySnapshot $snapshot,

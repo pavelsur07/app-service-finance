@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAds\Controller;
 
-use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
+use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
-use Doctrine\DBAL\Connection;
 
 /**
  * Диагностика Ozon Performance API: список отчётов.
@@ -85,7 +84,7 @@ final class OzonDebugController extends AbstractController
         $pages = [];
         $pageSize = 100;
 
-        for ($page = 1; $page <= 5; $page++) {
+        for ($page = 1; $page <= 5; ++$page) {
             $listResp = $this->httpClient->request(
                 'GET',
                 "https://api-performance.ozon.ru/api/client/statistics/list?page=$page&pageSize=$pageSize",
@@ -119,7 +118,7 @@ final class OzonDebugController extends AbstractController
             $foundData = null;
             foreach ($allItems as $item) {
                 foreach ($item as $val) {
-                    if (is_string($val) && strcasecmp($val, $u) === 0) {
+                    if (is_string($val) && 0 === strcasecmp($val, $u)) {
                         $found = true;
                         $foundData = $item;
                         break 2;
@@ -152,7 +151,7 @@ final class OzonDebugController extends AbstractController
 
         return new JsonResponse([
             'companyId' => $companyId,
-            'client_id' => substr($row['client_id'], 0, 16) . '...',
+            'client_id' => substr($row['client_id'], 0, 16).'...',
             'token_ok' => true,
             'token_http_code' => $tokenCode,
             'list_pages' => $pages,

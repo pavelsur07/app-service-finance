@@ -30,7 +30,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
 
 final class InitialSyncHandlerTest extends TestCase
 {
-    private const COMPANY_ID    = '11111111-1111-1111-1111-111111111111';
+    private const COMPANY_ID = '11111111-1111-1111-1111-111111111111';
     private const CONNECTION_ID = '22222222-2222-2222-2222-222222222222';
 
     /**
@@ -51,13 +51,13 @@ final class InitialSyncHandlerTest extends TestCase
         // Следующая партия (split) = 2026-03-30 .. 2026-03-31 — первая половина
         // недели 30.03–05.04, разрезанной по границе месяца.
         $message = new InitialSyncMessage(
-            companyId:    self::COMPANY_ID,
+            companyId: self::COMPANY_ID,
             connectionId: self::CONNECTION_ID,
-            marketplace:  MarketplaceType::OZON->value,
-            dateFrom:     '2026-03-23 00:00:00',
-            dateTo:       '2026-03-29 23:59:59',
+            marketplace: MarketplaceType::OZON->value,
+            dateFrom: '2026-03-23 00:00:00',
+            dateTo: '2026-03-29 23:59:59',
             nextDateFrom: '2026-03-30 00:00:00',
-            nextDateTo:   '2026-03-31 23:59:59',
+            nextDateTo: '2026-03-31 23:59:59',
         );
 
         $handler($message);
@@ -92,13 +92,13 @@ final class InitialSyncHandlerTest extends TestCase
         [$handler, $captured] = $this->createHandler(new MockClock('2026-04-03 12:00:00'));
 
         $message = new InitialSyncMessage(
-            companyId:    self::COMPANY_ID,
+            companyId: self::COMPANY_ID,
             connectionId: self::CONNECTION_ID,
-            marketplace:  MarketplaceType::OZON->value,
-            dateFrom:     '2026-03-30 00:00:00',
-            dateTo:       '2026-03-31 23:59:59',
+            marketplace: MarketplaceType::OZON->value,
+            dateFrom: '2026-03-30 00:00:00',
+            dateTo: '2026-03-31 23:59:59',
             nextDateFrom: '2026-04-01 00:00:00',
-            nextDateTo:   '2026-04-05 23:59:59',
+            nextDateTo: '2026-04-05 23:59:59',
         );
 
         $handler($message);
@@ -355,9 +355,8 @@ final class InitialSyncHandlerTest extends TestCase
         ?\Throwable $flushException = null,
         bool $entityManagerOpenAfterFlushException = true,
         MarketplaceType $connectionMarketplace = MarketplaceType::OZON,
-    ): array
-    {
-        $company    = CompanyBuilder::aCompany()->withId(self::COMPANY_ID)->build();
+    ): array {
+        $company = CompanyBuilder::aCompany()->withId(self::COMPANY_ID)->build();
         $connection = new MarketplaceConnection(
             self::CONNECTION_ID,
             $company,
@@ -366,10 +365,10 @@ final class InitialSyncHandlerTest extends TestCase
 
         $em = $this->createMock(EntityManagerInterface::class);
         $em->method('find')->willReturnCallback(static function (string $class, string $id) use ($company, $connection) {
-            if ($class === Company::class && $id === self::COMPANY_ID) {
+            if (Company::class === $class && self::COMPANY_ID === $id) {
                 return $company;
             }
-            if ($class === MarketplaceConnection::class && $id === self::CONNECTION_ID) {
+            if (MarketplaceConnection::class === $class && self::CONNECTION_ID === $id) {
                 return $connection;
             }
 
@@ -379,7 +378,7 @@ final class InitialSyncHandlerTest extends TestCase
         $rawDocumentRepository = $this->createMock(MarketplaceRawDocumentRepository::class);
         $rawDocumentRepository->method('findExistingInitialSyncDocument')->willReturn($existingRawDocument);
         $em->method('getRepository')->with(MarketplaceRawDocument::class)->willReturn($rawDocumentRepository);
-        if ($flushException !== null) {
+        if (null !== $flushException) {
             $em->method('flush')->willThrowException($flushException);
         }
         $em->method('isOpen')->willReturn($entityManagerOpenAfterFlushException);
@@ -388,11 +387,11 @@ final class InitialSyncHandlerTest extends TestCase
         $adapter->method('getMarketplaceType')->willReturn(MarketplaceType::OZON->value);
         $adapter->method('getApiEndpointName')->willReturn('test/endpoint');
         // Непустой raw → handler сохранит MarketplaceRawDocument и дойдёт до dispatch.
-        $fetchRawReportExpectation = $expectedFetchCalls !== null
+        $fetchRawReportExpectation = null !== $expectedFetchCalls
             ? $adapter->expects(self::exactly($expectedFetchCalls))
             : $adapter->expects(self::any());
 
-        if ($fetchException !== null) {
+        if (null !== $fetchException) {
             $fetchRawReportExpectation->method('fetchRawReport')->willThrowException($fetchException);
         } elseif ($emptyRawData) {
             $fetchRawReportExpectation->method('fetchRawReport')->willReturn([]);
@@ -404,7 +403,7 @@ final class InitialSyncHandlerTest extends TestCase
 
         // Контейнер для пойманного сообщения — анонимный объект, чтобы можно было
         // вернуть его по ссылке из фабрики.
-        $captured  = new \stdClass();
+        $captured = new \stdClass();
         $captured->message = null;
 
         $messageBus = $this->createMock(MessageBusInterface::class);

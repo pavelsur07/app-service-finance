@@ -121,16 +121,16 @@ class MarketplaceOzonRealization
         Assert::uuid($id);
         Assert::uuid($companyId);
 
-        $this->id               = $id;
-        $this->companyId        = $companyId;
-        $this->rawDocument      = $rawDocument;
-        $this->sku              = $sku;
+        $this->id = $id;
+        $this->companyId = $companyId;
+        $this->rawDocument = $rawDocument;
+        $this->sku = $sku;
         $this->pricePerInstance = $pricePerInstance;
-        $this->quantity         = $quantity;
-        $this->periodFrom       = $periodFrom;
-        $this->periodTo         = $periodTo;
-        $this->totalAmount      = bcmul($pricePerInstance, (string) $quantity, 2);
-        $this->createdAt        = new \DateTimeImmutable();
+        $this->quantity = $quantity;
+        $this->periodFrom = $periodFrom;
+        $this->periodTo = $periodTo;
+        $this->totalAmount = bcmul($pricePerInstance, (string) $quantity, 2);
+        $this->createdAt = new \DateTimeImmutable();
     }
 
     /**
@@ -148,8 +148,8 @@ class MarketplaceOzonRealization
         $price = number_format($pricePerInstance, 2, '.', '');
 
         $this->pricePerInstance = $price;
-        $this->quantity         = $quantity;
-        $this->totalAmount      = bcmul($price, (string) $quantity, 2);
+        $this->quantity = $quantity;
+        $this->totalAmount = bcmul($price, (string) $quantity, 2);
     }
 
     /**
@@ -166,37 +166,119 @@ class MarketplaceOzonRealization
         $price = number_format($pricePerInstance, 2, '.', '');
 
         $this->returnPricePerInstance = $price;
-        $this->returnQuantity         = $quantity;
-        $this->returnAmount           = bcmul($price, (string) $quantity, 2);
+        $this->returnQuantity = $quantity;
+        $this->returnAmount = bcmul($price, (string) $quantity, 2);
     }
 
     public function hasReturn(): bool
     {
-        return $this->returnAmount !== null;
+        return null !== $this->returnAmount;
     }
 
     // --- Getters ---
 
-    public function getId(): string { return $this->id; }
-    public function getCompanyId(): string { return $this->companyId; }
-    public function getListing(): ?MarketplaceListing { return $this->listing; }
-    public function getRawDocument(): MarketplaceRawDocument { return $this->rawDocument; }
-    public function getSku(): string { return $this->sku; }
-    public function getOfferId(): ?string { return $this->offerId; }
-    public function getName(): ?string { return $this->name; }
-    public function getPricePerInstance(): string { return $this->pricePerInstance; }
-    public function getQuantity(): int { return $this->quantity; }
-    public function getTotalAmount(): string { return $this->totalAmount; }
-    public function getReturnPricePerInstance(): ?string { return $this->returnPricePerInstance; }
-    public function getReturnQuantity(): ?int { return $this->returnQuantity; }
-    public function getReturnAmount(): ?string { return $this->returnAmount; }
-    public function getPeriodFrom(): \DateTimeImmutable { return $this->periodFrom; }
-    public function getPeriodTo(): \DateTimeImmutable { return $this->periodTo; }
-    public function getPlDocumentId(): ?string { return $this->plDocumentId; }
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
+    public function getId(): string
+    {
+        return $this->id;
+    }
 
-    public function setListing(?MarketplaceListing $listing): void { $this->listing = $listing; }
-    public function setOfferId(?string $offerId): void { $this->offerId = $offerId; }
-    public function setName(?string $name): void { $this->name = $name; }
-    public function setPlDocumentId(?string $plDocumentId): void { $this->plDocumentId = $plDocumentId; }
+    public function getCompanyId(): string
+    {
+        return $this->companyId;
+    }
+
+    public function getListing(): ?MarketplaceListing
+    {
+        return $this->listing;
+    }
+
+    public function getRawDocument(): MarketplaceRawDocument
+    {
+        return $this->rawDocument;
+    }
+
+    public function getSku(): string
+    {
+        return $this->sku;
+    }
+
+    public function getOfferId(): ?string
+    {
+        return $this->offerId;
+    }
+
+    public function getName(): ?string
+    {
+        return $this->name;
+    }
+
+    public function getPricePerInstance(): string
+    {
+        return $this->pricePerInstance;
+    }
+
+    public function getQuantity(): int
+    {
+        return $this->quantity;
+    }
+
+    public function getTotalAmount(): string
+    {
+        return $this->totalAmount;
+    }
+
+    public function getReturnPricePerInstance(): ?string
+    {
+        return $this->returnPricePerInstance;
+    }
+
+    public function getReturnQuantity(): ?int
+    {
+        return $this->returnQuantity;
+    }
+
+    public function getReturnAmount(): ?string
+    {
+        return $this->returnAmount;
+    }
+
+    public function getPeriodFrom(): \DateTimeImmutable
+    {
+        return $this->periodFrom;
+    }
+
+    public function getPeriodTo(): \DateTimeImmutable
+    {
+        return $this->periodTo;
+    }
+
+    public function getPlDocumentId(): ?string
+    {
+        return $this->plDocumentId;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    public function setListing(?MarketplaceListing $listing): void
+    {
+        $this->listing = $listing;
+    }
+
+    public function setOfferId(?string $offerId): void
+    {
+        $this->offerId = $offerId;
+    }
+
+    public function setName(?string $name): void
+    {
+        $this->name = $name;
+    }
+
+    public function setPlDocumentId(?string $plDocumentId): void
+    {
+        $this->plDocumentId = $plDocumentId;
+    }
 }

@@ -49,7 +49,7 @@ final class DiagnoseSalesVnDuplicatesCommand extends Command
         $companyId = $input->getOption('company-id');
         $limit = (int) $input->getOption('limit');
 
-        if (MarketplaceType::tryFrom($marketplace) === null) {
+        if (null === MarketplaceType::tryFrom($marketplace)) {
             $io->error(sprintf('Неизвестный marketplace: %s', $marketplace));
 
             return Command::FAILURE;
@@ -57,7 +57,7 @@ final class DiagnoseSalesVnDuplicatesCommand extends Command
 
         $from = $this->parseStrictDate($fromStr);
         $to = $this->parseStrictDate($toStr);
-        if ($from === null || $to === null) {
+        if (null === $from || null === $to) {
             $io->error('Неверный формат даты. Используйте реальную дату в формате Y-m-d.');
 
             return Command::FAILURE;
@@ -75,7 +75,7 @@ final class DiagnoseSalesVnDuplicatesCommand extends Command
             return Command::FAILURE;
         }
 
-        if (is_string($companyId) && $companyId !== '') {
+        if (is_string($companyId) && '' !== $companyId) {
             try {
                 Assert::uuid($companyId);
             } catch (\InvalidArgumentException) {
@@ -90,7 +90,7 @@ final class DiagnoseSalesVnDuplicatesCommand extends Command
             ['Marketplace' => $marketplace],
             ['Period from' => $from->format('Y-m-d')],
             ['Period to' => $to->format('Y-m-d')],
-            ['Company ID' => is_string($companyId) && $companyId !== '' ? $companyId : 'ALL'],
+            ['Company ID' => is_string($companyId) && '' !== $companyId ? $companyId : 'ALL'],
         );
 
         $params = [
@@ -99,7 +99,7 @@ final class DiagnoseSalesVnDuplicatesCommand extends Command
             'periodTo' => $to->format('Y-m-d'),
         ];
         $companyFilter = '';
-        if (is_string($companyId) && $companyId !== '') {
+        if (is_string($companyId) && '' !== $companyId) {
             $params['companyId'] = $companyId;
             $companyFilter = ' AND s.company_id = :companyId';
         }
@@ -160,7 +160,7 @@ final class DiagnoseSalesVnDuplicatesCommand extends Command
         );
 
         $io->section(sprintf('Топ дублей (_vN), limit=%d', $limit));
-        if ($topRows === []) {
+        if ([] === $topRows) {
             $io->success('Дубли с суффиксом _vN не найдены.');
 
             return Command::SUCCESS;
@@ -190,7 +190,7 @@ final class DiagnoseSalesVnDuplicatesCommand extends Command
     {
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
 
-        if ($date === false || $date->format('Y-m-d') !== $value) {
+        if (false === $date || $date->format('Y-m-d') !== $value) {
             return null;
         }
 

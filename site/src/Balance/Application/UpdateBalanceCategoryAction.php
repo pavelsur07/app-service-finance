@@ -39,7 +39,7 @@ final readonly class UpdateBalanceCategoryAction
         $category->setIsVisible($command->isVisible);
 
         $parentId = $command->parentId;
-        if (null !== $parentId || $category->getParent() !== null) {
+        if (null !== $parentId || null !== $category->getParent()) {
             $this->balanceStructurePolicy->assertCanSetParent($category, $parentId, $companyId);
         }
 

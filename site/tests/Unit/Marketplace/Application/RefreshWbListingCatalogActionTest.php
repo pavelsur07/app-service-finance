@@ -229,6 +229,6 @@ final class RefreshWbListingCatalogActionTest extends TestCase
     /** @param list<array<string, mixed>> $cards */
     private function catalogResponse(array $cards): MockResponse
     {
-        return new MockResponse(json_encode(['cards' => $cards, 'cursor' => ['total' => count($cards)]], JSON_THROW_ON_ERROR));
+        return new MockResponse(json_encode(['cards' => $cards, 'cursor' => ['total' => count($cards)]], \JSON_THROW_ON_ERROR));
     }
 }

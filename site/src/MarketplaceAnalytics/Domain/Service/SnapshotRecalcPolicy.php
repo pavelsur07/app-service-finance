@@ -12,7 +12,8 @@ final readonly class SnapshotRecalcPolicy
     public function __construct(
         private SnapshotCalculationPolicy $snapshotCalculationPolicy,
         private MarketplaceFacade $marketplaceFacade,
-    ) {}
+    ) {
+    }
 
     public function recalcBySchedule(string $companyId, int $lookbackDays): void
     {

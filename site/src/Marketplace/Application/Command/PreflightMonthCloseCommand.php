@@ -12,10 +12,10 @@ use App\Marketplace\Enum\CloseStage;
 final class PreflightMonthCloseCommand
 {
     public function __construct(
-        public readonly string     $companyId,
-        public readonly string     $marketplace,
-        public readonly int        $year,
-        public readonly int        $month,
+        public readonly string $companyId,
+        public readonly string $marketplace,
+        public readonly int $year,
+        public readonly int $month,
         public readonly CloseStage $stage,
     ) {
     }

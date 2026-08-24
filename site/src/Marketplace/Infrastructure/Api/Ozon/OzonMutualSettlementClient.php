@@ -74,7 +74,7 @@ final readonly class OzonMutualSettlementClient
             'language' => 'DEFAULT',
         ];
 
-        $url = self::BASE_URL . self::ENDPOINT;
+        $url = self::BASE_URL.self::ENDPOINT;
 
         $this->appLogger->info('Ozon MS request', [
             'companyId' => $companyId,
@@ -93,11 +93,7 @@ final readonly class OzonMutualSettlementClient
         } catch (\Exception $e) {
             $this->appLogger->error('Ozon MS failed', $e, ['companyId' => $companyId, 'request_body' => $requestBody]);
 
-            throw new \RuntimeException(
-                sprintf('Ozon mutual settlement: ошибка соединения: %s', $e->getMessage()),
-                0,
-                $e,
-            );
+            throw new \RuntimeException(sprintf('Ozon mutual settlement: ошибка соединения: %s', $e->getMessage()), 0, $e);
         }
 
         $responseBody = $response->getContent(false);
@@ -112,7 +108,7 @@ final readonly class OzonMutualSettlementClient
             'body_preview' => substr($responseBody, 0, 200),
         ]);
 
-        if ($statusCode !== 200) {
+        if (200 !== $statusCode) {
             $exception = new \RuntimeException(sprintf(
                 'Ozon mutual settlement API вернул HTTP %d: %s',
                 $statusCode,
@@ -213,7 +209,7 @@ final readonly class OzonMutualSettlementClient
             sleep($delay);
             $totalWaited += $delay;
 
-            $response = $this->httpClient->request('POST', self::BASE_URL . self::REPORT_INFO_ENDPOINT, [
+            $response = $this->httpClient->request('POST', self::BASE_URL.self::REPORT_INFO_ENDPOINT, [
                 'headers' => $headers,
                 'json' => ['code' => $reportCode],
                 'timeout' => self::REQUEST_TIMEOUT,
@@ -221,12 +217,8 @@ final readonly class OzonMutualSettlementClient
 
             $statusCode = $response->getStatusCode();
 
-            if ($statusCode !== 200) {
-                throw new \RuntimeException(sprintf(
-                    'Ozon report/info вернул HTTP %d для report_code=%s',
-                    $statusCode,
-                    $reportCode,
-                ));
+            if (200 !== $statusCode) {
+                throw new \RuntimeException(sprintf('Ozon report/info вернул HTTP %d для report_code=%s', $statusCode, $reportCode));
             }
 
             $data = $response->toArray();
@@ -250,11 +242,7 @@ final readonly class OzonMutualSettlementClient
             }
 
             if ('failed' === $status || 'error' === $status) {
-                throw new \RuntimeException(sprintf(
-                    'Ozon отчёт %s завершился с ошибкой: %s',
-                    $reportCode,
-                    (string) ($report['error'] ?? $data['error'] ?? 'unknown'),
-                ));
+                throw new \RuntimeException(sprintf('Ozon отчёт %s завершился с ошибкой: %s', $reportCode, (string) ($report['error'] ?? $data['error'] ?? 'unknown')));
             }
 
             // Exponential backoff: 2, 4, 8, 16...
@@ -264,11 +252,7 @@ final readonly class OzonMutualSettlementClient
             }
         }
 
-        throw new \RuntimeException(sprintf(
-            'Ozon отчёт %s не готов за %d секунд',
-            $reportCode,
-            self::POLL_MAX_WAIT_SECONDS,
-        ));
+        throw new \RuntimeException(sprintf('Ozon отчёт %s не готов за %d секунд', $reportCode, self::POLL_MAX_WAIT_SECONDS));
     }
 
     /**

@@ -12,7 +12,7 @@ final readonly class MarketplaceOtherProcessor implements MarketplaceRawProcesso
     public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = ''): bool
     {
         if ($type instanceof StagingRecordType) {
-            return $type === StagingRecordType::OTHER;
+            return StagingRecordType::OTHER === $type;
         }
 
         return $kind === StagingRecordType::OTHER->value;

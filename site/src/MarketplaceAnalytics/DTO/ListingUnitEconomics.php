@@ -45,11 +45,12 @@ final readonly class ListingUnitEconomics
         public int $ordersQuantity,
         public int $deliveredQuantity,
         public DataQualityFlags $dataQuality,
-    ) {}
+    ) {
+    }
 
     public function hasCostPrice(): bool
     {
-        return $this->costPrice !== null;
+        return null !== $this->costPrice;
     }
 
     public function isComplete(): bool
@@ -59,6 +60,6 @@ final readonly class ListingUnitEconomics
 
     public function isProfitable(): bool
     {
-        return $this->profitTotal !== null && bccomp($this->profitTotal, '0.00', 2) > 0;
+        return null !== $this->profitTotal && bccomp($this->profitTotal, '0.00', 2) > 0;
     }
 }

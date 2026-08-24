@@ -22,8 +22,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class MappingErrorResolveController extends AbstractController
 {
     public function __construct(
-        private readonly MappingErrorRepository  $repository,
-        private readonly EntityManagerInterface  $em,
+        private readonly MappingErrorRepository $repository,
+        private readonly EntityManagerInterface $em,
     ) {
     }
 
@@ -31,11 +31,11 @@ final class MappingErrorResolveController extends AbstractController
     {
         $error = $this->repository->find($id);
 
-        if ($error === null) {
+        if (null === $error) {
             throw $this->createNotFoundException('Ошибка маппинга не найдена.');
         }
 
-        if (!$this->isCsrfTokenValid('admin_marketplace_mapping_error_resolve' . $id, (string) $request->request->get('_token', ''))) {
+        if (!$this->isCsrfTokenValid('admin_marketplace_mapping_error_resolve'.$id, (string) $request->request->get('_token', ''))) {
             throw $this->createAccessDeniedException('Недействительный CSRF-токен');
         }
 

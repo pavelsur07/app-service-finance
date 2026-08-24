@@ -125,14 +125,14 @@ final class UnprocessedCostsQuery
         SQL;
 
         $rows = $this->connection->fetchAllAssociative($sql, [
-            'companyId'   => $companyId,
+            'companyId' => $companyId,
             'marketplace' => $marketplace,
-            'periodFrom'  => $periodFrom,
-            'periodTo'    => $periodTo,
+            'periodFrom' => $periodFrom,
+            'periodTo' => $periodTo,
         ]);
 
         return array_map(static function (array $r): array {
-            $isStorno       = (bool) $r['is_storno'];
+            $isStorno = (bool) $r['is_storno'];
             $mappingNegative = (bool) $r['mapping_is_negative'];
 
             // Сторно инвертирует знак маппинга:
@@ -148,16 +148,16 @@ final class UnprocessedCostsQuery
             return [
                 'cost_category_code' => $r['cost_category_code'],
                 'cost_category_name' => $r['cost_category_name'],
-                'pl_category_id'     => $r['pl_category_id'],
-                'costs_amount'       => $r['costs_amount'],
-                'storno_amount'      => $r['storno_amount'],
-                'net_amount'         => (string) ((float) $r['costs_amount'] - (float) $r['storno_amount']),
-                'is_storno'          => $isStorno,
-                'total_amount'       => $r['total_amount'],
-                'description'        => $description,
-                'is_negative'        => $isNegative,
-                'sort_order'         => (int) $r['sort_order'],
-                'records_count'      => (int) $r['records_count'],
+                'pl_category_id' => $r['pl_category_id'],
+                'costs_amount' => $r['costs_amount'],
+                'storno_amount' => $r['storno_amount'],
+                'net_amount' => (string) ((float) $r['costs_amount'] - (float) $r['storno_amount']),
+                'is_storno' => $isStorno,
+                'total_amount' => $r['total_amount'],
+                'description' => $description,
+                'is_negative' => $isNegative,
+                'sort_order' => (int) $r['sort_order'],
+                'records_count' => (int) $r['records_count'],
             ];
         }, $rows);
     }
@@ -207,10 +207,10 @@ final class UnprocessedCostsQuery
                 $preliminaryFilter
             SQL,
             [
-                'companyId'   => $companyId,
+                'companyId' => $companyId,
                 'marketplace' => $marketplace,
-                'periodFrom'  => $periodFrom,
-                'periodTo'    => $periodTo,
+                'periodFrom' => $periodFrom,
+                'periodTo' => $periodTo,
             ],
         );
 

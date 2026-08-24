@@ -12,8 +12,8 @@ use App\Mcp\Application\McpToolInterface;
 
 final class CashCategoryUpsertTool implements McpToolInterface
 {
-    use JsonToolOutput;
     use EnumArgument;
+    use JsonToolOutput;
 
     public function __construct(
         private readonly CashFacade $cashFacade,

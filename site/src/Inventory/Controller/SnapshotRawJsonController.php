@@ -32,7 +32,7 @@ final class SnapshotRawJsonController extends AbstractController
 
         $companyId = (string) $this->activeCompanyService->getActiveCompany()->getId();
         $session = $this->sessionRepository->findByIdAndCompany($id, $companyId);
-        if ($session === null) {
+        if (null === $session) {
             throw $this->createNotFoundException('Inventory snapshot session not found.');
         }
 
@@ -45,9 +45,9 @@ final class SnapshotRawJsonController extends AbstractController
                 'source' => $session->getSource()->value,
                 'status' => $session->getStatus()->value,
                 'triggerType' => $session->getTriggerType()->value,
-                'createdAt' => $session->getCreatedAt()->format(DATE_ATOM),
-                'startedAt' => $session->getStartedAt()?->format(DATE_ATOM),
-                'completedAt' => $session->getCompletedAt()?->format(DATE_ATOM),
+                'createdAt' => $session->getCreatedAt()->format(\DATE_ATOM),
+                'startedAt' => $session->getStartedAt()?->format(\DATE_ATOM),
+                'completedAt' => $session->getCompletedAt()?->format(\DATE_ATOM),
                 'receivedPages' => $session->getReceivedPages(),
                 'expectedPages' => $session->getExpectedPages(),
                 'errorMessage' => $session->getErrorMessage(),
@@ -59,13 +59,13 @@ final class SnapshotRawJsonController extends AbstractController
                 'sourceEndpoint' => $snapshot->getSourceEndpoint(),
                 'requestParams' => $snapshot->getRequestParams(),
                 'responseStatus' => $snapshot->getResponseStatus(),
-                'fetchedAt' => $snapshot->getFetchedAt()->format(DATE_ATOM),
+                'fetchedAt' => $snapshot->getFetchedAt()->format(\DATE_ATOM),
                 'fetchDurationMs' => $snapshot->getFetchDurationMs(),
                 'responseBody' => $snapshot->getResponseBody(),
             ], $rawSnapshots),
         ];
 
-        if ($rawSnapshots === []) {
+        if ([] === $rawSnapshots) {
             $payload['message'] = 'No raw snapshots saved for this session.';
         }
 

@@ -180,7 +180,6 @@ final class WbFinanceDiagnosticsCommand extends Command
         $io->table(['metric', 'value'], $rows);
     }
 
-
     private function renderConnectionDiagnostics(SymfonyStyle $io): void
     {
         $io->section('Per-connection recovery diagnostics');

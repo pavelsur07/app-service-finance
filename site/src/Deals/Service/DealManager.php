@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Deals\Service;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\Counterparty;
 use App\Company\Entity\User;
 use App\Company\Repository\CompanyMemberRepository;
+use App\Company\Repository\CounterpartyRepository;
 use App\Deals\Entity\Deal;
 use App\Deals\Entity\DealAdjustment;
 use App\Deals\Entity\DealCharge;
@@ -25,8 +27,6 @@ use App\Deals\Service\Request\RemoveDealChargeRequest;
 use App\Deals\Service\Request\RemoveDealItemRequest;
 use App\Deals\Service\Request\UpdateDealHeaderRequest;
 use App\Deals\Service\Request\UpdateDealItemRequest;
-use App\Company\Entity\Counterparty;
-use App\Company\Repository\CounterpartyRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 

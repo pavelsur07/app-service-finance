@@ -31,7 +31,7 @@ final class SecretPayloadMaskerTest extends TestCase
             ],
         ], $masked);
 
-        $encodedMasked = json_encode($masked, JSON_THROW_ON_ERROR);
+        $encodedMasked = json_encode($masked, \JSON_THROW_ON_ERROR);
         self::assertStringNotContainsString('secret-api-key', $encodedMasked);
         self::assertStringNotContainsString('client-1', $encodedMasked);
         self::assertStringNotContainsString('secret-token', $encodedMasked);

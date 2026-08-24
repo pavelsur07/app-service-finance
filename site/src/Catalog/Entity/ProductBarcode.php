@@ -19,11 +19,11 @@ use Webmozart\Assert\Assert;
 )]
 class ProductBarcode
 {
-    public const TYPE_EAN13      = 'EAN13';
-    public const TYPE_UPC        = 'UPC';
-    public const TYPE_CODE128    = 'CODE128';
+    public const TYPE_EAN13 = 'EAN13';
+    public const TYPE_UPC = 'UPC';
+    public const TYPE_CODE128 = 'CODE128';
     public const TYPE_DATAMATRIX = 'DATAMATRIX';
-    public const TYPE_OTHER      = 'OTHER';
+    public const TYPE_OTHER = 'OTHER';
 
     #[ORM\Id]
     #[ORM\Column(type: 'guid', unique: true)]
@@ -71,11 +71,11 @@ class ProductBarcode
             self::TYPE_OTHER,
         ]);
 
-        $this->id        = $id;
+        $this->id = $id;
         $this->companyId = $companyId;
-        $this->product   = $product;
-        $this->barcode   = trim($barcode);
-        $this->type      = $type;
+        $this->product = $product;
+        $this->barcode = trim($barcode);
+        $this->type = $type;
         $this->isPrimary = $isPrimary;
         $this->createdAt = new \DateTimeImmutable();
     }

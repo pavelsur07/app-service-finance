@@ -17,7 +17,8 @@ final readonly class DefaultCostMappingRule
         private bool $isNegative,
         private DefaultCostMappingConfidence $confidence,
         private ?string $note,
-    ) {}
+    ) {
+    }
 
     public function getMarketplace(): MarketplaceType
     {

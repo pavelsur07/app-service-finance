@@ -22,7 +22,7 @@ class WbWarehouseLogisticsCalculator implements CostCalculatorInterface
 
     public function supports(array $item): bool
     {
-        return $this->normalizer->sellerOperName($item) === 'Возмещение издержек по перевозке/по складским операциям с товаром';
+        return 'Возмещение издержек по перевозке/по складским операциям с товаром' === $this->normalizer->sellerOperName($item);
     }
 
     public function requiresListing(): bool
@@ -40,7 +40,7 @@ class WbWarehouseLogisticsCalculator implements CostCalculatorInterface
         }
 
         $externalId = $this->externalIdBuilder->build($item, 'warehouse_logistics');
-        if ($externalId === null) {
+        if (null === $externalId) {
             return [];
         }
 
@@ -52,7 +52,7 @@ class WbWarehouseLogisticsCalculator implements CostCalculatorInterface
         return [
             [
                 'category_code' => 'warehouse_logistics',
-                'amount' => (string)abs($rebillLogisticCost),
+                'amount' => (string) abs($rebillLogisticCost),
                 'external_id' => $externalId,
                 'cost_date' => $saleDate,
                 'description' => 'Логистика складские операции',

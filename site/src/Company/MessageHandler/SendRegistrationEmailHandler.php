@@ -8,9 +8,9 @@ use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Message\SendRegistrationEmailMessage;
+use App\Company\Repository\UserRepository;
 use App\Notification\DTO\EmailMessage;
 use App\Notification\Service\NotificationRouter;
-use App\Company\Repository\UserRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Marketplace\Controller;
 
+use App\Company\Repository\ProjectDirectionRepository;
 use App\Marketplace\Application\ReprocessMarketplacePeriodAction;
 use App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface;
 use App\Marketplace\Application\Service\WbInitialSyncStartDateResolver;
@@ -22,7 +23,6 @@ use App\Marketplace\Message\TriggerInitialSyncMessage;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
-use App\Company\Repository\ProjectDirectionRepository;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\AppLogger;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -405,28 +405,7 @@ final class MarketplaceControllerCreateConnectionTest extends TestCase
     ): MarketplaceController {
         $ozonCredentialValidator ??= $this->createMock(OzonSellerCredentialValidatorInterface::class);
 
-        return new class(
-            $companyService,
-            $connectionRepository,
-            self::uninitialized(MarketplaceRawDocumentRepository::class),
-            self::uninitialized(MarketplaceAdapterRegistry::class),
-            self::uninitialized(OzonRealizationStatusQuery::class),
-            self::uninitialized(RawDocumentsListQuery::class),
-            self::uninitialized(ProjectDirectionRepository::class),
-            $em,
-            $messageBus,
-            self::uninitialized(ReprocessMarketplacePeriodAction::class),
-            self::uninitialized(SyncConnectionAction::class),
-            $startDateResolver,
-            $planner,
-            self::uninitialized(WbFinanceSyncStatusListQuery::class),
-            $ozonCredentialValidator,
-            new \App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec(
-                $this->fieldEncryptionServiceStub(),
-                $this->createMock(\App\Shared\Security\Contract\SecretRotationServiceInterface::class),
-            ),
-            new AppLogger($this->createMock(\Psr\Log\LoggerInterface::class)),
-        ) extends MarketplaceController {
+        return new class($companyService, $connectionRepository, self::uninitialized(MarketplaceRawDocumentRepository::class), self::uninitialized(MarketplaceAdapterRegistry::class), self::uninitialized(OzonRealizationStatusQuery::class), self::uninitialized(RawDocumentsListQuery::class), self::uninitialized(ProjectDirectionRepository::class), $em, $messageBus, self::uninitialized(ReprocessMarketplacePeriodAction::class), self::uninitialized(SyncConnectionAction::class), $startDateResolver, $planner, self::uninitialized(WbFinanceSyncStatusListQuery::class), $ozonCredentialValidator, new \App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec($this->fieldEncryptionServiceStub(), $this->createMock(\App\Shared\Security\Contract\SecretRotationServiceInterface::class)), new AppLogger($this->createMock(\Psr\Log\LoggerInterface::class))) extends MarketplaceController {
             protected function addFlash(string $type, mixed $message): void
             {
             }
@@ -446,11 +425,9 @@ final class MarketplaceControllerCreateConnectionTest extends TestCase
     private function fieldEncryptionServiceStub(): \App\Shared\Security\Contract\FieldEncryptionServiceInterface
     {
         $service = $this->createMock(\App\Shared\Security\Contract\FieldEncryptionServiceInterface::class);
-        $service->method('encrypt')->willReturnCallback(static fn (string $plaintext): \App\Shared\Security\ValueObject\EncryptedPayload =>
-            new \App\Shared\Security\ValueObject\EncryptedPayload('encrypted:' . $plaintext, 'v1', new \DateTimeImmutable())
+        $service->method('encrypt')->willReturnCallback(static fn (string $plaintext): \App\Shared\Security\ValueObject\EncryptedPayload => new \App\Shared\Security\ValueObject\EncryptedPayload('encrypted:'.$plaintext, 'v1', new \DateTimeImmutable())
         );
-        $service->method('decrypt')->willReturnCallback(static fn (\App\Shared\Security\ValueObject\EncryptedPayload $payload): string =>
-            str_starts_with($payload->ciphertext(), 'encrypted:') ? substr($payload->ciphertext(), 10) : $payload->ciphertext()
+        $service->method('decrypt')->willReturnCallback(static fn (\App\Shared\Security\ValueObject\EncryptedPayload $payload): string => str_starts_with($payload->ciphertext(), 'encrypted:') ? substr($payload->ciphertext(), 10) : $payload->ciphertext()
         );
 
         return $service;

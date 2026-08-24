@@ -88,9 +88,9 @@ final class ExtractBatchesToRawDocumentsActionTest extends TestCase
 
         $zip = new \ZipArchive();
         self::assertTrue(true === $zip->open($zipAbsolute, \ZipArchive::CREATE | \ZipArchive::OVERWRITE));
-        $zip->addFromString('22655731_23.04.2026-23.04.2026.csv', "csv-1-content");
-        $zip->addFromString('22655732_23.04.2026-23.04.2026.csv', "csv-2-content");
-        $zip->addFromString('22655733_23.04.2026-23.04.2026.csv', "csv-3-content");
+        $zip->addFromString('22655731_23.04.2026-23.04.2026.csv', 'csv-1-content');
+        $zip->addFromString('22655732_23.04.2026-23.04.2026.csv', 'csv-2-content');
+        $zip->addFromString('22655733_23.04.2026-23.04.2026.csv', 'csv-3-content');
         $zip->close();
 
         $batch = AdScheduledBatchBuilder::aBatch()
@@ -113,9 +113,9 @@ final class ExtractBatchesToRawDocumentsActionTest extends TestCase
 
         $zip = new \ZipArchive();
         self::assertTrue(true === $zip->open($zipAbsolute, \ZipArchive::CREATE | \ZipArchive::OVERWRITE));
-        $zip->addFromString('22655731.csv', "csv-only");
-        $zip->addFromString('readme.txt', "this should be skipped");
-        $zip->addFromString('manifest.json', "{\"ignored\":true}");
+        $zip->addFromString('22655731.csv', 'csv-only');
+        $zip->addFromString('readme.txt', 'this should be skipped');
+        $zip->addFromString('manifest.json', '{"ignored":true}');
         $zip->close();
 
         $batch = AdScheduledBatchBuilder::aBatch()
@@ -288,8 +288,8 @@ final class ExtractBatchesToRawDocumentsActionTest extends TestCase
 
         $zip = new \ZipArchive();
         self::assertTrue(true === $zip->open($zipAbsolute, \ZipArchive::CREATE | \ZipArchive::OVERWRITE));
-        $zip->addFromString('22655731_23.04.2026-23.04.2026.csv', "csv-1-content");
-        $zip->addFromString('22655732_23.04.2026-23.04.2026.csv', "csv-2-content");
+        $zip->addFromString('22655731_23.04.2026-23.04.2026.csv', 'csv-1-content');
+        $zip->addFromString('22655732_23.04.2026-23.04.2026.csv', 'csv-2-content');
         $zip->close();
 
         $batch = AdScheduledBatchBuilder::aBatch()

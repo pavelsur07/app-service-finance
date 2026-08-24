@@ -69,13 +69,13 @@ final class WbListingResolverService
             );
         }
 
-        if ($size === 'UNKNOWN' && $barcode !== null && $barcode !== '') {
+        if ('UNKNOWN' === $size && null !== $barcode && '' !== $barcode) {
             $barcodeEntity = $this->barcodeRepository->findByBarcode(
                 $companyId,
                 $barcode,
                 MarketplaceType::WILDBERRIES,
             );
-            if ($barcodeEntity !== null) {
+            if (null !== $barcodeEntity) {
                 $listing = $barcodeEntity->getListing();
                 $this->bindVariantIdentity($listing, $nmId, $size, $marketplaceVariantId);
 
@@ -156,7 +156,7 @@ final class WbListingResolverService
             $brandName,
             $subjectName,
             $saName,
-            $size !== 'UNKNOWN' ? $size : null,
+            'UNKNOWN' !== $size ? $size : null,
         ]);
 
         $listing = new MarketplaceListing(
@@ -169,9 +169,9 @@ final class WbListingResolverService
         $listing->setMarketplaceSku($nmId);
         $listing->setMarketplaceVariantId($marketplaceVariantId);
         $listing->setSize($size);
-        $listing->setSupplierSku($saName !== '' ? $saName : null);
-        $listing->setPrice($price !== '' ? $price : '0');
-        $listing->setName($nameParts !== [] ? implode(' ', $nameParts) : null);
+        $listing->setSupplierSku('' !== $saName ? $saName : null);
+        $listing->setPrice('' !== $price ? $price : '0');
+        $listing->setName([] !== $nameParts ? implode(' ', $nameParts) : null);
 
         $this->em->persist($listing);
 
@@ -181,11 +181,11 @@ final class WbListingResolverService
         // resolve() не нашёл листинг ни по натуральному ключу, ни по chrtId, ни по
         // самому баркоду — значит баркод свободен. Это же даёт следующим безразмерным
         // строкам найти листинг по баркоду вместо создания дубля.
-        if ($barcode !== null && $barcode !== '') {
+        if (null !== $barcode && '' !== $barcode) {
             $this->pendingBarcodes[] = [
                 'companyId' => $companyId,
                 'listingId' => $listing->getId(),
-                'barcode'   => $barcode,
+                'barcode' => $barcode,
             ];
         }
 
@@ -217,7 +217,7 @@ final class WbListingResolverService
     {
         $normalized = trim((string) $tsName);
 
-        return $normalized !== '' && $normalized !== '0' ? $normalized : 'UNKNOWN';
+        return '' !== $normalized && '0' !== $normalized ? $normalized : 'UNKNOWN';
     }
 
     private function bindVariantIdentity(

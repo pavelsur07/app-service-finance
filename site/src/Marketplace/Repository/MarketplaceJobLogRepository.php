@@ -19,8 +19,9 @@ class MarketplaceJobLogRepository extends ServiceEntityRepository
     /**
      * Найти последнюю запись для каждого из указанных типов задач.
      *
-     * @param  JobType[]                      $jobTypes
-     * @return array<string, MarketplaceJobLog>  ['job_type_value' => MarketplaceJobLog]
+     * @param JobType[] $jobTypes
+     *
+     * @return array<string, MarketplaceJobLog> ['job_type_value' => MarketplaceJobLog]
      */
     public function findLastByJobTypes(string $companyId, array $jobTypes): array
     {

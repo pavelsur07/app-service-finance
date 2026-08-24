@@ -7,17 +7,17 @@ namespace App\Marketplace\Infrastructure\Query;
 use Doctrine\DBAL\Connection;
 
 /**
- * Query для получения списка листингов без привязки к Product
+ * Query для получения списка листингов без привязки к Product.
  */
 class UnmappedListingsQuery
 {
     public function __construct(
-        private readonly Connection $connection
+        private readonly Connection $connection,
     ) {
     }
 
     /**
-     * Получить все unmapped листинги для компании
+     * Получить все unmapped листинги для компании.
      *
      * @return array<int, array{
      *   id: string,
@@ -51,7 +51,7 @@ class UnmappedListingsQuery
     }
 
     /**
-     * Количество unmapped листингов для компании
+     * Количество unmapped листингов для компании.
      */
     public function countUnmappedForCompany(string $companyId): int
     {
@@ -66,7 +66,7 @@ class UnmappedListingsQuery
     }
 
     /**
-     * Поиск unmapped листингов по SKU или названию
+     * Поиск unmapped листингов по SKU или названию.
      *
      * @return array<int, array{
      *   id: string,
@@ -94,13 +94,13 @@ class UnmappedListingsQuery
             ->andWhere('(l.marketplace_sku ILIKE :search OR l.supplier_sku ILIKE :search)')
             ->orderBy('l.created_at', 'DESC')
             ->setParameter('company', $companyId)
-            ->setParameter('search', '%' . $search . '%')
+            ->setParameter('search', '%'.$search.'%')
             ->executeQuery()
             ->fetchAllAssociative();
     }
 
     /**
-     * Найти листинг по ID с проверкой принадлежности к компании
+     * Найти листинг по ID с проверкой принадлежности к компании.
      */
     public function findByIdAndCompany(string $listingId, string $companyId): ?array
     {
@@ -117,5 +117,4 @@ class UnmappedListingsQuery
 
         return $result ?: null;
     }
-
 }

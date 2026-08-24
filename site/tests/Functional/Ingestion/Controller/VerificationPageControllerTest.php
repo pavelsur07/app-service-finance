@@ -85,11 +85,11 @@ final class VerificationPageControllerTest extends WebTestCaseBase
         $statusCode = $response->getStatusCode();
 
         self::assertTrue(
-            $statusCode === 302 || $statusCode === 401 || $statusCode === 403,
+            302 === $statusCode || 401 === $statusCode || 403 === $statusCode,
             sprintf('Expected auth response, got HTTP %d.', $statusCode),
         );
 
-        if ($statusCode === 302) {
+        if (302 === $statusCode) {
             self::assertStringContainsString('/login', (string) $response->headers->get('Location'));
         }
     }

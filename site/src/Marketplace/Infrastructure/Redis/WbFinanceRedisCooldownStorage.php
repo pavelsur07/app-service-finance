@@ -8,7 +8,9 @@ use App\Marketplace\Application\Service\WbFinanceCooldownStorageInterface;
 
 final readonly class WbFinanceRedisCooldownStorage implements WbFinanceCooldownStorageInterface
 {
-    public function __construct(private object $redisClient) {}
+    public function __construct(private object $redisClient)
+    {
+    }
 
     public function getUntilTimestamp(string $key): ?int
     {

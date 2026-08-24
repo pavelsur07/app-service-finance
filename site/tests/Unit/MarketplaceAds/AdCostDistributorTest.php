@@ -48,12 +48,12 @@ final class AdCostDistributorTest extends TestCase
 
     private function sumImpressions(array $results): int
     {
-        return array_sum(array_map(static fn(CostDistributionResult $r) => $r->impressions, $results));
+        return array_sum(array_map(static fn (CostDistributionResult $r) => $r->impressions, $results));
     }
 
     private function sumClicks(array $results): int
     {
-        return array_sum(array_map(static fn(CostDistributionResult $r) => $r->clicks, $results));
+        return array_sum(array_map(static fn (CostDistributionResult $r) => $r->clicks, $results));
     }
 
     // -------------------------------------------------------------------------
@@ -183,7 +183,7 @@ final class AdCostDistributorTest extends TestCase
     {
         // 7 equal listings, cost = '100.00' — 100/7 repeating decimal
         $listings = [];
-        for ($i = 1; $i <= 7; $i++) {
+        for ($i = 1; $i <= 7; ++$i) {
             $listings[] = $this->makeListing("L{$i}");
         }
 

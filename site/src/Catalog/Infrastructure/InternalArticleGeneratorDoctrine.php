@@ -14,7 +14,7 @@ use Doctrine\DBAL\Connection;
  */
 final class InternalArticleGeneratorDoctrine implements InternalArticleGenerator
 {
-    private const PREFIX     = 'PRD';
+    private const PREFIX = 'PRD';
     private const PAD_LENGTH = 6;
 
     public function __construct(private readonly Connection $connection)
@@ -57,7 +57,7 @@ final class InternalArticleGeneratorDoctrine implements InternalArticleGenerator
             '%s-%d-%s',
             self::PREFIX,
             $year,
-            str_pad((string) $seq, self::PAD_LENGTH, '0', STR_PAD_LEFT),
+            str_pad((string) $seq, self::PAD_LENGTH, '0', \STR_PAD_LEFT),
         );
     }
 }

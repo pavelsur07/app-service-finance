@@ -76,7 +76,7 @@ class MarketplaceRawProcessingRun
         Assert::notEmpty($documentType);
         Assert::notEmpty($profileCode);
 
-        if ($retryOfRunId !== null) {
+        if (null !== $retryOfRunId) {
             Assert::uuid($retryOfRunId);
         }
 
@@ -112,18 +112,73 @@ class MarketplaceRawProcessingRun
         $this->details = $details;
     }
 
-    public function getId(): string { return $this->id; }
-    public function getCompanyId(): string { return $this->companyId; }
-    public function getRawDocumentId(): string { return $this->rawDocumentId; }
-    public function getMarketplace(): MarketplaceType { return $this->marketplace; }
-    public function getDocumentType(): string { return $this->documentType; }
-    public function getTrigger(): PipelineTrigger { return $this->trigger; }
-    public function getStatus(): PipelineStatus { return $this->status; }
-    public function getProfileCode(): string { return $this->profileCode; }
-    public function getStartedAt(): \DateTimeImmutable { return $this->startedAt; }
-    public function getFinishedAt(): ?\DateTimeImmutable { return $this->finishedAt; }
-    public function getLastErrorMessage(): ?string { return $this->lastErrorMessage; }
-    public function getSummary(): ?array { return $this->summary; }
-    public function getDetails(): ?array { return $this->details; }
-    public function getRetryOfRunId(): ?string { return $this->retryOfRunId; }
+    public function getId(): string
+    {
+        return $this->id;
+    }
+
+    public function getCompanyId(): string
+    {
+        return $this->companyId;
+    }
+
+    public function getRawDocumentId(): string
+    {
+        return $this->rawDocumentId;
+    }
+
+    public function getMarketplace(): MarketplaceType
+    {
+        return $this->marketplace;
+    }
+
+    public function getDocumentType(): string
+    {
+        return $this->documentType;
+    }
+
+    public function getTrigger(): PipelineTrigger
+    {
+        return $this->trigger;
+    }
+
+    public function getStatus(): PipelineStatus
+    {
+        return $this->status;
+    }
+
+    public function getProfileCode(): string
+    {
+        return $this->profileCode;
+    }
+
+    public function getStartedAt(): \DateTimeImmutable
+    {
+        return $this->startedAt;
+    }
+
+    public function getFinishedAt(): ?\DateTimeImmutable
+    {
+        return $this->finishedAt;
+    }
+
+    public function getLastErrorMessage(): ?string
+    {
+        return $this->lastErrorMessage;
+    }
+
+    public function getSummary(): ?array
+    {
+        return $this->summary;
+    }
+
+    public function getDetails(): ?array
+    {
+        return $this->details;
+    }
+
+    public function getRetryOfRunId(): ?string
+    {
+        return $this->retryOfRunId;
+    }
 }

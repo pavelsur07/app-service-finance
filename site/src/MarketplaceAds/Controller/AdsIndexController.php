@@ -21,7 +21,8 @@ final class AdsIndexController extends AbstractController
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly MarketplaceFacade $marketplaceFacade,
         private readonly AdLoadJobRepository $adLoadJobRepository,
-    ) {}
+    ) {
+    }
 
     #[Route('/marketplace-ads', name: 'marketplace_ads_index', methods: ['GET'])]
     public function __invoke(): Response

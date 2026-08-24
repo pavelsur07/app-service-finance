@@ -329,7 +329,6 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
         return true;
     }
 
-
     public function findByRawDocumentId(string $companyId, string $rawDocumentId): ?MarketplaceFinancialReportSyncStatus
     {
         Assert::uuid($companyId);

@@ -170,7 +170,7 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
         $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
         $repo->method('findLatestActiveJobByCompanyAndMarketplace')->willReturn(null);
         $repo->method('findCompletedJobCoveringDate')->willReturn(null);
-        $repo->method('findLatestJobCoveringDate')->willReturn($this->job(AdLoadJobStatus::FAILED, 'Marketplace API rate limit exceeded'));        
+        $repo->method('findLatestJobCoveringDate')->willReturn($this->job(AdLoadJobStatus::FAILED, 'Marketplace API rate limit exceeded'));
 
         $dispatch = $this->createMock(DispatchOzonAdLoadActionInterface::class);
         $dispatch->expects(self::never())->method('__invoke');
@@ -372,7 +372,6 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
         self::assertStringContainsString('deferred=3', $tester->getDisplay());
     }
 
-
     public function testAllActiveUsesConnectionsQueryAndProcessesEachCompany(): void
     {
         $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
@@ -466,7 +465,6 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
         self::assertStringNotContainsString('Return value must be of type', $display);
     }
 
-
     public function testActiveCompanyJobForAnotherDateDefersMissingDayWithoutDispatchAndWithoutErrorLog(): void
     {
         $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
@@ -532,7 +530,6 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
             $logger,
         );
     }
-
 
     private function emptyConnectionsQuery(): ActiveOzonPerformanceConnectionsQuery
     {

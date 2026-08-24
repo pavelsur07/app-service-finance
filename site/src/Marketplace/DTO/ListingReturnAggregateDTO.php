@@ -10,5 +10,6 @@ final readonly class ListingReturnAggregateDTO
         public string $listingId,
         public string $returnsTotal,
         public int $returnsQuantity,
-    ) {}
+    ) {
+    }
 }

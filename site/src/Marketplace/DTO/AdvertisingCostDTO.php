@@ -20,7 +20,8 @@ final readonly class AdvertisingCostDTO
         public string $amount,
         public array $analyticsData,
         public string $externalCampaignId,
-    ) {}
+    ) {
+    }
 
     public static function fromEntity(MarketplaceAdvertisingCost $entity): self
     {

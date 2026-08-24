@@ -37,7 +37,7 @@ final class ListingDailySnapshotRepository extends ServiceEntityRepository imple
             ->setParameter('dateFrom', $dateFrom)
             ->setParameter('dateTo', $dateTo);
 
-        if ($marketplace !== null) {
+        if (null !== $marketplace) {
             $qb->andWhere('s.marketplace = :marketplace')
                 ->setParameter('marketplace', $marketplace);
         }
@@ -73,22 +73,22 @@ final class ListingDailySnapshotRepository extends ServiceEntityRepository imple
             ->where('s.companyId = :companyId')
             ->setParameter('companyId', $companyId);
 
-        if ($marketplace !== null) {
+        if (null !== $marketplace) {
             $qb->andWhere('s.marketplace = :marketplace')
                 ->setParameter('marketplace', $marketplace);
         }
 
-        if ($dateFrom !== null) {
+        if (null !== $dateFrom) {
             $qb->andWhere('s.snapshotDate >= :dateFrom')
                 ->setParameter('dateFrom', $dateFrom);
         }
 
-        if ($dateTo !== null) {
+        if (null !== $dateTo) {
             $qb->andWhere('s.snapshotDate <= :dateTo')
                 ->setParameter('dateTo', $dateTo);
         }
 
-        if ($listingId !== null) {
+        if (null !== $listingId) {
             $qb->andWhere('s.listingId = :listingId')
                 ->setParameter('listingId', $listingId);
         }

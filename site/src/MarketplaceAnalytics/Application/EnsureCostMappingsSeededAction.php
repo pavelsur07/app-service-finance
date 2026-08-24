@@ -12,7 +12,8 @@ final class EnsureCostMappingsSeededAction
     public function __construct(
         private readonly DefaultCostMappingSeedPolicy $seedPolicy,
         private readonly EntityManagerInterface $entityManager,
-    ) {}
+    ) {
+    }
 
     public function __invoke(string $companyId, string $marketplace): void
     {

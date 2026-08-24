@@ -16,5 +16,6 @@ final readonly class ListingSalesAggregateDTO
         public string $costPriceTotal,
         public int $costPriceQuantity,
         public ?string $supplierSku = null,
-    ) {}
+    ) {
+    }
 }

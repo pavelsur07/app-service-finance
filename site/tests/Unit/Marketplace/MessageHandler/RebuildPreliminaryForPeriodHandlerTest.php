@@ -31,10 +31,10 @@ final class RebuildPreliminaryForPeriodHandlerTest extends TestCase
         $handler = new RebuildPreliminaryForPeriodHandler($action, new NullLogger());
 
         $handler(new RebuildPreliminaryForPeriodMessage(
-            companyId:   '11111111-1111-1111-1111-111111111111',
+            companyId: '11111111-1111-1111-1111-111111111111',
             marketplace: 'ozon',
-            year:        2026,
-            month:       4,
+            year: 2026,
+            month: 4,
             actorUserId: '00000000-0000-0000-0000-000000000001',
         ));
 
@@ -62,10 +62,10 @@ final class RebuildPreliminaryForPeriodHandlerTest extends TestCase
         $handler = new RebuildPreliminaryForPeriodHandler($action, new NullLogger());
 
         $handler(new RebuildPreliminaryForPeriodMessage(
-            companyId:   '11111111-1111-1111-1111-111111111111',
+            companyId: '11111111-1111-1111-1111-111111111111',
             marketplace: 'ozon',
-            year:        2026,
-            month:       4,
+            year: 2026,
+            month: 4,
             actorUserId: '00000000-0000-0000-0000-000000000001',
         ));
 
@@ -92,10 +92,10 @@ final class RebuildPreliminaryForPeriodHandlerTest extends TestCase
         $this->expectExceptionMessage('db down');
 
         $handler(new RebuildPreliminaryForPeriodMessage(
-            companyId:   '11111111-1111-1111-1111-111111111111',
+            companyId: '11111111-1111-1111-1111-111111111111',
             marketplace: 'ozon',
-            year:        2026,
-            month:       4,
+            year: 2026,
+            month: 4,
             actorUserId: '00000000-0000-0000-0000-000000000001',
         ));
     }

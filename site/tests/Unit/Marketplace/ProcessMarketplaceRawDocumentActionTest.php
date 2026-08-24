@@ -44,8 +44,8 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $this->createMock(RowClassifierRegistryInterface::class),
             $this->createMock(MarketplaceRawProcessorRegistryInterface::class),
             $repository,
-            $this->createMock(\App\Marketplace\Repository\MarketplaceSaleRepository::class),
-            $this->createMock(\App\Marketplace\Repository\MarketplaceReturnRepository::class),
+            $this->createMock(MarketplaceSaleRepository::class),
+            $this->createMock(MarketplaceReturnRepository::class),
             $this->createMock(MarketplaceCostRepository::class),
             $this->createMock(EntityManagerInterface::class),
             $this->createCostCategoryResolver(),
@@ -80,8 +80,8 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $classifierRegistry,
             $this->createMock(MarketplaceRawProcessorRegistryInterface::class),
             $repository,
-            $this->createMock(\App\Marketplace\Repository\MarketplaceSaleRepository::class),
-            $this->createMock(\App\Marketplace\Repository\MarketplaceReturnRepository::class),
+            $this->createMock(MarketplaceSaleRepository::class),
+            $this->createMock(MarketplaceReturnRepository::class),
             $this->createMock(MarketplaceCostRepository::class),
             $this->createMock(EntityManagerInterface::class),
             $this->createCostCategoryResolver(),
@@ -131,8 +131,8 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $this->createMock(RowClassifierRegistryInterface::class),
             $processorRegistry,
             $repository,
-            $this->createMock(\App\Marketplace\Repository\MarketplaceSaleRepository::class),
-            $this->createMock(\App\Marketplace\Repository\MarketplaceReturnRepository::class),
+            $this->createMock(MarketplaceSaleRepository::class),
+            $this->createMock(MarketplaceReturnRepository::class),
             $costRepository,
             $this->createMock(EntityManagerInterface::class),
             $this->createCostCategoryResolver(),
@@ -268,9 +268,9 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             ->method('warning')
             ->with(
                 'WB raw document partially reprocessed; linked rows preserved',
-                self::callback(static fn (array $context): bool => $context['preservedLinkedRows'] === 2
-                    && $context['processedRows'] === 7
-                    && $context['kind'] === 'costs'),
+                self::callback(static fn (array $context): bool => 2 === $context['preservedLinkedRows']
+                    && 7 === $context['processedRows']
+                    && 'costs' === $context['kind']),
             );
 
         $action = new ProcessMarketplaceRawDocumentAction(

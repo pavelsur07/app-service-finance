@@ -29,10 +29,10 @@ class MappingErrorRepository extends ServiceEntityRepository
         string $serviceName,
     ): ?MappingError {
         return $this->findOneBy([
-            'companyId'   => $companyId,
+            'companyId' => $companyId,
             'marketplace' => $marketplace,
-            'year'        => $year,
-            'month'       => $month,
+            'year' => $year,
+            'month' => $month,
             'serviceName' => $serviceName,
         ]);
     }

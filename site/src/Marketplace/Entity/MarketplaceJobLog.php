@@ -59,41 +59,72 @@ class MarketplaceJobLog
         Assert::uuid($id);
         Assert::uuid($companyId);
 
-        $this->id        = $id;
+        $this->id = $id;
         $this->companyId = $companyId;
-        $this->jobType   = $jobType;
-        $this->status    = JobStatus::RUNNING;
+        $this->jobType = $jobType;
+        $this->status = JobStatus::RUNNING;
         $this->startedAt = new \DateTimeImmutable();
     }
 
     public function complete(array $summary, array $details = []): void
     {
-        $this->status     = JobStatus::DONE;
+        $this->status = JobStatus::DONE;
         $this->finishedAt = new \DateTimeImmutable();
-        $this->summary    = $summary;
-        $this->details    = $details;
+        $this->summary = $summary;
+        $this->details = $details;
     }
 
     public function fail(string $errorMessage): void
     {
-        $this->status     = JobStatus::FAILED;
+        $this->status = JobStatus::FAILED;
         $this->finishedAt = new \DateTimeImmutable();
-        $this->summary    = ['error' => $errorMessage];
-        $this->details    = [];
+        $this->summary = ['error' => $errorMessage];
+        $this->details = [];
     }
 
-    public function getId(): string { return $this->id; }
-    public function getCompanyId(): string { return $this->companyId; }
-    public function getJobType(): JobType { return $this->jobType; }
-    public function getStatus(): JobStatus { return $this->status; }
-    public function getStartedAt(): \DateTimeImmutable { return $this->startedAt; }
-    public function getFinishedAt(): ?\DateTimeImmutable { return $this->finishedAt; }
-    public function getSummary(): ?array { return $this->summary; }
-    public function getDetails(): ?array { return $this->details; }
+    public function getId(): string
+    {
+        return $this->id;
+    }
+
+    public function getCompanyId(): string
+    {
+        return $this->companyId;
+    }
+
+    public function getJobType(): JobType
+    {
+        return $this->jobType;
+    }
+
+    public function getStatus(): JobStatus
+    {
+        return $this->status;
+    }
+
+    public function getStartedAt(): \DateTimeImmutable
+    {
+        return $this->startedAt;
+    }
+
+    public function getFinishedAt(): ?\DateTimeImmutable
+    {
+        return $this->finishedAt;
+    }
+
+    public function getSummary(): ?array
+    {
+        return $this->summary;
+    }
+
+    public function getDetails(): ?array
+    {
+        return $this->details;
+    }
 
     public function hasErrors(): bool
     {
-        if ($this->status === JobStatus::FAILED) {
+        if (JobStatus::FAILED === $this->status) {
             return true;
         }
 

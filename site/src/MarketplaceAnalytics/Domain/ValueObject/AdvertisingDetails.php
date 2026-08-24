@@ -9,7 +9,8 @@ final readonly class AdvertisingDetails
     public function __construct(
         public AdvertisingCpcMetrics $cpc,
         public AdvertisingOtherMetrics $other,
-    ) {}
+    ) {
+    }
 
     public function totalSpend(): string
     {

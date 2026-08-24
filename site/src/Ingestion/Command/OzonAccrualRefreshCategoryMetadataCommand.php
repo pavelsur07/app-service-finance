@@ -79,7 +79,7 @@ final class OzonAccrualRefreshCategoryMetadataCommand extends Command
 
         $resultRows = $this->refreshMetadata->refresh($companyId, $rawRecords, $dryRun);
         if ($jsonResult) {
-            $output->writeln(json_encode($resultRows, JSON_THROW_ON_ERROR));
+            $output->writeln(json_encode($resultRows, \JSON_THROW_ON_ERROR));
         } else {
             $this->printActionResult($io, $resultRows);
         }

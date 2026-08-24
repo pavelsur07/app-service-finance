@@ -16,17 +16,32 @@ final readonly class DefaultCostMappingPreviewResult
     ) {
     }
 
-    public function getMarketplace(): MarketplaceType { return $this->marketplace; }
+    public function getMarketplace(): MarketplaceType
+    {
+        return $this->marketplace;
+    }
+
     /** @return list<DefaultCostMappingPreviewItem> */
-    public function getItems(): array { return $this->items; }
+    public function getItems(): array
+    {
+        return $this->items;
+    }
+
     /** @return list<DefaultCostMappingPreviewItem> */
     public function getItemsByStatus(DefaultCostMappingPreviewStatus $status): array
     {
         return array_values(array_filter($this->items, static fn (DefaultCostMappingPreviewItem $item): bool => $item->getStatus() === $status));
     }
 
-    public function getTotal(): int { return count($this->items); }
-    public function getCountByStatus(DefaultCostMappingPreviewStatus $status): int { return count($this->getItemsByStatus($status)); }
+    public function getTotal(): int
+    {
+        return count($this->items);
+    }
+
+    public function getCountByStatus(DefaultCostMappingPreviewStatus $status): int
+    {
+        return count($this->getItemsByStatus($status));
+    }
 
     /** @return array<string, int> */
     public function getSummary(): array

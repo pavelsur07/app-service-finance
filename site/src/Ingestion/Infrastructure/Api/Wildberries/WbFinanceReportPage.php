@@ -8,7 +8,7 @@ final readonly class WbFinanceReportPage
 {
     /**
      * @param list<array<string, mixed>> $rows
-     * @param array<string, mixed>       $metadata
+     * @param array<string, mixed> $metadata
      */
     public function __construct(
         public array $rows,

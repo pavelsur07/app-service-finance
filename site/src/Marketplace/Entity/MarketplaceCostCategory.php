@@ -194,6 +194,6 @@ class MarketplaceCostCategory
 
     public function isDeleted(): bool
     {
-        return $this->deletedAt !== null;
+        return null !== $this->deletedAt;
     }
 }

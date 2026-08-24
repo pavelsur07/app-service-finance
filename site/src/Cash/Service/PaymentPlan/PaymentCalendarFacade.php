@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Cash\Service\PaymentPlan;
 
-use App\Cash\Entity\PaymentPlan\PaymentPlan;
-use App\Company\Entity\Company;
 use App\Cash\DTO\PaymentPlanDTO;
+use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Cash\Enum\PaymentPlan\PaymentPlanType as PaymentPlanTypeEnum;
+use App\Company\Entity\Company;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 

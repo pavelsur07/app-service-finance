@@ -27,7 +27,7 @@ final class BalanceController extends AbstractController
     {
         $companyId = $this->activeCompanyService->getActiveCompany()->getId();
         $dateParam = $request->query->getString('date');
-        $date = $dateParam !== '' ? new \DateTimeImmutable($dateParam) : new \DateTimeImmutable('today');
+        $date = '' !== $dateParam ? new \DateTimeImmutable($dateParam) : new \DateTimeImmutable('today');
 
         $report = $this->balanceFacade->getReportForCompany($companyId, $date);
 

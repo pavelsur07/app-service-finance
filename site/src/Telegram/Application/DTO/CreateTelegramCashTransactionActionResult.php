@@ -11,7 +11,8 @@ final readonly class CreateTelegramCashTransactionActionResult
         public string $amount,
         public string $directionLabel,
         public bool $skippedMissingMessageIdentity,
-    ) {}
+    ) {
+    }
 
     public static function created(bool $duplicate, string $amount, string $directionLabel): self
     {

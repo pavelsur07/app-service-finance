@@ -89,7 +89,7 @@ final readonly class OzonTransactionTotalsClient
         $result = $payload['result'] ?? null;
 
         if (!is_array($result)) {
-            $preview = mb_substr(json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: 'invalid_response', 0, 300);
+            $preview = mb_substr(json_encode($payload, \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES) ?: 'invalid_response', 0, 300);
             throw new \RuntimeException(sprintf('Некорректный ответ Ozon transaction totals: result отсутствует или не является массивом. preview=%s', $preview));
         }
 
@@ -133,10 +133,7 @@ final readonly class OzonTransactionTotalsClient
         if (is_string($value)) {
             $normalized = str_replace(',', '.', trim($value));
             if (!preg_match('/^-?\d+(?:\.\d+)?$/', $normalized)) {
-                throw new \RuntimeException(sprintf(
-                    'Некорректное числовое значение Ozon transaction totals в поле %s.',
-                    $field,
-                ));
+                throw new \RuntimeException(sprintf('Некорректное числовое значение Ozon transaction totals в поле %s.', $field));
             }
 
             $negative = str_starts_with($normalized, '-');
@@ -163,12 +160,9 @@ final readonly class OzonTransactionTotalsClient
 
             $result = sprintf('%d.%02d', $intValue, $hundredths);
 
-            return $negative && '0.00' !== $result ? '-' . $result : $result;
+            return $negative && '0.00' !== $result ? '-'.$result : $result;
         }
 
-        throw new \RuntimeException(sprintf(
-            'Некорректное числовое значение Ozon transaction totals в поле %s.',
-            $field,
-        ));
+        throw new \RuntimeException(sprintf('Некорректное числовое значение Ozon transaction totals в поле %s.', $field));
     }
 }

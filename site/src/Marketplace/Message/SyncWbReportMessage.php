@@ -13,5 +13,6 @@ final class SyncWbReportMessage
     public function __construct(
         public readonly string $companyId,       // ✅ scalar string (worker-safe)
         public readonly string $connectionId,    // ✅ scalar string (worker-safe)
-    ) {}
+    ) {
+    }
 }

@@ -52,9 +52,9 @@ final class SyncConnectionAction
                 return $this->planWbManualSync($command);
             }
 
-            $company  = $connection->getCompany();
-            $adapter  = $this->adapterRegistry->get($connection->getMarketplace());
-            $response     = $adapter->fetchRawReport($company, $command->fromDate, $command->toDate);
+            $company = $connection->getCompany();
+            $adapter = $this->adapterRegistry->get($connection->getMarketplace());
+            $response = $adapter->fetchRawReport($company, $command->fromDate, $command->toDate);
             $recordsCount = count($response);
 
             $rawDoc = new MarketplaceRawDocument(

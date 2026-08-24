@@ -90,10 +90,7 @@ final readonly class AdBatchPlanner
         $campaigns = $this->ozonClient->listAllSkuCampaigns($companyId);
 
         if ([] === $campaigns) {
-            throw new \RuntimeException(sprintf(
-                'No SKU campaigns found for company %s',
-                $companyId,
-            ));
+            throw new \RuntimeException(sprintf('No SKU campaigns found for company %s', $companyId));
         }
 
         /** @var list<string> $campaignIds */

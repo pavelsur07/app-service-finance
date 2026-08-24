@@ -136,7 +136,7 @@ final class OzonDailySyncCommandTest extends TestCase
     private static function assertDatesCoverRollingD1ToD14(array $messages, \DateTimeImmutable $referenceToday): void
     {
         $expectedDates = [];
-        for ($offset = 1; $offset <= 14; $offset++) {
+        for ($offset = 1; $offset <= 14; ++$offset) {
             $expectedDates[] = $referenceToday->modify(sprintf('-%d day', $offset))->format('Y-m-d');
         }
 

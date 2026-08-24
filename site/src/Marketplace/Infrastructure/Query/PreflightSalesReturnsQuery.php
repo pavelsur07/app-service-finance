@@ -40,10 +40,10 @@ final class PreflightSalesReturnsQuery
                AND sale_date >= :periodFrom
                AND sale_date <= :periodTo',
             [
-                'companyId'   => $companyId,
+                'companyId' => $companyId,
                 'marketplace' => $marketplace,
-                'periodFrom'  => $periodFrom,
-                'periodTo'    => $periodTo,
+                'periodFrom' => $periodFrom,
+                'periodTo' => $periodTo,
             ],
         ) ?: ['total' => 0, 'without_cost' => 0, 'already_processed' => 0];
     }
@@ -65,10 +65,10 @@ final class PreflightSalesReturnsQuery
                AND return_date >= :periodFrom
                AND return_date <= :periodTo',
             [
-                'companyId'   => $companyId,
+                'companyId' => $companyId,
                 'marketplace' => $marketplace,
-                'periodFrom'  => $periodFrom,
-                'periodTo'    => $periodTo,
+                'periodFrom' => $periodFrom,
+                'periodTo' => $periodTo,
             ],
         ) ?: ['total' => 0, 'without_cost' => 0, 'already_processed' => 0];
     }
@@ -83,10 +83,10 @@ final class PreflightSalesReturnsQuery
         string $periodTo,
     ): array {
         $params = [
-            'companyId'   => $companyId,
+            'companyId' => $companyId,
             'marketplace' => $marketplace,
-            'periodFrom'  => $periodFrom,
-            'periodTo'    => $periodTo,
+            'periodFrom' => $periodFrom,
+            'periodTo' => $periodTo,
         ];
 
         $rows = $this->connection->fetchAllAssociative(
@@ -141,10 +141,10 @@ final class PreflightSalesReturnsQuery
         string $periodTo,
     ): array {
         $params = [
-            'companyId'   => $companyId,
+            'companyId' => $companyId,
             'marketplace' => $marketplace,
-            'periodFrom'  => $periodFrom,
-            'periodTo'    => $periodTo,
+            'periodFrom' => $periodFrom,
+            'periodTo' => $periodTo,
         ];
 
         $rows = $this->connection->fetchAllAssociative(
@@ -199,7 +199,7 @@ final class PreflightSalesReturnsQuery
         int $month,
     ): bool {
         $periodFrom = sprintf('%d-%02d-01', $year, $month);
-        $periodTo   = (new \DateTimeImmutable($periodFrom))->modify('last day of this month')->format('Y-m-d');
+        $periodTo = (new \DateTimeImmutable($periodFrom))->modify('last day of this month')->format('Y-m-d');
 
         $result = $this->connection->fetchOne(
             'SELECT COUNT(*)
@@ -208,9 +208,9 @@ final class PreflightSalesReturnsQuery
                AND period_from >= :periodFrom
                AND period_to <= :periodTo',
             [
-                'companyId'  => $companyId,
+                'companyId' => $companyId,
                 'periodFrom' => $periodFrom,
-                'periodTo'   => $periodTo,
+                'periodTo' => $periodTo,
             ],
         );
 

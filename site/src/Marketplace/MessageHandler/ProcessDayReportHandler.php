@@ -38,21 +38,17 @@ final class ProcessDayReportHandler
     {
         $doc = $this->repository->find($message->rawDocumentId);
 
-        if ($doc === null) {
-            throw new UnrecoverableMessageHandlingException(
-                sprintf('MarketplaceRawDocument not found: %s', $message->rawDocumentId),
-            );
+        if (null === $doc) {
+            throw new UnrecoverableMessageHandlingException(sprintf('MarketplaceRawDocument not found: %s', $message->rawDocumentId));
         }
 
         if ((string) $doc->getCompany()->getId() !== $message->companyId) {
-            throw new UnrecoverableMessageHandlingException(
-                sprintf('IDOR: document %s does not belong to company %s', $message->rawDocumentId, $message->companyId),
-            );
+            throw new UnrecoverableMessageHandlingException(sprintf('IDOR: document %s does not belong to company %s', $message->rawDocumentId, $message->companyId));
         }
 
         if ($message->forceRefresh
-            && $doc->getMarketplace() === MarketplaceType::WILDBERRIES
-            && $doc->getDocumentType() === 'sales_report'
+            && MarketplaceType::WILDBERRIES === $doc->getMarketplace()
+            && 'sales_report' === $doc->getDocumentType()
         ) {
             // Удаляет только generated rows без связанного документа; строки
             // закрытого документа сохраняются, шаги пересоздают остальное.
@@ -78,9 +74,9 @@ final class ProcessDayReportHandler
         }
 
         $this->logger->info('Auto-dispatched pipeline for raw document', [
-            'company_id'      => $message->companyId,
+            'company_id' => $message->companyId,
             'raw_document_id' => $message->rawDocumentId,
-            'marketplace'     => $doc->getMarketplace()->value,
+            'marketplace' => $doc->getMarketplace()->value,
         ]);
     }
 }

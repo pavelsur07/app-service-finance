@@ -19,9 +19,9 @@ namespace App\Marketplace\Inventory;
 interface CostPriceResolverInterface
 {
     /**
-     * @param string             $companyId UUID компании
-     * @param string             $listingId UUID листинга (MarketplaceListing)
-     * @param \DateTimeImmutable $date      дата на которую нужна себестоимость
+     * @param string $companyId UUID компании
+     * @param string $listingId UUID листинга (MarketplaceListing)
+     * @param \DateTimeImmutable $date дата на которую нужна себестоимость
      *
      * @return string decimal ('850.00'), при отсутствии '0.00'
      */

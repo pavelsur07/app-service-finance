@@ -15,7 +15,8 @@ final readonly class UnitEconomicsAggregationPolicy
 {
     public function __construct(
         private ListingDailySnapshotRepositoryInterface $snapshotRepository,
-    ) {}
+    ) {
+    }
 
     /**
      * @return ListingUnitEconomics[]
@@ -46,8 +47,7 @@ final readonly class UnitEconomicsAggregationPolicy
             $result[] = $this->aggregateGroup($listingId, $listingSnapshots, $period);
         }
 
-        usort($result, static fn(ListingUnitEconomics $a, ListingUnitEconomics $b) =>
-            (int) $b->hasCostPrice() <=> (int) $a->hasCostPrice(),
+        usort($result, static fn (ListingUnitEconomics $a, ListingUnitEconomics $b) => (int) $b->hasCostPrice() <=> (int) $a->hasCostPrice(),
         );
 
         return $result;
@@ -108,7 +108,7 @@ final readonly class UnitEconomicsAggregationPolicy
             $commission = bcadd($commission, $cb->commission, 2);
             $otherCosts = bcadd($otherCosts, $cb->other, 2);
 
-            if ($snapshot->getCostPrice() === null) {
+            if (null === $snapshot->getCostPrice()) {
                 $hasCostPrice = false;
             } else {
                 $totalCostPrice = bcadd($totalCostPrice, $snapshot->getTotalCostPrice() ?? '0.00', 2);
@@ -141,7 +141,7 @@ final readonly class UnitEconomicsAggregationPolicy
             $snapshotFlags = DataQualityFlags::fromArray($snapshot->getDataQuality());
             $dataQuality = array_reduce(
                 $snapshotFlags->flags,
-                static fn(DataQualityFlags $carry, $flag) => $carry->addFlag($flag),
+                static fn (DataQualityFlags $carry, $flag) => $carry->addFlag($flag),
                 $dataQuality,
             );
         }
@@ -181,7 +181,7 @@ final readonly class UnitEconomicsAggregationPolicy
         $ros = null;
         $purchaseRate = null;
 
-        if ($aggCostPrice !== null) {
+        if (null !== $aggCostPrice) {
             if ($salesQuantity > 0) {
                 $profitPerUnit = bcsub(
                     bcsub($avgSalePrice, $aggCostPrice, 2),

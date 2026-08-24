@@ -21,34 +21,34 @@ final class ProductPurchasePriceType extends AbstractType
     {
         $builder
             ->add('effectiveFrom', DateType::class, [
-                'label'       => 'Действует с',
-                'widget'      => 'single_text',
-                'help'        => 'Дата начала действия закупочной цены.',
+                'label' => 'Действует с',
+                'widget' => 'single_text',
+                'help' => 'Дата начала действия закупочной цены.',
                 'constraints' => [new NotNull(message: 'Укажите дату начала действия.')],
             ])
             ->add('priceAmount', MoneyType::class, [
-                'label'       => 'Закупочная цена',
-                'currency'    => false,
-                'divisor'     => 1,
-                'help'        => 'Укажите сумму в рублях, например: 199.99',
+                'label' => 'Закупочная цена',
+                'currency' => false,
+                'divisor' => 1,
+                'help' => 'Укажите сумму в рублях, например: 199.99',
                 'constraints' => [
                     new NotNull(message: 'Укажите закупочную цену.'),
                     new GreaterThanOrEqual(0, message: 'Цена не может быть отрицательной.'),
                 ],
             ])
             ->add('currency', ChoiceType::class, [
-                'label'       => 'Валюта',
-                'choices'     => [
+                'label' => 'Валюта',
+                'choices' => [
                     'RUB' => 'RUB',
                     'USD' => 'USD',
                     'EUR' => 'EUR',
                 ],
-                'data'        => 'RUB',
+                'data' => 'RUB',
                 'constraints' => [new Choice(['RUB', 'USD', 'EUR'])],
             ])
             ->add('note', TextType::class, [
-                'label'    => 'Комментарий',
-                'help'     => 'Необязательное пояснение к изменению цены.',
+                'label' => 'Комментарий',
+                'help' => 'Необязательное пояснение к изменению цены.',
                 'required' => false,
             ]);
     }
@@ -56,7 +56,7 @@ final class ProductPurchasePriceType extends AbstractType
     public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
-            'data_class'     => null,
+            'data_class' => null,
             'csrf_protection' => true,
         ]);
     }

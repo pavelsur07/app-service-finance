@@ -182,8 +182,7 @@ final class WbFinanceReportClientTest extends TestCase
         MockHttpClient $http,
         ?WbFinanceCooldownStorageInterface $cooldownStorage = null,
         ?MockClock $clock = null,
-    ): WbFinanceReportClient
-    {
+    ): WbFinanceReportClient {
         $clock ??= new MockClock('2026-06-22T00:00:00+00:00');
 
         return new WbFinanceReportClient(

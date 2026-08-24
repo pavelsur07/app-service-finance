@@ -31,8 +31,7 @@ final class ProductShowController extends AbstractController
         ActiveCompanyService $activeCompanyService,
         ProductQuery $productQuery,
         ProductPurchasePriceQuery $purchasePriceQuery,
-    ): Response
-    {
+    ): Response {
         Assert::uuid($id);
 
         // Компания для read-запросов определяется только на уровне контроллера.
@@ -63,13 +62,13 @@ final class ProductShowController extends AbstractController
         ]);
 
         return $this->render('catalog/product/show.html.twig', [
-            'product'              => $product,
-            'todayPurchasePrice'   => $todayPurchasePrice,
-            'priceAtDate'          => $priceAtDate,
+            'product' => $product,
+            'todayPurchasePrice' => $todayPurchasePrice,
+            'priceAtDate' => $priceAtDate,
             'priceAtPurchasePrice' => $priceAtPurchasePrice,
-            'purchasePriceForm'    => $purchasePriceForm->createView(),
-            'priceHistory'         => $purchasePriceQuery->fetchHistory($companyId, $id),
-            'canEditProduct'       => null !== $this->router->getRouteCollection()->get('catalog_products_edit'),
+            'purchasePriceForm' => $purchasePriceForm->createView(),
+            'priceHistory' => $purchasePriceQuery->fetchHistory($companyId, $id),
+            'canEditProduct' => null !== $this->router->getRouteCollection()->get('catalog_products_edit'),
         ]);
     }
 }

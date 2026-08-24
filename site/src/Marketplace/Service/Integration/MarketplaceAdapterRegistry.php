@@ -26,11 +26,7 @@ class MarketplaceAdapterRegistry
         $key = $marketplace->value;
 
         if (!isset($this->adapters[$key])) {
-            throw new \RuntimeException(sprintf(
-                'Адаптер для маркетплейса "%s" не зарегистрирован. Доступные: %s',
-                $marketplace->getDisplayName(),
-                implode(', ', array_keys($this->adapters))
-            ));
+            throw new \RuntimeException(sprintf('Адаптер для маркетплейса "%s" не зарегистрирован. Доступные: %s', $marketplace->getDisplayName(), implode(', ', array_keys($this->adapters))));
         }
 
         return $this->adapters[$key];
@@ -47,7 +43,7 @@ class MarketplaceAdapterRegistry
     public function getAvailableMarketplaces(): array
     {
         return array_map(
-            fn(string $value) => MarketplaceType::from($value),
+            fn (string $value) => MarketplaceType::from($value),
             array_keys($this->adapters)
         );
     }

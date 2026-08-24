@@ -12,12 +12,13 @@ final readonly class WbCostExternalIdBuilder
     public function __construct(
         private WbSalesReportRowNormalizer $normalizer,
         private LoggerInterface $logger,
-    ) {}
+    ) {
+    }
 
     public function build(array $item, string $categoryCode): ?string
     {
         $rrdId = $this->normalizer->rrdId($item);
-        if ($rrdId === null) {
+        if (null === $rrdId) {
             $this->logger->warning('WB cost row skipped: missing rrdId/rrd_id for external_id generation.', [
                 'category_code' => $categoryCode,
             ]);

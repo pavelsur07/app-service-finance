@@ -17,7 +17,7 @@ final class MarketplaceRawProcessorRegistryTest extends TestCase
         $target = new class implements MarketplaceRawProcessorInterface {
             public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = ''): bool
             {
-                return $type === 'ozon' && $kind === 'sales';
+                return 'ozon' === $type && 'sales' === $kind;
             }
 
             public function process(string $companyId, string $rawDocId): int
@@ -25,7 +25,9 @@ final class MarketplaceRawProcessorRegistryTest extends TestCase
                 return 5;
             }
 
-            public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows, ?string $rawDocId = null): void {}
+            public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows, ?string $rawDocId = null): void
+            {
+            }
         };
 
         $registry = new MarketplaceRawProcessorRegistry([
@@ -40,7 +42,9 @@ final class MarketplaceRawProcessorRegistryTest extends TestCase
                     return 0;
                 }
 
-                public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows, ?string $rawDocId = null): void {}
+                public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows, ?string $rawDocId = null): void
+                {
+                }
             },
             $target,
         ]);

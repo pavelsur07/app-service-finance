@@ -40,8 +40,8 @@ final readonly class ApplyDefaultCostMappingAction
                 $status = $item->getStatus();
                 $costCode = $item->getCostCode();
 
-                if ($status === DefaultCostMappingPreviewStatus::WILL_CREATE) {
-                    if ($item->getCostCategoryId() !== null && $item->getPlCategoryId() !== null) {
+                if (DefaultCostMappingPreviewStatus::WILL_CREATE === $status) {
+                    if (null !== $item->getCostCategoryId() && null !== $item->getPlCategoryId()) {
                         $affected = $this->writer->createMapping($command->companyId, $item->getCostCategoryId(), $item->getPlCategoryId(), $item->isIncludeInPl(), $item->isNegative());
                         if ($affected > 0) {
                             $created[] = $costCode;
@@ -53,8 +53,8 @@ final readonly class ApplyDefaultCostMappingAction
                     continue;
                 }
 
-                if ($status === DefaultCostMappingPreviewStatus::WILL_FILL_EMPTY) {
-                    if ($item->getExistingMappingId() !== null && $item->getPlCategoryId() !== null) {
+                if (DefaultCostMappingPreviewStatus::WILL_FILL_EMPTY === $status) {
+                    if (null !== $item->getExistingMappingId() && null !== $item->getPlCategoryId()) {
                         $affected = $this->writer->fillEmptyMapping($command->companyId, $item->getExistingMappingId(), $item->getPlCategoryId(), $item->isIncludeInPl(), $item->isNegative());
                         if ($affected > 0) {
                             $updated[] = $costCode;

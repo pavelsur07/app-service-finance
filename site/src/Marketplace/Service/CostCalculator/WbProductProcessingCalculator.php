@@ -10,7 +10,7 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
 /**
- * Калькулятор для затрат "Обработка товара"
+ * Калькулятор для затрат "Обработка товара".
  */
 class WbProductProcessingCalculator implements CostCalculatorInterface
 {
@@ -25,7 +25,7 @@ class WbProductProcessingCalculator implements CostCalculatorInterface
 
     public function supports(array $item): bool
     {
-        return $this->normalizer->sellerOperName($item) === 'Обработка товара';
+        return 'Обработка товара' === $this->normalizer->sellerOperName($item);
     }
 
     public function requiresListing(): bool
@@ -44,7 +44,7 @@ class WbProductProcessingCalculator implements CostCalculatorInterface
         }
 
         $externalId = $this->externalIdBuilder->build($item, 'product_processing');
-        if ($externalId === null) {
+        if (null === $externalId) {
             return [];
         }
 
@@ -56,7 +56,7 @@ class WbProductProcessingCalculator implements CostCalculatorInterface
         $product = null;
 
         // Если есть И nm_id И ts_name - привязываем к товару
-        if ($nmId !== '' && $tsName !== '' && $listing) {
+        if ('' !== $nmId && '' !== $tsName && $listing) {
             $product = $listing->getProduct();
         }
 
@@ -64,7 +64,7 @@ class WbProductProcessingCalculator implements CostCalculatorInterface
             [
                 'category_code' => 'product_processing',
                 'category_name' => 'Обработка товара',
-                'amount' => (string)abs($amount),
+                'amount' => (string) abs($amount),
                 'external_id' => $externalId,
                 'cost_date' => $saleDate,
                 'description' => 'Обработка товара',

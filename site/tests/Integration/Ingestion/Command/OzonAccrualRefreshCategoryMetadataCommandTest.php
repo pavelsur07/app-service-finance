@@ -165,7 +165,7 @@ final class OzonAccrualRefreshCategoryMetadataCommandTest extends IntegrationTes
         ]);
 
         self::assertSame(Command::SUCCESS, $exit, $tester->getDisplay());
-        $resultRows = json_decode(trim($tester->getDisplay()), true, flags: JSON_THROW_ON_ERROR);
+        $resultRows = json_decode(trim($tester->getDisplay()), true, flags: \JSON_THROW_ON_ERROR);
         self::assertSame('done', $resultRows[0]['status']);
         self::assertSame(1, $resultRows[0]['updated']);
         self::assertStringNotContainsString('Ozon accrual category metadata refresh', $tester->getDisplay());

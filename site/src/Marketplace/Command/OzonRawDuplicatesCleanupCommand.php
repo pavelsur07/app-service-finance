@@ -50,7 +50,7 @@ final class OzonRawDuplicatesCleanupCommand extends Command
         $apply = (bool) $input->getOption('apply');
         $dispatchReprocess = (bool) $input->getOption('dispatch-reprocess');
 
-        if ($companyId === '' || $fromOption === '' || $toOption === '') {
+        if ('' === $companyId || '' === $fromOption || '' === $toOption) {
             $io->error('Опции --company-id, --from и --to обязательны.');
 
             return Command::FAILURE;
@@ -67,7 +67,7 @@ final class OzonRawDuplicatesCleanupCommand extends Command
         $from = $this->parseStrictDate($fromOption);
         $to = $this->parseStrictDate($toOption);
 
-        if ($from === null || $to === null) {
+        if (null === $from || null === $to) {
             $io->error('Неверный формат дат. Используйте YYYY-MM-DD.');
 
             return Command::FAILURE;
@@ -94,11 +94,11 @@ final class OzonRawDuplicatesCleanupCommand extends Command
             $io->section($dayPlan->day->format('Y-m-d'));
             $io->listing([
                 sprintf('canonicalRawDocumentId: %s', $dayPlan->canonicalRawDocumentId),
-                sprintf('duplicateRawDocumentIds: %s', $dayPlan->duplicateRawDocumentIds === [] ? '-' : implode(', ', $dayPlan->duplicateRawDocumentIds)),
+                sprintf('duplicateRawDocumentIds: %s', [] === $dayPlan->duplicateRawDocumentIds ? '-' : implode(', ', $dayPlan->duplicateRawDocumentIds)),
                 sprintf('stale open rows (sales/returns/costs): %d / %d / %d', $dayPlan->staleSalesRowsCount, $dayPlan->staleReturnsRowsCount, $dayPlan->staleCostsRowsCount),
                 sprintf('closed rows (sales/returns/costs): %d / %d / %d', $dayPlan->closedSalesRowsCount, $dayPlan->closedReturnsRowsCount, $dayPlan->closedCostsRowsCount),
                 sprintf('canAutoCleanup: %s', $dayPlan->canAutoCleanup ? 'true' : 'false'),
-                sprintf('safe_to_delete_raw_docs (info only): %s', $dayPlan->safeToDeleteRawDocumentIds === [] ? '-' : implode(', ', $dayPlan->safeToDeleteRawDocumentIds)),
+                sprintf('safe_to_delete_raw_docs (info only): %s', [] === $dayPlan->safeToDeleteRawDocumentIds ? '-' : implode(', ', $dayPlan->safeToDeleteRawDocumentIds)),
             ]);
 
             foreach ($dayPlan->warnings as $warning) {
@@ -134,10 +134,10 @@ final class OzonRawDuplicatesCleanupCommand extends Command
             sprintf('deleted rows (sales/returns/costs): %d / %d / %d', $result->deletedSalesRows, $result->deletedReturnsRows, $result->deletedCostsRows),
             sprintf('cleaned days: %d', $result->cleanedDaysCount),
             sprintf('reprocess messages dispatched: %d', $dispatchReprocess ? count($result->cleanedCanonicalRawDocumentIds) : 0),
-            sprintf('canonical raw docs: %s', $result->cleanedCanonicalRawDocumentIds === [] ? '-' : implode(', ', $result->cleanedCanonicalRawDocumentIds)),
+            sprintf('canonical raw docs: %s', [] === $result->cleanedCanonicalRawDocumentIds ? '-' : implode(', ', $result->cleanedCanonicalRawDocumentIds)),
         ]);
 
-        if (!$dispatchReprocess && $result->cleanedCanonicalRawDocumentIds !== []) {
+        if (!$dispatchReprocess && [] !== $result->cleanedCanonicalRawDocumentIds) {
             $io->note('Для ручного reprocess используйте canonical raw docs из списка выше.');
         }
 
@@ -148,7 +148,7 @@ final class OzonRawDuplicatesCleanupCommand extends Command
     {
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
 
-        if ($date === false || $date->format('Y-m-d') !== $value) {
+        if (false === $date || $date->format('Y-m-d') !== $value) {
             return null;
         }
 

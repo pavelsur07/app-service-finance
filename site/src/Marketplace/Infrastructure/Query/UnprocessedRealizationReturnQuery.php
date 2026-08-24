@@ -70,9 +70,9 @@ final class UnprocessedRealizationReturnQuery
         SQL;
 
         return $this->connection->fetchAllAssociative($sql, [
-            'companyId'  => $companyId,
+            'companyId' => $companyId,
             'periodFrom' => $periodFrom,
-            'periodTo'   => $periodTo,
+            'periodTo' => $periodTo,
         ]);
     }
 }

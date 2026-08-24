@@ -45,7 +45,7 @@ final class WbFinanceProbeCommand extends Command
             $companyId = $this->requiredUuidOption($input, 'company-id');
             $connectionRef = $this->requiredUuidOption($input, 'connection-ref');
             $date = $this->requiredDateOption($input, 'date');
-            $rrdId = $this->intOption($input, 'rrd-id', 0, PHP_INT_MAX);
+            $rrdId = $this->intOption($input, 'rrd-id', 0, \PHP_INT_MAX);
             $limit = $this->intOption($input, 'limit', 1, 100000);
             $sampleLimit = $this->intOption($input, 'sample-limit', 1, 20);
 

@@ -27,5 +27,6 @@ final class CreateMarketplaceAnalyticsRequest
         public readonly string $title,
 
         // public readonly ?string $description = null,
-    ) {}
+    ) {
+    }
 }

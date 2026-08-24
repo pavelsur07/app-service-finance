@@ -36,7 +36,7 @@ class MarketplaceCostPLMappingRepository extends ServiceEntityRepository
         string $costCategoryId,
     ): ?MarketplaceCostPLMapping {
         return $this->findOneBy([
-            'companyId'    => $companyId,
+            'companyId' => $companyId,
             'costCategory' => $costCategoryId,
         ]);
     }

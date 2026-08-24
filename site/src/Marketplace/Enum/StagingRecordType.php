@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Marketplace\Enum;
 
 /**
- * StagingRecordType - типы записей из маркетплейсов
+ * StagingRecordType - типы записей из маркетплейсов.
  */
 enum StagingRecordType: string
 {
     /**
-     * Продажа
+     * Продажа.
      */
     case SALE = 'sale';
 
@@ -20,22 +20,22 @@ enum StagingRecordType: string
     case RETURN = 'return';
 
     /**
-     * Расход/комиссия
+     * Расход/комиссия.
      */
     case COST = 'cost';
 
     /**
-     * Сторно (отмена операции)
+     * Сторно (отмена операции).
      */
     case STORNO = 'storno';
 
     /**
-     * Прочие/неопознанные операции
+     * Прочие/неопознанные операции.
      */
     case OTHER = 'other';
 
     /**
-     * Получить человекочитаемое название
+     * Получить человекочитаемое название.
      */
     public function getLabel(): string
     {
@@ -49,7 +49,7 @@ enum StagingRecordType: string
     }
 
     /**
-     * Получить иконку для UI
+     * Получить иконку для UI.
      */
     public function getIcon(): string
     {
@@ -63,7 +63,7 @@ enum StagingRecordType: string
     }
 
     /**
-     * Получить CSS класс для badge
+     * Получить CSS класс для badge.
      */
     public function getBadgeClass(): string
     {
@@ -77,7 +77,7 @@ enum StagingRecordType: string
     }
 
     /**
-     * Получить название класса финальной сущности
+     * Получить название класса финальной сущности.
      */
     public function getFinalEntityClass(): string
     {
@@ -91,15 +91,15 @@ enum StagingRecordType: string
     }
 
     /**
-     * Является ли тип положительным для выручки
+     * Является ли тип положительным для выручки.
      */
     public function isPositive(): bool
     {
-        return $this === self::SALE;
+        return self::SALE === $this;
     }
 
     /**
-     * Является ли тип отрицательным для выручки
+     * Является ли тип отрицательным для выручки.
      */
     public function isNegative(): bool
     {
