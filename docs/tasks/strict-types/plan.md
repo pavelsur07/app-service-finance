@@ -49,17 +49,36 @@ X извне не влияет — там режим задаёт файл-вы�
 
 ## Процедура на каждом батче
 
+Фиксер прогоняется **по списку конкретных файлов**, не по каталогу модуля, и
+только с двумя правилами:
+
 ```bash
-docker compose run --rm site-php-cli vendor/bin/php-cs-fixer fix src/<Module> \
-  --rules=declare_strict_types --allow-risky=yes --using-cache=no
-docker compose run --rm site-php-cli vendor/bin/php-cs-fixer fix src/<Module> \
-  --using-cache=no
-make site-test
+F=$(tr '\n' ' ' < files.txt)
+docker compose run --rm site-php-cli sh -c \
+  "for f in $F; do vendor/bin/php-cs-fixer fix \"\$f\" \
+     --rules=declare_strict_types,blank_line_after_opening_tag \
+     --allow-risky=yes --using-cache=no -q || echo \"FAIL \$f\"; done"
 ```
 
-Первая команда добавляет только `declare`, вторая нормализует форматирование по
-`@Symfony`. Конфиг до Stage 6 не трогаем: выключенное правило существующие
-объявления не снимает, только не добавляет новые.
+Три вещи выяснены на практике в Stage 2, все три ломали процедуру:
+
+1. **Нормализующий проход по каталогу модуля недопустим.** В Stage 1 все файлы
+   каталога были в scope, и проход был безвреден. Начиная со Stage 2 модули
+   почти конформны (`Marketplace` — 32 файла из 420), и проход правит чужой код:
+   точки в phpdoc, trailing commas, пустые строки между методами интерфейса.
+2. **`--config` и `--rules` вместе php-cs-fixer не принимает**, а при нескольких
+   путях требует `--config`. Отсюда цикл по одному файлу: для одиночного пути
+   конфиг не нужен.
+3. **Одного правила `declare_strict_types` мало** — оно даёт компактную форму
+   `<?php declare(strict_types=1);`. Каноническая форма в две строки получается
+   только вместе с `blank_line_after_opening_tag`.
+
+Конфиг до Stage 6 не трогаем: выключенное правило существующие объявления не
+снимает, только не добавляет новые.
+
+Проверка после каждого Work item — `make site-test-unit` (6 с). Проверка Stage —
+полный `make site-test` (~6 мин, пик 343 МБ) **фоном**: он укладывается в память
+без запаса, но не в лимит одного вызова.
 
 ## Stage 1: тривиальные файлы без бизнес-логики
 Risk: HIGH-LOCAL

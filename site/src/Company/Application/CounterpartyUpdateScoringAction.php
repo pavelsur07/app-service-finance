@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Company\Application;
 
 use App\Company\Application\Command\CounterpartyUpdateScoringCommand;

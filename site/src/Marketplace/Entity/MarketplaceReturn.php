@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Marketplace\Entity;
 
 use App\Company\Entity\Company;
