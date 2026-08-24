@@ -14,7 +14,7 @@
             </div>
         </div>
 
-        <div class="card">
+        <div class="card mb-3">
             <div class="card-body">
                 <form method="POST" action="{{ path('marketplace_connection_edit', {id: connection.id}) }}">
                     <input type="hidden" name="_token" value="{{ csrf_token('marketplace_connection_edit' ~ connection.id) }}">
@@ -43,5 +43,43 @@
                 </form>
             </div>
         </div>
+
+        {% if can_update_api_key %}
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Обновление API-ключа</h3>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ path('marketplace_connection_api_key_update', {id: connection.id}) }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token('marketplace_connection_api_key_update' ~ connection.id) }}">
+
+                        {% if connection.marketplace.value == 'ozon' %}
+                            <div class="mb-3">
+                                <label class="form-label">Client-Id магазина</label>
+                                <input type="text" class="form-control" value="{{ connection.clientId }}" readonly>
+                                <small class="text-muted">Client-Id и идентификатор подключения не изменятся.</small>
+                            </div>
+                        {% endif %}
+
+                        <div class="mb-3">
+                            <label class="form-label required" for="marketplace-api-key">Новый API-ключ</label>
+                            <input type="password"
+                                   name="api_key"
+                                   id="marketplace-api-key"
+                                   class="form-control"
+                                   autocomplete="new-password"
+                                   required>
+                            <small class="text-muted">
+                                Ключ будет сохранён только после успешной проверки. Текущий ключ не отображается.
+                            </small>
+                        </div>
+
+                        <div class="form-footer">
+                            <button type="submit" class="btn btn-primary">Проверить и обновить</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
     </div>
 {% endblock %}

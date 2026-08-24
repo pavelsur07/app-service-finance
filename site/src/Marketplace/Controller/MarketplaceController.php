@@ -968,6 +968,8 @@ class MarketplaceController extends AbstractController
         return $this->render('marketplace/connection/edit.html.twig', [
             'connection' => $connection,
             'project_directions' => $projectDirections,
+            'can_update_api_key' => MarketplaceConnectionType::SELLER === $connection->getConnectionType()
+                && in_array($connection->getMarketplace(), [MarketplaceType::OZON, MarketplaceType::WILDBERRIES], true),
         ]);
     }
 }
