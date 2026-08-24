@@ -1,0 +1,12 @@
+# Коммиты, которые меняли только форматирование. git blame их пропускает.
+#
+# Использование:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# GitHub подхватывает файл автоматически.
+#
+# Сюда попадают ТОЛЬКО чисто форматирующие правки. Коммит с рискованными
+# правилами php-cs-fixer сюда не входит: он менял сигнатуру метода, оператор
+# и флаги fopen — такие изменения в blame должны быть видны.
+
+# style: apply non-risky @Symfony formatting rules to 462 files
+42172b1ac88776645c91fb919fc2c8cffa14d171
