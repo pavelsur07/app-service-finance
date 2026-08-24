@@ -1,10 +1,10 @@
 ## Current checkpoint
 
-**Phase:** Stage 4 — DONE
+**Phase:** Stage 5 — DONE
 **Status:** done
-**Stage base commit:** 574b07d4 (база Stage 4)
+**Stage base commit:** c2f6e931 (база Stage 5)
 **Current Work item:** none
-**Owner gate:** Stage 5 объявлен owner_gate: yes
+**Owner gate:** получен для Stage 5; Stage 6 объявлен owner_gate: yes
 
 ### Completed
 - Phase 0 — план в `docs/tasks/strict-types/plan.md`
@@ -12,6 +12,7 @@
 - Stage 2 — 70 файлов (`Marketplace` 32, `Company` 25, `Finance` 10, `Catalog` 2, `MarketplaceAnalytics` 1). Долг 296 → 226.
 - Stage 3 — 98 файлов, весь модуль `Cash`. Долг 226 → 128.
 - Stage 4 — 37 файлов (`Shared` 9 отдельно + `Telegram` 9, `Billing` 5, `Balance` 4, `Admin` 4, `Report` 3, `Twig` 3). Долг 128 → 91.
+- Stage 5 — 63 файла (`Deals` 31, `Analytics` 24, `Notification` 8). Долг 91 → 28. **src/ закрыт полностью.**
 
 ### Current diff / affected files
 - 13 файлов в `site/src/`, +29 −3
@@ -28,7 +29,8 @@
 - уроки, накопленные за Stage 2-4: ревьюеру сразу давать тела файлов с логикой; сверять реально вложенные файлы с заявленным в промпте; явно запрещать шелл, иначе падает песочница
 
 ### Exact next action
-- **Stage 5 — owner_gate: yes, требуется решение Владельца.** `Deals` (31), `Analytics` (24), `Notification` (8).
+- Stage 6: 28 файлов в `tests/`, затем флип `'declare_strict_types' => true` в `site/.php-cs-fixer.php` и снятие из `CLAUDE.md` заметки «make site-cs-check этого не проверяет».
+- После флипа `make site-cs-check` должен стать зелёным по этому правилу — это и есть Definition of Done всей задачи.
   Тестов почти нет: `Deals` 3 на 42 файла, `Analytics` 10 на 26, `Notification` 0 на 8.
   По плану сначала регрессионные тесты на денежные и парсящие пути, потом declare.
 - Остаток долга: 91 = 63 в этих трёх модулях + 28 в `tests/` (Stage 6).

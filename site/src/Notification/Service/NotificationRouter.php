@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Notification\Service;
 
 use App\Notification\Contract\NotificationSenderInterface;

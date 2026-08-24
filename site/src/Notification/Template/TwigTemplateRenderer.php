@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // src/Notification/Template/TwigTemplateRenderer.php
 
 namespace App\Notification\Template;

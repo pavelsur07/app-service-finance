@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Analytics\Application\Widget;
 
 use App\Analytics\Api\Response\FreeCashWidgetResponse;
