@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Admin\Controller\Billing;
 
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
