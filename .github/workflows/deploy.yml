@@ -132,6 +132,13 @@ jobs:
             - name: 🐳 Build site-php-cli
               run: docker compose build site-php-cli
 
+            - name: 📦 Cache composer dependencies
+              uses: actions/cache@v4
+              with:
+                  path: site/vendor
+                  key: composer-${{ hashFiles('site/composer.lock') }}
+                  restore-keys: composer-
+
             - name: 📦 Install PHP dependencies
               run: |
                   docker compose run --rm -T \
@@ -162,6 +169,13 @@ jobs:
             - name: 🐳 Build site-php-cli
               run: docker compose build site-php-cli
 
+            - name: 📦 Cache composer dependencies
+              uses: actions/cache@v4
+              with:
+                  path: site/vendor
+                  key: composer-${{ hashFiles('site/composer.lock') }}
+                  restore-keys: composer-
+
             - name: 📦 Install PHP dependencies
               run: |
                   docker compose run --rm -T \
@@ -182,6 +196,71 @@ jobs:
                     --user "$(id -u):$(id -g)" \
                     -e COMPOSER_HOME=/tmp/composer \
                     site-php-cli composer cs:strict-types
+
+    # ИНТЕГРАЦИОННЫЕ И ФУНКЦИОНАЛЬНЫЕ ТЕСТЫ — на реальной БД.
+    #   Идёт ПАРАЛЛЕЛЬНО сборке и гейтит не её, а деплой: собранный образ безвреден,
+    #   выкаченный непротестированный — нет. Тесты укладываются в окно, которое
+    #   пайплайн и так тратит на сборку четырёх образов.
+    #   Unit покрыты job'ом unit-tests и здесь не дублируются.
+    backend-tests:
+        name: 🧪 Integration & functional tests
+        needs: changes
+        if: ${{ needs.changes.outputs.backend == 'true' }}
+        runs-on: ubuntu-latest
+        steps:
+            - name: 📦 Checkout repository
+              uses: actions/checkout@v6
+
+            - name: 🐳 Build site-php-cli
+              run: docker compose build site-php-cli
+
+            - name: 📦 Cache composer dependencies
+              uses: actions/cache@v4
+              with:
+                  path: site/vendor
+                  key: composer-${{ hashFiles('site/composer.lock') }}
+                  restore-keys: composer-
+
+            - name: 🗄️ Start Postgres and Redis
+              run: docker compose up -d site-postgres site-redis
+
+            - name: 📦 Install PHP dependencies
+              run: |
+                  docker compose run --rm -T \
+                    --user "$(id -u):$(id -g)" \
+                    -e COMPOSER_HOME=/tmp/composer \
+                    site-php-cli composer install --no-interaction --prefer-dist --no-progress --no-scripts
+
+            - name: ⏳ Wait for Postgres
+              run: |
+                  until docker compose exec -T site-postgres pg_isready --timeout=0 --dbname=app; do sleep 1; done
+
+            - name: 🧬 Create test database and run migrations
+              run: |
+                  docker compose run --rm -T \
+                    --user "$(id -u):$(id -g)" \
+                    -e COMPOSER_HOME=/tmp/composer \
+                    site-php-cli php bin/console doctrine:database:create --if-not-exists --env=test
+                  docker compose run --rm -T \
+                    --user "$(id -u):$(id -g)" \
+                    -e COMPOSER_HOME=/tmp/composer \
+                    site-php-cli php bin/console doctrine:migrations:migrate --no-interaction --env=test
+
+            - name: 🧪 Integration tests
+              run: |
+                  docker compose run --rm -T \
+                    --user "$(id -u):$(id -g)" \
+                    -e COMPOSER_HOME=/tmp/composer \
+                    -e COMPOSER_PROCESS_TIMEOUT=0 \
+                    site-php-cli composer test:integration
+
+            - name: 🧪 Functional tests
+              run: |
+                  docker compose run --rm -T \
+                    --user "$(id -u):$(id -g)" \
+                    -e COMPOSER_HOME=/tmp/composer \
+                    -e COMPOSER_PROCESS_TIMEOUT=0 \
+                    site-php-cli composer test:functional
 
     # 1. ЭТАП СБОРКИ: собираем только затронутые образы (динамическая матрица).
     build-and-push:
@@ -225,8 +304,8 @@ jobs:
     # 2. ПРОВЕРКА СХЕМЫ — перед автоматическим или ручным deploy.
     schema-ready:
         name: 🔍 Verify production schema is ready
-        needs: [ build-and-push, migrations-empty-db, api-types-check ]
-        if: ${{ !cancelled() && github.ref == 'refs/heads/master' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.production_action == 'deploy')) && needs.build-and-push.result == 'success' && needs.migrations-empty-db.result == 'success' && needs.api-types-check.result == 'success' }}
+        needs: [ build-and-push, migrations-empty-db, api-types-check, backend-tests ]
+        if: ${{ !cancelled() && github.ref == 'refs/heads/master' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.production_action == 'deploy')) && needs.build-and-push.result == 'success' && needs.migrations-empty-db.result == 'success' && needs.api-types-check.result == 'success' && needs['backend-tests'].result != 'failure' }}
         concurrency:
             group: production-release
             cancel-in-progress: false
