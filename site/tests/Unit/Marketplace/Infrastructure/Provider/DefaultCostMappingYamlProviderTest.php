@@ -12,8 +12,8 @@ use PHPUnit\Framework\TestCase;
 
 final class DefaultCostMappingYamlProviderTest extends TestCase
 {
-    private const DEFAULT_CONFIG_PATH = __DIR__ . '/../../../../../config/marketplace/default_cost_mapping.yaml';
-    private const FIXTURES_DIR = __DIR__ . '/../../../../Fixtures/Marketplace/Provider';
+    private const DEFAULT_CONFIG_PATH = __DIR__.'/../../../../../config/marketplace/default_cost_mapping.yaml';
+    private const FIXTURES_DIR = __DIR__.'/../../../../Fixtures/Marketplace/Provider';
     private const NEW_OZON_COST_MAPPINGS = [
         'ozon_temporary_storage' => 'OPEX_WH_STORAGE',
         'ozon_additional_packaging_warehouse' => 'OPEX_WH_STORAGE',
@@ -92,7 +92,7 @@ final class DefaultCostMappingYamlProviderTest extends TestCase
 
     public function testDuplicateCostCodeThrowsException(): void
     {
-        $provider = new DefaultCostMappingYamlProvider(self::FIXTURES_DIR . '/invalid_duplicate_cost_code.yaml');
+        $provider = new DefaultCostMappingYamlProvider(self::FIXTURES_DIR.'/invalid_duplicate_cost_code.yaml');
 
         $this->expectException(DefaultCostMappingConfigException::class);
         $this->expectExceptionMessage('Duplicate cost_code');
@@ -102,7 +102,7 @@ final class DefaultCostMappingYamlProviderTest extends TestCase
 
     public function testInvalidConfidenceThrowsException(): void
     {
-        $provider = new DefaultCostMappingYamlProvider(self::FIXTURES_DIR . '/invalid_confidence.yaml');
+        $provider = new DefaultCostMappingYamlProvider(self::FIXTURES_DIR.'/invalid_confidence.yaml');
 
         $this->expectException(DefaultCostMappingConfigException::class);
         $this->expectExceptionMessage('invalid confidence');
@@ -112,7 +112,7 @@ final class DefaultCostMappingYamlProviderTest extends TestCase
 
     public function testMissingRequiredFieldThrowsException(): void
     {
-        $provider = new DefaultCostMappingYamlProvider(self::FIXTURES_DIR . '/missing_required_field.yaml');
+        $provider = new DefaultCostMappingYamlProvider(self::FIXTURES_DIR.'/missing_required_field.yaml');
 
         $this->expectException(DefaultCostMappingConfigException::class);
         $this->expectExceptionMessage('pl_code');
@@ -122,7 +122,7 @@ final class DefaultCostMappingYamlProviderTest extends TestCase
 
     public function testDefaultsAreAppliedForOptionalFields(): void
     {
-        $provider = new DefaultCostMappingYamlProvider(self::FIXTURES_DIR . '/defaults_optional_fields.yaml');
+        $provider = new DefaultCostMappingYamlProvider(self::FIXTURES_DIR.'/defaults_optional_fields.yaml');
 
         $ruleSet = $provider->getForMarketplace(MarketplaceType::OZON);
         $rule = $ruleSet->getByCostCode('ozon_sale_commission');

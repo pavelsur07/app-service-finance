@@ -34,10 +34,10 @@ use App\Marketplace\Repository\MarketplaceMonthCloseRepository;
 final class MonthClosePreflightAction
 {
     public function __construct(
-        private readonly PreflightSalesReturnsQuery      $salesReturnsQuery,
-        private readonly PreflightCostsQuery             $costsQuery,
+        private readonly PreflightSalesReturnsQuery $salesReturnsQuery,
+        private readonly PreflightCostsQuery $costsQuery,
         private readonly MarketplaceMonthCloseRepository $monthCloseRepository,
-        private readonly CompanyFacade                   $companyFacade,
+        private readonly CompanyFacade $companyFacade,
     ) {
     }
 
@@ -45,7 +45,7 @@ final class MonthClosePreflightAction
     {
         $checks = match ($command->stage) {
             CloseStage::SALES_RETURNS => $this->checkSalesReturns($command),
-            CloseStage::COSTS         => $this->checkCosts($command),
+            CloseStage::COSTS => $this->checkCosts($command),
         };
 
         $checks = array_merge(
@@ -64,10 +64,10 @@ final class MonthClosePreflightAction
     {
         $checks = [];
 
-        $company    = $this->companyFacade->findById($command->companyId);
+        $company = $this->companyFacade->findById($command->companyId);
         $lockBefore = $company?->getFinanceLockBefore();
 
-        if ($lockBefore !== null) {
+        if (null !== $lockBefore) {
             $periodEnd = (new \DateTimeImmutable(sprintf('%d-%02d-01', $command->year, $command->month)))
                 ->modify('last day of this month');
 
@@ -83,11 +83,11 @@ final class MonthClosePreflightAction
         }
 
         $marketplace = MarketplaceType::from($command->marketplace);
-        $monthClose  = $this->monthCloseRepository->findByPeriod(
+        $monthClose = $this->monthCloseRepository->findByPeriod(
             $command->companyId, $marketplace, $command->year, $command->month,
         );
 
-        if ($monthClose !== null && $monthClose->isStageClosed($command->stage)) {
+        if (null !== $monthClose && $monthClose->isStageClosed($command->stage)) {
             $checks[] = PreflightCheck::error(
                 'already_closed',
                 'Этап закрыт',
@@ -106,16 +106,16 @@ final class MonthClosePreflightAction
 
     private function checkSalesReturns(PreflightMonthCloseCommand $command): array
     {
-        $checks     = [];
+        $checks = [];
         $periodFrom = sprintf('%d-%02d-01', $command->year, $command->month);
-        $periodTo   = (new \DateTimeImmutable($periodFrom))->modify('last day of this month')->format('Y-m-d');
+        $periodTo = (new \DateTimeImmutable($periodFrom))->modify('last day of this month')->format('Y-m-d');
 
-        $salesStats       = $this->salesReturnsQuery->getSalesStats($command->companyId, $command->marketplace, $periodFrom, $periodTo);
-        $salesTotal       = (int) $salesStats['total'];
+        $salesStats = $this->salesReturnsQuery->getSalesStats($command->companyId, $command->marketplace, $periodFrom, $periodTo);
+        $salesTotal = (int) $salesStats['total'];
         $salesWithoutCost = (int) $salesStats['without_cost'];
         $salesAlreadyProcessed = (int) $salesStats['already_processed'];
 
-        if ($salesTotal === 0) {
+        if (0 === $salesTotal) {
             $checks[] = PreflightCheck::warning('sales_count', 'Продажи за период', 'Нет продаж за выбранный период', $salesTotal);
         } elseif ($salesWithoutCost > 0) {
             $skus = $this->salesReturnsQuery->getSalesWithoutCostSkus($command->companyId, $command->marketplace, $periodFrom, $periodTo);
@@ -144,12 +144,12 @@ final class MonthClosePreflightAction
             $checks[] = PreflightCheck::ok('sales_already_processed', 'Уже обработанные продажи', 'Продажи готовы к обработке');
         }
 
-        $returnsStats       = $this->salesReturnsQuery->getReturnsStats($command->companyId, $command->marketplace, $periodFrom, $periodTo);
-        $returnsTotal       = (int) $returnsStats['total'];
+        $returnsStats = $this->salesReturnsQuery->getReturnsStats($command->companyId, $command->marketplace, $periodFrom, $periodTo);
+        $returnsTotal = (int) $returnsStats['total'];
         $returnsWithoutCost = (int) $returnsStats['without_cost'];
         $returnsAlreadyProcessed = (int) $returnsStats['already_processed'];
 
-        if ($returnsTotal === 0) {
+        if (0 === $returnsTotal) {
             $checks[] = PreflightCheck::ok('returns_without_cost', 'Себестоимость возвратов', 'Нет возвратов за период', 0);
         } elseif ($returnsWithoutCost > 0) {
             $skus = $this->salesReturnsQuery->getReturnsWithoutCostSkus($command->companyId, $command->marketplace, $periodFrom, $periodTo);
@@ -196,19 +196,19 @@ final class MonthClosePreflightAction
 
     private function checkCosts(PreflightMonthCloseCommand $command): array
     {
-        $checks     = [];
+        $checks = [];
         $periodFrom = sprintf('%d-%02d-01', $command->year, $command->month);
-        $periodTo   = (new \DateTimeImmutable($periodFrom))->modify('last day of this month')->format('Y-m-d');
+        $periodTo = (new \DateTimeImmutable($periodFrom))->modify('last day of this month')->format('Y-m-d');
 
-        $costsStats      = $this->costsQuery->getCostsStats($command->companyId, $command->marketplace, $periodFrom, $periodTo);
-        $total           = (int) $costsStats['total'];
+        $costsStats = $this->costsQuery->getCostsStats($command->companyId, $command->marketplace, $periodFrom, $periodTo);
+        $total = (int) $costsStats['total'];
         $alreadyProcessed = (int) $costsStats['already_processed'];
-        $withoutMapping  = (int) $costsStats['without_pl_mapping'];
-        $excluded        = (int) $costsStats['excluded_from_pl'];
-        $netAmountForPl  = $costsStats['net_amount_for_pl'] ?? '0';
+        $withoutMapping = (int) $costsStats['without_pl_mapping'];
+        $excluded = (int) $costsStats['excluded_from_pl'];
+        $netAmountForPl = $costsStats['net_amount_for_pl'] ?? '0';
 
         // Проверка 1: нет затрат за период (предупреждение)
-        if ($total === 0) {
+        if (0 === $total) {
             $checks[] = PreflightCheck::warning('costs_count', 'Затраты за период', 'Нет затрат за выбранный период', 0);
         } else {
             $checks[] = PreflightCheck::ok('costs_count', 'Затраты за период', sprintf('Затрат за период: %d шт.', $total), $total);

@@ -269,7 +269,7 @@ final class OzonCostCategoryTest extends TestCase
     public function testByCodeContainsAllCategories(): void
     {
         $byCode = OzonCostCategory::byCode();
-        $all    = OzonCostCategory::all();
+        $all = OzonCostCategory::all();
 
         $this->assertCount(count($all), $byCode);
     }

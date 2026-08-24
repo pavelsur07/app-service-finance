@@ -52,7 +52,7 @@ final readonly class PreviewDefaultSaleMappingAction
     }
 
     /**
-     * @param array<string, list<array{id: string, code: string, name: string, type: string, flow: string, is_visible: bool}>>              $plByCode
+     * @param array<string, list<array{id: string, code: string, name: string, type: string, flow: string, is_visible: bool}>> $plByCode
      * @param array<string, list<array{id: string, pl_category_id: string, pl_category_name: ?string, is_active: bool, is_negative: bool}>> $existingMappings
      */
     private function buildItem(DefaultSaleMappingRule $rule, array $plByCode, array $existingMappings): DefaultSaleMappingPreviewItem
@@ -93,7 +93,7 @@ final readonly class PreviewDefaultSaleMappingAction
     }
 
     /**
-     * @param array{id: string, code: string, name: string, type: string, flow: string, is_visible: bool}|null              $pl
+     * @param array{id: string, code: string, name: string, type: string, flow: string, is_visible: bool}|null $pl
      * @param array{id: string, pl_category_id: string, pl_category_name: ?string, is_active: bool, is_negative: bool}|null $existing
      */
     private function item(DefaultSaleMappingRule $rule, ?array $pl, ?array $existing, DefaultSaleMappingPreviewStatus $status, string $message): DefaultSaleMappingPreviewItem

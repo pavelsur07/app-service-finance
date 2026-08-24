@@ -34,9 +34,9 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
 {
     public function testLegacySerializedCostsMessageDoesNotPretendForceRefreshWasRequested(): void
     {
-        $user    = UserBuilder::aUser()->withIndex(6)->build();
+        $user = UserBuilder::aUser()->withIndex(6)->build();
         $company = CompanyBuilder::aCompany()->withIndex(6)->withOwner($user)->build();
-        $doc     = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)->build();
+        $doc = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)->build();
 
         $repo = $this->createMock(MarketplaceRawDocumentRepository::class);
         $repo->method('find')->with($doc->getId())->willReturn($doc);
@@ -78,9 +78,9 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
 
     public function testForceRefreshForcesEveryPipelineStepToReprocessGeneratedRows(): void
     {
-        $user    = UserBuilder::aUser()->withIndex(5)->build();
+        $user = UserBuilder::aUser()->withIndex(5)->build();
         $company = CompanyBuilder::aCompany()->withIndex(5)->withOwner($user)->build();
-        $doc     = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)->build();
+        $doc = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)->build();
 
         $repo = $this->createMock(MarketplaceRawDocumentRepository::class);
         $repo->method('find')->with($doc->getId())->willReturn($doc);
@@ -139,9 +139,9 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
      */
     public function testHandlerRecordsFailureWhenEmWasClosedByPrimaryException(): void
     {
-        $user    = UserBuilder::aUser()->withIndex(1)->build();
+        $user = UserBuilder::aUser()->withIndex(1)->build();
         $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
-        $doc     = MarketplaceRawDocumentBuilder::aDocument()
+        $doc = MarketplaceRawDocumentBuilder::aDocument()
             ->forCompany($company)
             ->build();
 
@@ -162,8 +162,8 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
         $closedEm->expects(self::never())->method('flush');
 
         // The "fresh" EM returned after resetManager() handles the markStepFailed() flush.
-        $freshEm        = $this->createMock(EntityManagerInterface::class);
-        $freshRepo      = $this->createMock(EntityRepository::class);
+        $freshEm = $this->createMock(EntityManagerInterface::class);
+        $freshRepo = $this->createMock(EntityRepository::class);
         $freshRepo->expects(self::once())
             ->method('find')
             ->with($doc->getId())
@@ -188,8 +188,8 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
 
         $message = new ProcessRawDocumentStepMessage(
             rawDocumentId: $doc->getId(),
-            step:          PipelineStep::COSTS->value,
-            companyId:     $company->getId(),
+            step: PipelineStep::COSTS->value,
+            companyId: $company->getId(),
         );
 
         try {
@@ -216,9 +216,9 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
      */
     public function testHandlerFlushesOnOriginalEmWhenStillOpen(): void
     {
-        $user    = UserBuilder::aUser()->withIndex(2)->build();
+        $user = UserBuilder::aUser()->withIndex(2)->build();
         $company = CompanyBuilder::aCompany()->withIndex(2)->withOwner($user)->build();
-        $doc     = MarketplaceRawDocumentBuilder::aDocument()
+        $doc = MarketplaceRawDocumentBuilder::aDocument()
             ->forCompany($company)
             ->build();
 
@@ -257,8 +257,8 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
 
         $message = new ProcessRawDocumentStepMessage(
             rawDocumentId: $doc->getId(),
-            step:          PipelineStep::SALES->value,
-            companyId:     $company->getId(),
+            step: PipelineStep::SALES->value,
+            companyId: $company->getId(),
         );
 
         $this->expectExceptionObject($primaryException);
@@ -377,9 +377,9 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
 
     public function testHandlerSyncsWbStatusOnSuccessfulPipelineCompletion(): void
     {
-        $user    = UserBuilder::aUser()->withIndex(3)->build();
+        $user = UserBuilder::aUser()->withIndex(3)->build();
         $company = CompanyBuilder::aCompany()->withIndex(3)->withOwner($user)->build();
-        $doc     = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)->build();
+        $doc = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)->build();
 
         $repo = $this->createMock(MarketplaceRawDocumentRepository::class);
         $repo->method('find')->with($doc->getId())->willReturn($doc);
@@ -411,12 +411,11 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
         }
     }
 
-
     public function testHandlerIgnoresUpdaterExceptionOnSuccessPath(): void
     {
-        $user    = UserBuilder::aUser()->withIndex(4)->build();
+        $user = UserBuilder::aUser()->withIndex(4)->build();
         $company = CompanyBuilder::aCompany()->withIndex(4)->withOwner($user)->build();
-        $doc     = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)->build();
+        $doc = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)->build();
 
         $repo = $this->createMock(MarketplaceRawDocumentRepository::class);
         $repo->method('find')->with($doc->getId())->willReturn($doc);

@@ -424,8 +424,8 @@ class ReportTransactionsStatementController extends AbstractController
 
     /**
      * @param array<int, array{start: \DateTimeImmutable, end: \DateTimeImmutable, label_start: \DateTimeImmutable, label_end: \DateTimeImmutable}> $periods
-     * @param array<string, array<string, array{opening: float, closing: float}>>                                                                   $balances
-     * @param list<array{date: \DateTimeImmutable, document: ?string, counterparty: ?string, description: ?string, amount: float}>                  $transactions
+     * @param array<string, array<string, array{opening: float, closing: float}>> $balances
+     * @param list<array{date: \DateTimeImmutable, document: ?string, counterparty: ?string, description: ?string, amount: float}> $transactions
      *
      * @return array{
      *   summary: array{opening: float, income: float, expense: float, closing: float},

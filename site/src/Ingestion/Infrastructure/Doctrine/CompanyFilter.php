@@ -23,10 +23,7 @@ final class CompanyFilter extends SQLFilter
         }
 
         if (!$targetEntity->hasField('companyId')) {
-            throw new \LogicException(sprintf(
-                'Tenant-owned Ingestion entity "%s" must declare a companyId field.',
-                $className,
-            ));
+            throw new \LogicException(sprintf('Tenant-owned Ingestion entity "%s" must declare a companyId field.', $className));
         }
 
         return sprintf('%s.company_id = %s', $targetTableAlias, $this->getParameter('companyId'));

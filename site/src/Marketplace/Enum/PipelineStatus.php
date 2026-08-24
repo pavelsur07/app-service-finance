@@ -28,11 +28,11 @@ enum PipelineStatus: string
 
     public function isTerminal(): bool
     {
-        return $this === self::COMPLETED || $this === self::FAILED;
+        return self::COMPLETED === $this || self::FAILED === $this;
     }
 
     public function isRunning(): bool
     {
-        return $this === self::RUNNING;
+        return self::RUNNING === $this;
     }
 }

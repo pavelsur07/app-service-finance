@@ -56,17 +56,17 @@ final class PreflightCostsQuery
               AND c.cost_date  <= :periodTo
             SQL,
             [
-                'companyId'   => $companyId,
+                'companyId' => $companyId,
                 'marketplace' => $marketplace,
-                'periodFrom'  => $periodFrom,
-                'periodTo'    => $periodTo,
+                'periodFrom' => $periodFrom,
+                'periodTo' => $periodTo,
             ],
         ) ?: [
-            'total'              => 0,
-            'already_processed'  => 0,
+            'total' => 0,
+            'already_processed' => 0,
             'without_pl_mapping' => 0,
-            'excluded_from_pl'   => 0,
-            'net_amount_for_pl'  => '0',
+            'excluded_from_pl' => 0,
+            'net_amount_for_pl' => '0',
         ];
     }
 
@@ -97,10 +97,10 @@ final class PreflightCostsQuery
             ORDER BY COUNT(c.id) DESC
             SQL,
             [
-                'companyId'   => $companyId,
+                'companyId' => $companyId,
                 'marketplace' => $marketplace,
-                'periodFrom'  => $periodFrom,
-                'periodTo'    => $periodTo,
+                'periodFrom' => $periodFrom,
+                'periodTo' => $periodTo,
             ],
         );
     }
@@ -129,10 +129,10 @@ final class PreflightCostsQuery
               AND cc.code       = 'ozon_other_service'
             SQL,
             [
-                'companyId'   => $companyId,
+                'companyId' => $companyId,
                 'marketplace' => $marketplace,
-                'periodFrom'  => $periodFrom,
-                'periodTo'    => $periodTo,
+                'periodFrom' => $periodFrom,
+                'periodTo' => $periodTo,
             ],
         );
     }
@@ -170,10 +170,10 @@ final class PreflightCostsQuery
             ORDER BY COUNT(mc.id) DESC
             SQL,
             [
-                'companyId'   => $companyId,
+                'companyId' => $companyId,
                 'marketplace' => $marketplace,
-                'periodFrom'  => $periodFrom,
-                'periodTo'    => $periodTo,
+                'periodFrom' => $periodFrom,
+                'periodTo' => $periodTo,
             ],
         );
     }
@@ -228,10 +228,10 @@ final class PreflightCostsQuery
             ORDER BY mcc.name ASC
             SQL,
             [
-                'companyId'   => $companyId,
+                'companyId' => $companyId,
                 'marketplace' => $marketplace,
-                'periodFrom'  => $periodFrom,
-                'periodTo'    => $periodTo,
+                'periodFrom' => $periodFrom,
+                'periodTo' => $periodTo,
             ],
         );
     }

@@ -73,7 +73,7 @@ final class GeneratedRowsDuplicatesAuditCommand extends Command
     {
         $io->section(sprintf('Details: %s', $tableName));
 
-        if ($rows === []) {
+        if ([] === $rows) {
             $io->text('No duplicate groups found.');
 
             return;

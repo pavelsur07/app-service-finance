@@ -119,8 +119,7 @@ final class WbFinanceSyncStatusControllerTest extends WebTestCaseBase
         \DateTimeImmutable $businessDate,
         MarketplaceType $marketplace,
         string $reportType,
-    ): MarketplaceFinancialReportSyncStatus
-    {
+    ): MarketplaceFinancialReportSyncStatus {
         $status = new MarketplaceFinancialReportSyncStatus(
             Uuid::uuid7()->toString(),
             $companyId,

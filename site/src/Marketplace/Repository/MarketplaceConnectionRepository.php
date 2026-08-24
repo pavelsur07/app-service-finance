@@ -78,8 +78,6 @@ class MarketplaceConnectionRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
-
-
     public function findByIdAndCompany(string $connectionId, Company $company): ?MarketplaceConnection
     {
         return $this->createQueryBuilder('c')
@@ -90,6 +88,7 @@ class MarketplaceConnectionRepository extends ServiceEntityRepository
             ->getQuery()
             ->getOneOrNullResult();
     }
+
     /**
      * @return MarketplaceConnection[]
      */
@@ -118,15 +117,15 @@ class MarketplaceConnectionRepository extends ServiceEntityRepository
         MarketplaceConnectionType $connectionType = MarketplaceConnectionType::SELLER,
     ): ?MarketplaceConnection {
         $conn = $this->getEntityManager()->getConnection();
-        $id   = $conn->fetchOne(
+        $id = $conn->fetchOne(
             'SELECT id FROM marketplace_connections
              WHERE company_id = :companyId
                AND marketplace = :marketplace
                AND connection_type = :connectionType
              LIMIT 1',
             [
-                'companyId'      => $companyId,
-                'marketplace'    => $marketplace->value,
+                'companyId' => $companyId,
+                'marketplace' => $marketplace->value,
                 'connectionType' => $connectionType->value,
             ],
         );

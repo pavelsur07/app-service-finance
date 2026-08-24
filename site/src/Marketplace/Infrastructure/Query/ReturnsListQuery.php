@@ -36,7 +36,7 @@ final class ReturnsListQuery
             ->setParameter('companyId', $companyId)
             ->orderBy('r.return_date', 'DESC');
 
-        if ($marketplace !== null) {
+        if (null !== $marketplace) {
             $qb->andWhere('r.marketplace = :marketplace')
                 ->setParameter('marketplace', $marketplace);
         }

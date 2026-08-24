@@ -25,7 +25,7 @@ final class ReconciliationPageController extends AbstractController
 
         return $this->render('marketplace/reconciliation.html.twig', [
             'active_tab' => 'reconciliation',
-            'company'    => $company,
+            'company' => $company,
         ]);
     }
 }

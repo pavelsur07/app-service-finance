@@ -22,7 +22,7 @@ final class OzonProductStocksRawNormalizer
         $rawSnapshotId = $raw instanceof InventoryRawSnapshot ? $raw->getId() : '';
 
         $items = $this->extractItems($payload);
-        if ($items === []) {
+        if ([] === $items) {
             return [];
         }
 
@@ -34,7 +34,7 @@ final class OzonProductStocksRawNormalizer
             }
 
             $stocks = $item['stocks'] ?? null;
-            if (!is_array($stocks) || $stocks === []) {
+            if (!is_array($stocks) || [] === $stocks) {
                 continue;
             }
 
@@ -46,7 +46,7 @@ final class OzonProductStocksRawNormalizer
                 }
 
                 $sourceSku = trim((string) $stock['sku']);
-                if ($sourceSku === '') {
+                if ('' === $sourceSku) {
                     continue;
                 }
 

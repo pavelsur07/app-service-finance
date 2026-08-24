@@ -50,6 +50,7 @@ class MarketplaceListingBarcodeRepository extends ServiceEntityRepository
      * Массовая загрузка по списку barcodes — индексировано по barcode.
      *
      * @param string[] $barcodes
+     *
      * @return array<string, MarketplaceListingBarcode>
      */
     public function findByBarcodesIndexed(
@@ -90,18 +91,18 @@ class MarketplaceListingBarcodeRepository extends ServiceEntityRepository
         MarketplaceType $marketplace,
         string $barcode,
     ): bool {
-        return $this->findOneBy([
-            'companyId'   => $companyId,
+        return null !== $this->findOneBy([
+            'companyId' => $companyId,
             'marketplace' => $marketplace->value,
-            'barcode'     => $barcode,
-        ]) !== null;
+            'barcode' => $barcode,
+        ]);
     }
 
     /**
-     * @deprecated Используйте existsForCompanyAndMarketplace — баркод уникален внутри маркетплейса, не глобально.
+     * @deprecated используйте existsForCompanyAndMarketplace — баркод уникален внутри маркетплейса, не глобально
      */
     public function existsForCompany(string $companyId, string $barcode): bool
     {
-        return $this->findOneBy(['companyId' => $companyId, 'barcode' => $barcode]) !== null;
+        return null !== $this->findOneBy(['companyId' => $companyId, 'barcode' => $barcode]);
     }
 }

@@ -22,6 +22,6 @@ final class MarketplaceRawDocumentMarketplaceQuery implements MarketplaceRawDocu
             ],
         );
 
-        return $marketplace === false ? null : (string) $marketplace;
+        return false === $marketplace ? null : (string) $marketplace;
     }
 }

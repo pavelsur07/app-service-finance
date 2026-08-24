@@ -53,11 +53,6 @@ final class RawNdjsonCodec
         }
     }
 
-    /**
-     * @param mixed $value
-     *
-     * @return mixed
-     */
     private function normalizeValue(mixed $value): mixed
     {
         if (!is_array($value)) {

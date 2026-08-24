@@ -40,7 +40,7 @@ class WbAcquiringCalculator implements CostCalculatorInterface
         }
 
         $externalId = $this->externalIdBuilder->build($item, 'acquiring');
-        if ($externalId === null) {
+        if (null === $externalId) {
             return [];
         }
 
@@ -52,7 +52,7 @@ class WbAcquiringCalculator implements CostCalculatorInterface
         return [
             [
                 'category_code' => 'acquiring',
-                'amount' => (string)abs($acquiringFee),
+                'amount' => (string) abs($acquiringFee),
                 'external_id' => $externalId,
                 'cost_date' => $saleDate,
                 'description' => 'Эквайринг',

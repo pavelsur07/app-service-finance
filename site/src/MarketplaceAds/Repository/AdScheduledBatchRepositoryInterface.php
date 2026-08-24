@@ -22,4 +22,3 @@ interface AdScheduledBatchRepositoryInterface
 
     public function abandonNonTerminalBatchesForTerminalJob(string $jobId, string $reason): int;
 }
-

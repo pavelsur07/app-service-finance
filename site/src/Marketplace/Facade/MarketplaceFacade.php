@@ -217,7 +217,7 @@ final readonly class MarketplaceFacade
             ],
         );
 
-        return array_map(static fn(array $row) => new SaleData(
+        return array_map(static fn (array $row) => new SaleData(
             marketplace: MarketplaceType::from($row['marketplace']),
             externalOrderId: $row['external_order_id'],
             saleDate: new \DateTimeImmutable($row['sale_date']),
@@ -225,7 +225,7 @@ final readonly class MarketplaceFacade
             quantity: (int) $row['quantity'],
             pricePerUnit: $row['price_per_unit'],
             totalRevenue: $row['total_revenue'],
-            rawData: $row['raw_data'] !== null ? json_decode($row['raw_data'], true) : null,
+            rawData: null !== $row['raw_data'] ? json_decode($row['raw_data'], true) : null,
         ), $rows);
     }
 
@@ -252,7 +252,7 @@ final readonly class MarketplaceFacade
             ],
         );
 
-        return array_map(static fn(array $row) => new ReturnData(
+        return array_map(static fn (array $row) => new ReturnData(
             marketplace: MarketplaceType::from($row['marketplace']),
             marketplaceSku: $row['marketplace_sku'],
             returnDate: new \DateTimeImmutable($row['return_date']),
@@ -315,14 +315,14 @@ final readonly class MarketplaceFacade
             ->setParameter('companyId', $companyId)
             ->setParameter('active', true);
 
-        if ($marketplace !== null) {
+        if (null !== $marketplace) {
             $qb->andWhere('l.marketplace = :marketplace')
                 ->setParameter('marketplace', $marketplace);
         }
 
         $rows = $qb->executeQuery()->fetchAllAssociative();
 
-        return array_map(static fn(array $row) => new ActiveListingDTO(
+        return array_map(static fn (array $row) => new ActiveListingDTO(
             id: $row['id'],
             marketplace: $row['marketplace'],
             marketplaceSku: $row['marketplace_sku'],
@@ -339,7 +339,7 @@ final readonly class MarketplaceFacade
             ['id' => $listingId, 'companyId' => $companyId],
         );
 
-        if ($row === false) {
+        if (false === $row) {
             return null;
         }
 
@@ -358,7 +358,7 @@ final readonly class MarketplaceFacade
     ): ?string {
         $result = $this->costPriceResolver->resolve($companyId, $listingId, $date);
 
-        return bccomp($result, '0.00', 2) === 0 ? null : $result;
+        return 0 === bccomp($result, '0.00', 2) ? null : $result;
     }
 
     /**
@@ -390,14 +390,14 @@ final readonly class MarketplaceFacade
                AND l.marketplace = :marketplace
                AND l.marketplace_sku = :marketplaceSku',
             [
-                'companyId'     => $companyId,
-                'marketplace'   => $marketplace,
+                'companyId' => $companyId,
+                'marketplace' => $marketplace,
                 'marketplaceSku' => $marketplaceSku,
             ],
         );
 
-        return array_map(static fn(array $row) => [
-            'id'        => $row['id'],
+        return array_map(static fn (array $row) => [
+            'id' => $row['id'],
             'parentSku' => $row['parent_sku'],
         ], $rows);
     }
@@ -407,7 +407,8 @@ final readonly class MarketplaceFacade
      * Результат сгруппирован по parentSku; SKU без листингов в ключах отсутствуют
      * (caller должен обработать их отдельно).
      *
-     * @param  string[] $marketplaceSkus
+     * @param string[] $marketplaceSkus
+     *
      * @return array<string, list<array{id: string, parentSku: string}>> parentSku => listings
      */
     public function findListingsByMarketplaceSkus(
@@ -415,7 +416,7 @@ final readonly class MarketplaceFacade
         string $marketplace,
         array $marketplaceSkus,
     ): array {
-        if ($marketplaceSkus === []) {
+        if ([] === $marketplaceSkus) {
             return [];
         }
 
@@ -426,8 +427,8 @@ final readonly class MarketplaceFacade
                AND l.marketplace = :marketplace
                AND l.marketplace_sku IN (:marketplaceSkus)',
             [
-                'companyId'       => $companyId,
-                'marketplace'     => $marketplace,
+                'companyId' => $companyId,
+                'marketplace' => $marketplace,
                 'marketplaceSkus' => array_values(array_unique($marketplaceSkus)),
             ],
             ['marketplaceSkus' => ArrayParameterType::STRING],
@@ -436,7 +437,7 @@ final readonly class MarketplaceFacade
         $result = [];
         foreach ($rows as $row) {
             $result[$row['parent_sku']][] = [
-                'id'        => $row['id'],
+                'id' => $row['id'],
                 'parentSku' => $row['parent_sku'],
             ];
         }
@@ -496,7 +497,8 @@ final readonly class MarketplaceFacade
      * Bulk-запрос продаж для набора листингов за одну дату.
      * Листинги без продаж в результате отсутствуют (caller должен подставить 0 самостоятельно).
      *
-     * @param  string[]           $listingIds
+     * @param string[] $listingIds
+     *
      * @return array<string, int> listingId => суммарное количество продаж
      */
     public function getSalesQuantitiesForListings(
@@ -504,7 +506,7 @@ final readonly class MarketplaceFacade
         array $listingIds,
         \DateTimeImmutable $date,
     ): array {
-        if ($listingIds === []) {
+        if ([] === $listingIds) {
             return [];
         }
 
@@ -516,9 +518,9 @@ final readonly class MarketplaceFacade
                AND s.sale_date = :date
              GROUP BY s.listing_id',
             [
-                'companyId'  => $companyId,
+                'companyId' => $companyId,
                 'listingIds' => $listingIds,
-                'date'       => $date->format('Y-m-d'),
+                'date' => $date->format('Y-m-d'),
             ],
             ['listingIds' => ArrayParameterType::STRING],
         );
@@ -568,7 +570,8 @@ final readonly class MarketplaceFacade
     }
 
     /**
-     * @param  list<string> $listingIds
+     * @param list<string> $listingIds
+     *
      * @return array<string, \App\Marketplace\DTO\ListingMetaDTO> keyed by id
      */
     public function getListingsMetaByIds(
@@ -588,8 +591,9 @@ final readonly class MarketplaceFacade
      *
      * Используется при парсинге raw snapshot'ов остатков в нормализованные StockSnapshot записи.
      *
-     * @param  string         $companyId  UUID компании
-     * @param  array<string>  $listingIds массив UUID листингов (max 5000)
+     * @param string $companyId UUID компании
+     * @param array<string> $listingIds массив UUID листингов (max 5000)
+     *
      * @return array<string, string|null> map listingId → productId|null
      */
     public function resolveListingsToProducts(string $companyId, array $listingIds): array

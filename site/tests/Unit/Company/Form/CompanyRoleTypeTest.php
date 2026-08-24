@@ -9,9 +9,9 @@ use App\Company\Form\CompanyRoleType;
 use App\Company\Security\AccessLevel;
 use App\Company\Security\Module;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Form\Extension\Validator\ValidatorExtension;
 use Symfony\Component\Form\FormFactoryInterface;
 use Symfony\Component\Form\Forms;
-use Symfony\Component\Form\Extension\Validator\ValidatorExtension;
 use Symfony\Component\Validator\Validation;
 
 final class CompanyRoleTypeTest extends TestCase

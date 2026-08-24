@@ -9,7 +9,7 @@ final readonly class ImportPLCategoryTreeResult
     /**
      * @param ImportPLCategoryTreeRow[] $created
      * @param ImportPLCategoryTreeRow[] $updated
-     * @param list<string>              $unresolvedFormulaCodes токены формул, которых не будет в целевой компании после импорта
+     * @param list<string> $unresolvedFormulaCodes токены формул, которых не будет в целевой компании после импорта
      */
     public function __construct(
         public array $created,

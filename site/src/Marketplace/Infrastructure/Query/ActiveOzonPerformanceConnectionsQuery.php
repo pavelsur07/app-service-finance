@@ -18,7 +18,7 @@ final readonly class ActiveOzonPerformanceConnectionsQuery
     }
 
     /**
-     * @return list<array{id: string, company_id: string, client_id: null|string}>
+     * @return list<array{id: string, company_id: string, client_id: string|null}>
      */
     public function execute(?string $companyId = null): array
     {

@@ -32,17 +32,18 @@ final readonly class RequestOzonInventorySnapshotAction
     {
         Assert::uuid($companyId);
 
-        if ($actorUserId !== null) {
+        if (null !== $actorUserId) {
             Assert::uuid($actorUserId);
         }
 
         $connections = $this->marketplaceFacade->getActiveOzonSellerConnections($companyId);
 
-        if ($connections === []) {
+        if ([] === $connections) {
             $this->logger->info('Inventory snapshot request skipped: no active Ozon SELLER connections.', [
                 'companyId' => $companyId,
                 'triggerType' => $triggerType->value,
             ]);
+
             return new OzonInventorySnapshotRequestResult(
                 queuedCount: 0,
                 skippedCount: 0,
@@ -58,7 +59,7 @@ final readonly class RequestOzonInventorySnapshotAction
 
         foreach ($connections as $connection) {
             $connectionId = (string) ($connection['connectionId'] ?? '');
-            if ($connectionId === '') {
+            if ('' === $connectionId) {
                 $this->logger->warning('Inventory snapshot request skipped: empty connectionId.', [
                     'companyId' => $companyId,
                     'triggerType' => $triggerType->value,
@@ -88,7 +89,7 @@ final readonly class RequestOzonInventorySnapshotAction
             $validConnectionIds[] = $connectionId;
         }
 
-        if ($validConnectionIds === []) {
+        if ([] === $validConnectionIds) {
             return new OzonInventorySnapshotRequestResult(
                 queuedCount: 0,
                 skippedCount: $skippedCount,
@@ -100,7 +101,7 @@ final readonly class RequestOzonInventorySnapshotAction
 
         $activeSession = $this->sessionRepository->findLatestActiveByCompanyAndSource($companyId, MarketplaceType::OZON);
 
-        if ($activeSession !== null) {
+        if (null !== $activeSession) {
             $this->logger->info('Inventory snapshot request skipped: active session already exists.', [
                 'companyId' => $companyId,
                 'snapshotSessionId' => $activeSession->getId(),
@@ -108,6 +109,7 @@ final readonly class RequestOzonInventorySnapshotAction
                 'queuedCount' => 0,
                 'skippedCount' => $skippedCount + count($validConnectionIds),
             ]);
+
             return new OzonInventorySnapshotRequestResult(
                 queuedCount: 0,
                 skippedCount: $skippedCount + count($validConnectionIds),
@@ -135,7 +137,6 @@ final readonly class RequestOzonInventorySnapshotAction
         $queuedCount = 0;
 
         foreach ($validConnectionIds as $connectionId) {
-
             try {
                 $this->messageBus->dispatch(new SyncOzonInventorySnapshotMessage(
                     companyId: $companyId,
@@ -170,7 +171,7 @@ final readonly class RequestOzonInventorySnapshotAction
             }
         }
 
-        if ($queuedCount === 0) {
+        if (0 === $queuedCount) {
             $session->markFailed('Failed to queue all Ozon inventory snapshot messages.');
             $this->entityManager->flush();
         }

@@ -20,7 +20,8 @@ final readonly class SnapshotSummaryResponse
         private int $totalSalesQuantity,
         private int $totalOrdersQuantity,
         private array $listings,
-    ) {}
+    ) {
+    }
 
     /**
      * @param ListingUnitEconomics[] $items
@@ -66,7 +67,7 @@ final readonly class SnapshotSummaryResponse
                 'orders_quantity' => $this->totalOrdersQuantity,
             ],
             'listings' => array_map(
-                static fn(SnapshotListingSummary $l) => $l->toArray(),
+                static fn (SnapshotListingSummary $l) => $l->toArray(),
                 $this->listings,
             ),
         ];

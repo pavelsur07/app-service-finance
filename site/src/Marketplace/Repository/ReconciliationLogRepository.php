@@ -20,7 +20,7 @@ class ReconciliationLogRepository extends ServiceEntityRepository
     }
 
     /**
-     * Найти все логи для батча
+     * Найти все логи для батча.
      */
     public function findByBatch(ProcessingBatch $batch): array
     {
@@ -33,7 +33,7 @@ class ReconciliationLogRepository extends ServiceEntityRepository
     }
 
     /**
-     * Найти провалившиеся проверки для батча
+     * Найти провалившиеся проверки для батча.
      */
     public function findFailedByBatch(ProcessingBatch $batch): array
     {
@@ -48,7 +48,7 @@ class ReconciliationLogRepository extends ServiceEntityRepository
     }
 
     /**
-     * Найти последнюю проверку определенного типа для батча
+     * Найти последнюю проверку определенного типа для батча.
      */
     public function findLatestByType(ProcessingBatch $batch, string $checkType): ?ReconciliationLog
     {
@@ -64,7 +64,7 @@ class ReconciliationLogRepository extends ServiceEntityRepository
     }
 
     /**
-     * Проверить прошли ли все проверки для батча
+     * Проверить прошли ли все проверки для батча.
      */
     public function areAllChecksPassed(ProcessingBatch $batch): bool
     {
@@ -77,7 +77,7 @@ class ReconciliationLogRepository extends ServiceEntityRepository
             ->getQuery()
             ->getSingleScalarResult();
 
-        return $failedCount === 0;
+        return 0 === $failedCount;
     }
 
     /**

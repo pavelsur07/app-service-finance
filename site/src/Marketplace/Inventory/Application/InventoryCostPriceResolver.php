@@ -31,14 +31,14 @@ final class InventoryCostPriceResolver implements CostPriceResolverInterface
         // Шаг 1: ищем активную запись на дату
         $record = $this->repository->findActiveAtDate($companyId, $listingId, $date);
 
-        if ($record !== null) {
+        if (null !== $record) {
             return $record->getPriceAmount();
         }
 
         // Шаг 2: дата раньше первой записи — берём самую раннюю
         $earliest = $this->repository->findEarliest($companyId, $listingId);
 
-        if ($earliest !== null) {
+        if (null !== $earliest) {
             return $earliest->getPriceAmount();
         }
 

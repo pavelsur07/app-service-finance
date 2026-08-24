@@ -77,7 +77,6 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
         )[0] ?? null;
     }
 
-
     /**
      * Deterministic lookup for refresh/idempotency by exact period + api endpoint.
      * Excludes FAILED documents and returns newest first.
@@ -196,7 +195,7 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
             return null;
         }
 
-        return new \DateTimeImmutable($value . ' 00:00:00');
+        return new \DateTimeImmutable($value.' 00:00:00');
     }
 
     /**
@@ -219,7 +218,8 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
      * Используется в ReprocessMarketplaceCommand.
      * Фильтрует по periodFrom/periodTo документа (перекрытие с запрошенным периодом).
      *
-     * @param string|null $documentType  null = все типы | 'sales_report' | 'realization'
+     * @param string|null $documentType null = все типы | 'sales_report' | 'realization'
+     *
      * @return MarketplaceRawDocument[]
      */
     public function findByCompanyAndPeriod(
@@ -243,7 +243,7 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
             ->setParameter('periodTo', $periodTo)
             ->orderBy('d.syncedAt', 'ASC');
 
-        if ($documentType !== null) {
+        if (null !== $documentType) {
             $qb->andWhere('d.documentType = :documentType')
                 ->setParameter('documentType', $documentType);
         }
@@ -277,14 +277,14 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
 
         $params = ['status' => PipelineStatus::COMPLETED->value];
 
-        if ($companyId !== null) {
+        if (null !== $companyId) {
             $sql .= ' AND mrd.company_id = :companyId';
             $params['companyId'] = $companyId;
         }
 
         $ids = $conn->fetchFirstColumn($sql, $params);
 
-        if ($ids === []) {
+        if ([] === $ids) {
             return [];
         }
 
@@ -312,7 +312,7 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
         int $month,
     ): array {
         $firstDay = new \DateTimeImmutable(sprintf('%d-%02d-01', $year, $month));
-        $lastDay  = $firstDay->modify('last day of this month');
+        $lastDay = $firstDay->modify('last day of this month');
 
         return $this->createQueryBuilder('d')
             ->join('d.company', 'c')

@@ -14,7 +14,7 @@ final readonly class WbReportRowClassifier implements RowClassifierInterface
 {
     public function supports(MarketplaceType $type): bool
     {
-        return $type === MarketplaceType::WILDBERRIES;
+        return MarketplaceType::WILDBERRIES === $type;
     }
 
     public function classify(array $rawRow): StagingRecordType
@@ -54,13 +54,11 @@ final readonly class WbReportRowClassifier implements RowClassifierInterface
 
             $value = trim((string) $row[$key]);
 
-            if ($value !== '') {
+            if ('' !== $value) {
                 return $value;
             }
         }
 
         return '';
     }
-
 }
-

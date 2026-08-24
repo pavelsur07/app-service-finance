@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Builders\Cash;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
-use App\Company\Entity\Company;
 use App\Cash\Enum\Accounts\MoneyAccountType;
+use App\Company\Entity\Company;
 use App\Tests\Builders\Company\CompanyBuilder;
 
 final class MoneyAccountBuilder

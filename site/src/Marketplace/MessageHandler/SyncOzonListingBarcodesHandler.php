@@ -23,12 +23,12 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 final class SyncOzonListingBarcodesHandler
 {
     public function __construct(
-        private readonly OzonProductBarcodeFetcher           $barcodeFetcher,
-        private readonly MarketplaceListingRepository        $listingRepository,
+        private readonly OzonProductBarcodeFetcher $barcodeFetcher,
+        private readonly MarketplaceListingRepository $listingRepository,
         private readonly MarketplaceListingBarcodeRepository $barcodeRepository,
-        private readonly MarketplaceJobLogRepository         $jobLogRepository,
-        private readonly EntityManagerInterface              $em,
-        private readonly LoggerInterface                     $logger,
+        private readonly MarketplaceJobLogRepository $jobLogRepository,
+        private readonly EntityManagerInterface $em,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -55,6 +55,7 @@ final class SyncOzonListingBarcodesHandler
             if (empty($listings)) {
                 $jobLog->complete(['created' => 0, 'skipped' => 0, 'errors' => 0]);
                 $this->jobLogRepository->save($jobLog);
+
                 return;
             }
 
@@ -75,44 +76,44 @@ final class SyncOzonListingBarcodesHandler
 
             // Логируем SKU без данных от API
             $skusNotFound = array_diff($skus, array_keys($skuToData));
-            $details      = [];
+            $details = [];
             foreach ($skusNotFound as $missingSku) {
-                $listing   = $skuToListing[$missingSku];
+                $listing = $skuToListing[$missingSku];
                 $details[] = [
-                    'sku'    => $missingSku,
-                    'name'   => $listing->getName(),
+                    'sku' => $missingSku,
+                    'name' => $listing->getName(),
                     'reason' => 'SKU не найден в Ozon API',
                 ];
                 $this->logger->warning('[OzonBarcodeSync] SKU not found in API', [
                     'company_id' => $companyId,
-                    'sku'        => $missingSku,
+                    'sku' => $missingSku,
                 ]);
             }
 
-            $barcodesCreated    = 0;
-            $barcodesSkipped    = 0;
+            $barcodesCreated = 0;
+            $barcodesSkipped = 0;
             $supplierSkuUpdated = 0;
 
             foreach ($skuToData as $sku => $data) {
                 $listing = $skuToListing[(string) $sku] ?? null;
-                if ($listing === null) {
+                if (null === $listing) {
                     continue;
                 }
 
                 // Обновляем supplier_sku из offer_id если не заполнен
                 $offerId = $data['offer_id'] ?? null;
-                if ($offerId !== null && $offerId !== '' && $listing->getSupplierSku() === null) {
+                if (null !== $offerId && '' !== $offerId && null === $listing->getSupplierSku()) {
                     $listing->setSupplierSku($offerId);
-                    $supplierSkuUpdated++;
+                    ++$supplierSkuUpdated;
                 }
 
                 foreach ($data['barcodes'] as $barcode) {
-                    if ($barcode === '') {
+                    if ('' === $barcode) {
                         continue;
                     }
 
                     if ($this->barcodeRepository->existsForCompanyAndMarketplace($companyId, MarketplaceType::OZON, $barcode)) {
-                        $barcodesSkipped++;
+                        ++$barcodesSkipped;
                         continue;
                     }
 
@@ -124,18 +125,18 @@ final class SyncOzonListingBarcodesHandler
                         $barcode,
                     );
                     $this->em->persist($barcodeEntity);
-                    $barcodesCreated++;
+                    ++$barcodesCreated;
                 }
             }
 
             $this->em->flush();
 
             $summary = [
-                'total_skus'          => count($skus),
-                'barcodes_created'    => $barcodesCreated,
-                'barcodes_skipped'    => $barcodesSkipped,
-                'supplier_sku_updated'=> $supplierSkuUpdated,
-                'errors'              => count($details),
+                'total_skus' => count($skus),
+                'barcodes_created' => $barcodesCreated,
+                'barcodes_skipped' => $barcodesSkipped,
+                'supplier_sku_updated' => $supplierSkuUpdated,
+                'errors' => count($details),
             ];
 
             $jobLog->complete($summary, $details);
@@ -151,7 +152,7 @@ final class SyncOzonListingBarcodesHandler
 
             $this->logger->error('[OzonBarcodeSync] Failed', [
                 'company_id' => $companyId,
-                'error'      => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
 
             throw $e;

@@ -20,7 +20,8 @@ final class CostMappingIndexController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly UnitEconomyCostMappingRepositoryInterface $repository,
-    ) {}
+    ) {
+    }
 
     #[Route(
         '/api/marketplace-analytics/cost-mappings',
@@ -40,7 +41,7 @@ final class CostMappingIndexController extends AbstractController
         );
 
         $data = array_map(
-            static fn($mapping) => CostMappingResponse::fromEntity($mapping)->toArray(),
+            static fn ($mapping) => CostMappingResponse::fromEntity($mapping)->toArray(),
             $result['items'],
         );
 

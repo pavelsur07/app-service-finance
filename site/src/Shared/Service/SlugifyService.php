@@ -7,11 +7,10 @@ namespace App\Shared\Service;
 class SlugifyService
 {
     /**
-     * Генерирует slug из строки
+     * Генерирует slug из строки.
      *
      * @param string $text Исходный текст
      * @param string $prefix Префикс для slug (например, 'wb_')
-     * @return string
      */
     public function slugify(string $text, string $prefix = ''): string
     {
@@ -22,15 +21,15 @@ class SlugifyService
         $text = $this->sanitize($text);
 
         // Добавляем префикс если нужно
-        if ($prefix !== '') {
-            $text = $prefix . $text;
+        if ('' !== $prefix) {
+            $text = $prefix.$text;
         }
 
         return $text;
     }
 
     /**
-     * Транслитерация кириллицы в латиницу
+     * Транслитерация кириллицы в латиницу.
      */
     private function transliterate(string $text): string
     {
@@ -55,7 +54,7 @@ class SlugifyService
     }
 
     /**
-     * Очистка и форматирование slug
+     * Очистка и форматирование slug.
      */
     private function sanitize(string $text): string
     {

@@ -127,9 +127,9 @@ final class PLCategoryTreeFileReader
     }
 
     /**
-     * @param list<mixed>              $rows
+     * @param list<mixed> $rows
      * @param list<PLCategoryTreeNode> &$nodes
-     * @param array<string, string>    &$seenCodes
+     * @param array<string, string> &$seenCodes
      */
     private function collect(array $rows, ?PLCategoryTreeNode $parent, string $parentPath, array &$nodes, array &$seenCodes, int $level): void
     {
@@ -274,7 +274,7 @@ final class PLCategoryTreeFileReader
     /**
      * @template T of \BackedEnum
      *
-     * @param array<mixed>    $row
+     * @param array<mixed> $row
      * @param class-string<T> $enumClass
      *
      * @return T

@@ -12,7 +12,8 @@ final class GetPortfolioSummaryAction
 {
     public function __construct(
         private readonly PortfolioSummaryPolicy $policy,
-    ) {}
+    ) {
+    }
 
     public function __invoke(
         string $companyId,

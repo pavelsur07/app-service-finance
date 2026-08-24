@@ -43,11 +43,11 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
     public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = ''): bool
     {
         if ($type instanceof StagingRecordType) {
-            return $type === StagingRecordType::RETURN
-                && $marketplace === MarketplaceType::OZON;
+            return StagingRecordType::RETURN === $type
+                && MarketplaceType::OZON === $marketplace;
         }
 
-        return $type === MarketplaceType::OZON->value && $kind === 'returns';
+        return $type === MarketplaceType::OZON->value && 'returns' === $kind;
     }
 
     /**
@@ -57,7 +57,7 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
     {
         $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
         if (!$rawDoc instanceof MarketplaceRawDocument) {
-            throw new \RuntimeException('Raw document not found: ' . $rawDocId);
+            throw new \RuntimeException('Raw document not found: '.$rawDocId);
         }
 
         $this->connection->beginTransaction();
@@ -91,7 +91,7 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
 
         $company = $this->em->find(Company::class, $companyId);
         if (!$company instanceof Company) {
-            throw new \RuntimeException('Company not found: ' . $companyId);
+            throw new \RuntimeException('Company not found: '.$companyId);
         }
 
         // Собираем SKU с именами для идемпотентного создания листингов
@@ -99,7 +99,7 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
         foreach ($rawRows as $op) {
             foreach ($op['items'] ?? [] as $item) {
                 $sku = (string) ($item['sku'] ?? '');
-                if ($sku !== '' && !isset($skusWithNames[$sku])) {
+                if ('' !== $sku && !isset($skusWithNames[$sku])) {
                     $skusWithNames[$sku] = $item['name'] ?? null;
                 }
             }
@@ -111,8 +111,8 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
         // Очистка legacy-записей + вставка идут в одной транзакции.
         // Очистка запускается только один раз для каждого rawDocId
         // (daily pipeline может разбивать один raw документ на несколько батчей).
-        $shouldCleanup  = $rawDocId !== null && $this->cleanedUpRawDocId !== $rawDocId;
-        $useTransaction = $rawDocId !== null;
+        $shouldCleanup = null !== $rawDocId && $this->cleanedUpRawDocId !== $rawDocId;
+        $useTransaction = null !== $rawDocId;
 
         if ($useTransaction) {
             $this->connection->beginTransaction();
@@ -129,7 +129,8 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
             $allExternalIds = array_values(array_map(
                 static function (array $op): string {
                     $postingNumber = $op['posting']['posting_number'] ?? '';
-                    return $postingNumber !== '' ? $postingNumber : (string) ($op['operation_id'] ?? '');
+
+                    return '' !== $postingNumber ? $postingNumber : (string) ($op['operation_id'] ?? '');
                 },
                 $rawRows,
             ));
@@ -137,9 +138,9 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
 
             foreach ($rawRows as $op) {
                 $postingNumber = $op['posting']['posting_number'] ?? '';
-                $externalId = $postingNumber !== '' ? $postingNumber : (string) ($op['operation_id'] ?? '');
+                $externalId = '' !== $postingNumber ? $postingNumber : (string) ($op['operation_id'] ?? '');
 
-                if ($externalId === '' || isset($existingMap[$externalId])) {
+                if ('' === $externalId || isset($existingMap[$externalId])) {
                     continue;
                 }
 
@@ -149,16 +150,16 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
 
                 if (!$listing) {
                     $this->logger->warning('[Ozon] processBatch returns: listing not found', [
-                        'external_id'    => $externalId,
+                        'external_id' => $externalId,
                         'operation_type' => $op['operation_type'] ?? '',
-                        'sku'            => $sku,
+                        'sku' => $sku,
                     ]);
                     continue;
                 }
 
                 // Ищем связанную продажу по posting_number для получения costPrice
                 $sale = null;
-                if ($postingNumber !== '') {
+                if ('' !== $postingNumber) {
                     $sale = $this->saleRepository->findByMarketplaceOrder(
                         $company,
                         MarketplaceType::OZON,
@@ -187,7 +188,7 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
                 $return->setReturnReason($op['operation_type_name'] ?? null);
                 $return->setCostPrice($this->costPriceResolver->resolveForReturn($listing, $sale, $op));
                 $return->setRawData($op);
-                if ($rawDocId !== null) {
+                if (null !== $rawDocId) {
                     $return->setRawDocumentId($rawDocId);
                 }
 
@@ -230,7 +231,7 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
         }
 
         $periodFrom = $rawDoc->getPeriodFrom()->format('Y-m-d');
-        $periodTo   = $rawDoc->getPeriodTo()->format('Y-m-d');
+        $periodTo = $rawDoc->getPeriodTo()->format('Y-m-d');
 
         $deletedByDoc = (int) $this->connection->executeStatement(
             'DELETE FROM marketplace_returns
@@ -247,11 +248,11 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
                AND return_date BETWEEN :periodFrom AND :periodTo
                AND (raw_document_id IS NULL OR raw_document_id != :rawDocId)',
             [
-                'companyId'   => $companyId,
+                'companyId' => $companyId,
                 'marketplace' => MarketplaceType::OZON->value,
-                'periodFrom'  => $periodFrom,
-                'periodTo'    => $periodTo,
-                'rawDocId'    => $rawDocId,
+                'periodFrom' => $periodFrom,
+                'periodTo' => $periodTo,
+                'rawDocId' => $rawDocId,
             ],
         );
 
@@ -266,12 +267,12 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
                     $rawDocId,
                 ),
                 [
-                    'raw_doc_id'     => $rawDocId,
-                    'company_id'     => $companyId,
+                    'raw_doc_id' => $rawDocId,
+                    'company_id' => $companyId,
                     'deleted_by_doc' => $deletedByDoc,
-                    'deleted_stale'  => $deletedStale,
-                    'period_from'    => $periodFrom,
-                    'period_to'      => $periodTo,
+                    'deleted_stale' => $deletedStale,
+                    'period_from' => $periodFrom,
+                    'period_to' => $periodTo,
                 ],
             );
         }

@@ -14,7 +14,8 @@ final class CreateMarketplaceAnalyticsAction
 {
     public function __construct(
         // inject repositories, policies, etc.
-    ) {}
+    ) {
+    }
 
     public function __invoke(string $companyId, CreateMarketplaceAnalyticsRequest $request): void
     {

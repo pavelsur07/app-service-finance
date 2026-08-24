@@ -402,10 +402,10 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
 
     /**
      * @param array<string, string|null> $dailyStatuses
-     * @param array<string, int>         $dueRetryCounts     keyed by company:connection or company:connection:from:to
-     * @param array<string, int>         $futureQueuedCounts
-     * @param array<string, int>         $knownDayCounts     keyed by company:connection or company:connection:from:to
-     * @param array<string, int>         $emptyCounts        keyed by company:connection or company:connection:from:to
+     * @param array<string, int> $dueRetryCounts keyed by company:connection or company:connection:from:to
+     * @param array<string, int> $futureQueuedCounts
+     * @param array<string, int> $knownDayCounts keyed by company:connection or company:connection:from:to
+     * @param array<string, int> $emptyCounts keyed by company:connection or company:connection:from:to
      */
     private function dbFetchOneCallback(array $dailyStatuses, array $dueRetryCounts = [], array $futureQueuedCounts = [], array $knownDayCounts = [], array $emptyCounts = []): \Closure
     {

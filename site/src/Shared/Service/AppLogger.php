@@ -17,7 +17,7 @@ class AppLogger
     }
 
     /**
-     * Обычный информационный лог (пишется только в файл/консоль)
+     * Обычный информационный лог (пишется только в файл/консоль).
      */
     public function info(string $message, array $context = []): void
     {
@@ -34,11 +34,11 @@ class AppLogger
     }
 
     /**
-     * Фиксация ошибок с отправкой в Sentry
+     * Фиксация ошибок с отправкой в Sentry.
      */
-    public function error(string $message, \Throwable $exception = null, array $context = []): void
+    public function error(string $message, ?\Throwable $exception = null, array $context = []): void
     {
-        if ($exception !== null) {
+        if (null !== $exception) {
             $context['exception'] = $exception;
         }
 

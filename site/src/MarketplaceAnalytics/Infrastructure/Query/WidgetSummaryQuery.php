@@ -58,7 +58,6 @@ final readonly class WidgetSummaryQuery
         $returns = $this->marketplaceFacade->getReturnAggregatesByListing($companyId, $marketplace, $dateFrom, $dateTo);
         $costRows = $this->getCostAggregates($companyId, $marketplace, $dateFrom, $dateTo);
 
-
         $revenue = 0.0;
         $returnsTotal = 0.0;
         $costPriceTotal = 0.0;
@@ -67,10 +66,10 @@ final readonly class WidgetSummaryQuery
         foreach (self::WIDGET_GROUPS as $groupName) {
             $groups[$groupName] = [
                 'serviceGroup' => $groupName,
-                'costsAmount'  => 0.0,
+                'costsAmount' => 0.0,
                 'stornoAmount' => 0.0,
-                'netAmount'    => 0.0,
-                'categories'   => [],
+                'netAmount' => 0.0,
+                'categories' => [],
             ];
         }
 
@@ -101,15 +100,15 @@ final readonly class WidgetSummaryQuery
 
             // Агрегируем одинаковые categoryCode внутри группы
             // (на всякий случай — SQL уже группирует по cc.code, cc.name)
-            $categoryKey = $marketplaceFromRow . ':' . $code;
+            $categoryKey = $marketplaceFromRow.':'.$code;
 
             if (!isset($groups[$group]['categories'][$categoryKey])) {
                 $groups[$group]['categories'][$categoryKey] = [
-                    'code'         => $code,
-                    'name'         => $name,
-                    'costsAmount'  => 0.0,
+                    'code' => $code,
+                    'name' => $name,
+                    'costsAmount' => 0.0,
                     'stornoAmount' => 0.0,
-                    'netAmount'    => 0.0,
+                    'netAmount' => 0.0,
                 ];
             }
 
@@ -125,11 +124,11 @@ final readonly class WidgetSummaryQuery
             $categories = [];
             foreach ($group['categories'] as $cat) {
                 $categories[] = [
-                    'code'         => $cat['code'],
-                    'name'         => $cat['name'],
-                    'costsAmount'  => round($cat['costsAmount'], 2),
+                    'code' => $cat['code'],
+                    'name' => $cat['name'],
+                    'costsAmount' => round($cat['costsAmount'], 2),
                     'stornoAmount' => round($cat['stornoAmount'], 2),
-                    'netAmount'    => round($cat['netAmount'], 2),
+                    'netAmount' => round($cat['netAmount'], 2),
                 ];
             }
 
@@ -140,10 +139,10 @@ final readonly class WidgetSummaryQuery
 
             $widgetGroups[] = [
                 'serviceGroup' => $group['serviceGroup'],
-                'costsAmount'  => round($group['costsAmount'], 2),
+                'costsAmount' => round($group['costsAmount'], 2),
                 'stornoAmount' => round($group['stornoAmount'], 2),
-                'netAmount'    => $netAmount,
-                'categories'   => $categories,
+                'netAmount' => $netAmount,
+                'categories' => $categories,
             ];
         }
 
@@ -158,13 +157,13 @@ final readonly class WidgetSummaryQuery
         $marginPercent = $revenue > 0 ? round($profit / $revenue * 100, 1) : null;
 
         return [
-            'revenue'        => $revenue,
-            'returnsTotal'   => $returnsTotal,
+            'revenue' => $revenue,
+            'returnsTotal' => $returnsTotal,
             'costPriceTotal' => $costPriceTotal,
-            'totalCosts'     => $totalCosts,
-            'profit'         => $profit,
-            'marginPercent'  => $marginPercent,
-            'widgetGroups'   => $widgetGroups,
+            'totalCosts' => $totalCosts,
+            'profit' => $profit,
+            'marginPercent' => $marginPercent,
+            'widgetGroups' => $widgetGroups,
         ];
     }
 
@@ -195,7 +194,7 @@ final readonly class WidgetSummaryQuery
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
     ): array {
-        $mpFilter = $marketplace !== null ? 'AND c.marketplace = :marketplace' : '';
+        $mpFilter = null !== $marketplace ? 'AND c.marketplace = :marketplace' : '';
 
         // Effective op type per строке считается в подзапросе — чтобы не
         // дублировать логику compensation/decompensation в трёх SUM(CASE ...).
@@ -233,14 +232,14 @@ final readonly class WidgetSummaryQuery
             ORDER BY costs_amount ASC
             SQL,
             array_filter([
-                'companyId'   => $companyId,
-                'periodFrom'  => $from->format('Y-m-d'),
-                'periodTo'    => $to->format('Y-m-d'),
+                'companyId' => $companyId,
+                'periodFrom' => $from->format('Y-m-d'),
+                'periodTo' => $to->format('Y-m-d'),
                 'marketplace' => $marketplace,
-            ], static fn ($v) => $v !== null),
+            ], static fn ($v) => null !== $v),
         );
 
-        /** @var list<array{
+        /* @var list<array{
          *     marketplace: string,
          *     category_code: string,
          *     category_name: string,

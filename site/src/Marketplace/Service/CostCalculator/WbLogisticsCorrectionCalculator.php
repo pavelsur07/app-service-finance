@@ -22,7 +22,7 @@ class WbLogisticsCorrectionCalculator implements CostCalculatorInterface
 
     public function supports(array $item): bool
     {
-        return $this->normalizer->sellerOperName($item) === 'Коррекция логистики';
+        return 'Коррекция логистики' === $this->normalizer->sellerOperName($item);
     }
 
     public function requiresListing(): bool
@@ -39,7 +39,7 @@ class WbLogisticsCorrectionCalculator implements CostCalculatorInterface
         }
 
         $externalId = $this->externalIdBuilder->build($item, 'logistics_correction');
-        if ($externalId === null) {
+        if (null === $externalId) {
             return [];
         }
 

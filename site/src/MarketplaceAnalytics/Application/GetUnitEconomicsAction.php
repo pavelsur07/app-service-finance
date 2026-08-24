@@ -12,7 +12,8 @@ final class GetUnitEconomicsAction
 {
     public function __construct(
         private readonly UnitEconomicsAggregationPolicy $policy,
-    ) {}
+    ) {
+    }
 
     /**
      * @return ListingUnitEconomics[]

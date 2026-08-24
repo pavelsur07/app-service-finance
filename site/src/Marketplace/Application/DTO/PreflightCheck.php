@@ -12,11 +12,11 @@ final class PreflightCheck
     public function __construct(
         public readonly string $key,
         public readonly string $label,
-        public readonly bool   $passed,
-        public readonly bool   $blocking,   // true — блокирует закрытие
+        public readonly bool $passed,
+        public readonly bool $blocking,   // true — блокирует закрытие
         public readonly string $message,
-        public readonly mixed  $value = null, // дополнительные данные (счётчик и т.п.)
-        public readonly array  $details = [], // структурированные данные для UI (список элементов и т.п.)
+        public readonly mixed $value = null, // дополнительные данные (счётчик и т.п.)
+        public readonly array $details = [], // структурированные данные для UI (список элементов и т.п.)
     ) {
     }
 

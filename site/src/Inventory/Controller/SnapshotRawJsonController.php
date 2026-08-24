@@ -32,7 +32,7 @@ final class SnapshotRawJsonController extends AbstractController
 
         $companyId = (string) $this->activeCompanyService->getActiveCompany()->getId();
         $session = $this->sessionRepository->findByIdAndCompany($id, $companyId);
-        if ($session === null) {
+        if (null === $session) {
             throw $this->createNotFoundException('Inventory snapshot session not found.');
         }
 
@@ -65,7 +65,7 @@ final class SnapshotRawJsonController extends AbstractController
             ], $rawSnapshots),
         ];
 
-        if ($rawSnapshots === []) {
+        if ([] === $rawSnapshots) {
             $payload['message'] = 'No raw snapshots saved for this session.';
         }
 

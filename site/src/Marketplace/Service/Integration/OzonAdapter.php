@@ -11,8 +11,8 @@ use App\Marketplace\DTO\SaleData;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
+use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -46,7 +46,7 @@ class OzonAdapter implements MarketplaceAdapterInterface
         }
 
         try {
-            $response = $this->httpClient->request('POST', self::BASE_URL . self::TRANSACTION_ENDPOINT, [
+            $response = $this->httpClient->request('POST', self::BASE_URL.self::TRANSACTION_ENDPOINT, [
                 'headers' => $this->buildHeaders($connection),
                 'json' => [
                     'filter' => [
@@ -67,6 +67,7 @@ class OzonAdapter implements MarketplaceAdapterInterface
             return 200 === $response->getStatusCode();
         } catch (\Exception $e) {
             $this->logger->error('Ozon authentication failed', ['error' => $e->getMessage()]);
+
             return false;
         }
     }
@@ -103,7 +104,7 @@ class OzonAdapter implements MarketplaceAdapterInterface
         $pageCount = 1;
 
         do {
-            $response = $this->httpClient->request('POST', self::BASE_URL . self::TRANSACTION_ENDPOINT, [
+            $response = $this->httpClient->request('POST', self::BASE_URL.self::TRANSACTION_ENDPOINT, [
                 'headers' => $this->buildHeaders($connection),
                 'json' => [
                     'filter' => [
@@ -126,7 +127,7 @@ class OzonAdapter implements MarketplaceAdapterInterface
             $pageCount = (int) ($data['result']['page_count'] ?? 1);
 
             // In-place append: array_merge в цикле переписывал бы весь аккумулятор каждую итерацию.
-            if ($operations !== []) {
+            if ([] !== $operations) {
                 array_push($allOperations, ...$operations);
             }
 
@@ -162,9 +163,9 @@ class OzonAdapter implements MarketplaceAdapterInterface
         foreach ($operations as $op) {
             // Продажи: accruals_for_sale > 0, type = "orders"
             $type = $op['type'] ?? '';
-            $accruals = (float)($op['accruals_for_sale'] ?? 0);
+            $accruals = (float) ($op['accruals_for_sale'] ?? 0);
 
-            if ($type !== 'orders' || $accruals <= 0) {
+            if ('orders' !== $type || $accruals <= 0) {
                 continue;
             }
 
@@ -178,16 +179,16 @@ class OzonAdapter implements MarketplaceAdapterInterface
             $items = $op['items'] ?? [];
 
             // SKU первого товара в операции
-            $sku = !empty($items) ? (string)$items[0]['sku'] : '';
+            $sku = !empty($items) ? (string) $items[0]['sku'] : '';
 
             $sales[] = new SaleData(
                 marketplace: MarketplaceType::OZON,
-                externalOrderId: $postingNumber ?: (string)$op['operation_id'],
+                externalOrderId: $postingNumber ?: (string) $op['operation_id'],
                 saleDate: $operationDate,
                 marketplaceSku: $sku,
                 quantity: max(1, count($items)),
-                pricePerUnit: (string)$accruals,
-                totalRevenue: (string)$accruals,
+                pricePerUnit: (string) $accruals,
+                totalRevenue: (string) $accruals,
                 rawData: null
             );
         }
@@ -204,7 +205,7 @@ class OzonAdapter implements MarketplaceAdapterInterface
         $costs = [];
 
         foreach ($operations as $op) {
-            $operationId = (string)($op['operation_id'] ?? '');
+            $operationId = (string) ($op['operation_id'] ?? '');
             $operationDate = $this->parseOperationDate($op['operation_date'] ?? null);
             if (null === $operationDate) {
                 $this->logger->warning('Ozon operation skipped: invalid operation_date', ['operation_id' => $op['operation_id'] ?? null]);
@@ -212,49 +213,49 @@ class OzonAdapter implements MarketplaceAdapterInterface
             }
             $postingNumber = $op['posting']['posting_number'] ?? '';
             $items = $op['items'] ?? [];
-            $sku = !empty($items) ? (string)$items[0]['sku'] : null;
+            $sku = !empty($items) ? (string) $items[0]['sku'] : null;
 
             // Комиссия за продажу
-            $saleCommission = (float)($op['sale_commission'] ?? 0);
+            $saleCommission = (float) ($op['sale_commission'] ?? 0);
             if (abs($saleCommission) > 0) {
                 $costs[] = new CostData(
                     marketplace: MarketplaceType::OZON,
                     categoryCode: 'ozon_sale_commission',
-                    amount: (string)abs($saleCommission),
+                    amount: (string) abs($saleCommission),
                     costDate: $operationDate,
                     marketplaceSku: $sku,
                     description: 'Комиссия за продажу Ozon',
-                    externalId: $operationId . '_commission',
+                    externalId: $operationId.'_commission',
                     rawData: null
                 );
             }
 
             // Стоимость доставки
-            $deliveryCharge = (float)($op['delivery_charge'] ?? 0);
+            $deliveryCharge = (float) ($op['delivery_charge'] ?? 0);
             if (abs($deliveryCharge) > 0) {
                 $costs[] = new CostData(
                     marketplace: MarketplaceType::OZON,
                     categoryCode: 'ozon_delivery',
-                    amount: (string)abs($deliveryCharge),
+                    amount: (string) abs($deliveryCharge),
                     costDate: $operationDate,
                     marketplaceSku: $sku,
                     description: 'Доставка Ozon',
-                    externalId: $operationId . '_delivery',
+                    externalId: $operationId.'_delivery',
                     rawData: null
                 );
             }
 
             // Стоимость обратной доставки (возврат)
-            $returnDeliveryCharge = (float)($op['return_delivery_charge'] ?? 0);
+            $returnDeliveryCharge = (float) ($op['return_delivery_charge'] ?? 0);
             if (abs($returnDeliveryCharge) > 0) {
                 $costs[] = new CostData(
                     marketplace: MarketplaceType::OZON,
                     categoryCode: 'ozon_return_delivery',
-                    amount: (string)abs($returnDeliveryCharge),
+                    amount: (string) abs($returnDeliveryCharge),
                     costDate: $operationDate,
                     marketplaceSku: $sku,
                     description: 'Обратная доставка Ozon',
-                    externalId: $operationId . '_return_delivery',
+                    externalId: $operationId.'_return_delivery',
                     rawData: null
                 );
             }
@@ -262,7 +263,7 @@ class OzonAdapter implements MarketplaceAdapterInterface
             // Сервисы (хранение, обработка, подписка, и т.д.)
             $services = $op['services'] ?? [];
             foreach ($services as $idx => $service) {
-                $servicePrice = (float)($service['price'] ?? 0);
+                $servicePrice = (float) ($service['price'] ?? 0);
                 if (abs($servicePrice) <= 0) {
                     continue;
                 }
@@ -273,11 +274,11 @@ class OzonAdapter implements MarketplaceAdapterInterface
                 $costs[] = new CostData(
                     marketplace: MarketplaceType::OZON,
                     categoryCode: $categoryCode,
-                    amount: (string)abs($servicePrice),
+                    amount: (string) abs($servicePrice),
                     costDate: $operationDate,
                     marketplaceSku: $sku,
                     description: $serviceName,
-                    externalId: $operationId . '_svc_' . $idx,
+                    externalId: $operationId.'_svc_'.$idx,
                     rawData: null
                 );
             }
@@ -298,7 +299,7 @@ class OzonAdapter implements MarketplaceAdapterInterface
             $type = $op['type'] ?? '';
 
             // Возвраты: type = "returns"
-            if ($type !== 'returns') {
+            if ('returns' !== $type) {
                 continue;
             }
 
@@ -310,26 +311,26 @@ class OzonAdapter implements MarketplaceAdapterInterface
 
             $postingNumber = $op['posting']['posting_number'] ?? '';
             $items = $op['items'] ?? [];
-            $sku = !empty($items) ? (string)$items[0]['sku'] : '';
+            $sku = !empty($items) ? (string) $items[0]['sku'] : '';
 
             // accruals_for_sale будет отрицательным при возврате
-            $refundAmount = abs((float)($op['accruals_for_sale'] ?? 0));
+            $refundAmount = abs((float) ($op['accruals_for_sale'] ?? 0));
             // Если нет accruals, берём amount
             if ($refundAmount <= 0) {
-                $refundAmount = abs((float)($op['amount'] ?? 0));
+                $refundAmount = abs((float) ($op['amount'] ?? 0));
             }
 
-            $returnDeliveryCost = (float)($op['return_delivery_charge'] ?? 0);
+            $returnDeliveryCost = (float) ($op['return_delivery_charge'] ?? 0);
 
             $returns[] = new ReturnData(
                 marketplace: MarketplaceType::OZON,
                 marketplaceSku: $sku,
                 returnDate: $operationDate,
                 quantity: max(1, count($items)),
-                refundAmount: (string)$refundAmount,
+                refundAmount: (string) $refundAmount,
                 returnReason: $op['operation_type_name'] ?? null,
-                returnLogisticsCost: abs($returnDeliveryCost) > 0 ? (string)abs($returnDeliveryCost) : null,
-                externalReturnId: $postingNumber ?: (string)$op['operation_id'],
+                returnLogisticsCost: abs($returnDeliveryCost) > 0 ? (string) abs($returnDeliveryCost) : null,
+                externalReturnId: $postingNumber ?: (string) $op['operation_id'],
                 rawData: null
             );
         }

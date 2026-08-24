@@ -17,5 +17,6 @@ final readonly class CreateTelegramCashTransactionCommand
         public ?int $updateId,
         public ?int $messageDate,
         public string $text,
-    ) {}
+    ) {
+    }
 }

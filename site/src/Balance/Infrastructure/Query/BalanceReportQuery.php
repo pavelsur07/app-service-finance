@@ -176,7 +176,7 @@ final class BalanceReportQuery
 
             foreach ($currencies as $currency) {
                 $amount = $totals[$currency] ?? '0';
-                $signedAmount = $sign < 0 ? '-' . $amount : $amount;
+                $signedAmount = $sign < 0 ? '-'.$amount : $amount;
                 $amounts[$currency] = bcadd($amounts[$currency], $signedAmount, self::MONEY_SCALE);
             }
         }
@@ -192,7 +192,7 @@ final class BalanceReportQuery
         string $companyId,
         \DateTimeImmutable $date,
     ): array {
-        $key = $type->value . ':' . $companyId . ':' . $date->format('Y-m-d');
+        $key = $type->value.':'.$companyId.':'.$date->format('Y-m-d');
 
         if (!isset($this->totalsCache[$key])) {
             $provider = $this->registry->get($type);

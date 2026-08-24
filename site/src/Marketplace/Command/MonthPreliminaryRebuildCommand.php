@@ -41,8 +41,8 @@ final class MonthPreliminaryRebuildCommand extends Command
 
     public function __construct(
         private readonly ActiveSellerConnectionsQuery $connectionsQuery,
-        private readonly MessageBusInterface          $messageBus,
-        private readonly LoggerInterface              $logger,
+        private readonly MessageBusInterface $messageBus,
+        private readonly LoggerInterface $logger,
     ) {
         parent::__construct();
     }
@@ -58,8 +58,8 @@ final class MonthPreliminaryRebuildCommand extends Command
         }
 
         try {
-            $now   = new \DateTimeImmutable();
-            $year  = (int) $now->format('Y');
+            $now = new \DateTimeImmutable();
+            $year = (int) $now->format('Y');
             $month = (int) $now->format('n');
 
             $connections = $this->connectionsQuery->execute();
@@ -71,37 +71,37 @@ final class MonthPreliminaryRebuildCommand extends Command
             }
 
             $dispatched = 0;
-            $failed     = 0;
+            $failed = 0;
 
             foreach ($connections as $row) {
-                $companyId   = (string) $row['company_id'];
+                $companyId = (string) $row['company_id'];
                 $marketplace = (string) $row['marketplace'];
 
                 try {
                     $this->messageBus->dispatch(new RebuildPreliminaryForPeriodMessage(
-                        companyId:   $companyId,
+                        companyId: $companyId,
                         marketplace: $marketplace,
-                        year:        $year,
-                        month:       $month,
+                        year: $year,
+                        month: $month,
                         actorUserId: self::SYSTEM_ACTOR_USER_ID,
                     ));
 
-                    $dispatched++;
+                    ++$dispatched;
 
                     $this->logger->info('[PreliminaryRebuild] Dispatched', [
-                        'company_id'  => $companyId,
+                        'company_id' => $companyId,
                         'marketplace' => $marketplace,
-                        'year'        => $year,
-                        'month'       => $month,
+                        'year' => $year,
+                        'month' => $month,
                     ]);
                 } catch (\Throwable $e) {
                     // Сбой одного диспатча не должен прерывать остальные.
-                    $failed++;
+                    ++$failed;
 
                     $this->logger->error('[PreliminaryRebuild] Dispatch failed', [
-                        'company_id'  => $companyId,
+                        'company_id' => $companyId,
                         'marketplace' => $marketplace,
-                        'error'       => $e->getMessage(),
+                        'error' => $e->getMessage(),
                     ]);
                 }
             }

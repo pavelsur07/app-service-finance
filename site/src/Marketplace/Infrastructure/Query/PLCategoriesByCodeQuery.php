@@ -9,12 +9,14 @@ use Doctrine\DBAL\Connection;
 
 final readonly class PLCategoriesByCodeQuery
 {
-    public function __construct(private Connection $connection) {}
+    public function __construct(private Connection $connection)
+    {
+    }
 
     /** @param list<string> $codes @return array<string, list<array{id: string, code: string, name: string, type: string, flow: string, is_visible: bool}>> */
     public function fetchIndexed(string $companyId, array $codes): array
     {
-        if ($codes === []) {
+        if ([] === $codes) {
             return [];
         }
 

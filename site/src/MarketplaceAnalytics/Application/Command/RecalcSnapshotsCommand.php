@@ -61,7 +61,7 @@ final class RecalcSnapshotsCommand extends Command
             return Command::SUCCESS;
         } catch (\Throwable $e) {
             $this->logger->error('Recalc command failed', $e);
-            $output->writeln('<error>' . $e->getMessage() . '</error>');
+            $output->writeln('<error>'.$e->getMessage().'</error>');
 
             return Command::FAILURE;
         }

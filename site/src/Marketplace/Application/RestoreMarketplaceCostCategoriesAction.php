@@ -33,7 +33,7 @@ final class RestoreMarketplaceCostCategoriesAction
     public function __invoke(Company $company, MarketplaceType $marketplace): int
     {
         $allCodes = $this->getCategoriesForMarketplace($marketplace);
-        if ($allCodes === []) {
+        if ([] === $allCodes) {
             return 0;
         }
 
@@ -53,13 +53,13 @@ final class RestoreMarketplaceCostCategoriesAction
         foreach ($allCodes as $code => $name) {
             $category = $existingMap[$code] ?? null;
 
-            if ($category !== null) {
+            if (null !== $category) {
                 if ($category->isDeleted()) {
                     $category->restore();
-                    $restored++;
+                    ++$restored;
                 } elseif (!$category->isActive()) {
                     $category->setIsActive(true);
-                    $restored++;
+                    ++$restored;
                 }
 
                 continue;
@@ -74,7 +74,7 @@ final class RestoreMarketplaceCostCategoriesAction
             $category->setName($name);
 
             $this->em->persist($category);
-            $restored++;
+            ++$restored;
         }
 
         $this->em->flush();

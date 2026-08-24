@@ -6,7 +6,6 @@ namespace App\Tests\Builders\Balance;
 
 use App\Balance\Entity\BalanceCategory;
 use App\Balance\Enum\BalanceCategoryType;
-use Ramsey\Uuid\Uuid;
 
 final class BalanceCategoryBuilder
 {

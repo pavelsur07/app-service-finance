@@ -48,7 +48,7 @@ class CompanyController extends AbstractController
 
         $referer = $request->headers->get('referer');
 
-        if ($referer !== null) {
+        if (null !== $referer) {
             $refererHost = parse_url($referer, PHP_URL_HOST);
             if ($refererHost === $request->getHost()) {
                 return $this->redirect($referer);

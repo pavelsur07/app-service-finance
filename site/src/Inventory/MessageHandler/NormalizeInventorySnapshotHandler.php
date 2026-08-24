@@ -16,7 +16,8 @@ final readonly class NormalizeInventorySnapshotHandler
     public function __construct(
         private NormalizeInventorySnapshotAction $action,
         private AppLogger $logger,
-    ) {}
+    ) {
+    }
 
     public function __invoke(NormalizeInventorySnapshotMessage $message): void
     {
@@ -27,12 +28,13 @@ final readonly class NormalizeInventorySnapshotHandler
         ]);
 
         $source = MarketplaceType::tryFrom($message->source);
-        if ($source === null) {
+        if (null === $source) {
             $this->logger->warning('Inventory normalization skipped due to unsupported source value.', [
                 'companyId' => $message->companyId,
                 'snapshotSessionId' => $message->snapshotSessionId,
                 'source' => $message->source,
             ]);
+
             return;
         }
 

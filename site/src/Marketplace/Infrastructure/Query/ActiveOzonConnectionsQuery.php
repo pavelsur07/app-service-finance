@@ -19,7 +19,7 @@ final class ActiveOzonConnectionsQuery
     }
 
     /**
-     * @return array<int, array{id: string, company_id: string, client_id: null|string, finance_lock_before: null|string}>
+     * @return array<int, array{id: string, company_id: string, client_id: string|null, finance_lock_before: string|null}>
      */
     public function execute(?string $companyId = null): array
     {

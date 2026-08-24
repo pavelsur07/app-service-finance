@@ -11,5 +11,6 @@ final readonly class ActiveListingDTO
         public string $marketplace,
         public string $marketplaceSku,
         public ?string $name,
-    ) {}
+    ) {
+    }
 }

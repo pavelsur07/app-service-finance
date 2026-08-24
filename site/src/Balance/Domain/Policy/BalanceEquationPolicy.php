@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Balance\Domain\Policy;
 
-use App\Balance\DTO\BalanceRowView;
 use App\Balance\Enum\BalanceCategoryType;
 use App\Balance\ReadModel\BalanceReport;
 
@@ -40,7 +39,7 @@ final readonly class BalanceEquationPolicy
             }
 
             $right = bcadd($liabilities, $equity, 2);
-            if (bccomp($assets, $right, 2) !== 0) {
+            if (0 !== bccomp($assets, $right, 2)) {
                 $errors[] = sprintf(
                     '%s: активы (%s) ≠ обязательства (%s) + капитал (%s)',
                     $currency,

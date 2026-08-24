@@ -14,7 +14,7 @@ use Doctrine\DBAL\Connection;
  */
 final class InternalArticleGeneratorDoctrine implements InternalArticleGenerator
 {
-    private const PREFIX     = 'PRD';
+    private const PREFIX = 'PRD';
     private const PAD_LENGTH = 6;
 
     public function __construct(private readonly Connection $connection)

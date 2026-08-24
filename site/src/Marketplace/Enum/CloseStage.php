@@ -7,13 +7,13 @@ namespace App\Marketplace\Enum;
 enum CloseStage: string
 {
     case SALES_RETURNS = 'sales_returns';
-    case COSTS         = 'costs';
+    case COSTS = 'costs';
 
     public function getLabel(): string
     {
         return match ($this) {
             self::SALES_RETURNS => 'Продажи и возвраты',
-            self::COSTS         => 'Затраты',
+            self::COSTS => 'Затраты',
         };
     }
 }

@@ -21,7 +21,8 @@ final class RecalcSnapshotsMessageHandler
         private readonly EnsureCostMappingsSeededAction $ensureCostMappingsSeededAction,
         private readonly EntityManagerInterface $entityManager,
         private readonly AppLogger $logger,
-    ) {}
+    ) {
+    }
 
     public function __invoke(RecalcSnapshotsMessage $message): void
     {

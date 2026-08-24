@@ -11,10 +11,10 @@ use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Api\Wildberries\WbProductCardsClient;
 use App\Marketplace\Infrastructure\Query\WbBarcodeUpsertQuery;
+use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use Doctrine\ORM\EntityManagerInterface;
-use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
 use Psr\Log\LoggerInterface;
 
 final readonly class RefreshWbListingCatalogAction

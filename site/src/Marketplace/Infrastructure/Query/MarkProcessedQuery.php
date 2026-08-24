@@ -63,7 +63,7 @@ final class MarkProcessedQuery
                   AND s.document_id IS NULL
                   AND s.sale_date >= :periodFrom
                   AND s.sale_date <= :periodTo
-                  ' . $preliminaryFilter . '
+                  '.$preliminaryFilter.'
                   AND EXISTS (
                       SELECT 1
                       FROM marketplace_sale_mappings m
@@ -71,7 +71,7 @@ final class MarkProcessedQuery
                         AND m.marketplace = s.marketplace
                         AND m.operation_type = \'sale\'
                         AND m.is_active = true
-                        AND ' . $amountCase . ' != 0
+                        AND '.$amountCase.' != 0
                   )
              )',
             [
@@ -115,7 +115,7 @@ final class MarkProcessedQuery
                   AND r.document_id IS NULL
                   AND r.return_date >= :periodFrom
                   AND r.return_date <= :periodTo
-                  ' . $preliminaryFilter . '
+                  '.$preliminaryFilter.'
                   AND EXISTS (
                       SELECT 1
                       FROM marketplace_sale_mappings m
@@ -178,7 +178,7 @@ final class MarkProcessedQuery
                    AND c.cost_date <= :periodTo
                    AND m.include_in_pl = true
                    AND m.pl_category_id IS NOT NULL
-                   ' . $preliminaryFilter . '
+                   '.$preliminaryFilter.'
              )',
             [
                 'documentId' => $documentId,
@@ -198,7 +198,7 @@ final class MarkProcessedQuery
         string $marketplace,
         array $documentIds,
     ): int {
-        if ($documentIds === []) {
+        if ([] === $documentIds) {
             return 0;
         }
 
@@ -218,7 +218,7 @@ final class MarkProcessedQuery
         string $marketplace,
         array $documentIds,
     ): int {
-        if ($documentIds === []) {
+        if ([] === $documentIds) {
             return 0;
         }
 
@@ -238,7 +238,7 @@ final class MarkProcessedQuery
         string $marketplace,
         array $documentIds,
     ): int {
-        if ($documentIds === []) {
+        if ([] === $documentIds) {
             return 0;
         }
 

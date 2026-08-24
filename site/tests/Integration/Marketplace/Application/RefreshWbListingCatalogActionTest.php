@@ -146,7 +146,7 @@ final class RefreshWbListingCatalogActionTest extends IntegrationTestCase
 
     /**
      * @param list<array<string, mixed>>|null $activeCards
-     * @param list<array<string, mixed>>      $trashCards
+     * @param list<array<string, mixed>> $trashCards
      */
     private function client(?array $activeCards = null, array $trashCards = []): WbProductCardsClient
     {

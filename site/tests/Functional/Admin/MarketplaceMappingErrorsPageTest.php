@@ -113,7 +113,7 @@ final class MarketplaceMappingErrorsPageTest extends WebTestCaseBase
         self::assertCount(2, $crawler->filter('form [data-admin-confirm][data-admin-confirm-tone="primary"]'));
 
         $client->request('POST', sprintf('/admin/marketplace/mapping-errors/%s/resolve', $error->getId()), [
-            '_token' => $this->csrfToken($client, 'admin_marketplace_mapping_error_resolve' . $error->getId()),
+            '_token' => $this->csrfToken($client, 'admin_marketplace_mapping_error_resolve'.$error->getId()),
         ]);
         self::assertResponseRedirects('/admin/marketplace/mapping-errors');
 

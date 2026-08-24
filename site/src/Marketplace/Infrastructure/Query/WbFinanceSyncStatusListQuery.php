@@ -15,7 +15,8 @@ final class WbFinanceSyncStatusListQuery
 {
     public function __construct(
         private readonly Connection $connection,
-    ) {}
+    ) {
+    }
 
     public function createByCompanyQueryBuilder(string $companyId, ?\DateTimeImmutable $from = null): QueryBuilder
     {

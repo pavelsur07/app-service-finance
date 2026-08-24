@@ -341,7 +341,6 @@ final class WbFinanceSalesReportClientTest extends TestCase
         }
     }
 
-
     public function testRemote429RetryAfterSecondsSetsCooldownFromNow(): void
     {
         $storage = new InMemoryWbFinanceCooldownStorage();
@@ -439,7 +438,6 @@ final class WbFinanceSalesReportClientTest extends TestCase
             $storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:connection:connection-id'),
         );
     }
-
 
     public function testRemote429RetryAfterTakesPriorityOverLongResetTimestamp(): void
     {
@@ -708,7 +706,6 @@ final class WbFinanceSalesReportClientTest extends TestCase
         return new WbFinanceRateLimiter($factory, $clock ?? new MockClock(), null, $storage);
     }
 }
-
 
 final class InMemoryLogger extends AbstractLogger
 {

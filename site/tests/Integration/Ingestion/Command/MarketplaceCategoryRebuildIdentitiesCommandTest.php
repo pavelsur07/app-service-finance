@@ -183,8 +183,7 @@ final class MarketplaceCategoryRebuildIdentitiesCommandTest extends IntegrationT
     private function findCategory(
         string $normalizedKey,
         string $scope = OzonAccrualCategoryTaxonomyResolver::SCOPE_NON_ITEM,
-    ): ?ExternalCategory
-    {
+    ): ?ExternalCategory {
         /** @var ExternalCategoryRepository $repository */
         $repository = self::getContainer()->get(ExternalCategoryRepository::class);
 

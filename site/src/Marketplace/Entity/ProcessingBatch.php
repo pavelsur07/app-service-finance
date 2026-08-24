@@ -10,7 +10,7 @@ use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
 /**
- * ProcessingBatch - партия обработки raw документа
+ * ProcessingBatch - партия обработки raw документа.
  *
  * Отслеживает:
  * - Сколько записей должно быть обработано
@@ -81,7 +81,7 @@ class ProcessingBatch
      *   "sales": {"expected": 1000, "actual": 998, "passed": false},
      *   "returns": {"expected": 50, "actual": 50, "passed": true},
      *   "costs": {"unprocessed": 0, "passed": true}
-     * }
+     * }.
      */
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $reconciliationData = null;
@@ -100,7 +100,7 @@ class ProcessingBatch
     public function __construct(
         string $id,
         Company $company,
-        MarketplaceRawDocument $rawDocument
+        MarketplaceRawDocument $rawDocument,
     ) {
         Assert::uuid($id);
         $this->id = $id;
@@ -201,60 +201,70 @@ class ProcessingBatch
     public function setTotalRecords(int $totalRecords): self
     {
         $this->totalRecords = $totalRecords;
+
         return $this;
     }
 
     public function setSalesRecords(int $salesRecords): self
     {
         $this->salesRecords = $salesRecords;
+
         return $this;
     }
 
     public function setReturnRecords(int $returnRecords): self
     {
         $this->returnRecords = $returnRecords;
+
         return $this;
     }
 
     public function setCostRecords(int $costRecords): self
     {
         $this->costRecords = $costRecords;
+
         return $this;
     }
 
     public function setStornoRecords(int $stornoRecords): self
     {
         $this->stornoRecords = $stornoRecords;
+
         return $this;
     }
 
     public function setStatus(string $status): self
     {
         $this->status = $status;
+
         return $this;
     }
 
     public function setErrorMessage(?string $errorMessage): self
     {
         $this->errorMessage = $errorMessage;
+
         return $this;
     }
 
     public function setReconciliationData(?array $reconciliationData): self
     {
         $this->reconciliationData = $reconciliationData;
+
         return $this;
     }
 
     public function setStartedAt(?\DateTimeImmutable $startedAt): self
     {
         $this->startedAt = $startedAt;
+
         return $this;
     }
 
     public function setCompletedAt(?\DateTimeImmutable $completedAt): self
     {
         $this->completedAt = $completedAt;
+
         return $this;
     }
 
@@ -262,19 +272,22 @@ class ProcessingBatch
 
     public function incrementProcessedRecords(): self
     {
-        $this->processedRecords++;
+        ++$this->processedRecords;
+
         return $this;
     }
 
     public function incrementFailedRecords(): self
     {
-        $this->failedRecords++;
+        ++$this->failedRecords;
+
         return $this;
     }
 
     public function incrementSkippedRecords(): self
     {
-        $this->skippedRecords++;
+        ++$this->skippedRecords;
+
         return $this;
     }
 
@@ -284,6 +297,7 @@ class ProcessingBatch
     {
         $this->status = 'processing';
         $this->startedAt = new \DateTimeImmutable();
+
         return $this;
     }
 
@@ -291,6 +305,7 @@ class ProcessingBatch
     {
         $this->status = 'completed';
         $this->completedAt = new \DateTimeImmutable();
+
         return $this;
     }
 
@@ -299,13 +314,14 @@ class ProcessingBatch
         $this->status = 'failed';
         $this->errorMessage = $errorMessage;
         $this->completedAt = new \DateTimeImmutable();
+
         return $this;
     }
 
     // === RECONCILIATION METHODS ===
 
     /**
-     * Получить сводку по reconciliation
+     * Получить сводку по reconciliation.
      */
     public function getReconciliation(): array
     {
@@ -320,7 +336,7 @@ class ProcessingBatch
     }
 
     /**
-     * Все ли записи обработаны (processed + failed + skipped = total)
+     * Все ли записи обработаны (processed + failed + skipped = total).
      */
     public function isComplete(): bool
     {
@@ -328,7 +344,7 @@ class ProcessingBatch
     }
 
     /**
-     * Сколько записей не обработано
+     * Сколько записей не обработано.
      */
     public function getMissingRecords(): int
     {
@@ -336,11 +352,11 @@ class ProcessingBatch
     }
 
     /**
-     * Процент выполнения
+     * Процент выполнения.
      */
     public function getProgressPercent(): float
     {
-        if ($this->totalRecords === 0) {
+        if (0 === $this->totalRecords) {
             return 0.0;
         }
 
@@ -351,7 +367,7 @@ class ProcessingBatch
     }
 
     /**
-     * Есть ли ошибки обработки
+     * Есть ли ошибки обработки.
      */
     public function hasFailures(): bool
     {

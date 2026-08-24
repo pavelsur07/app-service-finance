@@ -70,37 +70,88 @@ class MappingError
         ?array $sampleRawJson = null,
     ) {
         Assert::uuid($id);
-        $this->id            = $id;
-        $this->companyId     = $companyId;
-        $this->marketplace   = $marketplace;
-        $this->year          = $year;
-        $this->month         = $month;
-        $this->serviceName   = $serviceName;
+        $this->id = $id;
+        $this->companyId = $companyId;
+        $this->marketplace = $marketplace;
+        $this->year = $year;
+        $this->month = $month;
+        $this->serviceName = $serviceName;
         $this->operationType = $operationType;
-        $this->totalAmount   = (string) $totalAmount;
-        $this->rowsCount     = $rowsCount;
+        $this->totalAmount = (string) $totalAmount;
+        $this->rowsCount = $rowsCount;
         $this->sampleRawJson = $sampleRawJson;
-        $this->detectedAt    = new \DateTimeImmutable();
+        $this->detectedAt = new \DateTimeImmutable();
     }
 
-    public function getId(): string { return $this->id; }
-    public function getCompanyId(): string { return $this->companyId; }
-    public function getMarketplace(): string { return $this->marketplace; }
-    public function getYear(): int { return $this->year; }
-    public function getMonth(): int { return $this->month; }
-    public function getServiceName(): string { return $this->serviceName; }
-    public function getOperationType(): string { return $this->operationType; }
-    public function getTotalAmount(): float { return (float) $this->totalAmount; }
-    public function getRowsCount(): int { return $this->rowsCount; }
-    public function getSampleRawJson(): ?array { return $this->sampleRawJson; }
-    public function getDetectedAt(): \DateTimeImmutable { return $this->detectedAt; }
-    public function getResolvedAt(): ?\DateTimeImmutable { return $this->resolvedAt; }
-    public function isResolved(): bool { return $this->resolvedAt !== null; }
+    public function getId(): string
+    {
+        return $this->id;
+    }
+
+    public function getCompanyId(): string
+    {
+        return $this->companyId;
+    }
+
+    public function getMarketplace(): string
+    {
+        return $this->marketplace;
+    }
+
+    public function getYear(): int
+    {
+        return $this->year;
+    }
+
+    public function getMonth(): int
+    {
+        return $this->month;
+    }
+
+    public function getServiceName(): string
+    {
+        return $this->serviceName;
+    }
+
+    public function getOperationType(): string
+    {
+        return $this->operationType;
+    }
+
+    public function getTotalAmount(): float
+    {
+        return (float) $this->totalAmount;
+    }
+
+    public function getRowsCount(): int
+    {
+        return $this->rowsCount;
+    }
+
+    public function getSampleRawJson(): ?array
+    {
+        return $this->sampleRawJson;
+    }
+
+    public function getDetectedAt(): \DateTimeImmutable
+    {
+        return $this->detectedAt;
+    }
+
+    public function getResolvedAt(): ?\DateTimeImmutable
+    {
+        return $this->resolvedAt;
+    }
+
+    public function isResolved(): bool
+    {
+        return null !== $this->resolvedAt;
+    }
 
     public function incrementAmount(float $amount): void
     {
-        $this->totalAmount = (string) (round((float) $this->totalAmount + $amount, 2));
-        $this->rowsCount++;
+        $this->totalAmount = (string) round((float) $this->totalAmount + $amount, 2);
+        ++$this->rowsCount;
         $this->detectedAt = new \DateTimeImmutable();
     }
 

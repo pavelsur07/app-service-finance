@@ -38,7 +38,7 @@ final readonly class AdSpendByListingQuery
      * Для полной суммы за период (включая non-attributed) использовать
      * MarketplaceAdsFacade::getTotalAdCostForPeriod().
      *
-     * @return array<string, string>  listingId => decimal-string adSpend
+     * @return array<string, string> listingId => decimal-string adSpend
      */
     public function getByListingForPeriod(
         string $companyId,

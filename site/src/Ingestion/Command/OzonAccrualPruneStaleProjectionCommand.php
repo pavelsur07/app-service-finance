@@ -220,7 +220,7 @@ final class OzonAccrualPruneStaleProjectionCommand extends Command
 
     /**
      * @param array<string, array<string, mixed>> $groupedRows
-     * @param list<array<string, mixed>>          $rows
+     * @param list<array<string, mixed>> $rows
      */
     private function collectGroupedRows(array &$groupedRows, IngestRawRecord $rawRecord, array $rows): void
     {

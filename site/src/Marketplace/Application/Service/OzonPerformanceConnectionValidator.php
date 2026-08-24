@@ -29,8 +29,8 @@ final readonly class OzonPerformanceConnectionValidator
      * Проверить credentials Ozon Performance API, запросив OAuth-токен.
      *
      * @throws OzonPerformanceValidationException
-     *   ::invalidCredentials — API вернул 401/403 (client_id / client_secret не подходят);
-     *   ::apiUnavailable     — таймаут, сеть или неожиданный HTTP-ответ.
+     *                                            ::invalidCredentials — API вернул 401/403 (client_id / client_secret не подходят);
+     *                                            ::apiUnavailable     — таймаут, сеть или неожиданный HTTP-ответ
      */
     public function validate(string $clientId, string $clientSecret): void
     {
@@ -49,10 +49,7 @@ final readonly class OzonPerformanceConnectionValidator
 
             $statusCode = $response->getStatusCode();
         } catch (TransportExceptionInterface $e) {
-            throw OzonPerformanceValidationException::apiUnavailable(
-                'сеть недоступна или превышен таймаут',
-                $e,
-            );
+            throw OzonPerformanceValidationException::apiUnavailable('сеть недоступна или превышен таймаут', $e);
         }
 
         if (401 === $statusCode || 403 === $statusCode) {
@@ -60,18 +57,13 @@ final readonly class OzonPerformanceConnectionValidator
         }
 
         if (200 !== $statusCode) {
-            throw OzonPerformanceValidationException::apiUnavailable(
-                sprintf('неожиданный HTTP-статус %d', $statusCode),
-            );
+            throw OzonPerformanceValidationException::apiUnavailable(sprintf('неожиданный HTTP-статус %d', $statusCode));
         }
 
         try {
             $data = $response->toArray(false);
         } catch (\Throwable $e) {
-            throw OzonPerformanceValidationException::apiUnavailable(
-                'некорректный формат ответа',
-                $e,
-            );
+            throw OzonPerformanceValidationException::apiUnavailable('некорректный формат ответа', $e);
         }
 
         if (!isset($data['access_token']) || !is_string($data['access_token']) || '' === $data['access_token']) {

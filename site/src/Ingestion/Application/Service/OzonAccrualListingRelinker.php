@@ -252,7 +252,7 @@ final readonly class OzonAccrualListingRelinker
     }
 
     /**
-     * @param list<array<string, mixed>>                                           $rows
+     * @param list<array<string, mixed>> $rows
      * @param array<string, \App\Ingestion\Application\DTO\ListingResolution|null> $resolutions
      *
      * @return array<string, FinancialTransaction>

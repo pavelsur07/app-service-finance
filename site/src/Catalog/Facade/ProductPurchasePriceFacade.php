@@ -28,10 +28,10 @@ final readonly class ProductPurchasePriceFacade
 
         return new PurchasePriceAtDto(
             effectiveFrom: (string) $row['effectiveFrom'],
-            effectiveTo:   isset($row['effectiveTo']) ? ($row['effectiveTo'] !== null ? (string) $row['effectiveTo'] : null) : null,
-            amount:        (string) $row['priceAmount'],
-            currency:      (string) $row['priceCurrency'],
-            note:          isset($row['note']) ? ($row['note'] !== null ? (string) $row['note'] : null) : null,
+            effectiveTo: isset($row['effectiveTo']) ? (null !== $row['effectiveTo'] ? (string) $row['effectiveTo'] : null) : null,
+            amount: (string) $row['priceAmount'],
+            currency: (string) $row['priceCurrency'],
+            note: isset($row['note']) ? (null !== $row['note'] ? (string) $row['note'] : null) : null,
         );
     }
 }

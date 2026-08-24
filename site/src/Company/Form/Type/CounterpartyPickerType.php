@@ -109,7 +109,7 @@ final class CounterpartyPickerType extends AbstractType
             /** @return list<CounterpartyChoiceDTO> */
             function (Options $options, mixed $value): array {
                 if (is_array($value) && [] !== $value) {
-                    /** @var list<CounterpartyChoiceDTO> $value */
+                    /* @var list<CounterpartyChoiceDTO> $value */
                     return $value;
                 }
 

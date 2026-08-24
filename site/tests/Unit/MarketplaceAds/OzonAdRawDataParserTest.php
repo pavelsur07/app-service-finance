@@ -45,7 +45,7 @@ final class OzonAdRawDataParserTest extends TestCase
         $json = json_encode([
             'rows' => [
                 ['campaign_id' => '123', 'campaign_name' => 'Кампания 1', 'sku' => '456',
-                 'spend' => 150.50, 'views' => 1000, 'clicks' => 50],
+                    'spend' => 150.50, 'views' => 1000, 'clicks' => 50],
             ],
         ], JSON_THROW_ON_ERROR);
 
@@ -67,11 +67,11 @@ final class OzonAdRawDataParserTest extends TestCase
         $json = json_encode([
             'rows' => [
                 ['campaign_id' => '123', 'campaign_name' => 'К1', 'sku' => '456',
-                 'spend' => 100.25, 'views' => 500, 'clicks' => 20],
+                    'spend' => 100.25, 'views' => 500, 'clicks' => 20],
                 ['campaign_id' => '123', 'campaign_name' => 'К1', 'sku' => '456',
-                 'spend' => 50.75, 'views' => 300, 'clicks' => 15],
+                    'spend' => 50.75, 'views' => 300, 'clicks' => 15],
                 ['campaign_id' => '123', 'campaign_name' => 'К1', 'sku' => '999',
-                 'spend' => 25.00, 'views' => 100, 'clicks' => 5],
+                    'spend' => 25.00, 'views' => 100, 'clicks' => 5],
             ],
         ], JSON_THROW_ON_ERROR);
 
@@ -98,9 +98,9 @@ final class OzonAdRawDataParserTest extends TestCase
         $json = json_encode([
             'rows' => [
                 ['campaign_id' => '111', 'campaign_name' => 'A', 'sku' => '456',
-                 'spend' => 10.00, 'views' => 100, 'clicks' => 1],
+                    'spend' => 10.00, 'views' => 100, 'clicks' => 1],
                 ['campaign_id' => '222', 'campaign_name' => 'B', 'sku' => '456',
-                 'spend' => 20.00, 'views' => 200, 'clicks' => 2],
+                    'spend' => 20.00, 'views' => 200, 'clicks' => 2],
             ],
         ], JSON_THROW_ON_ERROR);
 
@@ -122,7 +122,7 @@ final class OzonAdRawDataParserTest extends TestCase
         $json = json_encode([
             'rows' => [
                 ['campaign_id' => '1', 'campaign_name' => 'A', 'sku' => 'X',
-                 'spend' => 1.005, 'views' => 1, 'clicks' => 0],
+                    'spend' => 1.005, 'views' => 1, 'clicks' => 0],
             ],
         ], JSON_THROW_ON_ERROR);
 
@@ -142,11 +142,11 @@ final class OzonAdRawDataParserTest extends TestCase
         $json = json_encode([
             'rows' => [
                 ['campaign_id' => '1', 'campaign_name' => 'A', 'sku' => 'X',
-                 'spend' => 0.005, 'views' => 1, 'clicks' => 0],
+                    'spend' => 0.005, 'views' => 1, 'clicks' => 0],
                 ['campaign_id' => '1', 'campaign_name' => 'A', 'sku' => 'X',
-                 'spend' => 0.005, 'views' => 1, 'clicks' => 0],
+                    'spend' => 0.005, 'views' => 1, 'clicks' => 0],
                 ['campaign_id' => '1', 'campaign_name' => 'A', 'sku' => 'X',
-                 'spend' => 0.005, 'views' => 1, 'clicks' => 0],
+                    'spend' => 0.005, 'views' => 1, 'clicks' => 0],
             ],
         ], JSON_THROW_ON_ERROR);
 
@@ -161,11 +161,11 @@ final class OzonAdRawDataParserTest extends TestCase
         $json = json_encode([
             'rows' => [
                 ['campaign_id' => '1', 'campaign_name' => 'A', 'sku' => 'X',
-                 'spend' => 10.00, 'views' => 100, 'clicks' => 5],
+                    'spend' => 10.00, 'views' => 100, 'clicks' => 5],
                 ['campaign_name' => 'no id', 'sku' => 'Y',
-                 'spend' => 5.00, 'views' => 50, 'clicks' => 1],
+                    'spend' => 5.00, 'views' => 50, 'clicks' => 1],
                 ['campaign_id' => '2', 'campaign_name' => 'no sku',
-                 'spend' => 5.00, 'views' => 50, 'clicks' => 1],
+                    'spend' => 5.00, 'views' => 50, 'clicks' => 1],
             ],
         ], JSON_THROW_ON_ERROR);
 
@@ -189,21 +189,21 @@ final class OzonAdRawDataParserTest extends TestCase
         $json = json_encode([
             'rows' => [
                 ['campaign_id' => '1', 'campaign_name' => 'A', 'sku' => 'X',
-                 'spend' => 10.00, 'views' => 100, 'clicks' => 5],
+                    'spend' => 10.00, 'views' => 100, 'clicks' => 5],
                 ['campaign_name' => 'no id', 'sku' => 'Y',
-                 'spend' => 5.00, 'views' => 50, 'clicks' => 1],
+                    'spend' => 5.00, 'views' => 50, 'clicks' => 1],
                 ['campaign_id' => '2', 'campaign_name' => 'no sku',
-                 'spend' => 5.00, 'views' => 50, 'clicks' => 1],
+                    'spend' => 5.00, 'views' => 50, 'clicks' => 1],
                 'not-an-array',
             ],
         ], JSON_THROW_ON_ERROR);
 
         $parser->parse($json);
 
-        $warnings = array_filter($logger->records, static fn(array $r) => $r['level'] === 'warning');
+        $warnings = array_filter($logger->records, static fn (array $r) => 'warning' === $r['level']);
         self::assertCount(2, $warnings, 'Each skipped row with missing fields must emit a warning');
 
-        $summaries = array_filter($logger->records, static fn(array $r) => $r['level'] === 'info');
+        $summaries = array_filter($logger->records, static fn (array $r) => 'info' === $r['level']);
         self::assertCount(1, $summaries, 'Exactly one summary info-log must be emitted when rows were skipped');
 
         $summary = array_values($summaries)[0];
@@ -221,7 +221,7 @@ final class OzonAdRawDataParserTest extends TestCase
         $json = json_encode([
             'rows' => [
                 ['campaign_id' => '1', 'campaign_name' => 'A', 'sku' => 'X',
-                 'spend' => 10.00, 'views' => 100, 'clicks' => 5],
+                    'spend' => 10.00, 'views' => 100, 'clicks' => 5],
             ],
         ], JSON_THROW_ON_ERROR);
 
@@ -266,9 +266,9 @@ final class OzonAdRawDataParserTest extends TestCase
         $flatJson = json_encode([
             'rows' => [
                 ['campaign_id' => '111', 'campaign_name' => 'C1', 'sku' => 'A',
-                 'spend' => 12.34, 'views' => 100, 'clicks' => 3],
+                    'spend' => 12.34, 'views' => 100, 'clicks' => 3],
                 ['campaign_id' => '111', 'campaign_name' => 'C1', 'sku' => 'B',
-                 'spend' => 5.00, 'views' => 50, 'clicks' => 1],
+                    'spend' => 5.00, 'views' => 50, 'clicks' => 1],
             ],
         ], JSON_THROW_ON_ERROR);
 
@@ -372,7 +372,7 @@ final class OzonAdRawDataParserTest extends TestCase
                     'campaign_name' => 'ParentName',
                     'rows' => [
                         ['campaign_id' => 'ROW', 'campaign_name' => 'RowName',
-                         'sku' => 'X', 'spend' => 1.00, 'views' => 1, 'clicks' => 0],
+                            'sku' => 'X', 'spend' => 1.00, 'views' => 1, 'clicks' => 0],
                     ],
                 ],
             ],

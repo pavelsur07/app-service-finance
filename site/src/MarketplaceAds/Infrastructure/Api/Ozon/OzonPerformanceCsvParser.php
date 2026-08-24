@@ -309,7 +309,7 @@ final class OzonPerformanceCsvParser implements AdRawDataParserInterface
         }
 
         // Срезаем ведущий разделитель (`;` или `,`) — текст preamble-ячейки.
-        $campaignName = ltrim($firstLineTrimmed, ";,");
+        $campaignName = ltrim($firstLineTrimmed, ';,');
         $campaignName = trim($campaignName);
 
         $rest = false === $firstNewline ? '' : substr($csv, $firstNewline + 1);
@@ -355,7 +355,7 @@ final class OzonPerformanceCsvParser implements AdRawDataParserInterface
 
     /**
      * @param array<string, string> $row
-     * @param list<string>          $keys
+     * @param list<string> $keys
      */
     private function pickColumn(array $row, array $keys): string
     {

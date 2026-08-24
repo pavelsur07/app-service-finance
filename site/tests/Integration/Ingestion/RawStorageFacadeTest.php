@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Ingestion;
 
 use App\Ingestion\DTO\RawBatch;
-use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Exception\RawRecordNotFoundException;
 use App\Ingestion\Facade\RawStorageFacade;

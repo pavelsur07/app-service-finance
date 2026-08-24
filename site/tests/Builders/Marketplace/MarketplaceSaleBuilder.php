@@ -26,7 +26,7 @@ final class MarketplaceSaleBuilder
     private function __construct()
     {
         $this->id = Uuid::uuid4()->toString();
-        $this->externalOrderId = 'ext-' . Uuid::uuid4()->toString();
+        $this->externalOrderId = 'ext-'.Uuid::uuid4()->toString();
         $this->saleDate = new \DateTimeImmutable('2026-04-15');
     }
 
@@ -126,10 +126,10 @@ final class MarketplaceSaleBuilder
 
     public function build(): MarketplaceSale
     {
-        if ($this->company === null) {
+        if (null === $this->company) {
             throw new \LogicException('Company is required. Call forCompany().');
         }
-        if ($this->listing === null) {
+        if (null === $this->listing) {
             throw new \LogicException('Listing is required. Call forListing().');
         }
 
@@ -144,7 +144,7 @@ final class MarketplaceSaleBuilder
         $sale->setQuantity($this->quantity);
         $sale->setPricePerUnit($this->pricePerUnit);
         $sale->setTotalRevenue($this->totalRevenue);
-        if ($this->costPrice !== null) {
+        if (null !== $this->costPrice) {
             $sale->setCostPrice($this->costPrice);
         }
 

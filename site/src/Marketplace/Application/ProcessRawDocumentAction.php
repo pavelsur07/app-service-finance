@@ -21,12 +21,12 @@ final class ProcessRawDocumentAction implements ProcessRawDocumentActionInterfac
     {
         $marketplaceValue = $this->marketplaceQuery->getMarketplaceValue($cmd->companyId, $cmd->rawDocId);
 
-        if ($marketplaceValue === null) {
+        if (null === $marketplaceValue) {
             throw new \InvalidArgumentException("Raw document not found: {$cmd->rawDocId}");
         }
 
         $marketplace = MarketplaceType::from($marketplaceValue);
-        $processor   = $this->registry->get($marketplaceValue, $marketplace, $cmd->kind);
+        $processor = $this->registry->get($marketplaceValue, $marketplace, $cmd->kind);
 
         return $processor->process($cmd->companyId, $cmd->rawDocId);
     }

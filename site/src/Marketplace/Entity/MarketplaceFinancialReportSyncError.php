@@ -83,28 +83,61 @@ class MarketplaceFinancialReportSyncError
         $this->createdAt = new \DateTimeImmutable();
     }
 
-    public function getId(): string { return $this->id; }
+    public function getId(): string
+    {
+        return $this->id;
+    }
 
-    public function getSyncStatusId(): string { return $this->syncStatusId; }
+    public function getSyncStatusId(): string
+    {
+        return $this->syncStatusId;
+    }
 
-    public function getCompanyId(): string { return $this->companyId; }
+    public function getCompanyId(): string
+    {
+        return $this->companyId;
+    }
 
-    public function getConnectionId(): string { return $this->connectionId; }
+    public function getConnectionId(): string
+    {
+        return $this->connectionId;
+    }
 
-    public function getBusinessDate(): \DateTimeImmutable { return $this->businessDate; }
+    public function getBusinessDate(): \DateTimeImmutable
+    {
+        return $this->businessDate;
+    }
 
-    public function getErrorClass(): string { return $this->errorClass; }
+    public function getErrorClass(): string
+    {
+        return $this->errorClass;
+    }
 
-    public function getErrorMessage(): string { return $this->errorMessage; }
+    public function getErrorMessage(): string
+    {
+        return $this->errorMessage;
+    }
 
-    public function getStatusCode(): ?int { return $this->statusCode; }
+    public function getStatusCode(): ?int
+    {
+        return $this->statusCode;
+    }
 
-    public function getResponseExcerpt(): ?string { return $this->responseExcerpt; }
+    public function getResponseExcerpt(): ?string
+    {
+        return $this->responseExcerpt;
+    }
 
     /**
      * @return array<string, mixed>|null
      */
-    public function getRequestPayload(): ?array { return $this->requestPayload; }
+    public function getRequestPayload(): ?array
+    {
+        return $this->requestPayload;
+    }
 
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
 }

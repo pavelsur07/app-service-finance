@@ -35,7 +35,7 @@ SQL;
         $row = $this->connection->fetchAssociative($sql, [
             'companyId' => $companyId,
             'productId' => $productId,
-            'date'      => $at->format('Y-m-d'),
+            'date' => $at->format('Y-m-d'),
         ]);
 
         if (false === $row) {
@@ -43,11 +43,11 @@ SQL;
         }
 
         return [
-            'priceAmount'  => (string) $row['price_amount'],
+            'priceAmount' => (string) $row['price_amount'],
             'priceCurrency' => (string) $row['price_currency'],
             'effectiveFrom' => (string) $row['effective_from'],
-            'effectiveTo'  => null !== $row['effective_to'] ? (string) $row['effective_to'] : null,
-            'note'         => null !== $row['note'] ? (string) $row['note'] : null,
+            'effectiveTo' => null !== $row['effective_to'] ? (string) $row['effective_to'] : null,
+            'note' => null !== $row['note'] ? (string) $row['note'] : null,
         ];
     }
 
@@ -68,17 +68,17 @@ SQL;
         $rows = $this->connection->fetchAllAssociative($sql, [
             'companyId' => $companyId,
             'productId' => $productId,
-            'limit'     => max(1, $limit),
+            'limit' => max(1, $limit),
         ], [
             'limit' => \PDO::PARAM_INT,
         ]);
 
         return array_map(static fn (array $row): array => [
             'effectiveFrom' => (string) $row['effective_from'],
-            'effectiveTo'   => null !== $row['effective_to'] ? (string) $row['effective_to'] : null,
-            'priceAmount'   => (string) $row['price_amount'],
+            'effectiveTo' => null !== $row['effective_to'] ? (string) $row['effective_to'] : null,
+            'priceAmount' => (string) $row['price_amount'],
             'priceCurrency' => (string) $row['price_currency'],
-            'note'          => null !== $row['note'] ? (string) $row['note'] : null,
+            'note' => null !== $row['note'] ? (string) $row['note'] : null,
         ], $rows);
     }
 }

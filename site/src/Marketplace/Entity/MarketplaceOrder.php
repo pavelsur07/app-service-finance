@@ -79,42 +79,89 @@ class MarketplaceOrder
         Assert::maxLength($externalOrderId, 100);
         Assert::greaterThan($quantity, 0);
 
-        $this->companyId       = $companyId;
-        $this->listingId       = $listingId;
-        $this->marketplace     = $marketplace;
+        $this->companyId = $companyId;
+        $this->listingId = $listingId;
+        $this->marketplace = $marketplace;
         $this->externalOrderId = $externalOrderId;
-        $this->orderDate       = $orderDate;
-        $this->quantity        = $quantity;
-        $this->status          = $status;
-        $this->rawDocumentId   = $rawDocumentId;
-        $this->rawData         = $rawData;
-        $this->createdAt       = new \DateTimeImmutable();
-        $this->updatedAt       = new \DateTimeImmutable();
+        $this->orderDate = $orderDate;
+        $this->quantity = $quantity;
+        $this->status = $status;
+        $this->rawDocumentId = $rawDocumentId;
+        $this->rawData = $rawData;
+        $this->createdAt = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function changeStatus(OrderStatus $newStatus): void
     {
-        $this->status    = $newStatus;
+        $this->status = $newStatus;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function updateRawData(?string $rawDocumentId, ?array $rawData): void
     {
         $this->rawDocumentId = $rawDocumentId;
-        $this->rawData       = $rawData;
-        $this->updatedAt     = new \DateTimeImmutable();
+        $this->rawData = $rawData;
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
-    public function getId(): string { return $this->id; }
-    public function getCompanyId(): string { return $this->companyId; }
-    public function getListingId(): string { return $this->listingId; }
-    public function getMarketplace(): MarketplaceType { return $this->marketplace; }
-    public function getExternalOrderId(): string { return $this->externalOrderId; }
-    public function getOrderDate(): \DateTimeImmutable { return $this->orderDate; }
-    public function getQuantity(): int { return $this->quantity; }
-    public function getStatus(): OrderStatus { return $this->status; }
-    public function getRawDocumentId(): ?string { return $this->rawDocumentId; }
-    public function getRawData(): ?array { return $this->rawData; }
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
-    public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
+    public function getId(): string
+    {
+        return $this->id;
+    }
+
+    public function getCompanyId(): string
+    {
+        return $this->companyId;
+    }
+
+    public function getListingId(): string
+    {
+        return $this->listingId;
+    }
+
+    public function getMarketplace(): MarketplaceType
+    {
+        return $this->marketplace;
+    }
+
+    public function getExternalOrderId(): string
+    {
+        return $this->externalOrderId;
+    }
+
+    public function getOrderDate(): \DateTimeImmutable
+    {
+        return $this->orderDate;
+    }
+
+    public function getQuantity(): int
+    {
+        return $this->quantity;
+    }
+
+    public function getStatus(): OrderStatus
+    {
+        return $this->status;
+    }
+
+    public function getRawDocumentId(): ?string
+    {
+        return $this->rawDocumentId;
+    }
+
+    public function getRawData(): ?array
+    {
+        return $this->rawData;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    public function getUpdatedAt(): \DateTimeImmutable
+    {
+        return $this->updatedAt;
+    }
 }

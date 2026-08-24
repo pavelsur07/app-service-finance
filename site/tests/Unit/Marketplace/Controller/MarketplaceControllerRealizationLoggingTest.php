@@ -8,28 +8,27 @@ use App\Company\Repository\ProjectDirectionRepository;
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
 use App\Marketplace\Application\ProcessOzonRealizationAction;
 use App\Marketplace\Application\ReprocessMarketplacePeriodAction;
+use App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface;
+use App\Marketplace\Application\Service\WbInitialSyncStartDateResolver;
 use App\Marketplace\Application\SyncConnectionAction;
 use App\Marketplace\Controller\MarketplaceController;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Api\Ozon\OzonSellerCredentialValidatorInterface;
 use App\Marketplace\Infrastructure\Query\OzonRealizationStatusQuery;
 use App\Marketplace\Infrastructure\Query\RawDocumentsListQuery;
+use App\Marketplace\Infrastructure\Query\WbFinanceSyncStatusListQuery;
 use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceOzonRealizationRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
-use App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface;
-use App\Marketplace\Application\Service\WbInitialSyncStartDateResolver;
-use App\Marketplace\Infrastructure\Api\Ozon\OzonSellerCredentialValidatorInterface;
-use App\Marketplace\Infrastructure\Query\WbFinanceSyncStatusListQuery;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\AppLogger;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceRawDocumentBuilder;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -169,25 +168,7 @@ final class MarketplaceControllerRealizationLoggingTest extends TestCase
         AppLogger $appLogger,
         ?ReprocessMarketplacePeriodAction $reprocessAction = null,
     ): MarketplaceController {
-        return new class(
-            $companyService,
-            self::uninitialized(MarketplaceConnectionRepository::class),
-            $rawDocumentRepository,
-            self::uninitialized(MarketplaceAdapterRegistry::class),
-            self::uninitialized(OzonRealizationStatusQuery::class),
-            self::uninitialized(RawDocumentsListQuery::class),
-            self::uninitialized(ProjectDirectionRepository::class),
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(MessageBusInterface::class),
-            $reprocessAction ?? self::uninitialized(ReprocessMarketplacePeriodAction::class),
-            self::uninitialized(SyncConnectionAction::class),
-            self::uninitialized(WbInitialSyncStartDateResolver::class),
-            $this->createMock(WbFinancialReportSyncPlannerInterface::class),
-            self::uninitialized(WbFinanceSyncStatusListQuery::class),
-            $this->createMock(OzonSellerCredentialValidatorInterface::class),
-            self::uninitialized(ConnectionApiKeyCodec::class),
-            $appLogger,
-        ) extends MarketplaceController {
+        return new class($companyService, self::uninitialized(MarketplaceConnectionRepository::class), $rawDocumentRepository, self::uninitialized(MarketplaceAdapterRegistry::class), self::uninitialized(OzonRealizationStatusQuery::class), self::uninitialized(RawDocumentsListQuery::class), self::uninitialized(ProjectDirectionRepository::class), $this->createMock(EntityManagerInterface::class), $this->createMock(MessageBusInterface::class), $reprocessAction ?? self::uninitialized(ReprocessMarketplacePeriodAction::class), self::uninitialized(SyncConnectionAction::class), self::uninitialized(WbInitialSyncStartDateResolver::class), $this->createMock(WbFinancialReportSyncPlannerInterface::class), self::uninitialized(WbFinanceSyncStatusListQuery::class), $this->createMock(OzonSellerCredentialValidatorInterface::class), self::uninitialized(ConnectionApiKeyCodec::class), $appLogger) extends MarketplaceController {
             protected function addFlash(string $type, mixed $message): void
             {
             }

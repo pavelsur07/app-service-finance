@@ -159,7 +159,7 @@ final class OzonPerformanceCsvParserTest extends TestCase
         $json = json_encode([
             'rows' => [
                 ['campaign_id' => '123', 'campaign_name' => 'Кампания A', 'sku' => 'SKU-1',
-                 'spend' => 10.50, 'views' => 100, 'clicks' => 5],
+                    'spend' => 10.50, 'views' => 100, 'clicks' => 5],
             ],
         ], JSON_THROW_ON_ERROR);
 

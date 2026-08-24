@@ -24,7 +24,7 @@ trait EnumArgument
      * @template T of \BackedEnum
      *
      * @param array<string, mixed> $arguments
-     * @param class-string<T>      $enum
+     * @param class-string<T> $enum
      *
      * @return T|null
      */

@@ -16,15 +16,15 @@ final readonly class ListingKey
     private string $size;
 
     /**
-     * @param string      $marketplaceSku SKU листинга в маркетплейсе
-     * @param string|null $size           Размер (если отсутствует/пустой, используется UNKNOWN)
+     * @param string $marketplaceSku SKU листинга в маркетплейсе
+     * @param string|null $size Размер (если отсутствует/пустой, используется UNKNOWN)
      */
     public function __construct(string $marketplaceSku, ?string $size)
     {
         $this->marketplaceSku = trim($marketplaceSku);
 
-        $normalizedSize = $size !== null ? trim($size) : null;
-        $this->size = ($normalizedSize === null || $normalizedSize === '')
+        $normalizedSize = null !== $size ? trim($size) : null;
+        $this->size = (null === $normalizedSize || '' === $normalizedSize)
             ? self::UNKNOWN_SIZE
             : $normalizedSize;
     }

@@ -16,7 +16,7 @@ interface AdChunkProgressRepositoryInterface
      *  - выполнить `INSERT ... ON CONFLICT (job_id, date_from, date_to) DO NOTHING`.
      *
      * @return bool true если запись вставлена впервые, false если такой
-     *              чанк уже отмечен (повторный вызов при Messenger retry).
+     *              чанк уже отмечен (повторный вызов при Messenger retry)
      *
      * @throws \DomainException если $jobId не принадлежит $companyId
      */

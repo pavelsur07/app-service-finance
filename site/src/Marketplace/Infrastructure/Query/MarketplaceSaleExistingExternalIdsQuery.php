@@ -22,16 +22,16 @@ final readonly class MarketplaceSaleExistingExternalIdsQuery
      */
     public function findExisting(string $companyId, MarketplaceType $marketplace, array $externalIds): array
     {
-        if ($externalIds === []) {
+        if ([] === $externalIds) {
             return [];
         }
 
         $externalIds = array_values(array_unique(array_filter(
             $externalIds,
-            static fn (string $externalId): bool => $externalId !== '',
+            static fn (string $externalId): bool => '' !== $externalId,
         )));
 
-        if ($externalIds === []) {
+        if ([] === $externalIds) {
             return [];
         }
 

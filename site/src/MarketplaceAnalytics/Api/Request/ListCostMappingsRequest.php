@@ -12,7 +12,8 @@ final readonly class ListCostMappingsRequest
         public ?string $marketplace,
         public int $page,
         public int $perPage,
-    ) {}
+    ) {
+    }
 
     public static function fromRequest(Request $request): self
     {

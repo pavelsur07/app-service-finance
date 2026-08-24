@@ -13,8 +13,8 @@ final readonly class CloseMonthStageMessage
     public function __construct(
         public string $companyId,
         public string $marketplace,
-        public int    $year,
-        public int    $month,
+        public int $year,
+        public int $month,
         public string $stage,        // CloseStage::value
         public string $actorUserId,
     ) {

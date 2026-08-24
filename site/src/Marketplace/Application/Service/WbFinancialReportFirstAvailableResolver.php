@@ -23,7 +23,8 @@ final class WbFinancialReportFirstAvailableResolver
         private readonly WbFinancialReportPeriodResolver $periodResolver,
         private readonly MarketplaceFinancialReportSyncStatusRepository $syncStatusRepository,
         private readonly WbFinanceSalesReportClient $salesReportClient,
-    ) {}
+    ) {
+    }
 
     public function resolve(
         string $connectionId,

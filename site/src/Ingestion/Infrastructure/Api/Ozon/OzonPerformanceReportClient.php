@@ -418,11 +418,7 @@ final readonly class OzonPerformanceReportClient implements OzonPerformanceRepor
             && preg_match('#^/api/client/campaign/([^/]+)/objects$#', $endpoint, $matches)
             && str_contains(strtolower($content), 'campaign not found')
         ) {
-            throw new OzonPerformanceCampaignNotFoundException(
-                rawurldecode($matches[1]),
-                $endpoint,
-                mb_substr($content, 0, 500),
-            );
+            throw new OzonPerformanceCampaignNotFoundException(rawurldecode($matches[1]), $endpoint, mb_substr($content, 0, 500));
         }
 
         if ($statusCode < 200 || $statusCode >= 300) {
@@ -469,7 +465,7 @@ final readonly class OzonPerformanceReportClient implements OzonPerformanceRepor
 
     /**
      * @param list<array<string, mixed>> $rows
-     * @param array<string, mixed>       $metadata
+     * @param array<string, mixed> $metadata
      *
      * @return list<array<string, mixed>>
      */

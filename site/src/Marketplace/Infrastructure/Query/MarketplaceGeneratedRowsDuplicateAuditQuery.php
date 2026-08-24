@@ -117,7 +117,7 @@ final class MarketplaceGeneratedRowsDuplicateAuditQuery
     private function resolveKindConfig(string $kind): array
     {
         $config = self::DUPLICATE_TARGETS[$kind] ?? null;
-        if ($config === null) {
+        if (null === $config) {
             throw new \InvalidArgumentException(sprintf('Unknown duplicate audit kind: %s', $kind));
         }
 

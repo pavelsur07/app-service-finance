@@ -21,12 +21,12 @@ final class MarketplaceCostExistingExternalIdsQuery
      */
     public function execute(string $companyId, array $externalIds): array
     {
-        if ($externalIds === []) {
+        if ([] === $externalIds) {
             return [];
         }
 
-        $externalIds = array_values(array_unique(array_filter($externalIds, static fn (string $externalId): bool => $externalId !== '')));
-        if ($externalIds === []) {
+        $externalIds = array_values(array_unique(array_filter($externalIds, static fn (string $externalId): bool => '' !== $externalId)));
+        if ([] === $externalIds) {
             return [];
         }
 

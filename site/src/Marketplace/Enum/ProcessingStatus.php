@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Enum;
 
 /**
- * ProcessingStatus - статусы обработки staging записей
+ * ProcessingStatus - статусы обработки staging записей.
  *
  * Инвариант контракта pipeline:
  * failed step означает, что raw document не проведён полностью.
@@ -13,32 +13,32 @@ namespace App\Marketplace\Enum;
 enum ProcessingStatus: string
 {
     /**
-     * Ожидает обработки (только что распарсена из raw document)
+     * Ожидает обработки (только что распарсена из raw document).
      */
     case PENDING = 'pending';
 
     /**
-     * В процессе обработки (для избежания дублирования при параллельной обработке)
+     * В процессе обработки (для избежания дублирования при параллельной обработке).
      */
     case PROCESSING = 'processing';
 
     /**
-     * Успешно обработана (создана финальная сущность)
+     * Успешно обработана (создана финальная сущность).
      */
     case COMPLETED = 'completed';
 
     /**
-     * Обработка провалилась (ошибка валидации, не найден листинг и т.д.)
+     * Обработка провалилась (ошибка валидации, не найден листинг и т.д.).
      */
     case FAILED = 'failed';
 
     /**
-     * Пропущена (дубликат или другая причина)
+     * Пропущена (дубликат или другая причина).
      */
     case SKIPPED = 'skipped';
 
     /**
-     * Получить все статусы, которые считаются "обработанными"
+     * Получить все статусы, которые считаются "обработанными".
      */
     public static function getProcessedStatuses(): array
     {
@@ -50,7 +50,7 @@ enum ProcessingStatus: string
     }
 
     /**
-     * Получить все статусы, которые можно переобработать
+     * Получить все статусы, которые можно переобработать.
      */
     public static function getReprocessableStatuses(): array
     {
@@ -60,7 +60,7 @@ enum ProcessingStatus: string
     }
 
     /**
-     * Получить человекочитаемое название
+     * Получить человекочитаемое название.
      */
     public function getLabel(): string
     {
@@ -74,7 +74,7 @@ enum ProcessingStatus: string
     }
 
     /**
-     * Получить CSS класс для badge
+     * Получить CSS класс для badge.
      */
     public function getBadgeClass(): string
     {
@@ -88,7 +88,7 @@ enum ProcessingStatus: string
     }
 
     /**
-     * Является ли статус финальным (не требует дальнейшей обработки)
+     * Является ли статус финальным (не требует дальнейшей обработки).
      */
     public function isFinal(): bool
     {
@@ -103,6 +103,6 @@ enum ProcessingStatus: string
      */
     public function isReprocessable(): bool
     {
-        return $this === self::FAILED;
+        return self::FAILED === $this;
     }
 }

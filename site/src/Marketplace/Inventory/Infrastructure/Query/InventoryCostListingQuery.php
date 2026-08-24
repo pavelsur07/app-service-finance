@@ -78,21 +78,21 @@ final readonly class InventoryCostListingQuery
             ->setParameter('companyId', $companyId)
             ->setParameter('today', $today);
 
-        if ($marketplace !== null) {
+        if (null !== $marketplace) {
             $qb->andWhere('l.marketplace = :marketplace')
                 ->setParameter('marketplace', $marketplace);
         }
 
-        if ($search !== null && $search !== '') {
+        if (null !== $search && '' !== $search) {
             $escaped = $this->escapeLikeOperand($search);
             $qb->andWhere(
                 '(l.name ILIKE :search '
-                . 'OR l.marketplace_sku ILIKE :search '
-                . 'OR l.supplier_sku ILIKE :search '
-                . 'OR p.name ILIKE :search '
-                . 'OR p.sku ILIKE :search)'
+                .'OR l.marketplace_sku ILIKE :search '
+                .'OR l.supplier_sku ILIKE :search '
+                .'OR p.name ILIKE :search '
+                .'OR p.sku ILIKE :search)'
             )
-                ->setParameter('search', '%' . $escaped . '%');
+                ->setParameter('search', '%'.$escaped.'%');
         }
 
         return $qb;
@@ -136,7 +136,7 @@ final readonly class InventoryCostListingQuery
             [
                 'companyId' => $companyId,
                 'listingId' => $listingId,
-                'limit'     => $limit,
+                'limit' => $limit,
             ],
             ['limit' => \PDO::PARAM_INT],
         );

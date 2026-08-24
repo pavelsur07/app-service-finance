@@ -13,5 +13,6 @@ final readonly class ListingCostCategoryAggregateDTO
         public string $netAmount,
         public string $costsAmount,
         public string $stornoAmount,
-    ) {}
+    ) {
+    }
 }

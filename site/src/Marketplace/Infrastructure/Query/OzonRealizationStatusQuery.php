@@ -26,8 +26,8 @@ final class OzonRealizationStatusQuery
                AND document_type = :documentType
              ORDER BY period_from ASC",
             [
-                'companyId'    => $companyId,
-                'marketplace'  => 'ozon',
+                'companyId' => $companyId,
+                'marketplace' => 'ozon',
                 'documentType' => 'realization',
             ],
         );

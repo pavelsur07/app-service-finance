@@ -305,15 +305,12 @@ class AdLoadJobRepository extends ServiceEntityRepository implements AdLoadJobRe
         // Счётчики монотонно растут; отрицательный/нулевой delta — это баг вызывающего кода,
         // который иначе тихо испортит прогресс и будет замаскирован clamp'ом в getProgress().
         if ($delta < 1) {
-            throw new \InvalidArgumentException(sprintf(
-                'Инкремент должен быть >= 1, передано: %d',
-                $delta,
-            ));
+            throw new \InvalidArgumentException(sprintf('Инкремент должен быть >= 1, передано: %d', $delta));
         }
 
         $sql = sprintf(
             'UPDATE marketplace_ad_load_jobs SET %1$s = %1$s + :delta, updated_at = NOW() '
-            . 'WHERE id = :jobId AND company_id = :companyId',
+            .'WHERE id = :jobId AND company_id = :companyId',
             $column,
         );
 

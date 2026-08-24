@@ -21,5 +21,6 @@ final class RemapCostMappingRequest
             'other',
         ])]
         public readonly string $unitEconomyCostType = '',
-    ) {}
+    ) {
+    }
 }
