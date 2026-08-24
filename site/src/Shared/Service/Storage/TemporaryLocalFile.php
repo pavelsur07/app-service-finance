@@ -47,7 +47,7 @@ final readonly class TemporaryLocalFile
 
         try {
             $source = $this->storage->readStream($path);
-            $target = @fopen($tmpPath, 'wb');
+            $target = @fopen($tmpPath, 'w');
             if (false === $target) {
                 throw new ObjectStorageException(sprintf('Failed to open temporary file for object "%s".', $path));
             }

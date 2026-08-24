@@ -193,7 +193,7 @@ final readonly class RefreshWbListingCatalogAction
 
     private function positiveId(mixed $value, string $field): string
     {
-        $id = filter_var($value, FILTER_VALIDATE_INT);
+        $id = filter_var($value, \FILTER_VALIDATE_INT);
         if (false === $id || $id <= 0) {
             throw new \UnexpectedValueException(sprintf('WB Product Cards %s must be a positive integer.', $field));
         }

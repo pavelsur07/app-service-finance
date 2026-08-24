@@ -57,7 +57,7 @@ final class InternalArticleGeneratorDoctrine implements InternalArticleGenerator
             '%s-%d-%s',
             self::PREFIX,
             $year,
-            str_pad((string) $seq, self::PAD_LENGTH, '0', STR_PAD_LEFT),
+            str_pad((string) $seq, self::PAD_LENGTH, '0', \STR_PAD_LEFT),
         );
     }
 }

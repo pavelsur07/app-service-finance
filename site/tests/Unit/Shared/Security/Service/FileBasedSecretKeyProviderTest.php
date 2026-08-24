@@ -141,7 +141,7 @@ final class FileBasedSecretKeyProviderTest extends TestCase
     public function testReadsKeyFromFile(): void
     {
         $rawKey = random_bytes(32);
-        file_put_contents($this->tmpKeyFile, (string) json_encode(['v1' => base64_encode($rawKey)], JSON_THROW_ON_ERROR));
+        file_put_contents($this->tmpKeyFile, (string) json_encode(['v1' => base64_encode($rawKey)], \JSON_THROW_ON_ERROR));
 
         $provider = new FileBasedSecretKeyProvider(
             keyFile: $this->tmpKeyFile,
@@ -155,7 +155,7 @@ final class FileBasedSecretKeyProviderTest extends TestCase
 
     public function testThrowsForEmptyKeyMaterialWithoutSecretLeak(): void
     {
-        file_put_contents($this->tmpKeyFile, (string) json_encode(['v1' => '   '], JSON_THROW_ON_ERROR));
+        file_put_contents($this->tmpKeyFile, (string) json_encode(['v1' => '   '], \JSON_THROW_ON_ERROR));
 
         $provider = new FileBasedSecretKeyProvider(
             keyFile: $this->tmpKeyFile,

@@ -29,7 +29,7 @@ final readonly class LocalObjectStorage implements ObjectStorageInterface
 
     public function readStream(string $path)
     {
-        $stream = @fopen($this->storageService->getAbsolutePath($path), 'rb');
+        $stream = @fopen($this->storageService->getAbsolutePath($path), 'r');
         if (false === $stream) {
             throw new ObjectStorageException(sprintf('Failed to open object "%s" for reading.', $path));
         }

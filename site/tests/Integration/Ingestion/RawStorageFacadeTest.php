@@ -119,7 +119,7 @@ final class RawStorageFacadeTest extends IntegrationTestCase
 
         self::assertIsArray($row);
         self::assertArrayNotHasKey('payload', $row);
-        self::assertStringNotContainsString('SKU-LARGE', json_encode($row, JSON_THROW_ON_ERROR));
+        self::assertStringNotContainsString('SKU-LARGE', json_encode($row, \JSON_THROW_ON_ERROR));
         self::assertTrue($storage->exists($record->getStoragePath()));
         self::assertGreaterThan(0, $record->getByteSize());
     }

@@ -92,7 +92,7 @@ class ReconciliationSession
             throw new \DomainException('Only pending session can be completed.');
         }
 
-        $this->resultJson = json_encode($reconcileResult, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        $this->resultJson = json_encode($reconcileResult, \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR);
         $this->status = ReconciliationSessionStatus::COMPLETED;
         $this->completedAt = new \DateTimeImmutable();
     }
@@ -117,7 +117,7 @@ class ReconciliationSession
             return null;
         }
 
-        return json_decode($this->resultJson, true, 512, JSON_THROW_ON_ERROR);
+        return json_decode($this->resultJson, true, 512, \JSON_THROW_ON_ERROR);
     }
 
     // --- Getters ---

@@ -132,6 +132,6 @@ final class ReconciliationOvhCheckController extends AbstractController
             'category_exists' => $categoryExists,
             'records_with_new_code' => $recordsWithNewCode,
             'raw_data_sample' => $rawDataSample,
-        ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
+        ], 200, [], ['json_encode_options' => \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE]);
     }
 }

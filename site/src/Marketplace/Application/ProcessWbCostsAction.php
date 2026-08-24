@@ -198,7 +198,7 @@ final class ProcessWbCostsAction
 
             $dbExistingMap = $this->costExistingExternalIdsQuery->execute($companyId, $pendingIds);
 
-            $knownExternalIdsMap = $knownExternalIdsMap + $dbExistingMap;
+            $knownExternalIdsMap += $dbExistingMap;
 
             foreach ($pending as $pendingItem) {
                 $externalId = $pendingItem['external_id'];

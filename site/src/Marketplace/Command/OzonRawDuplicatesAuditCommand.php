@@ -102,7 +102,7 @@ final class OzonRawDuplicatesAuditCommand extends Command
         ];
 
         if ('json' === $format) {
-            $output->writeln((string) json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+            $output->writeln((string) json_encode($payload, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR));
 
             return Command::SUCCESS;
         }
@@ -138,7 +138,7 @@ final class OzonRawDuplicatesAuditCommand extends Command
         $headers = array_keys($rows[0]);
         $tableRows = array_map(
             static function (array $row): array {
-                return array_map(static fn (mixed $value): string => is_array($value) ? json_encode($value, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) : (string) $value, $row);
+                return array_map(static fn (mixed $value): string => is_array($value) ? json_encode($value, \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR) : (string) $value, $row);
             },
             $rows,
         );

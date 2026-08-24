@@ -237,7 +237,7 @@ final class OzonPerformanceCsvParser implements AdRawDataParserInterface
         $headerLine = false === $firstNewline ? $csv : substr($csv, 0, $firstNewline);
         $delimiter = str_contains($headerLine, ';') ? ';' : ',';
 
-        $fp = fopen('php://memory', 'r+b');
+        $fp = fopen('php://memory', 'r+');
         if (false === $fp) {
             throw new \RuntimeException('Ozon Performance CSV: не удалось открыть in-memory поток');
         }

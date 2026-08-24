@@ -45,13 +45,13 @@ final readonly class EncryptedPayload
         return [
             'ciphertext' => $this->ciphertext,
             'keyVersion' => $this->keyVersion,
-            'encryptedAt' => $this->encryptedAt->format(DATE_ATOM),
+            'encryptedAt' => $this->encryptedAt->format(\DATE_ATOM),
         ];
     }
 
     public function toStorageJson(): string
     {
-        return (string) json_encode($this->toStorageArray(), JSON_THROW_ON_ERROR);
+        return (string) json_encode($this->toStorageArray(), \JSON_THROW_ON_ERROR);
     }
 
     /**
@@ -91,7 +91,7 @@ final readonly class EncryptedPayload
         }
 
         try {
-            $decoded = json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
+            $decoded = json_decode($payload, true, 512, \JSON_THROW_ON_ERROR);
         } catch (\JsonException $exception) {
             throw new InvalidEncryptedPayloadException('Encrypted payload JSON is invalid.', 0, $exception);
         }

@@ -46,7 +46,7 @@ final class CostsVerifyQuery
         $grandTotalPublic = array_filter(
             $grandTotal,
             static fn (string $key) => !str_starts_with($key, '_'),
-            ARRAY_FILTER_USE_KEY,
+            \ARRAY_FILTER_USE_KEY,
         );
 
         return [

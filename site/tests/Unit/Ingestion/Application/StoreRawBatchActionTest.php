@@ -105,7 +105,7 @@ final class StoreRawBatchActionTest extends TestCase
                 self::callback(static fn (string $path): bool => str_contains($path, '/seller-report/')
                     && str_contains($path, '/external-report-1/')),
                 self::callback(static fn (string $payload): bool => $rows == array_map(
-                    static fn (string $line): array => json_decode($line, true, 512, JSON_THROW_ON_ERROR),
+                    static fn (string $line): array => json_decode($line, true, 512, \JSON_THROW_ON_ERROR),
                     array_filter(explode("\n", trim((string) gzdecode($payload)))),
                 )),
             )
@@ -212,7 +212,7 @@ final class StoreRawBatchActionTest extends TestCase
             ->with(
                 'missing-types.ndjson.gz',
                 self::callback(static fn (string $payload): bool => $rows == array_map(
-                    static fn (string $line): array => json_decode($line, true, 512, JSON_THROW_ON_ERROR),
+                    static fn (string $line): array => json_decode($line, true, 512, \JSON_THROW_ON_ERROR),
                     array_filter(explode("\n", trim((string) gzdecode($payload)))),
                 )),
             )

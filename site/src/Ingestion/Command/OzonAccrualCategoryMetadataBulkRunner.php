@@ -207,7 +207,7 @@ final readonly class OzonAccrualCategoryMetadataBulkRunner implements OzonAccrua
     private function refreshRawRecordInSubprocess(string $companyId, string $shopRef, string $rawRecordId, bool $dryRun): array
     {
         $process = new Process([
-            PHP_BINARY,
+            \PHP_BINARY,
             '-d',
             sprintf('memory_limit=%s', $this->memoryLimit()),
             $this->consolePath(),
@@ -258,7 +258,7 @@ final readonly class OzonAccrualCategoryMetadataBulkRunner implements OzonAccrua
         }
 
         try {
-            $decoded = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
+            $decoded = json_decode($output, true, flags: \JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
             return [];
         }

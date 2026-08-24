@@ -265,10 +265,10 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
         );
         self::assertIsArray($rawRow);
         self::assertSame('completed', $rawRow['processing_status']);
-        self::assertSame([], json_decode((string) $rawRow['failed_steps'], true, 512, JSON_THROW_ON_ERROR));
+        self::assertSame([], json_decode((string) $rawRow['failed_steps'], true, 512, \JSON_THROW_ON_ERROR));
         self::assertEqualsCanonicalizing(
             ['sales', 'returns', 'costs'],
-            json_decode((string) $rawRow['succeeded_steps'], true, 512, JSON_THROW_ON_ERROR),
+            json_decode((string) $rawRow['succeeded_steps'], true, 512, \JSON_THROW_ON_ERROR),
         );
 
         // Дублей нет, закрытая строка сохранила старую сумму, открытая пересоздана с новой.

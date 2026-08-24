@@ -64,7 +64,7 @@ final class CredentialFacadeTest extends IntegrationTestCase
         $facade->store($companyId, $connectionRef, $payload);
 
         $masked = $facade->readMasked($companyId, $connectionRef);
-        $encodedMasked = json_encode($masked, JSON_THROW_ON_ERROR);
+        $encodedMasked = json_encode($masked, \JSON_THROW_ON_ERROR);
 
         self::assertSame(['api_key' => '***', 'client_id' => null], $masked);
         self::assertStringNotContainsString('wb-secret-key', $encodedMasked);

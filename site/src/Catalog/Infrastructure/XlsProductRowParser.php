@@ -43,7 +43,7 @@ final class XlsProductRowParser
             throw new \RuntimeException(sprintf('Import file not found: %s', $filePath));
         }
 
-        $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        $extension = strtolower(pathinfo($filePath, \PATHINFO_EXTENSION));
         if (!in_array($extension, ['xls', 'xlsx'], true)) {
             throw new \RuntimeException(sprintf('Unsupported file extension "%s". Allowed: xls, xlsx.', $extension));
         }

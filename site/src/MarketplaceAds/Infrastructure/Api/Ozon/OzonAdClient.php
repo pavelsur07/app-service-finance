@@ -2050,7 +2050,7 @@ class OzonAdClient implements AdPlatformClientInterface
         // с переводами строк внутри кавычек и не создаёт отдельный массив строк
         // в памяти. escape='' — RFC 4180 не знает backslash-экранирования,
         // экранирование кавычки делается удвоением ("" внутри строкового поля).
-        $fp = fopen('php://memory', 'r+b');
+        $fp = fopen('php://memory', 'r+');
         if (false === $fp) {
             throw new \RuntimeException('Ozon Performance: не удалось открыть in-memory поток для CSV');
         }

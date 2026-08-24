@@ -99,7 +99,7 @@ final class SyncOzonInventorySnapshotHandler
                         'page' => $page,
                         'last_id' => $lastId,
                         'limit' => self::PAGE_LIMIT,
-                        'requestedAt' => $session->getStartedAt()->format(DATE_ATOM),
+                        'requestedAt' => $session->getStartedAt()->format(\DATE_ATOM),
                         'correlationId' => $session->getCorrelationId(),
                     ], static fn (mixed $value): bool => null !== $value),
                     responseStatus: 200,

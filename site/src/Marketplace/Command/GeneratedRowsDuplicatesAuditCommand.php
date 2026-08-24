@@ -86,7 +86,7 @@ final class GeneratedRowsDuplicatesAuditCommand extends Command
                     (string) $row['marketplace'],
                     (string) $row['external_id'],
                     (string) $row['duplicate_count'],
-                    is_array($row['row_ids']) ? json_encode($row['row_ids'], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) : (string) $row['row_ids'],
+                    is_array($row['row_ids']) ? json_encode($row['row_ids'], \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR) : (string) $row['row_ids'],
                 ];
             },
             $rows,

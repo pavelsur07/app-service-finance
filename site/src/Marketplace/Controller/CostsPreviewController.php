@@ -134,6 +134,6 @@ final class CostsPreviewController extends AbstractController
                     default => 'will_be_closed',
                 },
             ], $breakdown),
-        ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
+        ], 200, [], ['json_encode_options' => \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE]);
     }
 }

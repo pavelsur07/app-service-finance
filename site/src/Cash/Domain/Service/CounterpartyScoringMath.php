@@ -20,7 +20,7 @@ final class CounterpartyScoringMath
             return null;
         }
 
-        sort($delays, SORT_NUMERIC);
+        sort($delays, \SORT_NUMERIC);
         $count = count($delays);
         $middle = (int) floor($count / 2);
 

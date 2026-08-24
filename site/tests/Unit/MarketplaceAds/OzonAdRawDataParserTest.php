@@ -47,7 +47,7 @@ final class OzonAdRawDataParserTest extends TestCase
                 ['campaign_id' => '123', 'campaign_name' => 'Кампания 1', 'sku' => '456',
                     'spend' => 150.50, 'views' => 1000, 'clicks' => 50],
             ],
-        ], JSON_THROW_ON_ERROR);
+        ], \JSON_THROW_ON_ERROR);
 
         $result = $this->parser->parse($json);
 
@@ -73,7 +73,7 @@ final class OzonAdRawDataParserTest extends TestCase
                 ['campaign_id' => '123', 'campaign_name' => 'К1', 'sku' => '999',
                     'spend' => 25.00, 'views' => 100, 'clicks' => 5],
             ],
-        ], JSON_THROW_ON_ERROR);
+        ], \JSON_THROW_ON_ERROR);
 
         $result = $this->parser->parse($json);
 
@@ -102,7 +102,7 @@ final class OzonAdRawDataParserTest extends TestCase
                 ['campaign_id' => '222', 'campaign_name' => 'B', 'sku' => '456',
                     'spend' => 20.00, 'views' => 200, 'clicks' => 2],
             ],
-        ], JSON_THROW_ON_ERROR);
+        ], \JSON_THROW_ON_ERROR);
 
         $result = $this->parser->parse($json);
 
@@ -124,7 +124,7 @@ final class OzonAdRawDataParserTest extends TestCase
                 ['campaign_id' => '1', 'campaign_name' => 'A', 'sku' => 'X',
                     'spend' => 1.005, 'views' => 1, 'clicks' => 0],
             ],
-        ], JSON_THROW_ON_ERROR);
+        ], \JSON_THROW_ON_ERROR);
 
         $result = $this->parser->parse($json);
 
@@ -148,7 +148,7 @@ final class OzonAdRawDataParserTest extends TestCase
                 ['campaign_id' => '1', 'campaign_name' => 'A', 'sku' => 'X',
                     'spend' => 0.005, 'views' => 1, 'clicks' => 0],
             ],
-        ], JSON_THROW_ON_ERROR);
+        ], \JSON_THROW_ON_ERROR);
 
         $result = $this->parser->parse($json);
 
@@ -167,7 +167,7 @@ final class OzonAdRawDataParserTest extends TestCase
                 ['campaign_id' => '2', 'campaign_name' => 'no sku',
                     'spend' => 5.00, 'views' => 50, 'clicks' => 1],
             ],
-        ], JSON_THROW_ON_ERROR);
+        ], \JSON_THROW_ON_ERROR);
 
         $result = $this->parser->parse($json);
 
@@ -196,7 +196,7 @@ final class OzonAdRawDataParserTest extends TestCase
                     'spend' => 5.00, 'views' => 50, 'clicks' => 1],
                 'not-an-array',
             ],
-        ], JSON_THROW_ON_ERROR);
+        ], \JSON_THROW_ON_ERROR);
 
         $parser->parse($json);
 
@@ -223,7 +223,7 @@ final class OzonAdRawDataParserTest extends TestCase
                 ['campaign_id' => '1', 'campaign_name' => 'A', 'sku' => 'X',
                     'spend' => 10.00, 'views' => 100, 'clicks' => 5],
             ],
-        ], JSON_THROW_ON_ERROR);
+        ], \JSON_THROW_ON_ERROR);
 
         $parser->parse($json);
 
@@ -242,7 +242,7 @@ final class OzonAdRawDataParserTest extends TestCase
                     ],
                 ],
             ],
-        ], JSON_THROW_ON_ERROR);
+        ], \JSON_THROW_ON_ERROR);
 
         $result = $this->parser->parse($json);
 
@@ -270,7 +270,7 @@ final class OzonAdRawDataParserTest extends TestCase
                 ['campaign_id' => '111', 'campaign_name' => 'C1', 'sku' => 'B',
                     'spend' => 5.00, 'views' => 50, 'clicks' => 1],
             ],
-        ], JSON_THROW_ON_ERROR);
+        ], \JSON_THROW_ON_ERROR);
 
         $nestedJson = json_encode([
             'campaigns' => [
@@ -283,7 +283,7 @@ final class OzonAdRawDataParserTest extends TestCase
                     ],
                 ],
             ],
-        ], JSON_THROW_ON_ERROR);
+        ], \JSON_THROW_ON_ERROR);
 
         self::assertEquals($this->parser->parse($flatJson), $this->parser->parse($nestedJson));
     }
@@ -309,7 +309,7 @@ final class OzonAdRawDataParserTest extends TestCase
                     ],
                 ],
             ],
-        ], JSON_THROW_ON_ERROR);
+        ], \JSON_THROW_ON_ERROR);
 
         $result = $this->parser->parse($json);
 
@@ -350,7 +350,7 @@ final class OzonAdRawDataParserTest extends TestCase
                     ],
                 ],
             ],
-        ], JSON_THROW_ON_ERROR);
+        ], \JSON_THROW_ON_ERROR);
 
         $result = $this->parser->parse($json);
 
@@ -376,7 +376,7 @@ final class OzonAdRawDataParserTest extends TestCase
                     ],
                 ],
             ],
-        ], JSON_THROW_ON_ERROR);
+        ], \JSON_THROW_ON_ERROR);
 
         $result = $this->parser->parse($json);
 

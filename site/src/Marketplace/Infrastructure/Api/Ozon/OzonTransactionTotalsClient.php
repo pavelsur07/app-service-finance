@@ -89,7 +89,7 @@ final readonly class OzonTransactionTotalsClient
         $result = $payload['result'] ?? null;
 
         if (!is_array($result)) {
-            $preview = mb_substr(json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: 'invalid_response', 0, 300);
+            $preview = mb_substr(json_encode($payload, \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES) ?: 'invalid_response', 0, 300);
             throw new \RuntimeException(sprintf('Некорректный ответ Ozon transaction totals: result отсутствует или не является массивом. preview=%s', $preview));
         }
 
