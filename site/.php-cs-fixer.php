@@ -15,6 +15,6 @@ return (new PhpCsFixer\Config())
         'ordered_imports' => ['sort_algorithm' => 'alpha'],
         'phpdoc_align' => ['align' => 'left'],
         'native_function_invocation' => false,
-        'declare_strict_types' => false,
+        'declare_strict_types' => true,
     ])
     ->setFinder($finder);

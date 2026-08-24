@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tests\Functional\Finance\Controller;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
