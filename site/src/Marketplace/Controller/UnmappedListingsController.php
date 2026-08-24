@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Marketplace\Controller;
 
 use App\Marketplace\Infrastructure\Query\UnmappedListingsQuery;

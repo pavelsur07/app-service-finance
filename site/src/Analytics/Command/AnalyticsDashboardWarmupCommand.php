@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Analytics\Command;
 
 use App\Analytics\Api\Request\SnapshotQuery;

@@ -36,6 +36,9 @@ site-fixtures:
 site-cs-check:
 	$(DOCKER_COMPOSE) run --rm site-php-cli composer cs:check   # Проверка PHP-стиля
 
+site-cs-strict-types:
+	$(DOCKER_COMPOSE) run --rm site-php-cli composer cs:strict-types   # Гейт: declare(strict_types=1) в каждом файле
+
 site-cs-fix:
 	$(DOCKER_COMPOSE) run --rm site-php-cli composer cs:fix # Автопочинка PHP-стиля
     #$(DOCKER_COMPOSE) run --rm site-php-cli composer cs:phpcs   # Проверка через phpcs (PSR-12)

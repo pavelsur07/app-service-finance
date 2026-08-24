@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Finance\Controller\Api;
 
 use App\Company\Facade\FinancialResponsibilityCenterFacade;

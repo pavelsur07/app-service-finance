@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Cash\Command;
 
 use App\Company\Infrastructure\Repository\CompanyRepository;

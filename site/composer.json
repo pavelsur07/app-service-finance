@@ -102,6 +102,7 @@
         "test:smoke": "php bin/phpunit tests/Unit/Telegram tests/Functional/Telegram",
         "test:no-legacy": "phpunit -c phpunit.xml --exclude-group legacy",
         "cs:check": "php-cs-fixer fix --dry-run --diff --cache-file=var/cache/.php-cs-fixer.cache",
+        "cs:strict-types": "php-cs-fixer fix --dry-run --config=.php-cs-fixer.strict-types.php --using-cache=no",
         "cs:fix": "php-cs-fixer fix --cache-file=var/cache/.php-cs-fixer.cache",
         "cs:phpcs": "phpcs --standard=PSR12 src tests",
         "cs:twig": "twigcs --config .twig-cs-fixer.php templates",

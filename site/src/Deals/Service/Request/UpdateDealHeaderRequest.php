@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Deals\Service\Request;
 
 use App\Deals\Enum\DealChannel;

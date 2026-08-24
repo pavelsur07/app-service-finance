@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Balance\Provider;
 
 use App\Balance\Enum\BalanceLinkSourceType;

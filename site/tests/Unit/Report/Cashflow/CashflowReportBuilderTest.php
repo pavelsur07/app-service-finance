@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tests\Unit\Report\Cashflow;
 
 use App\Cash\Entity\Accounts\MoneyAccount;

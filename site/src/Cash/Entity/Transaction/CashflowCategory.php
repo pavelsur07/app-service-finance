@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Cash\Entity\Transaction;
 
 use App\Cash\Enum\PaymentPlan\PaymentPlanType;

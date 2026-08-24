@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Notification\Controller;
 
 use App\Notification\DTO\EmailMessage;
@@ -28,7 +30,7 @@ final class DashboardNotifyController extends AbstractController
         $this->denyAccessUnlessGranted('ROLE_USER');
 
         // CSRF
-        $this->isCsrfTokenValid('dashboard_notify', $request->request->get('_token'))
+        $this->isCsrfTokenValid('dashboard_notify', (string) $request->request->get('_token'))
             || throw $this->createAccessDeniedException('CSRF token invalid.');
 
         try {

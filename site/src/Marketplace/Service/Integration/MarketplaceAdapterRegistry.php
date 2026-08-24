@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Marketplace\Service\Integration;
 
 use App\Marketplace\Enum\MarketplaceType;

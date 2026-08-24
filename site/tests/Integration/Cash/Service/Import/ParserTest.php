@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tests\Integration\Cash\Service\Import;
 
 class ParserTest extends ClientBank1CImportServiceTestCase

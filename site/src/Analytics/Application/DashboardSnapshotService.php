@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Analytics\Application;
 
 use App\Analytics\Api\Response\SnapshotContextResponse;

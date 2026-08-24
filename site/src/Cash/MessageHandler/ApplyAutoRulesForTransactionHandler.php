@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Cash\MessageHandler;
 
 use App\Cash\Application\Service\AutoRuleDispatchGuard;

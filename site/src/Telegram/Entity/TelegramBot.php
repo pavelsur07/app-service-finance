@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Telegram\Entity;
 
 use App\Telegram\Repository\TelegramBotRepository;

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Catalog\Controller\Api;
 
 use App\Catalog\Infrastructure\Query\ProductQuery;

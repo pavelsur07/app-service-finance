@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // src/Notification/DTO/EmailMessage.php
 
 namespace App\Notification\DTO;

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Cash\MessageHandler\Import;
 
 use App\Cash\Message\Import\BankImportMessage;
