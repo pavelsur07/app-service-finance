@@ -125,12 +125,24 @@ jobs:
         needs: changes
         if: ${{ needs.changes.outputs.backend == 'true' }}
         runs-on: ubuntu-latest
+        env:
+            COMPOSE_PROJECT_NAME: app-service-finance
         steps:
             - name: 📦 Checkout repository
               uses: actions/checkout@v6
 
-            - name: 🐳 Build site-php-cli
-              run: docker compose build site-php-cli
+            - name: 🐳 Set up Buildx
+              uses: docker/setup-buildx-action@v4
+
+            - name: 🐳 Build site-php-cli (GHA cache)
+              uses: docker/build-push-action@v7
+              with:
+                  context: site/docker
+                  file: site/docker/development/php-cli/Dockerfile
+                  tags: app-service-finance-site-php-cli:latest
+                  load: true
+                  cache-from: type=gha,scope=site-php-cli-dev
+                  cache-to: type=gha,scope=site-php-cli-dev,mode=max
 
             - name: 📦 Cache composer dependencies
               uses: actions/cache@v4
@@ -162,12 +174,24 @@ jobs:
         needs: changes
         if: ${{ needs.changes.outputs.backend == 'true' }}
         runs-on: ubuntu-latest
+        env:
+            COMPOSE_PROJECT_NAME: app-service-finance
         steps:
             - name: 📦 Checkout repository
               uses: actions/checkout@v6
 
-            - name: 🐳 Build site-php-cli
-              run: docker compose build site-php-cli
+            - name: 🐳 Set up Buildx
+              uses: docker/setup-buildx-action@v4
+
+            - name: 🐳 Build site-php-cli (GHA cache)
+              uses: docker/build-push-action@v7
+              with:
+                  context: site/docker
+                  file: site/docker/development/php-cli/Dockerfile
+                  tags: app-service-finance-site-php-cli:latest
+                  load: true
+                  cache-from: type=gha,scope=site-php-cli-dev
+                  cache-to: type=gha,scope=site-php-cli-dev,mode=max
 
             - name: 📦 Cache composer dependencies
               uses: actions/cache@v4
@@ -207,12 +231,24 @@ jobs:
         needs: changes
         if: ${{ needs.changes.outputs.backend == 'true' }}
         runs-on: ubuntu-latest
+        env:
+            COMPOSE_PROJECT_NAME: app-service-finance
         steps:
             - name: 📦 Checkout repository
               uses: actions/checkout@v6
 
-            - name: 🐳 Build site-php-cli
-              run: docker compose build site-php-cli
+            - name: 🐳 Set up Buildx
+              uses: docker/setup-buildx-action@v4
+
+            - name: 🐳 Build site-php-cli (GHA cache)
+              uses: docker/build-push-action@v7
+              with:
+                  context: site/docker
+                  file: site/docker/development/php-cli/Dockerfile
+                  tags: app-service-finance-site-php-cli:latest
+                  load: true
+                  cache-from: type=gha,scope=site-php-cli-dev
+                  cache-to: type=gha,scope=site-php-cli-dev,mode=max
 
             - name: 📦 Cache composer dependencies
               uses: actions/cache@v4
