@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Cash\Controller\Transaction;
 
 use App\Cash\Application\DeleteCashTransactionAutoRuleAction;

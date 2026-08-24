@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Cash\Entity\PaymentPlan;
 
 use App\Cash\Entity\Accounts\MoneyAccount;

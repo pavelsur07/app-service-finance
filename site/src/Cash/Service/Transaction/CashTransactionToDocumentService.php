@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Cash\Service\Transaction;
 
 use App\Cash\Entity\Transaction\CashflowCategory;

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Cash\Message;
 
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleApplyMode;

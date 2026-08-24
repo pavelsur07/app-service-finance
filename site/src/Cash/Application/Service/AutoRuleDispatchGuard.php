@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Cash\Application\Service;
 
 use App\Cash\Application\DTO\CashTransactionAutoRuleApplicationPlan;

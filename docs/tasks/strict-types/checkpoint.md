@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 2 — DONE
+**Phase:** Stage 3 — DONE
 **Status:** done
-**Stage base commit:** dafaf625 (база Stage 2)
+**Stage base commit:** 62fc78f6 (база Stage 3)
 **Current Work item:** none
 **Owner gate:** no
 
@@ -10,6 +10,7 @@
 - Phase 0 — план в `docs/tasks/strict-types/plan.md`
 - Stage 1 — 13 файлов (`Exception` 3, `Util` 1, `Kernel.php` 1, `DataFixtures` 8). Долг 309 → 296.
 - Stage 2 — 70 файлов (`Marketplace` 32, `Company` 25, `Finance` 10, `Catalog` 2, `MarketplaceAnalytics` 1). Долг 296 → 226.
+- Stage 3 — 98 файлов, весь модуль `Cash`. Долг 226 → 128.
 
 ### Current diff / affected files
 - 13 файлов в `site/src/`, +29 −3
@@ -22,11 +23,11 @@
 
 ### Review status
 - внутренний: green, 1 итерация
-- внешний: `REVIEW_GREEN` на 2-м круге. Круг 1 дал два IMPORTANT (ложные), сняты по доказательству после передачи тел файлов.
-- урок: ревьюеру сразу давать тела файлов с логикой, а не только hunks
+- внешний Stage 3: `REVIEW_GREEN` на 3-м круге. Круг 1 — упавшая песочница (не ревью), круг 2 — зелёный по полному диффу, круг 3 — закрыт пропущенный `CashTransactionRepository`.
+- уроки: ревьюеру сразу давать тела файлов с логикой; сверять реально вложенные файлы с тем, что заявлено в промпте
 
 ### Exact next action
-- Stage 3: `Cash` — 98 файлов, по поддиректориям Entity / Repository / Application / Controller
+- Stage 4: `Shared` (9) первым и с полным прогоном — от него зависят остальные; далее `Telegram` (9), `Billing` (5), `Balance` (4), `Admin` (4), `Report` (3), `Twig` (3)
 
 ### Files to inspect first on resume
 - `docs/tasks/strict-types/plan.md` — процедура батча и распределение долга

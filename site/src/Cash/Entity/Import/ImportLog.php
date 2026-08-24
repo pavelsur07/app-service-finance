@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Cash\Entity\Import;
 
 use App\Cash\Repository\Import\ImportLogRepository;

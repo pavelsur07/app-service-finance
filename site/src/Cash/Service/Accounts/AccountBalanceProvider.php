@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Cash\Service\Accounts;
 
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;

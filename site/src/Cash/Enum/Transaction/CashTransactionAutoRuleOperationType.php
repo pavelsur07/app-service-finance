@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Cash\Enum\Transaction;
 
 enum CashTransactionAutoRuleOperationType: string

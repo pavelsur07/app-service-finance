@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Cash\Entity\Bank;
 
 use App\Cash\Repository\Bank\BankConnectionRepository;

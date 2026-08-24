@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Cash\Repository\PaymentPlan;
 
 use App\Cash\Entity\PaymentPlan\PaymentPlanMatch;

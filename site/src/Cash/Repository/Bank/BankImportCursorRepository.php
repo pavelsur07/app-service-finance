@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Cash\Repository\Bank;
 
 use App\Cash\Entity\Bank\BankImportCursor;
