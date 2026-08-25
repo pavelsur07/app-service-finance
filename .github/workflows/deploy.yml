@@ -306,13 +306,35 @@ jobs:
     #   выкаченный непротестированный — нет. Тесты укладываются в окно, которое
     #   пайплайн и так тратит на сборку четырёх образов.
     #   Unit покрыты job'ом unit-tests и здесь не дублируются.
+    # Сьюты режутся на параллельные legs: functional идёт ~275 с одним процессом и
+    #   делает backend-tests критическим путём. GitHub даёт параллельные job'ы
+    #   бесплатно, поэтому каждый leg получает свой раннер, свою БД и свою часть.
+    #   Раскладка functional считается bin/functional-shard.sh — списки не
+    #   захардкожены, новый каталог подхватывается сам.
     backend-tests:
-        name: 🧪 Integration & functional tests
+        name: 🧪 ${{ matrix.name }}
         needs: [ changes, dev-image ]
         if: ${{ needs.changes.outputs.backend == 'true' }}
         runs-on: ubuntu-latest
         env:
             COMPOSE_PROJECT_NAME: app-service-finance
+        strategy:
+            # Падение одного leg не отменяет остальные: нужен полный список
+            # упавших тестов, а не первый попавшийся.
+            fail-fast: false
+            matrix:
+                include:
+                    - name: Integration tests
+                      suite: integration
+                    - name: Functional tests 1/3
+                      suite: functional
+                      shard: 0
+                    - name: Functional tests 2/3
+                      suite: functional
+                      shard: 1
+                    - name: Functional tests 3/3
+                      suite: functional
+                      shard: 2
         steps:
             - name: 📦 Checkout repository
               uses: actions/checkout@v6
@@ -367,21 +389,25 @@ jobs:
                     -e COMPOSER_HOME=/tmp/composer \
                     site-php-cli php bin/console doctrine:migrations:migrate --no-interaction --env=test
 
-            - name: 🧪 Integration tests
+            - name: 🧪 Run ${{ matrix.name }}
               run: |
-                  docker compose run --rm -T \
-                    --user "$(id -u):$(id -g)" \
-                    -e COMPOSER_HOME=/tmp/composer \
-                    -e COMPOSER_PROCESS_TIMEOUT=0 \
-                    site-php-cli composer test:integration
-
-            - name: 🧪 Functional tests
-              run: |
-                  docker compose run --rm -T \
-                    --user "$(id -u):$(id -g)" \
-                    -e COMPOSER_HOME=/tmp/composer \
-                    -e COMPOSER_PROCESS_TIMEOUT=0 \
-                    site-php-cli composer test:functional
+                  if [ "${{ matrix.suite }}" = "integration" ]; then
+                      docker compose run --rm -T \
+                        --user "$(id -u):$(id -g)" \
+                        -e COMPOSER_HOME=/tmp/composer \
+                        -e COMPOSER_PROCESS_TIMEOUT=0 \
+                        site-php-cli composer test:integration
+                  else
+                      PATHS=$(docker compose run --rm -T \
+                        --user "$(id -u):$(id -g)" \
+                        site-php-cli bin/functional-shard.sh ${{ matrix.shard }} 3 | tr -d '\r')
+                      echo "Шард ${{ matrix.shard }} покрывает: $PATHS"
+                      docker compose run --rm -T \
+                        --user "$(id -u):$(id -g)" \
+                        -e COMPOSER_HOME=/tmp/composer \
+                        -e COMPOSER_PROCESS_TIMEOUT=0 \
+                        site-php-cli php bin/phpunit $PATHS
+                  fi
 
     # 1. ЭТАП СБОРКИ: собираем только затронутые образы (динамическая матрица).
     build-and-push:

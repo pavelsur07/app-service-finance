@@ -13,10 +13,8 @@ final class SystemCounterpartyRepositoryTest extends IntegrationTestCase
 {
     public function testFindsGlobalCounterpartyBySource(): void
     {
-        // Контрагента здесь НЕ создаём: `ozon` и `wildberries` засеяны миграцией
-        // Version20260619110000, а на `source` стоит уникальный индекс. Попытка
-        // вставить второй `ozon` падает с SQLSTATE[23505] на любой чисто
-        // мигрированной БД.
+        $this->ensureOzonSystemCounterparty();
+
         /** @var SystemCounterpartyRepository $repository */
         $repository = self::getContainer()->get(SystemCounterpartyRepository::class);
 
@@ -25,6 +23,37 @@ final class SystemCounterpartyRepositoryTest extends IntegrationTestCase
         self::assertNotNull($counterparty);
         self::assertSame(IngestSource::OZON, $counterparty->getSource());
         self::assertSame('Ozon', $counterparty->getName());
+    }
+
+    /**
+     * Тест обязан сам обеспечить своё предусловие, а не полагаться на данные,
+     * засеянные миграцией Version20260619110000.
+     *
+     * Полагаться на них нельзя: PostgresResetTestCase помечен
+     * #[SkipDatabaseRollback] и в tearDown делает TRUNCATE по всем таблицам
+     * безвозвратно, вычищая в том числе system_counterparties. Пройдёт тест или
+     * нет, зависело бы от того, отработал ли до него один из его наследников —
+     * а executionOrder="depends,defects" меняет порядок между прогонами.
+     *
+     * ON CONFLICT DO NOTHING делает вставку идемпотентной: строка есть — берём
+     * её, нет — создаём. DAMA откатит вставку после теста. Тот же приём уже
+     * применён в NormalizeRawRecordActionTest.
+     */
+    private function ensureOzonSystemCounterparty(): void
+    {
+        $this->connection->executeStatement(
+            <<<'SQL'
+                INSERT INTO system_counterparties (id, source, name, created_at)
+                VALUES (:id, :source, :name, :createdAt)
+                ON CONFLICT (source) DO NOTHING
+                SQL,
+            [
+                'id' => '1cbbfc7c-72ad-5505-8743-be71bdde6dc1',
+                'source' => IngestSource::OZON->value,
+                'name' => 'Ozon',
+                'createdAt' => (new \DateTimeImmutable())->format('Y-m-d H:i:s.u'),
+            ],
+        );
     }
 
     public function testGetBySourceThrowsWhenMissing(): void
