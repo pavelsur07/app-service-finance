@@ -120,17 +120,95 @@ jobs:
                   echo "landing=$la" >> "$GITHUB_OUTPUT"
                   echo "matrix={\"include\":[${items[*]}]}" >> "$GITHUB_OUTPUT"
 
-    unit-tests:
-        name: 🧪 Unit tests
+    # Dev-образ php-cli для тестовых job'ов: публикуется в ghcr и переиспользуется.
+    #   Тег — хеш входов образа (Dockerfile + conf.d + wait-for-it), поэтому пересборка
+    #   нужна только когда эти файлы реально менялись; иначе job лишь проверяет реестр.
+    #   На pull_request push в ghcr невозможен — так же, как у build-and-push, — поэтому
+    #   тестовые job'ы при отсутствии тега собирают образ сами (fallback у них внутри).
+    dev-image:
+        name: 🐳 Dev image
         needs: changes
         if: ${{ needs.changes.outputs.backend == 'true' }}
         runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            packages: write
+        outputs:
+            tag: ${{ steps.tag.outputs.tag }}
         steps:
             - name: 📦 Checkout repository
               uses: actions/checkout@v6
 
-            - name: 🐳 Build site-php-cli
-              run: docker compose build site-php-cli
+            - name: 🏷 Compute image tag from build inputs
+              id: tag
+              run: |
+                  TAG=$(find site/docker/development/php-cli/Dockerfile \
+                             site/docker/common/php/conf.d \
+                             site/docker/development/php/conf.d \
+                             site/docker/common/wait-for-it.sh \
+                          -type f | sort | xargs sha256sum | sha256sum | cut -c1-16)
+                  echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+                  echo "Тег dev-образа: $TAG"
+
+            - name: 🔐 Login to GHCR
+              uses: docker/login-action@v4
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: 🔎 Is the tag already published?
+              id: check
+              run: |
+                  if docker manifest inspect "ghcr.io/pavelsur07/site-php-cli-dev:${{ steps.tag.outputs.tag }}" >/dev/null 2>&1; then
+                      echo "available=true" >> "$GITHUB_OUTPUT"
+                      echo "Образ уже в реестре — сборка не нужна."
+                  else
+                      echo "available=false" >> "$GITHUB_OUTPUT"
+                      echo "Образа нет, потребуется сборка."
+                  fi
+
+            - name: 🛠 Set up Docker Buildx
+              if: ${{ steps.check.outputs.available == 'false' }}
+              uses: docker/setup-buildx-action@v4
+
+            - name: 🐳 Build and publish dev image
+              if: ${{ steps.check.outputs.available == 'false' }}
+              uses: docker/build-push-action@v7
+              with:
+                  context: site/docker
+                  file: site/docker/development/php-cli/Dockerfile
+                  push: ${{ github.event_name != 'pull_request' }}
+                  tags: ghcr.io/pavelsur07/site-php-cli-dev:${{ steps.tag.outputs.tag }}
+
+    unit-tests:
+        name: 🧪 Unit tests
+        needs: [ changes, dev-image ]
+        if: ${{ needs.changes.outputs.backend == 'true' }}
+        runs-on: ubuntu-latest
+        env:
+            COMPOSE_PROJECT_NAME: app-service-finance
+        steps:
+            - name: 📦 Checkout repository
+              uses: actions/checkout@v6
+
+            - name: 🔐 Login to GHCR
+              uses: docker/login-action@v4
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: 🐳 Pull dev image (fallback — local build)
+              run: |
+                  IMG="ghcr.io/pavelsur07/site-php-cli-dev:${{ needs.dev-image.outputs.tag }}"
+                  if docker pull -q "$IMG"; then
+                      docker tag "$IMG" app-service-finance-site-php-cli:latest
+                      echo "Образ получен из ghcr: $IMG"
+                  else
+                      echo "Образа нет в ghcr — собираю локально."
+                      docker compose build site-php-cli
+                  fi
 
             - name: 📦 Cache composer dependencies
               uses: actions/cache@v4
@@ -159,15 +237,32 @@ jobs:
 
     cs-check:
         name: 🎨 PHP code style
-        needs: changes
+        needs: [ changes, dev-image ]
         if: ${{ needs.changes.outputs.backend == 'true' }}
         runs-on: ubuntu-latest
+        env:
+            COMPOSE_PROJECT_NAME: app-service-finance
         steps:
             - name: 📦 Checkout repository
               uses: actions/checkout@v6
 
-            - name: 🐳 Build site-php-cli
-              run: docker compose build site-php-cli
+            - name: 🔐 Login to GHCR
+              uses: docker/login-action@v4
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: 🐳 Pull dev image (fallback — local build)
+              run: |
+                  IMG="ghcr.io/pavelsur07/site-php-cli-dev:${{ needs.dev-image.outputs.tag }}"
+                  if docker pull -q "$IMG"; then
+                      docker tag "$IMG" app-service-finance-site-php-cli:latest
+                      echo "Образ получен из ghcr: $IMG"
+                  else
+                      echo "Образа нет в ghcr — собираю локально."
+                      docker compose build site-php-cli
+                  fi
 
             - name: 📦 Cache composer dependencies
               uses: actions/cache@v4
@@ -204,15 +299,32 @@ jobs:
     #   Unit покрыты job'ом unit-tests и здесь не дублируются.
     backend-tests:
         name: 🧪 Integration & functional tests
-        needs: changes
+        needs: [ changes, dev-image ]
         if: ${{ needs.changes.outputs.backend == 'true' }}
         runs-on: ubuntu-latest
+        env:
+            COMPOSE_PROJECT_NAME: app-service-finance
         steps:
             - name: 📦 Checkout repository
               uses: actions/checkout@v6
 
-            - name: 🐳 Build site-php-cli
-              run: docker compose build site-php-cli
+            - name: 🔐 Login to GHCR
+              uses: docker/login-action@v4
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: 🐳 Pull dev image (fallback — local build)
+              run: |
+                  IMG="ghcr.io/pavelsur07/site-php-cli-dev:${{ needs.dev-image.outputs.tag }}"
+                  if docker pull -q "$IMG"; then
+                      docker tag "$IMG" app-service-finance-site-php-cli:latest
+                      echo "Образ получен из ghcr: $IMG"
+                  else
+                      echo "Образа нет в ghcr — собираю локально."
+                      docker compose build site-php-cli
+                  fi
 
             - name: 📦 Cache composer dependencies
               uses: actions/cache@v4
