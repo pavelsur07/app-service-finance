@@ -278,6 +278,15 @@ jobs:
                     -e COMPOSER_HOME=/tmp/composer \
                     site-php-cli composer install --no-interaction --prefer-dist --no-progress --no-scripts
 
+            - name: 🎨 Cache php-cs-fixer results
+              uses: actions/cache@v4
+              with:
+                  path: |
+                      site/var/cache/.php-cs-fixer.cache
+                      site/var/cache/.php-cs-fixer.strict-types.cache
+                  key: cs-fixer-${{ hashFiles('site/.php-cs-fixer.php', 'site/.php-cs-fixer.strict-types.php') }}-${{ github.sha }}
+                  restore-keys: cs-fixer-${{ hashFiles('site/.php-cs-fixer.php', 'site/.php-cs-fixer.strict-types.php') }}-
+
             - name: 🎨 Check PHP code style
               run: |
                   docker compose run --rm -T \
