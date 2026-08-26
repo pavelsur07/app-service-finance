@@ -160,7 +160,7 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces, t
             <div className="page-header d-print-none mb-3">
                 <div className="row g-2 align-items-center">
                     <div className="col">
-                        <h2 className="page-title">Unit — расширенный</h2>
+                        <h2 className="page-title">Unit — Экономика</h2>
                     </div>
                 </div>
             </div>

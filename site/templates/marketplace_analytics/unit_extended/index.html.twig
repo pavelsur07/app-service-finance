@@ -1,21 +1,15 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Unit — расширенный — Аналитика маркетплейсов{% endblock %}
+{% block title %}Unit — Экономика — Аналитика маркетплейсов{% endblock %}
 
 {% block content %}
-    {% include 'marketplace_analytics/_tabs.html.twig' with { activeTab: 'unit_extended' } %}
-
     <div class="page-body">
         <div class="container-xl">
-            <div class="tab-content">
-                <div class="tab-pane active show">
-                    <div
-                        id="react-unit-extended"
-                        data-marketplaces="{{ marketplaces|json_encode|e('html_attr') }}"
-                        data-tags="{{ tags|json_encode|e('html_attr') }}"
-                    ></div>
-                </div>
-            </div>
+            <div
+                id="react-unit-extended"
+                data-marketplaces="{{ marketplaces|json_encode|e('html_attr') }}"
+                data-tags="{{ tags|json_encode|e('html_attr') }}"
+            ></div>
         </div>
     </div>
 {% endblock %}
