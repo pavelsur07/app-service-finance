@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Support\Db;
 
+use App\Company\Security\SystemCompanyRoles;
+use App\Ingestion\Domain\SystemCounterparties;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -48,8 +51,46 @@ final class DbReset
                 'TRUNCATE %s RESTART IDENTITY CASCADE',
                 $tableList
             ));
+            $this->restoreReferenceData($connection);
         } finally {
             $connection->executeStatement("SET session_replication_role = 'origin'");
+        }
+    }
+
+    /**
+     * Восстанавливает справочные данные, засеянные миграциями.
+     *
+     * TRUNCATE сносит их вместе с тестовыми, а повторно миграции не идут:
+     * doctrine_migration_versions переживает reset. Без восстановления любой
+     * тест, опирающийся на системные роли или контрагентов, падает в
+     * зависимости от того, запускался ли до него PostgresResetTestCase, —
+     * то есть по порядку выполнения, а не по своему коду.
+     *
+     * Покрытие проверяется тестом DbResetTest: он сканирует миграции на
+     * статические INSERT ... VALUES и падает, если появилась таблица,
+     * которую здесь не восстанавливают.
+     */
+    private function restoreReferenceData(Connection $connection): void
+    {
+        $now = (new \DateTimeImmutable())->format('Y-m-d H:i:s.u');
+
+        foreach (SystemCompanyRoles::definitions() as $id => $definition) {
+            $connection->executeStatement(
+                'INSERT INTO company_role (id, company_id, name, permissions, created_at) VALUES (?, NULL, ?, ?, ?)',
+                [
+                    $id,
+                    $definition['name'],
+                    json_encode($definition['permissions'], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE),
+                    $now,
+                ],
+            );
+        }
+
+        foreach (SystemCounterparties::definitions() as $id => $definition) {
+            $connection->executeStatement(
+                'INSERT INTO system_counterparties (id, source, name, inn, created_at) VALUES (?, ?, ?, NULL, ?)',
+                [$id, $definition['source']->value, $definition['name'], $now],
+            );
         }
     }
 }
