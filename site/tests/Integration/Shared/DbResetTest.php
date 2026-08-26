@@ -74,9 +74,13 @@ final class DbResetTest extends IntegrationTestCase
             $sql = file_get_contents($file);
             self::assertIsString($sql);
 
-            if (preg_match_all('/INSERT\s+INTO\s+"?([a-z_]+)"?\s*\([^)]*\)\s*VALUES/i', $sql, $matches)) {
+            // Имя может быть в кавычках и с указанием схемы ("public"."company_role") —
+            // ловим обе формы и оставляем последний сегмент без кавычек. Пропуск здесь
+            // молчаливый, поэтому шаблон шире, чем нужно сегодняшним миграциям.
+            if (preg_match_all('/INSERT\s+INTO\s+([a-z0-9_."]+)\s*\([^)]*\)\s*VALUES/i', $sql, $matches)) {
                 foreach ($matches[1] as $table) {
-                    $seeded[$table] = true;
+                    $parts = explode('.', $table);
+                    $seeded[trim((string) array_pop($parts), '"')] = true;
                 }
             }
         }
