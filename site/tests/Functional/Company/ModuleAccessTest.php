@@ -15,7 +15,6 @@ use App\Company\Security\SystemCompanyRoles;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\CompanyMemberBuilder;
 use App\Tests\Builders\Company\UserBuilder;
-use App\Tests\Support\Db\SystemCompanyRolesSeeder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -70,7 +69,6 @@ final class ModuleAccessTest extends WebTestCaseBase
     {
         $client = static::createClient();
         $this->resetDb();
-        (new SystemCompanyRolesSeeder())->seed($this->em());
 
         [$company] = $this->seedCompanyWithOwner();
 
@@ -169,7 +167,6 @@ final class ModuleAccessTest extends WebTestCaseBase
     {
         $client = static::createClient();
         $this->resetDb();
-        (new SystemCompanyRolesSeeder())->seed($this->em());
 
         [$company] = $this->seedCompanyWithOwner();
 
@@ -230,7 +227,6 @@ final class ModuleAccessTest extends WebTestCaseBase
     {
         $client = static::createClient();
         $this->resetDb();
-        (new SystemCompanyRolesSeeder())->seed($this->em());
 
         [$company] = $this->seedCompanyWithOwner();
 
