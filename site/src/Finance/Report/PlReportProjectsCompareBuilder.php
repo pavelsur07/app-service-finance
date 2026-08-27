@@ -7,6 +7,7 @@ namespace App\Finance\Report;
 use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
 use App\Finance\Engine\ValueFormatter;
+use App\Finance\Enum\PLValueFormat;
 use App\Finance\Repository\PLCategoryRepository;
 
 final class PlReportProjectsCompareBuilder
@@ -26,6 +27,7 @@ final class PlReportProjectsCompareBuilder
      *   projects: array<int,array{id:string,name:string,isOverhead:bool}>,
      *   rows: array<int,array{id:string,code:?string,name:string,level:int,type:string,values: array<string,string>}>,
      *   rawValues: array<string, array<string,float>>,
+     *   formats: array<string, PLValueFormat>,
      *   warnings: string[],
      * }
      */
@@ -56,6 +58,7 @@ final class PlReportProjectsCompareBuilder
         $warnings = [];
         $rowsById = [];
         $rawValues = [];
+        $formats = [];
 
         if (!$this->calc->supportsProjectDimension()) {
             throw new \LogicException('P&L projects view requires project dimension support in facts');
@@ -84,6 +87,7 @@ final class PlReportProjectsCompareBuilder
                         'values' => [],
                     ];
                     $rawValues[$rowId] = [];
+                    $formats[$rowId] = $r->format;
                 }
 
                 $rowsById[$rowId]['values'][$projectId] = $r->formatted;
@@ -106,6 +110,7 @@ final class PlReportProjectsCompareBuilder
                         'values' => [],
                     ];
                     $rawValues[$rowId] = [];
+                    $formats[$rowId] = $resultRow->format;
                 }
                 $rowsById[$rowId]['values']['_total'] = $resultRow->formatted;
                 $rawValues[$rowId]['_total'] = $resultRow->rawValue;
@@ -124,7 +129,7 @@ final class PlReportProjectsCompareBuilder
                     $row['values']['_total'] = $this->fmt->format($sum, $format);
                 } else {
                     // fallback безопасно: деньги
-                    $row['values']['_total'] = $this->fmt->format($sum, \App\Finance\Enum\PLValueFormat::MONEY);
+                    $row['values']['_total'] = $this->fmt->format($sum, PLValueFormat::MONEY);
                 }
             }
             unset($row);
@@ -152,6 +157,7 @@ final class PlReportProjectsCompareBuilder
             'projects' => $projectsPayload,
             'rows' => array_values($rowsById),
             'rawValues' => $rawValues,
+            'formats' => $formats,
             'warnings' => array_values(array_unique($warnings)),
         ];
     }

@@ -10,11 +10,14 @@ use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Company\Security\ModuleAccess;
 use App\Finance\Application\Service\PLRegisterUpdater;
+use App\Finance\Infrastructure\Export\PlReportXlsxExporter;
 use App\Finance\Report\PlReportGridBuilder;
 use App\Finance\Report\PlReportPeriod;
 use App\Finance\Report\PlReportProjectsCompareBuilder;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -326,6 +329,134 @@ final class PlReportPreviewController extends AbstractController
         $response = new JsonResponse($payload, Response::HTTP_OK, [], false);
         $response->setEncodingOptions(\JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES);
         $response->headers->set('Content-Disposition', sprintf('attachment; filename="%s"', $filename));
+
+        return $response;
+    }
+
+    #[Route('/finance/report/preview/xlsx', name: 'finance_report_preview_xlsx', methods: ['GET'])]
+    public function exportXlsx(
+        Request $request,
+        ActiveCompanyService $activeCompany,
+        PlReportGridBuilder $gridBuilder,
+        PlReportProjectsCompareBuilder $projectsCompareBuilder,
+        ProjectDirectionRepository $projectDirections,
+        FinancialResponsibilityCenterFacade $responsibilityCenters,
+        PlReportXlsxExporter $exporter,
+    ): Response {
+        $company = $activeCompany->getActiveCompany();
+        $companyId = (string) $company->getId();
+
+        $grouping = (string) $request->query->get('grouping', 'month');
+        if (!\in_array($grouping, ['day', 'week', 'month', 'quarter'], true)) {
+            $grouping = 'month';
+        }
+
+        $layout = (string) $request->query->get('layout', 'periods');
+        if (!\in_array($layout, ['periods', 'projects'], true)) {
+            $layout = 'periods';
+        }
+
+        $projectDirectionsList = $projectDirections->findByCompany($company);
+        $filters = $this->resolveDimensionFilters(
+            $request,
+            $projectDirectionsList,
+            $responsibilityCenters->getActiveChoices($companyId),
+        );
+        [$from, $to] = $this->resolveDateRange($request->query->get('from'), $request->query->get('to'));
+
+        if ('projects' === $layout) {
+            $overheadProject = null;
+            foreach ($projectDirectionsList as $projectDirection) {
+                $name = mb_strtolower(trim((string) $projectDirection->getName()));
+                if ('общий' === $name || str_starts_with($name, 'общий')) {
+                    $overheadProject = $projectDirection;
+
+                    break;
+                }
+            }
+
+            $compareProjects = $filters['plural']
+                ? ($filters['projectFilter'] ?? $projectDirectionsList)
+                : $projectDirectionsList;
+
+            try {
+                $report = $projectsCompareBuilder->build(
+                    $company,
+                    $from,
+                    $to,
+                    $compareProjects,
+                    $overheadProject,
+                    $filters['responsibilityCenterFilter'],
+                    $filters['plural'],
+                );
+            } catch (\LogicException $exception) {
+                $this->addFlash('warning', 'Не удалось построить разрез по проектам: '.$exception->getMessage());
+
+                return $this->redirectToRoute('finance_report_preview', $request->query->all());
+            }
+
+            $columns = array_map(
+                static fn (array $project): array => [
+                    'id' => $project['id'],
+                    'label' => $project['name'].($project['isOverhead'] ? ' (Shared)' : ''),
+                ],
+                $report['projects'],
+            );
+            $columns[] = ['id' => '_total', 'label' => 'Итого'];
+            $sheetName = 'По проектам';
+        } else {
+            $report = $gridBuilder->build(
+                $company,
+                $from,
+                $to,
+                $grouping,
+                $filters['projectFilter'],
+                $filters['responsibilityCenterFilter'],
+            );
+            $columns = array_map(
+                static fn (PlReportPeriod $period): array => ['id' => $period->id, 'label' => $period->label],
+                $report['periods'],
+            );
+            $sheetName = 'По периодам';
+        }
+
+        $file = tempnam(sys_get_temp_dir(), 'pl_report_export_');
+        if (false === $file) {
+            throw new \RuntimeException('Unable to create temporary file for export');
+        }
+
+        try {
+            $exporter->export(
+                $sheetName,
+                $columns,
+                $report['rows'],
+                $report['rawValues'],
+                $report['formats'],
+                $request->query->getBoolean('show_meta'),
+                $file,
+            );
+        } catch (\Throwable $exception) {
+            if (is_file($file)) {
+                unlink($file);
+            }
+
+            throw $exception;
+        }
+
+        $response = new BinaryFileResponse($file);
+        $response->deleteFileAfterSend(true);
+        $response->headers->set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        $response->setContentDisposition(
+            HeaderUtils::DISPOSITION_ATTACHMENT,
+            sprintf(
+                'pl-report_%s_%s_%s.xlsx',
+                $layout,
+                $from->format('Y-m-d'),
+                $to->format('Y-m-d'),
+            ),
+        );
+        $response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate');
+        $response->headers->set('Accept-Ranges', 'none');
 
         return $response;
     }

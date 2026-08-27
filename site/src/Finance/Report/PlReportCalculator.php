@@ -167,6 +167,7 @@ final class PlReportCalculator
                 name: $c->getName(),
                 level: $c->getLevel(),
                 type: $c->getType()->value,
+                format: $c->getFormat(),
                 rawValue: (float) ($values[$c->getId()] ?? 0.0),
                 formatted: $this->fmt->format((float) ($values[$c->getId()] ?? 0.0), $c->getFormat())
             );
