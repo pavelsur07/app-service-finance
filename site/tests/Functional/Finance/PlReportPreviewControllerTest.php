@@ -10,9 +10,11 @@ use App\Finance\Entity\PLCategory;
 use App\Finance\Entity\PLDailyTotal;
 use App\Finance\Enum\PLCategoryType;
 use App\Finance\Enum\PLFlow;
+use App\Finance\Enum\PLValueFormat;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use OpenSpout\Reader\XLSX\Reader;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Component\DomCrawler\Crawler;
 
@@ -345,6 +347,11 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
         self::assertSame([$projectA->getId()], $jsonQuery['projectDirectionIds']);
         self::assertSame([$centerA->getId()], $jsonQuery['responsibilityCenterIds']);
 
+        $xlsxAction = $pageHeader->filter('[data-testid="btn-export-xlsx"]');
+        self::assertCount(1, $xlsxAction);
+        self::assertSame('XLSX', trim($xlsxAction->text()));
+        self::assertSame($jsonQuery, $this->queryFromHref((string) $xlsxAction->attr('href')));
+
         self::assertCount(0, $crawler->filter('form[action$="/finance/report/preview/recalc"]'));
         self::assertCount(0, $crawler->filter('#recalc_from'));
 
@@ -399,6 +406,101 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
         $legacyJsonQuery = $this->queryFromHref((string) $legacyProjects->filter('a[title="Скачать отчёт в формате JSON для проверки"]')->attr('href'));
         self::assertSame($projectA->getId(), $legacyJsonQuery['projectDirectionId']);
         self::assertArrayNotHasKey('projectFiltersPresent', $legacyJsonQuery);
+    }
+
+    public function testXlsxExportUsesCurrentLayoutFiltersAndNumericValues(): void
+    {
+        $client = static::createClient();
+        $company = $this->loginWithCompany($client, 'pl-report-preview-xlsx@example.test');
+        $projectA = new ProjectDirection('33333333-3333-3333-3333-000000000971', $company, 'Alpha project');
+        $projectB = new ProjectDirection('33333333-3333-3333-3333-000000000972', $company, 'Beta project');
+        $category = (new PLCategory('33333333-3333-3333-3333-000000000973', $company))
+            ->setName('XLSX revenue')
+            ->setCode('XLSX_REVENUE')
+            ->setFormat(PLValueFormat::PERCENT)
+            ->setFlow(PLFlow::INCOME);
+        $totalA = (new PLDailyTotal(
+            '33333333-3333-3333-3333-000000000974',
+            $company,
+            $projectA,
+            new \DateTimeImmutable('2026-08-10'),
+            $category,
+        ))->setAmountIncome('0.25');
+        $totalB = (new PLDailyTotal(
+            '33333333-3333-3333-3333-000000000975',
+            $company,
+            $projectB,
+            new \DateTimeImmutable('2026-08-10'),
+            $category,
+        ))->setAmountIncome('0.50');
+
+        $foreignUser = UserBuilder::aUser()->withIndex(2)->withEmail('pl-report-preview-xlsx-foreign@example.test')->build();
+        $foreignCompany = CompanyBuilder::aCompany()->withIndex(2)->withOwner($foreignUser)->build();
+        $foreignProject = new ProjectDirection(
+            '33333333-3333-3333-3333-000000000976',
+            $foreignCompany,
+            'Foreign project',
+        );
+
+        foreach ([$projectA, $projectB, $category, $totalA, $totalB, $foreignUser, $foreignCompany, $foreignProject] as $entity) {
+            $this->em()->persist($entity);
+        }
+        $this->em()->flush();
+
+        $client->request('GET', '/finance/report/preview/xlsx', [
+            'from' => '2026-08-01',
+            'to' => '2026-08-31',
+            'grouping' => 'month',
+            'layout' => 'periods',
+            'show_meta' => '1',
+            'projectFiltersPresent' => '1',
+            'projectDirectionIds' => [$projectA->getId(), $foreignProject->getId()],
+        ]);
+
+        self::assertResponseIsSuccessful();
+        self::assertSame(
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            $client->getResponse()->headers->get('Content-Type'),
+        );
+        self::assertStringContainsString(
+            'pl-report_periods_2026-08-01_2026-08-31.xlsx',
+            (string) $client->getResponse()->headers->get('Content-Disposition'),
+        );
+        $periodContent = (string) $client->getInternalResponse()->getContent();
+        $periodRows = $this->readXlsxRows($periodContent);
+        self::assertSame(['Строка', 'Код', 'Тип', '2026-08'], $periodRows[0]);
+        $periodRow = $this->xlsxRowByValue($periodRows, 1, 'XLSX_REVENUE');
+        self::assertSame('XLSX revenue', $periodRow[0]);
+        self::assertSame(0.25, $periodRow[3]);
+        self::assertSame('0.0%;(0.0%);0.0%', $this->xlsxNumberFormat($periodContent, 'D2'));
+
+        $client->request('GET', '/finance/report/preview/xlsx', [
+            'from' => '2026-08-01',
+            'to' => '2026-08-31',
+            'layout' => 'projects',
+            'show_meta' => '1',
+            'projectFiltersPresent' => '1',
+            'projectDirectionIds' => [$projectA->getId(), $projectB->getId(), $foreignProject->getId()],
+        ]);
+
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString(
+            'pl-report_projects_2026-08-01_2026-08-31.xlsx',
+            (string) $client->getResponse()->headers->get('Content-Disposition'),
+        );
+        $projectContent = (string) $client->getInternalResponse()->getContent();
+        $projectRows = $this->readXlsxRows($projectContent);
+        self::assertSame(
+            ['Строка', 'Код', 'Тип', 'Alpha project', 'Beta project', 'Итого'],
+            $projectRows[0],
+        );
+        self::assertNotContains('Foreign project', $projectRows[0]);
+        $projectRow = $this->xlsxRowByValue($projectRows, 1, 'XLSX_REVENUE');
+        self::assertSame('XLSX revenue', $projectRow[0]);
+        self::assertSame(0.25, $projectRow[3]);
+        self::assertSame(0.5, $projectRow[4]);
+        self::assertSame(0.75, $projectRow[5]);
+        self::assertSame('0.0%;(0.0%);0.0%', $this->xlsxNumberFormat($projectContent, 'D2'));
     }
 
     public function testProjectsLayoutUsesDirectoryOrderForSelectedProjects(): void
@@ -768,6 +870,72 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
         parse_str((string) parse_url($href, \PHP_URL_QUERY), $query);
 
         return $query;
+    }
+
+    /**
+     * @return list<list<mixed>>
+     */
+    private function readXlsxRows(string $content): array
+    {
+        $path = tempnam(sys_get_temp_dir(), 'pl_report_export_test_');
+        self::assertNotFalse($path);
+        file_put_contents($path, $content);
+
+        $reader = new Reader();
+        $reader->open($path);
+
+        try {
+            $rows = [];
+            foreach ($reader->getSheetIterator() as $sheet) {
+                foreach ($sheet->getRowIterator() as $row) {
+                    $rows[] = array_map(
+                        static fn ($cell) => $cell->getValue(),
+                        $row->getCells(),
+                    );
+                }
+
+                break;
+            }
+        } finally {
+            $reader->close();
+            unlink($path);
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param list<list<mixed>> $rows
+     *
+     * @return list<mixed>
+     */
+    private function xlsxRowByValue(array $rows, int $column, mixed $value): array
+    {
+        foreach ($rows as $row) {
+            if (($row[$column] ?? null) === $value) {
+                return $row;
+            }
+        }
+
+        self::fail(sprintf('XLSX row with value "%s" in column %d not found.', (string) $value, $column));
+    }
+
+    private function xlsxNumberFormat(string $content, string $coordinate): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'pl_report_format_test_');
+        self::assertNotFalse($path);
+        file_put_contents($path, $content);
+
+        try {
+            $spreadsheet = (new \PhpOffice\PhpSpreadsheet\Reader\Xlsx())->load($path);
+
+            return $spreadsheet->getActiveSheet()->getStyle($coordinate)->getNumberFormat()->getFormatCode();
+        } finally {
+            if (isset($spreadsheet)) {
+                $spreadsheet->disconnectWorksheets();
+            }
+            unlink($path);
+        }
     }
 
     private function loginWithCompany(KernelBrowser $client, string $email): object

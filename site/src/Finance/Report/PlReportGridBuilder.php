@@ -6,6 +6,7 @@ namespace App\Finance\Report;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
+use App\Finance\Enum\PLValueFormat;
 
 final class PlReportGridBuilder
 {
@@ -19,6 +20,7 @@ final class PlReportGridBuilder
      *   periods: PlReportPeriod[],
      *   rows: array<int,array{id:string,code:?string,name:string,level:int,type:string,values: array<string,string>}>,
      *   rawValues: array<string, array<string,float>>,
+     *   formats: array<string, PLValueFormat>,
      *   warnings: string[],
      * }
      */
@@ -47,6 +49,7 @@ final class PlReportGridBuilder
 
         $rows = [];
         $rawValues = [];
+        $formats = [];
         if ([] !== $results) {
             foreach ($results[0]->rows as $row) {
                 $rows[$row->id] = [
@@ -58,6 +61,7 @@ final class PlReportGridBuilder
                     'values' => [],
                 ];
                 $rawValues[$row->id] = [];
+                $formats[$row->id] = $row->format;
             }
 
             foreach ($results as $result) {
@@ -72,6 +76,7 @@ final class PlReportGridBuilder
             'periods' => $periods,
             'rows' => array_values($rows),
             'rawValues' => $rawValues,
+            'formats' => $formats,
             'warnings' => $warnings,
         ];
     }
