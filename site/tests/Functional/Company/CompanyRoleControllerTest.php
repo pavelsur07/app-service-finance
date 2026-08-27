@@ -13,7 +13,6 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\CompanyInviteBuilder;
 use App\Tests\Builders\Company\CompanyMemberBuilder;
 use App\Tests\Builders\Company\UserBuilder;
-use App\Tests\Support\Db\SystemCompanyRolesSeeder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 
 final class CompanyRoleControllerTest extends WebTestCaseBase
@@ -22,7 +21,6 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
     {
         $client = static::createClient();
         $this->resetDb();
-        (new SystemCompanyRolesSeeder())->seed($this->em());
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
@@ -59,7 +57,6 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
     {
         $client = static::createClient();
         $this->resetDb();
-        (new SystemCompanyRolesSeeder())->seed($this->em());
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
@@ -343,7 +340,6 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
     {
         $client = static::createClient();
         $this->resetDb();
-        (new SystemCompanyRolesSeeder())->seed($this->em());
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();

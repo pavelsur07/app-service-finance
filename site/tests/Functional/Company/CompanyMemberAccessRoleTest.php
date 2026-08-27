@@ -14,7 +14,6 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\CompanyInviteBuilder;
 use App\Tests\Builders\Company\CompanyMemberBuilder;
 use App\Tests\Builders\Company\UserBuilder;
-use App\Tests\Support\Db\SystemCompanyRolesSeeder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 
 final class CompanyMemberAccessRoleTest extends WebTestCaseBase
@@ -23,7 +22,6 @@ final class CompanyMemberAccessRoleTest extends WebTestCaseBase
     {
         $client = static::createClient();
         $this->resetDb();
-        (new SystemCompanyRolesSeeder())->seed($this->em());
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $memberUser = UserBuilder::aUser()->withIndex(2)->withEmail('member@example.test')->build();
@@ -61,7 +59,6 @@ final class CompanyMemberAccessRoleTest extends WebTestCaseBase
     {
         $client = static::createClient();
         $this->resetDb();
-        (new SystemCompanyRolesSeeder())->seed($this->em());
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $otherOwner = UserBuilder::aUser()->withIndex(2)->withEmail('other@example.test')->build();
@@ -109,7 +106,6 @@ final class CompanyMemberAccessRoleTest extends WebTestCaseBase
     {
         $client = static::createClient();
         $this->resetDb();
-        (new SystemCompanyRolesSeeder())->seed($this->em());
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
@@ -145,7 +141,6 @@ final class CompanyMemberAccessRoleTest extends WebTestCaseBase
     {
         $client = static::createClient();
         $this->resetDb();
-        (new SystemCompanyRolesSeeder())->seed($this->em());
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $memberUser = UserBuilder::aUser()->withIndex(2)->withEmail('member@example.test')->build();
@@ -182,7 +177,6 @@ final class CompanyMemberAccessRoleTest extends WebTestCaseBase
     {
         $client = static::createClient();
         $this->resetDb();
-        (new SystemCompanyRolesSeeder())->seed($this->em());
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $memberUser = UserBuilder::aUser()->withIndex(2)->withEmail('member@example.test')->build();
@@ -242,7 +236,6 @@ final class CompanyMemberAccessRoleTest extends WebTestCaseBase
     {
         $client = static::createClient();
         $this->resetDb();
-        (new SystemCompanyRolesSeeder())->seed($this->em());
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $memberUser = UserBuilder::aUser()->withIndex(2)->withEmail('member@example.test')->build();
@@ -283,7 +276,6 @@ final class CompanyMemberAccessRoleTest extends WebTestCaseBase
     {
         $client = static::createClient();
         $this->resetDb();
-        (new SystemCompanyRolesSeeder())->seed($this->em());
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $memberUser = UserBuilder::aUser()->withIndex(2)->withEmail('member@example.test')->build();
@@ -330,7 +322,6 @@ final class CompanyMemberAccessRoleTest extends WebTestCaseBase
     {
         $client = static::createClient();
         $this->resetDb();
-        (new SystemCompanyRolesSeeder())->seed($this->em());
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $operator = UserBuilder::aUser()->withIndex(2)->withEmail('operator@example.test')->build();

@@ -15,15 +15,14 @@ use App\Tests\Support\Kernel\WebTestCaseBase;
 final class SystemCompanyRolesTest extends WebTestCaseBase
 {
     /**
-     * Сидер восстанавливает системные шаблоны в точности по SystemCompanyRoles::definitions().
-     * DbReset трюнкает company_role, поэтому проверка SQL-сидера миграции внутри phpunit
-     * недетерминирована — здесь проверяется PHP-источник, миграция сверена при fresh-migrate.
+     * После DbReset системные шаблоны восстановлены в точности по
+     * SystemCompanyRoles::definitions() — не только по количеству (это проверяет
+     * DbResetTest), но и по имени и набору прав каждого шаблона.
      */
-    public function testSeededTemplatesMatchDefinitionsExactly(): void
+    public function testRestoredTemplatesMatchDefinitionsExactly(): void
     {
         static::createClient();
         $this->resetDb();
-        (new SystemCompanyRolesSeeder())->seed($this->em());
 
         $roles = $this->em()->getRepository(CompanyRole::class)->findBy(['company' => null]);
 
@@ -59,7 +58,6 @@ final class SystemCompanyRolesTest extends WebTestCaseBase
     {
         static::createClient();
         $this->resetDb();
-        (new SystemCompanyRolesSeeder())->seed($this->em());
 
         $owner = UserBuilder::aUser()
             ->withEmail('roles-owner@example.test')

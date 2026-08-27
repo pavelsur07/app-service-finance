@@ -14,7 +14,6 @@ use App\Company\Security\SystemCompanyRoles;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\CompanyMemberBuilder;
 use App\Tests\Builders\Company\UserBuilder;
-use App\Tests\Support\Db\SystemCompanyRolesSeeder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Ramsey\Uuid\Uuid;
 
@@ -129,7 +128,6 @@ final class DashboardSnapshotControllerTest extends WebTestCaseBase
     {
         $client = static::createClient();
         $this->resetDb();
-        (new SystemCompanyRolesSeeder())->seed($this->em());
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
