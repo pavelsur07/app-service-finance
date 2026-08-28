@@ -177,29 +177,33 @@
             {% set reportPeriodLabel = monthNames[fromMonth] ~ ' ' ~ fromYear ~ ' – ' ~ monthNames[toMonth] ~ ' ' ~ toYear %}
         {% endif %}
 
-        <header class="page-header d-flex align-items-start gap-2 mb-3">
-            <div>
-                <h2 class="page-title">Отчёт о прибылях и убытках</h2>
-                <p class="text-secondary mb-0">{{ reportPeriodLabel }}</p>
-            </div>
-            <div class="ms-auto d-print-none d-flex gap-2">
-                <a
-                    href="{{ path('finance_report_preview_xlsx', previewState) }}"
-                    class="btn btn-outline-secondary"
-                    title="Скачать текущий отчёт в формате XLSX"
-                    data-testid="btn-export-xlsx"
-                >
-                    <i class="ti ti-file-spreadsheet"></i>
-                    XLSX
-                </a>
-                <a
-                    href="{{ path('finance_report_preview_json', previewState) }}"
-                    class="btn btn-outline-secondary"
-                    title="Скачать отчёт в формате JSON для проверки"
-                >
-                    <i class="ti ti-download"></i>
-                    JSON
-                </a>
+        <header class="page-header mb-3">
+            <div class="row g-2 align-items-start">
+                <div class="col">
+                    <h2 class="page-title">Отчёт о прибылях и убытках</h2>
+                    <p class="text-secondary mb-0">{{ reportPeriodLabel }}</p>
+                </div>
+                <div class="col-auto ms-auto d-print-none">
+                    <div class="btn-list">
+                        <a
+                            href="{{ path('finance_report_preview_xlsx', previewState) }}"
+                            class="btn btn-outline-secondary"
+                            title="Скачать текущий отчёт в формате XLSX"
+                            data-testid="btn-export-xlsx"
+                        >
+                            <i class="ti ti-file-spreadsheet" aria-hidden="true"></i>
+                            XLSX
+                        </a>
+                        <a
+                            href="{{ path('finance_report_preview_json', previewState) }}"
+                            class="btn btn-outline-secondary"
+                            title="Скачать отчёт в формате JSON для проверки"
+                        >
+                            <i class="ti ti-download" aria-hidden="true"></i>
+                            JSON
+                        </a>
+                    </div>
+                </div>
             </div>
         </header>
 

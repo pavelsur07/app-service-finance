@@ -287,6 +287,10 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
         $pageHeader = $crawler->filter('.page-header');
         self::assertSame('Отчёт о прибылях и убытках', trim($pageHeader->filter('h2.page-title')->text()));
         self::assertSame('Февраль – Июль 2026', trim($pageHeader->filter('.text-secondary')->text()));
+        $headerActions = $pageHeader->filter('.row.g-2.align-items-start > .col-auto.ms-auto.d-print-none');
+        self::assertCount(1, $headerActions);
+        self::assertCount(1, $headerActions->filter('.btn-list'));
+        self::assertCount(2, $headerActions->filter('.btn-list > a.btn.btn-outline-secondary'));
         self::assertCount(1, $crawler->filter('main.container-xl'));
         self::assertCount(0, $crawler->filter('.page-body .page-body'));
         self::assertCount(1, $crawler->filter('form#pl-preview-filter-form.card.card-body.pl-preview-controls-card'));
