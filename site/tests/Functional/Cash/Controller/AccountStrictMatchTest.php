@@ -10,99 +10,110 @@ use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Ramsey\Uuid\Uuid;
+use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class AccountStrictMatchTest extends WebTestCaseBase
 {
-    public function testPreviewStopsWhenStatementAccountDiffersFromSelectedAccount(): void
+    private const STATEMENT_ACCOUNT = '40802810426140004223';
+    private const FIXTURE_NAME = 'Выписка_40802810426140004223_01.05.2026–31.05.2026.txt';
+
+    public function testFixtureAutomaticallySelectsAccountWithoutFormField(): void
     {
-        $client = static::createClient();
-        $container = static::getContainer();
-        $em = $container->get('doctrine.orm.entity_manager');
-        $hasher = $container->get(UserPasswordHasherInterface::class);
+        [$client, , $account] = $this->createContext(self::STATEMENT_ACCOUNT);
 
-        $this->resetDb();
+        $crawler = $client->request('GET', '/cash/import/bank1c');
 
-        $user = new User(Uuid::uuid4()->toString());
-        $user->setEmail('bank-import@example.com');
-        $user->setPassword($hasher->hashPassword($user, 'password'));
+        self::assertResponseIsSuccessful();
+        self::assertCount(0, $crawler->filter('#money_account_id'));
 
-        $company = new Company(Uuid::uuid4()->toString(), $user);
-        $company->setName('BankImport');
+        $this->uploadFile($client, $this->fixturePath(), self::FIXTURE_NAME);
 
-        $account = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Основной счёт', 'RUB');
-        $account->setAccountNumber('40702810900000000001');
+        self::assertResponseRedirects('/cash/import/bank1c/preview', 303);
 
-        $em->persist($user);
-        $em->persist($company);
-        $em->persist($account);
-        $em->flush();
+        $state = $client->getRequest()->getSession()->get('bank1c_import');
+        self::assertIsArray($state);
+        self::assertSame($account->getId(), $state['account_id']);
+        self::assertSame(self::STATEMENT_ACCOUNT, $state['statement_account']);
+        self::assertCount(3, $state['preview']);
 
-        $client->loginUser($user);
-        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
-        $token = $this->csrfToken($client, 'bank1c_import_upload');
+        $client->followRedirect();
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('Основной счёт', (string) $client->getResponse()->getContent());
+    }
 
-        $utf8Content = <<<TXT
+    public function testPreviewStopsWhenStatementAccountIsMissing(): void
+    {
+        [$client] = $this->createContext(self::STATEMENT_ACCOUNT);
+
+        $tmpFile = $this->temporaryStatement(<<<TXT
 1CClientBankExchange
-РасчСчет=40702810900000000002
 ДатаНачала=01.01.2024
 ДатаКонца=31.01.2024
 КонецФайла
-TXT;
-        $cpContent = mb_convert_encoding($utf8Content, 'CP1251', 'UTF-8');
-        $tmpFile = tempnam(sys_get_temp_dir(), 'bank1c');
-        file_put_contents($tmpFile, $cpContent);
+TXT);
 
-        $uploadedFile = new UploadedFile($tmpFile, 'statement.txt', 'text/plain', null, true);
+        try {
+            $this->uploadFile($client, $tmpFile, 'statement.txt');
 
-        $client->request('POST', '/cash/import/bank1c/preview/upload', [
-            'money_account_id' => $account->getId(),
-            '_token' => $token,
-        ], [
-            'import_file' => $uploadedFile,
-        ]);
+            self::assertResponseRedirects('/cash/import/bank1c', 303);
+            $session = $client->getRequest()->getSession();
+            self::assertFalse($session->has('bank1c_import'));
+            self::assertStringContainsString(
+                'В выписке не указан расчётный счёт',
+                $session->getFlashBag()->peek('danger')[0] ?? '',
+            );
+        } finally {
+            @unlink($tmpFile);
+        }
+    }
 
-        self::assertTrue($client->getResponse()->isRedirect('/cash/import/bank1c'));
+    public function testInactiveAndForeignAccountsAreNotDetected(): void
+    {
+        [$client, $company, $inactiveAccount] = $this->createContext(self::STATEMENT_ACCOUNT, false);
 
-        $responseSession = $client->getRequest()->getSession();
-        $flashes = $responseSession->getFlashBag()->peek('danger');
-        self::assertNotEmpty($flashes);
-        self::assertStringContainsString('Выбран неверный банк или выписка', $flashes[0]);
-        self::assertFalse($responseSession->has('bank1c_import'));
+        $em = static::getContainer()->get('doctrine.orm.entity_manager');
+        $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
 
-        @unlink($tmpFile);
+        $foreignUser = new User(Uuid::uuid4()->toString());
+        $foreignUser->setEmail('foreign-bank-import@example.com');
+        $foreignUser->setPassword($hasher->hashPassword($foreignUser, 'password'));
+        $foreignCompany = new Company(Uuid::uuid4()->toString(), $foreignUser);
+        $foreignCompany->setName('ForeignBankImport');
+        $foreignAccount = new MoneyAccount(
+            Uuid::uuid4()->toString(),
+            $foreignCompany,
+            MoneyAccountType::BANK,
+            'Чужой счёт',
+            'RUB',
+        );
+        $foreignAccount->setAccountNumber(self::STATEMENT_ACCOUNT);
+
+        $em->persist($foreignUser);
+        $em->persist($foreignCompany);
+        $em->persist($foreignAccount);
+        $em->flush();
+
+        self::assertFalse($inactiveAccount->isActive());
+        self::assertNotSame($company->getId(), $foreignCompany->getId());
+
+        $this->uploadFile($client, $this->fixturePath(), self::FIXTURE_NAME);
+
+        self::assertResponseRedirects('/cash/import/bank1c', 303);
+        $session = $client->getRequest()->getSession();
+        self::assertFalse($session->has('bank1c_import'));
+        self::assertStringContainsString(
+            'Для выписки не найден активный счёт',
+            $session->getFlashBag()->peek('danger')[0] ?? '',
+        );
     }
 
     public function testPreviewWorksWithUtf8EncodedFile(): void
     {
-        $client = static::createClient();
-        $container = static::getContainer();
-        $em = $container->get('doctrine.orm.entity_manager');
-        $hasher = $container->get(UserPasswordHasherInterface::class);
+        [$client, , $account] = $this->createContext('40702810900000000001');
 
-        $this->resetDb();
-
-        $user = new User(Uuid::uuid4()->toString());
-        $user->setEmail('bank-import-utf8@example.com');
-        $user->setPassword($hasher->hashPassword($user, 'password'));
-
-        $company = new Company(Uuid::uuid4()->toString(), $user);
-        $company->setName('BankImportUTF8');
-
-        $account = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Основной счёт', 'RUB');
-        $account->setAccountNumber('40702810900000000001');
-
-        $em->persist($user);
-        $em->persist($company);
-        $em->persist($account);
-        $em->flush();
-
-        $client->loginUser($user);
-        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
-        $token = $this->csrfToken($client, 'bank1c_import_upload');
-
-        $utf8Content = <<<TXT
+        $tmpFile = $this->temporaryStatement(<<<TXT
 1CClientBankExchange
 РасчСчет=40702810900000000001
 ДатаНачала=01.01.2024
@@ -121,28 +132,80 @@ TXT;
 НазначениеПлатежа=Оплата услуг
 КонецДокумента
 КонецФайла
-TXT;
+TXT);
 
-        $tmpFile = tempnam(sys_get_temp_dir(), 'bank1c');
-        file_put_contents($tmpFile, $utf8Content);
+        try {
+            $this->uploadFile($client, $tmpFile, 'statement_utf8.txt');
 
-        $uploadedFile = new UploadedFile($tmpFile, 'statement_utf8.txt', 'text/plain', null, true);
+            self::assertResponseRedirects('/cash/import/bank1c/preview', 303);
+            $state = $client->getRequest()->getSession()->get('bank1c_import');
+            self::assertIsArray($state);
+            self::assertSame($account->getId(), $state['account_id']);
+        } finally {
+            @unlink($tmpFile);
+        }
+    }
 
+    /** @return array{KernelBrowser, Company, MoneyAccount} */
+    private function createContext(string $accountNumber, bool $active = true): array
+    {
+        $client = static::createClient();
+        $em = static::getContainer()->get('doctrine.orm.entity_manager');
+        $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
+
+        $this->resetDb();
+
+        $user = new User(Uuid::uuid4()->toString());
+        $user->setEmail('bank-import@example.com');
+        $user->setPassword($hasher->hashPassword($user, 'password'));
+
+        $company = new Company(Uuid::uuid4()->toString(), $user);
+        $company->setName('BankImport');
+
+        $account = new MoneyAccount(
+            Uuid::uuid4()->toString(),
+            $company,
+            MoneyAccountType::BANK,
+            'Основной счёт',
+            'RUB',
+        );
+        $account->setAccountNumber($accountNumber);
+        $account->setIsActive($active);
+
+        $em->persist($user);
+        $em->persist($company);
+        $em->persist($account);
+        $em->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+
+        return [$client, $company, $account];
+    }
+
+    private function uploadFile(KernelBrowser $client, string $path, string $name): void
+    {
         $client->request('POST', '/cash/import/bank1c/preview/upload', [
-            'money_account_id' => $account->getId(),
-            '_token' => $token,
+            '_token' => $this->csrfToken($client, 'bank1c_import_upload'),
         ], [
-            'import_file' => $uploadedFile,
+            'import_file' => new UploadedFile($path, $name, 'text/plain', null, true),
         ]);
+    }
 
-        self::assertResponseRedirects('/cash/import/bank1c/preview', 303);
-        $client->followRedirect();
-        self::assertResponseIsSuccessful();
-        self::assertStringContainsString('Предпросмотр импорта банковской выписки 1С', $client->getResponse()->getContent());
+    private function temporaryStatement(string $content): string
+    {
+        $tmpFile = tempnam(sys_get_temp_dir(), 'bank1c');
+        self::assertIsString($tmpFile);
+        self::assertNotFalse(file_put_contents($tmpFile, $content));
 
-        $responseSession = $client->getRequest()->getSession();
-        self::assertTrue($responseSession->has('bank1c_import'));
+        return $tmpFile;
+    }
 
-        @unlink($tmpFile);
+    private function fixturePath(): string
+    {
+        $path = dirname(__DIR__, 3).'/Fixtures/Cash/import/bank1c/'.self::FIXTURE_NAME;
+        self::assertFileExists($path);
+
+        return $path;
     }
 }

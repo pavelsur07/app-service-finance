@@ -34,14 +34,12 @@ class Bank1CImportController extends AbstractController
     }
 
     #[Route('', name: 'cash_bank1c_import_upload', methods: ['GET'])]
-    public function upload(MoneyAccountRepository $accountRepository): Response
+    public function upload(): Response
     {
-        $company = $this->activeCompanyService->getActiveCompany();
-        $accounts = $accountRepository->findBy(['company' => $company]);
+        // Сохраняем прежнюю проверку активной компании после удаления селектора счёта.
+        $this->activeCompanyService->getActiveCompany();
 
-        return $this->render('cash/bank1c_import_upload.html.twig', [
-            'accounts' => $accounts,
-        ]);
+        return $this->render('cash/bank1c_import_upload.html.twig');
     }
 
     /**
@@ -136,21 +134,6 @@ class Bank1CImportController extends AbstractController
             return $this->redirectToRoute('cash_bank1c_import_upload', [], 303);
         }
 
-        $accountId = (string) $request->request->get('money_account_id');
-        if ('' === $accountId) {
-            $this->addFlash('danger', 'Пожалуйста, выберите счёт.');
-
-            return $this->redirectToRoute('cash_bank1c_import_upload', [], 303);
-        }
-
-        $company = $this->activeCompanyService->getActiveCompany();
-        $selectedAccount = $accountRepository->find($accountId);
-        if (null === $selectedAccount || $selectedAccount->getCompany() !== $company) {
-            $this->addFlash('danger', 'Выбранный счёт недоступен.');
-
-            return $this->redirectToRoute('cash_bank1c_import_upload', [], 303);
-        }
-
         $rawContent = file_get_contents($uploadedFile->getPathname());
         if (false === $rawContent) {
             $this->addFlash('danger', 'Не удалось прочитать файл импорта.');
@@ -165,21 +148,23 @@ class Bank1CImportController extends AbstractController
         $statementAccountValue = $parsedData['header']['РасчСчет'] ?? null;
         $statementPeriodStart = $parsedData['header']['ДатаНачала'] ?? null;
         $statementPeriodEnd = $parsedData['header']['ДатаКонца'] ?? null;
-        $statementAccount = is_string($statementAccountValue) ? $statementAccountValue : null;
+        $statementAccount = is_string($statementAccountValue) ? trim($statementAccountValue) : '';
 
-        $statementAccountNormalized = $this->normalizeAccountNumber($statementAccount);
-        $selectedAccountNormalized = $this->normalizeAccountNumber($selectedAccount->getAccountNumber());
+        if ('' === $statementAccount) {
+            $this->addFlash('danger', 'В выписке не указан расчётный счёт.');
 
-        if (
-            null === $statementAccountNormalized
-            || null === $selectedAccountNormalized
-            || $statementAccountNormalized !== $selectedAccountNormalized
-        ) {
+            return $this->redirectToRoute('cash_bank1c_import_upload', [], 303);
+        }
+
+        $company = $this->activeCompanyService->getActiveCompany();
+        $selectedAccount = $accountRepository->findOneByCompanyAndAccountNumber($company, $statementAccount);
+
+        if (null === $selectedAccount) {
             $this->addFlash(
                 'danger',
                 sprintf(
-                    'Выбран неверный банк или выписка: в файле указан счёт %s',
-                    $statementAccount ?? 'не указан',
+                    'Для выписки не найден активный счёт %s.',
+                    $this->accountMasker->mask($statementAccount) ?? $statementAccount,
                 ),
             );
 
@@ -397,19 +382,6 @@ class Bank1CImportController extends AbstractController
             'summary' => $summary,
             'importLog' => $importLog,
         ]);
-    }
-
-    private function normalizeAccountNumber(?string $accountNumber): ?string
-    {
-        if (null === $accountNumber) {
-            return null;
-        }
-        $normalized = preg_replace('/[^0-9]/', '', $accountNumber);
-        if (null === $normalized || '' === $normalized) {
-            return null;
-        }
-
-        return $normalized;
     }
 
     private function generateDownloadName(string $originalFileName): string
