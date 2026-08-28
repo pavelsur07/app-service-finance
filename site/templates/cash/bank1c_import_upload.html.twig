@@ -20,23 +20,9 @@
                       method="post"
                       enctype="multipart/form-data">
 
-               {# <form action="{{ path('cash_bank1c_import_preview') }}" method="post" enctype="multipart/form-data">#}
                     <div class="mb-3">
                         <label class="form-label required" for="import_file">Файл выгрузки</label>
                         <input type="file" class="form-control" id="import_file" name="import_file" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label required" for="money_account_id">Счёт</label>
-                        <select class="form-select" id="money_account_id" name="money_account_id" required>
-                            {% if accounts is not empty %}
-                                <option value="">Выберите счёт</option>
-                                {% for account in accounts %}
-                                    <option value="{{ account.id }}">{{ account.name }}</option>
-                                {% endfor %}
-                            {% else %}
-                                <option value="" disabled selected>Нет доступных счетов</option>
-                            {% endif %}
-                        </select>
                     </div>
                     <input type="hidden" name="_token" value="{{ csrf_token('bank1c_import_upload') }}">
                     <div class="d-flex justify-content-end gap-2">
