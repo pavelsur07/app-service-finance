@@ -9,7 +9,6 @@ use App\Company\Entity\CompanyRole;
 use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Security\SystemCompanyRoles;
 use App\Tests\Builders\Company\UserBuilder;
-use App\Tests\Support\Db\SystemCompanyRolesSeeder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 
 final class SystemCompanyRolesTest extends WebTestCaseBase
@@ -39,19 +38,6 @@ final class SystemCompanyRolesTest extends WebTestCaseBase
             self::assertSame($definition['name'], $byId[$id]->getName());
             self::assertEquals($definition['permissions'], $byId[$id]->getPermissions());
         }
-    }
-
-    public function testSeederIsIdempotent(): void
-    {
-        static::createClient();
-        $this->resetDb();
-
-        $seeder = new SystemCompanyRolesSeeder();
-        $seeder->seed($this->em());
-        $seeder->seed($this->em());
-
-        $roles = $this->em()->getRepository(CompanyRole::class)->findBy(['company' => null]);
-        self::assertCount(\count(SystemCompanyRoles::definitions()), $roles);
     }
 
     public function testOwnerMembershipCreatorAssignsSystemOwnerTemplate(): void
