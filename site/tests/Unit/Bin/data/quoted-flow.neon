@@ -1,0 +1,9 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Ошибка A$#'
+			identifier: test.rule
+			count: 1
+			path: src/A.php
+
+		- { "message": '#^Ошибка QUOTED$#', "identifier": test.rule, "count": 1, "path": src/Q.php }

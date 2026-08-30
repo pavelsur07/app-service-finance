@@ -1,0 +1,131 @@
+# Статический анализ типизации. Гейт: `make site-stan` / `composer stan`.
+#
+# Гейт обязан быть достижимо зелёным (CLAUDE.md, «Health-гейты»): существующие
+# ошибки зафиксированы в phpstan-baseline.neon, новый код проверяется на полном
+# уровне сразу. Baseline только сжимается — не перегенерируется «начисто» и не
+# удаляется, иначе регресс перестаёт отличаться от нормы.
+#
+# Фактический охват: 2347 из 2363 PHP-файлов src+tests. Исключены два
+# унаследованных теста и фикстуры правил — причины в excludePaths ниже.
+includes:
+    - phpstan-baseline.neon
+
+parameters:
+    # 8 — уровень, на котором ловятся null-разыменования: самая частая причина
+    # реальных 500-х. Уровень не понижать ради зелёного гейта — для этого baseline.
+    level: 8
+
+    paths:
+        - src
+        - tests
+
+    # migrations сознательно вне охвата: 242 сгенерированных one-shot файла,
+    # уже прогнанных на проде. Их анализ дал бы вечный балласт в baseline.
+    # bin/, config/, public/ — точки входа, вне охвата по той же причине.
+
+    # Нижняя граница объявленного в composer.json диапазона `^8.4`: код обязан
+    # работать на всём диапазоне, поэтому анализ идёт под 8.4.0, а не под версию
+    # хоста разработчика и не под текущий патч прода (php:8.4.24).
+    phpVersion: 80400
+
+    # Кэш результатов — в var/, он в .gitignore.
+    tmpDir: var/cache/phpstan
+
+    # Два теста подменяют final-классы анонимными наследниками; в рантайме это
+    # работает через dg/bypass-finals (tests/bootstrap.php:9). PHPStan помечает
+    # `class.extendsFinal` как неигнорируемую ошибку и не принимает ни baseline,
+    # ни ignoreErrors — единственная форма исключения здесь excludePaths.
+    # `analyse` (а не `analyseAndScan`): файлы по-прежнему сканируются на
+    # символы, не анализируются только их собственные ошибки.
+    # FOLLOW-UP: переписать эти тесты на createMock (bypass-finals позволяет
+    # мокать final) и убрать исключение — тогда файлы вернутся под анализ.
+    excludePaths:
+        analyse:
+            - tests/Integration/Marketplace/CloseMonthStageActionRollbackTest.php
+            - tests/Unit/Marketplace/MessageHandler/RebuildPreliminaryForPeriodHandlerTest.php
+            # Фикстуры RepositoryCompanyScopeRuleTest: они нарушают правило
+            # намеренно. Под анализом их нарушение попало бы в baseline и
+            # выглядело бы как долг, а не как материал теста.
+            - tests/Unit/PHPStan/data
+
+    # Расширение phpstan-symfony читает скомпилированный DI-контейнер: без него
+    # `$container->get()`, аргументы контроллеров и Form/Request-типы остаются
+    # `object` или `mixed`. Файл генерируется `bin/console cache:warmup --env=test`
+    # и лежит в gitignore'нутом var/ — прогрев встроен в `make site-stan`.
+    #
+    # Почему test, а не dev. Под анализ попадают и `src`, и `tests` (930 записей
+    # baseline — тестовые). Dev-контейнер не знает сервисов, регистрируемых только
+    # в тестах, и давал 5 ложных `symfonyContainer.serviceNotFound` на
+    # Monolog\Handler\TestHandler и тестовых фикстурах. Замер: переключение
+    # dev -> test снимает ровно эти 5 и не меняет ни одной другой категории
+    # (3530 -> 3525). Это НЕ значит, что test-контейнер — надмножество dev:
+    # config/services_test.yaml подменяет реализации и теги production-сервисов
+    # (OzonAccrualClientInterface -> фейк, WbFinanceReportConnector -> tags: [],
+    # свой lock factory). Равенство категорий говорит лишь о том, что на текущем
+    # наборе диагностик разницы нет.
+    # Принятый false negative: обращение из `src` к сервису, существующему только
+    # в test, здесь помечено не будет. Сегодня таких обращений нет, но гарантии,
+    # что динамический `$container->get()` поймают тесты, тоже нет — риск принят
+    # сознательно в обмен на снятие шума, который иначе остаётся в baseline
+    # навсегда. Строгая альтернатива — два прогона с разными контейнерами для
+    # `src` и `tests` — стоит вдвое дороже по времени CI.
+    symfony:
+        containerXmlPath: var/cache/test/App_KernelTestDebugContainer.xml
+
+    # Расширение phpstan-doctrine получает метадату 117 сущностей: `find()` даёт
+    # `?Entity` вместо `object`, QueryBuilder и DQL типизируются, а обращения к
+    # полям сущностей перестают быть `mixed`.
+    #
+    # Обратите внимание: оставшиеся `Access to an undefined property ...::$_em`
+    # в baseline — НЕ слепота анализатора, а реальный долг. В Doctrine ORM 3
+    # EntityRepository хранит менеджер в private `$em`; свойства `$_em` больше нет.
+    # Загрузчик поднимает Kernel в окружении `test` — том же, из которого взят
+    # контейнер выше, — но соединение с БД не открывает.
+    doctrine:
+        objectManagerLoader: tests/object-manager.php
+
+    # PHPat и так даёт каждому правилу свой identifier (`phpat.<имя правила>`),
+    # поэтому baseline различает их и без этой опции. Она добавляет имя правила
+    # в человекочитаемый текст ошибки — в выводе CI сразу видно, какая граница
+    # нарушена, без похода в identifier.
+    phpat:
+        show_rule_names: true
+
+    # Запреты из «Глобальных запретов» CLAUDE.md, которые до сих пор держались
+    # на внимании ревьюера. Замер до внедрения: ни одного вхождения в src+tests,
+    # поэтому гейт зелёный с первого дня и работает чистым ratchet'ом.
+    # `var_export()` не запрещаем: два его вызова в тесте собирают текст
+    # сообщения об ошибке — это не отладочный вывод.
+    disallowedFunctionCalls:
+        -
+            function:
+                - 'dump()'
+                - 'dd()'
+                - 'var_dump()'
+                - 'print_r()'
+            message: 'отладочный вывод не должен попадать в коммит (CLAUDE.md, «Глобальные запреты»)'
+        -
+            function:
+                - 'die()'
+                - 'exit()'
+            message: 'останов процесса вместо исключения: бросить доменное исключение (CLAUDE.md, «Обработка ошибок»)'
+
+    # Ratchet: как только ошибка из baseline починена, её строка протухает и
+    # гейт краснеет, требуя убрать строку. Без этого baseline тихо гниёт.
+    reportUnmatchedIgnoredErrors: true
+
+# Правила границ модулей (PHPat). Живут в tests/, потому что это проверка, а не
+# рантайм: site/.dockerignore исключает tests/ из прод-образа.
+services:
+    -
+        class: App\Tests\Architecture\ModuleBoundaryRules
+        tags:
+            - phpat.test
+
+    # Собственное правило: IDOR-пункт ревью становится машинной проверкой.
+    -
+        class: App\Tests\PHPStan\Rules\RepositoryCompanyScopeRule
+        arguments:
+            reflectionProvider: @reflectionProvider
+        tags:
+            - phpstan.rules.rule

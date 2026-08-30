@@ -31,3 +31,7 @@
 
 /package-lock.json
 symfony_context.txt
+
+###> phpstan/phpstan ###
+phpstan.neon
+###< phpstan/phpstan ###

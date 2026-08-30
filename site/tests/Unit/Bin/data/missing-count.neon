@@ -1,0 +1,12 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Ошибка A$#'
+			identifier: test.rule
+			path: src/A.php
+
+		-
+			message: '#^Ошибка B$#'
+			identifier: test.rule
+			count: 2
+			path: src/B.php

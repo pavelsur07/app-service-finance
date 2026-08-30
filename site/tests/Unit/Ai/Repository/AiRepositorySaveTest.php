@@ -16,6 +16,7 @@ use App\Company\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\Persistence\ManagerRegistry;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -85,7 +86,7 @@ final class AiRepositorySaveTest extends TestCase
     private function repositoryFor(
         string $repositoryClass,
         string $entityClass,
-        EntityManagerInterface $entityManager,
+        EntityManagerInterface&MockObject $entityManager,
     ): object {
         $entityManager->method('getClassMetadata')->willReturn(new ClassMetadata($entityClass));
 

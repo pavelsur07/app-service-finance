@@ -4,6 +4,7 @@
     "minimum-stability": "stable",
     "prefer-stable": true,
     "require": {
+        "php": "^8.4",
         "ext-bcmath": "*",
         "ext-ctype": "*",
         "ext-iconv": "*",
@@ -67,10 +68,14 @@
         "allow-plugins": {
             "php-http/discovery": true,
             "symfony/flex": true,
-            "symfony/runtime": true
+            "symfony/runtime": true,
+            "phpstan/extension-installer": true
         },
         "bump-after-update": true,
-        "sort-packages": true
+        "sort-packages": true,
+        "platform": {
+            "php": "8.4.24"
+        }
     },
     "autoload": {
         "psr-4": {
@@ -106,6 +111,8 @@
         "cs:fix": "php-cs-fixer fix --cache-file=var/cache/.php-cs-fixer.cache",
         "cs:phpcs": "phpcs --standard=PSR12 src tests",
         "cs:twig": "twigcs --config .twig-cs-fixer.php templates",
+        "stan": "phpstan analyse --memory-limit=1G",
+        "stan:baseline": "phpstan analyse --generate-baseline --allow-empty-baseline --memory-limit=1G",
         "auto-scripts": {
             "cache:clear": "symfony-cmd",
             "assets:install %PUBLIC_DIR%": "symfony-cmd",
@@ -133,8 +140,16 @@
         "doctrine/doctrine-fixtures-bundle": "^4.3.1",
         "friendsofphp/php-cs-fixer": "^3.95.1",
         "friendsoftwig/twigcs": "^6.6.1",
+        "phpat/phpat": "^0.12",
         "phpseclib/bcmath_compat": ">=2.0.3",
+        "phpstan/extension-installer": "^1.4",
+        "phpstan/phpstan": "^2.2",
+        "phpstan/phpstan-doctrine": "^2.0",
+        "phpstan/phpstan-phpunit": "^2.0",
+        "phpstan/phpstan-symfony": "^2.0",
+        "phpstan/phpstan-webmozart-assert": "^2.0",
         "phpunit/phpunit": "^11.5.55",
+        "spaze/phpstan-disallowed-calls": "^4.14",
         "squizlabs/php_codesniffer": "^4.0.1",
         "symfony/browser-kit": "7.4.*",
         "symfony/css-selector": "7.4.*",
