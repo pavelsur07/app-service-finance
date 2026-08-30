@@ -36,7 +36,7 @@ final readonly class AssignCompanyMemberAccessRoleAction
         $company = $member->getCompany();
 
         try {
-            $this->em->wrapInTransaction(function () use ($member, $role, $company): void {
+            $this->em->wrapInTransaction(function () use ($member, $role, $company, $roleId): void {
                 // Инвариант «остался делегированный админ» проверяется под блокировкой строки
                 // компании: два одновременных понижения иначе прошли бы каждое своей проверкой
                 // и вместе оставили компанию без администратора.

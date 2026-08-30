@@ -23,10 +23,10 @@ final class AiRunRepository extends ServiceEntityRepository
 
     public function save(AiRun $run, bool $flush = false): void
     {
-        $this->_em->persist($run);
+        $this->getEntityManager()->persist($run);
 
         if ($flush) {
-            $this->_em->flush();
+            $this->getEntityManager()->flush();
         }
     }
 
