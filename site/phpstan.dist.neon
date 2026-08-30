@@ -1,0 +1,49 @@
+# Статический анализ типизации. Гейт: `make site-stan` / `composer stan`.
+#
+# Гейт обязан быть достижимо зелёным (CLAUDE.md, «Health-гейты»): существующие
+# ошибки зафиксированы в phpstan-baseline.neon, новый код проверяется на полном
+# уровне сразу. Baseline только сжимается — не перегенерируется «начисто» и не
+# удаляется, иначе регресс перестаёт отличаться от нормы.
+#
+# Фактический охват: 2343 из 2345 PHP-файлов src+tests. Два тестовых файла
+# исключены целиком — причина и план возврата в excludePaths ниже.
+includes:
+    - phpstan-baseline.neon
+
+parameters:
+    # 8 — уровень, на котором ловятся null-разыменования: самая частая причина
+    # реальных 500-х. Уровень не понижать ради зелёного гейта — для этого baseline.
+    level: 8
+
+    paths:
+        - src
+        - tests
+
+    # migrations сознательно вне охвата: 242 сгенерированных one-shot файла,
+    # уже прогнанных на проде. Их анализ дал бы вечный балласт в baseline.
+    # bin/, config/, public/ — точки входа, вне охвата по той же причине.
+
+    # Нижняя граница объявленного в composer.json диапазона `^8.4`: код обязан
+    # работать на всём диапазоне, поэтому анализ идёт под 8.4.0, а не под версию
+    # хоста разработчика и не под текущий патч прода (php:8.4.24).
+    phpVersion: 80400
+
+    # Кэш результатов — в var/, он в .gitignore.
+    tmpDir: var/cache/phpstan
+
+    # Два теста подменяют final-классы анонимными наследниками; в рантайме это
+    # работает через dg/bypass-finals (tests/bootstrap.php:9). PHPStan помечает
+    # `class.extendsFinal` как неигнорируемую ошибку и не принимает ни baseline,
+    # ни ignoreErrors — единственная форма исключения здесь excludePaths.
+    # `analyse` (а не `analyseAndScan`): файлы по-прежнему сканируются на
+    # символы, не анализируются только их собственные ошибки.
+    # FOLLOW-UP: переписать эти тесты на createMock (bypass-finals позволяет
+    # мокать final) и убрать исключение — тогда файлы вернутся под анализ.
+    excludePaths:
+        analyse:
+            - tests/Integration/Marketplace/CloseMonthStageActionRollbackTest.php
+            - tests/Unit/Marketplace/MessageHandler/RebuildPreliminaryForPeriodHandlerTest.php
+
+    # Ratchet: как только ошибка из baseline починена, её строка протухает и
+    # гейт краснеет, требуя убрать строку. Без этого baseline тихо гниёт.
+    reportUnmatchedIgnoredErrors: true

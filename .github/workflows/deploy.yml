@@ -25,6 +25,7 @@ jobs:
         runs-on: ubuntu-latest
         outputs:
             backend: ${{ steps.matrix.outputs.backend }}
+            static_analysis: ${{ steps.matrix.outputs.static_analysis }}
             frontend: ${{ steps.matrix.outputs.frontend }}
             landing: ${{ steps.matrix.outputs.landing }}
             matrix: ${{ steps.matrix.outputs.matrix }}
@@ -60,6 +61,15 @@ jobs:
                         - 'site/yarn.lock'
                       landing:
                         - 'landing/**'
+                      # Не входит в deployable-матрицу: правка конфига или baseline
+                      # PHPStan обязана снова прогнать анализ, но production-образы
+                      # и деплой от неё не зависят. Dev-образ php-cli при этом может
+                      # собраться — это среда прогона анализа, не артефакт релиза.
+                      # Без этого фильтра PR, перегенерировавший baseline «начисто»,
+                      # обошёл бы гейт целиком.
+                      static_analysis:
+                        - 'site/phpstan.dist.neon'
+                        - 'site/phpstan-baseline.neon'
 
             # В PR собираем матрицу образов ровно под то, что изменилось:
             #   frontend        → site-nginx + site-php-fpm (оба пекут public/build)
@@ -75,6 +85,7 @@ jobs:
                   be='${{ steps.f.outputs.backend }}'
                   fe='${{ steps.f.outputs.frontend }}'
                   la='${{ steps.f.outputs.landing }}'
+                  sa='${{ steps.f.outputs.static_analysis }}'
 
                   if [ "$GITHUB_EVENT_NAME" = 'push' ] && [ "$GITHUB_REF" = 'refs/heads/master' ]; then
                     if [ "$be" = 'true' ] || [ "$fe" = 'true' ] || [ "$la" = 'true' ]; then
@@ -87,6 +98,7 @@ jobs:
                     be=false
                     fe=false
                     la=false
+                    sa=false
 
                     if [ "$PRODUCTION_ACTION" != 'none' ] && [ "$GITHUB_REF" != 'refs/heads/master' ]; then
                       echo '::error::Production gates can run only from master'
@@ -118,6 +130,7 @@ jobs:
                   echo "backend=$be" >> "$GITHUB_OUTPUT"
                   echo "frontend=$fe" >> "$GITHUB_OUTPUT"
                   echo "landing=$la" >> "$GITHUB_OUTPUT"
+                  echo "static_analysis=$sa" >> "$GITHUB_OUTPUT"
                   echo "matrix={\"include\":[${items[*]}]}" >> "$GITHUB_OUTPUT"
 
     # Dev-образ php-cli для тестовых job'ов: публикуется в ghcr и переиспользуется.
@@ -128,7 +141,8 @@ jobs:
     dev-image:
         name: 🐳 Dev image
         needs: changes
-        if: ${{ needs.changes.outputs.backend == 'true' }}
+        # static_analysis — потому что от этого образа зависит job `stan`.
+        if: ${{ needs.changes.outputs.backend == 'true' || needs.changes.outputs.static_analysis == 'true' }}
         runs-on: ubuntu-latest
         permissions:
             contents: read
@@ -300,6 +314,72 @@ jobs:
                     --user "$(id -u):$(id -g)" \
                     -e COMPOSER_HOME=/tmp/composer \
                     site-php-cli composer cs:strict-types
+
+    # СТАТИЧЕСКИЙ АНАЛИЗ ТИПИЗАЦИИ — PHPStan level 8.
+    #   Сознательно НЕ добавлен в needs у build-and-push: гейтит PR, но не блокирует
+    #   сборку и деплой. Поведение Production-пайплайна этим job'ом не меняется.
+    #   Достижимо зелёный: унаследованные ошибки лежат в site/phpstan-baseline.neon,
+    #   на PR проверяется только то, что изменил автор.
+    stan:
+        name: 🔬 Static analysis
+        needs: [ changes, dev-image ]
+        if: ${{ needs.changes.outputs.backend == 'true' || needs.changes.outputs.static_analysis == 'true' }}
+        runs-on: ubuntu-latest
+        env:
+            COMPOSE_PROJECT_NAME: app-service-finance
+        steps:
+            - name: 📦 Checkout repository
+              uses: actions/checkout@v6
+
+            - name: 🔐 Login to GHCR
+              uses: docker/login-action@v4
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: 🐳 Pull dev image (fallback — local build)
+              run: |
+                  IMG="ghcr.io/pavelsur07/site-php-cli-dev:${{ needs.dev-image.outputs.tag }}"
+                  if docker pull -q "$IMG"; then
+                      docker tag "$IMG" app-service-finance-site-php-cli:latest
+                      echo "Образ получен из ghcr: $IMG"
+                  else
+                      echo "Образа нет в ghcr — собираю локально."
+                      docker compose build site-php-cli
+                  fi
+
+            - name: 📦 Cache composer dependencies
+              uses: actions/cache@v4
+              with:
+                  path: site/vendor
+                  key: composer-${{ hashFiles('site/composer.lock') }}
+                  restore-keys: composer-
+
+            - name: 📦 Install PHP dependencies
+              run: |
+                  docker compose run --rm -T \
+                    --user "$(id -u):$(id -g)" \
+                    -e COMPOSER_HOME=/tmp/composer \
+                    site-php-cli composer install --no-interaction --prefer-dist --no-progress --no-scripts
+
+            # Result cache PHPStan: холодный прогон 2345 файлов идёт минуты,
+            # тёплый — секунды. Ключ включает baseline и конфиг: их правка
+            # обязана инвалидировать кэш.
+            - name: 🔬 Cache PHPStan result cache
+              uses: actions/cache@v4
+              with:
+                  path: site/var/cache/phpstan
+                  key: phpstan-${{ hashFiles('site/composer.lock', 'site/phpstan.dist.neon', 'site/phpstan-baseline.neon') }}-${{ github.sha }}
+                  restore-keys: phpstan-${{ hashFiles('site/composer.lock', 'site/phpstan.dist.neon', 'site/phpstan-baseline.neon') }}-
+
+            - name: 🔬 Run PHPStan
+              run: |
+                  docker compose run --rm -T \
+                    --user "$(id -u):$(id -g)" \
+                    -e COMPOSER_HOME=/tmp/composer \
+                    -e COMPOSER_PROCESS_TIMEOUT=0 \
+                    site-php-cli composer stan -- --no-progress --error-format=github
 
     # ИНТЕГРАЦИОННЫЕ И ФУНКЦИОНАЛЬНЫЕ ТЕСТЫ — на реальной БД.
     #   Идёт ПАРАЛЛЕЛЬНО сборке и гейтит не её, а деплой: собранный образ безвреден,

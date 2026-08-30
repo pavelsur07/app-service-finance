@@ -4,6 +4,7 @@
     "minimum-stability": "stable",
     "prefer-stable": true,
     "require": {
+        "php": "^8.4",
         "ext-bcmath": "*",
         "ext-ctype": "*",
         "ext-iconv": "*",
@@ -70,7 +71,10 @@
             "symfony/runtime": true
         },
         "bump-after-update": true,
-        "sort-packages": true
+        "sort-packages": true,
+        "platform": {
+            "php": "8.4.24"
+        }
     },
     "autoload": {
         "psr-4": {
@@ -106,6 +110,8 @@
         "cs:fix": "php-cs-fixer fix --cache-file=var/cache/.php-cs-fixer.cache",
         "cs:phpcs": "phpcs --standard=PSR12 src tests",
         "cs:twig": "twigcs --config .twig-cs-fixer.php templates",
+        "stan": "phpstan analyse --memory-limit=1G",
+        "stan:baseline": "phpstan analyse --generate-baseline --allow-empty-baseline --memory-limit=1G",
         "auto-scripts": {
             "cache:clear": "symfony-cmd",
             "assets:install %PUBLIC_DIR%": "symfony-cmd",
@@ -134,6 +140,7 @@
         "friendsofphp/php-cs-fixer": "^3.95.1",
         "friendsoftwig/twigcs": "^6.6.1",
         "phpseclib/bcmath_compat": ">=2.0.3",
+        "phpstan/phpstan": "^2.2",
         "phpunit/phpunit": "^11.5.55",
         "squizlabs/php_codesniffer": "^4.0.1",
         "symfony/browser-kit": "7.4.*",

@@ -41,8 +41,22 @@ site-cs-strict-types:
 
 site-cs-fix:
 	$(DOCKER_COMPOSE) run --rm site-php-cli composer cs:fix # Автопочинка PHP-стиля
+
     #$(DOCKER_COMPOSE) run --rm site-php-cli composer cs:phpcs   # Проверка через phpcs (PSR-12)
     #$(DOCKER_COMPOSE) run --rm site-php-cli composer cs:twig    # Линт Twig-шаблонов
+
+# ===== СТАТИЧЕСКИЙ АНАЛИЗ =====
+# Гейт достижимо зелёный: существующие ошибки лежат в site/phpstan-baseline.neon,
+# новый код проверяется на level 8 сразу. COMPOSER_PROCESS_TIMEOUT=0 — холодный
+# прогон 2345 файлов не укладывается в дефолтные 300 с composer.
+
+site-stan:
+	$(DOCKER_COMPOSE) run --rm -e COMPOSER_PROCESS_TIMEOUT=0 site-php-cli composer stan   # Гейт: статический анализ типизации (PHPStan, level 8)
+
+# Baseline только сокращать. Перегенерация «начисто» стирает ratchet: регресс
+# перестаёт отличаться от унаследованного долга.
+site-stan-baseline:
+	$(DOCKER_COMPOSE) run --rm -e COMPOSER_PROCESS_TIMEOUT=0 site-php-cli composer stan:baseline   # Перегенерация baseline PHPStan
 
 # ===== TESTS =====
 
