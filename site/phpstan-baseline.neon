@@ -79,12 +79,6 @@ parameters:
 			path: src/Ai/Repository/AiAgentRepository.php
 
 		-
-			message: '#^Access to an undefined property App\\Ai\\Repository\\AiRunRepository\:\:\$_em\.$#'
-			identifier: property.notFound
-			count: 2
-			path: src/Ai/Repository/AiRunRepository.php
-
-		-
 			message: '#^Метод\-запрос App\\Ai\\Repository\\AiRunRepository\:\:findLatestForAgent\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
 			identifier: vashfindir.repositoryCompanyScope
 			count: 1
@@ -95,12 +89,6 @@ parameters:
 			identifier: vashfindir.repositoryCompanyScope
 			count: 1
 			path: src/Ai/Repository/AiRunRepository.php
-
-		-
-			message: '#^Access to an undefined property App\\Ai\\Repository\\AiSuggestionRepository\:\:\$_em\.$#'
-			identifier: property.notFound
-			count: 2
-			path: src/Ai/Repository/AiSuggestionRepository.php
 
 		-
 			message: '#^Метод\-запрос App\\Ai\\Repository\\AiSuggestionRepository\:\:countForRun\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
@@ -2333,12 +2321,6 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: src/Catalog/Infrastructure/XlsProductRowParser.php
-
-		-
-			message: '#^Undefined variable\: \$roleId$#'
-			identifier: variable.undefined
-			count: 1
-			path: src/Company/Application/AssignCompanyMemberAccessRoleAction.php
 
 		-
 			message: '#^Cannot call method getId\(\) on App\\Company\\Entity\\User\|null\.$#'

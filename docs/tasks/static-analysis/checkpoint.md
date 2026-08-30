@@ -86,6 +86,27 @@ PHPat: границы модулей и заморозка легаси-зоны
 (`docs/tasks/ui-dashboard/**`, `docs/tasks/ui-pnl/**`) остались в индексе
 нетронутыми — проверено `git show --stat HEAD` и `git status --short`.
 
+### Интеграция с master после merge PR #2387
+`master` получил исправление двух багов, найденных этим анализом. Ветка слита с
+`master`, baseline пересобран — и это ratchet, отработавший как задумано:
+
+- **ушло 3 записи / 5 ошибок** — подавления исправленных багов
+  (`property.notFound` на `$_em` в двух репозиториях Ai, `variable.undefined`
+  на `$roleId` в `AssignCompanyMemberAccessRoleAction`);
+- **новых записей не добавлено.** Первый прогон после слияния дал 2 записи из
+  тестов, пришедших с PR #2387: `EntityManagerInterface::method()` (тип мока не
+  был уточнён до `EntityManagerInterface&MockObject`) и `argument.type` на
+  `withUser($company->getUser())` — `getUser()` возвращает `?User`. Обе
+  исправлены в тестах, а не подавлены: заводить подавления для только что
+  написанного кода — ровно то, что ratchet должен предотвращать.
+
+Baseline: **3694 → 3689** ошибок, **2518 → 2515** записей.
+Проверки на слитом состоянии: `composer stan` exit 0, `composer cs:check` exit 0,
+`composer cs:strict-types` exit 0, `composer test:unit` — 1951 OK.
+
+Слияние выполнено в отдельном git worktree: в основном рабочем дереве лежат
+незакоммиченные файлы Владельца, и merge их бы затронул.
+
 ### Files to inspect first on resume
 - `site/tests/PHPStan/Rules/RepositoryCompanyScopeRule.php`
 - `site/bin/phpstan-baseline-guard.sh`

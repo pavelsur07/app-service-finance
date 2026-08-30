@@ -40,11 +40,12 @@ final class AssignCompanyMemberAccessRoleActionTest extends TestCase
 
     public function testThrowsDomainExceptionWhenRoleDisappearsBeforeLock(): void
     {
-        $company = $this->createCompany();
+        $user = new User('11111111-1111-7111-8111-111111111111');
+        $company = new Company('22222222-2222-7222-8222-222222222222', $user);
         $role = new CompanyRole(self::ROLE_ID, 'Бухгалтер', [Module::FINANCE->value => AccessLevel::WRITE->value], $company);
         $member = CompanyMemberBuilder::aMember()
             ->withCompany($company)
-            ->withUser($company->getUser())
+            ->withUser($user)
             ->build();
 
         $entityManager = $this->createMock(EntityManagerInterface::class);
@@ -77,12 +78,5 @@ final class AssignCompanyMemberAccessRoleActionTest extends TestCase
         $registry->method('getManagerForClass')->willReturn($entityManager);
 
         return new CompanyMemberRepository($registry);
-    }
-
-    private function createCompany(): Company
-    {
-        $user = new User('11111111-1111-7111-8111-111111111111');
-
-        return new Company('22222222-2222-7222-8222-222222222222', $user);
     }
 }
