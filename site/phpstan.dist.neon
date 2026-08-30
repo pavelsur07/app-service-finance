@@ -5,7 +5,7 @@
 # уровне сразу. Baseline только сжимается — не перегенерируется «начисто» и не
 # удаляется, иначе регресс перестаёт отличаться от нормы.
 #
-# Фактический охват: 2344 из 2346 PHP-файлов src+tests. Два тестовых файла
+# Фактический охват: 2345 из 2347 PHP-файлов src+tests. Два тестовых файла
 # исключены целиком — причина и план возврата в excludePaths ниже.
 includes:
     - phpstan-baseline.neon
@@ -80,6 +80,21 @@ parameters:
     doctrine:
         objectManagerLoader: tests/object-manager.php
 
+    # PHPat и так даёт каждому правилу свой identifier (`phpat.<имя правила>`),
+    # поэтому baseline различает их и без этой опции. Она добавляет имя правила
+    # в человекочитаемый текст ошибки — в выводе CI сразу видно, какая граница
+    # нарушена, без похода в identifier.
+    phpat:
+        show_rule_names: true
+
     # Ratchet: как только ошибка из baseline починена, её строка протухает и
     # гейт краснеет, требуя убрать строку. Без этого baseline тихо гниёт.
     reportUnmatchedIgnoredErrors: true
+
+# Правила границ модулей (PHPat). Живут в tests/, потому что это проверка, а не
+# рантайм: site/.dockerignore исключает tests/ из прод-образа.
+services:
+    -
+        class: App\Tests\Architecture\ModuleBoundaryRules
+        tags:
+            - phpat.test

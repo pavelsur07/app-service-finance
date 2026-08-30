@@ -7,6 +7,42 @@ parameters:
 			path: src/Admin/Controller/CreateAccountController.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Admin\\Controller\\CreateAccountController should not depend on App\\Company\\Repository\\UserRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 2
+			path: src/Admin/Controller/CreateAccountController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesIngestion\: App\\Admin\\Controller\\IngestionExternalCategoriesController should not depend on App\\Ingestion\\Application\\Action\\DiscoverExternalCategoriesAction$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesIngestion
+			count: 1
+			path: src/Admin/Controller/IngestionExternalCategoriesController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesIngestion\: App\\Admin\\Controller\\IngestionExternalCategoriesController should not depend on App\\Ingestion\\Application\\Action\\RefreshOzonAccrualCategoryMetadataAction$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesIngestion
+			count: 1
+			path: src/Admin/Controller/IngestionExternalCategoriesController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesIngestion\: App\\Admin\\Controller\\IngestionExternalCategoriesController should not depend on App\\Ingestion\\Application\\Action\\SeedExternalCategoryMappingsAction$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesIngestion
+			count: 1
+			path: src/Admin/Controller/IngestionExternalCategoriesController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesIngestion\: App\\Admin\\Controller\\IngestionExternalCategoriesController should not depend on App\\Ingestion\\Application\\Action\\UpdateExternalCategoryMappingAction$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesIngestion
+			count: 1
+			path: src/Admin/Controller/IngestionExternalCategoriesController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesIngestion\: App\\Admin\\Controller\\IngestionExternalCategoriesController should not depend on App\\Ingestion\\Infrastructure\\Query\\ExternalCategoryAdminQuery$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesIngestion
+			count: 2
+			path: src/Admin/Controller/IngestionExternalCategoriesController.php
+
+		-
 			message: '#^Method App\\Admin\\Controller\\UserController\:\:createAccountForm\(\) return type with generic interface Symfony\\Component\\Form\\FormInterface does not specify its types\: TData$#'
 			identifier: missingType.generics
 			count: 1
@@ -16,6 +52,12 @@ parameters:
 			message: '#^Method App\\Admin\\Controller\\UserController\:\:renderUserIndex\(\) has parameter \$accountForm with generic interface Symfony\\Component\\Form\\FormInterface but does not specify its types\: TData$#'
 			identifier: missingType.generics
 			count: 1
+			path: src/Admin/Controller/UserController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Admin\\Controller\\UserController should not depend on App\\Company\\Repository\\UserRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 2
 			path: src/Admin/Controller/UserController.php
 
 		-
@@ -79,6 +121,24 @@ parameters:
 			path: src/Ai/Service/Agent/CashflowAgent.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Ai\\Service\\Agent\\CashflowAgent should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Ai/Service/Agent/CashflowAgent.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Ai\\Service\\Agent\\CashflowAgent should not depend on App\\Cash\\Repository\\PaymentPlan\\PaymentPlanRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Ai/Service/Agent/CashflowAgent.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Ai\\Service\\Agent\\CashflowAgent should not depend on App\\Cash\\Repository\\Transaction\\CashTransactionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Ai/Service/Agent/CashflowAgent.php
+
+		-
 			message: '#^Method App\\Ai\\Service\\Llm\\LlmResponse\:\:tryDecodeJson\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -109,6 +169,24 @@ parameters:
 			path: src/Analytics/Application/DashboardSnapshotService.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Analytics\\Application\\LastUpdatedAtResolver should not depend on App\\Cash\\Repository\\Accounts\\MoneyFundMovementRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Analytics/Application/LastUpdatedAtResolver.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Analytics\\Application\\LastUpdatedAtResolver should not depend on App\\Cash\\Repository\\Transaction\\CashTransactionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Analytics/Application/LastUpdatedAtResolver.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesFinance\: App\\Analytics\\Application\\LastUpdatedAtResolver should not depend on App\\Finance\\Repository\\PLDailyTotalRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesFinance
+			count: 1
+			path: src/Analytics/Application/LastUpdatedAtResolver.php
+
+		-
 			message: '#^Offset ''FINANCING'' on array\{OPERATING\: float, INVESTING\: float, FINANCING\: float\} on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 1
@@ -127,8 +205,56 @@ parameters:
 			path: src/Analytics/Application/Widget/CashflowSplitWidgetBuilder.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Analytics\\Application\\Widget\\CashflowSplitWidgetBuilder should not depend on App\\Cash\\Repository\\Transaction\\CashTransactionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Analytics/Application/Widget/CashflowSplitWidgetBuilder.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Analytics\\Application\\Widget\\FreeCashWidgetBuilder should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Analytics/Application/Widget/FreeCashWidgetBuilder.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Analytics\\Application\\Widget\\FreeCashWidgetBuilder should not depend on App\\Cash\\Repository\\Accounts\\MoneyFundMovementRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Analytics/Application/Widget/FreeCashWidgetBuilder.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Analytics\\Application\\Widget\\FreeCashWidgetBuilder should not depend on App\\Cash\\Service\\Accounts\\AccountBalanceProvider$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Analytics/Application/Widget/FreeCashWidgetBuilder.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Analytics\\Application\\Widget\\InflowWidgetBuilder should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Analytics/Application/Widget/InflowWidgetBuilder.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Analytics\\Application\\Widget\\InflowWidgetBuilder should not depend on App\\Cash\\Repository\\Transaction\\CashTransactionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Analytics/Application/Widget/InflowWidgetBuilder.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Analytics\\Application\\Widget\\OutflowWidgetBuilder should not depend on App\\Cash\\Repository\\Transaction\\CashTransactionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Analytics/Application/Widget/OutflowWidgetBuilder.php
+
+		-
 			message: '#^Offset ''rawValues'' on array\{periods\: array\<App\\Finance\\Report\\PlReportPeriod\>, rows\: array\<int, array\{id\: string, code\: string\|null, name\: string, level\: int, type\: string, values\: array\<string, string\>\}\>, rawValues\: array\<string, array\<string, float\>\>, formats\: array\<string, App\\Finance\\Enum\\PLValueFormat\>, warnings\: array\<string\>\} on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Analytics/Application/Widget/ProfitWidgetBuilder.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesFinance\: App\\Analytics\\Application\\Widget\\ProfitWidgetBuilder should not depend on App\\Finance\\Repository\\PLCategoryRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesFinance
 			count: 1
 			path: src/Analytics/Application/Widget/ProfitWidgetBuilder.php
 
@@ -157,6 +283,18 @@ parameters:
 			path: src/Analytics/Application/Widget/RevenueWidgetBuilder.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesFinance\: App\\Analytics\\Application\\Widget\\RevenueWidgetBuilder should not depend on App\\Finance\\Repository\\PLCategoryRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesFinance
+			count: 1
+			path: src/Analytics/Application/Widget/RevenueWidgetBuilder.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesFinance\: App\\Analytics\\Application\\Widget\\RevenueWidgetBuilder should not depend on App\\Finance\\Repository\\PLDailyTotalRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesFinance
+			count: 1
+			path: src/Analytics/Application/Widget/RevenueWidgetBuilder.php
+
+		-
 			message: '#^Offset ''categoryName'' on array\{categoryId\: string\|null, categoryName\: string, sumAbs\: float\} on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 1
@@ -166,6 +304,12 @@ parameters:
 			message: '#^Offset ''sumAbs'' on array\{categoryId\: string\|null, categoryName\: string, sumAbs\: float\} on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 5
+			path: src/Analytics/Application/Widget/TopCashWidgetBuilder.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Analytics\\Application\\Widget\\TopCashWidgetBuilder should not depend on App\\Cash\\Repository\\Transaction\\CashTransactionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
 			path: src/Analytics/Application/Widget/TopCashWidgetBuilder.php
 
 		-
@@ -185,6 +329,30 @@ parameters:
 			identifier: nullsafe.neverNull
 			count: 1
 			path: src/Analytics/Application/Widget/TopPnlWidgetBuilder.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesFinance\: App\\Analytics\\Application\\Widget\\TopPnlWidgetBuilder should not depend on App\\Finance\\Repository\\PLCategoryRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesFinance
+			count: 1
+			path: src/Analytics/Application/Widget/TopPnlWidgetBuilder.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesFinance\: App\\Analytics\\Application\\Widget\\TopPnlWidgetBuilder should not depend on App\\Finance\\Repository\\PLDailyTotalRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesFinance
+			count: 1
+			path: src/Analytics/Application/Widget/TopPnlWidgetBuilder.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Analytics\\Command\\AnalyticsDashboardWarmupCommand should not depend on App\\Company\\Infrastructure\\Repository\\CompanyRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Analytics/Command/AnalyticsDashboardWarmupCommand.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesFinance\: App\\Analytics\\Command\\AnalyticsDashboardWarmupCommand should not depend on App\\Finance\\Application\\Service\\PLRegisterUpdater$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesFinance
+			count: 1
+			path: src/Analytics/Command/AnalyticsDashboardWarmupCommand.php
 
 		-
 			message: '#^Call to an undefined method object\:\:getId\(\)\.$#'
@@ -269,6 +437,18 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: src/Balance/Provider/CashTotalsProvider.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Balance\\Provider\\CashTotalsProvider should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountDailyBalanceRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Balance/Provider/CashTotalsProvider.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Balance\\Provider\\FundsTotalsProvider should not depend on App\\Cash\\Service\\Accounts\\FundBalanceService$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Balance/Provider/FundsTotalsProvider.php
 
 		-
 			message: '#^Class App\\Balance\\Repository\\BalanceCategoryLinkRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
@@ -373,6 +553,18 @@ parameters:
 			path: src/Cash/Application/SaveCashTransactionSplitsAction.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Cash\\Application\\ScoreCompanyCounterpartiesAction should not depend on App\\Company\\Repository\\CounterpartyRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Cash/Application/ScoreCompanyCounterpartiesAction.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Cash\\Application\\Service\\CashTransactionAutoRuleGeneralCfoAssigner should not depend on App\\Company\\Repository\\UserRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Cash/Application/Service/CashTransactionAutoRuleGeneralCfoAssigner.php
+
+		-
 			message: '#^Parameter \#1 \$audits of method App\\Cash\\Application\\Service\\CashTransactionAutoRuleProvenanceResolver\:\:latestChangeIsAutoAssigned\(\) expects list\<App\\Shared\\Entity\\AuditLog\>, list\<object\> given\.$#'
 			identifier: argument.type
 			count: 1
@@ -385,8 +577,20 @@ parameters:
 			path: src/Cash/Application/Service/DailyBalanceRecalculator.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Cash\\Command\\CashAutoRulesEnqueueCommand should not depend on App\\Company\\Repository\\UserRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Cash/Command/CashAutoRulesEnqueueCommand.php
+
+		-
 			message: '#^Parameter \#1 \$company of method App\\Cash\\Application\\Service\\DailyBalanceRecalculator\:\:recalcRange\(\) expects App\\Company\\Entity\\Company, object given\.$#'
 			identifier: argument.type
+			count: 1
+			path: src/Cash/Command/DailyBalanceRecalcCommand.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Cash\\Command\\DailyBalanceRecalcCommand should not depend on App\\Company\\Infrastructure\\Repository\\CompanyRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
 			count: 1
 			path: src/Cash/Command/DailyBalanceRecalcCommand.php
 
@@ -394,6 +598,12 @@ parameters:
 			message: '#^Strict comparison using \!\=\= between null and DateTimeImmutable will always evaluate to true\.$#'
 			identifier: notIdentical.alwaysTrue
 			count: 2
+			path: src/Cash/Command/SoftDeleteCompanyTransactionsCommand.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Cash\\Command\\SoftDeleteCompanyTransactionsCommand should not depend on App\\Company\\Infrastructure\\Repository\\CompanyRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
 			path: src/Cash/Command/SoftDeleteCompanyTransactionsCommand.php
 
 		-
@@ -553,6 +763,12 @@ parameters:
 			path: src/Cash/Controller/Transaction/CashTransactionAutoRuleController.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Cash\\Controller\\Transaction\\CashTransactionAutoRuleController should not depend on App\\Company\\Repository\\ProjectDirectionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 2
+			path: src/Cash/Controller/Transaction/CashTransactionAutoRuleController.php
+
+		-
 			message: '#^Call to an undefined method object\:\:getCompany\(\)\.$#'
 			identifier: method.notFound
 			count: 1
@@ -613,6 +829,12 @@ parameters:
 			path: src/Cash/Controller/Transaction/CashTransactionController.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Cash\\Controller\\Transaction\\CashTransactionController should not depend on App\\Company\\Repository\\CounterpartyRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Cash/Controller/Transaction/CashTransactionController.php
+
+		-
 			message: '#^Parameter \#2 \$companyId of method App\\Cash\\Repository\\Transfer\\CashTransferRepository\:\:findOneByTransactionAndCompanyId\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
@@ -634,6 +856,12 @@ parameters:
 			message: '#^Parameter \#2 \$token of method Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController\:\:isCsrfTokenValid\(\) expects string\|null, bool\|float\|int\|string\|null given\.$#'
 			identifier: argument.type
 			count: 1
+			path: src/Cash/Controller/Transaction/CashflowCategoryController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesFinance\: App\\Cash\\Controller\\Transaction\\CashflowCategoryController should not depend on App\\Finance\\Repository\\PLCategoryRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesFinance
+			count: 2
 			path: src/Cash/Controller/Transaction/CashflowCategoryController.php
 
 		-
@@ -1051,6 +1279,12 @@ parameters:
 			path: src/Cash/Form/Transaction/CashTransactionType.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Cash\\Form\\Transaction\\CashTransactionType should not depend on App\\Company\\Repository\\ProjectDirectionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Cash/Form/Transaction/CashTransactionType.php
+
+		-
 			message: '#^Class App\\Cash\\Form\\Transaction\\CashflowCategoryType extends generic class Symfony\\Component\\Form\\AbstractType but does not specify its types\: TData$#'
 			identifier: missingType.generics
 			count: 1
@@ -1113,6 +1347,12 @@ parameters:
 		-
 			message: '#^Parameter \#2 \$company of method App\\Cash\\Service\\Import\\Bank\\BankImportService\:\:importCompany\(\) expects App\\Company\\Entity\\Company, object given\.$#'
 			identifier: argument.type
+			count: 1
+			path: src/Cash/MessageHandler/Import/BankImportHandler.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Cash\\MessageHandler\\Import\\BankImportHandler should not depend on App\\Company\\Infrastructure\\Repository\\CompanyRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
 			count: 1
 			path: src/Cash/MessageHandler/Import/BankImportHandler.php
 
@@ -1543,6 +1783,12 @@ parameters:
 			path: src/Cash/Service/Import/ClientBank1CImportService.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Cash\\Service\\Import\\ClientBank1CImportService should not depend on App\\Company\\Repository\\CounterpartyRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Cash/Service/Import/ClientBank1CImportService.php
+
+		-
 			message: '#^Method Doctrine\\Persistence\\ObjectManager\:\:flush\(\) invoked with 1 parameter, 0 required\.$#'
 			identifier: arguments.count
 			count: 1
@@ -1587,6 +1833,12 @@ parameters:
 		-
 			message: '#^Parameter \#2 \$moneyAccountId of method App\\Cash\\Service\\Import\\File\\CashFileImportService\:\:makeDedupeHash\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
+			count: 1
+			path: src/Cash/Service/Import/File/CashFileImportService.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Cash\\Service\\Import\\File\\CashFileImportService should not depend on App\\Company\\Repository\\CounterpartyRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
 			count: 1
 			path: src/Cash/Service/Import/File/CashFileImportService.php
 
@@ -1729,6 +1981,18 @@ parameters:
 			path: src/Cash/Service/Transaction/CashTransactionService.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Cash\\Service\\Transaction\\CashTransactionToDocumentService should not depend on App\\Company\\Repository\\ProjectDirectionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Cash/Service/Transaction/CashTransactionToDocumentService.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesFinance\: App\\Cash\\Service\\Transaction\\CashTransactionToDocumentService should not depend on App\\Finance\\Application\\Service\\PLRegisterUpdater$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesFinance
+			count: 1
+			path: src/Cash/Service/Transaction/CashTransactionToDocumentService.php
+
+		-
 			message: '#^Access to an undefined property App\\Catalog\\DTO\\CreateProductCommand\:\:\$vendorSku\.$#'
 			identifier: property.notFound
 			count: 1
@@ -1815,6 +2079,12 @@ parameters:
 		-
 			message: '#^Parameter \#1 \$companyId of method App\\Marketplace\\Repository\\MarketplaceListingRepository\:\:findMarketplaceNamesByProductIds\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
+			count: 1
+			path: src/Catalog/Controller/ProductIndexController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesMarketplace\: App\\Catalog\\Controller\\ProductIndexController should not depend on App\\Marketplace\\Repository\\MarketplaceListingRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesMarketplace
 			count: 1
 			path: src/Catalog/Controller/ProductIndexController.php
 
@@ -2011,6 +2281,12 @@ parameters:
 			path: src/Company/Application/Service/AccountBootstrapper.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesFinance\: App\\Company\\Application\\Service\\AccountBootstrapper should not depend on App\\Finance\\Repository\\PLCategoryRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesFinance
+			count: 1
+			path: src/Company/Application/Service/AccountBootstrapper.php
+
+		-
 			message: '#^Parameter \#1 \$companyId of method App\\Company\\Infrastructure\\Query\\CounterpartySearchQuery\:\:search\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
@@ -2037,6 +2313,12 @@ parameters:
 		-
 			message: '#^Parameter \#2 \$token of method Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController\:\:isCsrfTokenValid\(\) expects string\|null, bool\|float\|int\|string\|null given\.$#'
 			identifier: argument.type
+			count: 1
+			path: src/Company/Controller/CompanyController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Company\\Controller\\CompanyController should not depend on App\\Cash\\Service\\Category\\CashflowSystemCategoryService$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
 			count: 1
 			path: src/Company/Controller/CompanyController.php
 
@@ -2509,8 +2791,26 @@ parameters:
 			path: src/Company/Security/ModuleAccessVoter.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Company\\Service\\CompanyOwnerAccountCreator should not depend on App\\Cash\\Service\\Category\\CashflowSystemCategoryService$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Company/Service/CompanyOwnerAccountCreator.php
+
+		-
 			message: '#^Parameter \#1 \$companyId of callable App\\Balance\\Application\\SeedBalanceStructureAction expects string, string\|null given\.$#'
 			identifier: argument.type
+			count: 1
+			path: src/DataFixtures/AppFixtures.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesBalance\: App\\DataFixtures\\AppFixtures should not depend on App\\Balance\\Application\\SeedBalanceStructureAction$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesBalance
+			count: 1
+			path: src/DataFixtures/AppFixtures.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\DataFixtures\\AppFixtures should not depend on App\\Cash\\Service\\Accounts\\AccountBalanceService$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
 			count: 1
 			path: src/DataFixtures/AppFixtures.php
 
@@ -2519,6 +2819,12 @@ parameters:
 			identifier: nullCoalesce.offset
 			count: 1
 			path: src/DataFixtures/MarketplaceCostCategoriesFixtures.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesFinance\: App\\DataFixtures\\PLDocumentsFixtures should not depend on App\\Finance\\Application\\Service\\PLRegisterUpdater$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesFinance
+			count: 1
+			path: src/DataFixtures/PLDocumentsFixtures.php
 
 		-
 			message: '#^Parameter \#1 \$id of method App\\Deals\\Service\\ChargeTypeManager\:\:update\(\) expects string, string\|null given\.$#'
@@ -2707,10 +3013,52 @@ parameters:
 			path: src/Deals/Form/DealItemType.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Deals\\Service\\ChargeTypeManager should not depend on App\\Company\\Repository\\CompanyMemberRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Deals/Service/ChargeTypeManager.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Deals\\Service\\DealManager should not depend on App\\Company\\Repository\\CompanyMemberRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Deals/Service/DealManager.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Deals\\Service\\DealManager should not depend on App\\Company\\Repository\\CounterpartyRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Deals/Service/DealManager.php
+
+		-
 			message: '#^Method App\\Finance\\Application\\Action\\ImportPLCategoryTreeAction\:\:findExisting\(\) should return App\\Finance\\Entity\\PLCategory\|null but returns object\|null\.$#'
 			identifier: return.type
 			count: 2
 			path: src/Finance/Application/Action/ImportPLCategoryTreeAction.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Finance\\Application\\Action\\ImportPLCategoryTreeAction should not depend on App\\Company\\Infrastructure\\Repository\\CompanyRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Finance/Application/Action/ImportPLCategoryTreeAction.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Finance\\Application\\CreatePLDocumentAction should not depend on App\\Company\\Infrastructure\\Repository\\CompanyRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Finance/Application/CreatePLDocumentAction.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Finance\\Application\\CreatePLDocumentAction should not depend on App\\Company\\Repository\\CounterpartyRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Finance/Application/CreatePLDocumentAction.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Finance\\Application\\CreatePLDocumentAction should not depend on App\\Company\\Repository\\ProjectDirectionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Finance/Application/CreatePLDocumentAction.php
 
 		-
 			message: '#^Call to an undefined method object\:\:getCompany\(\)\.$#'
@@ -2729,6 +3077,30 @@ parameters:
 			identifier: argument.type
 			count: 2
 			path: src/Finance/Application/Service/FinanceDashboardKpiProvider.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Application\\Service\\FinanceDashboardKpiProvider should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Finance/Application/Service/FinanceDashboardKpiProvider.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Application\\Service\\FinanceDashboardKpiProvider should not depend on App\\Cash\\Repository\\Transaction\\CashTransactionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Finance/Application/Service/FinanceDashboardKpiProvider.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Application\\Service\\FinanceDashboardKpiProvider should not depend on App\\Cash\\Service\\Accounts\\AccountBalanceProvider$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Finance/Application/Service/FinanceDashboardKpiProvider.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Finance\\Application\\Service\\FinanceDocumentResponsibilityCenterNormalizer should not depend on App\\Company\\Repository\\ProjectDirectionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Finance/Application/Service/FinanceDocumentResponsibilityCenterNormalizer.php
 
 		-
 			message: '#^Call to function method_exists\(\) with App\\Finance\\Entity\\DocumentOperation and ''getCategory'' will always evaluate to true\.$#'
@@ -2785,8 +3157,20 @@ parameters:
 			path: src/Finance/Command/PlRegisterRecalcCommand.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Finance\\Command\\PlRegisterRecalcCommand should not depend on App\\Company\\Infrastructure\\Repository\\CompanyRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Finance/Command/PlRegisterRecalcCommand.php
+
+		-
 			message: '#^Parameter \#1 \$company of method App\\Finance\\Application\\Service\\PLSnapshotBuilder\:\:rebuildRange\(\) expects App\\Company\\Entity\\Company, object\|null given\.$#'
 			identifier: argument.type
+			count: 1
+			path: src/Finance/Command/PlSnapshotRebuildCommand.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Finance\\Command\\PlSnapshotRebuildCommand should not depend on App\\Company\\Infrastructure\\Repository\\CompanyRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
 			count: 1
 			path: src/Finance/Command/PlSnapshotRebuildCommand.php
 
@@ -2803,6 +3187,12 @@ parameters:
 			path: src/Finance/Command/RecalcPlRegisterCommand.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Finance\\Command\\RecalcPlRegisterCommand should not depend on App\\Company\\Infrastructure\\Repository\\CompanyRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Finance/Command/RecalcPlRegisterCommand.php
+
+		-
 			message: '#^Parameter \#1 \$stream of function fclose expects resource, resource\|false given\.$#'
 			identifier: argument.type
 			count: 1
@@ -2815,6 +3205,24 @@ parameters:
 			path: src/Finance/Controller/Api/PublicCashflowReportController.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Finance\\Controller\\Api\\PublicCashflowReportController should not depend on App\\Company\\Service\\ReportApiKeyManager$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Finance/Controller/Api/PublicCashflowReportController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Finance\\Controller\\Api\\PublicPlReportController should not depend on App\\Company\\Repository\\ProjectDirectionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Finance/Controller/Api/PublicPlReportController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Finance\\Controller\\Api\\PublicPlReportController should not depend on App\\Company\\Service\\ReportApiKeyManager$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Finance/Controller/Api/PublicPlReportController.php
+
+		-
 			message: '#^Method App\\Finance\\Controller\\DocumentController\:\:buildTransactionAllocationView\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -2824,6 +3232,12 @@ parameters:
 			message: '#^Parameter \#2 \$token of method Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController\:\:isCsrfTokenValid\(\) expects string\|null, bool\|float\|int\|string\|null given\.$#'
 			identifier: argument.type
 			count: 2
+			path: src/Finance/Controller/DocumentController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Finance\\Controller\\DocumentController should not depend on App\\Company\\Repository\\ProjectDirectionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 3
 			path: src/Finance/Controller/DocumentController.php
 
 		-
@@ -2881,10 +3295,40 @@ parameters:
 			path: src/Finance/Controller/PlReportPreviewController.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Finance\\Controller\\PlReportPreviewController should not depend on App\\Company\\Application\\Service\\AccountBootstrapper$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Finance/Controller/PlReportPreviewController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Finance\\Controller\\PlReportPreviewController should not depend on App\\Company\\Repository\\ProjectDirectionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 3
+			path: src/Finance/Controller/PlReportPreviewController.php
+
+		-
 			message: '#^Instanceof between App\\Finance\\Entity\\DocumentOperation and App\\Finance\\Entity\\DocumentOperation will always evaluate to true\.$#'
 			identifier: instanceof.alwaysTrue
 			count: 1
 			path: src/Finance/Controller/RawPlReportController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Controller\\ReportAccountBalancesController should not depend on App\\Cash\\Application\\Service\\DailyBalanceRecalculator$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Finance/Controller/ReportAccountBalancesController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Controller\\ReportAccountBalancesController should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountDailyBalanceRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Finance/Controller/ReportAccountBalancesController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Controller\\ReportAccountBalancesController should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Finance/Controller/ReportAccountBalancesController.php
 
 		-
 			message: '#^Parameter \#2 \$accountIds of method App\\Cash\\Repository\\Transaction\\CashTransactionRepository\:\:sumByAccountAndPeriod\(\) expects list\<string\>, non\-empty\-list\<string\|null\> given\.$#'
@@ -2905,8 +3349,32 @@ parameters:
 			path: src/Finance/Controller/ReportAccountBalancesStructuredController.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Controller\\ReportAccountBalancesStructuredController should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Finance/Controller/ReportAccountBalancesStructuredController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Controller\\ReportAccountBalancesStructuredController should not depend on App\\Cash\\Repository\\Transaction\\CashTransactionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Finance/Controller/ReportAccountBalancesStructuredController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Controller\\ReportAccountBalancesStructuredController should not depend on App\\Cash\\Service\\Accounts\\AccountBalanceProvider$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Finance/Controller/ReportAccountBalancesStructuredController.php
+
+		-
 			message: '#^Parameter \#3 \$projectDirections of method App\\Report\\Cashflow\\CashflowReportRequestMapper\:\:fromRequest\(\) expects list\<App\\Company\\Entity\\ProjectDirection\>\|null, array\<App\\Company\\Entity\\ProjectDirection\> given\.$#'
 			identifier: argument.type
+			count: 1
+			path: src/Finance/Controller/ReportCashflowController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Finance\\Controller\\ReportCashflowController should not depend on App\\Company\\Repository\\ProjectDirectionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
 			count: 1
 			path: src/Finance/Controller/ReportCashflowController.php
 
@@ -2932,6 +3400,12 @@ parameters:
 			message: '#^Parameter \#1 \$stream of function fputcsv expects resource, resource\|false given\.$#'
 			identifier: argument.type
 			count: 4
+			path: src/Finance/Controller/ReportCashflowOpsCheckController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Controller\\ReportCashflowOpsCheckController should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
 			path: src/Finance/Controller/ReportCashflowOpsCheckController.php
 
 		-
@@ -2967,6 +3441,24 @@ parameters:
 		-
 			message: '#^Variable \$name on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.variable
+			count: 1
+			path: src/Finance/Controller/ReportTransactionsStatementController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Controller\\ReportTransactionsStatementController should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountDailyBalanceRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Finance/Controller/ReportTransactionsStatementController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Controller\\ReportTransactionsStatementController should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Finance/Controller/ReportTransactionsStatementController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Controller\\ReportTransactionsStatementController should not depend on App\\Cash\\Repository\\Transaction\\CashTransactionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
 			count: 1
 			path: src/Finance/Controller/ReportTransactionsStatementController.php
 
@@ -3121,6 +3613,24 @@ parameters:
 			path: src/Finance/Facade/FinanceFacade.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Facade\\FinanceFacade should not depend on App\\Cash\\Repository\\Transaction\\CashTransactionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Finance/Facade/FinanceFacade.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Finance\\Facade\\FinanceFacade should not depend on App\\Company\\Repository\\CounterpartyRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Finance/Facade/FinanceFacade.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Finance\\Facade\\FinanceFacade should not depend on App\\Company\\Repository\\ProjectDirectionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Finance/Facade/FinanceFacade.php
+
+		-
 			message: '#^Call to an undefined method object\:\:getCode\(\)\.$#'
 			identifier: method.notFound
 			count: 1
@@ -3165,6 +3675,12 @@ parameters:
 		-
 			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Finance/Facts/PLDailyTotalFactsProvider.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Finance\\Facts\\PLDailyTotalFactsProvider should not depend on App\\Company\\Repository\\ProjectDirectionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
 			count: 1
 			path: src/Finance/Facts/PLDailyTotalFactsProvider.php
 
@@ -3613,8 +4129,20 @@ parameters:
 			path: src/Ingestion/Command/OzonAccrualRollingRefreshCommand.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesMarketplace\: App\\Ingestion\\Command\\OzonAccrualRollingRefreshCommand should not depend on App\\Marketplace\\Infrastructure\\Query\\ActiveSellerConnectionsQuery$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesMarketplace
+			count: 1
+			path: src/Ingestion/Command/OzonAccrualRollingRefreshCommand.php
+
+		-
 			message: '#^Instanceof between App\\Ingestion\\Application\\DTO\\ShopDescriptor and App\\Ingestion\\Application\\DTO\\ShopDescriptor will always evaluate to true\.$#'
 			identifier: instanceof.alwaysTrue
+			count: 1
+			path: src/Ingestion/Command/OzonAccrualVerifyRollingRefreshCommand.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesMarketplace\: App\\Ingestion\\Command\\OzonAccrualVerifyRollingRefreshCommand should not depend on App\\Marketplace\\Infrastructure\\Query\\ActiveSellerConnectionsQuery$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesMarketplace
 			count: 1
 			path: src/Ingestion/Command/OzonAccrualVerifyRollingRefreshCommand.php
 
@@ -3643,6 +4171,12 @@ parameters:
 			path: src/Ingestion/Command/RunIncrementalCommand.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesMarketplace\: App\\Ingestion\\Command\\RunIncrementalCommand should not depend on App\\Marketplace\\Infrastructure\\Query\\ActiveSellerConnectionsQuery$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesMarketplace
+			count: 1
+			path: src/Ingestion/Command/RunIncrementalCommand.php
+
+		-
 			message: '#^Offset ''ozon''\|''ozon_performance''\|''wildberries'' might not exist on array\{ozon\: array\{''ozon_finance…'', ''ozon_performance…'', ''ozon_performance…'', ''ozon_performance…'', ''ozon_performance…'', ''ozon_performance…'', ''ozon_performance…''\}, wildberries\: array\{''wildberries_finance…''\}\}\.$#'
 			identifier: offsetAccess.notFound
 			count: 1
@@ -3665,6 +4199,18 @@ parameters:
 			identifier: return.type
 			count: 1
 			path: src/Ingestion/Facade/IngestionFacade.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesMarketplace\: App\\Ingestion\\Facade\\MarketplaceListingFacade should not depend on App\\Marketplace\\Repository\\MarketplaceListingBarcodeRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesMarketplace
+			count: 1
+			path: src/Ingestion/Facade/MarketplaceListingFacade.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesMarketplace\: App\\Ingestion\\Facade\\MarketplaceListingFacade should not depend on App\\Marketplace\\Repository\\MarketplaceListingRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesMarketplace
+			count: 1
+			path: src/Ingestion/Facade/MarketplaceListingFacade.php
 
 		-
 			message: '#^Offset ''api_key'' on array\{api_key\: string, client_id\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
@@ -3697,6 +4243,12 @@ parameters:
 			path: src/Ingestion/Infrastructure/Api/Wildberries/WbFinanceReportClient.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesMarketplace\: App\\Ingestion\\Infrastructure\\Api\\Wildberries\\WbFinanceReportClient should not depend on App\\Marketplace\\Application\\Service\\WbFinanceRateLimiter$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesMarketplace
+			count: 1
+			path: src/Ingestion/Infrastructure/Api/Wildberries/WbFinanceReportClient.php
+
+		-
 			message: '#^Method App\\Ingestion\\Infrastructure\\Doctrine\\EncryptedJsonType\:\:convertToPHPValue\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -3713,6 +4265,12 @@ parameters:
 			identifier: arrayValues.list
 			count: 1
 			path: src/Ingestion/Infrastructure/Query/OzonAccrualProjectionHealthQuery.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesMarketplace\: App\\Ingestion\\Infrastructure\\Query\\ReconciliationQuery should not depend on App\\Marketplace\\Repository\\OzonTransactionTotalsCheckRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesMarketplace
+			count: 1
+			path: src/Ingestion/Infrastructure/Query/ReconciliationQuery.php
 
 		-
 			message: '#^Method App\\Inventory\\Application\\NormalizeInventorySnapshotAction\:\:findOrCreateLocation\(\) should return App\\Inventory\\Entity\\Location but returns object\.$#'
@@ -4927,6 +5485,12 @@ parameters:
 			path: src/Marketplace/Controller/MarketplaceController.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Marketplace\\Controller\\MarketplaceController should not depend on App\\Company\\Repository\\ProjectDirectionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Marketplace/Controller/MarketplaceController.php
+
+		-
 			message: '#^Access to an undefined property App\\Marketplace\\Enum\\MarketplaceType\:\:\$displayName\.$#'
 			identifier: property.notFound
 			count: 2
@@ -4954,6 +5518,18 @@ parameters:
 			message: '#^Parameter \#2 \$companyId of method App\\Marketplace\\Repository\\MarketplaceSaleMappingRepository\:\:findByIdAndCompany\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 2
+			path: src/Marketplace/Controller/MarketplaceSaleMappingController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Marketplace\\Controller\\MarketplaceSaleMappingController should not depend on App\\Company\\Repository\\ProjectDirectionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Marketplace/Controller/MarketplaceSaleMappingController.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesFinance\: App\\Marketplace\\Controller\\MarketplaceSaleMappingController should not depend on App\\Finance\\Repository\\PLCategoryRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesFinance
+			count: 1
 			path: src/Marketplace/Controller/MarketplaceSaleMappingController.php
 
 		-
@@ -8083,6 +8659,36 @@ parameters:
 			path: src/Report/Cashflow/CashflowReportBuilder.php
 
 		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Report\\Cashflow\\CashflowReportBuilder should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountDailyBalanceRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Report/Cashflow/CashflowReportBuilder.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Report\\Cashflow\\CashflowReportBuilder should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Report/Cashflow/CashflowReportBuilder.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Report\\Cashflow\\CashflowReportBuilder should not depend on App\\Cash\\Repository\\Transaction\\CashTransactionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Report/Cashflow/CashflowReportBuilder.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Report\\Cashflow\\CashflowReportBuilder should not depend on App\\Cash\\Repository\\Transaction\\CashflowCategoryRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Report/Cashflow/CashflowReportBuilder.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Report\\Cashflow\\CashflowReportBuilder should not depend on App\\Company\\Repository\\ProjectDirectionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Report/Cashflow/CashflowReportBuilder.php
+
+		-
 			message: '#^Parameter \#2 \$availableIds of method App\\Report\\Cashflow\\CashflowReportRequestMapper\:\:resolveSelectedIds\(\) expects list\<string\>, array\<string\> given\.$#'
 			identifier: argument.type
 			count: 1
@@ -8091,6 +8697,12 @@ parameters:
 		-
 			message: '#^Parameter \#8 \$availableProjectDirections of class App\\Report\\Cashflow\\CashflowReportParams constructor expects list\<App\\Company\\Entity\\ProjectDirection\>\|null, array\<App\\Company\\Entity\\ProjectDirection\>\|null given\.$#'
 			identifier: argument.type
+			count: 1
+			path: src/Report/Cashflow/CashflowReportRequestMapper.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Report\\Cashflow\\CashflowReportRequestMapper should not depend on App\\Company\\Repository\\ProjectDirectionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
 			count: 1
 			path: src/Report/Cashflow/CashflowReportRequestMapper.php
 
@@ -8115,6 +8727,12 @@ parameters:
 		-
 			message: '#^Method App\\Shared\\EventSubscriber\\AuditLogSubscriber\:\:postPersist\(\) has parameter \$args with generic class Doctrine\\Persistence\\Event\\LifecycleEventArgs but does not specify its types\: TObjectManager$#'
 			identifier: missingType.generics
+			count: 1
+			path: src/Shared/EventSubscriber/AuditLogSubscriber.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Shared\\EventSubscriber\\AuditLogSubscriber should not depend on App\\Cash\\Application\\Service\\AutoRuleDispatchGuard$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
 			count: 1
 			path: src/Shared/EventSubscriber/AuditLogSubscriber.php
 
@@ -8181,6 +8799,18 @@ parameters:
 		-
 			message: '#^Parameter \#2 \$user of method App\\Company\\Repository\\CompanyMemberRepository\:\:findActiveOneByCompanyAndUser\(\) expects App\\Company\\Entity\\User, Symfony\\Component\\Security\\Core\\User\\UserInterface given\.$#'
 			identifier: argument.type
+			count: 1
+			path: src/Shared/Service/ActiveCompanyService.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Shared\\Service\\ActiveCompanyService should not depend on App\\Company\\Infrastructure\\Repository\\CompanyRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
+			count: 1
+			path: src/Shared/Service/ActiveCompanyService.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Shared\\Service\\ActiveCompanyService should not depend on App\\Company\\Repository\\CompanyMemberRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
 			count: 1
 			path: src/Shared/Service/ActiveCompanyService.php
 
@@ -8259,6 +8889,18 @@ parameters:
 		-
 			message: '#^Parameter \#2 \$accountIds of method App\\Cash\\Repository\\Transaction\\CashTransactionRepository\:\:sumByAccountAndPeriod\(\) expects list\<string\>, non\-empty\-list\<string\|null\> given\.$#'
 			identifier: argument.type
+			count: 1
+			path: src/Telegram/Command/SendTelegramReportsCommand.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Telegram\\Command\\SendTelegramReportsCommand should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Telegram/Command/SendTelegramReportsCommand.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Telegram\\Command\\SendTelegramReportsCommand should not depend on App\\Cash\\Repository\\Transaction\\CashTransactionRepository$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
 			count: 1
 			path: src/Telegram/Command/SendTelegramReportsCommand.php
 
@@ -8567,6 +9209,18 @@ parameters:
 			identifier: catch.neverThrown
 			count: 1
 			path: src/Twig/CurrencyFormatExtension.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Twig\\MaskingExtension should not depend on App\\Cash\\Service\\Accounts\\AccountMasker$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Twig/MaskingExtension.php
+
+		-
+			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Twig\\MoneyTotalsExtension should not depend on App\\Cash\\Service\\Accounts\\MoneyTotalsWidgetProvider$#'
+			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
+			count: 1
+			path: src/Twig/MoneyTotalsExtension.php
 
 		-
 			message: '#^Parameter \#2 \$company of class App\\Cash\\Entity\\Transaction\\CashflowCategory constructor expects App\\Company\\Entity\\Company, object given\.$#'
