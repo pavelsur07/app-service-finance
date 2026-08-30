@@ -22,10 +22,10 @@ final class AiSuggestionRepository extends ServiceEntityRepository
 
     public function save(AiSuggestion $suggestion, bool $flush = false): void
     {
-        $this->_em->persist($suggestion);
+        $this->getEntityManager()->persist($suggestion);
 
         if ($flush) {
-            $this->_em->flush();
+            $this->getEntityManager()->flush();
         }
     }
 
