@@ -363,15 +363,27 @@ jobs:
                     -e COMPOSER_HOME=/tmp/composer \
                     site-php-cli composer install --no-interaction --prefer-dist --no-progress --no-scripts
 
-            # Result cache PHPStan: холодный прогон 2345 файлов идёт минуты,
+            # Result cache PHPStan: холодный прогон 2344 файлов идёт минуты,
             # тёплый — секунды. Ключ включает baseline и конфиг: их правка
-            # обязана инвалидировать кэш.
+            # обязана инвалидировать кэш. XML контейнера в ключ не входит — его
+            # хеширует само расширение (SymfonyContainerResultCacheMetaExtension),
+            # поэтому пересобранный контейнер кэш инвалидирует сам.
             - name: 🔬 Cache PHPStan result cache
               uses: actions/cache@v4
               with:
                   path: site/var/cache/phpstan
                   key: phpstan-${{ hashFiles('site/composer.lock', 'site/phpstan.dist.neon', 'site/phpstan-baseline.neon') }}-${{ github.sha }}
                   restore-keys: phpstan-${{ hashFiles('site/composer.lock', 'site/phpstan.dist.neon', 'site/phpstan-baseline.neon') }}-
+
+            # Расширения phpstan-symfony/phpstan-doctrine анализируют скомпилированный
+            # DI-контейнер. Отдельный шаг, а не часть запуска анализа: ошибка компиляции
+            # контейнера должна падать здесь и читаться как ошибка контейнера.
+            - name: 🔥 Warm Symfony container
+              run: |
+                  docker compose run --rm -T \
+                    --user "$(id -u):$(id -g)" \
+                    -e COMPOSER_HOME=/tmp/composer \
+                    site-php-cli php bin/console cache:warmup --env=test
 
             - name: 🔬 Run PHPStan
               run: |

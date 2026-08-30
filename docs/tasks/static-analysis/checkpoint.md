@@ -1,44 +1,47 @@
 ## Current checkpoint
 
-**Phase:** Stage 1 — Release Gate
+**Phase:** Stage 2 — Release Gate
 **Status:** done
-**Stage base commit:** `015d92e088b71050a8b89fc6d26fb8b2f64b3caf`
-**Current Work item:** none — 1.1…1.5 завершены
+**Stage base commit:** `d902c511deb2d8867d58419645b798b417e0f329`
+**Current Work item:** none — 2.1…2.5 завершены
 **Owner gate:** yes
 
 ### Completed
-- 1.1 — `phpstan/phpstan ^2.2` в require-dev; `require.php: "^8.4"`, `config.platform.php: 8.4.24`.
-- 1.2 — `site/phpstan.dist.neon` (level 8, src+tests, phpVersion 80400, tmpDir var/cache/phpstan, reportUnmatchedIgnoredErrors: true); composer-скрипты `stan`, `stan:baseline`.
-- 1.3 — `site/phpstan-baseline.neon`: 3777 ошибок в 2412 записях, 14473 строки.
-- 1.4 — `make site-stan`, `make site-stan-baseline`; `CLAUDE.md` обновлён.
-- 1.5 — CI-job `🔬 Static analysis` в `.github/workflows/deploy.yml`.
+**Stage 1 — DONE, смёржен в ветку, CI зелёный, PR #2386 (Draft).**
+Гейт PHPStan level 8, baseline 3777, CI-job `🔬 Static analysis` (1m20s, pass).
+
+**Stage 2:**
+- 2.1 — `phpstan/extension-installer`, `phpstan-symfony`, `phpstan-doctrine`,
+  `phpstan-phpunit`, `phpstan-webmozart-assert` в require-dev.
+- 2.2 — `site/tests/object-manager.php`: окружение `test`, 117 маппингов, без БД.
+- 2.3 — `symfony.containerXmlPath` (test-контейнер) и `doctrine.objectManagerLoader`.
+- 2.4 — `site-stan-prepare` как предусловие целей Makefile; шаг прогрева в CI-job.
+- 2.5 — baseline 3777 → 3525 (2358 записей, 1428 `src` / 930 `tests`), дельта разобрана.
 
 ### Current diff / affected files
-- `Makefile` — 2 таргета
-- `CLAUDE.md` — раздел «Красный baseline»
-- `.github/workflows/deploy.yml` — новый job `stan`
-- `site/composer.json`, `site/composer.lock`, `site/symfony.lock`, `site/.gitignore` — зависимость и рецепт Flex
-- `site/phpstan.dist.neon`, `site/phpstan-baseline.neon` — новые
-- `docs/tasks/static-analysis/{plan,checkpoint}.md`, `stages/stage-1.md` — новые
+- `site/composer.json`, `site/composer.lock` — 5 dev-зависимостей
+- `site/tests/object-manager.php` — новый
+- `site/phpstan.dist.neon`, `site/phpstan-baseline.neon`
+- `Makefile`, `.github/workflows/deploy.yml`, `CLAUDE.md`
+- `docs/tasks/static-analysis/{plan,checkpoint}.md`, `stages/stage-2.md`
 
 ### Checks and baseline
 - `composer stan` — exit 0, `[OK] No errors`
-- негативная проба (`?DateTimeImmutable->format()` в новом файле) — exit 1, `method.nonObject`
-- `composer stan -- --error-format=github` — exit 0 (формат для CI валиден)
-- `composer cs:strict-types` — `Found 0 of 2345`, exit 0 (baseline был зелёный)
-- `composer test:unit` — 1927 тестов OK, 4 deprecations (pre-existing)
-- `composer validate --strict` — exit 1 из-за pre-existing constraints openspout/phpspreadsheet, к Stage не относится
-- `cs:check` (хронически красный, 506/2342) неприменим
+- проба `find()->definitelyNotAMethod()` — exit 1, тип разрешён до `MoneyAccount|null`
+- без прогретого контейнера — exit 1, явный `hash_file(...): No such file or directory`
+- `composer cs:strict-types` — `Found 0 of 2346`, exit 0
+- `composer cs:check` — `Found 0 of 2346`, exit 0
+- `composer test:unit` — 1927 OK, 4 deprecations (pre-existing)
 
 ### Review status
-- iteration: внутреннее — 1, внешнее — 3, итог **REVIEW_GREEN**
-- подтверждено и исправлено: 3 IMPORTANT + 7 MINOR; отклонённых находок нет
-- unresolved findings: —
+- iteration: внутреннее — 1, внешнее — 2, итог **REVIEW_GREEN**
+- подтверждено и исправлено: 1 IMPORTANT + 5 MINOR; отклонённых находок нет
+- unresolved findings: нет
 
 ### Exact next action
-Решение Владельца: начинать Stage 2 или остановиться на Stage 1.
+Решение Владельца: начинать Stage 3 (PHPat, границы модулей) или остановиться.
 
 ### Files to inspect first on resume
-- `site/phpstan.dist.neon`
-- `.github/workflows/deploy.yml` (job `stan`)
-- `docs/tasks/static-analysis/plan.md`
+- `site/phpstan.dist.neon` (блоки `symfony` и `doctrine`)
+- `site/tests/object-manager.php`
+- `docs/tasks/static-analysis/stages/stage-2.md`

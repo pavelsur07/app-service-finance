@@ -87,8 +87,62 @@ CI-job. Runtime-код, схема БД, Messenger, контракты не за
 ---
 
 ## Stage 2: расширения PHPStan (Symfony, Doctrine, PHPUnit, webmozart-assert)
-Risk: MEDIUM · owner_gate: yes · release_candidate: no · independently_deployable: yes
-Не начат. Требует `tests/object-manager.php` и `cache:warmup` в CI-job.
+Risk: MEDIUM
+owner_gate: yes
+release_candidate: no
+independently_deployable: yes
+stage_base_commit: `d902c511deb2d8867d58419645b798b417e0f329`
+
+Обоснование риска: dev-зависимости и правка конфига анализатора плюс один
+дополнительный шаг в CI-job `stan`. Runtime-код, схема БД, Messenger и контракты
+не затрагиваются; цепочка деплоя по-прежнему не зависит от job'а `stan`.
+
+Смысл Stage: без расширений PHPStan не понимает Symfony DI и Doctrine, и
+значительная часть из 3777 записей baseline — не долг, а слепота анализатора.
+В топе baseline Stage 1: `method.notFound` — 330, `property.notFound` (в основном
+`$_em` в Repository), `missingType.generics` — 87. Расширения должны их снять,
+одновременно добавив собственные правила (валидность service id, DQL, маппинг).
+
+### Definition of Done
+- Установлены `phpstan/extension-installer`, `phpstan/phpstan-symfony`,
+  `phpstan/phpstan-doctrine`, `phpstan/phpstan-phpunit`, `phpstan/phpstan-webmozart-assert`.
+- `phpstan.dist.neon` объявляет `containerXmlPath` и `objectManagerLoader`.
+- Создан `site/tests/object-manager.php`; он не требует живой БД.
+- `make site-stan` работает «из чистого состояния»: прогрев контейнера — часть цели,
+  а не отдельное знание в голове разработчика.
+- CI-job `stan` прогревает контейнер до анализа.
+- Baseline перегенерирован; дельта «до/после» зафиксирована с разбивкой по категориям.
+- Гейт остаётся достижимо зелёным (exit 0) и доказан красным на искусственной ошибке,
+  причём проба должна ловиться именно новым расширением, а не общим правилом.
+- Отсутствие прогретого контейнера даёт понятный отказ, а не ложную зелень.
+
+### Явно вне scope Stage 2
+- PHPat и правила границ модулей (Stage 3).
+- Собственные правила и `spaze/phpstan-disallowed-calls` (Stage 4).
+- Сжатие baseline сверх того, что расширения снимают автоматически.
+- Исправление найденного в Stage 1 бага с `$roleId` — отдельная задача с регрессионным тестом.
+- `consoleApplicationLoader` расширения Symfony — не нужен для текущего охвата.
+
+### Work items
+- 2.1 — установить extension-installer и четыре расширения.
+- 2.2 — `site/tests/object-manager.php`.
+- 2.3 — параметры `symfony.containerXmlPath` и `doctrine.objectManagerLoader` в конфиге.
+- 2.4 — прогрев контейнера в `make site-stan`/`site-stan-baseline` и в CI-job.
+- 2.5 — перегенерация baseline, замер дельты, доказательство гейта зелёным и красным.
+
+### Stage checks
+- `composer stan` — exit 0.
+- Негативная проверка правилом расширения — ненулевой exit.
+- Проверка отказа без прогретого контейнера — понятная ошибка, не ложная зелень.
+- `composer test:unit` — без изменений.
+- `composer cs:strict-types` — новый PHP-файл `tests/object-manager.php` обязан пройти гейт.
+- YAML workflow разбирается, цепочка деплоя не изменена.
+
+### Reviewer focus
+- `tests/object-manager.php` не тянет живую БД и не попадает в прод-образ.
+- Дельта baseline объяснена: что снято расширениями, что добавлено их правилами.
+- Прогрев контейнера не маскирует ошибку компиляции контейнера.
+- Кэш PHPStan в CI инвалидируется при изменении конфига.
 
 ## Stage 3: PHPat — границы модулей и Facade
 Risk: MEDIUM · owner_gate: yes · release_candidate: no · independently_deployable: yes

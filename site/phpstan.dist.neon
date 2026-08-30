@@ -5,7 +5,7 @@
 # уровне сразу. Baseline только сжимается — не перегенерируется «начисто» и не
 # удаляется, иначе регресс перестаёт отличаться от нормы.
 #
-# Фактический охват: 2343 из 2345 PHP-файлов src+tests. Два тестовых файла
+# Фактический охват: 2344 из 2346 PHP-файлов src+tests. Два тестовых файла
 # исключены целиком — причина и план возврата в excludePaths ниже.
 includes:
     - phpstan-baseline.neon
@@ -43,6 +43,42 @@ parameters:
         analyse:
             - tests/Integration/Marketplace/CloseMonthStageActionRollbackTest.php
             - tests/Unit/Marketplace/MessageHandler/RebuildPreliminaryForPeriodHandlerTest.php
+
+    # Расширение phpstan-symfony читает скомпилированный DI-контейнер: без него
+    # `$container->get()`, аргументы контроллеров и Form/Request-типы остаются
+    # `object` или `mixed`. Файл генерируется `bin/console cache:warmup --env=test`
+    # и лежит в gitignore'нутом var/ — прогрев встроен в `make site-stan`.
+    #
+    # Почему test, а не dev. Под анализ попадают и `src`, и `tests` (930 записей
+    # baseline — тестовые). Dev-контейнер не знает сервисов, регистрируемых только
+    # в тестах, и давал 5 ложных `symfonyContainer.serviceNotFound` на
+    # Monolog\Handler\TestHandler и тестовых фикстурах. Замер: переключение
+    # dev -> test снимает ровно эти 5 и не меняет ни одной другой категории
+    # (3530 -> 3525). Это НЕ значит, что test-контейнер — надмножество dev:
+    # config/services_test.yaml подменяет реализации и теги production-сервисов
+    # (OzonAccrualClientInterface -> фейк, WbFinanceReportConnector -> tags: [],
+    # свой lock factory). Равенство категорий говорит лишь о том, что на текущем
+    # наборе диагностик разницы нет.
+    # Принятый false negative: обращение из `src` к сервису, существующему только
+    # в test, здесь помечено не будет. Сегодня таких обращений нет, но гарантии,
+    # что динамический `$container->get()` поймают тесты, тоже нет — риск принят
+    # сознательно в обмен на снятие шума, который иначе остаётся в baseline
+    # навсегда. Строгая альтернатива — два прогона с разными контейнерами для
+    # `src` и `tests` — стоит вдвое дороже по времени CI.
+    symfony:
+        containerXmlPath: var/cache/test/App_KernelTestDebugContainer.xml
+
+    # Расширение phpstan-doctrine получает метадату 117 сущностей: `find()` даёт
+    # `?Entity` вместо `object`, QueryBuilder и DQL типизируются, а обращения к
+    # полям сущностей перестают быть `mixed`.
+    #
+    # Обратите внимание: оставшиеся `Access to an undefined property ...::$_em`
+    # в baseline — НЕ слепота анализатора, а реальный долг. В Doctrine ORM 3
+    # EntityRepository хранит менеджер в private `$em`; свойства `$_em` больше нет.
+    # Загрузчик поднимает Kernel в окружении `test` — том же, из которого взят
+    # контейнер выше, — но соединение с БД не открывает.
+    doctrine:
+        objectManagerLoader: tests/object-manager.php
 
     # Ratchet: как только ошибка из baseline починена, её строка протухает и
     # гейт краснеет, требуя убрать строку. Без этого baseline тихо гниёт.

@@ -48,14 +48,20 @@ site-cs-fix:
 # ===== СТАТИЧЕСКИЙ АНАЛИЗ =====
 # Гейт достижимо зелёный: существующие ошибки лежат в site/phpstan-baseline.neon,
 # новый код проверяется на level 8 сразу. COMPOSER_PROCESS_TIMEOUT=0 — холодный
-# прогон 2345 файлов не укладывается в дефолтные 300 с composer.
+# прогон 2344 анализируемых файлов не укладывается в дефолтные 300 с composer.
 
-site-stan:
+# Расширения phpstan-symfony и phpstan-doctrine читают скомпилированный контейнер
+# из var/cache/test. Прогрев — предусловие цели, а не отдельное знание в голове:
+# без него анализ падает, и это должно быть невозможно сделать случайно.
+site-stan-prepare:
+	$(DOCKER_COMPOSE) run --rm site-php-cli php bin/console cache:warmup --env=test
+
+site-stan: site-stan-prepare
 	$(DOCKER_COMPOSE) run --rm -e COMPOSER_PROCESS_TIMEOUT=0 site-php-cli composer stan   # Гейт: статический анализ типизации (PHPStan, level 8)
 
 # Baseline только сокращать. Перегенерация «начисто» стирает ratchet: регресс
 # перестаёт отличаться от унаследованного долга.
-site-stan-baseline:
+site-stan-baseline: site-stan-prepare
 	$(DOCKER_COMPOSE) run --rm -e COMPOSER_PROCESS_TIMEOUT=0 site-php-cli composer stan:baseline   # Перегенерация baseline PHPStan
 
 # ===== TESTS =====
