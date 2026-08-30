@@ -331,6 +331,29 @@ jobs:
             - name: 📦 Checkout repository
               uses: actions/checkout@v6
 
+            # Ratchet стоит первым шагом сознательно: рост baseline не требует ни
+            # образа, ни зависимостей, ни анализа, поэтому падает до них, а не
+            # после двух минут работы. Совсем «за секунды» не выйдет: job ждёт
+            # dev-image через needs — вынести проверку в отдельный job без этой
+            # зависимости можно, но ради экономии ~15 с плодить job не стали.
+            # Пропуск возможен только по явной метке в заголовке PR: молча
+            # вырасти baseline не может.
+            - name: 📉 Baseline не должен расти
+              if: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.title, '[baseline-grow]') }}
+              run: |
+                  BASE_SHA='${{ github.event.pull_request.base.sha }}'
+                  if ! git fetch --no-tags --depth=1 origin "$BASE_SHA"; then
+                      echo "::error::не удалось получить базу сравнения $BASE_SHA"
+                      exit 1
+                  fi
+                  if git cat-file -e "$BASE_SHA:site/phpstan-baseline.neon" 2>/dev/null; then
+                      git show "$BASE_SHA:site/phpstan-baseline.neon" > /tmp/baseline-base.neon
+                  else
+                      echo "В базе сравнения baseline ещё нет — проверка роста неприменима."
+                      : > /tmp/baseline-base.neon
+                  fi
+                  site/bin/phpstan-baseline-guard.sh /tmp/baseline-base.neon site/phpstan-baseline.neon
+
             - name: 🔐 Login to GHCR
               uses: docker/login-action@v4
               with:
@@ -363,7 +386,7 @@ jobs:
                     -e COMPOSER_HOME=/tmp/composer \
                     site-php-cli composer install --no-interaction --prefer-dist --no-progress --no-scripts
 
-            # Result cache PHPStan: холодный прогон 2344 файлов идёт минуты,
+            # Result cache PHPStan: холодный прогон 2347 файлов идёт минуты,
             # тёплый — секунды. Ключ включает baseline и конфиг: их правка
             # обязана инвалидировать кэш. XML контейнера в ключ не входит — его
             # хеширует само расширение (SymfonyContainerResultCacheMetaExtension),

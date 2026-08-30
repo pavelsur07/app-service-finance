@@ -5,8 +5,8 @@
 # уровне сразу. Baseline только сжимается — не перегенерируется «начисто» и не
 # удаляется, иначе регресс перестаёт отличаться от нормы.
 #
-# Фактический охват: 2345 из 2347 PHP-файлов src+tests. Два тестовых файла
-# исключены целиком — причина и план возврата в excludePaths ниже.
+# Фактический охват: 2347 из 2363 PHP-файлов src+tests. Исключены два
+# унаследованных теста и фикстуры правил — причины в excludePaths ниже.
 includes:
     - phpstan-baseline.neon
 
@@ -43,6 +43,10 @@ parameters:
         analyse:
             - tests/Integration/Marketplace/CloseMonthStageActionRollbackTest.php
             - tests/Unit/Marketplace/MessageHandler/RebuildPreliminaryForPeriodHandlerTest.php
+            # Фикстуры RepositoryCompanyScopeRuleTest: они нарушают правило
+            # намеренно. Под анализом их нарушение попало бы в baseline и
+            # выглядело бы как долг, а не как материал теста.
+            - tests/Unit/PHPStan/data
 
     # Расширение phpstan-symfony читает скомпилированный DI-контейнер: без него
     # `$container->get()`, аргументы контроллеров и Form/Request-типы остаются
@@ -87,6 +91,25 @@ parameters:
     phpat:
         show_rule_names: true
 
+    # Запреты из «Глобальных запретов» CLAUDE.md, которые до сих пор держались
+    # на внимании ревьюера. Замер до внедрения: ни одного вхождения в src+tests,
+    # поэтому гейт зелёный с первого дня и работает чистым ratchet'ом.
+    # `var_export()` не запрещаем: два его вызова в тесте собирают текст
+    # сообщения об ошибке — это не отладочный вывод.
+    disallowedFunctionCalls:
+        -
+            function:
+                - 'dump()'
+                - 'dd()'
+                - 'var_dump()'
+                - 'print_r()'
+            message: 'отладочный вывод не должен попадать в коммит (CLAUDE.md, «Глобальные запреты»)'
+        -
+            function:
+                - 'die()'
+                - 'exit()'
+            message: 'останов процесса вместо исключения: бросить доменное исключение (CLAUDE.md, «Обработка ошибок»)'
+
     # Ratchet: как только ошибка из baseline починена, её строка протухает и
     # гейт краснеет, требуя убрать строку. Без этого baseline тихо гниёт.
     reportUnmatchedIgnoredErrors: true
@@ -98,3 +121,11 @@ services:
         class: App\Tests\Architecture\ModuleBoundaryRules
         tags:
             - phpat.test
+
+    # Собственное правило: IDOR-пункт ревью становится машинной проверкой.
+    -
+        class: App\Tests\PHPStan\Rules\RepositoryCompanyScopeRule
+        arguments:
+            reflectionProvider: @reflectionProvider
+        tags:
+            - phpstan.rules.rule

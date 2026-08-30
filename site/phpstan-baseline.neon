@@ -73,15 +73,39 @@ parameters:
 			path: src/Ai/Entity/AiAgent.php
 
 		-
+			message: '#^Метод\-запрос App\\Ai\\Repository\\AiAgentRepository\:\:findEnabledByType\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Ai/Repository/AiAgentRepository.php
+
+		-
 			message: '#^Access to an undefined property App\\Ai\\Repository\\AiRunRepository\:\:\$_em\.$#'
 			identifier: property.notFound
 			count: 2
 			path: src/Ai/Repository/AiRunRepository.php
 
 		-
+			message: '#^Метод\-запрос App\\Ai\\Repository\\AiRunRepository\:\:findLatestForAgent\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Ai/Repository/AiRunRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Ai\\Repository\\AiRunRepository\:\:findLatestPendingRunForAgent\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Ai/Repository/AiRunRepository.php
+
+		-
 			message: '#^Access to an undefined property App\\Ai\\Repository\\AiSuggestionRepository\:\:\$_em\.$#'
 			identifier: property.notFound
 			count: 2
+			path: src/Ai/Repository/AiSuggestionRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Ai\\Repository\\AiSuggestionRepository\:\:countForRun\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
 			path: src/Ai/Repository/AiSuggestionRepository.php
 
 		-
@@ -519,6 +543,18 @@ parameters:
 		-
 			message: '#^Class App\\Billing\\Repository\\SubscriptionIntegrationRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
 			identifier: missingType.generics
+			count: 1
+			path: src/Billing/Repository/SubscriptionIntegrationRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Billing\\Repository\\SubscriptionIntegrationRepository\:\:findActiveForSubscription\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Billing/Repository/SubscriptionIntegrationRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Billing\\Repository\\SubscriptionIntegrationRepository\:\:isIntegrationEnabled\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
 			count: 1
 			path: src/Billing/Repository/SubscriptionIntegrationRepository.php
 
@@ -1411,10 +1447,22 @@ parameters:
 			path: src/Cash/Repository/Accounts/MoneyFundMovementRepository.php
 
 		-
+			message: '#^Метод\-запрос App\\Cash\\Repository\\Bank\\BankConnectionRepository\:\:findActiveByBankCode\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Cash/Repository/Bank/BankConnectionRepository.php
+
+		-
 			message: '#^Method App\\Cash\\Repository\\Import\\ImportLogRepository\:\:paginateByCompany\(\) return type with generic class Pagerfanta\\Pagerfanta does not specify its types\: T$#'
 			identifier: missingType.generics
 			count: 1
 			path: src/Cash/Repository/Import/ImportLogRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Cash\\Repository\\PaymentPlan\\PaymentPlanMatchRepository\:\:findOneByTransaction\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Cash/Repository/PaymentPlan/PaymentPlanMatchRepository.php
 
 		-
 			message: '#^Class App\\Cash\\Repository\\PaymentPlan\\PaymentPlanRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
@@ -1423,10 +1471,22 @@ parameters:
 			path: src/Cash/Repository/PaymentPlan/PaymentPlanRepository.php
 
 		-
+			message: '#^Метод\-запрос App\\Cash\\Repository\\PaymentPlan\\PaymentPlanRepository\:\:findTemplateForRecurrenceRule\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Cash/Repository/PaymentPlan/PaymentPlanRepository.php
+
+		-
 			message: '#^Class App\\Cash\\Repository\\PaymentPlan\\PaymentRecurrenceRuleRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
 			identifier: missingType.generics
 			count: 1
 			path: src/Cash/Repository/PaymentPlan/PaymentRecurrenceRuleRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Cash\\Repository\\Transaction\\CashTransactionAutoRuleRepository\:\:findActiveGeneralProjectTargetsWithoutCfo\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Cash/Repository/Transaction/CashTransactionAutoRuleRepository.php
 
 		-
 			message: '#^Class App\\Cash\\Repository\\Transaction\\CashTransactionRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
@@ -2215,6 +2275,12 @@ parameters:
 			path: src/Catalog/Form/ProductType.php
 
 		-
+			message: '#^Метод\-запрос App\\Catalog\\Infrastructure\\ProductRepository\:\:paginateForCompany\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Catalog/Infrastructure/ProductRepository.php
+
+		-
 			message: '#^Method App\\Catalog\\Infrastructure\\Query\\ProductPurchasePriceQuery\:\:findPriceAtDate\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -2237,6 +2303,24 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: src/Catalog/Infrastructure/Query/ProductQuery.php
+
+		-
+			message: '#^Метод\-запрос App\\Catalog\\Infrastructure\\Repository\\ProductBarcodeRepository\:\:findByProduct\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Catalog/Infrastructure/Repository/ProductBarcodeRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Catalog\\Infrastructure\\Repository\\ProductImportRepository\:\:findById\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Catalog/Infrastructure/Repository/ProductImportRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Catalog\\Infrastructure\\Repository\\ProductImportRepository\:\:getByIdOrFail\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Catalog/Infrastructure/Repository/ProductImportRepository.php
 
 		-
 			message: '#^Method App\\Catalog\\Infrastructure\\XlsProductRowParser\:\:cellNumericAsString\(\) has parameter \$cells with no value type specified in iterable type array\.$#'
@@ -2743,8 +2827,50 @@ parameters:
 			path: src/Company/Infrastructure/Repository/CompanyRepository.php
 
 		-
+			message: '#^Метод\-запрос App\\Company\\Repository\\CompanyInviteRepository\:\:countByAccessRole\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Company/Repository/CompanyInviteRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Company\\Repository\\CompanyInviteRepository\:\:countPendingByAccessRole\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Company/Repository/CompanyInviteRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Company\\Repository\\CompanyInviteRepository\:\:findOneByTokenHash\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Company/Repository/CompanyInviteRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Company\\Repository\\CompanyMemberRepository\:\:countByAccessRole\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Company/Repository/CompanyMemberRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Company\\Repository\\CompanyMemberRepository\:\:findActiveByUserId\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Company/Repository/CompanyMemberRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Company\\Repository\\CompanyMemberRepository\:\:findFirstActiveCompanyForUser\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Company/Repository/CompanyMemberRepository.php
+
+		-
 			message: '#^Method App\\Company\\Repository\\CounterpartyRepository\:\:findByFilters\(\) has parameter \$sort with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
+			count: 1
+			path: src/Company/Repository/CounterpartyRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Company\\Repository\\CounterpartyRepository\:\:findAllForBackfill\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
 			count: 1
 			path: src/Company/Repository/CounterpartyRepository.php
 
@@ -2771,6 +2897,12 @@ parameters:
 			identifier: return.type
 			count: 1
 			path: src/Company/Repository/ProjectDirectionRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Company\\Repository\\ReportApiKeyRepository\:\:findActiveByPrefix\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Company/Repository/ReportApiKeyRepository.php
 
 		-
 			message: '#^Strict comparison using \=\=\= between null and App\\Company\\Security\\AccessLevel\:\:READ\|App\\Company\\Security\\AccessLevel\:\:WRITE will always evaluate to false\.$#'
@@ -3883,6 +4015,12 @@ parameters:
 			path: src/Finance/Repository/DocumentRepository.php
 
 		-
+			message: '#^Метод\-запрос App\\Finance\\Repository\\DocumentRepository\:\:findByCompany\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Finance/Repository/DocumentRepository.php
+
+		-
 			message: '#^Class App\\Finance\\Repository\\PLCategoryRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
 			identifier: missingType.generics
 			count: 1
@@ -3910,6 +4048,12 @@ parameters:
 			message: '#^Unreachable statement \- code above always terminates\.$#'
 			identifier: deadCode.unreachable
 			count: 2
+			path: src/Finance/Repository/PLDailyTotalRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Finance\\Repository\\PLDailyTotalRepository\:\:maxUpdatedAtGlobal\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
 			path: src/Finance/Repository/PLDailyTotalRepository.php
 
 		-
@@ -4273,6 +4417,12 @@ parameters:
 			path: src/Ingestion/Infrastructure/Query/ReconciliationQuery.php
 
 		-
+			message: '#^Метод\-запрос App\\Ingestion\\Repository\\IngestRawRecordRepository\:\:findStuckPending\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Ingestion/Repository/IngestRawRecordRepository.php
+
+		-
 			message: '#^Method App\\Inventory\\Application\\NormalizeInventorySnapshotAction\:\:findOrCreateLocation\(\) should return App\\Inventory\\Entity\\Location but returns object\.$#'
 			identifier: return.type
 			count: 1
@@ -4433,6 +4583,30 @@ parameters:
 			identifier: missingType.generics
 			count: 1
 			path: src/Loan/Form/LoanType.php
+
+		-
+			message: '#^Метод\-запрос App\\Loan\\Repository\\LoanPaymentScheduleRepository\:\:findByLoanOrderedByDueDate\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Loan/Repository/LoanPaymentScheduleRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Loan\\Repository\\LoanPaymentScheduleRepository\:\:findNextPaymentForLoan\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Loan/Repository/LoanPaymentScheduleRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Loan\\Repository\\LoanPaymentScheduleRepository\:\:findUnpaidByLoan\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Loan/Repository/LoanPaymentScheduleRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Loan\\Repository\\LoanPaymentScheduleRepository\:\:sumInterestForLoanAndPeriod\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Loan/Repository/LoanPaymentScheduleRepository.php
 
 		-
 			message: '#^Anonymous function has an unused use \$blocked\.$#'
@@ -7267,6 +7441,18 @@ parameters:
 			path: src/Marketplace/MessageHandler/TriggerInitialSyncHandler.php
 
 		-
+			message: '#^Метод\-запрос App\\Marketplace\\Repository\\MappingErrorRepository\:\:findAllWithCompanyInfo\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Marketplace/Repository/MappingErrorRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Marketplace\\Repository\\MappingErrorRepository\:\:findUnresolvedWithCompanyInfo\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Marketplace/Repository/MappingErrorRepository.php
+
+		-
 			message: '#^Class App\\Marketplace\\Repository\\MarketplaceAdvertisingCostRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
 			identifier: missingType.generics
 			count: 1
@@ -7369,6 +7555,12 @@ parameters:
 			path: src/Marketplace/Repository/MarketplaceCostRepository.php
 
 		-
+			message: '#^Метод\-запрос App\\Marketplace\\Repository\\MarketplaceCostRepository\:\:findByProduct\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Marketplace/Repository/MarketplaceCostRepository.php
+
+		-
 			message: '#^Class App\\Marketplace\\Repository\\MarketplaceFinancialReportSyncErrorRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
 			identifier: missingType.generics
 			count: 1
@@ -7395,6 +7587,30 @@ parameters:
 		-
 			message: '#^Class App\\Marketplace\\Repository\\MarketplaceListingRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
 			identifier: missingType.generics
+			count: 1
+			path: src/Marketplace/Repository/MarketplaceListingRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Marketplace\\Repository\\MarketplaceListingRepository\:\:findByMarketplaceSku\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Marketplace/Repository/MarketplaceListingRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Marketplace\\Repository\\MarketplaceListingRepository\:\:findByMarketplaceVariantId\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Marketplace/Repository/MarketplaceListingRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Marketplace\\Repository\\MarketplaceListingRepository\:\:findByProduct\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Marketplace/Repository/MarketplaceListingRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Marketplace\\Repository\\MarketplaceListingRepository\:\:findBySupplierSku\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
 			count: 1
 			path: src/Marketplace/Repository/MarketplaceListingRepository.php
 
@@ -7465,6 +7681,12 @@ parameters:
 			path: src/Marketplace/Repository/MarketplaceRawDocumentRepository.php
 
 		-
+			message: '#^Метод\-запрос App\\Marketplace\\Repository\\MarketplaceRawDocumentRepository\:\:findDocsWithCrossCompanyCosts\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Marketplace/Repository/MarketplaceRawDocumentRepository.php
+
+		-
 			message: '#^Class App\\Marketplace\\Repository\\MarketplaceRawProcessingRunRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
 			identifier: missingType.generics
 			count: 1
@@ -7489,6 +7711,12 @@ parameters:
 			path: src/Marketplace/Repository/MarketplaceReturnRepository.php
 
 		-
+			message: '#^Метод\-запрос App\\Marketplace\\Repository\\MarketplaceReturnRepository\:\:findByProduct\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Marketplace/Repository/MarketplaceReturnRepository.php
+
+		-
 			message: '#^Class App\\Marketplace\\Repository\\MarketplaceSaleMappingRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
 			identifier: missingType.generics
 			count: 1
@@ -7503,6 +7731,12 @@ parameters:
 		-
 			message: '#^Method App\\Marketplace\\Repository\\MarketplaceSaleRepository\:\:findForCostRecalculation\(\) has parameter \$listingIds with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
+			count: 1
+			path: src/Marketplace/Repository/MarketplaceSaleRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Marketplace\\Repository\\MarketplaceSaleRepository\:\:findByProduct\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
 			count: 1
 			path: src/Marketplace/Repository/MarketplaceSaleRepository.php
 
@@ -7527,6 +7761,36 @@ parameters:
 		-
 			message: '#^Method App\\Marketplace\\Repository\\ReconciliationLogRepository\:\:getChecksSummary\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
+			count: 1
+			path: src/Marketplace/Repository/ReconciliationLogRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Marketplace\\Repository\\ReconciliationLogRepository\:\:areAllChecksPassed\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Marketplace/Repository/ReconciliationLogRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Marketplace\\Repository\\ReconciliationLogRepository\:\:findByBatch\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Marketplace/Repository/ReconciliationLogRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Marketplace\\Repository\\ReconciliationLogRepository\:\:findFailedByBatch\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Marketplace/Repository/ReconciliationLogRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Marketplace\\Repository\\ReconciliationLogRepository\:\:findLatestByType\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/Marketplace/Repository/ReconciliationLogRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Marketplace\\Repository\\ReconciliationLogRepository\:\:getChecksSummary\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
 			count: 1
 			path: src/Marketplace/Repository/ReconciliationLogRepository.php
 
@@ -8065,6 +8329,18 @@ parameters:
 			path: src/MarketplaceAds/Repository/AdLoadJobRepository.php
 
 		-
+			message: '#^Метод\-запрос App\\MarketplaceAds\\Repository\\AdLoadJobRepository\:\:find\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/MarketplaceAds/Repository/AdLoadJobRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\MarketplaceAds\\Repository\\AdLoadJobRepository\:\:findAllRunning\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/MarketplaceAds/Repository/AdLoadJobRepository.php
+
+		-
 			message: '#^Class App\\MarketplaceAds\\Repository\\AdRawDocumentRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
 			identifier: missingType.generics
 			count: 1
@@ -8089,6 +8365,12 @@ parameters:
 			path: src/MarketplaceAds/Repository/AdRawDocumentRepository.php
 
 		-
+			message: '#^Метод\-запрос App\\MarketplaceAds\\Repository\\AdRawDocumentRepository\:\:streamByFilters\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/MarketplaceAds/Repository/AdRawDocumentRepository.php
+
+		-
 			message: '#^Class App\\MarketplaceAds\\Repository\\AdScheduledBatchRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
 			identifier: missingType.generics
 			count: 1
@@ -8097,6 +8379,18 @@ parameters:
 		-
 			message: '#^Method App\\MarketplaceAds\\Repository\\AdScheduledBatchRepository\:\:findByIdAndCompany\(\) should return App\\MarketplaceAds\\Entity\\AdScheduledBatch\|null but returns object\|null\.$#'
 			identifier: return.type
+			count: 1
+			path: src/MarketplaceAds/Repository/AdScheduledBatchRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\MarketplaceAds\\Repository\\AdScheduledBatchRepository\:\:findAllInFlight\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
+			count: 1
+			path: src/MarketplaceAds/Repository/AdScheduledBatchRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\MarketplaceAds\\Repository\\AdScheduledBatchRepository\:\:findNextPlanned\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
 			count: 1
 			path: src/MarketplaceAds/Repository/AdScheduledBatchRepository.php
 
@@ -8115,6 +8409,12 @@ parameters:
 		-
 			message: '#^Method App\\MarketplaceAds\\Repository\\OzonAdPendingReportRepository\:\:findByOzonUuid\(\) should return App\\MarketplaceAds\\Entity\\OzonAdPendingReport\|null but returns object\|null\.$#'
 			identifier: return.type
+			count: 1
+			path: src/MarketplaceAds/Repository/OzonAdPendingReportRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\MarketplaceAds\\Repository\\OzonAdPendingReportRepository\:\:findCompanyIdsWithDueReports\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
 			count: 1
 			path: src/MarketplaceAds/Repository/OzonAdPendingReportRepository.php
 
@@ -9183,6 +9483,12 @@ parameters:
 		-
 			message: '#^Method App\\Telegram\\Repository\\BotLinkRepository\:\:findByCompany\(\) should return array\<App\\Telegram\\Entity\\BotLink\> but returns list\<object\>\.$#'
 			identifier: return.type
+			count: 1
+			path: src/Telegram/Repository/BotLinkRepository.php
+
+		-
+			message: '#^Метод\-запрос App\\Telegram\\Repository\\BotLinkRepository\:\:findOneByTokenForUpdate\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
+			identifier: vashfindir.repositoryCompanyScope
 			count: 1
 			path: src/Telegram/Repository/BotLinkRepository.php
 
