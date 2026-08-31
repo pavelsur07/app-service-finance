@@ -66,6 +66,12 @@ site-stan-baseline: site-stan-prepare
 
 # ===== TESTS =====
 
+.PHONY: test-provision-vf-prod-deploy
+
+# Локальный security-тест owner-run provisioner; production не вызывается.
+test-provision-vf-prod-deploy:
+	bash tests/shell/provision-vf-prod-deploy-test.sh
+
 site-test-telegram:
 	$(DOCKER_COMPOSE) run --rm site-php-cli composer test:smoke
 

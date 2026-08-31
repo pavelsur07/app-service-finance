@@ -1087,6 +1087,15 @@ Allowed production wrappers:
 `sudo /usr/local/bin/codex-psql-ro`
 `sudo /usr/local/bin/codex-console <allowed-symfony-command> ...`
 
+Human operator diagnostics are separate from Codex access. The `deploy` account
+may be provisioned by the owner with a source-restricted SSH key and exactly one
+NOPASSWD entry for the root-owned `/usr/local/bin/deploy-diagnostics` wrapper.
+That wrapper may expose only validated `ps`, `images`, bounded `logs`, and a
+single-statement `psql -c` path delegated to `codex-psql-ro`. The account must
+not belong to `docker`, `sudo`, or `wheel`, and the wrapper must not expose
+Docker exec/inspect/run/cp, container mutation, arbitrary sudo, or write-capable
+SQL. Codex must not use the `deploy` account or this human-operator wrapper.
+
 Read-only production checks may be run after the owner asks for a production check:
 Docker process/status checks through `codex-docker-ps`.
 Messenger queue stats through `codex-console messenger:stats`.
