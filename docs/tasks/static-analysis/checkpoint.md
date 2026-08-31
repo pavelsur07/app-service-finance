@@ -1,7 +1,7 @@
 ## Current checkpoint
 
-**Phase:** Stage 4 — Release Gate
-**Status:** done
+**Phase:** ЗАДАЧА ЗАВЕРШЕНА — смёржена и выкачена на production
+**Status:** closed
 **Stage base commit:** `cf1ef467cda672362086e7738ba8deb822485346`
 **Current Work item:** none — 4.1…4.4 завершены
 **Owner gate:** yes
@@ -79,12 +79,28 @@ PHPat: границы модулей и заморозка легаси-зоны
   ограничения названы прямо в докблоке правила и в CLAUDE.md
 - unresolved findings: нет
 
-### Exact next action
-Решение Владельца после закрытия Stage 4.
+### Итог
+Все четыре Stage смёржены в `master` через PR #2386 (мерж-коммит `7962d9e9`)
+и выкачены на production: job `deploy` — success, `🔬 Static analysis` на
+`master` отработал зелёным с первого прогона.
 
-Коммит Stage 4 выполнен pathspec'ом; посторонние staged-файлы Владельца
-(`docs/tasks/ui-dashboard/**`, `docs/tasks/ui-pnl/**`) остались в индексе
-нетронутыми — проверено `git show --stat HEAD` и `git status --short`.
+Ветка `chore/phpstan-static-analysis` удалена локально и на `origin` после
+проверки по чек-листу `AGENTS.md`: PR `MERGED` с базой `master`, мерж-коммит —
+предок свежего `origin/master`, живой тип ветки совпадал с `headRefOid`.
+
+На `master` включена защита ветки; обязательны `🔬 Static analysis`,
+`🎨 PHP code style`, `🧪 Unit tests`. Integration и functional обязательными
+сделать нельзя, пока они в матрице — механика ловушки описана в `CLAUDE.md`
+и вынесена в issue #2393.
+
+Оставшийся долг заведён в issue: #2389 (call-site правило, 84 вызова),
+#2390 (51 метод-запрос без companyId), #2391 (118 нарушений границ),
+#2394 (Facade и ужесточение правила), #2395 (`#[ManyToOne]` и циклы),
+#2396 (`doctrine.columnType` и два теста в excludePaths),
+#2397 (долг типизации через Rector).
+
+### Exact next action
+Ничего. Задача закрыта; продолжение — по issue выше.
 
 ### Интеграция с master после merge PR #2387
 `master` получил исправление двух багов, найденных этим анализом. Ветка слита с

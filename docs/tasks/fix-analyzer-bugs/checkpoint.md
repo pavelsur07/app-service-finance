@@ -1,7 +1,7 @@
 ## Current checkpoint
 
-**Phase:** Stage 1 — Release Gate
-**Status:** done
+**Phase:** ЗАДАЧА ЗАВЕРШЕНА — смёржена и выкачена на production
+**Status:** closed
 **Stage base commit:** `015d92e088b71050a8b89fc6d26fb8b2f64b3caf`
 **Current Work item:** none — 1.1…1.4 завершены
 **Owner gate:** yes
@@ -39,11 +39,23 @@
   ветке сокращения baseline; исправлен критерий, а не отметка
 - unresolved findings: нет
 
+### Итог
+Смёржено в `master` через PR #2387 (мерж-коммит `9d3f2d9b`) и выкачено на
+production: job `deploy` — success.
+
+Порядок слияния отработал как планировалось. Этот PR ушёл первым, после чего
+в ветке анализатора три подавления протухли и были сняты пересборкой baseline:
+**3694 → 3689** ошибок, **2518 → 2515** записей. Guard роста сокращение
+пропустил, как и должен.
+
+Ветка `fix/ai-repository-em-and-role-id` удалена локально и на `origin` после
+проверки по чек-листу `AGENTS.md`.
+
+Незакрытый FOLLOW-UP — вынос `flush()` из репозиториев в Action — заведён
+в issue #2392.
+
 ### Exact next action
-Решение Владельца о merge. Порядок имеет значение: если первым мержится этот PR,
-то в PR #2386 нужно выполнить `make site-stan-baseline` — три записи протухнут,
-baseline сократится на 5 ошибок. Guard роста при этом не сработает: он
-запрещает рост, а не сокращение.
+Ничего. Задача закрыта.
 
 ### Files to inspect first on resume
 - `docs/tasks/fix-analyzer-bugs/stages/stage-1.md`, раздел «Взаимодействие с PR #2386»
