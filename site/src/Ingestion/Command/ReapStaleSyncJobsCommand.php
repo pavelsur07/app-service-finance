@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Ingestion\Command;
 
+use App\Ingestion\Enum\SyncJobStatus;
 use App\Ingestion\Repository\SyncJobRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -68,8 +69,17 @@ final class ReapStaleSyncJobsCommand extends Command
         }
 
         try {
-            $hours = max(1, (int) $input->getOption('older-than-hours'));
-            $limit = max(1, (int) $input->getOption('limit'));
+            // Строго, а не max(1, (int) ...): опечатка вроде `abc` или `0`
+            // молча уменьшила бы защитный порог до часа и оборвала бы живые
+            // задачи. Тихое ослабление защиты хуже отказа.
+            $hours = $this->positiveInt($input->getOption('older-than-hours'));
+            $limit = $this->positiveInt($input->getOption('limit'));
+            if (null === $hours || null === $limit) {
+                $output->writeln('older-than-hours and limit must be positive integers.');
+
+                return self::INVALID;
+            }
+
             $dryRun = (bool) $input->getOption('dry-run');
 
             $olderThan = new \DateTimeImmutable(sprintf('-%d hours', $hours));
@@ -83,21 +93,37 @@ final class ReapStaleSyncJobsCommand extends Command
                 return self::SUCCESS;
             }
 
+            $reaped = [];
             foreach ($jobs as $job) {
-                $job->markFailed('stale_no_progress');
+                // Машина состояний запрещает OPEN -> FAILED. Задача, которую
+                // так и не взял воркер, не падала — её некому было выполнить,
+                // поэтому CANCELLED. Это не обход правила, а его соблюдение.
+                if (SyncJobStatus::OPEN === $job->getStatus()) {
+                    $job->markCancelled('stale_never_started');
+                } else {
+                    $job->markFailed('stale_no_progress');
+                }
 
+                $reaped[] = $job;
+            }
+
+            $this->entityManager->flush();
+
+            foreach ($reaped as $job) {
+                // Логируем ПОСЛЕ flush: иначе при ошибке БД журнал утверждал бы,
+                // что задача убрана, хотя изменение не сохранилось.
+                //
                 // Класс проблемы, а не инцидент конкретного прогона: воркер мог
                 // быть убит штатно при деплое. Поэтому warning, а не error.
                 $this->logger->warning('Ingestion sync job reaped as stale.', [
                     'companyId' => $job->getCompanyId(),
                     'jobId' => $job->getId(),
+                    'status' => $job->getStatus()->value,
                     'source' => $job->getSource()->value,
                     'resourceType' => $job->getResourceType(),
                     'shopRef' => $job->getShopRef(),
                 ]);
             }
-
-            $this->entityManager->flush();
 
             $output->writeln(sprintf('reaped: %d', count($jobs)));
             $output->writeln('finish');
@@ -106,5 +132,19 @@ final class ReapStaleSyncJobsCommand extends Command
         } finally {
             $this->release();
         }
+    }
+
+    private function positiveInt(mixed $value): ?int
+    {
+        if (!is_string($value) && !is_int($value)) {
+            return null;
+        }
+
+        $raw = trim((string) $value);
+        if (1 !== preg_match('/^[1-9]\d*$/', $raw)) {
+            return null;
+        }
+
+        return (int) $raw;
     }
 }

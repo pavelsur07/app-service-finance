@@ -9,6 +9,7 @@ use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\SyncJobKind;
 use App\Ingestion\Enum\SyncJobStatus;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
@@ -72,6 +73,50 @@ final class ReapStaleSyncJobsCommandTest extends IntegrationTestCase
         $this->makeTester()->execute(['--older-than-hours' => '6']);
 
         self::assertSame('completed', $this->statusOf($job));
+    }
+
+    /**
+     * Машина состояний запрещает переход OPEN → FAILED
+     * (SyncJobStatus::canTransitionTo). Задача, которая так и не была взята
+     * воркером, обязана уйти в CANCELLED: она не падала, её просто некому было
+     * выполнить. Прежний тест на OPEN шёл под --dry-run и до перехода не
+     * доходил, поэтому дефект не ловился.
+     */
+    public function testStaleOpenJobIsCancelledBecauseItNeverStarted(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $job = $this->seedJob($companyId, SyncJobStatus::OPEN, new \DateTimeImmutable('-10 hours'));
+
+        $tester = $this->makeTester();
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['--older-than-hours' => '6']));
+        self::assertSame('cancelled', $this->statusOf($job));
+    }
+
+    /**
+     * Опечатка в пороге не должна молча ослаблять защиту: `abc` и `0`
+     * превращались в 1 час и обрывали бы живые задачи.
+     */
+    #[DataProvider('invalidThresholds')]
+    public function testInvalidThresholdIsRejectedInsteadOfSilentlyBecomingOne(string $value): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $job = $this->seedJob($companyId, SyncJobStatus::RUNNING, new \DateTimeImmutable('-2 hours'));
+
+        $tester = $this->makeTester();
+
+        self::assertSame(Command::INVALID, $tester->execute(['--older-than-hours' => $value]));
+        self::assertSame('running', $this->statusOf($job));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function invalidThresholds(): iterable
+    {
+        yield 'не число' => ['abc'];
+        yield 'ноль' => ['0'];
+        yield 'отрицательное' => ['-3'];
     }
 
     private function statusOf(string $jobId): string

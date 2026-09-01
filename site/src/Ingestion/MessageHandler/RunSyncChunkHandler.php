@@ -136,6 +136,16 @@ final readonly class RunSyncChunkHandler
                 } elseif ($result->hasMore) {
                     throw new \RuntimeException('Ingestion connector returned hasMore without next cursor.');
                 }
+
+                // Отметка живости на границе итерации.
+                //
+                // Уборщик зависших задач (app:ingestion:reap-stale-jobs) считает
+                // признаком отсутствия движения updatedAt, а тот менялся только
+                // при смене статуса — то есть один раз на старте. Многочасовой
+                // backfill без этой строки выглядел бы зависшим и был бы убран
+                // на живом ходу.
+                $job->heartbeat();
+                $this->entityManager->flush();
             } while ($result->hasMore);
 
             $this->syncFacade->markJobCompleted(new MarkJobCompletedCommand($job->getId(), $job->getCompanyId()));

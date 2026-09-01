@@ -137,6 +137,19 @@ class SyncJob implements TenantOwnedInterface
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /**
+     * Отметка живости для долгих прогонов.
+     *
+     * Уборщик зависших задач считает признаком отсутствия движения `updatedAt`,
+     * но во время цикла по страницам он не менялся: статус ставится один раз
+     * на старте. Живой многочасовой backfill выглядел бы зависшим. Вызывается
+     * на границе каждой итерации и делает `updatedAt` тем, чем его считают.
+     */
+    public function heartbeat(): void
+    {
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
     public function markCompleted(?\DateTimeImmutable $finishedAt = null): void
     {
         $this->transitionTo(SyncJobStatus::COMPLETED);
