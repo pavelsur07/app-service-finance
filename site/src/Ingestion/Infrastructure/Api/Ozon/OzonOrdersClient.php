@@ -66,6 +66,8 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
             $body['translit'] = true;
         }
 
+        $startedAt = microtime(true);
+
         try {
             $response = $this->httpClient->request('POST', self::BASE_URL.$endpoint, [
                 'headers' => [
@@ -84,11 +86,16 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
             throw new ConnectorTransientException(sprintf('Ozon orders transport error for %s.', $endpoint), 0, $exception);
         }
 
+        // Метод, эндпоинт, статус и длительность — обязательный минимум для
+        // внешнего HTTP. Тело ответа не логируется никогда: в заказах есть
+        // адреса доставки и данные покупателей.
         $this->logger->info('Ozon orders page fetched.', [
             'companyId' => $companyId,
             'connectionRef' => $connectionRef,
+            'method' => 'POST',
             'endpoint' => $endpoint,
             'statusCode' => $statusCode,
+            'durationMs' => (int) round((microtime(true) - $startedAt) * 1000),
             'offset' => $offset,
         ]);
 
@@ -130,8 +137,18 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
                 throw new MalformedConnectorResponseException(sprintf('Ozon orders response has no result.postings for %s.', $endpoint));
             }
 
-            $rows = array_values(array_filter($result['postings'], 'is_array'));
-            $hasNext = (bool) ($result['has_next'] ?? false);
+            $rows = $this->postingRows($result['postings'], $endpoint);
+
+            // has_next обязан быть булевым.
+            //
+            // Отсутствующий ключ раньше молча означал `false` и обрывал
+            // пагинацию на первой странице, а строка "false" приводилась к
+            // true и давала лишний круг. Оба случая — испорченный ответ, и
+            // молчать о нём нельзя: пропуск страниц не виден никак.
+            $hasNext = $result['has_next'] ?? null;
+            if (!is_bool($hasNext)) {
+                throw new MalformedConnectorResponseException(sprintf('Ozon orders response has non-boolean result.has_next for %s.', $endpoint));
+            }
 
             return new OzonRawPage($rows, $hasNext, null, []);
         }
@@ -140,12 +157,35 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
             throw new MalformedConnectorResponseException(sprintf('Ozon orders response has no result array for %s.', $endpoint));
         }
 
-        $rows = array_values(array_filter($result, 'is_array'));
+        $rows = $this->postingRows($result, $endpoint);
 
         // FBO не отдаёт has_next: полная страница означает «возможно, есть
         // ещё». Ценой одного лишнего запроса на ровно кратном объёме это
         // честнее, чем гадать.
+        //
+        // Именно поэтому отбрасывать элементы здесь нельзя: выброшенный
+        // элемент уменьшил бы счётчик, страница перестала бы считаться полной
+        // и обход закончился бы раньше времени — молча и с потерей заказов.
         return new OzonRawPage($rows, count($rows) >= $limit, null, []);
+    }
+
+    /**
+     * @param array<array-key, mixed> $rows
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function postingRows(array $rows, string $endpoint): array
+    {
+        $result = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                throw new MalformedConnectorResponseException(sprintf('Ozon orders response contains a non-object posting for %s.', $endpoint));
+            }
+
+            $result[] = $row;
+        }
+
+        return $result;
     }
 
     /**

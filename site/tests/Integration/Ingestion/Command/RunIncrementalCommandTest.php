@@ -322,9 +322,11 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
         $tester = $this->tester('app:ingestion:run-incremental');
         $exit = $tester->execute(['--resource' => 'ozon_orders_typo']);
 
-        // Опечатка в cron-строке не должна тихо превращаться в полный обход
-        // всех ресурсов: пустой отбор — это ноль задач, а не «фильтра нет».
-        self::assertSame(Command::SUCCESS, $exit);
+        // Опечатка в cron-строке обязана быть громкой. Крон запускается с
+        // --quiet: тихий SUCCESS означал бы, что ресурс перестал грузиться,
+        // а задание продолжает отчитываться успехом.
+        self::assertSame(Command::INVALID, $exit);
+        self::assertStringContainsString('Unknown --resource', $tester->getDisplay());
         self::assertSame(0, $this->incrementalJobCount($company->getId()));
         self::assertCount(0, $transport->getSent());
     }

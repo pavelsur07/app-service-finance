@@ -26,7 +26,11 @@ use Webmozart\Assert\Assert;
  */
 #[ORM\Entity(repositoryClass: IngestOrderRepository::class)]
 #[ORM\Table(name: 'ingest_orders')]
-#[ORM\UniqueConstraint(name: 'uniq_ingest_order_external', columns: ['company_id', 'source', 'external_id'])]
+// connection_ref входит в ключ: posting_number уникален в пределах кабинета
+// продавца, а не глобально. Без него два кабинета Ozon одной компании слились
+// бы в одну запись, и статусы с позициями одного подключения затирали бы
+// другое.
+#[ORM\UniqueConstraint(name: 'uniq_ingest_order_external', columns: ['company_id', 'source', 'connection_ref', 'external_id'])]
 #[ORM\Index(name: 'idx_ingest_order_company_status_ordered', columns: ['company_id', 'status', 'ordered_at'])]
 #[ORM\Index(name: 'idx_ingest_order_company_connection', columns: ['company_id', 'connection_ref'])]
 class IngestOrder implements TenantOwnedInterface

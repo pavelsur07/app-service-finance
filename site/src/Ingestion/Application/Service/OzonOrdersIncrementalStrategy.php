@@ -22,9 +22,14 @@ final readonly class OzonOrdersIncrementalStrategy extends AbstractHourlyCursorI
         private EnsureOrdersCursorAction $ensureCursorAction,
         private string $resourceType,
         ClockInterface $clock,
-        int $minIntervalMinutes = 60,
+        ?int $minIntervalMinutes = null,
     ) {
-        parent::__construct($clock, $minIntervalMinutes);
+        // Значение по умолчанию задаёт база: порог связан с периодом крона,
+        // а не со схемой Ozon, и дублировать здесь число значило бы завести
+        // второе место, где он расходится с расписанием.
+        null === $minIntervalMinutes
+            ? parent::__construct($clock)
+            : parent::__construct($clock, $minIntervalMinutes);
     }
 
     public function source(): IngestSource

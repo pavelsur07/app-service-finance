@@ -48,6 +48,38 @@ final class IngestOrderStatusEventRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
     }
 
+    /**
+     * Уже зафиксировано ли ЭТО наблюдение.
+     *
+     * Ключ — сырьё плюс сырой статус, а не «текущий статус заказа». Повторная
+     * нормализация старого raw снова видит расхождение с текущим статусом
+     * (устаревшее наблюдение его не двигает) и без этой проверки дописывала бы
+     * копию события при каждом прогоне.
+     */
+    public function existsObservation(
+        string $companyId,
+        string $orderId,
+        ?string $rawRecordId,
+        string $rawStatus,
+    ): bool {
+        if (null === $rawRecordId) {
+            return false;
+        }
+
+        $qb = $this->createQueryBuilder('e')
+            ->select('COUNT(e.id)')
+            ->andWhere('e.companyId = :companyId')
+            ->andWhere('e.orderId = :orderId')
+            ->andWhere('e.rawRecordId = :rawRecordId')
+            ->andWhere('e.rawStatus = :rawStatus')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('orderId', $orderId)
+            ->setParameter('rawRecordId', $rawRecordId)
+            ->setParameter('rawStatus', $rawStatus);
+
+        return (int) $qb->getQuery()->getSingleScalarResult() > 0;
+    }
+
     public function save(IngestOrderStatusEvent $event): void
     {
         $this->getEntityManager()->persist($event);

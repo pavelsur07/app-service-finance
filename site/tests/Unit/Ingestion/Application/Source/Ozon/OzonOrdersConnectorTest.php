@@ -108,7 +108,7 @@ final class OzonOrdersConnectorTest extends TestCase
         $result = $this->connector->pull($this->request('{"since":"2026-09-01T10:00:00+00:00"}'));
 
         self::assertNotNull($result->rawBatch);
-        self::assertSame('fbo:window-2026-09-01T09-2026-09-01T12', $result->rawBatch->externalId);
+        self::assertSame('fbo:window-2026-09-01T09-2026-09-01T12:offset-0', $result->rawBatch->externalId);
     }
 
     /**
@@ -121,6 +121,81 @@ final class OzonOrdersConnectorTest extends TestCase
 
         self::assertNotNull($result->rawBatch);
         self::assertCount(1, iterator_to_array($result->rawBatch->rows));
+    }
+
+    /**
+     * Регрессия: на старом коде продолжение теряло окно и смещение.
+     *
+     * Наружу уходил hasMore=true, но состояние содержало только `since`, уже
+     * продвинутый до конца окна. Следующий вызов начинал с offset=0 в НОВОМ
+     * окне, и заказы после лимита страниц не читал никто и никогда.
+     */
+    public function testContinuationCarriesFrozenWindowAndOffset(): void
+    {
+        $pages = [];
+        for ($i = 0; $i < OzonOrdersConnector::MAX_PAGES_PER_PULL; ++$i) {
+            $pages[] = new OzonRawPage($this->postings(OzonOrdersConnector::PAGE_LIMIT), true, null, []);
+        }
+        $this->client->queue(...$pages);
+
+        $result = $this->connector->pull($this->request('{"since":"2026-09-01T10:00:00+00:00"}'));
+
+        self::assertTrue($result->hasMore);
+        self::assertNotNull($result->nextCursorValue);
+        $decoded = json_decode($result->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
+
+        // Окно заморожено целиком, а не сведено к одной точке.
+        self::assertSame('2026-09-01T09:45:00+00:00', $decoded['since']);
+        self::assertSame('2026-09-01T12:00:00+00:00', $decoded['to']);
+        self::assertSame(
+            OzonOrdersConnector::MAX_PAGES_PER_PULL * OzonOrdersConnector::PAGE_LIMIT,
+            $decoded['offset'],
+        );
+    }
+
+    public function testContinuationResumesSameWindowAtStoredOffset(): void
+    {
+        $this->client->queue(new OzonRawPage($this->postings(2), false, null, []));
+
+        $result = $this->connector->pull($this->request(json_encode([
+            'since' => '2026-09-01T09:45:00+00:00',
+            'to' => '2026-09-01T12:00:00+00:00',
+            'offset' => 20000,
+        ], \JSON_THROW_ON_ERROR)));
+
+        // Окно то же самое, перекрытие повторно НЕ вычитается, чтение
+        // продолжается с сохранённого смещения.
+        self::assertSame('2026-09-01T09:45:00+00:00', $this->client->calls[0]['since']);
+        self::assertSame('2026-09-01T12:00:00+00:00', $this->client->calls[0]['to']);
+        self::assertSame(20000, $this->client->calls[0]['offset']);
+
+        // Чанк — отдельная логическая запись: под общим externalId он выглядел
+        // бы новой версией первого чанка и затёр бы его.
+        self::assertNotNull($result->rawBatch);
+        self::assertSame('fbo:window-2026-09-01T09-2026-09-01T12:offset-20000', $result->rawBatch->externalId);
+
+        // Окно дочитано — курсор наконец уезжает на его конец.
+        self::assertFalse($result->hasMore);
+        $decoded = json_decode((string) $result->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertSame('2026-09-01T12:00:00+00:00', $decoded['since']);
+        self::assertArrayNotHasKey('to', $decoded);
+    }
+
+    /**
+     * Половинчатое состояние не должно читаться с произвольного смещения:
+     * без `to` окно неизвестно, и offset относился бы к другому окну.
+     */
+    public function testCursorWithOffsetButNoWindowStartsFresh(): void
+    {
+        $this->client->queue(new OzonRawPage($this->postings(1), false, null, []));
+
+        $this->connector->pull($this->request(json_encode([
+            'since' => '2026-09-01T10:00:00+00:00',
+            'offset' => 20000,
+        ], \JSON_THROW_ON_ERROR)));
+
+        self::assertSame(0, $this->client->calls[0]['offset']);
+        self::assertSame('2026-09-01T09:45:00+00:00', $this->client->calls[0]['since']);
     }
 
     /**

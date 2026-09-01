@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Ingestion\Domain\Contract;
 
-use App\Ingestion\Application\DTO\MappedOrder;
+use App\Ingestion\Application\DTO\MappedOrderBatch;
 use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Enum\IngestSource;
 
@@ -24,9 +24,10 @@ interface OrderMapperInterface
     public function resourceTypes(): array;
 
     /**
-     * @param iterable<array<string, mixed>> $rows
+     * Возвращает и разобранные заказы, и отброшенные строки: молчаливый
+     * пропуск невозможно заметить, а курсор после нормализации уже уехал.
      *
-     * @return list<MappedOrder>
+     * @param iterable<array<string, mixed>> $rows
      */
-    public function map(IngestRawRecord $rawRecord, iterable $rows): array;
+    public function map(IngestRawRecord $rawRecord, iterable $rows): MappedOrderBatch;
 }

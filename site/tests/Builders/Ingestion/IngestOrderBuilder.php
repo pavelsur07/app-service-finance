@@ -59,6 +59,14 @@ final class IngestOrderBuilder
         return $clone;
     }
 
+    public function withConnectionRef(string $connectionRef): self
+    {
+        $clone = clone $this;
+        $clone->connectionRef = $connectionRef;
+
+        return $clone;
+    }
+
     public function withExternalId(string $externalId): self
     {
         $clone = clone $this;

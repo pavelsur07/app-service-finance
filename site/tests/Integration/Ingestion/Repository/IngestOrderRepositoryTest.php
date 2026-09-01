@@ -30,10 +30,32 @@ final class IngestOrderRepositoryTest extends IntegrationTestCase
         $this->persist(IngestOrderBuilder::anOrder()->forCompany($companyB)->withExternalId('shared-1')->build());
         $this->em->flush();
 
-        $found = $this->repository->findByExternalId($companyA, IngestSource::OZON, 'shared-1');
+        $found = $this->repository->findByExternalId($companyA, IngestSource::OZON, 'connection-1', 'shared-1');
 
         self::assertNotNull($found);
         self::assertSame($companyA, $found->getCompanyId());
+    }
+
+    /**
+     * Регрессия: posting_number уникален в пределах кабинета продавца, а не
+     * глобально. Без connectionRef в ключе два кабинета одной компании
+     * слились бы в одну запись, и статусы с позициями одного подключения
+     * затирали бы другое.
+     */
+    public function testSamePostingNumberInTwoConnectionsStaysSeparate(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+
+        $this->persist(IngestOrderBuilder::anOrder()->forCompany($companyId)->withConnectionRef('cabinet-a')->withExternalId('111-2222-3')->build());
+        $this->persist(IngestOrderBuilder::anOrder()->forCompany($companyId)->withConnectionRef('cabinet-b')->withExternalId('111-2222-3')->build());
+        $this->em->flush();
+
+        $a = $this->repository->findByExternalId($companyId, IngestSource::OZON, 'cabinet-a', '111-2222-3');
+        $b = $this->repository->findByExternalId($companyId, IngestSource::OZON, 'cabinet-b', '111-2222-3');
+
+        self::assertNotNull($a);
+        self::assertNotNull($b);
+        self::assertNotSame($a->getId(), $b->getId());
     }
 
     /**

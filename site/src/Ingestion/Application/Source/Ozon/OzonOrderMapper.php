@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Ingestion\Application\Source\Ozon;
 
 use App\Ingestion\Application\DTO\MappedOrder;
+use App\Ingestion\Application\DTO\MappedOrderBatch;
 use App\Ingestion\Application\DTO\MappedOrderItem;
 use App\Ingestion\Domain\Contract\OrderMapperInterface;
 use App\Ingestion\Entity\IngestRawRecord;
@@ -31,7 +32,7 @@ final class OzonOrderMapper implements OrderMapperInterface
         return [OzonResourceType::ORDERS_FBO, OzonResourceType::ORDERS_FBS];
     }
 
-    public function map(IngestRawRecord $rawRecord, iterable $rows): array
+    public function map(IngestRawRecord $rawRecord, iterable $rows): MappedOrderBatch
     {
         // Схема берётся из типа ресурса, а не из payload'а: у FBO и FBS разные
         // эндпоинты и разные словари статусов, и определять её по содержимому
@@ -41,17 +42,41 @@ final class OzonOrderMapper implements OrderMapperInterface
             : IngestOrderScheme::FBO;
 
         $orders = [];
+        $skipped = [];
+
         foreach ($rows as $row) {
+            // Служебный маркер пустого окна — единственный ожидаемый повод
+            // ничего не разбирать. Всё остальное, что не разобралось, — потеря,
+            // и она обязана быть видимой.
+            if (true === ($row['_ingestion_empty'] ?? null)) {
+                continue;
+            }
+
             $postingNumber = $this->stringOrNull($row['posting_number'] ?? null);
+            if (null === $postingNumber) {
+                $skipped[] = ['reason' => 'missing_posting_number', 'hint' => null];
+                continue;
+            }
+
             $status = $this->stringOrNull($row['status'] ?? null);
-            if (null === $postingNumber || null === $status) {
+            if (null === $status) {
+                $skipped[] = ['reason' => 'missing_status', 'hint' => $postingNumber];
+                continue;
+            }
+
+            // Дату заказа НЕ подменяем временем загрузки: подстановка тихо
+            // сдвигала бы заказ в сегодняшний день и искажала любую
+            // аналитику по датам. Нечитаемая дата — это испорченная строка.
+            $orderedAt = $this->parseDate($row['created_at'] ?? null);
+            if (null === $orderedAt) {
+                $skipped[] = ['reason' => 'unparsable_created_at', 'hint' => $postingNumber];
                 continue;
             }
 
             $orders[] = new MappedOrder(
                 externalId: $postingNumber,
                 scheme: $scheme,
-                orderedAt: $this->parseDate($row['created_at'] ?? null) ?? $rawRecord->getFetchedAt(),
+                orderedAt: $orderedAt,
                 rawStatus: $status,
                 items: $this->mapItems($row),
                 externalOrderId: $this->stringOrNull($row['order_number'] ?? null),
@@ -60,7 +85,7 @@ final class OzonOrderMapper implements OrderMapperInterface
             );
         }
 
-        return $orders;
+        return new MappedOrderBatch($orders, $skipped);
     }
 
     /**
@@ -77,6 +102,7 @@ final class OzonOrderMapper implements OrderMapperInterface
 
         $items = [];
         $lineNo = 0;
+        $seen = [];
         foreach ($products as $product) {
             if (!is_array($product)) {
                 continue;
@@ -86,9 +112,9 @@ final class OzonOrderMapper implements OrderMapperInterface
             $offerId = $this->stringOrNull($product['offer_id'] ?? null);
 
             $items[] = new MappedOrderItem(
-                // lineNo — позиция в исходном массиве. Это часть ключа
-                // идемпотентности, поэтому он не должен зависеть от содержимого.
+                // lineNo — только порядок отображения.
                 lineNo: $lineNo,
+                lineKey: $this->lineKey($sku, $offerId, $lineNo, $seen),
                 quantity: is_numeric($product['quantity'] ?? null) ? (int) $product['quantity'] : 0,
                 externalSku: $sku,
                 offerId: $offerId,
@@ -131,6 +157,31 @@ final class OzonOrderMapper implements OrderMapperInterface
      * Рубли строкой → копейки строкой. Через float нельзя: денежная арифметика
      * в плавающей точке даёт расхождения на больших объёмах.
      */
+    /**
+     * Идентичность позиции внутри заказа.
+     *
+     * SKU (или offerId) плюс номер повторения. Позиционный ключ ломался при
+     * перестановке `products`: строка сохраняла прежние опознавательные поля,
+     * но получала количество, цену и листинг соседнего товара. Голый SKU тоже
+     * не годится — один SKU может повториться на двух строках отправления.
+     *
+     * @param array<string, int> $seen счётчик повторений, изменяется по ссылке
+     */
+    private function lineKey(?string $sku, ?string $offerId, int $lineNo, array &$seen): string
+    {
+        $base = null !== $sku ? 'sku:'.$sku : (null !== $offerId ? 'offer:'.$offerId : null);
+        if (null === $base) {
+            // Товар без обоих идентификаторов опознать нечем — остаётся
+            // позиция. Хуже позиционного ключа тут ничего нет, но и лучше нет.
+            return 'line:'.$lineNo;
+        }
+
+        $occurrence = $seen[$base] ?? 0;
+        $seen[$base] = $occurrence + 1;
+
+        return substr($base.'#'.$occurrence, 0, 120);
+    }
+
     private function toMinor(mixed $price): ?string
     {
         if (!is_string($price) && !is_int($price) && !is_float($price)) {
@@ -145,7 +196,9 @@ final class OzonOrderMapper implements OrderMapperInterface
         $fraction = str_pad($m[3] ?? '', 2, '0');
         $digits = ltrim($m[2].$fraction, '0');
 
-        return $m[1].('' === $digits ? '0' : $digits);
+        // Ноль канонизируем без знака: "-0" — то же самое число, но другая
+        // строка, и сравнение денежных значений на нём разъезжается.
+        return '' === $digits ? '0' : $m[1].$digits;
     }
 
     private function stringOrNull(mixed $value): ?string

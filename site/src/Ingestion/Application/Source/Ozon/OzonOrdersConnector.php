@@ -39,7 +39,7 @@ final readonly class OzonOrdersConnector implements SourceConnectorInterface
     private const WINDOW_OVERLAP_MINUTES = 15;
 
     /** Сколько страниц берём за один pull, чтобы не пересидеть TTL блокировки. */
-    private const MAX_PAGES_PER_PULL = 20;
+    public const MAX_PAGES_PER_PULL = 20;
 
     public function __construct(
         private OzonOrdersClientInterface $client,
@@ -79,12 +79,29 @@ final readonly class OzonOrdersConnector implements SourceConnectorInterface
             : IngestOrderScheme::FBO;
 
         $now = $this->clock->now();
-        $cursorSince = $this->decodeCursorSince($request->cursorValue);
-        $since = $this->resolveSince($request, $now, $cursorSince);
-        $to = $request->windowTo ?? $now;
+        $state = $this->decodeCursor($request->cursorValue);
+        $cursorSince = $state['since'];
+
+        // Продолжение несёт ЗАМОРОЖЕННОЕ окно и смещение.
+        //
+        // Без этого остаток окна терялся безвозвратно: после лимита страниц
+        // наружу уходил hasMore=true, но состояние содержало только `since`,
+        // уже продвинутый до конца окна. Следующий вызов начинал с offset=0 в
+        // НОВОМ окне, и заказы с 21-й страницы не читал никто и никогда.
+        // Особенно больно на первом семидневном посеве.
+        $isContinuation = null !== $state['to'];
+        if ($isContinuation) {
+            $since = $cursorSince ?? $now->modify('-1 hour');
+            $to = $state['to'];
+            $offset = $state['offset'];
+        } else {
+            $since = $this->resolveSince($request, $now, $cursorSince);
+            $to = $request->windowTo ?? $now;
+            $offset = 0;
+        }
 
         $rows = [];
-        $offset = 0;
+        $startOffset = $offset;
         $pages = 0;
         $hasMorePages = false;
 
@@ -119,11 +136,28 @@ final readonly class OzonOrdersConnector implements SourceConnectorInterface
             shopRef: $request->shopRef,
             source: IngestSource::OZON,
             resourceType: $request->resourceType,
-            externalId: $this->windowKey($scheme, $since, $to),
+            externalId: $this->windowKey($scheme, $since, $to, $startOffset),
             syncJobId: $request->syncJobId,
             fetchedAt: $now,
             rows: [] === $rows ? [$this->emptyMarker($request->resourceType, $since, $to)] : $rows,
         );
+
+        if ($hasMorePages) {
+            // Персистентный курсор здесь НЕ двигается: RunSyncChunkHandler на
+            // ветке продолжения не вызывает updateCursor, а передаёт это
+            // значение следующим сообщением. Окно остаётся тем же, пока не
+            // дочитано до конца.
+            return new PullResult(
+                rawBatch: $batch,
+                nextCursorValue: json_encode([
+                    'since' => $since->format(\DATE_ATOM),
+                    'to' => $to->format(\DATE_ATOM),
+                    'offset' => $offset,
+                ], \JSON_THROW_ON_ERROR),
+                hasMore: true,
+                continuationDelaySeconds: 1,
+            );
+        }
 
         // Курсор не едет назад. IngestCursor::advance() монотонность не
         // проверяет, а откат заставил бы перекачивать одно и то же вечно.
@@ -131,13 +165,13 @@ final readonly class OzonOrdersConnector implements SourceConnectorInterface
         // Сравнение именно с ИСХОДНЫМ значением курсора, а не с $since:
         // $since уже сдвинут назад на перекрытие окна, и вернуть его значило
         // бы каждый час откатывать позицию на четверть часа.
-        $nextSince = max($to, $cursorSince ?? $to);
+        $nextSince = max($to, $isContinuation ? $to : ($cursorSince ?? $to));
 
         return new PullResult(
             rawBatch: $batch,
             nextCursorValue: json_encode(['since' => $nextSince->format(\DATE_ATOM)], \JSON_THROW_ON_ERROR),
-            hasMore: $hasMorePages,
-            continuationDelaySeconds: $hasMorePages ? 1 : null,
+            hasMore: false,
+            continuationDelaySeconds: null,
         );
     }
 
@@ -160,23 +194,40 @@ final readonly class OzonOrdersConnector implements SourceConnectorInterface
         return $since->modify(sprintf('-%d minutes', self::WINDOW_OVERLAP_MINUTES));
     }
 
-    private function decodeCursorSince(?string $cursorValue): ?\DateTimeImmutable
+    /**
+     * @return array{since: ?\DateTimeImmutable, to: ?\DateTimeImmutable, offset: int}
+     */
+    private function decodeCursor(?string $cursorValue): array
     {
+        $empty = ['since' => null, 'to' => null, 'offset' => 0];
+
         if (null === $cursorValue || '' === trim($cursorValue)) {
-            return null;
+            return $empty;
         }
 
         try {
             $payload = json_decode($cursorValue, true, 512, \JSON_THROW_ON_ERROR);
             if (!is_array($payload) || !is_string($payload['since'] ?? null)) {
-                return null;
+                return $empty;
             }
 
-            return new \DateTimeImmutable($payload['since']);
+            $since = new \DateTimeImmutable($payload['since']);
+
+            // Продолжение опознаётся по паре `to` + целочисленный `offset`.
+            // Половинчатое состояние (одно без другого) продолжением не
+            // считаем: лучше пройти окно заново, чем читать с произвольного
+            // смещения.
+            $to = is_string($payload['to'] ?? null) ? new \DateTimeImmutable($payload['to']) : null;
+            $offset = $payload['offset'] ?? null;
+            if (null === $to || !is_int($offset) || $offset < 0) {
+                return ['since' => $since, 'to' => null, 'offset' => 0];
+            }
+
+            return ['since' => $since, 'to' => $to, 'offset' => $offset];
         } catch (\Throwable) {
             // Нечитаемый курсор не должен останавливать загрузку: считаем, что
             // позиции нет, и берём окно по умолчанию.
-            return null;
+            return $empty;
         }
     }
 
@@ -184,13 +235,20 @@ final readonly class OzonOrdersConnector implements SourceConnectorInterface
      * Детерминированный ключ окна вместо порядкового номера: неизменившееся
      * окно даёт тот же hash и не создаёт нового объекта в хранилище.
      */
-    private function windowKey(IngestOrderScheme $scheme, \DateTimeImmutable $since, \DateTimeImmutable $to): string
-    {
+    private function windowKey(
+        IngestOrderScheme $scheme,
+        \DateTimeImmutable $since,
+        \DateTimeImmutable $to,
+        int $startOffset,
+    ): string {
+        // Смещение — часть ключа: чанки одного окна несут разные строки, и под
+        // общим externalId второй чанк выглядел бы новой версией первого.
         return sprintf(
-            '%s:window-%s-%s',
+            '%s:window-%s-%s:offset-%d',
             $scheme->value,
             $since->format('Y-m-d\TH'),
             $to->format('Y-m-d\TH'),
+            $startOffset,
         );
     }
 

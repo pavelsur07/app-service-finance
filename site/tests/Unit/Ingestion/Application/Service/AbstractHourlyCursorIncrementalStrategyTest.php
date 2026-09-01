@@ -43,6 +43,30 @@ final class AbstractHourlyCursorIncrementalStrategyTest extends TestCase
         self::assertFalse($strategy->cursorIsDue('{"since":"2026-09-01T11:50:00+00:00"}'));
     }
 
+    private function strategyAt(MockClock $clock): AbstractHourlyCursorIncrementalStrategy
+    {
+        return new readonly class($clock) extends AbstractHourlyCursorIncrementalStrategy {
+            public function source(): IngestSource
+            {
+                return IngestSource::OZON;
+            }
+
+            public function resourceType(): string
+            {
+                return 'test_orders';
+            }
+
+            public function supportsConnection(array $connection): bool
+            {
+                return true;
+            }
+
+            public function ensureCursor(string $companyId, string $connectionRef): void
+            {
+            }
+        };
+    }
+
     private function strategy(int $minIntervalMinutes = 60): AbstractHourlyCursorIncrementalStrategy
     {
         return new readonly class(new MockClock('2026-09-01 12:00:00'), $minIntervalMinutes) extends AbstractHourlyCursorIncrementalStrategy {
@@ -65,5 +89,28 @@ final class AbstractHourlyCursorIncrementalStrategyTest extends TestCase
             {
             }
         };
+    }
+
+    /**
+     * Регрессия: при пороге ровно в 60 минут курсор, записанный воркером на
+     * минуту позже запуска крона, отодвигал следующий обход на целый час —
+     * ресурс молча становился двухчасовым.
+     */
+    public function testCursorSlightlyYoungerThanCronPeriodIsStillDue(): void
+    {
+        $clock = new MockClock(new \DateTimeImmutable('2026-09-01T13:35:00+00:00'));
+        $strategy = $this->strategyAt($clock);
+
+        // Прошлый прогон отработал в 12:36 — 59 минут назад.
+        self::assertTrue($strategy->cursorIsDue(json_encode(['since' => '2026-09-01T12:36:00+00:00'], \JSON_THROW_ON_ERROR)));
+    }
+
+    public function testFreshCursorWithinToleranceIsNotDue(): void
+    {
+        $clock = new MockClock(new \DateTimeImmutable('2026-09-01T13:35:00+00:00'));
+        $strategy = $this->strategyAt($clock);
+
+        // 50 минут назад — внутри порога, повторный обход не нужен.
+        self::assertFalse($strategy->cursorIsDue(json_encode(['since' => '2026-09-01T12:45:00+00:00'], \JSON_THROW_ON_ERROR)));
     }
 }

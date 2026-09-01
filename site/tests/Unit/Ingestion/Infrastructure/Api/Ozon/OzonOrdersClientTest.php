@@ -8,6 +8,7 @@ use App\Ingestion\Enum\IngestOrderScheme;
 use App\Ingestion\Exception\ConnectorAuthException;
 use App\Ingestion\Exception\ConnectorRateLimitedException;
 use App\Ingestion\Exception\ConnectorTransientException;
+use App\Ingestion\Exception\MalformedConnectorResponseException;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonCredentialProviderInterface;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonOrdersClient;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -97,12 +98,56 @@ final class OzonOrdersClientTest extends TestCase
         $this->fetch($client);
     }
 
-    private function fetch(OzonOrdersClient $client): void
+    /**
+     * Отсутствующий has_next раньше молча означал «страниц больше нет» и
+     * обрывал обход на первой странице. Пропуск не виден ничем.
+     */
+    public function testFbsMissingHasNextIsMalformed(): void
+    {
+        $client = $this->client(new MockResponse('{"result":{"postings":[]}}', ['http_code' => 200]));
+
+        $this->expectException(MalformedConnectorResponseException::class);
+        $this->fetch($client, IngestOrderScheme::FBS);
+    }
+
+    /**
+     * Строка "false" приводилась к true и давала лишний круг пагинации.
+     */
+    public function testFbsStringHasNextIsMalformed(): void
+    {
+        $client = $this->client(new MockResponse('{"result":{"postings":[],"has_next":"false"}}', ['http_code' => 200]));
+
+        $this->expectException(MalformedConnectorResponseException::class);
+        $this->fetch($client, IngestOrderScheme::FBS);
+    }
+
+    /**
+     * Не-объект в списке раньше выбрасывался молча. У FBO это опаснее всего:
+     * счётчик строк — единственный признак полной страницы, и выброшенный
+     * элемент оборвал бы обход раньше времени.
+     */
+    public function testNonObjectPostingIsMalformed(): void
+    {
+        $client = $this->client(new MockResponse('{"result":[{"posting_number":"p-1"},"broken"]}', ['http_code' => 200]));
+
+        $this->expectException(MalformedConnectorResponseException::class);
+        $this->fetch($client);
+    }
+
+    public function testInvalidJsonIsMalformed(): void
+    {
+        $client = $this->client(new MockResponse('not json', ['http_code' => 200]));
+
+        $this->expectException(MalformedConnectorResponseException::class);
+        $this->fetch($client);
+    }
+
+    private function fetch(OzonOrdersClient $client, IngestOrderScheme $scheme = IngestOrderScheme::FBO): void
     {
         $client->fetchPostings(
             '0192f0c2-0000-7000-8000-000000000001',
             '0192f0c2-0000-7000-8000-000000000002',
-            IngestOrderScheme::FBO,
+            $scheme,
             new \DateTimeImmutable('2026-09-01T00:00:00+00:00'),
             new \DateTimeImmutable('2026-09-01T01:00:00+00:00'),
             100,

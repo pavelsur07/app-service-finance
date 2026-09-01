@@ -19,9 +19,9 @@ final class IngestOrderItemRepository extends ServiceEntityRepository
     }
 
     /**
-     * @return array<int, IngestOrderItem> lineNo => позиция
+     * @return array<string, IngestOrderItem> lineKey => позиция
      */
-    public function findByOrderIndexedByLine(string $companyId, string $orderId): array
+    public function findByOrderIndexedByLineKey(string $companyId, string $orderId): array
     {
         /** @var list<IngestOrderItem> $items */
         $items = $this->createQueryBuilder('i')
@@ -34,7 +34,7 @@ final class IngestOrderItemRepository extends ServiceEntityRepository
 
         $indexed = [];
         foreach ($items as $item) {
-            $indexed[$item->getLineNo()] = $item;
+            $indexed[$item->getLineKey()] = $item;
         }
 
         return $indexed;

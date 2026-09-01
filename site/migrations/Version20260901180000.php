@@ -39,7 +39,7 @@ final class Version20260901180000 extends AbstractMigration
                 PRIMARY KEY(id)
             )
             SQL);
-        $this->addSql('CREATE UNIQUE INDEX uniq_ingest_order_external ON ingest_orders (company_id, source, external_id)');
+        $this->addSql('CREATE UNIQUE INDEX uniq_ingest_order_external ON ingest_orders (company_id, source, connection_ref, external_id)');
         $this->addSql('CREATE INDEX idx_ingest_order_company_status_ordered ON ingest_orders (company_id, status, ordered_at)');
         $this->addSql('CREATE INDEX idx_ingest_order_company_connection ON ingest_orders (company_id, connection_ref)');
         foreach (['ordered_at', 'status_observed_at', 'refresh_stopped_at', 'created_at', 'updated_at'] as $column) {
@@ -52,6 +52,7 @@ final class Version20260901180000 extends AbstractMigration
                 company_id UUID NOT NULL,
                 order_id UUID NOT NULL,
                 line_no INT NOT NULL,
+                line_key VARCHAR(120) NOT NULL,
                 external_sku VARCHAR(100) DEFAULT NULL,
                 offer_id VARCHAR(255) DEFAULT NULL,
                 barcode VARCHAR(100) DEFAULT NULL,
@@ -70,7 +71,7 @@ final class Version20260901180000 extends AbstractMigration
         // Ключ идемпотентности: перенормализация того же raw обязана обновить
         // позиции, а не создать дубли. По external_sku нельзя — один SKU может
         // повториться на двух строках одного отправления.
-        $this->addSql('CREATE UNIQUE INDEX uniq_ingest_order_item_line ON ingest_order_items (company_id, order_id, line_no)');
+        $this->addSql('CREATE UNIQUE INDEX uniq_ingest_order_item_line_key ON ingest_order_items (company_id, order_id, line_key)');
         $this->addSql('CREATE INDEX idx_ingest_order_item_company_listing ON ingest_order_items (company_id, listing_id)');
         $this->addSql('CREATE INDEX idx_ingest_order_item_order ON ingest_order_items (order_id)');
         foreach (['created_at', 'updated_at'] as $column) {
@@ -91,6 +92,7 @@ final class Version20260901180000 extends AbstractMigration
                 PRIMARY KEY(id)
             )
             SQL);
+        $this->addSql('CREATE UNIQUE INDEX uniq_ingest_order_status_event_observation ON ingest_order_status_events (company_id, order_id, raw_record_id, raw_status)');
         $this->addSql('CREATE INDEX idx_ingest_order_status_event_order ON ingest_order_status_events (order_id, observed_at)');
         $this->addSql('CREATE INDEX idx_ingest_order_status_event_company ON ingest_order_status_events (company_id, observed_at)');
         foreach (['observed_at', 'created_at'] as $column) {

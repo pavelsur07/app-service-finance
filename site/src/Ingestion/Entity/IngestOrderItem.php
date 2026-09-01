@@ -18,13 +18,21 @@ use Webmozart\Assert\Assert;
  * с несколькими SKU, а выкуп считается по листингу. Связь на заказе не дала бы
  * посчитать показатель в многострочном заказе.
  *
- * `lineNo` — индекс позиции в исходном массиве, и он часть уникального ключа.
- * Ключ по `externalSku` не годится: один SKU может повториться на двух строках
- * одного отправления, и перенормализация того же raw создала бы дубли.
+ * Идентичность позиции — `lineKey`, а НЕ порядковый `lineNo`.
+ *
+ * Позиционный ключ ломается при перестановке `products` в ответе источника:
+ * строка 0 сохраняла бы прежние `externalSku`/`offerId` (их не обновляет
+ * refresh()), но получала бы количество, цену и листинг другого товара —
+ * прямое смешение данных между позициями.
+ *
+ * Голый `externalSku` тоже не годится: один SKU может повториться на двух
+ * строках одного отправления. Поэтому ключ — SKU (или offerId) плюс номер
+ * повторения; он переживает и перестановку, и повтор. `lineNo` остаётся
+ * порядком отображения.
  */
 #[ORM\Entity(repositoryClass: IngestOrderItemRepository::class)]
 #[ORM\Table(name: 'ingest_order_items')]
-#[ORM\UniqueConstraint(name: 'uniq_ingest_order_item_line', columns: ['company_id', 'order_id', 'line_no'])]
+#[ORM\UniqueConstraint(name: 'uniq_ingest_order_item_line_key', columns: ['company_id', 'order_id', 'line_key'])]
 #[ORM\Index(name: 'idx_ingest_order_item_company_listing', columns: ['company_id', 'listing_id'])]
 #[ORM\Index(name: 'idx_ingest_order_item_order', columns: ['order_id'])]
 class IngestOrderItem implements TenantOwnedInterface
@@ -41,6 +49,10 @@ class IngestOrderItem implements TenantOwnedInterface
 
     #[ORM\Column(type: Types::INTEGER)]
     private int $lineNo;
+
+    /** Устойчивая идентичность позиции внутри заказа; см. докблок класса. */
+    #[ORM\Column(type: Types::STRING, length: 120)]
+    private string $lineKey;
 
     #[ORM\Column(type: Types::STRING, length: 100, nullable: true)]
     private ?string $externalSku = null;
@@ -93,6 +105,7 @@ class IngestOrderItem implements TenantOwnedInterface
         string $companyId,
         string $orderId,
         int $lineNo,
+        string $lineKey,
         int $quantity,
         ?string $externalSku = null,
         ?string $offerId = null,
@@ -105,12 +118,15 @@ class IngestOrderItem implements TenantOwnedInterface
         Assert::uuid($companyId);
         Assert::uuid($orderId);
         Assert::greaterThanEq($lineNo, 0);
+        Assert::stringNotEmpty($lineKey);
+        Assert::maxLength($lineKey, 120);
         Assert::greaterThanEq($quantity, 0);
 
         $this->id = Uuid::uuid7()->toString();
         $this->companyId = $companyId;
         $this->orderId = $orderId;
         $this->lineNo = $lineNo;
+        $this->lineKey = $lineKey;
         $this->quantity = $quantity;
         $this->externalSku = $externalSku;
         $this->offerId = $offerId;
@@ -134,13 +150,23 @@ class IngestOrderItem implements TenantOwnedInterface
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /**
+     * Порядок отображения обновляется вместе с содержимым: позиция может
+     * переехать в ответе источника, и оставить прежний lineNo значило бы
+     * показывать заказ в порядке, которого у него уже нет. Идентичность при
+     * этом не меняется — она в lineKey.
+     */
     public function refresh(
+        int $lineNo,
         int $quantity,
         ?string $name,
         ?string $priceMinor,
         ?string $currency,
         bool $marketplaceBuyout,
     ): void {
+        Assert::greaterThanEq($lineNo, 0);
+
+        $this->lineNo = $lineNo;
         $this->quantity = $quantity;
         $this->name = $name ?? $this->name;
         $this->priceMinor = $priceMinor ?? $this->priceMinor;
@@ -167,6 +193,11 @@ class IngestOrderItem implements TenantOwnedInterface
     public function getLineNo(): int
     {
         return $this->lineNo;
+    }
+
+    public function getLineKey(): string
+    {
+        return $this->lineKey;
     }
 
     public function getExternalSku(): ?string

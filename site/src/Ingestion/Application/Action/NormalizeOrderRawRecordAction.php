@@ -61,7 +61,8 @@ final readonly class NormalizeOrderRawRecordAction
 
         $rows = iterator_to_array($this->rawStorageFacade->read($rawRecord->getId(), $command->companyId), false);
         $mapper = $this->orderMapperRegistry->get($rawRecord->getSource(), $rawRecord->getResourceType());
-        $orders = $mapper->map($rawRecord, $rows);
+        $batch = $mapper->map($rawRecord, $rows);
+        $orders = $batch->orders;
 
         // Момент наблюдения — когда сырьё было СКАЧАНО, а не когда мы его
         // разбираем. Иначе повторная нормализация старого сырья задним числом
@@ -72,6 +73,25 @@ final readonly class NormalizeOrderRawRecordAction
             $this->applyOrder($rawRecord, $mappedOrder, $observedAt);
         }
 
+        // Строка, которую маппер не смог разобрать, обязана стать видимой
+        // очередью. Курсор после нормализации уже уехал вперёд, поэтому
+        // молчаливый пропуск — постоянная потеря, ничем не отличимая от
+        // «заказов в окне не было».
+        foreach ($batch->skipped as $skipped) {
+            ($this->recordNormalizationIssueAction)(new RecordNormalizationIssueCommand(
+                companyId: $command->companyId,
+                rawRecordId: $rawRecord->getId(),
+                operationGroupId: null,
+                kind: NormalizationIssueKind::MAPPER_FAILURE,
+                details: [
+                    'source' => $rawRecord->getSource()->value,
+                    'resourceType' => $rawRecord->getResourceType(),
+                    'reason' => $skipped['reason'],
+                    'externalId' => $skipped['hint'],
+                ],
+            ));
+        }
+
         $rawRecord->markNormalizationDone();
         $this->entityManager->flush();
 
@@ -80,6 +100,7 @@ final readonly class NormalizeOrderRawRecordAction
             'rawRecordId' => $rawRecord->getId(),
             'resourceType' => $rawRecord->getResourceType(),
             'orders' => count($orders),
+            'skippedRows' => count($batch->skipped),
         ]);
     }
 
@@ -105,7 +126,12 @@ final readonly class NormalizeOrderRawRecordAction
             ));
         }
 
-        $order = $this->orderRepository->findByExternalId($companyId, $rawRecord->getSource(), $mapped->externalId);
+        $order = $this->orderRepository->findByExternalId(
+            $companyId,
+            $rawRecord->getSource(),
+            $rawRecord->getConnectionRef(),
+            $mapped->externalId,
+        );
 
         if (null === $order) {
             $order = new IngestOrder(
@@ -161,6 +187,14 @@ final readonly class NormalizeOrderRawRecordAction
         \DateTimeImmutable $observedAt,
         string $rawRecordId,
     ): void {
+        // Одно наблюдение — одно событие. Устаревшее наблюдение не двигает
+        // статус заказа, поэтому «статус отличается» остаётся истиной навсегда,
+        // и без этой проверки каждый повторный прогон того же сырья дописывал
+        // бы ещё одну копию.
+        if ($this->statusEventRepository->existsObservation($order->getCompanyId(), $order->getId(), $rawRecordId, $rawStatus)) {
+            return;
+        }
+
         $this->statusEventRepository->save(new IngestOrderStatusEvent(
             companyId: $order->getCompanyId(),
             orderId: $order->getId(),
@@ -181,7 +215,7 @@ final readonly class NormalizeOrderRawRecordAction
             return;
         }
 
-        $existing = $this->itemRepository->findByOrderIndexedByLine($order->getCompanyId(), $order->getId());
+        $existing = $this->itemRepository->findByOrderIndexedByLineKey($order->getCompanyId(), $order->getId());
 
         $sourceDataRows = [];
         foreach ($mappedItems as $index => $mappedItem) {
@@ -195,13 +229,14 @@ final readonly class NormalizeOrderRawRecordAction
         );
 
         foreach ($mappedItems as $index => $mappedItem) {
-            $item = $existing[$mappedItem->lineNo] ?? null;
+            $item = $existing[$mappedItem->lineKey] ?? null;
 
             if (null === $item) {
                 $item = new IngestOrderItem(
                     companyId: $order->getCompanyId(),
                     orderId: $order->getId(),
                     lineNo: $mappedItem->lineNo,
+                    lineKey: $mappedItem->lineKey,
                     quantity: $mappedItem->quantity,
                     externalSku: $mappedItem->externalSku,
                     offerId: $mappedItem->offerId,
@@ -214,6 +249,7 @@ final readonly class NormalizeOrderRawRecordAction
                 $this->itemRepository->save($item);
             } else {
                 $item->refresh(
+                    $mappedItem->lineNo,
                     $mappedItem->quantity,
                     $mappedItem->name,
                     $mappedItem->priceMinor,

@@ -25,6 +25,11 @@ use Webmozart\Assert\Assert;
  */
 #[ORM\Entity(repositoryClass: IngestOrderStatusEventRepository::class)]
 #[ORM\Table(name: 'ingest_order_status_events')]
+// Наблюдение одного и того же статуса из одного и того же сырья — одно
+// событие, а не новое при каждой перенормализации. Без этого повторный прогон
+// старого raw бесконечно дописывал бы копии: устаревшее наблюдение не двигает
+// статус заказа, поэтому «статус отличается» остаётся истиной навсегда.
+#[ORM\UniqueConstraint(name: 'uniq_ingest_order_status_event_observation', columns: ['company_id', 'order_id', 'raw_record_id', 'raw_status'])]
 #[ORM\Index(name: 'idx_ingest_order_status_event_order', columns: ['order_id', 'observed_at'])]
 #[ORM\Index(name: 'idx_ingest_order_status_event_company', columns: ['company_id', 'observed_at'])]
 class IngestOrderStatusEvent implements TenantOwnedInterface

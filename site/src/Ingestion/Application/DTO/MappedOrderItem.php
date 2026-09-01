@@ -9,8 +9,10 @@ use Webmozart\Assert\Assert;
 /**
  * Позиция заказа в нормализованном виде.
  *
- * `lineNo` — индекс позиции в исходном массиве маркетплейса. Он часть ключа
- * идемпотентности, поэтому обязан быть стабильным для одного и того же сырья.
+ * `lineNo` — порядок отображения, индекс позиции в исходном массиве.
+ * `lineKey` — идентичность позиции внутри заказа. Разделены намеренно: порядок
+ * в ответе источника может измениться, и позиционный ключ тогда перемешал бы
+ * данные соседних позиций между собой.
  */
 final readonly class MappedOrderItem
 {
@@ -19,6 +21,7 @@ final readonly class MappedOrderItem
      */
     public function __construct(
         public int $lineNo,
+        public string $lineKey,
         public int $quantity,
         public ?string $externalSku = null,
         public ?string $offerId = null,
@@ -30,6 +33,8 @@ final readonly class MappedOrderItem
         public array $sourceData = [],
     ) {
         Assert::greaterThanEq($lineNo, 0);
+        Assert::stringNotEmpty($lineKey);
+        Assert::maxLength($lineKey, 120);
         Assert::greaterThanEq($quantity, 0);
     }
 }

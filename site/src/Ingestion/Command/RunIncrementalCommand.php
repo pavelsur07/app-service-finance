@@ -94,6 +94,24 @@ final class RunIncrementalCommand extends Command
         }
 
         $resourceType = $this->resourceType($input);
+        // Опечатка в cron-строке не должна выглядеть как успешный прогон.
+        // Крон запускается с --quiet, поэтому warning не виден никому: ресурс
+        // молча перестал бы грузиться, а задание продолжало бы отчитываться
+        // успехом. Явно переданный, но никому не известный ресурс — ошибка
+        // конфигурации, и она обязана быть громкой.
+        if (null !== $resourceType && !$this->resourceTypeIsKnown($resourceType)) {
+            $io->error(sprintf(
+                'Unknown --resource "%s". Registered: %s.',
+                $resourceType,
+                implode(', ', $this->knownResourceTypes()),
+            ));
+            $this->logger->error('Ingestion incremental aborted: unknown resource filter.', [
+                'resourceType' => $resourceType,
+            ]);
+
+            return Command::INVALID;
+        }
+
         $strategies = $this->strategiesForSource($source, $resourceType);
         if ([] === $strategies) {
             $sourceValue = $source?->value ?? 'all';
@@ -256,6 +274,31 @@ final class RunIncrementalCommand extends Command
             static fn (IncrementalResourceStrategyInterface $strategy): bool => (null === $source || $strategy->source() === $source)
                 && (null === $resourceType || $strategy->resourceType() === $resourceType),
         ));
+    }
+
+    private function resourceTypeIsKnown(string $resourceType): bool
+    {
+        foreach ($this->strategies as $strategy) {
+            if ($strategy->resourceType() === $resourceType) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function knownResourceTypes(): array
+    {
+        $types = array_map(
+            static fn (IncrementalResourceStrategyInterface $strategy): string => $strategy->resourceType(),
+            $this->strategies,
+        );
+        sort($types);
+
+        return array_values(array_unique($types));
     }
 
     private function resourceType(InputInterface $input): ?string

@@ -21,7 +21,7 @@ final class OzonOrderMapperTest extends TestCase
      */
     public function testMapsEveryPostingFromTheCapturedFixture(): void
     {
-        $orders = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBO), $this->fixtureRows());
+        $orders = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBO), $this->fixtureRows())->orders;
 
         self::assertCount(4, $orders);
         self::assertSame(
@@ -37,7 +37,7 @@ final class OzonOrderMapperTest extends TestCase
      */
     public function testExternalIdIsPostingNumberAndOrderNumberIsKeptSeparately(): void
     {
-        $orders = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBO), $this->fixtureRows());
+        $orders = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBO), $this->fixtureRows())->orders;
         $first = $orders[0];
 
         self::assertSame('00001-0001-1', $first->externalId);
@@ -50,7 +50,7 @@ final class OzonOrderMapperTest extends TestCase
      */
     public function testSubstatusIsKeptVerbatim(): void
     {
-        $orders = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBO), $this->fixtureRows());
+        $orders = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBO), $this->fixtureRows())->orders;
 
         self::assertSame('posting_on_way_to_city', $orders[0]->rawSubstatus);
     }
@@ -59,8 +59,8 @@ final class OzonOrderMapperTest extends TestCase
     {
         $mapper = new OzonOrderMapper();
 
-        self::assertSame(IngestOrderScheme::FBO, $mapper->map($this->rawRecord(OzonResourceType::ORDERS_FBO), $this->fixtureRows())[0]->scheme);
-        self::assertSame(IngestOrderScheme::FBS, $mapper->map($this->rawRecord(OzonResourceType::ORDERS_FBS), $this->fixtureRows())[0]->scheme);
+        self::assertSame(IngestOrderScheme::FBO, $mapper->map($this->rawRecord(OzonResourceType::ORDERS_FBO), $this->fixtureRows())->orders[0]->scheme);
+        self::assertSame(IngestOrderScheme::FBS, $mapper->map($this->rawRecord(OzonResourceType::ORDERS_FBS), $this->fixtureRows())->orders[0]->scheme);
     }
 
     /**
@@ -69,7 +69,7 @@ final class OzonOrderMapperTest extends TestCase
      */
     public function testPriceIsConvertedToMinorUnits(): void
     {
-        $orders = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBO), $this->fixtureRows());
+        $orders = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBO), $this->fixtureRows())->orders;
         $item = $orders[0]->items[0];
 
         self::assertSame('209500', $item->priceMinor);
@@ -91,7 +91,7 @@ final class OzonOrderMapperTest extends TestCase
             'products' => [['sku' => 1, 'quantity' => 1, 'price' => $price, 'currency_code' => 'RUB']],
         ]];
 
-        $orders = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBO), $rows);
+        $orders = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBO), $rows)->orders;
 
         self::assertSame($expected, $orders[0]->items[0]->priceMinor);
     }
@@ -108,6 +108,11 @@ final class OzonOrderMapperTest extends TestCase
         yield 'одна цифра после точки' => ['12.3', '1230'];
         yield 'не число' => ['бесплатно', null];
         yield 'null' => [null, null];
+        // "-0" — то же число, но другая строка: на сравнении денежных значений
+        // такая пара молча разъезжается.
+        yield 'отрицательный ноль' => ['-0.00', '0'];
+        yield 'минус ноль без дробной части' => ['-0', '0'];
+        yield 'отрицательная цена' => ['-15.50', '-1550'];
     }
 
     /**
@@ -123,7 +128,7 @@ final class OzonOrderMapperTest extends TestCase
             \JSON_THROW_ON_ERROR,
         )['result'];
 
-        $orders = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBO), $rows);
+        $orders = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBO), $rows)->orders;
 
         self::assertCount(2, $orders[0]->items);
         self::assertSame([0, 1], array_map(static fn ($i): int => $i->lineNo, $orders[0]->items));
@@ -135,7 +140,7 @@ final class OzonOrderMapperTest extends TestCase
      */
     public function testItemCarriesResolverInputInSourceData(): void
     {
-        $orders = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBO), $this->fixtureRows());
+        $orders = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBO), $this->fixtureRows())->orders;
         $sourceData = $orders[0]->items[0]->sourceData;
 
         self::assertSame('TEST-ART-001-1', $sourceData['offer_id']);
@@ -148,7 +153,7 @@ final class OzonOrderMapperTest extends TestCase
      */
     public function testEmptyPayloadYieldsNoOrders(): void
     {
-        self::assertSame([], (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBS), []));
+        self::assertSame([], (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBS), [])->orders);
     }
 
     /**
@@ -171,6 +176,59 @@ final class OzonOrderMapperTest extends TestCase
         $path = \dirname(__DIR__, 5).'/Fixtures/Marketplace/Orders/ozon_posting_fbo_list.json';
 
         return json_decode((string) file_get_contents($path), true, 512, \JSON_THROW_ON_ERROR)['result'];
+    }
+
+    /**
+     * Регрессия: строка без обязательных полей раньше исчезала молча. Курсор
+     * после нормализации уже уехал, поэтому пропуск был постоянным и ничем не
+     * отличался от «заказов в окне не было».
+     */
+    public function testRowWithoutPostingNumberIsReportedAsSkipped(): void
+    {
+        $batch = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBO), [
+            ['status' => 'delivering'],
+        ]);
+
+        self::assertSame([], $batch->orders);
+        self::assertSame([['reason' => 'missing_posting_number', 'hint' => null]], $batch->skipped);
+    }
+
+    public function testRowWithoutStatusIsReportedAsSkipped(): void
+    {
+        $batch = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBO), [
+            ['posting_number' => '111-2222-3', 'created_at' => '2026-09-01T10:00:00Z'],
+        ]);
+
+        self::assertSame([], $batch->orders);
+        self::assertSame([['reason' => 'missing_status', 'hint' => '111-2222-3']], $batch->skipped);
+    }
+
+    /**
+     * Дата заказа не подменяется временем загрузки: подстановка тихо сдвигала
+     * бы заказ в сегодняшний день и искажала любую аналитику по датам.
+     */
+    public function testUnparsableCreatedAtIsSkippedInsteadOfSubstituted(): void
+    {
+        $batch = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBO), [
+            ['posting_number' => '111-2222-3', 'status' => 'delivering', 'created_at' => 'позавчера'],
+        ]);
+
+        self::assertSame([], $batch->orders);
+        self::assertSame([['reason' => 'unparsable_created_at', 'hint' => '111-2222-3']], $batch->skipped);
+    }
+
+    /**
+     * Служебный маркер пустого окна — единственный ожидаемый повод ничего не
+     * разобрать, и он не должен попадать в очередь на разбор.
+     */
+    public function testEmptyWindowMarkerIsNotReportedAsSkipped(): void
+    {
+        $batch = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBO), [
+            ['_ingestion_empty' => true, '_ingestion_resource' => OzonResourceType::ORDERS_FBO],
+        ]);
+
+        self::assertSame([], $batch->orders);
+        self::assertSame([], $batch->skipped);
     }
 
     private function rawRecord(string $resourceType): IngestRawRecord

@@ -20,14 +20,25 @@ final class IngestOrderRepository extends ServiceEntityRepository
         parent::__construct($registry, IngestOrder::class);
     }
 
-    public function findByExternalId(string $companyId, IngestSource $source, string $externalId): ?IngestOrder
-    {
+    /**
+     * connectionRef обязателен: posting_number уникален в пределах кабинета
+     * продавца, а не глобально. Без него два кабинета одной компании слились
+     * бы в одну запись заказа.
+     */
+    public function findByExternalId(
+        string $companyId,
+        IngestSource $source,
+        string $connectionRef,
+        string $externalId,
+    ): ?IngestOrder {
         return $this->createQueryBuilder('o')
             ->andWhere('o.companyId = :companyId')
             ->andWhere('o.source = :source')
+            ->andWhere('o.connectionRef = :connectionRef')
             ->andWhere('o.externalId = :externalId')
             ->setParameter('companyId', $companyId)
             ->setParameter('source', $source->value)
+            ->setParameter('connectionRef', $connectionRef)
             ->setParameter('externalId', $externalId)
             ->getQuery()
             ->getOneOrNullResult();
@@ -38,8 +49,12 @@ final class IngestOrderRepository extends ServiceEntityRepository
      *
      * @return array<string, IngestOrder> externalId => заказ
      */
-    public function findManyByExternalIdsIndexed(string $companyId, IngestSource $source, array $externalIds): array
-    {
+    public function findManyByExternalIdsIndexed(
+        string $companyId,
+        IngestSource $source,
+        string $connectionRef,
+        array $externalIds,
+    ): array {
         if ([] === $externalIds) {
             return [];
         }
@@ -48,9 +63,11 @@ final class IngestOrderRepository extends ServiceEntityRepository
         $orders = $this->createQueryBuilder('o')
             ->andWhere('o.companyId = :companyId')
             ->andWhere('o.source = :source')
+            ->andWhere('o.connectionRef = :connectionRef')
             ->andWhere('o.externalId IN (:externalIds)')
             ->setParameter('companyId', $companyId)
             ->setParameter('source', $source->value)
+            ->setParameter('connectionRef', $connectionRef)
             ->setParameter('externalIds', $externalIds)
             ->getQuery()
             ->getResult();
