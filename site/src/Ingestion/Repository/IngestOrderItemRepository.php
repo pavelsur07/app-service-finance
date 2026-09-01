@@ -41,6 +41,39 @@ final class IngestOrderItemRepository extends ServiceEntityRepository
     }
 
     /**
+     * Позиции сразу для НЕСКОЛЬКИХ заказов.
+     *
+     * Одна страница коннектора несёт до 20 000 строк, и запрос на заказ дал бы
+     * столько же обращений на один batch нормализации.
+     *
+     * @param list<string> $orderIds
+     *
+     * @return array<string, array<string, IngestOrderItem>> orderId => lineKey => позиция
+     */
+    public function findByOrdersIndexedByLineKey(string $companyId, array $orderIds): array
+    {
+        if ([] === $orderIds) {
+            return [];
+        }
+
+        /** @var list<IngestOrderItem> $items */
+        $items = $this->createQueryBuilder('i')
+            ->andWhere('i.companyId = :companyId')
+            ->andWhere('i.orderId IN (:orderIds)')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('orderIds', $orderIds)
+            ->getQuery()
+            ->getResult();
+
+        $indexed = [];
+        foreach ($items as $item) {
+            $indexed[$item->getOrderId()][$item->getLineKey()] = $item;
+        }
+
+        return $indexed;
+    }
+
+    /**
      * Позиции без связи с листингом — видимая очередь на разбор.
      *
      * @return list<IngestOrderItem>

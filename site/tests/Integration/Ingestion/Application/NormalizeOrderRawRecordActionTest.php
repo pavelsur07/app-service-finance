@@ -173,6 +173,55 @@ final class NormalizeOrderRawRecordActionTest extends IntegrationTestCase
     }
 
     /**
+     * Регрессия: результат observeStatus() игнорировался. Устаревшее сырьё не
+     * трогало статус, но всё равно откатывало количество, цену и атрибуты —
+     * получался внутренне противоречивый заказ: новый статус с данными из
+     * старого ответа.
+     */
+    public function testStaleObservationDoesNotRewindItemData(): void
+    {
+        $fresh = new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 5, externalSku: 'AAA', priceMinor: '90000');
+        $this->mapper->queue($this->orderWithItems('delivered', [$fresh]));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-1', new \DateTimeImmutable('+1 hour')), $this->companyId));
+
+        // Старое сырьё: другой статус И другие данные позиции.
+        $stale = new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 1, externalSku: 'AAA', priceMinor: '10000');
+        $this->mapper->queue($this->orderWithItems('delivering', [$stale]));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-2', new \DateTimeImmutable('-1 hour')), $this->companyId));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($order);
+        self::assertSame(IngestOrderStatus::DELIVERED, $order->getStatus());
+
+        $items = $this->items->findByOrderIndexedByLineKey($this->companyId, $order->getId());
+        self::assertSame(5, $items['sku:AAA#0']->getQuantity(), 'Количество не должно откатываться старым сырьём.');
+        self::assertSame('90000', $items['sku:AAA#0']->getPriceMinor(), 'Цена не должна откатываться старым сырьём.');
+
+        // Событие при этом фиксируется: наблюдение — факт, который был.
+        self::assertSame(2, $this->events->countByOrder($this->companyId, $order->getId()));
+    }
+
+    /**
+     * Батч с несколькими заказами обрабатывается целиком, и повторяющийся
+     * externalId внутри одного батча попадает в ту же запись, а не создаёт
+     * вторую и не упирается в уникальный индекс.
+     */
+    public function testBatchWithRepeatedExternalIdCreatesSingleOrder(): void
+    {
+        $this->mapper->queue(
+            $this->orderWithItems('delivering', [new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 1)]),
+            $this->orderWithItems('delivering', [new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 2)]),
+        );
+
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-1'), $this->companyId));
+
+        self::assertSame(1, (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM ingest_orders WHERE company_id = :c',
+            ['c' => $this->companyId],
+        ));
+    }
+
+    /**
      * Незнакомый статус деградирует в UNKNOWN и попадает в видимую очередь,
      * а не в NULL и не в исключение.
      */

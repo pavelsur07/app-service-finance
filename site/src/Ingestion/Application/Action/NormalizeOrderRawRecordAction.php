@@ -69,8 +69,45 @@ final readonly class NormalizeOrderRawRecordAction
         // обогнала бы свежий статус и сломала монотонность.
         $observedAt = $rawRecord->getFetchedAt();
 
+        // Заказы поднимаются ОДНИМ запросом, а не по одному на строку.
+        //
+        // Коннектор отдаёт до 20 000 строк за pull, и запрос на заказ означал
+        // бы десятки тысяч обращений на один raw batch. Плюс промежуточный
+        // flush() на каждый новый заказ создавал частичное состояние: заказ
+        // сохранён, а его начальное событие и позиции — ещё нет. Падение
+        // между ними оставляло заказ с тем же статусом, и повтор уже не
+        // восстановил бы пропущенное событие. Теперь запись целиком —
+        // заказ, событие, позиции и markNormalizationDone — уходит одним
+        // flush в конце.
+        $known = $this->orderRepository->findManyByExternalIdsIndexed(
+            $command->companyId,
+            $rawRecord->getSource(),
+            $rawRecord->getConnectionRef(),
+            array_values(array_unique(array_map(
+                static fn (MappedOrder $order): string => $order->externalId,
+                $orders,
+            ))),
+        );
+
+        $existingItems = $this->itemRepository->findByOrdersIndexedByLineKey(
+            $command->companyId,
+            array_values(array_map(
+                static fn (IngestOrder $order): string => $order->getId(),
+                $known,
+            )),
+        );
+
         foreach ($orders as $mappedOrder) {
-            $this->applyOrder($rawRecord, $mappedOrder, $observedAt);
+            // Один и тот же externalId может встретиться в батче дважды:
+            // второй раз он обязан попасть в уже созданную запись, а не
+            // создать вторую и упереться в уникальный индекс.
+            $known[$mappedOrder->externalId] = $this->applyOrder(
+                $rawRecord,
+                $mappedOrder,
+                $observedAt,
+                $known,
+                $existingItems,
+            );
         }
 
         // Строка, которую маппер не смог разобрать, обязана стать видимой
@@ -104,8 +141,21 @@ final readonly class NormalizeOrderRawRecordAction
         ]);
     }
 
-    private function applyOrder(IngestRawRecord $rawRecord, MappedOrder $mapped, \DateTimeImmutable $observedAt): void
-    {
+    /**
+     * @param array<string, IngestOrder> $known externalId => заказ
+     * @param array<string, array<string, IngestOrderItem>> $existingItems orderId => lineKey => позиция,
+     *                                                                     изменяется по ссылке: тот же
+     *                                                                     externalId может встретиться в
+     *                                                                     батче второй раз, а созданные
+     *                                                                     позиции ещё не во flush'е
+     */
+    private function applyOrder(
+        IngestRawRecord $rawRecord,
+        MappedOrder $mapped,
+        \DateTimeImmutable $observedAt,
+        array $known,
+        array &$existingItems,
+    ): IngestOrder {
         $companyId = $rawRecord->getCompanyId();
         $status = $this->statusMapper->map($rawRecord->getSource(), $mapped->scheme, $mapped->rawStatus);
 
@@ -126,12 +176,7 @@ final readonly class NormalizeOrderRawRecordAction
             ));
         }
 
-        $order = $this->orderRepository->findByExternalId(
-            $companyId,
-            $rawRecord->getSource(),
-            $rawRecord->getConnectionRef(),
-            $mapped->externalId,
-        );
+        $order = $known[$mapped->externalId] ?? null;
 
         if (null === $order) {
             $order = new IngestOrder(
@@ -151,12 +196,11 @@ final readonly class NormalizeOrderRawRecordAction
                 attributes: [] === $mapped->attributes ? null : $mapped->attributes,
             );
             $this->orderRepository->save($order);
-            $this->entityManager->flush();
 
             $this->appendStatusEvent($order, $mapped->rawStatus, $status, null, $observedAt, $rawRecord->getId());
-            $this->applyItems($order, $mapped->items, $rawRecord);
+            $existingItems[$order->getId()] = $this->applyItems($order, $mapped->items, $rawRecord, []);
 
-            return;
+            return $order;
         }
 
         $previousStatus = $order->getStatus();
@@ -170,13 +214,32 @@ final readonly class NormalizeOrderRawRecordAction
             $this->appendStatusEvent($order, $mapped->rawStatus, $status, $previousStatus, $observedAt, $rawRecord->getId());
         }
 
-        $order->observeStatus($mapped->rawStatus, $status, $observedAt, $mapped->rawSubstatus, $rawRecord->getId());
+        // Снимок заказа обновляется ТОЛЬКО принятым наблюдением.
+        //
+        // observeStatus() возвращает false для устаревшего наблюдения и статус
+        // назад не двигает. Раньше результат игнорировался, и старое сырьё,
+        // не тронув статус, всё равно откатывало количество, цену, листинг и
+        // атрибуты: получался внутренне противоречивый заказ — новый статус с
+        // данными из старого ответа. Событие журнала при этом остаётся: оно
+        // фиксирует факт наблюдения, а не текущее состояние.
+        $accepted = $order->observeStatus($mapped->rawStatus, $status, $observedAt, $mapped->rawSubstatus, $rawRecord->getId());
+        if (!$accepted) {
+            return $order;
+        }
+
         $order->mergeAttributes($mapped->attributes);
         if (null !== $mapped->externalOrderId) {
             $order->setExternalOrderId($mapped->externalOrderId);
         }
 
-        $this->applyItems($order, $mapped->items, $rawRecord);
+        $existingItems[$order->getId()] = $this->applyItems(
+            $order,
+            $mapped->items,
+            $rawRecord,
+            $existingItems[$order->getId()] ?? [],
+        );
+
+        return $order;
     }
 
     private function appendStatusEvent(
@@ -207,15 +270,24 @@ final readonly class NormalizeOrderRawRecordAction
     }
 
     /**
+     * Возвращает карту позиций заказа после применения — она нужна вызывающему,
+     * потому что тот же externalId может встретиться в батче второй раз, а
+     * только что созданные позиции ещё не во flush'е и запросом не видны.
+     *
      * @param list<MappedOrderItem> $mappedItems
+     * @param array<string, IngestOrderItem> $existing lineKey => позиция
+     *
+     * @return array<string, IngestOrderItem>
      */
-    private function applyItems(IngestOrder $order, array $mappedItems, IngestRawRecord $rawRecord): void
-    {
+    private function applyItems(
+        IngestOrder $order,
+        array $mappedItems,
+        IngestRawRecord $rawRecord,
+        array $existing,
+    ): array {
         if ([] === $mappedItems) {
-            return;
+            return $existing;
         }
-
-        $existing = $this->itemRepository->findByOrderIndexedByLineKey($order->getCompanyId(), $order->getId());
 
         $sourceDataRows = [];
         foreach ($mappedItems as $index => $mappedItem) {
@@ -269,6 +341,9 @@ final readonly class NormalizeOrderRawRecordAction
             }
 
             $item->linkListing($resolution?->listingId, $listingSku);
+            $existing[$mappedItem->lineKey] = $item;
         }
+
+        return $existing;
     }
 }

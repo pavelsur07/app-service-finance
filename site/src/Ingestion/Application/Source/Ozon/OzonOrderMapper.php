@@ -32,6 +32,20 @@ final class OzonOrderMapper implements OrderMapperInterface
         return [OzonResourceType::ORDERS_FBO, OzonResourceType::ORDERS_FBS];
     }
 
+    /**
+     * Ozon отдаёт RFC3339 с литеральным «Z» и микросекундами
+     * (`2026-08-30T17:49:41.153418Z` — проверено на реальной выгрузке).
+     * Вариант со смещением и вариант без дробной части тоже принимаем: они
+     * валидны по стандарту, и полагаться на то, что источник никогда не
+     * сменит форму записи, оснований нет. `u` разбирает 1–6 знаков.
+     */
+    private const DATE_FORMATS = [
+        'Y-m-d\TH:i:s.u\Z',
+        'Y-m-d\TH:i:s\Z',
+        'Y-m-d\TH:i:s.uP',
+        'Y-m-d\TH:i:sP',
+    ];
+
     public function map(IngestRawRecord $rawRecord, iterable $rows): MappedOrderBatch
     {
         // Схема берётся из типа ресурса, а не из payload'а: у FBO и FBS разные
@@ -73,12 +87,18 @@ final class OzonOrderMapper implements OrderMapperInterface
                 continue;
             }
 
+            $mappedItems = $this->mapItems($row);
+            if (null !== $mappedItems['error']) {
+                $skipped[] = ['reason' => $mappedItems['error'], 'hint' => $postingNumber];
+                continue;
+            }
+
             $orders[] = new MappedOrder(
                 externalId: $postingNumber,
                 scheme: $scheme,
                 orderedAt: $orderedAt,
                 rawStatus: $status,
-                items: $this->mapItems($row),
+                items: $mappedItems['items'],
                 externalOrderId: $this->stringOrNull($row['order_number'] ?? null),
                 rawSubstatus: $this->stringOrNull($row['substatus'] ?? null),
                 attributes: $this->mapAttributes($row),
@@ -89,15 +109,24 @@ final class OzonOrderMapper implements OrderMapperInterface
     }
 
     /**
+     * Разбор позиций отправления.
+     *
+     * Повреждённая позиция — тоже потеря, и она не должна быть тише, чем
+     * повреждённый заказ: приведение произвольного значения к `0` или к `true`
+     * даёт правдоподобную, но выдуманную строку, а raw при этом помечается
+     * DONE и курсор уходит вперёд. Поэтому нарушение структуры делает
+     * НЕДЕЙСТВИТЕЛЬНЫМ весь posting: половина позиций хуже, чем явная очередь
+     * на разбор — по половине нельзя посчитать ни выкуп, ни сумму заказа.
+     *
      * @param array<string, mixed> $row
      *
-     * @return list<MappedOrderItem>
+     * @return array{items: list<MappedOrderItem>, error: ?string}
      */
     private function mapItems(array $row): array
     {
         $products = $row['products'] ?? [];
         if (!is_array($products)) {
-            return [];
+            return ['items' => [], 'error' => 'malformed_products'];
         }
 
         $items = [];
@@ -105,34 +134,85 @@ final class OzonOrderMapper implements OrderMapperInterface
         $seen = [];
         foreach ($products as $product) {
             if (!is_array($product)) {
-                continue;
+                return ['items' => [], 'error' => 'malformed_product_entry'];
+            }
+
+            $quantity = $this->intOrNull($product['quantity'] ?? null);
+            if (null === $quantity || $quantity < 0) {
+                return ['items' => [], 'error' => 'malformed_product_quantity'];
+            }
+
+            $buyout = $this->boolOrNull($product['is_marketplace_buyout'] ?? null);
+            if (null === $buyout) {
+                return ['items' => [], 'error' => 'malformed_product_buyout'];
+            }
+
+            // Цена может отсутствовать легально, но присутствующая и
+            // неразбираемая — испорченная: молчаливый null означал бы
+            // «бесплатно» в любом денежном расчёте.
+            $rawPrice = $product['price'] ?? null;
+            $priceMinor = null === $rawPrice ? null : $this->toMinor($rawPrice);
+            if (null !== $rawPrice && null === $priceMinor) {
+                return ['items' => [], 'error' => 'malformed_product_price'];
             }
 
             $sku = $this->stringOrNull($product['sku'] ?? null);
             $offerId = $this->stringOrNull($product['offer_id'] ?? null);
+            $name = $this->stringOrNull($product['name'] ?? null);
 
             $items[] = new MappedOrderItem(
                 // lineNo — только порядок отображения.
                 lineNo: $lineNo,
                 lineKey: $this->lineKey($sku, $offerId, $lineNo, $seen),
-                quantity: is_numeric($product['quantity'] ?? null) ? (int) $product['quantity'] : 0,
+                quantity: $quantity,
                 externalSku: $sku,
                 offerId: $offerId,
-                name: $this->stringOrNull($product['name'] ?? null),
-                priceMinor: $this->toMinor($product['price'] ?? null),
+                name: $name,
+                priceMinor: $priceMinor,
                 currency: $this->stringOrNull($product['currency_code'] ?? null),
-                marketplaceBuyout: (bool) ($product['is_marketplace_buyout'] ?? false),
+                marketplaceBuyout: $buyout,
                 // Ровно те ключи, которые читает OzonListingResolver.
                 sourceData: array_filter([
                     'sku' => $sku,
                     'offer_id' => $offerId,
-                    'name' => $this->stringOrNull($product['name'] ?? null),
+                    'name' => $name,
                 ], static fn (mixed $v): bool => null !== $v),
             );
             ++$lineNo;
         }
 
-        return $items;
+        return ['items' => $items, 'error' => null];
+    }
+
+    /**
+     * Строгое целое: строка "3" допустима, "3.5" и "три" — нет. Приведение
+     * произвольного значения к 0 тихо превратило бы позицию в «ничего не
+     * заказано».
+     */
+    private function intOrNull(mixed $value): ?int
+    {
+        if (is_int($value)) {
+            return $value;
+        }
+
+        if (is_string($value) && 1 === preg_match('/^-?\d+$/', trim($value))) {
+            return (int) trim($value);
+        }
+
+        return null;
+    }
+
+    /**
+     * Строгий bool: строка "false" при приведении становится true, то есть
+     * ровно переворачивает признак выкупа.
+     */
+    private function boolOrNull(mixed $value): ?bool
+    {
+        if (null === $value) {
+            return false;
+        }
+
+        return is_bool($value) ? $value : null;
     }
 
     /**
@@ -179,7 +259,15 @@ final class OzonOrderMapper implements OrderMapperInterface
         $occurrence = $seen[$base] ?? 0;
         $seen[$base] = $occurrence + 1;
 
-        return substr($base.'#'.$occurrence, 0, 120);
+        // Длинный идентификатор сворачиваем в хеш, а НЕ обрезаем: обрезка
+        // съедала бы номер повторения (#0 и #1 давали один ключ), а два
+        // разных offer_id с общим длинным началом схлопывались бы в одну
+        // позицию. offer_id у Ozon бывает до 255 символов.
+        if (mb_strlen($base) > 80) {
+            $base = 'h:'.hash('sha256', $base);
+        }
+
+        return $base.'#'.$occurrence;
     }
 
     private function toMinor(mixed $price): ?string
@@ -212,16 +300,51 @@ final class OzonOrderMapper implements OrderMapperInterface
         return '' === $string ? null : $string;
     }
 
+    /**
+     * Строгий разбор даты заказа.
+     *
+     * `new DateTimeImmutable($value)` датой не проверяет ничего: он примет
+     * относительную строку («tomorrow»), молча нормализует несуществующее
+     * число (2026-02-30 → 2026-03-02) и подставит таймзону процесса там, где
+     * её не было. Любой из этих случаев дал бы заказу правдоподобную, но
+     * выдуманную дату, а raw при этом пометился бы DONE — потеря стала бы
+     * постоянной и незаметной.
+     *
+     * Поэтому принимаем только явный момент времени со смещением.
+     */
     private function parseDate(mixed $value): ?\DateTimeImmutable
     {
-        if (!is_string($value) || '' === trim($value)) {
+        if (!is_string($value)) {
             return null;
         }
 
-        try {
-            return new \DateTimeImmutable($value);
-        } catch (\Exception) {
+        $raw = trim($value);
+        if ('' === $raw) {
             return null;
         }
+
+        // Таймзона задаётся явно: в форматах с литеральным «Z» символ
+        // съедается как обычный текст и смещение из строки НЕ читается —
+        // без этого аргумента момент в UTC был бы прочитан как местное время
+        // и каждая дата заказа уехала бы на смещение сервера.
+        $utc = new \DateTimeZone('UTC');
+
+        foreach (self::DATE_FORMATS as $format) {
+            $parsed = \DateTimeImmutable::createFromFormat($format, $raw, $utc);
+            if (false === $parsed) {
+                continue;
+            }
+
+            // createFromFormat прощает лишнее и «чинит» невозможные даты:
+            // getLastErrors() — единственный способ это заметить.
+            $errors = \DateTimeImmutable::getLastErrors();
+            if (false !== $errors && ($errors['warning_count'] > 0 || $errors['error_count'] > 0)) {
+                continue;
+            }
+
+            return $parsed;
+        }
+
+        return null;
     }
 }
