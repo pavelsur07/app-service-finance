@@ -1,0 +1,259 @@
+{
+  "result": [
+    {
+      "order_id": 100000001,
+      "order_number": "00001-0001",
+      "posting_number": "00001-0001-1",
+      "status": "delivering",
+      "cancel_reason_id": 0,
+      "created_at": "2026-08-30T17:49:41.153418Z",
+      "in_process_at": "2026-08-30T17:49:47.478839Z",
+      "products": [
+        {
+          "sku": 700000011,
+          "name": "Тестовый товар 1-1",
+          "quantity": 1,
+          "offer_id": "TEST-ART-001-1",
+          "price": "2095.00",
+          "digital_codes": [],
+          "currency_code": "RUB",
+          "is_marketplace_buyout": false
+        }
+      ],
+      "analytics_data": {
+        "city": "Тестоград",
+        "delivery_type": "PVZ",
+        "is_premium": true,
+        "payment_type_group_name": "Ozon Банк",
+        "warehouse_id": 1020002006967000,
+        "warehouse_name": "ТЕСТ_РФЦ",
+        "is_legal": false,
+        "client_delivery_date_begin": null,
+        "client_delivery_date_end": null
+      },
+      "financial_data": {
+        "products": [
+          {
+            "commission_amount": 0,
+            "commission_percent": 0,
+            "payout": 0,
+            "product_id": 220279573,
+            "old_price": 6226.29,
+            "price": 2095,
+            "total_discount_value": 4131.29,
+            "total_discount_percent": 66,
+            "actions": [
+              "Системная виртуальная скидка селлера Россия (RUB)",
+              "Эластичный бустинг. Без ограничения срока действия",
+              "Скидка (за счет Озон) - DD by AI benefit system",
+              "Скидка (за счет Озон) - OA by AI benefit system",
+              "Округление",
+              "Товарная скидка на доставку (Сквозная экономика 5)"
+            ],
+            "currency_code": "RUB"
+          }
+        ],
+        "cluster_from": "Тестовый кластер",
+        "cluster_to": "Тестовый кластер"
+      },
+      "additional_data": [],
+      "legal_info": {
+        "company_name": "",
+        "inn": "",
+        "kpp": ""
+      },
+      "substatus": "posting_on_way_to_city"
+    },
+    {
+      "order_id": 100000002,
+      "order_number": "00002-0001",
+      "posting_number": "00002-0001-1",
+      "status": "cancelled",
+      "cancel_reason_id": 79,
+      "created_at": "2026-08-30T18:37:28.229440Z",
+      "in_process_at": "2026-08-30T18:37:34.864479Z",
+      "products": [
+        {
+          "sku": 700000021,
+          "name": "Тестовый товар 2-1",
+          "quantity": 1,
+          "offer_id": "TEST-ART-002-1",
+          "price": "2145.00",
+          "digital_codes": [],
+          "currency_code": "RUB",
+          "is_marketplace_buyout": false
+        }
+      ],
+      "analytics_data": {
+        "city": "Тестоград",
+        "delivery_type": "PVZ",
+        "is_premium": false,
+        "payment_type_group_name": "Ozon Банк",
+        "warehouse_id": 1020002690706000,
+        "warehouse_name": "ТЕСТ_РФЦ",
+        "is_legal": false,
+        "client_delivery_date_begin": null,
+        "client_delivery_date_end": null
+      },
+      "financial_data": {
+        "products": [
+          {
+            "commission_amount": 0,
+            "commission_percent": 0,
+            "payout": 0,
+            "product_id": 286031076,
+            "old_price": 6120.38,
+            "price": 2145,
+            "total_discount_value": 3975.38,
+            "total_discount_percent": 65,
+            "actions": [
+              "Скидка (за счет Озон) - OA by AI benefit system",
+              "Округление",
+              "Товарная скидка на доставку (Сквозная экономика 5)",
+              "Системная виртуальная скидка селлера Россия (RUB)",
+              "Максимальный бустинг: усиление ",
+              "Скидка (за счет Озон) - DD by AI benefit system"
+            ],
+            "currency_code": "RUB"
+          }
+        ],
+        "cluster_from": "Тестовый кластер",
+        "cluster_to": "Тестовый кластер"
+      },
+      "additional_data": [],
+      "legal_info": {
+        "company_name": "",
+        "inn": "",
+        "kpp": ""
+      },
+      "substatus": "posting_canceled"
+    },
+    {
+      "order_id": 100000003,
+      "order_number": "00003-0001",
+      "posting_number": "00003-0001-1",
+      "status": "awaiting_deliver",
+      "cancel_reason_id": 0,
+      "created_at": "2026-08-30T20:44:05.027851Z",
+      "in_process_at": "2026-08-30T20:44:36.457181Z",
+      "products": [
+        {
+          "sku": 700000031,
+          "name": "Тестовый товар 3-1",
+          "quantity": 1,
+          "offer_id": "TEST-ART-003-1",
+          "price": "2145.00",
+          "digital_codes": [],
+          "currency_code": "RUB",
+          "is_marketplace_buyout": false
+        }
+      ],
+      "analytics_data": {
+        "city": "Тестоград",
+        "delivery_type": "PVZ",
+        "is_premium": false,
+        "payment_type_group_name": "Система Быстрых Платежей",
+        "warehouse_id": 1020000115166000,
+        "warehouse_name": "ТЕСТ_РФЦ",
+        "is_legal": false,
+        "client_delivery_date_begin": null,
+        "client_delivery_date_end": null
+      },
+      "financial_data": {
+        "products": [
+          {
+            "commission_amount": 0,
+            "commission_percent": 0,
+            "payout": 0,
+            "product_id": 1988145769,
+            "old_price": 6019.64,
+            "price": 2145,
+            "total_discount_value": 3874.6400000000003,
+            "total_discount_percent": 64,
+            "actions": [
+              "Товарная скидка на доставку (Сквозная экономика 5)",
+              "Системная виртуальная скидка селлера Россия (RUB)",
+              "Максимальный бустинг: усиление ",
+              "Скидка (за счет Озон) - DD by AI benefit system",
+              "Округление"
+            ],
+            "currency_code": "RUB"
+          }
+        ],
+        "cluster_from": "Тестовый кластер",
+        "cluster_to": "Тестовый кластер"
+      },
+      "additional_data": [],
+      "legal_info": {
+        "company_name": "",
+        "inn": "",
+        "kpp": ""
+      },
+      "substatus": "posting_transferring_to_delivery"
+    },
+    {
+      "order_id": 100000004,
+      "order_number": "00004-0001",
+      "posting_number": "00004-0001-1",
+      "status": "delivered",
+      "cancel_reason_id": 0,
+      "created_at": "2026-08-31T03:33:00.363208Z",
+      "in_process_at": "2026-08-31T03:33:08.569225Z",
+      "products": [
+        {
+          "sku": 700000041,
+          "name": "Тестовый товар 4-1",
+          "quantity": 1,
+          "offer_id": "TEST-ART-004-1",
+          "price": "2145.00",
+          "digital_codes": [],
+          "currency_code": "RUB",
+          "is_marketplace_buyout": false
+        }
+      ],
+      "analytics_data": {
+        "city": "Тестоград",
+        "delivery_type": "PVZ",
+        "is_premium": false,
+        "payment_type_group_name": "Ozon Банк",
+        "warehouse_id": 18044249781000,
+        "warehouse_name": "ТЕСТ_РФЦ",
+        "is_legal": false,
+        "client_delivery_date_begin": null,
+        "client_delivery_date_end": null
+      },
+      "financial_data": {
+        "products": [
+          {
+            "commission_amount": -1115.4,
+            "commission_percent": 52,
+            "payout": 1029.6,
+            "product_id": 1988146647,
+            "old_price": 6012.87,
+            "price": 2145,
+            "total_discount_value": 3867.87,
+            "total_discount_percent": 64,
+            "actions": [
+              "Системная виртуальная скидка селлера Россия (RUB)",
+              "Максимальный бустинг: усиление ",
+              "Скидка (за счет Озон) - DD by AI benefit system",
+              "Скидка (за счет Озон) - OA by AI benefit system",
+              "Округление",
+              "Товарная скидка на доставку (Сквозная экономика 5)"
+            ],
+            "currency_code": "RUB"
+          }
+        ],
+        "cluster_from": "Тестовый кластер",
+        "cluster_to": "Тестовый кластер"
+      },
+      "additional_data": [],
+      "legal_info": {
+        "company_name": "",
+        "inn": "",
+        "kpp": ""
+      },
+      "substatus": "posting_received"
+    }
+  ]
+}

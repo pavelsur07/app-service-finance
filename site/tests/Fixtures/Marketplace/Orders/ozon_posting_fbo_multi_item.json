@@ -1,0 +1,79 @@
+{
+  "result": [
+    {
+      "order_id": 100000001,
+      "order_number": "00001-0001",
+      "posting_number": "00099-0001-1",
+      "status": "delivering",
+      "cancel_reason_id": 0,
+      "created_at": "2026-08-30T17:49:41.153418Z",
+      "in_process_at": "2026-08-30T17:49:47.478839Z",
+      "products": [
+        {
+          "sku": 700000011,
+          "name": "Тестовый товар 1-1",
+          "quantity": 1,
+          "offer_id": "TEST-ART-001-1",
+          "price": "2095.00",
+          "digital_codes": [],
+          "currency_code": "RUB",
+          "is_marketplace_buyout": false
+        },
+        {
+          "sku": 700000099,
+          "name": "Тестовый товар 99-2",
+          "quantity": 2,
+          "offer_id": "TEST-ART-099-2",
+          "price": "2095.00",
+          "digital_codes": [],
+          "currency_code": "RUB",
+          "is_marketplace_buyout": false
+        }
+      ],
+      "analytics_data": {
+        "city": "Тестоград",
+        "delivery_type": "PVZ",
+        "is_premium": true,
+        "payment_type_group_name": "Ozon Банк",
+        "warehouse_id": 1020002006967000,
+        "warehouse_name": "ТЕСТ_РФЦ",
+        "is_legal": false,
+        "client_delivery_date_begin": null,
+        "client_delivery_date_end": null
+      },
+      "financial_data": {
+        "products": [
+          {
+            "commission_amount": 0,
+            "commission_percent": 0,
+            "payout": 0,
+            "product_id": 220279573,
+            "old_price": 6226.29,
+            "price": 2095,
+            "total_discount_value": 4131.29,
+            "total_discount_percent": 66,
+            "actions": [
+              "Системная виртуальная скидка селлера Россия (RUB)",
+              "Эластичный бустинг. Без ограничения срока действия",
+              "Скидка (за счет Озон) - DD by AI benefit system",
+              "Скидка (за счет Озон) - OA by AI benefit system",
+              "Округление",
+              "Товарная скидка на доставку (Сквозная экономика 5)"
+            ],
+            "currency_code": "RUB"
+          }
+        ],
+        "cluster_from": "Ярославль",
+        "cluster_to": "Воронеж"
+      },
+      "additional_data": [],
+      "legal_info": {
+        "company_name": "",
+        "inn": "",
+        "kpp": ""
+      },
+      "substatus": "posting_on_way_to_city",
+      "_fixture_note": "СИНТЕТИЧЕСКАЯ фикстура: в выгрузке 2026-09-01 все 100 отправлений FBO были однопозиционными. Вторая позиция добавлена вручную, чтобы проверить связь листингов на уровне позиции."
+    }
+  ]
+}

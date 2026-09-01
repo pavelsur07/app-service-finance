@@ -1,0 +1,107 @@
+{
+  "next": 1788267408828002001,
+  "orders": [
+    {
+      "address": null,
+      "scanPrice": 1000,
+      "comment": "",
+      "deliveryType": "fbs",
+      "supplyId": "WB-GI-271305969",
+      "orderUid": "itest0000000000000000000000000001",
+      "article": "TEST-ART-001",
+      "colorCode": "",
+      "rid": "eTEST.i0000000000000000000000000000001.0.0",
+      "createdAt": "2026-08-30T19:18:04Z",
+      "offices": [
+        "Тестоград"
+      ],
+      "skus": [
+        "4600000000001"
+      ],
+      "id": 5000000001,
+      "warehouseId": 116232,
+      "nmId": 20000001,
+      "chrtId": 400000001,
+      "price": 195700,
+      "convertedPrice": 195700,
+      "currencyCode": 643,
+      "convertedCurrencyCode": 643,
+      "cargoType": 1,
+      "crossBorderType": 0,
+      "isZeroOrder": false,
+      "options": {
+        "isB2B": false
+      },
+      "isPickupPointShipmentAllowed": false,
+      "officeId": 165
+    },
+    {
+      "address": null,
+      "scanPrice": null,
+      "comment": "",
+      "deliveryType": "fbs",
+      "supplyId": "",
+      "orderUid": "itest0000000000000000000000000002",
+      "article": "TEST-ART-002",
+      "colorCode": "",
+      "rid": "eTEST.i0000000000000000000000000000002.0.0",
+      "createdAt": "2026-09-01T12:28:32Z",
+      "offices": [
+        "Тестоград"
+      ],
+      "skus": [
+        "4600000000002"
+      ],
+      "id": 5000000002,
+      "warehouseId": 116232,
+      "nmId": 20000002,
+      "chrtId": 400000002,
+      "price": 293400,
+      "convertedPrice": 293400,
+      "currencyCode": 643,
+      "convertedCurrencyCode": 643,
+      "cargoType": 1,
+      "crossBorderType": 0,
+      "isZeroOrder": false,
+      "options": {
+        "isB2B": false
+      },
+      "isPickupPointShipmentAllowed": false,
+      "officeId": 165
+    },
+    {
+      "address": null,
+      "scanPrice": null,
+      "comment": "",
+      "deliveryType": "fbs",
+      "supplyId": "",
+      "orderUid": "itest0000000000000000000000000003",
+      "article": "TEST-ART-003",
+      "colorCode": "",
+      "rid": "eTEST.i0000000000000000000000000000003.0.0",
+      "createdAt": "2026-09-01T12:29:10Z",
+      "offices": [
+        "Тестоград"
+      ],
+      "skus": [
+        "4600000000003"
+      ],
+      "id": 5000000003,
+      "warehouseId": 116232,
+      "nmId": 20000003,
+      "chrtId": 400000003,
+      "price": 200900,
+      "convertedPrice": 200900,
+      "currencyCode": 643,
+      "convertedCurrencyCode": 643,
+      "cargoType": 1,
+      "crossBorderType": 0,
+      "isZeroOrder": false,
+      "options": {
+        "isB2B": false
+      },
+      "isPickupPointShipmentAllowed": false,
+      "officeId": 165
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "orders": [
+    {
+      "supplierStatus": "complete",
+      "wbStatus": "sorted",
+      "isCancellable": false,
+      "id": 5000000001
+    },
+    {
+      "supplierStatus": "new",
+      "wbStatus": "canceled_by_client",
+      "isCancellable": false,
+      "id": 5000000002
+    },
+    {
+      "supplierStatus": "new",
+      "wbStatus": "waiting",
+      "isCancellable": true,
+      "id": 5000000003
+    }
+  ]
+}
