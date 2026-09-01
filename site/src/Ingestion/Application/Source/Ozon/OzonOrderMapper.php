@@ -341,10 +341,17 @@ final class OzonOrderMapper implements OrderMapperInterface
             : ['created_at', 'in_process_at'];
 
         foreach ($fields as $field) {
-            $parsed = $this->parseDate($row[$field] ?? null);
-            if (null !== $parsed) {
-                return $parsed;
+            // Запасное поле — только на случай ОТСУТСТВИЯ предпочтительного.
+            //
+            // Переход по любой ошибке разбора обходил бы строгую проверку:
+            // FBO с испорченным created_at и валидным in_process_at принялся
+            // бы с семантически другой датой, а нарушение контракта осталось
+            // бы незамеченным.
+            if (!array_key_exists($field, $row) || null === $row[$field]) {
+                continue;
             }
+
+            return $this->parseDate($row[$field]);
         }
 
         return null;

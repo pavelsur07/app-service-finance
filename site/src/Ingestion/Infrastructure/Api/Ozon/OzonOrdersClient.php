@@ -185,7 +185,13 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
     {
         $result = [];
         foreach ($rows as $row) {
-            if (!is_array($row)) {
+            // Отправление обязано быть непустым JSON-ОБЪЕКТОМ. После
+            // json_decode(..., true) вложенный список вроде ["broken"] тоже
+            // является массивом и прошёл бы как posting: маппер отклонил бы
+            // его в MAPPER_FAILURE, но raw пометился бы DONE, а курсор ушёл
+            // вперёд — нарушение контракта API стало бы окончательным
+            // пропуском. Пустой объект тоже невалиден: опознать его нечем.
+            if (!is_array($row) || [] === $row || array_is_list($row)) {
                 throw new MalformedConnectorResponseException(sprintf('Ozon orders response contains a non-object posting for %s.', $endpoint));
             }
 

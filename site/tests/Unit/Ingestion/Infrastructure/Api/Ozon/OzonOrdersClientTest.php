@@ -188,6 +188,38 @@ final class OzonOrdersClientTest extends TestCase
         yield 'gateway timeout' => [504];
     }
 
+    /**
+     * Вложенный список после json_decode(..., true) — тоже массив, и прошёл бы
+     * как posting: маппер отклонил бы его, но raw пометился бы DONE, а курсор
+     * ушёл вперёд, превратив нарушение контракта в окончательный пропуск.
+     */
+    #[DataProvider('nonObjectPostingProvider')]
+    public function testNonObjectPostingShapesAreMalformed(string $payload): void
+    {
+        $client = $this->client(new MockResponse($payload, ['http_code' => 200]));
+
+        $this->expectException(MalformedConnectorResponseException::class);
+        $this->fetch($client);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function nonObjectPostingProvider(): iterable
+    {
+        yield 'вложенный список' => ['{"result":[["broken"]]}'];
+        yield 'пустой объект' => ['{"result":[{}]}'];
+        yield 'скаляр' => ['{"result":["broken"]}'];
+    }
+
+    public function testNonObjectFbsPostingIsMalformed(): void
+    {
+        $client = $this->client(new MockResponse('{"result":{"postings":[["broken"]],"has_next":false}}', ['http_code' => 200]));
+
+        $this->expectException(MalformedConnectorResponseException::class);
+        $this->fetch($client, IngestOrderScheme::FBS);
+    }
+
     private function fetch(OzonOrdersClient $client, IngestOrderScheme $scheme = IngestOrderScheme::FBO): void
     {
         $client->fetchPostings(

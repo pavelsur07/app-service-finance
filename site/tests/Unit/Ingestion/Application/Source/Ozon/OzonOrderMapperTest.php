@@ -393,6 +393,40 @@ final class OzonOrderMapperTest extends TestCase
     }
 
     /**
+     * Регрессия: переход к запасному полю по любой ошибке разбора обходил
+     * строгую проверку. FBO с испорченным created_at и валидным
+     * in_process_at принялся бы с семантически другой датой, а нарушение
+     * контракта осталось бы незамеченным.
+     */
+    public function testMalformedPreferredDateIsNotSilentlyReplacedByFallback(): void
+    {
+        $batch = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBO), [[
+            'posting_number' => 'p-1',
+            'status' => 'delivering',
+            'created_at' => 'сломано',
+            'in_process_at' => '2026-09-01T11:00:00Z',
+            'products' => [['sku' => 1, 'quantity' => 1, 'price' => '10.00']],
+        ]]);
+
+        self::assertSame([], $batch->orders);
+        self::assertSame([['reason' => 'unparsable_created_at', 'hint' => 'p-1']], $batch->skipped);
+    }
+
+    public function testMalformedPreferredDateIsNotReplacedForFbsEither(): void
+    {
+        $batch = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBS), [[
+            'posting_number' => 'p-1',
+            'status' => 'awaiting_deliver',
+            'in_process_at' => 'сломано',
+            'created_at' => '2026-09-01T11:00:00Z',
+            'products' => [['sku' => 1, 'quantity' => 1, 'price' => '10.00']],
+        ]]);
+
+        self::assertSame([], $batch->orders);
+        self::assertSame([['reason' => 'unparsable_created_at', 'hint' => 'p-1']], $batch->skipped);
+    }
+
+    /**
      * Регрессия: для форматов со смещением аргумент таймзоны у
      * createFromFormat() игнорируется, и объект оставался в исходной зоне.
      * Doctrine пишет datetime_immutable в TIMESTAMP WITHOUT TIME ZONE как
