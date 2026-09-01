@@ -127,7 +127,11 @@ final class OzonOrderMapper implements OrderMapperInterface
         // Отсутствующий или null-евый products — не «заказ без товаров», а
         // испорченный ответ: Ozon всегда присылает список. `?? []` превращал
         // его в корректный пустой заказ, и позиции терялись бесследно.
-        if (!array_key_exists('products', $row) || !is_array($row['products'])) {
+        // Именно список: json_decode(..., true) отдаёт объект тем же массивом,
+        // и непустой объект товаров прошёл бы как список с игнорированными
+        // ключами. Пустой `{}` от пустого `[]` таким способом не отличить, но
+        // и наблюдаемый результат у них один — ноль позиций.
+        if (!array_key_exists('products', $row) || !is_array($row['products']) || !array_is_list($row['products'])) {
             return ['items' => [], 'error' => 'malformed_products'];
         }
 

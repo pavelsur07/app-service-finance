@@ -216,6 +216,34 @@ final class OzonOrdersConnectorTest extends TestCase
     }
 
     /**
+     * Регрессия: через продолжение исходное значение курсора не переносилось,
+     * и финальная страница записывала конец окна. Курсор, ушедший вперёд,
+     * откатывался назад, и почасовой процесс заново обходил историю.
+     */
+    public function testContinuationCarriesMonotonicityFloor(): void
+    {
+        $pages = [];
+        for ($i = 0; $i < OzonOrdersConnector::MAX_PAGES_PER_PULL; ++$i) {
+            $pages[] = new OzonRawPage($this->postings(OzonOrdersConnector::PAGE_LIMIT), true, null, []);
+        }
+        $this->client->queue(...$pages);
+
+        // Курсор впереди текущих часов — окно окажется позади него.
+        $first = $this->connector->pull($this->request('{"since":"2026-09-01T18:00:00+00:00"}'));
+
+        self::assertTrue($first->hasMore);
+        $continuation = json_decode((string) $first->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertSame('2026-09-01T18:00:00+00:00', $continuation['floor']);
+
+        // Финальная страница продолжения не должна откатить курсор на конец окна.
+        $this->client->queue(new OzonRawPage($this->postings(1), false, null, []));
+        $final = $this->connector->pull($this->request((string) $first->nextCursorValue));
+
+        $decoded = json_decode((string) $final->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertSame('2026-09-01T18:00:00+00:00', $decoded['since']);
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     private function postings(int $count): array

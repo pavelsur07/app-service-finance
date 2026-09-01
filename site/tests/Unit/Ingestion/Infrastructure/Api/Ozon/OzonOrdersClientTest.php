@@ -163,6 +163,31 @@ final class OzonOrdersClientTest extends TestCase
         $this->fetch($client, IngestOrderScheme::FBS);
     }
 
+    /**
+     * 408 и 425 — временные по смыслу и подлежат повтору ровно как 5xx. Без
+     * отдельной ветки таймаут шлюза становился неповторяемым malformed
+     * response и убивал прогон.
+     */
+    #[DataProvider('transientStatusProvider')]
+    public function testTimeoutStatusesAreTransient(int $statusCode): void
+    {
+        $client = $this->client(new MockResponse('{}', ['http_code' => $statusCode]));
+
+        $this->expectException(ConnectorTransientException::class);
+        $this->fetch($client);
+    }
+
+    /**
+     * @return iterable<string, array{int}>
+     */
+    public static function transientStatusProvider(): iterable
+    {
+        yield 'request timeout' => [408];
+        yield 'too early' => [425];
+        yield 'bad gateway' => [502];
+        yield 'gateway timeout' => [504];
+    }
+
     private function fetch(OzonOrdersClient $client, IngestOrderScheme $scheme = IngestOrderScheme::FBO): void
     {
         $client->fetchPostings(

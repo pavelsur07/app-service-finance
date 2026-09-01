@@ -105,7 +105,11 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
         if (429 === $statusCode) {
             throw new ConnectorRateLimitedException(sprintf('Ozon orders rate limited for %s.', $endpoint), $this->retryAfterSeconds($headers));
         }
-        if ($statusCode >= 500) {
+        // 408 и 425 — временные по смыслу: истёкший таймаут запроса и
+        // «слишком рано» подлежат повтору ровно так же, как 5xx. Без этой
+        // ветки они попадали в общий разбор и становились неповторяемым
+        // malformed response, то есть таймаут шлюза убивал прогон.
+        if ($statusCode >= 500 || 408 === $statusCode || 425 === $statusCode) {
             throw new ConnectorTransientException(sprintf('Ozon orders server error for %s (HTTP %d).', $endpoint, $statusCode));
         }
         if (200 !== $statusCode) {

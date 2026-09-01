@@ -29,7 +29,11 @@ use Webmozart\Assert\Assert;
 // событие, а не новое при каждой перенормализации. Без этого повторный прогон
 // старого raw бесконечно дописывал бы копии: устаревшее наблюдение не двигает
 // статус заказа, поэтому «статус отличается» остаётся истиной навсегда.
-#[ORM\UniqueConstraint(name: 'uniq_ingest_order_status_event_observation', columns: ['company_id', 'order_id', 'raw_record_id', 'raw_status'])]
+// Порядок колонок подобран под запрос дедупа, который фильтрует по
+// (company_id, raw_record_id): при порядке с order_id посередине B-tree не мог
+// бы использовать префикс, и каждая нормализация просматривала бы все события
+// компании. Кортеж уникальности от перестановки не меняется.
+#[ORM\UniqueConstraint(name: 'uniq_ingest_order_status_event_observation', columns: ['company_id', 'raw_record_id', 'order_id', 'raw_status'])]
 #[ORM\Index(name: 'idx_ingest_order_status_event_order', columns: ['order_id', 'observed_at'])]
 #[ORM\Index(name: 'idx_ingest_order_status_event_company', columns: ['company_id', 'observed_at'])]
 class IngestOrderStatusEvent implements TenantOwnedInterface

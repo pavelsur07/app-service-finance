@@ -92,7 +92,7 @@ final class Version20260901180000 extends AbstractMigration
                 PRIMARY KEY(id)
             )
             SQL);
-        $this->addSql('CREATE UNIQUE INDEX uniq_ingest_order_status_event_observation ON ingest_order_status_events (company_id, order_id, raw_record_id, raw_status)');
+        $this->addSql('CREATE UNIQUE INDEX uniq_ingest_order_status_event_observation ON ingest_order_status_events (company_id, raw_record_id, order_id, raw_status)');
         $this->addSql('CREATE INDEX idx_ingest_order_status_event_order ON ingest_order_status_events (order_id, observed_at)');
         $this->addSql('CREATE INDEX idx_ingest_order_status_event_company ON ingest_order_status_events (company_id, observed_at)');
         foreach (['observed_at', 'created_at'] as $column) {

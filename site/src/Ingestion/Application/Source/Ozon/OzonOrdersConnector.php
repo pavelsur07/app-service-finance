@@ -94,10 +94,16 @@ final readonly class OzonOrdersConnector implements SourceConnectorInterface
             $since = $cursorSince ?? $now->modify('-1 hour');
             $to = $state['to'];
             $offset = $state['offset'];
+            // Пол монотонности переносится через продолжение отдельным полем:
+            // исходное значение курсора в продолжении уже недоступно, и без
+            // него финальная страница записала бы конец окна, откатив курсор,
+            // ушедший вперёд.
+            $floor = $state['floor'];
         } else {
             $since = $this->resolveSince($request, $now, $cursorSince);
             $to = $request->windowTo ?? $now;
             $offset = 0;
+            $floor = $cursorSince;
         }
 
         $rows = [];
@@ -149,11 +155,12 @@ final readonly class OzonOrdersConnector implements SourceConnectorInterface
             // дочитано до конца.
             return new PullResult(
                 rawBatch: $batch,
-                nextCursorValue: json_encode([
+                nextCursorValue: json_encode(array_filter([
                     'since' => $since->format(\DATE_ATOM),
                     'to' => $to->format(\DATE_ATOM),
                     'offset' => $offset,
-                ], \JSON_THROW_ON_ERROR),
+                    'floor' => $floor?->format(\DATE_ATOM),
+                ], static fn (mixed $v): bool => null !== $v), \JSON_THROW_ON_ERROR),
                 hasMore: true,
                 continuationDelaySeconds: 1,
             );
@@ -164,8 +171,9 @@ final readonly class OzonOrdersConnector implements SourceConnectorInterface
         //
         // Сравнение именно с ИСХОДНЫМ значением курсора, а не с $since:
         // $since уже сдвинут назад на перекрытие окна, и вернуть его значило
-        // бы каждый час откатывать позицию на четверть часа.
-        $nextSince = max($to, $isContinuation ? $to : ($cursorSince ?? $to));
+        // бы каждый час откатывать позицию на четверть часа. Через
+        // продолжение это значение приходит в поле floor.
+        $nextSince = max($to, $floor ?? $to);
 
         return new PullResult(
             rawBatch: $batch,
@@ -195,11 +203,11 @@ final readonly class OzonOrdersConnector implements SourceConnectorInterface
     }
 
     /**
-     * @return array{since: ?\DateTimeImmutable, to: ?\DateTimeImmutable, offset: int}
+     * @return array{since: ?\DateTimeImmutable, to: ?\DateTimeImmutable, offset: int, floor: ?\DateTimeImmutable}
      */
     private function decodeCursor(?string $cursorValue): array
     {
-        $empty = ['since' => null, 'to' => null, 'offset' => 0];
+        $empty = ['since' => null, 'to' => null, 'offset' => 0, 'floor' => null];
 
         if (null === $cursorValue || '' === trim($cursorValue)) {
             return $empty;
@@ -220,10 +228,12 @@ final readonly class OzonOrdersConnector implements SourceConnectorInterface
             $to = is_string($payload['to'] ?? null) ? new \DateTimeImmutable($payload['to']) : null;
             $offset = $payload['offset'] ?? null;
             if (null === $to || !is_int($offset) || $offset < 0) {
-                return ['since' => $since, 'to' => null, 'offset' => 0];
+                return ['since' => $since, 'to' => null, 'offset' => 0, 'floor' => null];
             }
 
-            return ['since' => $since, 'to' => $to, 'offset' => $offset];
+            $floor = is_string($payload['floor'] ?? null) ? new \DateTimeImmutable($payload['floor']) : null;
+
+            return ['since' => $since, 'to' => $to, 'offset' => $offset, 'floor' => $floor];
         } catch (\Throwable) {
             // Нечитаемый курсор не должен останавливать загрузку: считаем, что
             // позиции нет, и берём окно по умолчанию.

@@ -295,6 +295,9 @@ final class OzonOrderMapperTest extends TestCase
         yield 'ключа нет' => [$base];
         yield 'null' => [$base + ['products' => null]];
         yield 'строка' => [$base + ['products' => 'сломано']];
+        // json_decode(..., true) отдаёт объект тем же массивом: непустой объект
+        // товаров прошёл бы как список с игнорированными ключами.
+        yield 'объект вместо списка' => [$base + ['products' => ['a' => ['sku' => 1, 'quantity' => 1]]]];
     }
 
     /**
