@@ -1,0 +1,5 @@
+# Снимки bin/capture-ozon-listings.sh — реальные данные продавца.
+# В репозиторий кладём только вручную сокращённые/обезличенные фикстуры
+# уровнем выше, в tests/Fixtures/Marketplace/Ozon/.
+*
+!.gitignore
