@@ -471,8 +471,9 @@ final class OzonOrderMapperTest extends TestCase
     }
 
     /**
-     * lineNo — часть ключа идемпотентности, поэтому он индекс позиции в
-     * исходном массиве, а не что-то производное от содержимого.
+     * lineNo — ПОРЯДОК ОТОБРАЖЕНИЯ, то есть индекс позиции в исходном массиве.
+     * Идентичность позиции держит lineKey, поэтому lineNo волен меняться
+     * вместе с порядком в ответе источника.
      */
     public function testLineNumbersFollowTheSourceArrayOrder(): void
     {
