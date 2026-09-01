@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.84 / 2026-09-01
+> Версия: 1.85 / 2026-09-01
 
 ---
 
@@ -259,6 +259,33 @@ Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либ
 - Глобальной транзакции на прогон нет: upsert идемпотентен, частичное применение
   дозаполняется следующим прогоном, а транзакция на весь каталог держала бы
   блокировки на `marketplace_listings` и мешала бы финансовому pipeline.
+- Ручной запуск — `POST /marketplace/listings/sync-ozon-catalog`
+  (`SyncOzonListingCatalogController`, CSRF, `ModuleAccess::MARKETPLACE_WRITE`,
+  компания из `getActiveCompany()`). Диспатчит по одному сообщению на каждое
+  активное Ozon SELLER-подключение компании.
+- Каждый прогон пишет `MarketplaceJobLog` с `JobType::LISTING_CATALOG_SYNC_OZON`:
+  `running` → `done` со счётчиками `products_fetched` / `listings_upserted` /
+  `raw_records_stored`, либо `failed`. В `summary.error` кладётся **класс**
+  исключения, а не текст (он может нести детали ответа внешнего API); формат
+  один для всех ошибок, включая 429. Итог последнего прогона показывается на
+  странице листингов.
+- Терминальный статус журнала при ошибке пишется через DBAL
+  (`MarketplaceJobLogFailQuery`), а не через ORM: сбой внутри чанковой
+  транзакции закрывает `EntityManager` (`wrapInTransaction()` вызывает
+  `close()`), и `persist()` подменил бы исходное исключение техническим,
+  оставив запись в `running`.
+- Взаимное исключение прогонов — блокировка `LockFactory` по
+  `(companyId, connectionId)`, TTL 300 с с продлением на границах страниц и
+  чанков (`RefreshOzonListingCatalogAction` принимает прогресс-колбэк). Короткий
+  TTL не запирает подключение после аварийного завершения воркера, а продление
+  не даёт lease протухнуть посреди живого обхода крупного каталога. Триггеров
+  два (cron и кнопка); второй прогон отступает — без блокировки он удвоил бы
+  запросы к Ozon. Проверка «уже идёт» в контроллере была бы гонкой, поэтому её
+  там нет.
+- Аварийно оборванный воркер (SIGKILL, OOM) оставляет запись в `running`:
+  переводить просроченные прогоны в терминальный статус пока нечем. Это общее
+  свойство `MarketplaceJobLog` для всех `JobType`, не только этого — вынесено
+  в FOLLOW-UP.
 - HTTP 429 поднимает `OzonCatalogRateLimitException`; handler логирует `warning`
   (ретрай, а не инцидент) и пробрасывает исключение как есть. Оборачивать его в
   `RecoverableMessageHandlingException` нельзя: Symfony считает
@@ -3004,6 +3031,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.85 | 2026-09-01 | Marketplace: ручной запуск загрузки каталога Ozon из UI, журнал прогонов `MarketplaceJobLog` и взаимное исключение прогонов по подключению |
 | 1.84 | 2026-09-01 | Marketplace: загрузка каталога товаров Ozon в листинги — товары без продаж, наименование, дата создания на маркетплейсе; сопоставление по всему множеству `sources[].sku` |
 | 1.83 | 2026-09-01 | Marketplace/Ingestion: в `MarketplaceListing` добавлены `marketplaceCreatedAt` и `lastSeenAt`; `RawStorageFacade::storeAndGetIds()` отдаёт скалярные id вместо сущностей через границу модуля |
 | 1.82 | 2026-08-23 | MarketplaceAnalytics: добавлен facade-контракт пакетного пересчёта дневных снапшотов листингов для tenant-safe каскада после изменения себестоимости |

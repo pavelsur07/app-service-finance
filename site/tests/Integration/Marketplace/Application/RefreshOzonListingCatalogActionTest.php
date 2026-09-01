@@ -520,6 +520,32 @@ final class RefreshOzonListingCatalogActionTest extends IntegrationTestCase
     }
 
     /**
+     * Обход крупного каталога может идти дольше TTL блокировки. Без продления
+     * lease протух бы на живом прогоне, и второе сообщение начало бы
+     * параллельный обход — взаимное исключение перестало бы работать.
+     * Action обязан звать прогресс-колбэк на границах страниц и чанков.
+     */
+    public function testProgressCallbackIsCalledOnPageAndChunkBoundaries(): void
+    {
+        $company = $this->seedCompany(89);
+        $this->seedConnection($company, 89);
+        $this->em->flush();
+
+        $calls = 0;
+        $action = $this->action();
+        $action(
+            (string) $company->getId(),
+            $this->connectionId(89),
+            static function () use (&$calls): void {
+                ++$calls;
+            },
+        );
+
+        // Одна страница списка + один чанк карточек.
+        self::assertSame(2, $calls);
+    }
+
+    /**
      * @param list<MockResponse>|null $responses
      */
     private function action(?array $responses = null): RefreshOzonListingCatalogAction

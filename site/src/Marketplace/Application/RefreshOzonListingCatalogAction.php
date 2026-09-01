@@ -60,7 +60,13 @@ final readonly class RefreshOzonListingCatalogAction
     ) {
     }
 
-    public function __invoke(string $companyId, string $connectionId): OzonCatalogSyncResultDTO
+    /**
+     * @param \Closure|null $onProgress вызывается на границах страниц и чанков;
+     *                                  обработчик продлевает им lease блокировки,
+     *                                  иначе на длинном каталоге TTL истёк бы
+     *                                  посреди живого прогона
+     */
+    public function __invoke(string $companyId, string $connectionId, ?\Closure $onProgress = null): OzonCatalogSyncResultDTO
     {
         Assert::uuid($companyId);
         Assert::uuid($connectionId);
@@ -123,6 +129,10 @@ final readonly class RefreshOzonListingCatalogAction
             foreach ($pageIds as $productId) {
                 $productIds[$productId] = true;
             }
+
+            if (null !== $onProgress) {
+                $onProgress();
+            }
         }
 
         $this->assertWalkComplete($reportedTotal, count($productIds), ['company_id' => $companyId]);
@@ -182,6 +192,10 @@ final readonly class RefreshOzonListingCatalogAction
             $listingsUpserted += $this->entityManager->wrapInTransaction(
                 fn (): int => $this->applyToListings($company, $items, $lastSeenAt),
             );
+
+            if (null !== $onProgress) {
+                $onProgress();
+            }
         }
 
         $this->logger->info('[OzonListingCatalog] Sync finished.', [

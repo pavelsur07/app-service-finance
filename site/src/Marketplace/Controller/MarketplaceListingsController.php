@@ -6,9 +6,11 @@ namespace App\Marketplace\Controller;
 
 use App\Marketplace\DTO\ListingTagDTO;
 use App\Marketplace\Entity\MarketplaceListing;
+use App\Marketplace\Enum\JobType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\ListingTagAssignmentRepository;
 use App\Marketplace\Infrastructure\Query\MarketplaceListingsQuery;
+use App\Marketplace\Repository\MarketplaceJobLogRepository;
 use App\Marketplace\Repository\MarketplaceListingTagRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -28,6 +30,7 @@ class MarketplaceListingsController extends AbstractController
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly ListingTagAssignmentRepository $tagAssignments,
         private readonly MarketplaceListingTagRepository $tagRepository,
+        private readonly MarketplaceJobLogRepository $jobLogRepository,
     ) {
     }
 
@@ -81,6 +84,12 @@ class MarketplaceListingsController extends AbstractController
             'count_mapped' => $countMapped,
             'count_unmapped' => $countUnmapped,
             'active_tab' => 'listings',
+            // Итог последнего прогона каталога Ozon: кнопка без обратной связи
+            // работает вслепую.
+            'ozon_catalog_last_run' => $this->jobLogRepository->findLastByJobTypes(
+                $companyId,
+                [JobType::LISTING_CATALOG_SYNC_OZON],
+            )[JobType::LISTING_CATALOG_SYNC_OZON->value] ?? null,
         ]);
     }
 }
