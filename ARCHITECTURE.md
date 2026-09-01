@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.85 / 2026-09-01
+> Версия: 1.86 / 2026-09-01
 
 ---
 
@@ -118,6 +118,8 @@
 - Legacy-модули пока продолжают использовать `StorageService` напрямую. Их переезд на `ObjectStorageInterface` выполняется отдельными задачами, по одному модулю.
 
 ### Ingestion: cursor and sync jobs
+
+- `app:ingestion:reap-stale-jobs` (cron `52 * * * *`) переводит задачи, застрявшие в `OPEN`/`RUNNING` без движения дольше порога (по умолчанию 6 ч), в `FAILED` с причиной `stale_no_progress`. Без этого ресурс блокируется навсегда: `SyncJobRepository::findLatestForResource()` считает активной любую такую задачу **без ограничения по возрасту**, а `StartIncrementalAction` бросает на неё `ActiveBackfillExistsException`. Воркер, убитый по SIGKILL или OOM, не выполняет `finally`, и загрузка прекращается молча — `RunIncrementalCommand` засчитывает это как `skippedActive` и возвращает успех.
 
 - `IngestCursor` stores opaque cursor state for `(companyId, connectionRef, resourceType, shopRef)` and advances only through `UpdateCursorAction` / `SyncFacade::updateCursor`.
 - `SyncJob` stores orchestration state for backfill, incremental, and manual sync runs. Parent backfill jobs are split into child chunk jobs; children are dispatched as `RunSyncChunkMessage` through `ingest_fetch`.
@@ -3031,6 +3033,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.86 | 2026-09-01 | Ingestion: уборщик зависших `SyncJob` — задача в `OPEN`/`RUNNING` без движения больше не блокирует ресурс навсегда |
 | 1.85 | 2026-09-01 | Marketplace: ручной запуск загрузки каталога Ozon из UI, журнал прогонов `MarketplaceJobLog` и взаимное исключение прогонов по подключению |
 | 1.84 | 2026-09-01 | Marketplace: загрузка каталога товаров Ozon в листинги — товары без продаж, наименование, дата создания на маркетплейсе; сопоставление по всему множеству `sources[].sku` |
 | 1.83 | 2026-09-01 | Marketplace/Ingestion: в `MarketplaceListing` добавлены `marketplaceCreatedAt` и `lastSeenAt`; `RawStorageFacade::storeAndGetIds()` отдаёт скалярные id вместо сущностей через границу модуля |
