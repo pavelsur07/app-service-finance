@@ -1,0 +1,152 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Unit\Ingestion\Application\Source\Ozon;
+
+use App\Ingestion\Application\DTO\PullRequest;
+use App\Ingestion\Application\DTO\PushRequest;
+use App\Ingestion\Application\Source\Ozon\OzonOrdersConnector;
+use App\Ingestion\Application\Source\Ozon\OzonResourceType;
+use App\Ingestion\Enum\Capability;
+use App\Ingestion\Enum\IngestSource;
+use App\Ingestion\Exception\UnsupportedCapabilityException;
+use App\Ingestion\Infrastructure\Api\Ozon\OzonRawPage;
+use App\Tests\Integration\Ingestion\Fixtures\FakeOzonOrdersClient;
+use PHPUnit\Framework\TestCase;
+use Ramsey\Uuid\Uuid;
+use Symfony\Component\Clock\MockClock;
+
+final class OzonOrdersConnectorTest extends TestCase
+{
+    private FakeOzonOrdersClient $client;
+    private OzonOrdersConnector $connector;
+
+    protected function setUp(): void
+    {
+        $this->client = new FakeOzonOrdersClient();
+        $this->connector = new OzonOrdersConnector(
+            $this->client,
+            new MockClock('2026-09-01 12:00:00'),
+        );
+    }
+
+    public function testDeclaresBothOrderResourcesAndPullOnly(): void
+    {
+        self::assertSame(IngestSource::OZON, $this->connector->source());
+        self::assertSame(
+            [OzonResourceType::ORDERS_FBO, OzonResourceType::ORDERS_FBS],
+            $this->connector->resourceTypes(),
+        );
+        self::assertSame([Capability::CAN_PULL], $this->connector->capabilities());
+    }
+
+    public function testPushIsNotSupported(): void
+    {
+        $this->expectException(UnsupportedCapabilityException::class);
+        $this->connector->push(new PushRequest(
+            companyId: Uuid::uuid7()->toString(),
+            connectionRef: 'connection-1',
+            documentType: OzonResourceType::ORDERS_FBO,
+            payload: [],
+            idempotencyKey: 'key-1',
+        ));
+    }
+
+    /**
+     * Пагинация съедается внутри одного pull: наружу торчит только часовой
+     * курсор, а не смещение внутри окна.
+     */
+    public function testPaginatesUntilThePageIsNotFull(): void
+    {
+        $this->client->queue(
+            new OzonRawPage($this->postings(OzonOrdersConnector::PAGE_LIMIT), true, null, []),
+            new OzonRawPage($this->postings(3), false, null, []),
+        );
+
+        $result = $this->connector->pull($this->request('{"since":"2026-09-01T10:00:00+00:00"}'));
+
+        self::assertNotNull($result->rawBatch);
+        self::assertCount(OzonOrdersConnector::PAGE_LIMIT + 3, iterator_to_array($result->rawBatch->rows));
+        self::assertCount(2, $this->client->calls);
+        self::assertSame(0, $this->client->calls[0]['offset']);
+        self::assertSame(OzonOrdersConnector::PAGE_LIMIT, $this->client->calls[1]['offset']);
+    }
+
+    /**
+     * Окно берётся с перекрытием назад: отправление, созданное за миг до
+     * прошлого запроса, иначе не попало бы ни в одно окно.
+     */
+    public function testWindowOverlapsBackwards(): void
+    {
+        $this->connector->pull($this->request('{"since":"2026-09-01T11:00:00+00:00"}'));
+
+        self::assertSame('2026-09-01T10:45:00+00:00', $this->client->calls[0]['since']);
+        self::assertSame('2026-09-01T12:00:00+00:00', $this->client->calls[0]['to']);
+    }
+
+    /**
+     * Курсор не едет назад. IngestCursor::advance() монотонность не проверяет,
+     * а у часового инстант-курсора формат её тоже не гарантирует: коннектор,
+     * вернувший меньшее значение, заставил бы перекачивать одно и то же вечно.
+     */
+    public function testCursorNeverMovesBackwards(): void
+    {
+        $result = $this->connector->pull($this->request('{"since":"2026-09-01T18:00:00+00:00"}'));
+
+        self::assertNotNull($result->nextCursorValue);
+        $decoded = json_decode($result->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertGreaterThanOrEqual('2026-09-01T18:00:00+00:00', $decoded['since']);
+    }
+
+    /**
+     * externalId — оконный ключ, а не порядковый номер: неизменившееся окно
+     * не создаёт новый объект в S3 благодаря дедупу по sha256.
+     */
+    public function testExternalIdIsDeterministicWindowKey(): void
+    {
+        $result = $this->connector->pull($this->request('{"since":"2026-09-01T10:00:00+00:00"}'));
+
+        self::assertNotNull($result->rawBatch);
+        self::assertSame('fbo:window-2026-09-01T09-2026-09-01T12', $result->rawBatch->externalId);
+    }
+
+    /**
+     * Пустое окно всё равно фиксируется в raw: «за этот час заказов не было» —
+     * это факт, а не отсутствие данных.
+     */
+    public function testEmptyWindowIsStillRecorded(): void
+    {
+        $result = $this->connector->pull($this->request('{"since":"2026-09-01T10:00:00+00:00"}'));
+
+        self::assertNotNull($result->rawBatch);
+        self::assertCount(1, iterator_to_array($result->rawBatch->rows));
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function postings(int $count): array
+    {
+        $rows = [];
+        for ($i = 0; $i < $count; ++$i) {
+            $rows[] = ['posting_number' => 'p-'.$i, 'status' => 'delivering'];
+        }
+
+        return $rows;
+    }
+
+    private function request(?string $cursorValue): PullRequest
+    {
+        return new PullRequest(
+            companyId: Uuid::uuid7()->toString(),
+            connectionRef: 'connection-1',
+            shopRef: 'shop-main',
+            resourceType: OzonResourceType::ORDERS_FBO,
+            cursorValue: $cursorValue,
+            windowFrom: null,
+            windowTo: null,
+            syncJobId: Uuid::uuid7()->toString(),
+        );
+    }
+}

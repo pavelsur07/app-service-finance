@@ -23,6 +23,13 @@
 # больше одной задачи на подключение за запуск.
 20 * * * * cd /app && php bin/console app:marketplace:wb-financial-reports:orchestrate --refresh-days-back=14 --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# Почасовой обход заказов Ozon. Отдельная строка с --resource, а НЕ перевод
+# всей команды run-incremental на час: иначе финансовые стратегии просыпались бы
+# 24 раза в сутки без нужды. Каденция принадлежит ресурсу и выражена его
+# cursorIsDue(); крон лишь даёт возможность.
+35 * * * * cd /app && php bin/console app:ingestion:run-incremental --resource=ozon_orders_fbo --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+37 * * * * cd /app && php bin/console app:ingestion:run-incremental --resource=ozon_orders_fbs --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Освобождение ресурсов, заблокированных зависшими задачами синхронизации.
 # findLatestForResource() считает активной любую задачу в OPEN/RUNNING БЕЗ
 # ограничения по возрасту, поэтому воркер, убитый по SIGKILL или OOM, молча

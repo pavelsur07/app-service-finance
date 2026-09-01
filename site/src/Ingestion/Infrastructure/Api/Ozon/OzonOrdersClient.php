@@ -1,0 +1,161 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Ingestion\Infrastructure\Api\Ozon;
+
+use App\Ingestion\Enum\IngestOrderScheme;
+use App\Ingestion\Exception\ConnectorAuthException;
+use App\Ingestion\Exception\ConnectorRateLimitedException;
+use App\Ingestion\Exception\ConnectorTransientException;
+use App\Ingestion\Exception\MalformedConnectorResponseException;
+use Psr\Log\LoggerInterface;
+use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
+
+/**
+ * Отправления Ozon Seller API.
+ *
+ * Две схемы — два эндпоинта с разной формой ответа:
+ * - FBO `/v2/posting/fbo/list` отдаёт `result` списком и НЕ отдаёт `has_next`;
+ * - FBS `/v3/posting/fbs/list` отдаёт `result.postings` и `result.has_next`.
+ *
+ * Разница формы — не деталь реализации, а причина, по которой признак «есть ещё
+ * страницы» вычисляется по-разному: у FBO завершение определяется по неполной
+ * странице, у FBS — по флагу.
+ */
+final readonly class OzonOrdersClient implements OzonOrdersClientInterface
+{
+    private const BASE_URL = 'https://api-seller.ozon.ru';
+    private const FBO_ENDPOINT = '/v2/posting/fbo/list';
+    private const FBS_ENDPOINT = '/v3/posting/fbs/list';
+    private const TIMEOUT_SECONDS = 60;
+    private const DEFAULT_RETRY_AFTER_SECONDS = 60;
+
+    public function __construct(
+        private HttpClientInterface $httpClient,
+        private OzonCredentialProviderInterface $credentialProvider,
+        private LoggerInterface $logger,
+    ) {
+    }
+
+    public function fetchPostings(
+        string $companyId,
+        string $connectionRef,
+        IngestOrderScheme $scheme,
+        \DateTimeImmutable $since,
+        \DateTimeImmutable $to,
+        int $limit,
+        int $offset,
+    ): OzonRawPage {
+        $credentials = $this->credentialProvider->read($companyId, $connectionRef);
+        $endpoint = IngestOrderScheme::FBS === $scheme ? self::FBS_ENDPOINT : self::FBO_ENDPOINT;
+
+        $body = [
+            'dir' => 'ASC',
+            'filter' => [
+                'since' => $since->format(\DATE_ATOM),
+                'to' => $to->format(\DATE_ATOM),
+            ],
+            'limit' => $limit,
+            'offset' => $offset,
+            'with' => ['analytics_data' => true, 'financial_data' => true],
+        ];
+
+        if (IngestOrderScheme::FBO === $scheme) {
+            $body['translit'] = true;
+        }
+
+        try {
+            $response = $this->httpClient->request('POST', self::BASE_URL.$endpoint, [
+                'headers' => [
+                    'Client-Id' => (string) $credentials['client_id'],
+                    'Api-Key' => $credentials['api_key'],
+                    'Content-Type' => 'application/json',
+                ],
+                'json' => $body,
+                'timeout' => self::TIMEOUT_SECONDS,
+            ]);
+
+            $statusCode = $response->getStatusCode();
+            $headers = $response->getHeaders(false);
+            $payload = $response->getContent(false);
+        } catch (TransportExceptionInterface $exception) {
+            throw new ConnectorTransientException(sprintf('Ozon orders transport error for %s.', $endpoint), 0, $exception);
+        }
+
+        $this->logger->info('Ozon orders page fetched.', [
+            'companyId' => $companyId,
+            'connectionRef' => $connectionRef,
+            'endpoint' => $endpoint,
+            'statusCode' => $statusCode,
+            'offset' => $offset,
+        ]);
+
+        if (401 === $statusCode || 403 === $statusCode) {
+            throw new ConnectorAuthException(sprintf('Ozon orders auth failed for %s (HTTP %d).', $endpoint, $statusCode));
+        }
+        if (429 === $statusCode) {
+            throw new ConnectorRateLimitedException(sprintf('Ozon orders rate limited for %s.', $endpoint), $this->retryAfterSeconds($headers));
+        }
+        if ($statusCode >= 500) {
+            throw new ConnectorTransientException(sprintf('Ozon orders server error for %s (HTTP %d).', $endpoint, $statusCode));
+        }
+        if (200 !== $statusCode) {
+            throw new MalformedConnectorResponseException(sprintf('Ozon orders returned HTTP %d for %s.', $statusCode, $endpoint));
+        }
+
+        try {
+            $decoded = json_decode($payload, true, 512, \JSON_THROW_ON_ERROR);
+        } catch (\JsonException $exception) {
+            throw new MalformedConnectorResponseException(sprintf('Ozon orders returned invalid JSON for %s.', $endpoint), 0, $exception);
+        }
+
+        if (!is_array($decoded)) {
+            throw new MalformedConnectorResponseException(sprintf('Ozon orders returned unexpected payload for %s.', $endpoint));
+        }
+
+        return $this->toPage($decoded, $scheme, $limit, $endpoint);
+    }
+
+    /**
+     * @param array<string, mixed> $decoded
+     */
+    private function toPage(array $decoded, IngestOrderScheme $scheme, int $limit, string $endpoint): OzonRawPage
+    {
+        $result = $decoded['result'] ?? null;
+
+        if (IngestOrderScheme::FBS === $scheme) {
+            if (!is_array($result) || !is_array($result['postings'] ?? null)) {
+                throw new MalformedConnectorResponseException(sprintf('Ozon orders response has no result.postings for %s.', $endpoint));
+            }
+
+            $rows = array_values(array_filter($result['postings'], 'is_array'));
+            $hasNext = (bool) ($result['has_next'] ?? false);
+
+            return new OzonRawPage($rows, $hasNext, null, []);
+        }
+
+        if (!is_array($result)) {
+            throw new MalformedConnectorResponseException(sprintf('Ozon orders response has no result array for %s.', $endpoint));
+        }
+
+        $rows = array_values(array_filter($result, 'is_array'));
+
+        // FBO не отдаёт has_next: полная страница означает «возможно, есть
+        // ещё». Ценой одного лишнего запроса на ровно кратном объёме это
+        // честнее, чем гадать.
+        return new OzonRawPage($rows, count($rows) >= $limit, null, []);
+    }
+
+    /**
+     * @param array<string, list<string>> $headers
+     */
+    private function retryAfterSeconds(array $headers): int
+    {
+        // Ozon шлёт Retry-After в секундах либо не шлёт вовсе; HTTP-дату не разбираем.
+        $value = trim($headers['retry-after'][0] ?? '');
+
+        return ctype_digit($value) ? max(1, (int) $value) : self::DEFAULT_RETRY_AFTER_SECONDS;
+    }
+}

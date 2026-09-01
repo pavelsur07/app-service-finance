@@ -214,6 +214,28 @@ services:
         arguments:
             $mappers: !tagged_iterator app.ingestion.order_mapper
 
+    # ─── Заказы Ozon ───
+    App\Ingestion\Infrastructure\Api\Ozon\OzonOrdersClientInterface: '@App\Ingestion\Infrastructure\Api\Ozon\OzonOrdersClient'
+
+    App\Ingestion\Application\Source\Ozon\OzonOrdersConnector:
+        tags: ['app.ingestion.connector']
+
+    App\Ingestion\Application\Source\Ozon\OzonOrderMapper:
+        tags: ['app.ingestion.order_mapper']
+
+    # Один класс стратегии на обе схемы: они отличаются только строкой ресурса.
+    ingestion.strategy.ozon_orders_fbo:
+        class: App\Ingestion\Application\Service\OzonOrdersIncrementalStrategy
+        arguments:
+            $resourceType: 'ozon_orders_fbo'
+        tags: ['app.ingestion.incremental_strategy']
+
+    ingestion.strategy.ozon_orders_fbs:
+        class: App\Ingestion\Application\Service\OzonOrdersIncrementalStrategy
+        arguments:
+            $resourceType: 'ozon_orders_fbs'
+        tags: ['app.ingestion.incremental_strategy']
+
     App\Ingestion\Application\Service\ListingResolverRegistry:
         arguments:
             $resolvers: !tagged_iterator app.ingestion.listing_resolver

@@ -37,7 +37,7 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
         $transport->reset();
 
         $tester = $this->tester('app:ingestion:run-incremental');
-        $exit = $tester->execute([]);
+        $exit = $tester->execute(['--resource' => OzonResourceType::ACCRUAL_BY_DAY]);
 
         self::assertSame(Command::SUCCESS, $exit);
         self::assertStringContainsString('Dispatched 1 incremental jobs', $tester->getDisplay());
@@ -61,7 +61,7 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
         $transport->reset();
 
         $tester = $this->tester('app:ingestion:run-incremental');
-        $exit = $tester->execute(['--company-id' => $company->getId()]);
+        $exit = $tester->execute(['--company-id' => $company->getId(), '--resource' => OzonResourceType::ACCRUAL_BY_DAY]);
 
         $expectedSeed = (new \DateTimeImmutable('first day of this month'))->format('Y-m-d');
         $isSeedDue = new \DateTimeImmutable($expectedSeed) <= (new \DateTimeImmutable('today'))->modify('-1 day')->setTime(0, 0);
@@ -89,7 +89,7 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
         $transport->reset();
 
         $tester = $this->tester('app:ingestion:run-incremental');
-        $exit = $tester->execute([]);
+        $exit = $tester->execute(['--resource' => OzonResourceType::ACCRUAL_BY_DAY]);
 
         self::assertSame(Command::SUCCESS, $exit);
         self::assertStringContainsString('Dispatched 1 incremental jobs', $tester->getDisplay());
@@ -116,7 +116,7 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
         $transport->reset();
 
         $tester = $this->tester('app:ingestion:run-incremental');
-        $exit = $tester->execute(['--company-id' => $companyB->getId()]);
+        $exit = $tester->execute(['--company-id' => $companyB->getId(), '--resource' => OzonResourceType::ACCRUAL_BY_DAY]);
 
         self::assertSame(Command::SUCCESS, $exit);
         self::assertSame(0, $this->incrementalJobCount($companyA->getId()));
@@ -152,7 +152,7 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
         $transport->reset();
 
         $tester = $this->tester('app:ingestion:run-incremental');
-        $exit = $tester->execute(['--limit' => '1']);
+        $exit = $tester->execute(['--limit' => '1', '--resource' => OzonResourceType::ACCRUAL_BY_DAY]);
 
         self::assertSame(Command::SUCCESS, $exit);
         self::assertSame(0, $this->incrementalJobCount($newerCompany->getId()));
@@ -176,7 +176,7 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
         $transport->reset();
 
         $tester = $this->tester('app:ingestion:run-incremental');
-        $exit = $tester->execute([]);
+        $exit = $tester->execute(['--resource' => OzonResourceType::ACCRUAL_BY_DAY]);
 
         self::assertSame(Command::SUCCESS, $exit);
         self::assertStringContainsString('not due: 1', $tester->getDisplay());
@@ -283,10 +283,58 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
         $exit = $tester->execute([]);
 
         self::assertSame(Command::SUCCESS, $exit);
-        self::assertStringContainsString('Dispatched 2 incremental jobs', $tester->getDisplay());
-        self::assertSame(1, $this->incrementalJobCount($ozonCompany->getId()));
-        self::assertSame(1, $this->incrementalJobCount($wbCompany->getId()));
-        self::assertCount(2, $transport->getSent());
+        // Проверяем КОНКРЕТНЫЕ ресурсы, а не общий счётчик: предмет теста —
+        // что работают оба маркетплейса, и он не должен ломаться от появления
+        // новых стратегий у одного из них.
+        self::assertSame(1, $this->incrementalJobCountForResource((string) $ozonCompany->getId(), OzonResourceType::ACCRUAL_BY_DAY));
+        self::assertSame(1, $this->incrementalJobCountForResource((string) $wbCompany->getId(), WbResourceType::FINANCE_SALES_REPORT_DETAILED));
+        self::assertGreaterThanOrEqual(2, count($transport->getSent()));
+    }
+
+    public function testResourceFilterDispatchesOnlyRequestedResource(): void
+    {
+        $company = $this->seedCompany(1014);
+        $this->seedConnection($company, '77777777-7777-7777-7777-000000001014');
+
+        $transport = $this->getIngestFetchTransport();
+        $transport->reset();
+
+        $tester = $this->tester('app:ingestion:run-incremental');
+        $exit = $tester->execute(['--resource' => OzonResourceType::ORDERS_FBO]);
+
+        self::assertSame(Command::SUCCESS, $exit);
+        // Смысл опции: дать заказам собственный часовой слот в кроне, не
+        // разбудив при этом суточные финансовые стратегии.
+        self::assertSame(1, $this->incrementalJobCountForResource((string) $company->getId(), OzonResourceType::ORDERS_FBO));
+        self::assertSame(0, $this->incrementalJobCountForResource((string) $company->getId(), OzonResourceType::ORDERS_FBS));
+        self::assertSame(0, $this->incrementalJobCountForResource((string) $company->getId(), OzonResourceType::ACCRUAL_BY_DAY));
+        self::assertCount(1, $transport->getSent());
+    }
+
+    public function testUnknownResourceFilterDispatchesNothing(): void
+    {
+        $company = $this->seedCompany(1015);
+        $this->seedConnection($company, '77777777-7777-7777-7777-000000001015');
+
+        $transport = $this->getIngestFetchTransport();
+        $transport->reset();
+
+        $tester = $this->tester('app:ingestion:run-incremental');
+        $exit = $tester->execute(['--resource' => 'ozon_orders_typo']);
+
+        // Опечатка в cron-строке не должна тихо превращаться в полный обход
+        // всех ресурсов: пустой отбор — это ноль задач, а не «фильтра нет».
+        self::assertSame(Command::SUCCESS, $exit);
+        self::assertSame(0, $this->incrementalJobCount($company->getId()));
+        self::assertCount(0, $transport->getSent());
+    }
+
+    private function incrementalJobCountForResource(string $companyId, string $resourceType): int
+    {
+        return (int) $this->connection->fetchOne(
+            "SELECT COUNT(*) FROM ingest_sync_jobs WHERE company_id = :c AND resource_type = :r AND kind = 'incremental'",
+            ['c' => $companyId, 'r' => $resourceType],
+        );
     }
 
     private function seedCompany(int $index): Company

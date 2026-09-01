@@ -10,6 +10,14 @@ final class OzonResourceType
     public const ACCRUAL_BY_DAY = 'ozon_finance_accrual_by_day';
     public const ACCRUAL_TYPES = 'ozon_finance_accrual_types';
 
+    /**
+     * Заказы. Схема — часть идентификатора ресурса, а не поле payload'а:
+     * наборы статусов у FBO и FBS разные, и смешивать их в одном курсоре
+     * значило бы терять инкремент одной схемы при обходе другой.
+     */
+    public const ORDERS_FBO = 'ozon_orders_fbo';
+    public const ORDERS_FBS = 'ozon_orders_fbs';
+
     public const PERFORMANCE_CAMPAIGNS = 'ozon_performance_campaigns';
     public const PERFORMANCE_SKU_CAMPAIGN_OBJECTS = 'ozon_performance_sku_campaign_objects';
     public const PERFORMANCE_SEARCH_PROMO_PRODUCTS = 'ozon_performance_search_promo_products';

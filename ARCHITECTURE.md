@@ -83,6 +83,9 @@
 | `ExternalCategory` | Ingestion | global marketplace source dictionary, no company filter |
 | `ExternalCategoryMapping` | Ingestion | global mapping dictionary, no company filter |
 | `NormalizationIssue` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
+| `IngestOrder` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
+| `IngestOrderItem` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
+| `IngestOrderStatusEvent` | Ingestion | `string $companyId` + Doctrine `company` filter ✅ |
 | `Product` | Catalog | `Company $company` (legacy) — ещё не мигрирован |
 | `ProductImport` | Catalog | `string $companyId` ✅ |
 | `ProductBarcode` | Catalog | `string $companyId` ✅ |
@@ -121,6 +124,9 @@
 
 - `app:ingestion:reap-stale-jobs` (cron `52 * * * *`) переводит задачи, застрявшие в `OPEN`/`RUNNING` без движения дольше порога (по умолчанию 6 ч), в `FAILED` с причиной `stale_no_progress`. Без этого ресурс блокируется навсегда: `SyncJobRepository::findLatestForResource()` считает активной любую такую задачу **без ограничения по возрасту**, а `StartIncrementalAction` бросает на неё `ActiveBackfillExistsException`. Воркер, убитый по SIGKILL или OOM, не выполняет `finally`, и загрузка прекращается молча — `RunIncrementalCommand` засчитывает это как `skippedActive` и возвращает успех.
 
+- `app:ingestion:run-incremental --resource=<type>` ограничивает обход одним ресурсом. Опция существует ради каденции: заказы обходятся раз в час, финансовые ресурсы — раз в сутки, и у каждой группы своя строка в `docker/cron/app.cron` (`35/37 * * * *` для `ozon_orders_fbo`/`ozon_orders_fbs`, `0 3 * * *` для остального). Переводить общую команду на почасовой запуск нельзя: финансовые стратегии просыпались бы 24 раза в сутки без нужды. Неизвестное значение даёт пустой отбор и ноль задач, а не полный обход — опечатка в cron не должна тихо превращаться в обход всех ресурсов.
+- Каденция принадлежит стратегии, а не крону: `IncrementalResourceStrategyInterface::cursorIsDue()` — единственный источник истины. `AbstractHourlyCursorIncrementalStrategy` пропускает курсор, обновлённый менее `$minIntervalMinutes` (по умолчанию 60) назад, поэтому лишний запуск крона безвреден.
+
 - `IngestCursor` stores opaque cursor state for `(companyId, connectionRef, resourceType, shopRef)` and advances only through `UpdateCursorAction` / `SyncFacade::updateCursor`.
 - `SyncJob` stores orchestration state for backfill, incremental, and manual sync runs. Parent backfill jobs are split into child chunk jobs; children are dispatched as `RunSyncChunkMessage` through `ingest_fetch`.
 - `SyncJobStatus` owns the explicit state transition matrix. Entity methods reject invalid transitions and terminal jobs cannot be reopened.
@@ -146,6 +152,17 @@
 - `SourceConnectorInterface` is the per-source boundary for `discoverShops`, `pull`, and future `push`. Production connectors must be registered with `app.ingestion.connector`.
 - `SourceMapperInterface` maps raw rows to `MappedTransaction` DTOs and control sums. Mappers are pure and registered with `app.ingestion.mapper`.
 - `OzonSellerReportConnector` is the first production source connector. It supports `ozon_seller_daily_report` (`/v3/finance/transaction/list`) and `ozon_seller_realization` (`/v2/finance/realization`) through the Ingestion Ozon adapter. Legacy Marketplace Ozon jobs remain enabled until a later shadow/switch task.
+### Ingestion: orders
+
+- Заказы живут в `Ingestion` как `IngestOrder` / `IngestOrderItem` / `IngestOrderStatusEvent`. `Marketplace\Entity\MarketplaceOrder` не затрагивается: у него своя роль и своя запись.
+- Нормализация заказов идёт **мимо** финансового `NormalizeRawRecordAction`: `NormalizeRawRecordHandler` ветвится по `OrderMapperRegistry::has(source, resourceType)` и зовёт `NormalizeOrderRawRecordAction`. `MappedTransaction` требует `type`/`direction`/`money`/`operationGroupId` — заказу это чуждо, поэтому у заказов свои DTO `MappedOrder`/`MappedOrderItem` и свой контракт `OrderMapperInterface` (тег `app.ingestion.order_mapper`).
+- Статус хранится дважды: сырой строкой источника (`rawStatus`) и нормализованным `IngestOrderStatus`. Неизвестное значение источника даёт `UNKNOWN` и запись `NormalizationIssueKind::UNKNOWN_FIELD`, а не `NULL`: `NULL` одновременно ломает данные и прячет факт поломки.
+- Терминальность определяется в одном месте — `IngestOrderStatus::isTerminal()`. Дублировать предикат в запросах нельзя: три копии рано или поздно разойдутся.
+- История append-only: `IngestOrderStatusEvent` не имеет публичных мутаторов. `IngestOrder::observeStatus()` возвращает `false` и не двигает статус, если наблюдение старше текущего `statusObservedAt` — статус не едет назад при перестановке сообщений.
+- `IngestOrderScheme` (`FBO`/`FBS`) выводится из resourceType, а не из тела ответа: у Ozon схема задана эндпоинтом.
+- Связь с листингами хранится скалярами `listingId`/`listingSku`. Нерезолвленная позиция сохраняет `listingSku` при `listingId = null` — это видимая очередь на доразбор, а не потеря данных.
+- Таблицы заказов созданы **без FK** на `companies`/`marketplace_listings`: Ingestion ссылается на чужие сущности скалярами (см. правило `string $companyId` вместо `#[ManyToOne]`), и FK ввёл бы схемный дрейф относительно `doctrine:schema:update`.
+
 - `OzonSellerReportMapper` and `OzonRealizationMapper` decompose one Ozon operation into multiple canonical transactions with a shared `operationGroupId`. External ids use `ozon:operation:{operation_id}:{component}` so multiple same-type Ozon components can coexist under the current `(companyId, source, externalId, type)` natural key.
 - `NormalizeRawRecordAction` reads NDJSON raw payload, calls the mapper, upserts canonical transactions, records `NormalizationIssue` on mapper/control-sum problems, and marks the raw record `DONE`/`FAILED`. Normalization does not publish Finance events or write P&L aggregates.
 
