@@ -333,6 +333,58 @@ final class NormalizeOrderRawRecordActionTest extends IntegrationTestCase
     }
 
     /**
+     * Резолв листингов вынесен из цикла: один вызов на всё сырьё вместо вызова
+     * на заказ. Ключ теперь составной — «индекс заказа:индекс позиции», и
+     * ошибка в нём привязала бы позицию к чужому листингу. Проверяем, что
+     * позиции разных заказов сохранили каждая свой ключ резолва.
+     */
+    public function testResolutionsStayWithTheirOwnOrdersWhenResolvedInOneBatch(): void
+    {
+        $this->mapper->queue(
+            $this->orderWithExternalId('posting-1', [
+                new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA|offer:#0', quantity: 1, externalSku: 'AAA', sourceData: ['sku' => 'AAA']),
+            ]),
+            $this->orderWithExternalId('posting-2', [
+                new MappedOrderItem(lineNo: 0, lineKey: 'sku:BBB|offer:#0', quantity: 1, externalSku: 'BBB', sourceData: ['sku' => 'BBB']),
+                new MappedOrderItem(lineNo: 1, lineKey: 'sku:CCC|offer:#0', quantity: 1, externalSku: 'CCC', sourceData: ['sku' => 'CCC']),
+            ]),
+        );
+
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-1'), $this->companyId));
+
+        $first = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        $second = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-2');
+        self::assertNotNull($first);
+        self::assertNotNull($second);
+
+        $firstItems = $this->items->findByOrderIndexedByLineKey($this->companyId, $first->getId());
+        $secondItems = $this->items->findByOrderIndexedByLineKey($this->companyId, $second->getId());
+
+        self::assertSame(['sku:AAA|offer:#0'], array_keys($firstItems));
+        self::assertSame(['sku:BBB|offer:#0', 'sku:CCC|offer:#0'], $this->sortedKeys($secondItems));
+
+        // Ключ резолва сохранён у каждой позиции свой — листинг не найден, но
+        // именно свой externalSku, а не соседний.
+        self::assertSame('AAA', $firstItems['sku:AAA|offer:#0']->getListingSku());
+        self::assertSame('BBB', $secondItems['sku:BBB|offer:#0']->getListingSku());
+        self::assertSame('CCC', $secondItems['sku:CCC|offer:#0']->getListingSku());
+    }
+
+    /**
+     * @param list<MappedOrderItem> $items
+     */
+    private function orderWithExternalId(string $externalId, array $items): MappedOrder
+    {
+        return new MappedOrder(
+            externalId: $externalId,
+            scheme: IngestOrderScheme::FBO,
+            orderedAt: new \DateTimeImmutable('-2 days'),
+            rawStatus: 'delivering',
+            items: $items,
+        );
+    }
+
+    /**
      * Незнакомый статус деградирует в UNKNOWN и попадает в видимую очередь,
      * а не в NULL и не в исключение.
      */

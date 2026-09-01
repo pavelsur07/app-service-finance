@@ -6,6 +6,7 @@ namespace App\Ingestion\Application\Action;
 
 use App\Ingestion\Application\Command\NormalizeRawRecordCommand;
 use App\Ingestion\Application\Command\RecordNormalizationIssueCommand;
+use App\Ingestion\Application\DTO\ListingResolution;
 use App\Ingestion\Application\DTO\MappedOrder;
 use App\Ingestion\Application\DTO\MappedOrderItem;
 use App\Ingestion\Application\Service\ListingResolverRegistry;
@@ -116,7 +117,28 @@ final readonly class NormalizeOrderRawRecordAction
             )),
         );
 
-        foreach ($orders as $mappedOrder) {
+        // Резолв листингов — ОДИН вызов на всё сырьё, а не на каждый заказ.
+        //
+        // Пакетная загрузка заказов и позиций убрала N+1 на них, но резолвер
+        // оставался внутри цикла: страница коннектора несёт до 20 000 заказов,
+        // и это были бы 20 000 обращений. Ключ — «индекс заказа:индекс
+        // позиции», resolveMany() сохраняет ключи.
+        $sourceDataRows = [];
+        foreach ($orders as $orderIndex => $mappedOrder) {
+            foreach ($mappedOrder->items as $itemIndex => $mappedItem) {
+                $sourceDataRows[$orderIndex.':'.$itemIndex] = $mappedItem->sourceData;
+            }
+        }
+
+        $resolutions = [] === $sourceDataRows
+            ? []
+            : $this->listingResolverRegistry->resolveMany(
+                $rawRecord->getSource(),
+                $command->companyId,
+                $sourceDataRows,
+            );
+
+        foreach ($orders as $orderIndex => $mappedOrder) {
             // Один и тот же externalId может встретиться в батче дважды:
             // второй раз он обязан попасть в уже созданную запись, а не
             // создать вторую и упереться в уникальный индекс.
@@ -128,6 +150,8 @@ final readonly class NormalizeOrderRawRecordAction
                 $knownItems,
                 $currentItems,
                 $seenObservations,
+                $resolutions,
+                $orderIndex,
             );
         }
 
@@ -179,6 +203,7 @@ final readonly class NormalizeOrderRawRecordAction
      * @param array<string, array<string, IngestOrderItem>> $currentItems набор последнего снимка заказа
      * @param array<string, true> $seenObservations ключи уже записанных наблюдений,
      *                                              изменяется по ссылке
+     * @param array<array-key, ListingResolution|null> $resolutions «индекс заказа:индекс позиции»
      */
     private function applyOrder(
         IngestRawRecord $rawRecord,
@@ -188,6 +213,8 @@ final readonly class NormalizeOrderRawRecordAction
         array &$knownItems,
         array &$currentItems,
         array &$seenObservations,
+        array $resolutions,
+        int $orderIndex,
     ): IngestOrder {
         $companyId = $rawRecord->getCompanyId();
         $status = $this->statusMapper->map($rawRecord->getSource(), $mapped->scheme, $mapped->rawStatus);
@@ -231,7 +258,7 @@ final readonly class NormalizeOrderRawRecordAction
             $this->orderRepository->save($order);
 
             $this->appendStatusEvent($order, $mapped->rawStatus, $status, null, $observedAt, $rawRecord->getId(), $seenObservations);
-            $applied = $this->applyItems($order, $mapped->items, $rawRecord, []);
+            $applied = $this->applyItems($order, $mapped->items, [], $resolutions, $orderIndex);
             $knownItems[$order->getId()] = $applied;
             $currentItems[$order->getId()] = $applied;
 
@@ -270,8 +297,9 @@ final readonly class NormalizeOrderRawRecordAction
         $applied = $this->applyItems(
             $order,
             $mapped->items,
-            $rawRecord,
             $knownItems[$order->getId()] ?? [],
+            $resolutions,
+            $orderIndex,
         );
 
         // Пул пополняется, но не сжимается: позиция, пропавшая из этого
@@ -323,26 +351,18 @@ final readonly class NormalizeOrderRawRecordAction
      *
      * @param list<MappedOrderItem> $mappedItems
      * @param array<string, IngestOrderItem> $existing lineKey => позиция
+     * @param array<array-key, ListingResolution|null> $resolutions «индекс заказа:индекс позиции»
      *
      * @return array<string, IngestOrderItem>
      */
     private function applyItems(
         IngestOrder $order,
         array $mappedItems,
-        IngestRawRecord $rawRecord,
         array $existing,
+        array $resolutions,
+        int $orderIndex,
     ): array {
-        $sourceDataRows = [];
-        foreach ($mappedItems as $index => $mappedItem) {
-            $sourceDataRows[$index] = $mappedItem->sourceData;
-        }
-
         $applied = [];
-        $resolutions = $this->listingResolverRegistry->resolveMany(
-            $rawRecord->getSource(),
-            $order->getCompanyId(),
-            $sourceDataRows,
-        );
 
         foreach ($mappedItems as $index => $mappedItem) {
             $item = $existing[$mappedItem->lineKey] ?? null;
@@ -374,7 +394,7 @@ final readonly class NormalizeOrderRawRecordAction
                 );
             }
 
-            $resolution = $resolutions[$index] ?? null;
+            $resolution = $resolutions[$orderIndex.':'.$index] ?? null;
 
             // Нерезолвленное не теряется: ключ, по которому пытались искать,
             // сохраняется даже когда листинг не найден — это очередь на разбор,
