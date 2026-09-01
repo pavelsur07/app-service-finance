@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.82 / 2026-08-23
+> Версия: 1.83 / 2026-09-01
 
 ---
 
@@ -109,6 +109,7 @@
 ### Ingestion: raw storage
 
 - `RawStorageFacade` — единая точка записи/чтения raw payload для нового Ingestion-модуля. Legacy raw-сущности Marketplace/Inventory/Ads не меняются.
+- `RawStorageFacade::storeAndGetIds(RawBatch): list<string>` — та же запись, но возвращает скалярные id вместо `IngestRawRecord`. Для вызывающих из других модулей: `App\Ingestion\Entity\*` не пересекают границу модуля (`tests/Unit/Ingestion/Architecture/EntityBoundaryTest`). Внутри Ingestion используется `store()`.
 - `IngestRawRecord` хранит только metadata: company/connection/shop/source/resource/external id, storage path, hash, byte size, fetched/sync timestamps и normalization status. Payload в БД не хранится.
 - Payload записывается как canonical NDJSON, gzip-compressed, один файл на `RawBatch` chunk. Путь: `{company}/{source}/{shop}/{resource}/{yyyy}/{mm}/{dd}/{syncJobId}/{externalId}/{hash}.ndjson.gz`, чтобы несколько batch внутри одного sync job не перезаписывали друг друга.
 - Dedup: перед записью сверяется SHA-256 hash canonical uncompressed NDJSON по `(companyId, source, resourceType, externalId)`. Совпавший hash обновляет `lastSeenAt`; новый object не создаётся.
@@ -226,6 +227,13 @@
 - Назначение: хранит отдельные записи ошибок синхронизации как append-only историю; retry не перезаписывает предыдущую диагностику.
 - Поля: `syncStatusId`, `companyId`, `connectionId`, `businessDate`, `errorClass`, `errorMessage`, `statusCode`, `responseExcerpt`, `requestPayload`, `createdAt`.
 - `requestPayload` хранится в JSON-формате и **не должен** содержать API token, plaintext secret или полный raw response body.
+
+### Marketplace: даты жизненного цикла листинга
+
+- `MarketplaceListing.createdAt` — момент появления строки **у нас**; проставляется `#[ORM\PrePersist]`.
+- `MarketplaceListing.marketplaceCreatedAt` (`?DateTimeImmutable`, колонка `marketplace_created_at`) — дата создания товара **на стороне маркетплейса**. Для Ozon источник — `items[].created_at` из `/v3/product/info/list`. Понятия разные, смешивать нельзя.
+- `MarketplaceListing.lastSeenAt` (`?DateTimeImmutable`, колонка `last_seen_at`) — когда листинг последний раз встретился в выгрузке каталога маркетплейса. Пропажа из каталога **не** меняет `isActive`: разбор ручной.
+- Оба поля nullable и не заполняются финансовым pipeline: их пишет только каталожная загрузка.
 
 ### Marketplace: теги листингов
 
@@ -2928,6 +2936,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.83 | 2026-09-01 | Marketplace/Ingestion: в `MarketplaceListing` добавлены `marketplaceCreatedAt` и `lastSeenAt`; `RawStorageFacade::storeAndGetIds()` отдаёт скалярные id вместо сущностей через границу модуля |
 | 1.82 | 2026-08-23 | MarketplaceAnalytics: добавлен facade-контракт пакетного пересчёта дневных снапшотов листингов для tenant-safe каскада после изменения себестоимости |
 | 1.81 | 2026-08-21 | Finance: ручное удаление операций ОПиУ переведено на company-scoped soft delete с отдельной вкладкой удалённых, восстановлением и пересчётом связанных ДДС/ОПиУ агрегатов |
 | 1.80 | 2026-08-20 | Finance: ДДС принимает tenant-safe мультифильтры Проекты/ЦФО при сохранении legacy UI, JSON и CSV contracts |

@@ -189,6 +189,28 @@ final class RawStorageFacadeTest extends IntegrationTestCase
         ));
     }
 
+    public function testStoreAndGetIdsReturnsScalarIdentifiersUsableWithoutTheEntity(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $rows = [['sku' => 'SKU-CATALOG-1', 'name' => 'Лосины женские']];
+
+        /** @var RawStorageFacade $facade */
+        $facade = self::getContainer()->get(RawStorageFacade::class);
+
+        $ids = $facade->storeAndGetIds($this->batch($companyId, rows: $rows));
+
+        self::assertCount(1, $ids);
+        self::assertContainsOnly('string', $ids);
+
+        $storagePath = $this->connection->fetchOne(
+            'SELECT storage_path FROM ingest_raw_records WHERE id = :id AND company_id = :company_id',
+            ['id' => $ids[0], 'company_id' => $companyId],
+        );
+
+        self::assertIsString($storagePath);
+        self::assertEquals($rows, iterator_to_array($facade->read($ids[0], $companyId)));
+    }
+
     /**
      * @param list<array<string, mixed>> $rows
      */
