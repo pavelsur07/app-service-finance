@@ -356,6 +356,74 @@ final class OzonOrderMapperTest extends TestCase
     }
 
     /**
+     * Регрессия: дата бралась только из created_at. Реальных данных FBS у нас
+     * нет — снятое окно вернуло ноль отправлений, — а по документации Ozon у
+     * FBS фигурирует in_process_at. Ошибка в предположении стоила бы потери
+     * ВСЕХ заказов схемы: каждый получал бы unparsable_created_at, сырьё
+     * помечалось бы обработанным, курсор уходил бы вперёд.
+     */
+    public function testFbsPostingWithOnlyInProcessAtIsMapped(): void
+    {
+        $batch = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBS), [[
+            'posting_number' => '111-2222-3',
+            'status' => 'awaiting_deliver',
+            'in_process_at' => '2026-08-30T17:49:41.153418Z',
+            'products' => [['sku' => 1, 'quantity' => 1, 'price' => '10.00']],
+        ]]);
+
+        self::assertSame([], $batch->skipped);
+        self::assertSame('2026-08-30T17:49:41+00:00', $batch->orders[0]->orderedAt->format(\DATE_ATOM));
+    }
+
+    /**
+     * Обратная сторона: FBO с одним created_at тоже обязан разбираться, а
+     * приоритет полей не должен путать схемы.
+     */
+    public function testFboPrefersCreatedAtOverInProcessAt(): void
+    {
+        $batch = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBO), [[
+            'posting_number' => '111-2222-3',
+            'status' => 'delivering',
+            'created_at' => '2026-08-30T10:00:00Z',
+            'in_process_at' => '2026-08-30T11:00:00Z',
+            'products' => [['sku' => 1, 'quantity' => 1, 'price' => '10.00']],
+        ]]);
+
+        self::assertSame('2026-08-30T10:00:00+00:00', $batch->orders[0]->orderedAt->format(\DATE_ATOM));
+    }
+
+    /**
+     * Регрессия: для форматов со смещением аргумент таймзоны у
+     * createFromFormat() игнорируется, и объект оставался в исходной зоне.
+     * Doctrine пишет datetime_immutable в TIMESTAMP WITHOUT TIME ZONE как
+     * есть — 10:00+03:00 сохранился бы как 10:00 UTC, сдвинув дату заказа на
+     * три часа.
+     */
+    #[DataProvider('offsetDateCases')]
+    public function testDatesWithOffsetAreNormalizedToUtc(string $createdAt, string $expected): void
+    {
+        $batch = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBO), [[
+            'posting_number' => 'p-1',
+            'status' => 'delivering',
+            'created_at' => $createdAt,
+            'products' => [['sku' => 1, 'quantity' => 1, 'price' => '10.00']],
+        ]]);
+
+        self::assertSame([], $batch->skipped);
+        self::assertSame($expected, $batch->orders[0]->orderedAt->format(\DATE_ATOM));
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function offsetDateCases(): iterable
+    {
+        yield 'смещение без дробной части' => ['2026-09-01T10:00:00+03:00', '2026-09-01T07:00:00+00:00'];
+        yield 'смещение с дробной частью' => ['2026-09-01T10:00:00.123456+03:00', '2026-09-01T07:00:00+00:00'];
+        yield 'уже UTC через смещение' => ['2026-09-01T10:00:00+00:00', '2026-09-01T10:00:00+00:00'];
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     private function rowsWithPrice(mixed $price): array

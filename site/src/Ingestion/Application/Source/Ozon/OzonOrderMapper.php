@@ -81,7 +81,7 @@ final class OzonOrderMapper implements OrderMapperInterface
             // Дату заказа НЕ подменяем временем загрузки: подстановка тихо
             // сдвигала бы заказ в сегодняшний день и искажала любую
             // аналитику по датам. Нечитаемая дата — это испорченная строка.
-            $orderedAt = $this->parseDate($row['created_at'] ?? null);
+            $orderedAt = $this->parseOrderedAt($row, $scheme);
             if (null === $orderedAt) {
                 $skipped[] = ['reason' => 'unparsable_created_at', 'hint' => $postingNumber];
                 continue;
@@ -321,6 +321,36 @@ final class OzonOrderMapper implements OrderMapperInterface
     }
 
     /**
+     * Время заказа с учётом различий схем.
+     *
+     * У FBO в выгрузке есть и `created_at`, и `in_process_at`. Про FBS
+     * достоверных данных нет: снятое окно вернуло ноль отправлений, а по
+     * документации у него фигурирует `in_process_at`. Поэтому поле не
+     * угадывается: для каждой схемы задан порядок предпочтения, и второй
+     * вариант служит запасным. Ошибка в предположении о наличии поля стоила
+     * бы потери ВСЕХ заказов схемы — они получали бы
+     * `unparsable_created_at`, сырьё помечалось бы обработанным, а курсор
+     * уходил бы вперёд.
+     *
+     * @param array<string, mixed> $row
+     */
+    private function parseOrderedAt(array $row, IngestOrderScheme $scheme): ?\DateTimeImmutable
+    {
+        $fields = IngestOrderScheme::FBS === $scheme
+            ? ['in_process_at', 'created_at']
+            : ['created_at', 'in_process_at'];
+
+        foreach ($fields as $field) {
+            $parsed = $this->parseDate($row[$field] ?? null);
+            if (null !== $parsed) {
+                return $parsed;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Строгий разбор даты заказа.
      *
      * `new DateTimeImmutable($value)` датой не проверяет ничего: он примет
@@ -362,7 +392,12 @@ final class OzonOrderMapper implements OrderMapperInterface
                 continue;
             }
 
-            return $parsed;
+            // Приводим к UTC явно: для форматов со смещением аргумент $utc
+            // игнорируется, и объект остаётся в исходной зоне. Doctrine пишет
+            // datetime_immutable в TIMESTAMP WITHOUT TIME ZONE как есть, то
+            // есть 10:00+03:00 сохранился бы как 10:00 UTC — сдвиг на три часа
+            // в дате заказа и во всей аналитике по ней.
+            return $parsed->setTimezone($utc);
         }
 
         return null;
