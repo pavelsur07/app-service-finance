@@ -106,6 +106,40 @@ final readonly class OzonOrdersConnector implements SourceConnectorInterface
             $floor = $cursorSince;
         }
 
+        // Обратное окно в API не уходит.
+        //
+        // Курсор может оказаться впереди текущего момента: перевод системных
+        // часов, ручное продвижение, уже выполненная задача. Тогда since
+        // (посчитанный от курсора) больше to (посчитанного от часов), и Ozon
+        // получил бы since > to. Его HTTP 400 клиент классифицирует как
+        // неповторяемый malformed response, и загрузка встала бы вместо того,
+        // чтобы спокойно дождаться, пока время догонит курсор.
+        //
+        // Правильное поведение — ничего не запрашивать: за окном нулевой
+        // длины заказов нет по определению. Курсор при этом сохраняется полом
+        // монотонности и назад не едет.
+        if ($since > $to) {
+            return new PullResult(
+                rawBatch: new RawBatch(
+                    companyId: $request->companyId,
+                    connectionRef: $request->connectionRef,
+                    shopRef: $request->shopRef,
+                    source: IngestSource::OZON,
+                    resourceType: $request->resourceType,
+                    externalId: $this->windowKey($scheme, $since, $to, $offset),
+                    syncJobId: $request->syncJobId,
+                    fetchedAt: $now,
+                    rows: [$this->emptyMarker($request->resourceType, $since, $to)],
+                ),
+                nextCursorValue: json_encode(
+                    ['since' => max($to, $floor ?? $to)->format(\DATE_ATOM)],
+                    \JSON_THROW_ON_ERROR,
+                ),
+                hasMore: false,
+                continuationDelaySeconds: null,
+            );
+        }
+
         $rows = [];
         $startOffset = $offset;
         $pages = 0;

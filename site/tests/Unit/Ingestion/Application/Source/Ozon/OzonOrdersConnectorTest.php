@@ -228,19 +228,43 @@ final class OzonOrdersConnectorTest extends TestCase
         }
         $this->client->queue(...$pages);
 
-        // Курсор впереди текущих часов — окно окажется позади него.
-        $first = $this->connector->pull($this->request('{"since":"2026-09-01T18:00:00+00:00"}'));
+        // Курсор чуть впереди текущих часов: окно ещё корректно (12:10 минус
+        // перекрытие даёт 11:55 <= 12:00), но пол уже опережает конец окна.
+        $first = $this->connector->pull($this->request('{"since":"2026-09-01T12:10:00+00:00"}'));
 
         self::assertTrue($first->hasMore);
         $continuation = json_decode((string) $first->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame('2026-09-01T18:00:00+00:00', $continuation['floor']);
+        self::assertSame('2026-09-01T12:10:00+00:00', $continuation['floor']);
 
         // Финальная страница продолжения не должна откатить курсор на конец окна.
         $this->client->queue(new OzonRawPage($this->postings(1), false, null, []));
         $final = $this->connector->pull($this->request((string) $first->nextCursorValue));
 
         $decoded = json_decode((string) $final->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertSame('2026-09-01T12:10:00+00:00', $decoded['since']);
+    }
+
+    /**
+     * Регрессия: обратное окно уходило в API. Курсор может оказаться впереди
+     * текущего момента (перевод часов, ручное продвижение, уже выполненная
+     * задача), и тогда since > to. HTTP 400 от Ozon клиент классифицирует как
+     * неповторяемый malformed response, и загрузка встала бы вместо того,
+     * чтобы дождаться, пока время догонит курсор.
+     */
+    public function testFutureCursorDoesNotSendInvertedWindowToTheApi(): void
+    {
+        $result = $this->connector->pull($this->request('{"since":"2026-09-01T18:00:00+00:00"}'));
+
+        self::assertSame([], $this->client->calls, 'За окном нулевой длины запрашивать нечего.');
+
+        // Курсор сохраняется полом монотонности и назад не едет.
+        $decoded = json_decode((string) $result->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
         self::assertSame('2026-09-01T18:00:00+00:00', $decoded['since']);
+        self::assertFalse($result->hasMore);
+
+        // Факт «за это окно ничего не было» всё равно фиксируется в raw.
+        self::assertNotNull($result->rawBatch);
+        self::assertCount(1, iterator_to_array($result->rawBatch->rows));
     }
 
     /**
