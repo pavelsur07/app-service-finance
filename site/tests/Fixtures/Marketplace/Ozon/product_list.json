@@ -1,0 +1,28 @@
+{
+  "result": {
+    "items": [
+      {
+        "product_id": 115526753,
+        "offer_id": "TEST-ART-001/черный-M",
+        "has_fbo_stocks": false,
+        "has_fbs_stocks": true,
+        "archived": false,
+        "is_discounted": false,
+        "quants": [],
+        "sku": 308520421
+      },
+      {
+        "product_id": 2070985627,
+        "offer_id": "TEST-ART-002-L",
+        "has_fbo_stocks": false,
+        "has_fbs_stocks": true,
+        "archived": false,
+        "is_discounted": false,
+        "quants": [],
+        "sku": 2364427751
+      }
+    ],
+    "total": 2,
+    "last_id": ""
+  }
+}

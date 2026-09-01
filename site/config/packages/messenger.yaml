@@ -71,6 +71,8 @@ framework:
             'App\Marketplace\Message\SyncOzonReportMessage': async_sync
             'App\Marketplace\Message\SyncOzonRealizationMessage': async_sync
             'App\Marketplace\Message\SyncOzonListingBarcodesMessage': async_sync
+            # Каталог Ozon: внешние HTTP-запросы к Seller API -> async_sync.
+            'App\Marketplace\Message\SyncOzonListingCatalogMessage': async_sync
             'App\Marketplace\Message\InitialSyncMessage': async_sync
             'App\Marketplace\Message\TriggerInitialSyncMessage': async_sync
             'App\Marketplace\Application\Command\FetchMarketplaceDataCommand': async_sync

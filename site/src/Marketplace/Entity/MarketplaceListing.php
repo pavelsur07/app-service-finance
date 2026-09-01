@@ -76,6 +76,20 @@ class MarketplaceListing
     #[ORM\Column(length: 500, nullable: true)]
     private ?string $name = null;
 
+    /**
+     * Дата создания товара на стороне маркетплейса.
+     * Это не {@see $createdAt}: тот — момент появления строки у нас.
+     */
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $marketplaceCreatedAt = null;
+
+    /**
+     * Когда листинг последний раз встретился в выгрузке каталога маркетплейса.
+     * Пропажу из каталога разбираем вручную, поэтому isActive по нему не меняется.
+     */
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $lastSeenAt = null;
+
     public function __construct(string $id, Company $company, ?Product $product, MarketplaceType $marketplace)
     {
         Assert::uuid($id);
@@ -243,6 +257,30 @@ class MarketplaceListing
     public function setName(?string $name): self
     {
         $this->name = $name;
+
+        return $this;
+    }
+
+    public function getMarketplaceCreatedAt(): ?\DateTimeImmutable
+    {
+        return $this->marketplaceCreatedAt;
+    }
+
+    public function setMarketplaceCreatedAt(?\DateTimeImmutable $marketplaceCreatedAt): self
+    {
+        $this->marketplaceCreatedAt = $marketplaceCreatedAt;
+
+        return $this;
+    }
+
+    public function getLastSeenAt(): ?\DateTimeImmutable
+    {
+        return $this->lastSeenAt;
+    }
+
+    public function setLastSeenAt(?\DateTimeImmutable $lastSeenAt): self
+    {
+        $this->lastSeenAt = $lastSeenAt;
 
         return $this;
     }

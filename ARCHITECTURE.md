@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.82 / 2026-08-23
+> Версия: 1.85 / 2026-09-01
 
 ---
 
@@ -109,6 +109,7 @@
 ### Ingestion: raw storage
 
 - `RawStorageFacade` — единая точка записи/чтения raw payload для нового Ingestion-модуля. Legacy raw-сущности Marketplace/Inventory/Ads не меняются.
+- `RawStorageFacade::storeAndGetIds(RawBatch): list<string>` — та же запись, но возвращает скалярные id вместо `IngestRawRecord`. Для вызывающих из других модулей: `App\Ingestion\Entity\*` не пересекают границу модуля (`tests/Unit/Ingestion/Architecture/EntityBoundaryTest`). Внутри Ingestion используется `store()`.
 - `IngestRawRecord` хранит только metadata: company/connection/shop/source/resource/external id, storage path, hash, byte size, fetched/sync timestamps и normalization status. Payload в БД не хранится.
 - Payload записывается как canonical NDJSON, gzip-compressed, один файл на `RawBatch` chunk. Путь: `{company}/{source}/{shop}/{resource}/{yyyy}/{mm}/{dd}/{syncJobId}/{externalId}/{hash}.ndjson.gz`, чтобы несколько batch внутри одного sync job не перезаписывали друг друга.
 - Dedup: перед записью сверяется SHA-256 hash canonical uncompressed NDJSON по `(companyId, source, resourceType, externalId)`. Совпавший hash обновляет `lastSeenAt`; новый object не создаётся.
@@ -226,6 +227,108 @@
 - Назначение: хранит отдельные записи ошибок синхронизации как append-only историю; retry не перезаписывает предыдущую диагностику.
 - Поля: `syncStatusId`, `companyId`, `connectionId`, `businessDate`, `errorClass`, `errorMessage`, `statusCode`, `responseExcerpt`, `requestPayload`, `createdAt`.
 - `requestPayload` хранится в JSON-формате и **не должен** содержать API token, plaintext secret или полный raw response body.
+
+### Marketplace: загрузка каталога товаров Ozon
+
+Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либо
+`--company=<uuid>` вручную) → `SyncOzonListingCatalogMessage` (`async_sync`) →
+`SyncOzonListingCatalogHandler` → `RefreshOzonListingCatalogAction`.
+
+- `OzonProductCatalogClient` обходит `/v3/product/list` по `last_id` (limit 1000),
+  затем `/v3/product/info/list` чанками по 1000 `product_id`. Первый эндпоинт —
+  единственный источник, видящий товары **без продаж**: вход в него не зависит
+  от содержимого нашей БД.
+- Сырые ответы обоих эндпоинтов уходят в S3 через `RawStorageFacade::storeAndGetIds`,
+  ресурсы `ozon_seller_product_list` и `ozon_seller_product_info`,
+  `IngestSource::OZON`, `externalId` = `page-N` / `chunk-N`.
+- **Ключ сопоставления — всё множество `sources[].sku`, а не верхнеуровневый `sku`.**
+  У товара Ozon может быть несколько источников (sds/fbs), у каждого свой sku;
+  на реальной выгрузке 50 товаров дали 78 SKU. Листинг, заведённый финансовым
+  документом по FBS-схеме, находится только по вторичному sku. Обновляются **все**
+  листинги товара.
+- Товар, ни один SKU которого не имеет листинга, создаёт **одну** строку по
+  верхнеуровневому `sku`. Вторая появится сама при первой продаже по второй схеме.
+- `OzonListingCatalogUpsertQuery` — `ON CONFLICT ... DO UPDATE` по `name`,
+  `supplier_sku`, `marketplace_created_at`, `last_seen_at`, `marketplace_data`.
+  Финансовый `OzonListingUpsertQuery` остаётся `ON CONFLICT DO NOTHING`: общий
+  `DO UPDATE` позволил бы финансовому документу перезаписывать каталожное имя.
+- Каталог не меняет `is_active` и не пишет колонку `price`. Каталожная цена
+  витринная, а не цена продажи, и лежит в `marketplace_data` вместе со статусом,
+  признаком архива, картинкой и категорией. `marketplace_data` перезаписывается
+  целиком: каталог — единственный писатель этой колонки.
+- Глобальной транзакции на прогон нет: upsert идемпотентен, частичное применение
+  дозаполняется следующим прогоном, а транзакция на весь каталог держала бы
+  блокировки на `marketplace_listings` и мешала бы финансовому pipeline.
+- Ручной запуск — `POST /marketplace/listings/sync-ozon-catalog`
+  (`SyncOzonListingCatalogController`, CSRF, `ModuleAccess::MARKETPLACE_WRITE`,
+  компания из `getActiveCompany()`). Диспатчит по одному сообщению на каждое
+  активное Ozon SELLER-подключение компании.
+- Каждый прогон пишет `MarketplaceJobLog` с `JobType::LISTING_CATALOG_SYNC_OZON`:
+  `running` → `done` со счётчиками `products_fetched` / `listings_upserted` /
+  `raw_records_stored`, либо `failed`. В `summary.error` кладётся **класс**
+  исключения, а не текст (он может нести детали ответа внешнего API); формат
+  один для всех ошибок, включая 429. Итог последнего прогона показывается на
+  странице листингов.
+- Терминальный статус журнала при ошибке пишется через DBAL
+  (`MarketplaceJobLogFailQuery`), а не через ORM: сбой внутри чанковой
+  транзакции закрывает `EntityManager` (`wrapInTransaction()` вызывает
+  `close()`), и `persist()` подменил бы исходное исключение техническим,
+  оставив запись в `running`.
+- Взаимное исключение прогонов — блокировка `LockFactory` по
+  `(companyId, connectionId)`, TTL 300 с с продлением на границах страниц и
+  чанков (`RefreshOzonListingCatalogAction` принимает прогресс-колбэк). Короткий
+  TTL не запирает подключение после аварийного завершения воркера, а продление
+  не даёт lease протухнуть посреди живого обхода крупного каталога. Триггеров
+  два (cron и кнопка); второй прогон отступает — без блокировки он удвоил бы
+  запросы к Ozon. Проверка «уже идёт» в контроллере была бы гонкой, поэтому её
+  там нет.
+- Аварийно оборванный воркер (SIGKILL, OOM) оставляет запись в `running`:
+  переводить просроченные прогоны в терминальный статус пока нечем. Это общее
+  свойство `MarketplaceJobLog` для всех `JobType`, не только этого — вынесено
+  в FOLLOW-UP.
+- HTTP 429 поднимает `OzonCatalogRateLimitException`; handler логирует `warning`
+  (ретрай, а не инцидент) и пробрасывает исключение как есть. Оборачивать его в
+  `RecoverableMessageHandlingException` нельзя: Symfony считает
+  `RecoverableExceptionInterface` retryable безусловно, в обход `max_retries`, и
+  постоянный 429 крутился бы бесконечно, не доходя до failed-очереди. Обычное
+  исключение оставляет в силе `retry_strategy` транспорта `async_sync`.
+- Ответ Ozon с нарушенной структурой (`/v3/product/list` без `result.items` или
+  без строкового `last_id`, `/v3/product/info/list` без `items`) поднимает
+  `OzonCatalogApiException`. Тихо завершать обход нельзя: неполный каталог
+  отчитался бы успехом.
+- Ответ, из которого не извлеклось **ничего**, тоже поднимает
+  `OzonCatalogApiException`. Для карточек счёт ведётся от числа **запрошенных**
+  `product_id`, а не от числа элементов ответа: иначе `{"items":[]}` на непустой
+  чанк дал бы `received = 0`, ни одно условие не сработало бы, и прогон молча
+  отчитался бы успехом, не загрузив ничего.
+- Обрабатываются только карточки запрошенных `product_id` (сверка по
+  `items[].id`): ответ «не про тот чанк» не подменяет выборку.
+- Частичный пропуск ошибкой не считается — один недостающий или мусорный товар
+  не должен отменять ночную выгрузку, — но уходит в `warning` со счётчиками
+  `requested` / `returned` / `usable` / `skipped`.
+- Полнота обхода сверяется с `result.total`, который Ozon отдаёт на каждой
+  странице: ноль собранных при непустом каталоге — `OzonCatalogApiException`,
+  недобор — `warning` с `reported_total` / `collected` / `missing`. Без сверки
+  оборванная пагинация выглядела бы полной выгрузкой. Перебор расхождением не
+  считается: каталог мог вырасти по ходу обхода.
+- Пустая страница в raw не сохраняется: `RawStorageFacade` отвергает батч без
+  строк, а каталог, кратный размеру страницы, штатно отдаёт пустую последнюю
+  страницу. Raw кладётся до интерпретации — при непригодном ответе сохранённый
+  payload остаётся единственным свидетельством того, что прислал Ozon.
+- Каталожный `DO UPDATE` выполняется только при
+  `last_seen_at IS NULL OR EXCLUDED.last_seen_at > last_seen_at`. Прогон,
+  начавшийся раньше, но завершившийся позже, не подменяет более свежий снимок.
+  Сравнение строгое: `last_seen_at` имеет точность в секунду, и при `>=` два
+  прогона, стартовавшие в одну секунду, снова перезаписывали бы друг друга.
+  Внутри одного прогона повтора нет — у двух листингов одного товара разные
+  `marketplace_sku`, то есть разные conflict-ключи.
+
+### Marketplace: даты жизненного цикла листинга
+
+- `MarketplaceListing.createdAt` — момент появления строки **у нас**; проставляется `#[ORM\PrePersist]`.
+- `MarketplaceListing.marketplaceCreatedAt` (`?DateTimeImmutable`, колонка `marketplace_created_at`) — дата создания товара **на стороне маркетплейса**. Для Ozon источник — `items[].created_at` из `/v3/product/info/list`. Понятия разные, смешивать нельзя.
+- `MarketplaceListing.lastSeenAt` (`?DateTimeImmutable`, колонка `last_seen_at`) — когда листинг последний раз встретился в выгрузке каталога маркетплейса. Пропажа из каталога **не** меняет `isActive`: разбор ручной.
+- Оба поля nullable и не заполняются финансовым pipeline: их пишет только каталожная загрузка.
 
 ### Marketplace: теги листингов
 
@@ -2928,6 +3031,9 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.85 | 2026-09-01 | Marketplace: ручной запуск загрузки каталога Ozon из UI, журнал прогонов `MarketplaceJobLog` и взаимное исключение прогонов по подключению |
+| 1.84 | 2026-09-01 | Marketplace: загрузка каталога товаров Ozon в листинги — товары без продаж, наименование, дата создания на маркетплейсе; сопоставление по всему множеству `sources[].sku` |
+| 1.83 | 2026-09-01 | Marketplace/Ingestion: в `MarketplaceListing` добавлены `marketplaceCreatedAt` и `lastSeenAt`; `RawStorageFacade::storeAndGetIds()` отдаёт скалярные id вместо сущностей через границу модуля |
 | 1.82 | 2026-08-23 | MarketplaceAnalytics: добавлен facade-контракт пакетного пересчёта дневных снапшотов листингов для tenant-safe каскада после изменения себестоимости |
 | 1.81 | 2026-08-21 | Finance: ручное удаление операций ОПиУ переведено на company-scoped soft delete с отдельной вкладкой удалённых, восстановлением и пересчётом связанных ДДС/ОПиУ агрегатов |
 | 1.80 | 2026-08-20 | Finance: ДДС принимает tenant-safe мультифильтры Проекты/ЦФО при сохранении legacy UI, JSON и CSV contracts |

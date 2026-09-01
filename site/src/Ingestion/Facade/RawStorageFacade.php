@@ -26,6 +26,21 @@ final readonly class RawStorageFacade
     }
 
     /**
+     * Скалярные идентификаторы вместо сущностей — для вызывающих из других
+     * модулей: App\Ingestion\Entity\* не должны пересекать границу модуля,
+     * это проверяет tests/Unit/Ingestion/Architecture/EntityBoundaryTest.
+     *
+     * @return list<string>
+     */
+    public function storeAndGetIds(RawBatch $batch): array
+    {
+        return array_map(
+            static fn (IngestRawRecord $record): string => $record->getId(),
+            $this->store($batch),
+        );
+    }
+
+    /**
      * @return iterable<array<string, mixed>>
      */
     public function read(string $rawRecordId, string $companyId): iterable

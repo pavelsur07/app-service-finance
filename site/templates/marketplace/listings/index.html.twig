@@ -41,6 +41,29 @@
                     {% elseif filter == 'unmapped' %}Листинги без привязки
                     {% else %}Все листинги{% endif %}
                 </h3>
+                <form method="post" action="{{ path('marketplace_listings_sync_ozon_catalog') }}" class="d-inline">
+                    <input type="hidden" name="_token"
+                           value="{{ csrf_token('marketplace_listings_sync_ozon_catalog') }}">
+                    <button type="submit" class="btn btn-ghost-secondary"
+                            title="Загрузить наименования, артикулы и даты создания товаров из каталога Ozon">
+                        Обновить каталог Ozon
+                    </button>
+                </form>
+
+                {% if ozon_catalog_last_run %}
+                    <span class="text-secondary small" data-testid="ozon-catalog-last-run">
+                        {% if ozon_catalog_last_run.status.value == 'done' %}
+                            Каталог обновлён {{ ozon_catalog_last_run.finishedAt|date('d.m.Y H:i') }},
+                            товаров: {{ ozon_catalog_last_run.summary.products_fetched ?? 0 }}
+                        {% elseif ozon_catalog_last_run.status.value == 'failed' %}
+                            Последний прогон завершился ошибкой
+                            {{ ozon_catalog_last_run.finishedAt|date('d.m.Y H:i') }}
+                        {% else %}
+                            Загрузка каталога выполняется…
+                        {% endif %}
+                    </span>
+                {% endif %}
+
                 <a href="{{ path('marketplace_listing_tags_manage') }}" class="btn btn-ghost-secondary me-auto">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="16" height="16"
                          viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
