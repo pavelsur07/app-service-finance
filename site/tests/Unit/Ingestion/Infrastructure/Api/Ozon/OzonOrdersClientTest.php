@@ -142,6 +142,27 @@ final class OzonOrdersClientTest extends TestCase
         $this->fetch($client);
     }
 
+    /**
+     * Ассоциативный контейнер проходит is_array(), но его count() участвует в
+     * решении о пагинации: обход закончился бы на произвольном числе
+     * элементов.
+     */
+    public function testAssociativeResultIsMalformed(): void
+    {
+        $client = $this->client(new MockResponse('{"result":{"first":{"posting_number":"p-1"}}}', ['http_code' => 200]));
+
+        $this->expectException(MalformedConnectorResponseException::class);
+        $this->fetch($client);
+    }
+
+    public function testAssociativeFbsPostingsAreMalformed(): void
+    {
+        $client = $this->client(new MockResponse('{"result":{"postings":{"a":{"posting_number":"p-1"}},"has_next":false}}', ['http_code' => 200]));
+
+        $this->expectException(MalformedConnectorResponseException::class);
+        $this->fetch($client, IngestOrderScheme::FBS);
+    }
+
     private function fetch(OzonOrdersClient $client, IngestOrderScheme $scheme = IngestOrderScheme::FBO): void
     {
         $client->fetchPostings(

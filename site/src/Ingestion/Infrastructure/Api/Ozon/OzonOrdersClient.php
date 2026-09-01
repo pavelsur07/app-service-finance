@@ -133,7 +133,7 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
         $result = $decoded['result'] ?? null;
 
         if (IngestOrderScheme::FBS === $scheme) {
-            if (!is_array($result) || !is_array($result['postings'] ?? null)) {
+            if (!is_array($result) || !is_array($result['postings'] ?? null) || !array_is_list($result['postings'])) {
                 throw new MalformedConnectorResponseException(sprintf('Ozon orders response has no result.postings for %s.', $endpoint));
             }
 
@@ -153,8 +153,11 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
             return new OzonRawPage($rows, $hasNext, null, []);
         }
 
-        if (!is_array($result)) {
-            throw new MalformedConnectorResponseException(sprintf('Ozon orders response has no result array for %s.', $endpoint));
+        // Именно СПИСОК, а не объект: ассоциативный контейнер прошёл бы
+        // is_array(), а его count() участвует в решении о пагинации — обход
+        // закончился бы на произвольном числе элементов.
+        if (!is_array($result) || !array_is_list($result)) {
+            throw new MalformedConnectorResponseException(sprintf('Ozon orders response has no result list for %s.', $endpoint));
         }
 
         $rows = $this->postingRows($result, $endpoint);

@@ -316,6 +316,43 @@ final class OzonOrderMapperTest extends TestCase
     }
 
     /**
+     * Регрессия: база ключа бралась только из sku. Две строки с одним SKU и
+     * разными offer_id — это разные предложения; ключи sku:X#0 и sku:X#1
+     * различали их позиционно и менялись местами при перестановке строк.
+     */
+    public function testSameSkuWithDifferentOfferIdsGetStableDistinctKeys(): void
+    {
+        $mapper = new OzonOrderMapper();
+        $row = static fn (array $products): array => [[
+            'posting_number' => 'p-1',
+            'status' => 'delivering',
+            'created_at' => '2026-09-01T10:00:00Z',
+            'products' => $products,
+        ]];
+
+        $a = ['sku' => 55, 'offer_id' => 'ART-A', 'quantity' => 1, 'price' => '10.00'];
+        $b = ['sku' => 55, 'offer_id' => 'ART-B', 'quantity' => 9, 'price' => '90.00'];
+
+        $direct = $mapper->map($this->rawRecord(OzonResourceType::ORDERS_FBO), $row([$a, $b]))->orders[0]->items;
+        $swapped = $mapper->map($this->rawRecord(OzonResourceType::ORDERS_FBO), $row([$b, $a]))->orders[0]->items;
+
+        $keyOf = static function (array $items, string $offerId): string {
+            foreach ($items as $item) {
+                if ($item->offerId === $offerId) {
+                    return $item->lineKey;
+                }
+            }
+
+            self::fail('Позиция '.$offerId.' не найдена.');
+        };
+
+        // Ключ следует за товаром, а не за его местом в массиве.
+        self::assertSame($keyOf($direct, 'ART-A'), $keyOf($swapped, 'ART-A'));
+        self::assertSame($keyOf($direct, 'ART-B'), $keyOf($swapped, 'ART-B'));
+        self::assertNotSame($keyOf($direct, 'ART-A'), $keyOf($direct, 'ART-B'));
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     private function rowsWithPrice(mixed $price): array

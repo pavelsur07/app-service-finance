@@ -291,6 +291,48 @@ final class NormalizeOrderRawRecordActionTest extends IntegrationTestCase
     }
 
     /**
+     * Регрессия: удаление исчезнувших позиций выполнялось внутри цикла. Если
+     * тот же заказ встречался в батче ещё раз со снимком {A,B} после {A},
+     * Doctrine выполнял INSERT раньше DELETE и уникальный индекс ронял общий
+     * flush. Вычистка перенесена за пределы батча.
+     */
+    public function testItemReappearingLaterInTheSameBatchSurvives(): void
+    {
+        $a = static fn (): MappedOrderItem => new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 1, externalSku: 'AAA');
+        $b = static fn (): MappedOrderItem => new MappedOrderItem(lineNo: 1, lineKey: 'sku:BBB#0', quantity: 1, externalSku: 'BBB');
+
+        // Заказ уже существует с двумя позициями.
+        $this->mapper->queue($this->orderWithItems('delivering', [$a(), $b()]));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-1'), $this->companyId));
+
+        // Один raw: сначала снимок {A}, затем снова {A,B}.
+        $this->mapper->queue(
+            $this->orderWithItems('delivering', [$a()]),
+            $this->orderWithItems('delivered', [$a(), $b()]),
+        );
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-2', new \DateTimeImmutable('+1 hour')), $this->companyId));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($order);
+
+        $items = $this->items->findByOrderIndexedByLineKey($this->companyId, $order->getId());
+        self::assertSame(['sku:AAA#0', 'sku:BBB#0'], $this->sortedKeys($items));
+    }
+
+    /**
+     * @param array<string, mixed> $items
+     *
+     * @return list<string>
+     */
+    private function sortedKeys(array $items): array
+    {
+        $keys = array_keys($items);
+        sort($keys);
+
+        return $keys;
+    }
+
+    /**
      * Незнакомый статус деградирует в UNKNOWN и попадает в видимую очередь,
      * а не в NULL и не в исключение.
      */

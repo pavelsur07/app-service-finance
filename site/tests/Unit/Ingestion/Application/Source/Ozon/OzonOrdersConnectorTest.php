@@ -108,7 +108,24 @@ final class OzonOrdersConnectorTest extends TestCase
         $result = $this->connector->pull($this->request('{"since":"2026-09-01T10:00:00+00:00"}'));
 
         self::assertNotNull($result->rawBatch);
-        self::assertSame('fbo:window-2026-09-01T09-2026-09-01T12:offset-0', $result->rawBatch->externalId);
+        self::assertSame('fbo:window-2026-09-01T09:45:00Z-2026-09-01T12:00:00Z:offset-0', $result->rawBatch->externalId);
+    }
+
+    /**
+     * Регрессия: границы окна округлялись до часа, поэтому [09:45,12:00] и
+     * [09:30,12:30] давали один externalId — при ретрае до продвижения курсора
+     * разные чанки выглядели версиями одной raw-записи.
+     */
+    public function testWindowsWithinTheSameHourGetDistinctExternalIds(): void
+    {
+        $first = $this->connector->pull($this->request('{"since":"2026-09-01T10:00:00+00:00"}'));
+
+        $connector = new OzonOrdersConnector($this->client, new MockClock('2026-09-01 12:30:00'));
+        $second = $connector->pull($this->request('{"since":"2026-09-01T09:45:00+00:00"}'));
+
+        self::assertNotNull($first->rawBatch);
+        self::assertNotNull($second->rawBatch);
+        self::assertNotSame($first->rawBatch->externalId, $second->rawBatch->externalId);
     }
 
     /**
@@ -172,7 +189,7 @@ final class OzonOrdersConnectorTest extends TestCase
         // Чанк — отдельная логическая запись: под общим externalId он выглядел
         // бы новой версией первого чанка и затёр бы его.
         self::assertNotNull($result->rawBatch);
-        self::assertSame('fbo:window-2026-09-01T09-2026-09-01T12:offset-20000', $result->rawBatch->externalId);
+        self::assertSame('fbo:window-2026-09-01T09:45:00Z-2026-09-01T12:00:00Z:offset-20000', $result->rawBatch->externalId);
 
         // Окно дочитано — курсор наконец уезжает на его конец.
         self::assertFalse($result->hasMore);

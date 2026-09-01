@@ -99,7 +99,16 @@ final readonly class NormalizeOrderRawRecordAction
             true,
         );
 
-        $existingItems = $this->itemRepository->findByOrdersIndexedByLineKey(
+        // Две карты, а не одна.
+        //
+        // knownItems — пул сущностей для переиспользования, он не сжимается.
+        // currentItems — набор ПОСЛЕДНЕГО снимка каждого заказа. Удаление
+        // применяется один раз после всего батча: если удалять внутри цикла,
+        // а тот же заказ встретится в батче ещё раз со снимком {A,B} после
+        // {A}, Doctrine выполнит INSERT раньше DELETE и уникальный индекс
+        // уронит общий flush.
+        $currentItems = [];
+        $knownItems = $this->itemRepository->findByOrdersIndexedByLineKey(
             $command->companyId,
             array_values(array_map(
                 static fn (IngestOrder $order): string => $order->getId(),
@@ -116,7 +125,8 @@ final readonly class NormalizeOrderRawRecordAction
                 $mappedOrder,
                 $observedAt,
                 $known,
-                $existingItems,
+                $knownItems,
+                $currentItems,
                 $seenObservations,
             );
         }
@@ -140,6 +150,16 @@ final readonly class NormalizeOrderRawRecordAction
             ));
         }
 
+        // Позиции, исчезнувшие из последнего снимка заказа, удаляются: строка,
+        // которой в заказе уже нет, завышала бы и сумму, и агрегаты по выкупу.
+        foreach ($currentItems as $orderId => $applied) {
+            foreach ($knownItems[$orderId] ?? [] as $lineKey => $item) {
+                if (!isset($applied[$lineKey])) {
+                    $this->itemRepository->remove($item);
+                }
+            }
+        }
+
         $rawRecord->markNormalizationDone();
         $this->entityManager->flush();
 
@@ -154,11 +174,9 @@ final readonly class NormalizeOrderRawRecordAction
 
     /**
      * @param array<string, IngestOrder> $known externalId => заказ
-     * @param array<string, array<string, IngestOrderItem>> $existingItems orderId => lineKey => позиция,
-     *                                                                     изменяется по ссылке: тот же
-     *                                                                     externalId может встретиться в
-     *                                                                     батче второй раз, а созданные
-     *                                                                     позиции ещё не во flush'е
+     * @param array<string, array<string, IngestOrderItem>> $knownItems пул сущностей для
+     *                                                                  переиспользования, не сжимается
+     * @param array<string, array<string, IngestOrderItem>> $currentItems набор последнего снимка заказа
      * @param array<string, true> $seenObservations ключи уже записанных наблюдений,
      *                                              изменяется по ссылке
      */
@@ -167,7 +185,8 @@ final readonly class NormalizeOrderRawRecordAction
         MappedOrder $mapped,
         \DateTimeImmutable $observedAt,
         array $known,
-        array &$existingItems,
+        array &$knownItems,
+        array &$currentItems,
         array &$seenObservations,
     ): IngestOrder {
         $companyId = $rawRecord->getCompanyId();
@@ -212,7 +231,9 @@ final readonly class NormalizeOrderRawRecordAction
             $this->orderRepository->save($order);
 
             $this->appendStatusEvent($order, $mapped->rawStatus, $status, null, $observedAt, $rawRecord->getId(), $seenObservations);
-            $existingItems[$order->getId()] = $this->applyItems($order, $mapped->items, $rawRecord, []);
+            $applied = $this->applyItems($order, $mapped->items, $rawRecord, []);
+            $knownItems[$order->getId()] = $applied;
+            $currentItems[$order->getId()] = $applied;
 
             return $order;
         }
@@ -246,12 +267,18 @@ final readonly class NormalizeOrderRawRecordAction
             $order->setExternalOrderId($mapped->externalOrderId);
         }
 
-        $existingItems[$order->getId()] = $this->applyItems(
+        $applied = $this->applyItems(
             $order,
             $mapped->items,
             $rawRecord,
-            $existingItems[$order->getId()] ?? [],
+            $knownItems[$order->getId()] ?? [],
         );
+
+        // Пул пополняется, но не сжимается: позиция, пропавшая из этого
+        // снимка, может вернуться следующим снимком того же батча, и тогда
+        // её нужно переиспользовать, а не создавать заново.
+        $knownItems[$order->getId()] = $applied + ($knownItems[$order->getId()] ?? []);
+        $currentItems[$order->getId()] = $applied;
 
         return $order;
     }
@@ -291,9 +318,8 @@ final readonly class NormalizeOrderRawRecordAction
     }
 
     /**
-     * Возвращает карту позиций заказа после применения — она нужна вызывающему,
-     * потому что тот же externalId может встретиться в батче второй раз, а
-     * только что созданные позиции ещё не во flush'е и запросом не видны.
+     * Возвращает набор позиций ЭТОГО снимка (не объединённый с прежними):
+     * вызывающий по нему решает, какие старые позиции удалить после батча.
      *
      * @param list<MappedOrderItem> $mappedItems
      * @param array<string, IngestOrderItem> $existing lineKey => позиция
@@ -362,17 +388,9 @@ final readonly class NormalizeOrderRawRecordAction
             $applied[$mappedItem->lineKey] = $item;
         }
 
-        // Позиция, исчезнувшая из свежего снимка, удаляется.
-        //
-        // Источник отдаёт отправление целиком, поэтому оставленная строка —
-        // не «данные, которых нет в ответе», а позиция, которой в заказе уже
-        // нет: она завышала бы и сумму заказа, и любые агрегаты по выкупу.
-        foreach ($existing as $lineKey => $item) {
-            if (!isset($applied[$lineKey])) {
-                $this->itemRepository->remove($item);
-            }
-        }
-
+        // Удаление исчезнувших позиций здесь НЕ делается: тот же заказ может
+        // встретиться в батче ещё раз, и удалённая сущность понадобится снова.
+        // Вычистка — один раз после всего батча, в __invoke().
         return $applied;
     }
 }

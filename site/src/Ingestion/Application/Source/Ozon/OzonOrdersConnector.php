@@ -241,13 +241,17 @@ final readonly class OzonOrdersConnector implements SourceConnectorInterface
         \DateTimeImmutable $to,
         int $startOffset,
     ): string {
-        // Смещение — часть ключа: чанки одного окна несут разные строки, и под
-        // общим externalId второй чанк выглядел бы новой версией первого.
+        // Границы окна кодируются ПОЛНОСТЬЮ, до секунд и со смещением.
+        //
+        // Округление до часа склеивало разные окна: [09:45,12:00] и
+        // [09:30,12:30] давали один ключ, и при ретрае до продвижения курсора
+        // разные чанки выглядели версиями одной raw-записи. Смещение — тоже
+        // часть ключа: чанки одного окна несут разные строки.
         return sprintf(
             '%s:window-%s-%s:offset-%d',
             $scheme->value,
-            $since->format('Y-m-d\TH'),
-            $to->format('Y-m-d\TH'),
+            $since->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d\TH:i:s\Z'),
+            $to->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d\TH:i:s\Z'),
             $startOffset,
         );
     }
