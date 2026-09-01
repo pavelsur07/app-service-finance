@@ -89,7 +89,15 @@ final class PLDocumentsFixtures extends Fixture implements DependentFixtureInter
 
         $manager->flush();
 
-        $this->plRegisterUpdater->recalcRange($company, $startDate, $today);
+        // Регистр обязан покрывать ВСЕ созданные документы, а не только те, что
+        // не позже сегодняшнего дня. Документы каждого месяца ставятся на дни
+        // 1–6, поэтому при прогоне 1-го числа пять из шести оставались вне
+        // пересчёта: ОПиУ-виджеты видели неполный месяц, а `top_pnl` — пустоту.
+        // `max()` сохраняет прежнее поведение, когда сегодня позже последнего
+        // документа.
+        $lastDocumentDate = $months[array_key_last($months)]['date']->modify('+5 day');
+
+        $this->plRegisterUpdater->recalcRange($company, $startDate, max($today, $lastDocumentDate));
     }
 
     private function createDocument(
