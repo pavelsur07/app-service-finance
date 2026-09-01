@@ -207,6 +207,13 @@ services:
         arguments:
             $mappers: !tagged_iterator app.ingestion.mapper
 
+    # Реестр мапперов заказов. Он же — предикат ветвления нормализации:
+    # заказный ресурс узнаётся по наличию маппера, а не по списку строк
+    # в условии, который пришлось бы держать в нескольких местах.
+    App\Ingestion\Domain\Service\OrderMapperRegistry:
+        arguments:
+            $mappers: !tagged_iterator app.ingestion.order_mapper
+
     App\Ingestion\Application\Service\ListingResolverRegistry:
         arguments:
             $resolvers: !tagged_iterator app.ingestion.listing_resolver

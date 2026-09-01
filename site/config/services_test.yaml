@@ -12,6 +12,12 @@ services:
     App\Tests\Integration\Ingestion\Fixtures\FakeMapper:
         tags: ['app.ingestion.mapper']
 
+    App\Tests\Integration\Ingestion\Fixtures\FakeOrderMapper:
+        # public, потому что тест настраивает поведение фейка перед прогоном;
+        # без этого сервис инлайнится и из контейнера недоступен.
+        public: true
+        tags: ['app.ingestion.order_mapper']
+
     App\Ingestion\Application\Source\Wildberries\WbFinanceReportConnector:
         tags: []
 
