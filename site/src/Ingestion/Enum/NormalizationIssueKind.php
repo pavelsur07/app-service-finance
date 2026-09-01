@@ -11,6 +11,19 @@ enum NormalizationIssueKind: string
     case UNKNOWN_FIELD = 'unknown_field';
     case CURRENCY_MISMATCH = 'currency_mismatch';
 
+    /**
+     * Маркетплейс прислал статус заказа, которого нет в словаре. Заказ
+     * сохраняется со статусом UNKNOWN — это видимая очередь на разбор, а не
+     * потеря данных.
+     */
+    case UNKNOWN_ORDER_STATUS = 'unknown_order_status';
+
+    /**
+     * Заказ слишком долго висит в нетерминальном статусе. Опрашивать его
+     * дальше бессмысленно, но и молча забывать нельзя.
+     */
+    case STUCK_ORDER = 'stuck_order';
+
     public function label(): string
     {
         return match ($this) {
@@ -18,6 +31,8 @@ enum NormalizationIssueKind: string
             self::MAPPER_FAILURE => 'Ошибка маппинга',
             self::UNKNOWN_FIELD => 'Неизвестное поле',
             self::CURRENCY_MISMATCH => 'Несовпадение валют',
+            self::UNKNOWN_ORDER_STATUS => 'Неизвестный статус заказа',
+            self::STUCK_ORDER => 'Заказ завис в нетерминальном статусе',
         };
     }
 }

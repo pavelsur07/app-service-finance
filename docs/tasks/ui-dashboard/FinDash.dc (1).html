@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
+  <style>
+    body{margin:0;box-sizing:border-box;}
+    *{box-sizing:border-box;}
+    ::-webkit-scrollbar{width:8px;height:8px;}
+    ::-webkit-scrollbar-thumb{background:#d3d9e3;border-radius:8px;}
+  </style>
+</helmet>
+
+<div style="--vf-primary:#206bc4;--vf-primary-bg:#e8f1fc;--vf-success:#2fb344;--vf-success-bg:#eaf7ee;--vf-danger:#d63939;--vf-danger-bg:#fdf1f1;--vf-warning:#f76707;--vf-warning-bg:#fdf3ea;--vf-purple:#ae3ec9;--vf-body-bg:#f4f6fa;--vf-surface:#ffffff;--vf-border:#e6e9ef;--vf-border-light:#eef0f4;--vf-border-input:#dfe3ea;--vf-text:#1a2233;--vf-muted:#8a94a6;--vf-muted-2:#98a2b3;--vf-secondary:#556072;--vf-grid-dash:#c1c9d6;--vf-tooltip-muted:#aab4c4;--vf-font-family:'Inter',sans-serif;display:flex;min-height:100vh;background:#f4f6fa;font-family:'Inter',sans-serif;color:#1a2233;">
+
+  <aside style="width:260px;flex-shrink:0;background:#ffffff;border-right:1px solid #e6e9ef;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;">
+    <div style="display:flex;align-items:center;gap:10px;padding:20px 20px;border-bottom:1px solid #eef0f4;">
+      <div style="width:34px;height:34px;border-radius:8px;background:#206bc4;display:flex;align-items:center;justify-content:center;color:#ffffff;font-weight:800;font-size:16px;">V</div>
+      <div style="font-weight:700;font-size:16px;letter-spacing:-0.2px;">ВашФинДир</div>
+    </div>
+
+    <nav style="flex:1;padding:16px 12px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;">
+      <div style="font-size:11px;font-weight:700;color:#98a2b3;text-transform:uppercase;letter-spacing:0.06em;padding:8px 12px 6px;">Меню</div>
+      <sc-for list="{{ navItems }}" as="item" hint-placeholder-count="8">
+        <a href="#" style="{{ item.style }}">
+          <i class="{{ item.icon }}" style="font-size:18px;width:20px;text-align:center;"></i>
+          <span>{{ item.label }}</span>
+          <sc-if value="{{ item.badge }}" hint-placeholder-val="{{ false }}">
+            <span style="margin-left:auto;background:#e8f1fc;color:#206bc4;font-size:11px;font-weight:700;padding:2px 7px;border-radius:20px;">{{ item.badge }}</span>
+          </sc-if>
+        </a>
+      </sc-for>
+    </nav>
+
+    <div style="padding:14px 16px;border-top:1px solid #eef0f4;display:flex;align-items:center;gap:10px;">
+      <div style="width:36px;height:36px;border-radius:50%;background:#e8f1fc;display:flex;align-items:center;justify-content:center;color:#206bc4;font-weight:700;font-size:14px;">АК</div>
+      <div style="min-width:0;">
+        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Анна Ковалёва</div>
+        <div style="font-size:12px;color:#8a94a6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Финансовый директор</div>
+      </div>
+      <i class="ti ti-dots-vertical" style="margin-left:auto;color:#98a2b3;cursor:pointer;"></i>
+    </div>
+  </aside>
+
+  <main style="flex:1;min-width:0;padding:28px 36px 48px;">
+
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:24px;">
+      <div>
+        <h1 style="margin:0 0 4px;font-size:24px;font-weight:800;letter-spacing:-0.3px;">Дашборд</h1>
+        <div style="font-size:14px;color:#8a94a6;">Пятница, 15 августа 2026 · обновлено 5 минут назад</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="position:relative;">
+          <i class="ti ti-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#98a2b3;font-size:16px;"></i>
+          <input placeholder="Поиск по операциям" style="padding:9px 12px 9px 34px;border:1px solid #dfe3ea;border-radius:6px;font-size:13px;font-family:inherit;width:220px;outline:none;background:#ffffff;">
+        </div>
+        <button style="width:36px;height:36px;border-radius:6px;border:1px solid #dfe3ea;background:#ffffff;color:#556072;position:relative;cursor:pointer;">
+          <i class="ti ti-bell" style="font-size:17px;"></i>
+          <span style="position:absolute;top:6px;right:7px;width:6px;height:6px;border-radius:50%;background:#d63939;"></span>
+        </button>
+        <button style="display:flex;align-items:center;gap:6px;padding:9px 14px;border-radius:6px;border:1px solid #dfe3ea;background:#ffffff;color:#1a2233;font-size:13px;font-weight:600;cursor:pointer;">
+          <i class="ti ti-download" style="font-size:15px;"></i> Экспорт
+        </button>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:20px;">
+      <sc-for list="{{ widgets }}" as="w" hint-placeholder-count="4">
+        <div style="min-width:0;background:#ffffff;border:1px solid #e6e9ef;border-radius:8px;padding:18px 20px;display:flex;flex-direction:column;gap:14px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div style="width:38px;height:38px;border-radius:8px;background:{{ w.iconBg }};display:flex;align-items:center;justify-content:center;">
+              <i class="{{ w.icon }}" style="font-size:18px;color:{{ w.iconColor }};"></i>
+            </div>
+            <span style="display:flex;align-items:center;gap:3px;font-size:12px;font-weight:700;padding:3px 8px;border-radius:20px;background:{{ w.deltaBg }};color:{{ w.deltaColor }};">
+              <i class="{{ w.deltaIcon }}" style="font-size:12px;"></i>{{ w.deltaText }}
+            </span>
+          </div>
+          <div>
+            <div style="font-size:13px;color:#8a94a6;margin-bottom:4px;">{{ w.label }}</div>
+            <div style="font-size:24px;font-weight:800;letter-spacing:-0.4px;">{{ w.value }}</div>
+          </div>
+          <svg viewBox="0 0 120 32" style="width:100%;height:32px;" preserveAspectRatio="none">
+            <sc-for list="{{ w.bars }}" as="bar" hint-placeholder-count="30">
+              <rect x="{{ bar.x }}" y="{{ bar.y }}" width="{{ bar.w }}" height="{{ bar.h }}" fill="{{ w.iconColor }}"></rect>
+            </sc-for>
+          </svg>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="background:#ffffff;border:1px solid #e6e9ef;border-radius:8px;padding:22px 24px 18px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:6px;">
+        <div>
+          <div style="font-size:16px;font-weight:700;">Динамика остатка на счетах</div>
+          <div style="font-size:13px;color:#8a94a6;margin-top:2px;">Сводный остаток по всем счетам компании</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:18px;">
+          <div style="display:flex;align-items:center;gap:16px;font-size:12.5px;color:#556072;">
+            <span style="display:flex;align-items:center;gap:6px;"><span style="width:12px;height:2px;background:#206bc4;display:inline-block;"></span>Остаток</span>
+            <span style="display:flex;align-items:center;gap:6px;"><span style="width:12px;height:0;border-top:2px dashed #d63939;display:inline-block;"></span>Мин. остаток</span>
+          </div>
+          <div style="display:flex;background:#f4f6fa;border-radius:6px;padding:3px;gap:2px;">
+            <sc-for list="{{ rangeOptions }}" as="r" hint-placeholder-count="3">
+              <button onClick="{{ r.onClick }}" style="{{ r.style }}">{{ r.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+        <span style="font-size:12.5px;color:#8a94a6;">Потоки по видам деятельности:</span>
+        <sc-for list="{{ flowDefs }}" as="f" hint-placeholder-count="3">
+          <button onClick="{{ f.onClick }}" style="{{ f.chipStyle }}">
+            <span style="width:8px;height:8px;border-radius:50%;background:{{ f.color }};"></span>{{ f.label }}
+          </button>
+        </sc-for>
+      </div>
+
+      <div style="position:relative;width:100%;height:360px;">
+        <svg viewBox="0 0 1000 340" preserveAspectRatio="none" style="width:100%;height:360px;display:block;cursor:crosshair;" onMouseMove="{{ onChartMove }}" onMouseLeave="{{ onChartLeave }}">
+          <sc-for list="{{ gridLines }}" as="g" hint-placeholder-count="4">
+            <line x1="0" x2="1000" y1="{{ g.y }}" y2="{{ g.y }}" stroke="#eef0f4" stroke-width="1"></line>
+          </sc-for>
+
+          <line x1="0" x2="1000" y1="{{ thresholdY }}" y2="{{ thresholdY }}" stroke="#d63939" stroke-width="1.6" stroke-dasharray="6 5"></line>
+
+          <path d="{{ areaPath }}" fill="url(#balanceGradient)" stroke="none"></path>
+          <path d="{{ linePath }}" fill="none" stroke="#206bc4" stroke-width="2.5"></path>
+
+          <sc-for list="{{ flowDefs }}" as="f" hint-placeholder-count="3">
+            <sc-if value="{{ f.active }}" hint-placeholder-val="{{ false }}">
+              <path d="{{ f.path }}" fill="none" stroke="{{ f.color }}" stroke-width="2" stroke-dasharray="5 3"></path>
+            </sc-if>
+          </sc-for>
+
+          <sc-for list="{{ breachPoints }}" as="b" hint-placeholder-count="0">
+            <circle cx="{{ b.x }}" cy="{{ b.y }}" r="4.5" fill="#d63939" stroke="#ffffff" stroke-width="1.5"></circle>
+          </sc-for>
+
+          <defs>
+            <linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#206bc4" stop-opacity="0.18"></stop>
+              <stop offset="100%" stop-color="#206bc4" stop-opacity="0"></stop>
+            </linearGradient>
+          </defs>
+
+          <sc-if value="{{ hoverPoint }}" hint-placeholder-val="{{ false }}">
+            <line x1="{{ hoverPoint.x }}" x2="{{ hoverPoint.x }}" y1="20" y2="300" stroke="#c1c9d6" stroke-width="1" stroke-dasharray="3 3"></line>
+            <circle cx="{{ hoverPoint.x }}" cy="{{ hoverPoint.y }}" r="5" fill="{{ hoverPoint.below }}" stroke="#ffffff" stroke-width="2"></circle>
+          </sc-if>
+        </svg>
+
+        <sc-for list="{{ gridLines }}" as="g" hint-placeholder-count="4">
+          <div style="{{ g.labelStyle }}">{{ g.label }}</div>
+        </sc-for>
+
+        <div style="{{ thresholdLabelStyle }}">{{ thresholdLabel }}</div>
+
+        <sc-for list="{{ xLabels }}" as="xl" hint-placeholder-count="6">
+          <div style="{{ xl.labelStyle }}">{{ xl.label }}</div>
+        </sc-for>
+
+        <sc-if value="{{ hoverPoint }}" hint-placeholder-val="{{ false }}">
+          <div style="{{ hoverPoint.boxStyle }}">
+            <div style="font-size:11px;color:#aab4c4;">{{ hoverPoint.dateLabel }}</div>
+            <div style="font-size:14px;font-weight:700;color:#ffffff;margin-top:2px;">{{ hoverPoint.valueLabel }}</div>
+            <sc-for list="{{ hoverPoint.activeFlowRows }}" as="r" hint-placeholder-count="0">
+              <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:#dfe3ea;margin-top:6px;">
+                <span style="width:7px;height:7px;border-radius:50%;background:{{ r.color }};flex-shrink:0;"></span>
+                <span style="color:#aab4c4;">{{ r.label }}:</span>
+                <span style="font-weight:600;color:#ffffff;white-space:nowrap;">{{ r.valueLabel }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+
+      <sc-if value="{{ hasBreach }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:8px;background:#fdf1f1;border:1px solid #f7d6d6;color:#c0392b;border-radius:6px;padding:10px 14px;font-size:13px;margin-top:8px;">
+          <i class="ti ti-alert-triangle" style="font-size:16px;"></i>
+          Остаток опускался ниже минимального порога {{ thresholdLabel }} — отмечено на графике.
+        </div>
+      </sc-if>
+    </div>
+
+  </main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;minBalance&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:150000,&quot;tsType&quot;:&quot;number&quot;,&quot;min&quot;:50000,&quot;max&quot;:400000,&quot;step&quot;:10000,&quot;unit&quot;:&quot;₽&quot;,&quot;section&quot;:&quot;Параметры&quot;},&quot;currency&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;₽&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;₽&quot;,&quot;$&quot;,&quot;€&quot;],&quot;section&quot;:&quot;Параметры&quot;}}">
+const RU_MONTHS = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+
+function fmtMoney(v, currency){
+  return Math.round(v).toLocaleString('ru-RU') + ' ' + currency;
+}
+function fmtShort(v, currency){
+  return Math.round(v/1000).toLocaleString('ru-RU') + ' тыс ' + currency;
+}
+
+// deterministic 90-day balance series ending "today"
+function buildSeries(){
+  const base = 480000;
+  const raw = [0,15,30,10,-20,-45,-60,-40,-10,20,50,70,40,10,-30,-70,-95,-60,-20,15,
+    45,75,60,30,0,-25,-55,-35,-5,25,55,80,60,25,-10,-40,-15,20,50,85,
+    65,30,-5,-35,-65,-90,-70,-30,5,40,75,55,20,-15,-45,-20,15,50,85,
+    120,95,60,25,-10,-40,-70,-45,-5,30,65,100,80,45,10,-25,-55,-30,10,45,
+    80,115,150,120,85,50,15,-20,-50,-25];
+  let val = base;
+  return raw.map((d,i)=>{ val = val + d*350 + Math.sin(i/6)*9000; return Math.max(val, 40000); });
+}
+const FULL_SERIES = buildSeries();
+FULL_SERIES[62] = 92000; // dip below threshold for realism
+
+function buildActivitySeries(){
+  const n = FULL_SERIES.length;
+  const operating = [], financing = [], investing = [];
+  let op = 470000, fin = 470000, inv = 470000;
+  for(let i=0;i<n;i++){
+    const slump = (i>=64 && i<=81) ? -13500 : 0; // negative operating flow, visible in default 30d view
+    op += Math.sin(i/6)*5200 + 2600 + (i%9===0 ? 9000 : 0) + slump;
+    if (i === 72) op = -150000; // one day where expenses far exceeded income
+    fin += Math.cos(i/14)*3000 + (i%17===0 ? -32000 : 800);
+    inv += Math.sin(i/20+1)*1800 - 900 - (i%23===0 ? 14000 : 0);
+    operating.push(op); financing.push(fin); investing.push(inv);
+  }
+  return { operating, financing, investing };
+}
+const ACTIVITY_SERIES = buildActivitySeries();
+
+class Component extends DCLogic {
+  state = { rangeDays: 30, hoverIndex: null, flows: { operating: false, financing: false, investing: false } };
+
+  toggleFlow(key){
+    this.setState(s => ({ flows: { ...s.flows, [key]: !s.flows[key] } }));
+  }
+
+  handleChartMove(e, padL, plotW, dataLen){
+    const svg = e.currentTarget;
+    const rect = svg.getBoundingClientRect();
+    const fracX = (e.clientX - rect.left) / rect.width;
+    const svgX = fracX * 1000;
+    let idx = Math.round((svgX - padL) / (plotW/(dataLen-1)));
+    idx = Math.max(0, Math.min(dataLen-1, idx));
+    if(idx !== this.state.hoverIndex) this.setState({hoverIndex: idx});
+  }
+  handleChartLeave(){
+    this.setState({hoverIndex: null});
+  }
+
+  navItem(icon, label, active, badge){
+    return {
+      icon, label, badge,
+      style: `display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:6px;font-size:13.5px;font-weight:${active?600:500};text-decoration:none;color:${active?'#206bc4':'#556072'};background:${active?'#e8f1fc':'transparent'};`
+    };
+  }
+
+  sparkBars(data){
+    const n = data.length, w=120, h=32, gap=2;
+    const barW = (w-gap*(n-1))/n;
+    const min = Math.min(...data), max = Math.max(...data);
+    const bars = data.map((v,i)=>{
+      const hPct = max-min===0 ? 0.5 : (v-min)/(max-min);
+      const barH = Math.max(2, hPct*h);
+      return { x:(i*(barW+gap)).toFixed(1), y:(h-barH).toFixed(1), w:barW.toFixed(1), h:barH.toFixed(1) };
+    });
+    return bars;
+  }
+
+  renderVals(){
+    const currency = this.props.currency ?? '₽';
+    const minBalance = this.props.minBalance ?? 150000;
+    const rangeDays = this.state.rangeDays;
+    const data = FULL_SERIES.slice(FULL_SERIES.length - rangeDays);
+
+    const padL=0, padR=0, padT=28, padB=40, W=1000, H=340;
+    const plotW = W-padL-padR, plotH = H-padT-padB;
+    const flows = this.state.flows;
+    const flowDefsBase = [
+      { key:'operating', label:'Операционная', color:'#2fb344', series: ACTIVITY_SERIES.operating },
+      { key:'financing', label:'Финансовая', color:'#f76707', series: ACTIVITY_SERIES.financing },
+      { key:'investing', label:'Инвестиционная', color:'#ae3ec9', series: ACTIVITY_SERIES.investing },
+    ].map(f => ({ ...f, data: f.series.slice(f.series.length - rangeDays), active: !!flows[f.key] }));
+
+    const activeExtra = flowDefsBase.filter(f=>f.active).flatMap(f=>f.data);
+    const yMax = Math.max(...data, ...activeExtra, minBalance) * 1.08;
+    const yMin = Math.min(Math.min(...data, ...activeExtra, minBalance) * 0.9, minBalance*0.9);
+    const xOf = i => padL + i*(plotW/(data.length-1));
+    const yOf = v => padT + (yMax-v)/(yMax-yMin)*plotH;
+
+    const pts = data.map((v,i)=>[xOf(i), yOf(v)]);
+    const linePath = 'M' + pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' L');
+    const bottom = padT+plotH;
+    const areaPath = linePath + ` L${pts[pts.length-1][0].toFixed(1)},${bottom} L${pts[0][0].toFixed(1)},${bottom} Z`;
+
+    const yToPx = y => (y/340*360);
+    const thresholdY = yOf(minBalance);
+    const thresholdLabelStyle = `position:absolute;right:2px;top:${yToPx(thresholdY).toFixed(1)}px;transform:translateY(-100%);font-size:11.5px;font-weight:700;color:#d63939;font-family:'Inter',sans-serif;white-space:nowrap;pointer-events:none;`;
+    const breachPoints = data.map((v,i)=> v < minBalance ? {x:xOf(i).toFixed(1), y:yOf(v).toFixed(1)} : null).filter(Boolean);
+
+    const gridLines = [0,0.25,0.5,0.75,1].map(f=>{
+      const v = yMin + (yMax-yMin)*f;
+      const y = padT+plotH*(1-f);
+      return { y: y.toFixed(1), label: fmtShort(v, currency).replace(' тыс ', 'т '),
+        labelStyle: `position:absolute;left:2px;top:${yToPx(y).toFixed(1)}px;transform:translateY(-100%);font-size:11px;color:#98a2b3;font-family:'Inter',sans-serif;white-space:nowrap;pointer-events:none;` };
+    });
+
+    const today = new Date(2026,7,15);
+    const dateAt = i => { const d = new Date(today); d.setDate(d.getDate() - (data.length-1-i)); return d; };
+    const step = Math.max(1, Math.round(data.length/6));
+    const xLabels = [];
+    for(let i=0;i<data.length;i+=step){
+      const d = dateAt(i);
+      const xi = xOf(i);
+      const xPct = (xi/1000*100);
+      const edgeAlign = xPct < 4 ? 'left' : (xPct > 96 ? 'right' : 'center');
+      const transformX = edgeAlign==='left' ? 'translateX(0)' : (edgeAlign==='right' ? 'translateX(-100%)' : 'translateX(-50%)');
+      const leftStyle = edgeAlign==='right' ? `left:${xPct.toFixed(2)}%` : `left:${xPct.toFixed(2)}%`;
+      xLabels.push({ x: xi.toFixed(1), label: `${String(d.getDate()).padStart(2,'0')} ${RU_MONTHS[d.getMonth()]}`,
+        labelStyle: `position:absolute;${leftStyle};top:${yToPx(330).toFixed(1)}px;transform:${transformX};font-size:11px;color:#98a2b3;font-family:'Inter',sans-serif;white-space:nowrap;pointer-events:none;` });
+    }
+
+    const hi = this.state.hoverIndex;
+    let hoverPoint = null;
+    if(hi !== null && data[hi] !== undefined){
+      const hx = xOf(hi), hy = yOf(data[hi]);
+      const d = dateAt(hi);
+      const dateLabel = `${String(d.getDate()).padStart(2,'0')} ${RU_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+      const valueLabel = fmtMoney(data[hi], currency);
+      const nearRight = hx > 780;
+      const belowThreshold = data[hi] < minBalance;
+      const xPct = (hx/1000*100).toFixed(2);
+      const yPx = yToPx(Math.max(20, Math.min(hy, 300))).toFixed(1);
+      const boxTransform = nearRight ? 'translate(calc(-100% - 12px), -50%)' : 'translate(12px, -50%)';
+      const activeFlowRows = flowDefsBase.filter(f=>f.active && f.data[hi]!==undefined).map(f=>({
+        color: f.color, label: f.label, valueLabel: fmtMoney(f.data[hi], currency),
+      }));
+      hoverPoint = { x: hx.toFixed(1), y: hy.toFixed(1), dateLabel, valueLabel, activeFlowRows,
+        boxStyle: `position:absolute;left:${xPct}%;top:${yPx}px;transform:${boxTransform};width:210px;background:#1a2233;border-radius:6px;padding:10px 14px;pointer-events:none;`,
+        below: belowThreshold ? '#d63939' : '#206bc4' };
+    }
+    const onChartMove = (e) => this.handleChartMove(e, padL, plotW, data.length);
+    const onChartLeave = () => this.handleChartLeave();
+
+    const flowDefs = flowDefsBase.map(f => {
+      const pts2 = f.data.map((v,i)=>[xOf(i), yOf(v)]);
+      const path = 'M' + pts2.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' L');
+      return {
+        key: f.key, label: f.label, color: f.color, active: f.active, path,
+        onClick: () => this.toggleFlow(f.key),
+        chipStyle: `display:flex;align-items:center;gap:6px;border:1px solid ${f.active?f.color:'#dfe3ea'};background:${f.active?f.color+'1a':'#ffffff'};color:${f.active?f.color:'#556072'};font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:20px;cursor:pointer;`,
+      };
+    });
+
+    const rangeOptions = [30,60,90].map(r=>({
+      label: r+'д',
+      onClick: () => this.setState({rangeDays: r}),
+      style: `border:none;background:${rangeDays===r?'#ffffff':'transparent'};color:${rangeDays===r?'#206bc4':'#8a94a6'};font-weight:${rangeDays===r?700:500};font-size:12.5px;padding:6px 12px;border-radius:5px;cursor:pointer;box-shadow:${rangeDays===r?'0 1px 3px rgba(0,0,0,0.08)':'none'};`
+    }));
+
+    const todayBalance = FULL_SERIES[FULL_SERIES.length-1];
+    const yesterdayBalance = FULL_SERIES[FULL_SERIES.length-2];
+    const balanceDeltaPct = ((todayBalance-yesterdayBalance)/yesterdayBalance*100);
+    const inflow30 = 1540200, outflow30 = 1290540;
+    const net30 = inflow30 - outflow30;
+
+    const sp1 = this.sparkBars(FULL_SERIES.slice(-30));
+    const inflowDaily = Array.from({length:30}, (_,i)=> (32+ (i%6)*4 + Math.sin(i/3)*10 + (i%9===0?18:0)) * 1600);
+    const outflowDaily = Array.from({length:30}, (_,i)=> (28+ (i%5)*3 + Math.cos(i/4)*8 + (i%7===0?14:0)) * 1600);
+    const netDaily = inflowDaily.map((v,i)=> v - outflowDaily[i]);
+    const sp2 = this.sparkBars(inflowDaily);
+    const sp3 = this.sparkBars(outflowDaily);
+    const sp4 = this.sparkBars(netDaily);
+
+    const widgets = [
+      { label:'Остаток на сегодня', value: fmtMoney(todayBalance, currency), icon:'ti ti-wallet', iconBg:'#e8f1fc', iconColor:'#206bc4',
+        deltaText: Math.abs(balanceDeltaPct).toFixed(1)+'%', deltaIcon: balanceDeltaPct>=0?'ti ti-arrow-up-right':'ti ti-arrow-down-right',
+        deltaBg: balanceDeltaPct>=0?'#eaf7ee':'#fdf1f1', deltaColor: balanceDeltaPct>=0?'#2fb344':'#d63939',
+        bars: sp1 },
+      { label:'Приход (30 дней)', value: fmtMoney(inflow30, currency), icon:'ti ti-arrow-down-left', iconBg:'#eaf7ee', iconColor:'#2fb344',
+        deltaText:'8.2%', deltaIcon:'ti ti-arrow-up-right', deltaBg:'#eaf7ee', deltaColor:'#2fb344',
+        bars: sp2 },
+      { label:'Расход (30 дней)', value: fmtMoney(outflow30, currency), icon:'ti ti-arrow-up-right', iconBg:'#fdf1f1', iconColor:'#d63939',
+        deltaText:'3.4%', deltaIcon:'ti ti-arrow-down-right', deltaBg:'#eaf7ee', deltaColor:'#2fb344',
+        bars: sp3 },
+      { label:'Чистый поток (30 дней)', value: fmtMoney(net30, currency), icon:'ti ti-arrows-exchange', iconBg:'#fdf3ea', iconColor:'#f76707',
+        deltaText:'12.1%', deltaIcon:'ti ti-arrow-up-right', deltaBg:'#eaf7ee', deltaColor:'#2fb344',
+        bars: sp4 },
+    ];
+
+    return {
+      navItems: [
+        this.navItem('ti ti-layout-dashboard','Дашборд', true),
+        this.navItem('ti ti-cash','Движение денег', false),
+        this.navItem('ti ti-building-bank','Счета и карты', false),
+        this.navItem('ti ti-receipt-2','Транзакции', false, '12'),
+        this.navItem('ti ti-file-invoice','Инвойсы', false),
+        this.navItem('ti ti-users','Контрагенты', false),
+        this.navItem('ti ti-chart-bar','Отчёты', false),
+        this.navItem('ti ti-settings','Настройки', false),
+      ],
+      widgets,
+      linePath, areaPath, thresholdY: thresholdY.toFixed(1),
+      thresholdLabel: fmtShort(minBalance, currency),
+      gridLines, xLabels, breachPoints, hasBreach: breachPoints.length>0,
+      rangeOptions, hoverPoint, onChartMove, onChartLeave, thresholdLabelStyle, flowDefs,
+    };
+  }
+}
+
+</script>
+</body>
+</html>
