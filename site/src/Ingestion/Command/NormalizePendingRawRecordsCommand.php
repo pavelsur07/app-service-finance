@@ -7,6 +7,7 @@ namespace App\Ingestion\Command;
 use App\Ingestion\Domain\Service\MapperRegistry;
 use App\Ingestion\Message\NormalizeRawRecordMessage;
 use App\Ingestion\Repository\IngestRawRecordRepository;
+use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -26,6 +27,7 @@ final class NormalizePendingRawRecordsCommand extends Command
         private readonly IngestRawRecordRepository $rawRecordRepository,
         private readonly MapperRegistry $mapperRegistry,
         private readonly MessageBusInterface $messageBus,
+        private readonly EntityManagerInterface $entityManager,
         private readonly LoggerInterface $logger,
     ) {
         parent::__construct();
@@ -71,9 +73,18 @@ final class NormalizePendingRawRecordsCommand extends Command
 
         $rawRecordIds = [];
         $dispatched = 0;
+        $markedSkipped = 0;
         foreach ($records as $record) {
             if (!$this->mapperRegistry->has($record->getSource(), $record->getResourceType())) {
-                $this->logger->debug('Stale pending ingestion raw record skipped because mapper is not registered.', [
+                // Нормализовать такую запись нечем НИКОГДА, поэтому PENDING для
+                // неё — недостижимое состояние. Выборка берёт 50 самых старых
+                // pending по fetched_at: оставленные здесь записи навсегда
+                // занимали бы окно safety net и вытесняли бы из него те, что
+                // обработать можно. Переводим в терминальный SKIPPED.
+                $record->markNormalizationSkipped();
+                ++$markedSkipped;
+
+                $this->logger->debug('Stale pending ingestion raw record marked skipped because mapper is not registered.', [
                     'companyId' => $record->getCompanyId(),
                     'rawRecordId' => $record->getId(),
                     'source' => $record->getSource()->value,
@@ -101,9 +112,14 @@ final class NormalizePendingRawRecordsCommand extends Command
             }
         }
 
+        if ($markedSkipped > 0) {
+            $this->entityManager->flush();
+        }
+
         $this->logger->info('Dispatched stale pending ingestion raw records for normalization.', [
             'count' => $dispatched,
             'found' => count($records),
+            'markedSkipped' => $markedSkipped,
             'rawRecordIds' => $rawRecordIds,
             'thresholdMinutes' => $thresholdMinutes,
             'limit' => $limit,

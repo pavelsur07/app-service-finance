@@ -23,6 +23,14 @@
 # больше одной задачи на подключение за запуск.
 20 * * * * cd /app && php bin/console app:marketplace:wb-financial-reports:orchestrate --refresh-days-back=14 --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# Каталог товаров Ozon -> листинги (наименование, offer_id, дата создания товара).
+# Слот 03:40 выбран ДО финансовой выгрузки в 04:00, чтобы её процессоры видели уже
+# именованные листинги. Команда только диспатчит; HTTP-обход каталога делает
+# async_sync-воркер. Это единственный путь, видящий товары без продаж:
+# /v3/product/list отдаёт весь каталог, а не то, что засветилось в деньгах.
+# Соседи по суткам: 03:00 ingestion run-incremental, 03:10 WB financial daily.
+40 3 * * * cd /app && php bin/console app:marketplace:ozon-listing-catalog:sync --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Ночная синхронизация отчётов Ozon по реализации.
 0 4 * * * php bin/console app:marketplace:ozon-daily-sync --no-interaction
 

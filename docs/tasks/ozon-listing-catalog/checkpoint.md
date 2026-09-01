@@ -2,14 +2,14 @@
 
 **Задача:** загрузка каталога листингов Ozon (`docs/tasks/ozon-listing-catalog/plan.md`)
 **Ветка:** `docs/ozon-listing-catalog`
-**Обновлено:** 2026-09-01
+**Обновлено:** 2026-09-01 (Stage 2 закрыт)
 
 ### Состояние стадий
 
 | Stage | Статус | Риск |
 |---|---|---|
 | 1 — схема и raw-seam | ✅ DONE, REVIEW_GREEN, ждёт Release Gate | 🟡 MEDIUM |
-| 2 — загрузка каталога Ozon | ⬜ не начата | 🟠 HIGH-LOCAL |
+| 2 — загрузка каталога Ozon | ✅ DONE, ждёт Release Gate. REVIEW_GREEN **не достигнут** — закрыт решением Владельца с FOLLOW-UP | 🟠 HIGH-LOCAL |
 | 3 — ручной запуск из UI | ⬜ не начата | 🟢 LOW |
 
 ### Сделано
@@ -24,7 +24,23 @@
 
 ### Следующее действие
 
-🛑 Release Gate по Stage 1 — решение Владельца. После него Stage 2.
+🛑 Release Gate по Stage 1 и Stage 2 — решение Владельца. После него Stage 3
+(кнопка в UI + `MarketplaceJobLog`).
+
+**До первого прогона на продавце с крупным каталогом** — проверить потребление
+памяти: FOLLOW-UP 1 в `stages/stage-2.md` (память `O(весь каталог)`).
+
+### Stage 2 — что сделано
+
+- Pipeline `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`,
+  либо `--company=<uuid>`) → `SyncOzonListingCatalogMessage` (`async_sync`) →
+  `SyncOzonListingCatalogHandler` → `RefreshOzonListingCatalogAction`.
+- Сырые ответы обоих эндпоинтов на S3 через `RawStorageFacade::storeAndGetIds`.
+- Девять итераций внешнего ревью, 12 находок исправлено, 1 BLOCKER отклонён с
+  доказательством. Оставшееся — в FOLLOW-UP отчёта Stage 2.
+- Попутно исправлен регресс в соседнем пайплайне: записи без маппера теперь
+  переводятся в `SKIPPED`, иначе каталожные raw навсегда занимали бы окно
+  `app:ingestion:normalize-pending` и вытесняли финансовые.
 
 ### Что нужно знать при возобновлении
 
