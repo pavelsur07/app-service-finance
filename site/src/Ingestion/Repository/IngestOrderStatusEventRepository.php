@@ -49,35 +49,31 @@ final class IngestOrderStatusEventRepository extends ServiceEntityRepository
     }
 
     /**
-     * Уже зафиксировано ли ЭТО наблюдение.
+     * Ключи наблюдений, уже записанных ИЗ ЭТОГО сырья.
      *
-     * Ключ — сырьё плюс сырой статус, а не «текущий статус заказа». Повторная
-     * нормализация старого raw снова видит расхождение с текущим статусом
-     * (устаревшее наблюдение его не двигает) и без этой проверки дописывала бы
-     * копию события при каждом прогоне.
+     * Одним запросом на весь batch: проверка на каждое событие давала бы до
+     * 20 000 COUNT'ов на одну страницу коннектора и всё равно не видела бы
+     * события, созданные в этом же прогоне, — Doctrine-запрос не видит
+     * непрофлашенные сущности UnitOfWork.
+     *
+     * @return list<string> «orderId\0rawStatus»
      */
-    public function existsObservation(
-        string $companyId,
-        string $orderId,
-        ?string $rawRecordId,
-        string $rawStatus,
-    ): bool {
-        if (null === $rawRecordId) {
-            return false;
-        }
-
-        $qb = $this->createQueryBuilder('e')
-            ->select('COUNT(e.id)')
+    public function observationKeysForRawRecord(string $companyId, string $rawRecordId): array
+    {
+        /** @var list<array{orderId: string, rawStatus: string}> $rows */
+        $rows = $this->createQueryBuilder('e')
+            ->select('e.orderId AS orderId', 'e.rawStatus AS rawStatus')
             ->andWhere('e.companyId = :companyId')
-            ->andWhere('e.orderId = :orderId')
             ->andWhere('e.rawRecordId = :rawRecordId')
-            ->andWhere('e.rawStatus = :rawStatus')
             ->setParameter('companyId', $companyId)
-            ->setParameter('orderId', $orderId)
             ->setParameter('rawRecordId', $rawRecordId)
-            ->setParameter('rawStatus', $rawStatus);
+            ->getQuery()
+            ->getResult();
 
-        return (int) $qb->getQuery()->getSingleScalarResult() > 0;
+        return array_map(
+            static fn (array $row): string => $row['orderId']."\0".$row['rawStatus'],
+            $rows,
+        );
     }
 
     public function save(IngestOrderStatusEvent $event): void

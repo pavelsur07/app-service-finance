@@ -151,6 +151,13 @@ class IngestOrderItem implements TenantOwnedInterface
     }
 
     /**
+     * Обновление позиции по СНИМКУ, а не частичным слиянием.
+     *
+     * Ozon отдаёт отправление целиком, поэтому отсутствие цены в свежем ответе
+     * означает «цены нет», а не «оставь прежнюю». Прежний `?? $this->...`
+     * сохранял значение, которого в новом снимке уже не было, и заказ нёс
+     * стоимость, взятую из устаревшего ответа.
+     *
      * Порядок отображения обновляется вместе с содержимым: позиция может
      * переехать в ответе источника, и оставить прежний lineNo значило бы
      * показывать заказ в порядке, которого у него уже нет. Идентичность при
@@ -165,12 +172,13 @@ class IngestOrderItem implements TenantOwnedInterface
         bool $marketplaceBuyout,
     ): void {
         Assert::greaterThanEq($lineNo, 0);
+        Assert::greaterThanEq($quantity, 0);
 
         $this->lineNo = $lineNo;
         $this->quantity = $quantity;
-        $this->name = $name ?? $this->name;
-        $this->priceMinor = $priceMinor ?? $this->priceMinor;
-        $this->currency = $currency ?? $this->currency;
+        $this->name = $name;
+        $this->priceMinor = $priceMinor;
+        $this->currency = $currency;
         $this->marketplaceBuyout = $marketplaceBuyout;
         $this->updatedAt = new \DateTimeImmutable();
     }

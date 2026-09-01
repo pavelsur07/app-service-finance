@@ -89,6 +89,16 @@ final readonly class NormalizeOrderRawRecordAction
             ))),
         );
 
+        // Ключи уже записанных наблюдений — одним запросом на весь batch.
+        // Ключ ведётся локально и пополняется сразу при создании события:
+        // Doctrine-запрос не видит непрофлашенные сущности, поэтому
+        // последовательность A → B → A внутри одного батча иначе создала бы
+        // два события A и уронила финальный flush на уникальном индексе.
+        $seenObservations = array_fill_keys(
+            $this->statusEventRepository->observationKeysForRawRecord($command->companyId, $rawRecord->getId()),
+            true,
+        );
+
         $existingItems = $this->itemRepository->findByOrdersIndexedByLineKey(
             $command->companyId,
             array_values(array_map(
@@ -107,6 +117,7 @@ final readonly class NormalizeOrderRawRecordAction
                 $observedAt,
                 $known,
                 $existingItems,
+                $seenObservations,
             );
         }
 
@@ -148,6 +159,8 @@ final readonly class NormalizeOrderRawRecordAction
      *                                                                     externalId может встретиться в
      *                                                                     батче второй раз, а созданные
      *                                                                     позиции ещё не во flush'е
+     * @param array<string, true> $seenObservations ключи уже записанных наблюдений,
+     *                                              изменяется по ссылке
      */
     private function applyOrder(
         IngestRawRecord $rawRecord,
@@ -155,6 +168,7 @@ final readonly class NormalizeOrderRawRecordAction
         \DateTimeImmutable $observedAt,
         array $known,
         array &$existingItems,
+        array &$seenObservations,
     ): IngestOrder {
         $companyId = $rawRecord->getCompanyId();
         $status = $this->statusMapper->map($rawRecord->getSource(), $mapped->scheme, $mapped->rawStatus);
@@ -197,7 +211,7 @@ final readonly class NormalizeOrderRawRecordAction
             );
             $this->orderRepository->save($order);
 
-            $this->appendStatusEvent($order, $mapped->rawStatus, $status, null, $observedAt, $rawRecord->getId());
+            $this->appendStatusEvent($order, $mapped->rawStatus, $status, null, $observedAt, $rawRecord->getId(), $seenObservations);
             $existingItems[$order->getId()] = $this->applyItems($order, $mapped->items, $rawRecord, []);
 
             return $order;
@@ -211,7 +225,7 @@ final readonly class NormalizeOrderRawRecordAction
         // устаревшее наблюдение другого статуса всё равно записывается: это
         // факт, который был.
         if ($statusChanged) {
-            $this->appendStatusEvent($order, $mapped->rawStatus, $status, $previousStatus, $observedAt, $rawRecord->getId());
+            $this->appendStatusEvent($order, $mapped->rawStatus, $status, $previousStatus, $observedAt, $rawRecord->getId(), $seenObservations);
         }
 
         // Снимок заказа обновляется ТОЛЬКО принятым наблюдением.
@@ -242,6 +256,9 @@ final readonly class NormalizeOrderRawRecordAction
         return $order;
     }
 
+    /**
+     * @param array<string, true> $seenObservations изменяется по ссылке
+     */
     private function appendStatusEvent(
         IngestOrder $order,
         string $rawStatus,
@@ -249,14 +266,18 @@ final readonly class NormalizeOrderRawRecordAction
         ?IngestOrderStatus $previousStatus,
         \DateTimeImmutable $observedAt,
         string $rawRecordId,
+        array &$seenObservations,
     ): void {
         // Одно наблюдение — одно событие. Устаревшее наблюдение не двигает
         // статус заказа, поэтому «статус отличается» остаётся истиной навсегда,
         // и без этой проверки каждый повторный прогон того же сырья дописывал
         // бы ещё одну копию.
-        if ($this->statusEventRepository->existsObservation($order->getCompanyId(), $order->getId(), $rawRecordId, $rawStatus)) {
+        $key = $order->getId()."\0".$rawStatus;
+        if (isset($seenObservations[$key])) {
             return;
         }
+
+        $seenObservations[$key] = true;
 
         $this->statusEventRepository->save(new IngestOrderStatusEvent(
             companyId: $order->getCompanyId(),
@@ -285,15 +306,12 @@ final readonly class NormalizeOrderRawRecordAction
         IngestRawRecord $rawRecord,
         array $existing,
     ): array {
-        if ([] === $mappedItems) {
-            return $existing;
-        }
-
         $sourceDataRows = [];
         foreach ($mappedItems as $index => $mappedItem) {
             $sourceDataRows[$index] = $mappedItem->sourceData;
         }
 
+        $applied = [];
         $resolutions = $this->listingResolverRegistry->resolveMany(
             $rawRecord->getSource(),
             $order->getCompanyId(),
@@ -341,9 +359,20 @@ final readonly class NormalizeOrderRawRecordAction
             }
 
             $item->linkListing($resolution?->listingId, $listingSku);
-            $existing[$mappedItem->lineKey] = $item;
+            $applied[$mappedItem->lineKey] = $item;
         }
 
-        return $existing;
+        // Позиция, исчезнувшая из свежего снимка, удаляется.
+        //
+        // Источник отдаёт отправление целиком, поэтому оставленная строка —
+        // не «данные, которых нет в ответе», а позиция, которой в заказе уже
+        // нет: она завышала бы и сумму заказа, и любые агрегаты по выкупу.
+        foreach ($existing as $lineKey => $item) {
+            if (!isset($applied[$lineKey])) {
+                $this->itemRepository->remove($item);
+            }
+        }
+
+        return $applied;
     }
 }

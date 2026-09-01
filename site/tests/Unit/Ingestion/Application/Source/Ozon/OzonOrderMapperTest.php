@@ -234,6 +234,7 @@ final class OzonOrderMapperTest extends TestCase
             'posting_number' => 'p-1',
             'status' => 'delivering',
             'created_at' => '2026-08-30T17:49:41.153418Z',
+            'products' => [['sku' => 1, 'quantity' => 1, 'price' => '10.00']],
         ]]);
 
         self::assertSame([], $batch->skipped);
@@ -266,6 +267,52 @@ final class OzonOrderMapperTest extends TestCase
         foreach ($keys as $key) {
             self::assertLessThanOrEqual(120, mb_strlen($key), 'Ключ обязан помещаться в колонку.');
         }
+    }
+
+    /**
+     * Регрессия: `$row['products'] ?? []` превращал отсутствующий или
+     * null-евый список в корректный пустой заказ. Позиции терялись бесследно,
+     * raw помечался DONE, курсор уходил вперёд.
+     *
+     * @param array<string, mixed> $row
+     */
+    #[DataProvider('missingProductsCases')]
+    public function testMissingProductsContainerSkipsThePosting(array $row): void
+    {
+        $batch = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBO), [$row]);
+
+        self::assertSame([], $batch->orders);
+        self::assertSame([['reason' => 'malformed_products', 'hint' => 'p-1']], $batch->skipped);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>}>
+     */
+    public static function missingProductsCases(): iterable
+    {
+        $base = ['posting_number' => 'p-1', 'status' => 'delivering', 'created_at' => '2026-09-01T10:00:00Z'];
+
+        yield 'ключа нет' => [$base];
+        yield 'null' => [$base + ['products' => null]];
+        yield 'строка' => [$base + ['products' => 'сломано']];
+    }
+
+    /**
+     * Позиция без sku и без offer_id опознаётся только по номеру строки — то
+     * есть ровно тем позиционным ключом, ради ухода от которого вводился
+     * lineKey. Такой posting отклоняется целиком.
+     */
+    public function testProductWithoutAnyIdentitySkipsThePosting(): void
+    {
+        $batch = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBO), [[
+            'posting_number' => 'p-1',
+            'status' => 'delivering',
+            'created_at' => '2026-09-01T10:00:00Z',
+            'products' => [['name' => 'Товар без артикула', 'quantity' => 1, 'price' => '10.00']],
+        ]]);
+
+        self::assertSame([], $batch->orders);
+        self::assertSame([['reason' => 'missing_product_identity', 'hint' => 'p-1']], $batch->skipped);
     }
 
     /**

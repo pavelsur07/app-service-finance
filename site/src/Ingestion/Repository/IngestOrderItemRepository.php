@@ -93,6 +93,11 @@ final class IngestOrderItemRepository extends ServiceEntityRepository
         return $items;
     }
 
+    public function remove(IngestOrderItem $item): void
+    {
+        $this->getEntityManager()->remove($item);
+    }
+
     public function save(IngestOrderItem $item): void
     {
         $this->getEntityManager()->persist($item);

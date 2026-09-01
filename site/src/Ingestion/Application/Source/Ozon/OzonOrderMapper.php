@@ -124,10 +124,14 @@ final class OzonOrderMapper implements OrderMapperInterface
      */
     private function mapItems(array $row): array
     {
-        $products = $row['products'] ?? [];
-        if (!is_array($products)) {
+        // Отсутствующий или null-евый products — не «заказ без товаров», а
+        // испорченный ответ: Ozon всегда присылает список. `?? []` превращал
+        // его в корректный пустой заказ, и позиции терялись бесследно.
+        if (!array_key_exists('products', $row) || !is_array($row['products'])) {
             return ['items' => [], 'error' => 'malformed_products'];
         }
+
+        $products = $row['products'];
 
         $items = [];
         $lineNo = 0;
@@ -158,12 +162,18 @@ final class OzonOrderMapper implements OrderMapperInterface
 
             $sku = $this->stringOrNull($product['sku'] ?? null);
             $offerId = $this->stringOrNull($product['offer_id'] ?? null);
+            if (null === $sku && null === $offerId) {
+                // Опознать позицию нечем, и падение на позиционный ключ
+                // вернуло бы ровно тот дефект, ради которого вводился lineKey.
+                return ['items' => [], 'error' => 'missing_product_identity'];
+            }
+
             $name = $this->stringOrNull($product['name'] ?? null);
 
             $items[] = new MappedOrderItem(
                 // lineNo — только порядок отображения.
                 lineNo: $lineNo,
-                lineKey: $this->lineKey($sku, $offerId, $lineNo, $seen),
+                lineKey: $this->lineKey($sku, $offerId, $seen),
                 quantity: $quantity,
                 externalSku: $sku,
                 offerId: $offerId,
@@ -247,14 +257,12 @@ final class OzonOrderMapper implements OrderMapperInterface
      *
      * @param array<string, int> $seen счётчик повторений, изменяется по ссылке
      */
-    private function lineKey(?string $sku, ?string $offerId, int $lineNo, array &$seen): string
+    private function lineKey(?string $sku, ?string $offerId, array &$seen): string
     {
-        $base = null !== $sku ? 'sku:'.$sku : (null !== $offerId ? 'offer:'.$offerId : null);
-        if (null === $base) {
-            // Товар без обоих идентификаторов опознать нечем — остаётся
-            // позиция. Хуже позиционного ключа тут ничего нет, но и лучше нет.
-            return 'line:'.$lineNo;
-        }
+        // Позиция без обоих идентификаторов сюда не доходит: mapItems
+        // отклоняет весь posting раньше. Позиционного запасного варианта тут
+        // намеренно нет — он вернул бы дефект, ради которого вводился lineKey.
+        $base = null !== $sku ? 'sku:'.$sku : 'offer:'.$offerId;
 
         $occurrence = $seen[$base] ?? 0;
         $seen[$base] = $occurrence + 1;

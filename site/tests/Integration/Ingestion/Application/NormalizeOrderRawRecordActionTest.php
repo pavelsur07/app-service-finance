@@ -222,6 +222,75 @@ final class NormalizeOrderRawRecordActionTest extends IntegrationTestCase
     }
 
     /**
+     * Регрессия: existsObservation() спрашивала БД на каждое событие, а
+     * Doctrine-запрос не видит непрофлашенные сущности. Последовательность
+     * A → B → A внутри одного батча создавала два события A и роняла финальный
+     * flush на уникальном индексе.
+     */
+    public function testRepeatedStatusWithinOneBatchDoesNotDuplicateEvent(): void
+    {
+        $this->mapper->queue(
+            $this->orderWithItems('delivering', [new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 1)]),
+            $this->orderWithItems('delivered', [new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 1)]),
+            $this->orderWithItems('delivering', [new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 1)]),
+        );
+
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-1'), $this->companyId));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($order);
+        // delivering и delivered — по одному событию, повтор delivering не пишется.
+        self::assertSame(2, $this->events->countByOrder($this->companyId, $order->getId()));
+    }
+
+    /**
+     * Регрессия: refresh() сохранял прежние nullable-значения через `??`.
+     * Источник отдаёт отправление целиком, поэтому отсутствие цены в свежем
+     * ответе означает «цены нет», а не «оставь старую» — заказ нёс стоимость
+     * из устаревшего ответа.
+     */
+    public function testFreshSnapshotClearsPriceThatDisappeared(): void
+    {
+        $withPrice = new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 1, externalSku: 'AAA', priceMinor: '90000');
+        $this->mapper->queue($this->orderWithItems('delivering', [$withPrice]));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-1'), $this->companyId));
+
+        $withoutPrice = new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 1, externalSku: 'AAA');
+        $this->mapper->queue($this->orderWithItems('delivered', [$withoutPrice]));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-2', new \DateTimeImmutable('+1 hour')), $this->companyId));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($order);
+
+        $items = $this->items->findByOrderIndexedByLineKey($this->companyId, $order->getId());
+        self::assertNull($items['sku:AAA#0']->getPriceMinor());
+    }
+
+    /**
+     * Позиция, исчезнувшая из свежего снимка, удаляется: оставленная строка
+     * завышала бы и сумму заказа, и агрегаты по выкупу.
+     */
+    public function testItemMissingFromFreshSnapshotIsRemoved(): void
+    {
+        $this->mapper->queue($this->orderWithItems('delivering', [
+            new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 1, externalSku: 'AAA'),
+            new MappedOrderItem(lineNo: 1, lineKey: 'sku:BBB#0', quantity: 1, externalSku: 'BBB'),
+        ]));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-1'), $this->companyId));
+
+        $this->mapper->queue($this->orderWithItems('delivered', [
+            new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 1, externalSku: 'AAA'),
+        ]));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-2', new \DateTimeImmutable('+1 hour')), $this->companyId));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($order);
+
+        $items = $this->items->findByOrderIndexedByLineKey($this->companyId, $order->getId());
+        self::assertSame(['sku:AAA#0'], array_keys($items));
+    }
+
+    /**
      * Незнакомый статус деградирует в UNKNOWN и попадает в видимую очередь,
      * а не в NULL и не в исключение.
      */
