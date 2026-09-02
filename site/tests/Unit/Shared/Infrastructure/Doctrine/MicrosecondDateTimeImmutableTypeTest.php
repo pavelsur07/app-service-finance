@@ -64,6 +64,29 @@ final class MicrosecondDateTimeImmutableTypeTest extends TestCase
         );
     }
 
+    /**
+     * Строка, записанная ДО смены типа, обязана читаться так же, как читалась.
+     *
+     * Прежний тип форматировал момент в зоне объекта, а все писатели
+     * `fetchedAt` берут время уже в зоне приложения (`new DateTimeImmutable()`
+     * либо `applicationTime()` поверх часов). Значит накопленные строки — это
+     * «стенные часы» зоны приложения, и новый тип обязан вернуть тот же момент,
+     * а не сдвинуть историю.
+     */
+    public function testValueWrittenBeforeTheTypeChangeKeepsItsInstant(): void
+    {
+        $appZone = new \DateTimeZone(date_default_timezone_get());
+        $written = new \DateTimeImmutable('2026-06-20 13:00:00.000000', $appZone);
+
+        // Ровно то, что прежний тип положил бы в колонку для такого объекта.
+        $legacyRow = $written->format('Y-m-d H:i:s');
+
+        $restored = (new MicrosecondDateTimeImmutableType())->convertToPHPValue($legacyRow, new PostgreSQLPlatform());
+
+        self::assertNotNull($restored);
+        self::assertSame($written->format('U'), $restored->format('U'));
+    }
+
     public function testNullPassesThrough(): void
     {
         $type = new MicrosecondDateTimeImmutableType();

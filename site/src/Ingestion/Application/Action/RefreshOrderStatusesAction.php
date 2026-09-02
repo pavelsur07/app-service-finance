@@ -21,6 +21,7 @@ use App\Ingestion\Exception\ConnectorAuthException;
 use App\Ingestion\Exception\ConnectorRateLimitedException;
 use App\Ingestion\Exception\ConnectorTransientException;
 use App\Ingestion\Exception\MalformedConnectorResponseException;
+use App\Ingestion\Exception\RawStorageException;
 use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonOrdersClientInterface;
 use App\Ingestion\Infrastructure\Api\Wildberries\WbOrdersClientInterface;
@@ -717,6 +718,15 @@ final readonly class RefreshOrderStatusesAction
                 $record->markNormalizationSkipped();
             }
         });
+
+        // Хранилище возвращает список, но на одну партию всегда отдаёт ровно
+        // одну запись. Полагаться на это молча нельзя: если контракт когда-то
+        // изменится, наблюдения привяжутся к первой записи, и события поздних
+        // строк будут указывать на payload, в котором их ответа нет. Пусть
+        // такое падает громко, а не портит аудит незаметно.
+        if (1 !== count($records)) {
+            throw new RawStorageException(sprintf('Order status refresh audit expected a single raw record, got %d.', count($records)));
+        }
 
         return $records[0]->getId();
     }

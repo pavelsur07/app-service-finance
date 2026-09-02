@@ -21,6 +21,18 @@ use Doctrine\Migrations\AbstractMigration;
  * DDL меняется только в комментариях: тип колонки в PostgreSQL уже верный,
  * Doctrine отличает свои типы по метке `(DC2Type:...)`. Существующие значения
  * второй точности читаются новым типом без конверсии.
+ *
+ * Данные НЕ конвертируются, и это проверено, а не предположено. Новый тип
+ * приводит момент к зоне приложения на записи, тогда как прежний писал его в
+ * зоне объекта. Расхождение возникло бы только у строк, записанных из объекта
+ * с другой зоной. Все писатели `RawBatch::fetchedAt` берут время либо через
+ * `new \DateTimeImmutable()` (зона приложения), либо через `applicationTime()`
+ * поверх `ClockInterface` — то есть уже в зоне приложения:
+ * `RefreshOzonListingCatalogAction`, `WbFinanceReportConnector`,
+ * `OzonSellerReportConnector`, `OzonPerformanceReportConnector`,
+ * `OzonOrdersConnector`, `WbOrdersConnector`. Поэтому накопленные строки
+ * читаются новым типом ровно так же, как читались старым, и сдвига истории
+ * не происходит.
  */
 final class Version20260902160000 extends AbstractMigration
 {
