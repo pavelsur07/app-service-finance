@@ -123,6 +123,11 @@ final class StoreRawBatchActionTest extends TestCase
 
         $flushCalls = 0;
         $entityManager = $this->createMock(EntityManagerInterface::class);
+        // Повторная встреча сырья идёт под блокировкой строки, то есть внутри
+        // транзакции: без этого замыкание не выполнилось бы вовсе.
+        $entityManager->method('wrapInTransaction')->willReturnCallback(
+            static fn (callable $work): mixed => $work($entityManager),
+        );
         $entityManager->expects(self::once())->method('persist')->with(self::isInstanceOf(IngestRawRecord::class));
         $entityManager->expects(self::never())->method('clear');
         $entityManager->expects(self::once())
@@ -219,8 +224,15 @@ final class StoreRawBatchActionTest extends TestCase
             ->willReturnCallback(static fn (string $path, string $payload): StoredObject => new StoredObject($path, strlen($payload)));
 
         $entityManager = $this->createMock(EntityManagerInterface::class);
+        // Повторная встреча сырья идёт под блокировкой строки, то есть внутри
+        // транзакции: без этого замыкание не выполнилось бы вовсе.
+        $entityManager->method('wrapInTransaction')->willReturnCallback(
+            static fn (callable $work): mixed => $work($entityManager),
+        );
         $entityManager->expects(self::never())->method('persist');
-        $entityManager->expects(self::once())->method('flush');
+        // Отдельного flush() больше нет: повторная встреча идёт внутри
+        // wrapInTransaction(), который коммитит и сбрасывает сам.
+        $entityManager->expects(self::never())->method('flush');
 
         $managerRegistry = $this->createMock(ManagerRegistry::class);
         $managerRegistry->expects(self::never())->method('resetManager');

@@ -6,10 +6,12 @@ namespace App\Tests\Integration\Ingestion\Application;
 
 use App\Ingestion\Application\Action\PruneRawRecordsAction;
 use App\Ingestion\Application\Command\PruneRawRecordsCommand;
+use App\Ingestion\Application\ReadRawRecordAction;
 use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Entity\NormalizationIssue;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\NormalizationIssueKind;
+use App\Ingestion\Exception\RawPayloadPrunedException;
 use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Repository\IngestRawRecordRepository;
 use App\Shared\Service\Storage\ObjectStorageInterface;
@@ -364,6 +366,27 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
         self::assertSame(0, $result->prunedPayloads, '…но к моменту удаления перестал им быть.');
         self::assertNotNull($this->rawRecords->findByIdAndCompany($target['id'], $this->companyId));
         self::assertTrue($this->storage->exists($target['path']));
+    }
+
+    /**
+     * Чтение очищенного сырья отвечает внятным отказом, а не сбоем хранилища.
+     *
+     * «Записи нет» и «запись есть, а нагрузки уже нет» — разные факты с разной
+     * реакцией: первое означает неверный идентификатор, второе — что данные
+     * вышли за окно хранения, и это ожидаемо.
+     */
+    public function testReadingAPrunedPayloadFailsExplicitly(): void
+    {
+        $record = $this->seedRaw('page-1', new \DateTimeImmutable('-400 days'));
+
+        ($this->action)(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
+        $this->em->clear();
+
+        /** @var ReadRawRecordAction $read */
+        $read = self::getContainer()->get(ReadRawRecordAction::class);
+
+        $this->expectException(RawPayloadPrunedException::class);
+        iterator_to_array($read($record['id'], $this->companyId), false);
     }
 
     /**

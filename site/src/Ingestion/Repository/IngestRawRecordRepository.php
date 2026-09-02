@@ -163,6 +163,33 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
     }
 
     /**
+     * Одна запись под блокировкой записи, с принудительным перечитыванием.
+     *
+     * Нужна дедупу: retention и повторная загрузка правят одну и ту же строку
+     * и один и тот же объект, и без общей блокировки их шаги переплетаются —
+     * восстановление снимало отметку, а retention следом удалял объект,
+     * оставляя запись, которая утверждает, что нагрузка на месте.
+     *
+     * `HINT_REFRESH` обязателен: иначе вернутся поля, прочитанные до
+     * блокировки.
+     */
+    public function findOneForUpdate(string $companyId, string $rawRecordId): ?IngestRawRecord
+    {
+        /** @var IngestRawRecord|null $record */
+        $record = $this->createQueryBuilder('record')
+            ->andWhere('record.companyId = :companyId')
+            ->andWhere('record.id = :rawRecordId')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('rawRecordId', $rawRecordId)
+            ->getQuery()
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getOneOrNullResult();
+
+        return $record;
+    }
+
+    /**
      * Кандидаты под блокировкой записи, с принудительным перечитыванием.
      *
      * Между выборкой и удалением проходит время, и за него дедуп мог обновить

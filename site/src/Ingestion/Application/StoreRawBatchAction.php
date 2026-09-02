@@ -28,6 +28,27 @@ final readonly class StoreRawBatchAction
     }
 
     /**
+     * Вернуть нагрузку, если её нет, и только ПОТОМ снять отметку.
+     *
+     * Порядок важен: отметка, снятая раньше записи объекта, означала бы
+     * запись, утверждающую, что нагрузка на месте, когда её ещё нет.
+     */
+    private function restorePayload(IngestRawRecord $record, string $ndjson): void
+    {
+        if (null !== $record->getPayloadPrunedAt() || !$this->objectStorage->exists($record->getStoragePath())) {
+            $compressed = gzencode($ndjson, 6);
+            if (false === $compressed) {
+                throw new RawStorageException('Failed to gzip raw payload.');
+            }
+
+            $this->objectStorage->write($record->getStoragePath(), $compressed);
+        }
+
+        $record->markPayloadRestored();
+        $record->markSeen();
+    }
+
+    /**
      * @return list<IngestRawRecord>
      */
     public function __invoke(RawBatch $batch): array
@@ -43,10 +64,7 @@ final readonly class StoreRawBatchAction
         );
 
         if (null !== $latestRecord && $latestRecord->getHash() === $hash) {
-            $this->repairMissingObject($latestRecord, $ndjson);
-            $this->entityManager->flush();
-
-            return [$latestRecord];
+            return [$this->reuse($batch, $latestRecord, $ndjson)];
         }
 
         $existingRecord = $this->rawRecordRepository->findOneByCompanySourceExternalIdAndHash(
@@ -58,10 +76,7 @@ final readonly class StoreRawBatchAction
         );
 
         if (null !== $existingRecord) {
-            $this->repairMissingObject($existingRecord, $ndjson);
-            $this->entityManager->flush();
-
-            return [$existingRecord];
+            return [$this->reuse($batch, $existingRecord, $ndjson)];
         }
 
         $compressed = gzencode($ndjson, 6);
@@ -96,24 +111,35 @@ final readonly class StoreRawBatchAction
         return [$record];
     }
 
-    private function repairMissingObject(IngestRawRecord $record, string $ndjson): void
+    /**
+     * Повторная встреча того же сырья: подтвердить, при необходимости вернуть
+     * нагрузку и снять отметку retention.
+     *
+     * Всё это — ПОД БЛОКИРОВКОЙ строки, потому что retention правит ту же
+     * строку и тот же объект. Без общей блокировки шаги переплетались:
+     * восстановление снимало отметку, видя ещё существующий объект, а
+     * retention следом удалял его — оставалась запись, которая утверждает,
+     * что нагрузка на месте, и чтение падало ошибкой хранилища.
+     *
+     * Порядок внутри тоже важен: объект пишется ДО снятия отметки. Иначе
+     * отметка снялась бы раньше, чем данные появились.
+     */
+    private function reuse(RawBatch $batch, IngestRawRecord $record, string $ndjson): IngestRawRecord
     {
-        // Та же выгрузка приехала снова — нагрузка вернулась, и отметка
-        // retention снимается. Без этого запись утверждала бы, что объекта
-        // нет, тогда как он снова на месте, и чтение отвечало бы ошибкой на
-        // существующих данных.
-        $record->markPayloadRestored();
+        $reused = $record;
 
-        if (!$this->objectStorage->exists($record->getStoragePath())) {
-            $compressed = gzencode($ndjson, 6);
-            if (false === $compressed) {
-                throw new RawStorageException('Failed to gzip raw payload.');
-            }
+        $this->entityManager->wrapInTransaction(
+            function () use ($batch, $record, $ndjson, &$reused): void {
+                $locked = $this->rawRecordRepository->findOneForUpdate($batch->companyId, $record->getId())
+                    ?? $record;
 
-            $this->objectStorage->write($record->getStoragePath(), $compressed);
-        }
+                $this->restorePayload($locked, $ndjson);
 
-        $record->markSeen();
+                $reused = $locked;
+            },
+        );
+
+        return $reused;
     }
 
     private function recoverConcurrentDuplicate(
@@ -154,7 +180,9 @@ final readonly class StoreRawBatchAction
             throw $exception;
         }
 
-        $this->repairMissingObject($existingRecord, $ndjson);
+        // Без блокировки: сюда попадают только что созданную конкурентом
+        // запись, она свежая и кандидатом retention быть не может.
+        $this->restorePayload($existingRecord, $ndjson);
         $entityManager->flush();
 
         return $existingRecord;

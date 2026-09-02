@@ -37,8 +37,8 @@ final class PruneRawRecordsCommand extends Command
         $this
             ->addOption('older-than-days', null, InputOption::VALUE_REQUIRED, 'Retention window in days.', self::DEFAULT_OLDER_THAN_DAYS)
             ->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Maximum raw records handled in one run.', self::DEFAULT_LIMIT)
-            ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Report what would be deleted without touching anything.')
-            ->addOption('execute', null, InputOption::VALUE_NONE, 'Delete the records and their stored objects.');
+            ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Report which payloads would be deleted without touching anything.')
+            ->addOption('execute', null, InputOption::VALUE_NONE, 'Delete stored payloads while keeping raw-record metadata.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

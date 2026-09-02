@@ -110,90 +110,85 @@ final readonly class PruneRawRecordsAction
      */
     private function pruneChunk(PruneRawRecordsResult $result, array $chunk, \DateTimeImmutable $notSeenSince): PruneRawRecordsResult
     {
-        /** @var array<string, array{path: string, bytes: int}> $marked */
-        $marked = [];
+        foreach ($chunk as $rawRecordId) {
+            $result = $this->pruneOne($result, $rawRecordId, $notSeenSince);
+        }
 
-        // Кандидаты перечитываются под блокировкой И перепроверяются условием.
-        //
-        // Между выборкой и этим моментом дедуп мог обновить `lastSeenAt`, а
-        // нормализация — завести проблему на запись. Удалить её после этого
-        // значило бы необратимо потерять свежее сырьё или единственное
-        // доказательство, а восстановить его неоткуда.
-        $now = $this->clock->now()->setTimezone(new \DateTimeZone(date_default_timezone_get()));
+        return $result;
+    }
 
-        $this->entityManager->wrapInTransaction(function () use ($chunk, $notSeenSince, $now, &$marked): void {
-            $locked = $this->rawRecordRepository->findManyPrunableForUpdate($chunk, $notSeenSince);
+    /**
+     * Одна запись — одна транзакция, и удаление объекта ВНУТРИ неё.
+     *
+     * Раньше отметка коммитилась, а объект удалялся после: в этот промежуток
+     * повторная загрузка успевала снять отметку, увидев ещё существующий
+     * объект, — и retention удалял его следом. Оставалась запись, которая
+     * утверждает, что нагрузка на месте, а чтение падало ошибкой хранилища.
+     * Общая блокировка строки исключает это переплетение: дедуп ждёт, а
+     * дождавшись, перечитывает состояние.
+     *
+     * Плата — сетевой вызов внутри транзакции. Он ограничен ОДНОЙ записью и
+     * одним удалением: строки старше года, и спорить за них некому, кроме
+     * той самой повторной загрузки, ради которой блокировка и берётся.
+     */
+    private function pruneOne(PruneRawRecordsResult $result, string $rawRecordId, \DateTimeImmutable $notSeenSince): PruneRawRecordsResult
+    {
+        $pruned = false;
+        $orphaned = false;
+        $bytes = 0;
+
+        $this->entityManager->wrapInTransaction(function () use ($rawRecordId, $notSeenSince, &$pruned, &$orphaned, &$bytes): void {
+            $locked = $this->rawRecordRepository->findManyPrunableForUpdate([$rawRecordId], $notSeenSince);
+            if ([] === $locked) {
+                // Запись перестала быть кандидатом, пока мы шли к ней: её
+                // подтвердили заново или уже очистили.
+                return;
+            }
+
+            $record = $locked[0];
 
             // Удержание перепроверяется УЖЕ ПОД блокировкой и отдельным
             // запросом: `FOR UPDATE` защищает строку сырья, но не отсутствие
             // строки в таблице проблем, и условие внутри блокирующей выборки
             // осталось бы снимком её собственного момента.
-            $held = array_flip($this->rawRecordRepository->filterHeldByUnresolvedIssues(
-                array_map(static fn (IngestRawRecord $record): string => $record->getId(), $locked),
-            ));
-
-            foreach ($locked as $record) {
-                if (isset($held[$record->getId()])) {
-                    continue;
-                }
-
-                $marked[$record->getId()] = [
-                    'path' => $record->getStoragePath(),
-                    'bytes' => $record->getByteSize(),
-                ];
-
-                $record->markPayloadPruned($now);
+            if ([] !== $this->rawRecordRepository->filterHeldByUnresolvedIssues([$record->getId()])) {
+                return;
             }
 
-            // Пути пишутся в лог ДО коммита. Если процесс умрёт между коммитом
-            // и удалением объектов, обработчик ошибки не выполнится и путь
-            // исчез бы вместе со строкой; в логе он остаётся, и осиротевший
-            // объект можно найти и убрать.
-            if ([] !== $marked) {
-                $this->logger->info('Raw objects are about to be deleted.', [
-                    'storagePaths' => array_column($marked, 'path'),
-                ]);
-            }
-        });
+            $path = $record->getStoragePath();
 
-        $skipped = count($chunk) - count($marked);
-        if ($skipped > 0) {
-            // Не ошибка: запись перестала быть кандидатом, пока мы шли к ней.
-            // Но и не пустяк — молча пропущенное удаление выглядело бы как
-            // сделанное.
-            $this->logger->info('Raw records stopped being prunable between selection and deletion.', [
-                'records' => $skipped,
-            ]);
-        }
+            // Путь пишется в лог ДО удаления: если процесс умрёт между
+            // удалением объекта и коммитом, откат вернёт отметку, а объекта
+            // уже не будет — найти его можно будет только по этой записи.
+            $this->logger->info('Raw object is about to be deleted.', ['storagePath' => $path]);
 
-        $orphaned = 0;
-        $freed = 0;
+            $record->markPayloadPruned($this->clock->now()->setTimezone(new \DateTimeZone(date_default_timezone_get())));
+            $pruned = true;
+            $bytes = $record->getByteSize();
 
-        foreach ($marked as $rawRecordId => $object) {
             try {
-                $this->objectStorage->delete($object['path']);
-                $freed += $object['bytes'];
+                $this->objectStorage->delete($path);
             } catch (\Throwable $exception) {
-                // Запись уже помечена, значит она не утверждает, что нагрузка
-                // на месте. Объект остался и занимает место — путь уходит в
-                // лог, чтобы его можно было убрать вручную. Его размер в
-                // освобождённые не идёт: место занято, и отчёт не должен
-                // утверждать обратное.
-                ++$orphaned;
+                // Отметка остаётся: запись не должна утверждать, что нагрузка
+                // на месте. Объект занимает место — путь уходит в лог, чтобы
+                // его можно было убрать вручную, а его размер в освобождённые
+                // не идёт.
+                $orphaned = true;
+                $bytes = 0;
                 $this->logger->error('Raw object left behind after its payload was marked pruned.', [
-                    'rawRecordId' => $rawRecordId,
-                    'storagePath' => $object['path'],
+                    'rawRecordId' => $record->getId(),
+                    'storagePath' => $path,
                     // Класс, а не сообщение: в тексте ошибок хранилища
                     // встречаются URL с учётными данными.
                     'exceptionClass' => $exception::class,
                 ]);
             }
-        }
+        });
 
         return $result->with(
-            prunedPayloads: count($marked),
-            bytesFreed: $freed,
-            orphanedObjects: $orphaned,
+            prunedPayloads: $pruned ? 1 : 0,
+            bytesFreed: $bytes,
+            orphanedObjects: $orphaned ? 1 : 0,
         );
     }
 
