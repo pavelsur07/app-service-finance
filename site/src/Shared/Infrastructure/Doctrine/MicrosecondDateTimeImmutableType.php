@@ -19,6 +19,11 @@ use Doctrine\DBAL\Types\Type;
  * СТАРОМУ `12:00:00.100`, обработанному позже, — статус ехал назад, а в
  * журнале появлялся перевёрнутый переход.
  *
+ * Тип отвечает и за зону. Колонка хранит голые «стенные часы», поэтому момент
+ * приводится к зоне приложения на записи и разбирается в ней же на чтении:
+ * иначе отметка из ClockInterface (UTC) легла бы в базу как UTC и вернулась
+ * как местная — сдвиг на смещение зоны при каждом round-trip.
+ *
  * Применяется точечно, к отметкам наблюдения, а не ко всем 55 колонкам
  * времени в проекте: смена типа у остальных — отдельное решение с отдельной
  * проверкой обратной совместимости.
@@ -48,7 +53,14 @@ final class MicrosecondDateTimeImmutableType extends Type
         }
 
         if ($value instanceof \DateTimeImmutable) {
-            return $value->format(self::FORMAT);
+            // Зона приводится к зоне приложения ПЕРЕД форматированием.
+            //
+            // Колонка без зоны хранит голые «стенные часы», а читатель ниже
+            // разбирает их в зоне приложения. Записать момент как есть значило
+            // бы положить UTC-время и прочитать его как местное: отметка,
+            // пришедшая из ClockInterface (UTC), возвращалась бы сдвинутой на
+            // смещение зоны — три часа для Europe/Moscow.
+            return $value->setTimezone(self::applicationTimezone())->format(self::FORMAT);
         }
 
         throw ConversionException::conversionFailedInvalidType($value, $this->getName(), ['null', \DateTimeImmutable::class]);
@@ -66,8 +78,11 @@ final class MicrosecondDateTimeImmutableType extends Type
 
         // Прочитанное без дробной части — нормальное состояние: строки,
         // записанные до перехода на этот тип, микросекунд не содержат.
-        $converted = \DateTimeImmutable::createFromFormat(self::FORMAT, $value)
-            ?: \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $value);
+        // Зона указывается явно: полагаться на умолчание процесса значило бы
+        // читать одну и ту же строку по-разному в разных окружениях.
+        $timezone = self::applicationTimezone();
+        $converted = \DateTimeImmutable::createFromFormat(self::FORMAT, $value, $timezone)
+            ?: \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $value, $timezone);
 
         if (false === $converted) {
             throw ConversionException::conversionFailedFormat($value, $this->getName(), self::FORMAT);
@@ -79,5 +94,10 @@ final class MicrosecondDateTimeImmutableType extends Type
     public function requiresSQLCommentHint(AbstractPlatform $platform): bool
     {
         return true;
+    }
+
+    private static function applicationTimezone(): \DateTimeZone
+    {
+        return new \DateTimeZone(date_default_timezone_get());
     }
 }

@@ -42,6 +42,28 @@ final class MicrosecondDateTimeImmutableTypeTest extends TestCase
         self::assertSame('2026-09-01 10:00:00.000000', $restored->format('Y-m-d H:i:s.u'));
     }
 
+    /**
+     * Регрессия: тип писал момент в зоне ОБЪЕКТА, а читал как местный.
+     * Отметка из ClockInterface приходит в UTC, поэтому каждый round-trip
+     * сдвигал её на смещение зоны — три часа для Europe/Moscow. Наблюдение,
+     * прочитанное из базы, оказывалось «старше» самого себя.
+     */
+    public function testInstantSurvivesTheRoundTripRegardlessOfItsTimezone(): void
+    {
+        $type = new MicrosecondDateTimeImmutableType();
+        $platform = new PostgreSQLPlatform();
+        $utc = new \DateTimeImmutable('2026-09-01 10:00:00.500000', new \DateTimeZone('UTC'));
+
+        $restored = $type->convertToPHPValue($type->convertToDatabaseValue($utc, $platform), $platform);
+
+        self::assertNotNull($restored);
+        self::assertSame(
+            $utc->format('U.u'),
+            $restored->format('U.u'),
+            'Момент обязан вернуться тем же, в какой бы зоне ни пришёл.',
+        );
+    }
+
     public function testNullPassesThrough(): void
     {
         $type = new MicrosecondDateTimeImmutableType();

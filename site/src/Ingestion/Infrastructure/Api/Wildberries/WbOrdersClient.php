@@ -113,11 +113,22 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
             ['json' => ['orders' => $orderIds]],
         );
 
-        $rows = $this->listOfObjects($decoded['data']['orders'] ?? null, $decoded['shape']->orders ?? null, self::ORDERS_STATUS_ENDPOINT, 'orders');
+        $evidence = self::evidence($decoded['data']);
+        $rows = $this->listOfObjects($decoded['data']['orders'] ?? null, $decoded['shape']->orders ?? null, self::ORDERS_STATUS_ENDPOINT, 'orders', $evidence);
+
+        // Спрошенные номера — множество, по которому проверяется КАЖДЫЙ
+        // вернувшийся. Чужой номер означает, что ответ относится не к нашему
+        // запросу; принять его молча значило бы записать статус постороннего
+        // заказа или потерять доказательство, объявив наш заказ ненайденным.
+        $requested = array_flip($orderIds);
 
         $indexed = [];
         foreach ($rows as $row) {
             $id = $row['id'] ?? null;
+            if (is_int($id) && !isset($requested[$id])) {
+                throw new MalformedConnectorResponseException(sprintf('WB %s returned a status row for an order that was not requested.', self::ORDERS_STATUS_ENDPOINT), decodedPayload: $evidence);
+            }
+
             if (!is_int($id)) {
                 throw new MalformedConnectorResponseException(sprintf('WB %s returned a status row without an integer id.', self::ORDERS_STATUS_ENDPOINT), decodedPayload: self::evidence($decoded['data']));
             }
@@ -273,8 +284,14 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
             throw new ConnectorTransientException(sprintf('WB orders server error for %s (HTTP %d).', $endpoint, (int) $statusCode));
         }
 
+        // Неожиданный код — свойство ЭНДПОИНТА, а не пачки: следующий запрос
+        // вернёт то же самое. Без этого признака цикл перепроса принял бы
+        // сломанный API за набор испорченных пачек, продолжил долбить его и
+        // завершил прогон успехом.
         if (200 !== $statusCode) {
-            throw new MalformedConnectorResponseException(sprintf('WB orders returned HTTP %d for %s.', $statusCode, $endpoint), decodedPayload: null === $payload ? null : self::evidence(json_decode($payload, true)));
+            $evidence = null === $payload ? null : self::evidence(json_decode($payload, true));
+
+            throw new MalformedConnectorResponseException(sprintf('WB orders returned HTTP %d for %s.', $statusCode, $endpoint), decodedPayload: $evidence, endpointWide: true);
         }
     }
 
@@ -298,14 +315,16 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
      * пустого объекта. Данные — из ассоциативного, потому что дальше по
      * конвейеру ходят массивы.
      *
+     * @param array<string, mixed>|null $evidence разобранный ответ целиком — доказательство для аудита
+     *
      * @return list<array<string, mixed>>
      */
-    private function listOfObjects(mixed $value, mixed $shape, string $endpoint, ?string $field): array
+    private function listOfObjects(mixed $value, mixed $shape, string $endpoint, ?string $field, ?array $evidence = null): array
     {
         $where = null === $field ? $endpoint : sprintf('%s.%s', $endpoint, $field);
 
         if (!is_array($shape) || !is_array($value) || !array_is_list($value)) {
-            throw new MalformedConnectorResponseException(sprintf('WB %s is not a list.', $where));
+            throw new MalformedConnectorResponseException(sprintf('WB %s is not a list.', $where), decodedPayload: $evidence);
         }
 
         $rows = [];
@@ -314,7 +333,7 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
             // нечем. Проверка формы и проверка содержательности здесь обе
             // нужны, и это та же строгость, что у Ozon-клиента.
             if (!is_array($row) || [] === $row || !($shape[$index] ?? null) instanceof \stdClass) {
-                throw new MalformedConnectorResponseException(sprintf('WB %s contains a non-object row.', $where));
+                throw new MalformedConnectorResponseException(sprintf('WB %s contains a non-object row.', $where), decodedPayload: $evidence);
             }
 
             $rows[] = $row;

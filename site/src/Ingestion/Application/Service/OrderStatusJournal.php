@@ -106,6 +106,19 @@ final readonly class OrderStatusJournal
         ?string $rawSubstatus,
         string $rawRecordId,
     ): StatusObservationOutcome {
+        // Равное время — не повод перезаписывать ЧУЖОЕ наблюдение.
+        //
+        // observeStatus() отклоняет только строго более старое, поэтому при
+        // одинаковом `fetchedAt` двух разных сырьевых записей повтор первой
+        // затирал бы состояние, записанное второй, и не оставлял бы даже
+        // строки в журнале. Для наблюдения «последний победил» — осознанное
+        // правило, для ПОВТОРА уже разобранного сырья — нет: повтор ничего
+        // нового не сообщает.
+        $current = $order->getStatusObservedAt();
+        if (null !== $current && $observedAt <= $current && $order->getLastRawRecordId() !== $rawRecordId) {
+            return StatusObservationOutcome::rejected();
+        }
+
         $differs = $order->getStatus() !== $status || $order->getRawStatus() !== $rawStatus;
         $accepted = $order->observeStatus($rawStatus, $status, $observedAt, $rawSubstatus, $rawRecordId);
 

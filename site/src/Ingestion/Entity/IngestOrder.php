@@ -313,7 +313,10 @@ class IngestOrder implements TenantOwnedInterface
     public function stopRefreshing(\DateTimeImmutable $at): void
     {
         $this->refreshStoppedAt = $at;
-        $this->updatedAt = new \DateTimeImmutable();
+        // Одна операция — одни часы, как и в markRefreshAttempted(): момент
+        // остановки И есть «сейчас» этой записи, а системное время рядом с
+        // переданным завело бы вторую шкалу.
+        $this->updatedAt = $at;
     }
 
     public function setExternalOrderId(?string $externalOrderId): void

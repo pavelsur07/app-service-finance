@@ -197,6 +197,45 @@ final class NormalizeOrderRawRecordActionTest extends IntegrationTestCase
     }
 
     /**
+     * Регрессия: повтор с РАВНОЙ отметкой времени затирал чужое наблюдение.
+     *
+     * `observeStatus()` отклоняет только строго более старое, поэтому при
+     * одинаковом `fetchedAt` двух разных сырьевых записей повтор первой
+     * перезаписывал состояние, записанное второй, — и не оставлял даже строки
+     * в журнале, потому что повтор событий не пишет. Микросекунды делают
+     * совпадение редким, но полного порядка не создают.
+     */
+    public function testReplayWithEqualFetchTimeDoesNotOverwriteAnotherRaw(): void
+    {
+        $at = new \DateTimeImmutable('2026-09-01T10:00:00.500000+00:00');
+
+        $this->mapper->queue($this->order('delivering', 1));
+        $firstRawId = $this->storeRaw('page-1', $at);
+        ($this->action)(new NormalizeRawRecordCommand($firstRawId, $this->companyId));
+
+        // Второе сырьё с ТОЙ ЖЕ отметкой скачивания.
+        $this->mapper->queue($this->order('delivered', 1));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-2', $at), $this->companyId));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($order);
+        self::assertSame(IngestOrderStatus::DELIVERED, $order->getStatus());
+
+        // Повтор первого сырья ничего не сообщает: оно уже разобрано.
+        $this->mapper->queue($this->order('delivering', 1));
+        ($this->action)(new NormalizeRawRecordCommand($firstRawId, $this->companyId, forceReplay: true));
+
+        $this->em->clear();
+        $reloaded = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($reloaded);
+        self::assertSame(
+            IngestOrderStatus::DELIVERED,
+            $reloaded->getStatus(),
+            'Повтор не перезаписывает наблюдение другого сырья с равной отметкой.',
+        );
+    }
+
+    /**
      * Регрессия: идентичность позиции была позиционной. Источник вправе
      * прислать те же товары в другом порядке — на старом коде строка 0
      * сохраняла прежние externalSku/offerId, но получала количество, цену и

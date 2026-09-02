@@ -25,11 +25,19 @@ use Doctrine\Migrations\AbstractMigration;
  * повторяющихся наблюдений — заказ применяет переход, а журнал его теряет.
  * Порядковый номер различает наблюдения по факту их появления, а от повторной
  * записи защищает не ключ, а транзакция разбора и отдельный путь повтора
- * (`OrderStatusJournal::reapply()`).
+ * (`OrderStatusJournal::reapply()`). Уже записанным событиям номера
+ * проставляются оконной функцией ДО создания индекса: прежняя схема допускала
+ * несколько строк на пару (сырьё, заказ), и общий ноль уронил бы миграцию на
+ * первой же настоящей истории A → B.
  *
  * Индекс очереди — под фактический предикат И порядок, включая выражение
  * `CASE`, которым «ни разу не спрошенные» поднимаются в начало: без него
  * pathkeys не совпадают и PostgreSQL сортирует всех кандидатов подключения.
+ * Терминальные статусы исключены из индекса: у заказа, созданного сразу
+ * доставленным, отметка попытки навсегда NULL, и он занимал бы начало индекса,
+ * хотя запрос отбрасывает его следом. Список статусов записан литералами —
+ * значения enum'а, а не параметры, иначе PostgreSQL не смог бы доказать, что
+ * предикат запроса влечёт предикат индекса.
  *
  * Про блокировки: таблицы заказов в production пусты — заказы этой задачей
  * только вводятся, — поэтому перестроение индекса здесь мгновенно и окна
@@ -48,6 +56,27 @@ final class Version20260902170000 extends AbstractMigration
         $this->addSql('ALTER TABLE ingest_order_status_events ADD applied BOOLEAN DEFAULT NULL');
         $this->addSql('ALTER TABLE ingest_order_status_events ADD occurrence INT DEFAULT 0 NOT NULL');
 
+        // Существующие события нумеруются ДО создания уникального индекса.
+        //
+        // Прежняя схема допускала несколько строк на пару (сырьё, заказ) —
+        // ровно так выглядит записанная история A → B. Оставить им общий ноль
+        // значило бы уронить создание индекса на первой же настоящей истории.
+        // Порядок — по времени наблюдения, при равенстве по id: он устойчив и
+        // повторяем.
+        $this->addSql(
+            'UPDATE ingest_order_status_events AS e
+                SET occurrence = numbered.position
+               FROM (
+                   SELECT id,
+                          ROW_NUMBER() OVER (
+                              PARTITION BY company_id, raw_record_id, order_id
+                              ORDER BY observed_at, id
+                          ) - 1 AS position
+                     FROM ingest_order_status_events
+               ) AS numbered
+              WHERE e.id = numbered.id'
+        );
+
         $this->addSql('DROP INDEX uniq_ingest_order_status_event_observation');
         $this->addSql(
             'CREATE UNIQUE INDEX uniq_ingest_order_status_event_observation
@@ -64,7 +93,8 @@ final class Version20260902170000 extends AbstractMigration
                  status_refresh_attempted_at,
                  id
              )
-             WHERE refresh_stopped_at IS NULL'
+             WHERE refresh_stopped_at IS NULL
+               AND status NOT IN (\'delivered\', \'cancelled\', \'returned\')'
         );
     }
 

@@ -786,6 +786,30 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
         );
     }
 
+    /**
+     * Незнакомый токен статуса — одна проблема, а не по одной в час.
+     *
+     * Часовой опрос неизменного неизвестного статуса плодил бы до 720 копий на
+     * заказ за окно опроса, и очередь на разбор превращалась бы в шум, в
+     * котором настоящие проблемы не найти.
+     */
+    public function testUnknownStatusRaisesTheIssueOnceNotEveryHour(): void
+    {
+        $company = $this->seedCompanyWithConnection();
+        $this->seedOrder($company, 'posting-1', IngestOrderStatus::SHIPPED, 'delivering');
+
+        $this->ozon->setPostings(['posting-1' => ['posting_number' => 'posting-1', 'status' => 'teleported']]);
+
+        ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+        ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+        ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        self::assertSame(1, (int) $this->connection->fetchOne(
+            "SELECT COUNT(*) FROM ingest_normalization_issues WHERE company_id = :c AND kind = 'unknown_order_status'",
+            ['c' => (string) $company->getId()],
+        ));
+    }
+
     private function deactivateConnections(Company $company): void
     {
         $this->connection->executeStatement(

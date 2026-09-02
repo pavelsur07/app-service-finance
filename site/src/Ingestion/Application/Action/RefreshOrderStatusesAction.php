@@ -309,24 +309,6 @@ final readonly class RefreshOrderStatusesAction
 
                 $status = $this->statusMapper->map($source, $order->getScheme(), $observation['rawStatus']);
 
-                if (IngestOrderStatus::UNKNOWN === $status) {
-                    // Тот же механизм, что и в нормализации: незнакомый токен
-                    // становится видимой очередью на разбор, а не тихо ждёт
-                    // общего STUCK_ORDER через месяц.
-                    ($this->recordIssueAction)(new RecordNormalizationIssueCommand(
-                        companyId: $companyId,
-                        rawRecordId: $rawRecordId,
-                        operationGroupId: null,
-                        kind: NormalizationIssueKind::UNKNOWN_ORDER_STATUS,
-                        details: [
-                            'source' => $source->value,
-                            'scheme' => $order->getScheme()->value,
-                            'rawStatus' => $observation['rawStatus'],
-                            'externalId' => $order->getExternalId(),
-                        ],
-                    ));
-                }
-
                 $outcome = $this->statusJournal->observe(
                     $order,
                     $observation['rawStatus'],
@@ -343,6 +325,27 @@ final readonly class RefreshOrderStatusesAction
                 // supplier_status и wb_status.
                 if ($outcome->accepted && [] !== $observation['statusAttributes']) {
                     $order->mergeAttributes($observation['statusAttributes']);
+                }
+
+                // Незнакомый токен уходит в ту же видимую очередь, что и при
+                // нормализации, но ТОЛЬКО когда наблюдение действительно
+                // изменило состояние. Часовой опрос неизменного неизвестного
+                // статуса иначе плодил бы по проблеме в час — до 720 копий на
+                // заказ за окно опроса, и очередь на разбор превращалась бы в
+                // шум, в котором настоящие проблемы не найти.
+                if ($outcome->changed && IngestOrderStatus::UNKNOWN === $status) {
+                    ($this->recordIssueAction)(new RecordNormalizationIssueCommand(
+                        companyId: $companyId,
+                        rawRecordId: $rawRecordId,
+                        operationGroupId: null,
+                        kind: NormalizationIssueKind::UNKNOWN_ORDER_STATUS,
+                        details: [
+                            'source' => $source->value,
+                            'scheme' => $order->getScheme()->value,
+                            'rawStatus' => $observation['rawStatus'],
+                            'externalId' => $order->getExternalId(),
+                        ],
+                    ));
                 }
 
                 if ($outcome->changed) {
@@ -691,27 +694,29 @@ final readonly class RefreshOrderStatusesAction
         // нет, но поле обязательно, и подставлять чужой идентификатор нельзя.
         $runId = Uuid::uuid7()->toString();
 
-        $records = $this->rawStorageFacade->store(new RawBatch(
-            companyId: $companyId,
-            connectionRef: $connectionRef,
-            shopRef: $connectionRef,
-            source: $source,
-            resourceType: $resourceType,
-            externalId: sprintf('%s:run-%s', $resourceType, $runId),
-            syncJobId: $runId,
-            fetchedAt: $now,
-            rows: $rows,
-        ));
+        // Вставка и пометка — одной транзакцией. store() делает собственный
+        // flush, и падение между ним и пометкой оставило бы запись в статусе
+        // PENDING: ресурс, для которого маппера не существует, вечно ждал бы
+        // нормализации.
+        $records = [];
 
-        // Пометка уходит в базу ТУТ ЖЕ, а не вместе с наблюдениями: store()
-        // уже сделал flush, и запись существует со статусом PENDING. Падение
-        // между этими моментами оставило бы вечно ожидающий нормализации
-        // ресурс, для которого маппера не существует.
-        foreach ($records as $record) {
-            $record->markNormalizationSkipped();
-        }
+        $this->entityManager->wrapInTransaction(function () use ($companyId, $connectionRef, $source, $resourceType, $runId, $rows, $now, &$records): void {
+            $records = $this->rawStorageFacade->store(new RawBatch(
+                companyId: $companyId,
+                connectionRef: $connectionRef,
+                shopRef: $connectionRef,
+                source: $source,
+                resourceType: $resourceType,
+                externalId: sprintf('%s:run-%s', $resourceType, $runId),
+                syncJobId: $runId,
+                fetchedAt: $now,
+                rows: $rows,
+            ));
 
-        $this->entityManager->flush();
+            foreach ($records as $record) {
+                $record->markNormalizationSkipped();
+            }
+        });
 
         return $records[0]->getId();
     }
