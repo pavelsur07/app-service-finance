@@ -111,11 +111,9 @@ if [[ "$DO_OZON" -eq 1 ]]; then
         if [[ "$scheme" == "fbs" ]]; then
             posting="$(jq -r '.result.postings[0].posting_number // empty' "$list_file" 2>/dev/null || true)"
             get_endpoint=/v3/posting/fbs/get
-            body_extra='{}'
         else
             posting="$(jq -r '.result[0].posting_number // empty' "$list_file" 2>/dev/null || true)"
             get_endpoint=/v2/posting/fbo/get
-            body_extra='{translit:true}'
         fi
 
         if [[ -z "$posting" ]]; then
@@ -123,8 +121,11 @@ if [[ "$DO_OZON" -eq 1 ]]; then
             continue
         fi
 
-        ozon_post "$get_endpoint" "$(jq -nc --arg pn "$posting" \
-            "{posting_number:\$pn, with:{analytics_data:true, financial_data:true}} + ${body_extra}")" \
+        # Тело ровно такое же, как у OzonOrdersClient::fetchPosting(): образец
+        # должен показывать ответ на РЕАЛЬНЫЙ запрос. Дополнительные блоки
+        # (`analytics_data`, `financial_data`) production-клиент не просит, и
+        # снимать их значило бы класть в выгрузку лишние персональные данные.
+        ozon_post "$get_endpoint" "$(jq -nc --arg pn "$posting" '{posting_number:$pn}')" \
             "$OUT_DIR/ozon-posting-${scheme}-get.json"
     done
     echo

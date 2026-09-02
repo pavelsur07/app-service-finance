@@ -13,6 +13,7 @@ use App\Ingestion\Enum\IngestOrderStatus;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Exception\ConnectorAuthException;
 use App\Ingestion\Exception\ConnectorRateLimitedException;
+use App\Ingestion\Exception\MalformedConnectorResponseException;
 use App\Ingestion\Repository\IngestOrderRepository;
 use App\Ingestion\Repository\IngestOrderStatusEventRepository;
 use App\Marketplace\Entity\MarketplaceConnection;
@@ -425,6 +426,116 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
         $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
 
         self::assertSame(1, $result->stopped);
+    }
+
+    /**
+     * Регрессия к BLOCKER: очередь планировалась по времени НАБЛЮДЕНИЯ, а 404
+     * его не двигает. Заказы, на которые Ozon отвечает 404, вечно занимали
+     * начало лимита, и живой заказ кабинета не опрашивался никогда.
+     */
+    public function testOrdersAnsweredWith404DoNotHoldTheQueueForever(): void
+    {
+        $company = $this->seedCompanyWithConnection();
+        $this->seedOrder($company, 'gone', IngestOrderStatus::SHIPPED, 'delivering');
+        $this->seedOrder($company, 'alive', IngestOrderStatus::SHIPPED, 'delivering');
+
+        $this->ozon->setPostings(['alive' => ['posting_number' => 'alive', 'status' => 'delivered']]);
+
+        // Лимит в один заказ: на первом прогоне его получает один из двух.
+        ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 1));
+        $second = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 1));
+
+        // Кто бы ни попал в первый прогон, на втором очередь обязана сдвинуться.
+        self::assertSame(1, $second->polled + $second->missing);
+
+        $this->em->clear();
+        $alive = $this->orders->findByExternalId((string) $company->getId(), IngestSource::OZON, self::CONNECTION_ID, 'alive');
+        self::assertNotNull($alive);
+        self::assertSame(IngestOrderStatus::DELIVERED, $alive->getStatus(), 'Живой заказ дождался своей очереди.');
+    }
+
+    /**
+     * Испорченный ответ относится к ОДНОМУ отправлению. Прерывать из-за него
+     * цикл значило бы, что одно вечно кривое отправление каждый час
+     * останавливает обработку всех следующих заказов кабинета.
+     */
+    public function testMalformedPostingDoesNotStopTheRestOfTheConnection(): void
+    {
+        $company = $this->seedCompanyWithConnection();
+        $this->seedOrder($company, 'broken', IngestOrderStatus::SHIPPED, 'delivering', null, null, IngestSource::OZON, null, null, new \DateTimeImmutable('-3 hours'));
+        $this->seedOrder($company, 'alive', IngestOrderStatus::SHIPPED, 'delivering', null, null, IngestSource::OZON, null, null, new \DateTimeImmutable('-1 hour'));
+
+        $this->ozon->setPostingFailures(['broken' => new MalformedConnectorResponseException('bad shape')]);
+        $this->ozon->setPostings(['alive' => ['posting_number' => 'alive', 'status' => 'delivered']]);
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        self::assertSame(0, $result->failedConnections, 'Кривое отправление — не сбой подключения.');
+        self::assertSame(1, $result->invalid);
+        self::assertSame(1, $result->polled);
+
+        $this->em->clear();
+        $alive = $this->orders->findByExternalId((string) $company->getId(), IngestSource::OZON, self::CONNECTION_ID, 'alive');
+        self::assertNotNull($alive);
+        self::assertSame(IngestOrderStatus::DELIVERED, $alive->getStatus());
+    }
+
+    /**
+     * Ответа не было вовсе, поэтому заказы не «неизвестны маркетплейсу» — их
+     * просто не спросили. Считать их missing значило бы объявить сбой сети
+     * свойством данных.
+     */
+    public function testWildberriesRateLimitDoesNotDeclareOrdersMissing(): void
+    {
+        $company = $this->seedCompanyWithConnection(MarketplaceType::WILDBERRIES);
+        $this->seedOrder(
+            $company,
+            'rid-1',
+            IngestOrderStatus::ORDERED,
+            'supplierStatus=new;wbStatus=waiting',
+            null,
+            null,
+            IngestSource::WILDBERRIES,
+            null,
+            '5000000001',
+        );
+
+        $this->wb->failStatusesWith(new ConnectorRateLimitedException('rate limited', 60));
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        self::assertSame(1, $result->failedConnections);
+        self::assertSame(0, $result->missing);
+    }
+
+    /**
+     * Тихая остановка без видимой очереди хуже, чем заказ, который продолжают
+     * опрашивать: остановленный и невидимый исчезает совсем.
+     */
+    public function testStuckOrderWithoutRawRecordIsNotStoppedSilently(): void
+    {
+        $company = $this->seedCompanyWithConnection();
+        $order = IngestOrderBuilder::anOrder()
+            ->forCompany((string) $company->getId())
+            ->withConnectionRef(self::CONNECTION_ID)
+            ->withSource(IngestSource::OZON)
+            ->withScheme(IngestOrderScheme::FBO)
+            ->withExternalId('orphan')
+            ->withStatus(IngestOrderStatus::SHIPPED, 'delivering')
+            ->orderedAt(new \DateTimeImmutable('-90 days'))
+            ->withLastRawRecordId(null)
+            ->build();
+        $this->em->persist($order);
+        $this->em->flush();
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        self::assertSame(0, $result->stopped);
+
+        $this->em->clear();
+        $reloaded = $this->orders->findByExternalId((string) $company->getId(), IngestSource::OZON, self::CONNECTION_ID, 'orphan');
+        self::assertNotNull($reloaded);
+        self::assertNull($reloaded->getRefreshStoppedAt(), 'Заказ остаётся в очереди, а не исчезает молча.');
     }
 
     private function deactivateConnections(Company $company): void

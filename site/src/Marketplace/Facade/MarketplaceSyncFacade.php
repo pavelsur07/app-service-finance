@@ -31,23 +31,47 @@ final readonly class MarketplaceSyncFacade
     }
 
     /**
-     * Активные SELLER-подключения для модулей, которым нужно пройти по всем
-     * парам (компания, маркетплейс).
+     * Активные SELLER-подключения ОДНОЙ компании.
      *
      * Через Facade, а не напрямую Query: `Infrastructure/` чужого модуля
      * закрыт, и без этой точки входа Ingestion пришлось бы нарушать границу.
      *
-     * Без пагинации сознательно: это реестр подключений (по одному на кабинет
-     * продавца), а не список документов. Его размер ограничен числом кабинетов
-     * и не растёт со временем, в отличие от проводок или заказов. Отбор по
-     * компании отдан БД — параметр `$companyId`.
+     * Пагинации здесь нет и не нужно: у компании столько подключений, сколько
+     * у неё кабинетов продавца — единицы.
      *
      * @return list<ActiveSellerConnectionDTO>
      */
-    public function activeSellerConnections(?string $companyId = null): array
+    public function activeSellerConnections(string $companyId): array
+    {
+        return $this->toDtos($this->activeSellerConnectionsQuery->executeForCompany($companyId));
+    }
+
+    /**
+     * Страница реестра подключений ВСЕХ компаний, keyset-курсор по
+     * `connectionRef`.
+     *
+     * @companyScopeExempt Системный обход: cron-командам нужно пройти по всем
+     * парам (компания, маркетплейс), и ограничивать выборку одной компанией
+     * здесь нечем. Метод назван отдельно и требует явного лимита, чтобы
+     * межкомпанейский проход нельзя было получить случайно, попросив «просто
+     * подключения».
+     *
+     * @return list<ActiveSellerConnectionDTO>
+     */
+    public function activeSellerConnectionsPage(int $limit, ?string $afterConnectionRef = null): array
+    {
+        return $this->toDtos($this->activeSellerConnectionsQuery->executePage($limit, $afterConnectionRef));
+    }
+
+    /**
+     * @param list<array{id: string, company_id: string, marketplace: string}> $rows
+     *
+     * @return list<ActiveSellerConnectionDTO>
+     */
+    private function toDtos(array $rows): array
     {
         $connections = [];
-        foreach ($this->activeSellerConnectionsQuery->execute($companyId) as $row) {
+        foreach ($rows as $row) {
             $connections[] = new ActiveSellerConnectionDTO(
                 connectionRef: (string) $row['id'],
                 companyId: (string) $row['company_id'],

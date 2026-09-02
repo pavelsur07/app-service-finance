@@ -28,11 +28,13 @@ final class IngestOrderBuilder
 
     private ?string $externalOrderId = null;
 
+    private ?\DateTimeImmutable $refreshAttemptedAt = null;
+
     /**
      * Заказ без сырья не существует: он всегда создаётся нормализацией.
      * Билдер повторяет это, иначе тесты проверяли бы недостижимое состояние.
      */
-    private string $lastRawRecordId;
+    private ?string $lastRawRecordId;
 
     private function __construct()
     {
@@ -112,6 +114,14 @@ final class IngestOrderBuilder
         return $clone;
     }
 
+    public function refreshAttemptedAt(?\DateTimeImmutable $attemptedAt): self
+    {
+        $clone = clone $this;
+        $clone->refreshAttemptedAt = $attemptedAt;
+
+        return $clone;
+    }
+
     public function withExternalOrderId(?string $externalOrderId): self
     {
         $clone = clone $this;
@@ -120,7 +130,7 @@ final class IngestOrderBuilder
         return $clone;
     }
 
-    public function withLastRawRecordId(string $rawRecordId): self
+    public function withLastRawRecordId(?string $rawRecordId): self
     {
         $clone = clone $this;
         $clone->lastRawRecordId = $rawRecordId;
@@ -141,7 +151,7 @@ final class IngestOrderBuilder
 
     public function build(): IngestOrder
     {
-        return new IngestOrder(
+        $order = new IngestOrder(
             companyId: $this->companyId,
             connectionRef: $this->connectionRef,
             shopRef: $this->shopRef,
@@ -156,5 +166,11 @@ final class IngestOrderBuilder
             lastRawRecordId: $this->lastRawRecordId,
             externalOrderId: $this->externalOrderId,
         );
+
+        if (null !== $this->refreshAttemptedAt) {
+            $order->markRefreshAttempted($this->refreshAttemptedAt);
+        }
+
+        return $order;
     }
 }

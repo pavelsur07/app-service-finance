@@ -96,14 +96,14 @@ final class IngestOrderRepositoryTest extends IntegrationTestCase
         self::assertSame(['live-1', 'unknown-1'], $ids);
     }
 
-    public function testRefreshSelectionOrdersByStalestObservationFirst(): void
+    public function testRefreshSelectionOrdersByStalestAttemptFirst(): void
     {
         $companyId = Uuid::uuid7()->toString();
 
         $this->persist(IngestOrderBuilder::anOrder()->forCompany($companyId)->withExternalId('fresh')
-            ->statusObservedAt(new \DateTimeImmutable('-1 hour'))->build());
+            ->refreshAttemptedAt(new \DateTimeImmutable('-1 hour'))->build());
         $this->persist(IngestOrderBuilder::anOrder()->forCompany($companyId)->withExternalId('stale')
-            ->statusObservedAt(new \DateTimeImmutable('-10 hours'))->build());
+            ->refreshAttemptedAt(new \DateTimeImmutable('-10 hours'))->build());
         $this->em->flush();
 
         $candidates = $this->repository->findNonTerminalForRefresh(
@@ -115,6 +115,42 @@ final class IngestOrderRepositoryTest extends IntegrationTestCase
         );
 
         self::assertSame('stale', $candidates[0]->getExternalId());
+    }
+
+    /**
+     * Регрессия: очередь планировалась по времени НАБЛЮДЕНИЯ, а попытка бывает
+     * без наблюдения — 404, ответ без статуса, отсутствие заказа в успешном
+     * ответе WB. Такие заказы отметку наблюдения не двигают, а сортировка
+     * устойчива, поэтому они вечно занимали начало лимита, и остальные заказы
+     * кабинета не опрашивались никогда.
+     */
+    public function testOrderPolledWithoutObservationLeavesTheHeadOfTheQueue(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+
+        // Заказ, который час назад спросили и получили 404: наблюдения нет,
+        // отметка попытки — есть.
+        $this->persist(IngestOrderBuilder::anOrder()->forCompany($companyId)->withExternalId('always-404')
+            ->statusObservedAt(new \DateTimeImmutable('-10 hours'))
+            ->refreshAttemptedAt(new \DateTimeImmutable('-1 hour'))->build());
+
+        // Заказ, который наблюдали недавно, но с тех пор ни разу не спрашивали.
+        $this->persist(IngestOrderBuilder::anOrder()->forCompany($companyId)->withExternalId('waiting')
+            ->statusObservedAt(new \DateTimeImmutable('-2 hours'))
+            ->refreshAttemptedAt(new \DateTimeImmutable('-5 hours'))->build());
+
+        $this->em->flush();
+
+        $candidates = $this->repository->findNonTerminalForRefresh(
+            $companyId,
+            IngestSource::OZON,
+            'connection-1',
+            new \DateTimeImmutable('-30 days'),
+            1,
+        );
+
+        self::assertCount(1, $candidates);
+        self::assertSame('waiting', $candidates[0]->getExternalId(), 'Лимит достаётся давно не спрошенному заказу.');
     }
 
     public function testStuckOrdersAreDiscoverable(): void

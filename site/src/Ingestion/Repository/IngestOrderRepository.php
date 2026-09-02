@@ -120,10 +120,17 @@ final class IngestOrderRepository extends ServiceEntityRepository
 
         /** @var list<IngestOrder> $orders */
         $orders = $qb
-            // Заказы БЕЗ статуса идут первыми: им статус нужнее всего, а
-            // PostgreSQL при ASC ставит NULL в конец и они опрашивались бы
-            // последними — то есть при исчерпании лимита никогда.
-            ->addSelect('CASE WHEN o.statusObservedAt IS NULL THEN 0 ELSE 1 END AS HIDDEN observedRank')
+            // Очередь планируется по времени ПОПЫТКИ, а не наблюдения.
+            //
+            // Попытка бывает без наблюдения: 404, ответ без поля статуса,
+            // отсутствие заказа в успешном ответе WB. По отметке наблюдения
+            // такие заказы стояли бы в начале очереди вечно — сортировка
+            // устойчива, — и при исчерпании лимита остальные заказы кабинета
+            // не опрашивались бы никогда.
+            //
+            // Ни разу не опрошенные идут первыми: им статус нужнее всего, а
+            // PostgreSQL при ASC ставит NULL в конец.
+            ->addSelect('CASE WHEN o.statusRefreshAttemptedAt IS NULL THEN 0 ELSE 1 END AS HIDDEN attemptRank')
             ->andWhere('o.companyId = :companyId')
             ->andWhere('o.source = :source')
             ->andWhere('o.connectionRef = :connectionRef')
@@ -135,10 +142,10 @@ final class IngestOrderRepository extends ServiceEntityRepository
             ->setParameter('connectionRef', $connectionRef)
             ->setParameter('statuses', $nonTerminal)
             ->setParameter('orderedAfter', $orderedAfter)
-            ->orderBy('observedRank', 'ASC')
-            ->addOrderBy('o.statusObservedAt', 'ASC')
+            ->orderBy('attemptRank', 'ASC')
+            ->addOrderBy('o.statusRefreshAttemptedAt', 'ASC')
             // Устойчивый третий ключ: без него заказы с одинаковым временем
-            // наблюдения (а у не опрошенных оно одинаково всегда — NULL)
+            // попытки (а у ни разу не опрошенных оно одинаково всегда — NULL)
             // возвращались бы в произвольном порядке, и при исчерпании лимита
             // часть из них не опрашивалась бы никогда.
             ->addOrderBy('o.id', 'ASC')
@@ -176,29 +183,51 @@ final class IngestOrderRepository extends ServiceEntityRepository
     }
 
     /**
-     * Заказ под блокировкой записи, с принудительным перечитыванием из БД.
+     * Заказы под блокировкой записи, с принудительным перечитыванием из БД.
      *
-     * `HINT_REFRESH` обязателен: без него Doctrine вернёт экземпляр из карты
+     * ОДИН запрос на пачку, а не запрос на заказ: перепрос применяет до
+     * тысячи наблюдений за прогон, и блокировка по одной строке дала бы
+     * тысячу обращений внутри транзакции.
+     *
+     * `HINT_REFRESH` обязателен: без него Doctrine вернёт экземпляры из карты
      * идентичности с полями, прочитанными до внешних HTTP-запросов, и
-     * `SELECT ... FOR UPDATE` защитил бы строку в базе, оставив в памяти
+     * `SELECT ... FOR UPDATE` защитил бы строки в базе, оставив в памяти
      * устаревшее состояние — то есть ровно ту гонку, ради которой блокировка и
      * берётся.
+     *
+     * Порядок по `id` задаёт единый порядок захвата блокировок: два прогона,
+     * взявшие пересекающиеся пачки в разном порядке, встали бы в взаимную
+     * блокировку.
+     *
+     * @param list<string> $orderIds
+     *
+     * @return array<string, IngestOrder> ключ — идентификатор заказа
      */
-    public function findOneForUpdate(string $companyId, string $orderId): ?IngestOrder
+    public function findManyForUpdate(string $companyId, array $orderIds): array
     {
+        if ([] === $orderIds) {
+            return [];
+        }
+
         $query = $this->createQueryBuilder('o')
             ->andWhere('o.companyId = :companyId')
-            ->andWhere('o.id = :orderId')
+            ->andWhere('o.id IN (:orderIds)')
             ->setParameter('companyId', $companyId)
-            ->setParameter('orderId', $orderId)
+            ->setParameter('orderIds', array_values(array_unique($orderIds)))
+            ->orderBy('o.id', 'ASC')
             ->getQuery()
             ->setLockMode(LockMode::PESSIMISTIC_WRITE)
             ->setHint(Query::HINT_REFRESH, true);
 
-        /** @var IngestOrder|null $order */
-        $order = $query->getOneOrNullResult();
+        /** @var list<IngestOrder> $orders */
+        $orders = $query->getResult();
 
-        return $order;
+        $indexed = [];
+        foreach ($orders as $order) {
+            $indexed[$order->getId()] = $order;
+        }
+
+        return $indexed;
     }
 
     /**

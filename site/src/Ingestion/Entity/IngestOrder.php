@@ -119,6 +119,19 @@ class IngestOrder implements TenantOwnedInterface
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6, nullable: true)]
     private ?\DateTimeImmutable $refreshStoppedAt = null;
 
+    /**
+     * Момент ПОПЫТКИ перепроса — независимо от того, чем она кончилась.
+     *
+     * Отдельно от `statusObservedAt`, потому что попытка бывает без
+     * наблюдения: 404, ответ без поля статуса, отсутствие заказа в успешном
+     * ответе WB. Планировать очередь по времени наблюдения нельзя — такие
+     * заказы отметку не двигают, а сортировка стабильна, поэтому они вечно
+     * занимали бы начало лимита и остальные заказы кабинета не опрашивались
+     * бы никогда.
+     */
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6, nullable: true)]
+    private ?\DateTimeImmutable $statusRefreshAttemptedAt = null;
+
     /** @var array<string, mixed> */
     #[ORM\Column(type: Types::JSON, nullable: true)]
     private ?array $attributes = null;
@@ -274,6 +287,20 @@ class IngestOrder implements TenantOwnedInterface
         $this->updatedAt = new \DateTimeImmutable();
 
         return true;
+    }
+
+    /**
+     * Попытка перепроса состоялась — независимо от её исхода.
+     */
+    public function markRefreshAttempted(\DateTimeImmutable $at): void
+    {
+        $this->statusRefreshAttemptedAt = $at;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function getStatusRefreshAttemptedAt(): ?\DateTimeImmutable
+    {
+        return $this->statusRefreshAttemptedAt;
     }
 
     public function stopRefreshing(\DateTimeImmutable $at): void
