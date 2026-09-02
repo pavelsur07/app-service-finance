@@ -39,6 +39,9 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
     private const ORDERS_ENDPOINT = '/api/v3/orders';
     private const ORDERS_STATUS_ENDPOINT = '/api/v3/orders/status';
     private const STATISTICS_ORDERS_ENDPOINT = '/api/v1/supplier/orders';
+    /** Предел на одну ось статуса; склейка обеих обязана влезть в VARCHAR(255). */
+    private const STATUS_AXIS_MAX_LENGTH = 100;
+
     private const DEFAULT_RETRY_AFTER_SECONDS = 70;
     private const TIMEOUT_SECONDS = 120;
 
@@ -95,10 +98,10 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
         );
     }
 
-    public function fetchMarketplaceStatuses(string $companyId, string $connectionRef, array $orderIds): array
+    public function fetchMarketplaceStatuses(string $companyId, string $connectionRef, array $orderIds): WbOrderStatusPage
     {
         if ([] === $orderIds) {
-            return [];
+            return new WbOrderStatusPage();
         }
         if (count($orderIds) > self::STATUS_BATCH_SIZE) {
             throw new \InvalidArgumentException(sprintf('WB order statuses accept at most %d ids per request.', self::STATUS_BATCH_SIZE));
@@ -123,45 +126,80 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
         $requested = array_flip($orderIds);
 
         $indexed = [];
+        $rejected = 0;
+
         foreach ($rows as $row) {
-            $id = $row['id'] ?? null;
-            if (is_int($id) && !isset($requested[$id])) {
-                throw new MalformedConnectorResponseException(sprintf('WB %s returned a status row for an order that was not requested.', self::ORDERS_STATUS_ENDPOINT), decodedPayload: $evidence);
-            }
-
-            if (!is_int($id)) {
-                throw new MalformedConnectorResponseException(sprintf('WB %s returned a status row without an integer id.', self::ORDERS_STATUS_ENDPOINT), decodedPayload: self::evidence($decoded['data']));
-            }
-
-            // Обе оси обязательны.
+            // Повреждённая СТРОКА отбраковывается, а не роняет ответ.
             //
-            // Строка без них проходила бы дальше и становилась НАБЛЮДЕНИЕМ
-            // статуса с пустыми осями: заказ получал бы UNKNOWN, ложное
-            // событие журнала и статусную отметку, закрывающую дорогу более
-            // старому, но настоящему статусу. Повреждённый ответ обязан
-            // приводить к повтору, а не к записи выдуманного состояния.
-            if (!is_string($row['supplierStatus'] ?? null) || !is_string($row['wbStatus'] ?? null)) {
-                throw new MalformedConnectorResponseException(sprintf('WB %s returned a status row without both status axes.', self::ORDERS_STATUS_ENDPOINT), decodedPayload: self::evidence($decoded['data']));
+            // Ответ — это, как правило, всё подключение целиком, поэтому
+            // исключение на первой кривой строке навсегда блокировало бы
+            // обновление всех остальных корректных заказов. Нарушение формы
+            // всего ответа по-прежнему исключение: см. listOfObjects().
+            if (null === self::statusRow($row, $requested, $indexed)) {
+                ++$rejected;
+
+                continue;
             }
 
-            // Поле обязательно, а не «если прислали»: строка без него — такое
-            // же неполное статусное наблюдение, как строка без осей, и
-            // записывать по ней состояние нельзя.
-            if (!is_bool($row['isCancellable'] ?? null)) {
-                throw new MalformedConnectorResponseException(sprintf('WB %s returned a status row without a boolean isCancellable.', self::ORDERS_STATUS_ENDPOINT), decodedPayload: self::evidence($decoded['data']));
-            }
-
-            // Повтор номера в одном ответе — нарушение контракта: строки с
-            // разными статусами молча затирали бы друг друга, и отброшенная
-            // не попала бы даже в аудит.
-            if (isset($indexed[$id])) {
-                throw new MalformedConnectorResponseException(sprintf('WB %s returned the same order id twice.', self::ORDERS_STATUS_ENDPOINT), decodedPayload: $evidence);
-            }
-
+            /** @var int $id */
+            $id = $row['id'];
             $indexed[$id] = $row;
         }
 
-        return $indexed;
+        if ($rejected > 0) {
+            $this->logger->warning('WB status rows were rejected as malformed.', [
+                'companyId' => $companyId,
+                'connectionRef' => $connectionRef,
+                'rejectedRows' => $rejected,
+                'acceptedRows' => count($indexed),
+            ]);
+        }
+
+        return new WbOrderStatusPage(
+            statuses: $indexed,
+            rejectedRows: $rejected,
+            evidence: $rejected > 0 ? $evidence : null,
+        );
+    }
+
+    /**
+     * Пригодна ли строка статуса. `null` — отбраковать.
+     *
+     * @param array<string, mixed> $row
+     * @param array<int, int> $requested спрошенные номера
+     * @param array<int, array<string, mixed>> $indexed уже принятые строки
+     *
+     * @return array<string, mixed>|null
+     */
+    private static function statusRow(array $row, array $requested, array $indexed): ?array
+    {
+        $id = $row['id'] ?? null;
+
+        // Чужой номер означает, что строка относится не к нашему запросу;
+        // принять её значило бы записать статус постороннего заказа.
+        // Повтор номера — тоже брак: строки с разными статусами молча
+        // затирали бы друг друга.
+        if (!is_int($id) || !isset($requested[$id]) || isset($indexed[$id])) {
+            return null;
+        }
+
+        // Обе оси обязательны и обязаны быть ПРИГОДНЫМИ токенами.
+        //
+        // `is_string()` мало: пустая строка становилась бы НАБЛЮДЕНИЕМ статуса
+        // с пустыми осями — заказ получал бы UNKNOWN, ложное событие журнала и
+        // статусную отметку, закрывающую дорогу настоящему статусу. Длина тоже
+        // не мелочь: склейка осей уходит в `raw_status`, а это VARCHAR(255).
+        if (null === self::statusAxis($row['supplierStatus'] ?? null) || null === self::statusAxis($row['wbStatus'] ?? null)) {
+            return null;
+        }
+
+        // Поле обязательно, а не «если прислали»: строка без него — такое же
+        // неполное статусное наблюдение, как строка без осей.
+        if (!is_bool($row['isCancellable'] ?? null)) {
+            return null;
+        }
+
+        return $row;
     }
 
     public function fetchStatisticsOrders(
@@ -313,6 +351,29 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
     private static function evidence(mixed $decoded): ?array
     {
         return is_array($decoded) && !array_is_list($decoded) ? $decoded : null;
+    }
+
+    /**
+     * Ось статуса: непустая строка, влезающая в колонку вместе со второй осью.
+     *
+     * Предел на ось, а не на склейку: `supplierStatus=…;wbStatus=…` добавляет
+     * 25 служебных символов, и две оси по 100 дают 225 при колонке в 255.
+     * Проверять уже собранную строку поздно — к тому моменту непонятно, какая
+     * из осей виновата.
+     */
+    private static function statusAxis(mixed $value): ?string
+    {
+        if (!is_string($value)) {
+            return null;
+        }
+
+        $axis = trim($value);
+
+        if ('' === $axis || mb_strlen($axis) > self::STATUS_AXIS_MAX_LENGTH) {
+            return null;
+        }
+
+        return $axis;
     }
 
     /**

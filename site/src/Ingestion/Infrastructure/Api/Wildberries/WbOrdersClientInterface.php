@@ -22,11 +22,14 @@ interface WbOrdersClientInterface
     /**
      * Статусы `/api/v3/orders/status` по номерам заказов marketplace-api.
      *
-     * @param list<int> $orderIds
+     * Возвращает страницу: пригодные строки отдельно от отбракованных.
+     * Повреждённая СТРОКА не роняет ответ — ответ, как правило, покрывает всё
+     * подключение, и одна вечно кривая строка блокировала бы обновление всех
+     * остальных заказов. Нарушение формы всего ответа остаётся исключением.
      *
-     * @return array<int, array<string, mixed>> id заказа => строка статуса
+     * @param list<int> $orderIds
      */
-    public function fetchMarketplaceStatuses(string $companyId, string $connectionRef, array $orderIds): array;
+    public function fetchMarketplaceStatuses(string $companyId, string $connectionRef, array $orderIds): WbOrderStatusPage;
 
     /**
      * Поток изменений `/api/v1/supplier/orders?flag=0` statistics-api.

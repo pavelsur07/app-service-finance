@@ -72,6 +72,9 @@ final readonly class RefreshOrderStatusesAction
     /** Предел колонок `raw_status` и `raw_substatus`. */
     private const STATUS_TOKEN_MAX_LENGTH = 255;
 
+    /** Сколько конфликтующих номеров искать за прогон подключения. */
+    private const COLLISION_SCAN_LIMIT = 1000;
+
     public function __construct(
         private MarketplaceSyncFacade $marketplaceSyncFacade,
         private IngestOrderRepository $orderRepository,
@@ -220,7 +223,16 @@ final readonly class RefreshOrderStatusesAction
     ): RefreshOrderStatusesResult {
         $poll = IngestSource::OZON === $source
             ? $this->pollOzon($companyId, $connectionRef, $orders)
-            : $this->pollWildberries($companyId, $connectionRef, $orders);
+            : $this->pollWildberries(
+                $companyId,
+                $connectionRef,
+                $orders,
+                // Коллизии ищутся по ВСЕМУ подключению, а не внутри страницы
+                // очереди: при малом лимите два заказа с одним номером попали
+                // бы в разные прогоны и оба получили бы статус одного и того
+                // же заказа маркетплейса.
+                $this->orderRepository->findDuplicateExternalOrderIds($companyId, $source, $connectionRef, self::COLLISION_SCAN_LIMIT),
+            );
 
         // Сбой одного подключения не отменяет уже полученного. Ответы, успевшие
         // приехать до 429 или таймаута, применяются: иначе поздняя ошибка
@@ -538,11 +550,14 @@ final readonly class RefreshOrderStatusesAction
 
     /**
      * @param list<IngestOrder> $orders
+     * @param list<string> $duplicateExternalOrderIds номера, встречающиеся у нескольких заказов подключения
      *
      * @return array{rows: list<array<string, mixed>>, observations: list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>, observedAt: \DateTimeImmutable}>, attempts: array<string, \DateTimeImmutable>, requested: int, missing: int, invalid: int, failure: \Throwable|null}
      */
-    private function pollWildberries(string $companyId, string $connectionRef, array $orders): array
+    private function pollWildberries(string $companyId, string $connectionRef, array $orders, array $duplicateExternalOrderIds): array
     {
+        $collidingWbIds = array_flip($duplicateExternalOrderIds);
+
         // Номер marketplace-api живёт в собственной колонке, а не в JSON:
         // по ней же идёт отсев в запросе. Заказ, известный лишь из потока
         // изменений statistics, спросить не у кого — эндпоинта «статус по
@@ -551,9 +566,7 @@ final readonly class RefreshOrderStatusesAction
         $attempts = [];
         $invalid = 0;
 
-        /** @var array<int, true> $collidingWbIds */
-        $collidingWbIds = [];
-        /** @var array<int, list<string>> $collidingExternalIds */
+        /** @var array<string, list<string>> $collidingExternalIds */
         $collidingExternalIds = [];
 
         foreach ($orders as $order) {
@@ -584,28 +597,12 @@ final readonly class RefreshOrderStatusesAction
             // ни наблюдения, ни отметки попытки — то есть вечно возвращался бы
             // в начало очереди. Приписать один ответ двум разным заказам тоже
             // нельзя: доказательства, что это один и тот же заказ, нет.
-            // Номер, уже признанный конфликтным, обратно в опрос не
-            // возвращается: третий и следующий заказы с тем же номером иначе
-            // снова попали бы в выборку и один из них произвольно получил бы
-            // чужой статус.
-            if (isset($collidingWbIds[$wbOrderId])) {
+            // Конфликтный номер в опрос не идёт вовсе — независимо от того,
+            // сколько его носителей попало в эту страницу очереди.
+            if (isset($collidingWbIds[$externalOrderId])) {
                 ++$invalid;
                 $attempts[$order->getId()] = $this->applicationTime();
-                $collidingExternalIds[$wbOrderId][] = $order->getExternalId();
-
-                continue;
-            }
-
-            if (isset($byWbId[$wbOrderId])) {
-                $collision = $byWbId[$wbOrderId];
-                unset($byWbId[$wbOrderId]);
-                $collidingWbIds[$wbOrderId] = true;
-                $collidingExternalIds[$wbOrderId] = [$collision->getExternalId(), $order->getExternalId()];
-
-                foreach ([$collision, $order] as $conflicting) {
-                    ++$invalid;
-                    $attempts[$conflicting->getId()] = $this->applicationTime();
-                }
+                $collidingExternalIds[$externalOrderId][] = $order->getExternalId();
 
                 continue;
             }
@@ -615,11 +612,11 @@ final readonly class RefreshOrderStatusesAction
 
         // Один агрегированный warning на номер, а не по записи: конфликт
         // описывается множеством заказов, а не отдельным.
-        foreach ($collidingExternalIds as $wbOrderId => $externalIds) {
+        foreach ($collidingExternalIds as $externalOrderId => $externalIds) {
             $this->logger->warning('Wildberries orders share one marketplace id.', [
                 'companyId' => $companyId,
                 'connectionRef' => $connectionRef,
-                'externalOrderId' => (string) $wbOrderId,
+                'externalOrderId' => (string) $externalOrderId,
                 'externalIds' => $externalIds,
             ]);
         }
@@ -646,7 +643,7 @@ final readonly class RefreshOrderStatusesAction
             $requested += count($chunk);
 
             try {
-                $statuses = $this->wbClient->fetchMarketplaceStatuses($companyId, $connectionRef, $chunk);
+                $page = $this->wbClient->fetchMarketplaceStatuses($companyId, $connectionRef, $chunk);
             } catch (ConnectorAuthException|ConnectorRateLimitedException|ConnectorTransientException $exception) {
                 // Ответа не было вовсе, поэтому заказы этого чанка не
                 // «неизвестны маркетплейсу» — их просто не спросили. Считать их
@@ -700,6 +697,18 @@ final readonly class RefreshOrderStatusesAction
             // между первым и последним проходят минуты.
             $answeredAt = $this->applicationTime();
             $answered = 0;
+            $statuses = $page->statuses;
+
+            // Отбракованные строки — дефект интеграции, а не отсутствие заказа
+            // у маркетплейса. Считаются отдельно, доказательство идёт в raw, а
+            // пригодные строки того же ответа применяются как обычно.
+            if ($page->rejectedRows > 0) {
+                $invalid += $page->rejectedRows;
+
+                if (null !== $page->evidence) {
+                    $rows[] = $page->evidence;
+                }
+            }
 
             foreach ($statuses as $wbOrderId => $row) {
                 $order = $byWbId[$wbOrderId] ?? null;

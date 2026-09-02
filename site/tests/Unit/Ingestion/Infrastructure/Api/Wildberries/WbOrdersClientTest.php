@@ -113,9 +113,10 @@ final class WbOrdersClientTest extends TestCase
             ['http_code' => 200],
         )));
 
-        $statuses = $client->fetchMarketplaceStatuses(self::COMPANY_ID, self::CONNECTION_REF, [5, 7]);
+        $page = $client->fetchMarketplaceStatuses(self::COMPANY_ID, self::CONNECTION_REF, [5, 7]);
 
-        self::assertSame(['new', 'complete'], [$statuses[5]['supplierStatus'], $statuses[7]['supplierStatus']]);
+        self::assertSame(['new', 'complete'], [$page->statuses[5]['supplierStatus'], $page->statuses[7]['supplierStatus']]);
+        self::assertSame(0, $page->rejectedRows);
     }
 
     /**
@@ -130,7 +131,7 @@ final class WbOrdersClientTest extends TestCase
             return new MockResponse('{"orders":[]}', ['http_code' => 200]);
         });
 
-        self::assertSame([], $this->client($http)->fetchMarketplaceStatuses(self::COMPANY_ID, self::CONNECTION_REF, []));
+        self::assertSame([], $this->client($http)->fetchMarketplaceStatuses(self::COMPANY_ID, self::CONNECTION_REF, [])->statuses);
         self::assertSame(0, $calls);
     }
 
@@ -275,12 +276,69 @@ final class WbOrdersClientTest extends TestCase
         self::assertSame([], $page->rows);
     }
 
-    public function testStatusRowWithoutIntegerIdIsMalformed(): void
+    public function testStatusRowWithoutIntegerIdIsRejected(): void
     {
         $client = $this->client(new MockHttpClient(new MockResponse('{"orders":[{"supplierStatus":"new"}]}', ['http_code' => 200])));
 
-        $this->expectException(MalformedConnectorResponseException::class);
-        $client->fetchMarketplaceStatuses(self::COMPANY_ID, self::CONNECTION_REF, [5]);
+        $page = $client->fetchMarketplaceStatuses(self::COMPANY_ID, self::CONNECTION_REF, [5]);
+
+        self::assertSame([], $page->statuses);
+        self::assertSame(1, $page->rejectedRows);
+    }
+
+    /**
+     * Повреждённая СТРОКА не роняет ответ: он, как правило, покрывает всё
+     * подключение, и исключение на первой кривой строке навсегда блокировало
+     * бы обновление всех остальных корректных заказов.
+     */
+    public function testValidRowsSurviveAMalformedNeighbour(): void
+    {
+        $client = $this->client(new MockHttpClient(new MockResponse(
+            '{"orders":[{"id":5,"supplierStatus":"","wbStatus":"waiting","isCancellable":true},{"id":7,"supplierStatus":"complete","wbStatus":"sorted","isCancellable":false}]}',
+            ['http_code' => 200],
+        )));
+
+        $page = $client->fetchMarketplaceStatuses(self::COMPANY_ID, self::CONNECTION_REF, [5, 7]);
+
+        self::assertSame([7], array_keys($page->statuses));
+        self::assertSame(1, $page->rejectedRows);
+        self::assertNotNull($page->evidence, 'Отбракованная строка обязана дойти до аудита.');
+    }
+
+    /**
+     * Ось длиннее предела: склейка осей уходит в `raw_status`, а это
+     * VARCHAR(255). Пропущенная сюда строка уронила бы финальный flush и
+     * откатила аудит, события и отметки попыток всего подключения.
+     */
+    public function testOverlongStatusAxisIsRejected(): void
+    {
+        $payload = sprintf(
+            '{"orders":[{"id":5,"supplierStatus":"%s","wbStatus":"sorted","isCancellable":false}]}',
+            str_repeat('x', 101),
+        );
+
+        $page = $this->client(new MockHttpClient(new MockResponse($payload, ['http_code' => 200])))
+            ->fetchMarketplaceStatuses(self::COMPANY_ID, self::CONNECTION_REF, [5]);
+
+        self::assertSame([], $page->statuses);
+        self::assertSame(1, $page->rejectedRows);
+    }
+
+    /**
+     * Чужой номер означает, что строка относится не к нашему запросу: принять
+     * её значило бы записать статус постороннего заказа.
+     */
+    public function testRowForAnOrderThatWasNotRequestedIsRejected(): void
+    {
+        $client = $this->client(new MockHttpClient(new MockResponse(
+            '{"orders":[{"id":9,"supplierStatus":"new","wbStatus":"waiting","isCancellable":true}]}',
+            ['http_code' => 200],
+        )));
+
+        $page = $client->fetchMarketplaceStatuses(self::COMPANY_ID, self::CONNECTION_REF, [5]);
+
+        self::assertSame([], $page->statuses);
+        self::assertSame(1, $page->rejectedRows);
     }
 
     #[DataProvider('invalidArgumentProvider')]
@@ -316,12 +374,14 @@ final class WbOrdersClientTest extends TestCase
      * выдуманного состояния.
      */
     #[DataProvider('brokenStatusRowProvider')]
-    public function testStatusRowWithoutBothAxesIsMalformed(string $payload): void
+    public function testStatusRowWithoutBothAxesIsRejected(string $payload): void
     {
         $client = $this->client(new MockHttpClient(new MockResponse($payload, ['http_code' => 200])));
 
-        $this->expectException(MalformedConnectorResponseException::class);
-        $client->fetchMarketplaceStatuses(self::COMPANY_ID, self::CONNECTION_REF, [5]);
+        $page = $client->fetchMarketplaceStatuses(self::COMPANY_ID, self::CONNECTION_REF, [5]);
+
+        self::assertSame([], $page->statuses);
+        self::assertSame(1, $page->rejectedRows);
     }
 
     /**

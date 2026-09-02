@@ -837,6 +837,13 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
             );
         }
 
+        // Лимит в один заказ: коллизия обязана обнаруживаться по всему
+        // подключению, а не внутри страницы очереди — иначе носители одного
+        // номера попадали бы в разные прогоны и не встречались никогда.
+        $first = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 1));
+        self::assertSame(1, $first->invalid);
+        self::assertSame([], $this->wb->calls, 'Приписать один ответ нескольким заказам нельзя.');
+
         $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
 
         self::assertSame(3, $result->invalid);
@@ -884,6 +891,48 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
         // все остальные заказы подключения.
         yield 'longer than the column' => ['status' => str_repeat('x', 256)];
         yield 'blank' => ['status' => '   '];
+    }
+
+    /**
+     * Одна повреждённая строка ответа WB не должна блокировать остальные.
+     *
+     * Ответ, как правило, покрывает всё подключение целиком, поэтому
+     * исключение на первой кривой строке навсегда останавливало бы обновление
+     * всех корректных заказов кабинета.
+     */
+    public function testMalformedRowDoesNotBlockTheValidOnesInTheSameResponse(): void
+    {
+        $company = $this->seedCompanyWithConnection(MarketplaceType::WILDBERRIES);
+        $this->seedOrder(
+            $company,
+            'rid-1',
+            IngestOrderStatus::ORDERED,
+            'supplierStatus=new;wbStatus=waiting',
+            null,
+            null,
+            IngestSource::WILDBERRIES,
+            null,
+            '5000000001',
+        );
+
+        $this->wb->setStatuses([5000000001 => [
+            'id' => 5000000001,
+            'supplierStatus' => 'complete',
+            'wbStatus' => 'sorted',
+            'isCancellable' => false,
+        ]]);
+        $this->wb->rejectRows(1, ['orders' => [['id' => 5000000002, 'supplierStatus' => '']]]);
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        self::assertSame(0, $result->failedConnections, 'Кривая строка — не сбой подключения.');
+        self::assertSame(1, $result->invalid, 'Отбракованная строка считается…');
+        self::assertSame(1, $result->observed, '…но корректная применяется.');
+
+        $this->em->clear();
+        $order = $this->orders->findByExternalId((string) $company->getId(), IngestSource::WILDBERRIES, self::CONNECTION_ID, 'rid-1');
+        self::assertNotNull($order);
+        self::assertSame(IngestOrderStatus::SHIPPED, $order->getStatus());
     }
 
     private function deactivateConnections(Company $company): void

@@ -320,6 +320,48 @@ final class IngestOrderRepository extends ServiceEntityRepository
     }
 
     /**
+     * Номера маркетплейса, встречающиеся у ДВУХ и более заказов подключения.
+     *
+     * Коллизию нельзя искать внутри уже ограниченной страницы очереди: при
+     * `--limit=1` два заказа с одним номером попадают в разные прогоны и
+     * никогда не встречаются, а значит оба получают статус одного и того же
+     * заказа маркетплейса. Проверять нужно по всему подключению.
+     *
+     * Ограничена той же областью, что и очередь: остановленные и терминальные
+     * заказы не опрашиваются, и конфликт между ними ни на что не влияет.
+     *
+     * @return list<string>
+     */
+    public function findDuplicateExternalOrderIds(
+        string $companyId,
+        IngestSource $source,
+        string $connectionRef,
+        int $limit,
+    ): array {
+        /** @var list<array{externalOrderId: string}> $rows */
+        $rows = $this->createQueryBuilder('o')
+            ->select('o.externalOrderId AS externalOrderId')
+            ->andWhere('o.companyId = :companyId')
+            ->andWhere('o.source = :source')
+            ->andWhere('o.connectionRef = :connectionRef')
+            ->andWhere('o.status IN (:statuses)')
+            ->andWhere('o.refreshStoppedAt IS NULL')
+            ->andWhere('o.externalOrderId IS NOT NULL')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('source', $source->value)
+            ->setParameter('connectionRef', $connectionRef)
+            ->setParameter('statuses', self::nonTerminalStatuses())
+            ->groupBy('o.externalOrderId')
+            ->having('COUNT(o.id) > 1')
+            ->orderBy('o.externalOrderId', 'ASC')
+            ->setMaxResults(max(1, min(1000, $limit)))
+            ->getQuery()
+            ->getResult();
+
+        return array_map(static fn (array $row): string => $row['externalOrderId'], $rows);
+    }
+
+    /**
      * Заказы ВСЕХ компаний под блокировкой записи — для системного прохода по
      * зависшим.
      *

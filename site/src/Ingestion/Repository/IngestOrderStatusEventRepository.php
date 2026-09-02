@@ -19,9 +19,20 @@ final class IngestOrderStatusEventRepository extends ServiceEntityRepository
     }
 
     /**
+     * История переходов заказа в порядке наблюдения.
+     *
+     * Одной отметки времени мало: все события одного сырья наблюдались
+     * одновременно, поэтому последовательность A → B → A → B вернулась бы в
+     * произвольном порядке — ровно то, ради чего заведён порядковый номер.
+     * Сырьё группируется, внутри него порядок задаёт номер, а `id` замыкает
+     * сравнение, чтобы результат был воспроизводим.
+     *
+     * Лимит обязателен: журнал append-only и растёт, а списочная выборка без
+     * границы рано или поздно упирается в память.
+     *
      * @return list<IngestOrderStatusEvent>
      */
-    public function findByOrder(string $companyId, string $orderId): array
+    public function findByOrder(string $companyId, string $orderId, int $limit = 200): array
     {
         /** @var list<IngestOrderStatusEvent> $events */
         $events = $this->createQueryBuilder('e')
@@ -30,6 +41,10 @@ final class IngestOrderStatusEventRepository extends ServiceEntityRepository
             ->setParameter('companyId', $companyId)
             ->setParameter('orderId', $orderId)
             ->orderBy('e.observedAt', 'ASC')
+            ->addOrderBy('e.rawRecordId', 'ASC')
+            ->addOrderBy('e.occurrence', 'ASC')
+            ->addOrderBy('e.id', 'ASC')
+            ->setMaxResults(max(1, min(1000, $limit)))
             ->getQuery()
             ->getResult();
 

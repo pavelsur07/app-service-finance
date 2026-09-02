@@ -332,9 +332,12 @@ final readonly class WbOrdersConnector implements SourceConnectorInterface
             return $rows;
         }
 
+        // Отбракованные клиентом строки сюда не доходят и в лог не пишутся
+        // повторно: об этом уже сообщил сам клиент. Заказ без статуса поедет
+        // дальше как наблюдение без статусной оси — штатный путь.
         $statuses = [];
         foreach (array_chunk(array_values(array_unique($ids)), WbOrdersClient::STATUS_BATCH_SIZE) as $chunk) {
-            $statuses += $this->client->fetchMarketplaceStatuses($request->companyId, $request->connectionRef, $chunk);
+            $statuses += $this->client->fetchMarketplaceStatuses($request->companyId, $request->connectionRef, $chunk)->statuses;
         }
 
         $merged = [];

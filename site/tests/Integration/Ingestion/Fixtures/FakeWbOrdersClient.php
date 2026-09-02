@@ -6,6 +6,7 @@ namespace App\Tests\Integration\Ingestion\Fixtures;
 
 use App\Ingestion\Infrastructure\Api\Wildberries\WbOrdersClientInterface;
 use App\Ingestion\Infrastructure\Api\Wildberries\WbOrdersPage;
+use App\Ingestion\Infrastructure\Api\Wildberries\WbOrderStatusPage;
 
 final class FakeWbOrdersClient implements WbOrdersClientInterface
 {
@@ -26,6 +27,11 @@ final class FakeWbOrdersClient implements WbOrdersClientInterface
      * частичного сбоя проверяли бы не поведение, а фейк.
      */
     private ?\Throwable $statusFailure = null;
+
+    private int $rejectedRows = 0;
+
+    /** @var array<string, mixed>|null */
+    private ?array $rejectedEvidence = null;
 
     public function queueMarketplace(WbOrdersPage ...$pages): void
     {
@@ -67,7 +73,7 @@ final class FakeWbOrdersClient implements WbOrdersClientInterface
         $this->statusFailure = $failure;
     }
 
-    public function fetchMarketplaceStatuses(string $companyId, string $connectionRef, array $orderIds): array
+    public function fetchMarketplaceStatuses(string $companyId, string $connectionRef, array $orderIds): WbOrderStatusPage
     {
         $this->calls[] = ['endpoint' => 'status', 'ids' => $orderIds];
 
@@ -82,7 +88,20 @@ final class FakeWbOrdersClient implements WbOrdersClientInterface
             }
         }
 
-        return $result;
+        return new WbOrderStatusPage(
+            statuses: $result,
+            rejectedRows: $this->rejectedRows,
+            evidence: $this->rejectedEvidence,
+        );
+    }
+
+    /**
+     * @param array<string, mixed>|null $evidence
+     */
+    public function rejectRows(int $rejected, ?array $evidence = null): void
+    {
+        $this->rejectedRows = $rejected;
+        $this->rejectedEvidence = $evidence;
     }
 
     public function fetchStatisticsOrders(

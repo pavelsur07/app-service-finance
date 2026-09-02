@@ -163,7 +163,13 @@ services:
     App\Ingestion\Facade\MarketplaceListingFacade:
         public: true
 
-    App\Ingestion\Infrastructure\Api\Ozon\OzonCredentialProviderInterface: '@App\Ingestion\Infrastructure\Api\Ozon\CredentialFacadeOzonCredentialProvider'
+    # Память на процесс поверх источника: перепрос статусов ходит в Ozon по одному
+    # отправлению, и чтение секрета из БД на каждый вызов было бы N+1.
+    App\Ingestion\Infrastructure\Api\Ozon\CachingOzonCredentialProvider:
+        arguments:
+            $inner: '@App\Ingestion\Infrastructure\Api\Ozon\CredentialFacadeOzonCredentialProvider'
+
+    App\Ingestion\Infrastructure\Api\Ozon\OzonCredentialProviderInterface: '@App\Ingestion\Infrastructure\Api\Ozon\CachingOzonCredentialProvider'
     App\Ingestion\Infrastructure\Api\Ozon\OzonAccrualClientInterface: '@App\Ingestion\Infrastructure\Api\Ozon\OzonAccrualClient'
     App\Ingestion\Infrastructure\Api\Ozon\OzonPerformanceReportClientInterface: '@App\Ingestion\Infrastructure\Api\Ozon\OzonPerformanceReportClient'
     App\Ingestion\Infrastructure\Api\Ozon\OzonPerformanceReportClient:
