@@ -151,6 +151,88 @@ final class PruneRawRecordsLockingTest extends PostgresResetTestCase
         );
     }
 
+    /**
+     * Повторная выгрузка не может вернуть нагрузку, пока retention удаляет её.
+     *
+     * Это центральное утверждение стадии: обе стороны работают под ОДНОЙ
+     * блокировкой строки. Без неё дедуп снимал бы отметки, видя ещё
+     * существующий объект, а retention удалял его следом — оставалась запись,
+     * которая утверждает, что нагрузка на месте, при отсутствующем объекте.
+     *
+     * Момент вмешательства даёт лог о предстоящем удалении: он пишется внутри
+     * транзакции второй фазы, уже под блокировкой и до обращения к хранилищу.
+     */
+    public function testConcurrentReuseCannotClearTheMarkWhileThePayloadIsBeingDeleted(): void
+    {
+        $rawRecordId = $this->seedStaleRawRecord();
+
+        // Решение уже принято прежним прогоном: остаётся вторая фаза.
+        $this->connection->executeStatement(
+            'UPDATE ingest_raw_records SET payload_pruned_at = now() WHERE id = :id',
+            ['id' => $rawRecordId],
+        );
+
+        $competitor = $this->newConnection();
+        // Иначе конкурент ждал бы retention до конца теста.
+        $competitor->executeStatement("SET lock_timeout = '250ms'");
+
+        $restored = null;
+
+        $action = new PruneRawRecordsAction(
+            self::getContainer()->get(IngestRawRecordRepository::class),
+            self::getContainer()->get(ObjectStorageInterface::class),
+            $this->em,
+            self::getContainer()->get(ClockInterface::class),
+            new class($competitor, $rawRecordId, $restored) extends AbstractLogger {
+                public function __construct(
+                    private readonly Connection $competitor,
+                    private readonly string $rawRecordId,
+                    private ?bool &$restored,
+                ) {
+                }
+
+                public function competitorSucceeded(): ?bool
+                {
+                    return $this->restored;
+                }
+
+                /**
+                 * @param mixed[] $context
+                 */
+                public function log($level, string|\Stringable $message, array $context = []): void
+                {
+                    if (!str_contains((string) $message, 'about to be deleted')) {
+                        return;
+                    }
+
+                    try {
+                        // Ровно то, что делает дедуп при повторной выгрузке.
+                        $this->competitor->executeStatement(
+                            'UPDATE ingest_raw_records
+                                SET payload_pruned_at = NULL, payload_deleted_at = NULL, last_seen_at = now()
+                              WHERE id = :id',
+                            ['id' => $this->rawRecordId],
+                        );
+                        $this->restored = true;
+                    } catch (\Throwable) {
+                        $this->restored = false;
+                    }
+                }
+            },
+        );
+
+        try {
+            $action(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
+        } finally {
+            $competitor->close();
+        }
+
+        self::assertFalse(
+            $restored,
+            'Возврат нагрузки обязан ждать: иначе отметка снимется, а объект будет удалён следом.',
+        );
+    }
+
     private function seedStaleRawRecord(): string
     {
         $id = Uuid::uuid7()->toString();

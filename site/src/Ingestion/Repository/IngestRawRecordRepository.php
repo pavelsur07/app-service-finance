@@ -236,6 +236,67 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
     }
 
     /**
+     * Записи с принятым решением, но ещё не удалённым объектом.
+     *
+     * Незавершённая очистка: решение закоммичено, а до хранилища прогон не
+     * дошёл — упал, был убит или не успел. Без этой выборки объект остался бы
+     * навсегда: кандидатов ищут среди НЕпомеченных, и такая строка туда уже
+     * не попадает.
+     *
+     * @companyScopeExempt См. {@see findPrunable()}: политика хранения общая.
+     *
+     * @return list<IngestRawRecord>
+     */
+    public function findPendingPayloadDeletion(int $limit): array
+    {
+        /** @var list<IngestRawRecord> $records */
+        $records = $this->createQueryBuilder('record')
+            ->andWhere('record.payloadPrunedAt IS NOT NULL')
+            ->andWhere('record.payloadDeletedAt IS NULL')
+            ->orderBy('record.payloadPrunedAt', 'ASC')
+            ->addOrderBy('record.id', 'ASC')
+            ->setMaxResults(max(1, min(1000, $limit)))
+            ->getQuery()
+            ->getResult();
+
+        return $records;
+    }
+
+    /**
+     * Те же записи под блокировкой, с принудительным перечитыванием.
+     *
+     * Повторная выгрузка могла вернуть нагрузку и снять отметки, пока прогон
+     * шёл к удалению объекта: перечитать состояние под блокировкой — это
+     * единственный способ не удалить только что восстановленное.
+     *
+     * @companyScopeExempt См. {@see findPrunable()}: политика хранения общая.
+     *
+     * @param list<string> $ids
+     *
+     * @return list<IngestRawRecord>
+     */
+    public function findPendingPayloadDeletionForUpdate(array $ids): array
+    {
+        if ([] === $ids) {
+            return [];
+        }
+
+        /** @var list<IngestRawRecord> $records */
+        $records = $this->createQueryBuilder('record')
+            ->andWhere('record.payloadPrunedAt IS NOT NULL')
+            ->andWhere('record.payloadDeletedAt IS NULL')
+            ->andWhere('record.id IN (:ids)')
+            ->setParameter('ids', array_values(array_unique($ids)))
+            ->orderBy('record.id', 'ASC')
+            ->getQuery()
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getResult();
+
+        return $records;
+    }
+
+    /**
      * Какие из этих записей удерживаются НЕРАЗОБРАННОЙ проблемой.
      *
      * Спрашивается уже под блокировкой строк сырья и отдельным запросом:

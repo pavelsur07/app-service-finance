@@ -82,6 +82,17 @@ class IngestRawRecord implements TenantOwnedInterface
     #[ORM\Column(type: 'datetime_immutable_us', nullable: true)]
     private ?\DateTimeImmutable $payloadPrunedAt = null;
 
+    /**
+     * Когда объект действительно удалён из хранилища.
+     *
+     * Отдельно от решения: хранилище не транзакционно, и коммит решения обязан
+     * произойти ДО обращения к нему. Иначе падение между удалением и коммитом
+     * откатило бы решение при уже уничтоженных данных. Пара отметок делает
+     * незавершённое состояние видимым, а работу — повторяемой.
+     */
+    #[ORM\Column(type: 'datetime_immutable_us', nullable: true)]
+    private ?\DateTimeImmutable $payloadDeletedAt = null;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]
     private \DateTimeImmutable $createdAt;
 
@@ -216,9 +227,21 @@ class IngestRawRecord implements TenantOwnedInterface
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /**
+     * Решение удалить нагрузку. Коммитится ДО обращения к хранилищу.
+     */
     public function markPayloadPruned(\DateTimeImmutable $at): void
     {
         $this->payloadPrunedAt = $at;
+        $this->updatedAt = $at;
+    }
+
+    /**
+     * Объект действительно удалён.
+     */
+    public function markPayloadDeleted(\DateTimeImmutable $at): void
+    {
+        $this->payloadDeletedAt = $at;
         $this->updatedAt = $at;
     }
 
@@ -235,12 +258,18 @@ class IngestRawRecord implements TenantOwnedInterface
         }
 
         $this->payloadPrunedAt = null;
+        $this->payloadDeletedAt = null;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function getPayloadPrunedAt(): ?\DateTimeImmutable
     {
         return $this->payloadPrunedAt;
+    }
+
+    public function getPayloadDeletedAt(): ?\DateTimeImmutable
+    {
+        return $this->payloadDeletedAt;
     }
 
     public function markNormalizationDone(): void

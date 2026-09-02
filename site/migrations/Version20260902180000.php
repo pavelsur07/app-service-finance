@@ -17,8 +17,7 @@ use Doctrine\Migrations\AbstractMigration;
  * уже удалил, и свежая выгрузка терялась молча.
  *
  * Дорого стоит объект в хранилище, а не строка метаданных в сотню байт.
- * Поэтому удаляется объект, а строка получает отметку `payload_pruned_at` и
- * живёт дальше:
+ * Поэтому удаляется объект, а строка живёт дальше:
  *
  * - висячих указателей нет: `ingest_financial_transactions`,
  *   `ingest_order_status_events` и `ingest_orders.last_raw_record_id`
@@ -26,17 +25,27 @@ use Doctrine\Migrations\AbstractMigration;
  *   сбоя хранилища;
  * - дедупу нечего терять: строка на месте, `markSeen()` обновляет
  *   существующую запись;
- * - `StoreRawBatchAction::repairMissingObject()` уже умеет вернуть объект,
- *   если та же выгрузка приедет снова, — отметка при этом снимается, и модель
- *   самовосстанавливается;
- * - проблема, заведённая на такое сырьё, видит запись и знает, что нагрузка
- *   удалена и когда. Это деградация, но видимая, а не тихая потеря.
+ * - `StoreRawBatchAction` вернёт объект, если та же выгрузка приедет снова, —
+ *   отметки при этом снимаются, и модель самовосстанавливается.
+ *
+ * ДВЕ отметки, а не одна, потому что объектное хранилище не транзакционно:
+ *
+ * - `payload_pruned_at` — РЕШЕНИЕ удалить, коммитится ДО обращения к
+ *   хранилищу. Читатели с этого момента считают нагрузку недоступной;
+ * - `payload_deleted_at` — объект действительно удалён, ставится после
+ *   успешного `delete()`.
+ *
+ * Одной отметки не хватает: она проставляется в памяти, а коммит происходит
+ * после удаления объекта, и падение между ними откатывало бы решение при уже
+ * уничтоженных данных — «строка утверждает, что нагрузка есть, объекта нет».
+ * Две отметки делают незавершённое состояние видимым и повторяемым: следующий
+ * прогон найдёт помеченные, но не удалённые, и доведёт дело до конца.
  */
 final class Version20260902180000 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'Adds a payload retention mark to raw records instead of deleting the rows.';
+        return 'Adds payload retention marks to raw records instead of deleting the rows.';
     }
 
     public function up(Schema $schema): void
@@ -44,16 +53,29 @@ final class Version20260902180000 extends AbstractMigration
         $this->addSql('ALTER TABLE ingest_raw_records ADD payload_pruned_at TIMESTAMP(6) WITHOUT TIME ZONE DEFAULT NULL');
         $this->addSql("COMMENT ON COLUMN ingest_raw_records.payload_pruned_at IS '(DC2Type:datetime_immutable_us)'");
 
-        $this->addSql(
-            'CREATE INDEX idx_ingest_raw_record_retention
-             ON ingest_raw_records (last_seen_at)
-             WHERE payload_pruned_at IS NULL'
-        );
+        $this->addSql('ALTER TABLE ingest_raw_records ADD payload_deleted_at TIMESTAMP(6) WITHOUT TIME ZONE DEFAULT NULL');
+        $this->addSql("COMMENT ON COLUMN ingest_raw_records.payload_deleted_at IS '(DC2Type:datetime_immutable_us)'");
     }
 
     public function down(Schema $schema): void
     {
-        $this->addSql('DROP INDEX idx_ingest_raw_record_retention');
+        // Проверка ДО DDL. После первого же `--execute` отметка — единственный
+        // признак того, что нагрузка удалена намеренно; объекты при этом уже
+        // невосстановимы. Сняв колонку, мы вернули бы строкам вид записей с
+        // нагрузкой, и чтение падало бы ошибкой хранилища.
+        $pruned = (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM ingest_raw_records WHERE payload_pruned_at IS NOT NULL'
+        );
+
+        $this->abortIf(
+            $pruned > 0,
+            sprintf(
+                'Rollback would erase the only evidence that %d payload(s) were pruned on purpose. Decide what to do with them first.',
+                $pruned,
+            ),
+        );
+
+        $this->addSql('ALTER TABLE ingest_raw_records DROP payload_deleted_at');
         $this->addSql('ALTER TABLE ingest_raw_records DROP payload_pruned_at');
     }
 }

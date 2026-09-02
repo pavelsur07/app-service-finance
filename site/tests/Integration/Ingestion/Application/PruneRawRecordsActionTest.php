@@ -369,6 +369,34 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
     }
 
     /**
+     * Незавершённая очистка доводится следующим прогоном.
+     *
+     * Решение коммитится ДО обращения к хранилищу, поэтому падение между ними
+     * оставляет запись помеченной, но с живым объектом. Кандидатов ищут среди
+     * НЕпомеченных, значит без отдельной выборки такой объект остался бы в
+     * хранилище навсегда.
+     */
+    public function testPayloadMarkedButNotDeletedIsFinishedByTheNextRun(): void
+    {
+        $record = $this->seedRaw('page-1', new \DateTimeImmutable('-400 days'));
+
+        // Прогон, который принял решение, но до хранилища не дошёл.
+        $this->connection->executeStatement(
+            'UPDATE ingest_raw_records SET payload_pruned_at = now() WHERE id = :id',
+            ['id' => $record['id']],
+        );
+        $this->em->clear();
+
+        self::assertTrue($this->storage->exists($record['path']), 'Объект пока на месте.');
+
+        $result = ($this->action)(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
+
+        self::assertSame(0, $result->candidates, 'Помеченная запись кандидатом уже не считается…');
+        self::assertGreaterThan(0, $result->bytesFreed, '…но её объект всё равно удаляется.');
+        self::assertFalse($this->storage->exists($record['path']));
+    }
+
+    /**
      * Чтение очищенного сырья отвечает внятным отказом, а не сбоем хранилища.
      *
      * «Записи нет» и «запись есть, а нагрузки уже нет» — разные факты с разной
