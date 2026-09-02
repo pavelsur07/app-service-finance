@@ -31,6 +31,7 @@ final class Version20260901180000 extends AbstractMigration
                 raw_substatus VARCHAR(255) DEFAULT NULL,
                 status VARCHAR(32) NOT NULL,
                 status_observed_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
+                snapshot_observed_at TIMESTAMP(0) WITHOUT TIME ZONE DEFAULT NULL,
                 last_raw_record_id UUID DEFAULT NULL,
                 refresh_stopped_at TIMESTAMP(0) WITHOUT TIME ZONE DEFAULT NULL,
                 attributes JSON DEFAULT NULL,
@@ -42,7 +43,7 @@ final class Version20260901180000 extends AbstractMigration
         $this->addSql('CREATE UNIQUE INDEX uniq_ingest_order_external ON ingest_orders (company_id, source, connection_ref, external_id)');
         $this->addSql('CREATE INDEX idx_ingest_order_company_status_ordered ON ingest_orders (company_id, status, ordered_at)');
         $this->addSql('CREATE INDEX idx_ingest_order_company_connection ON ingest_orders (company_id, connection_ref)');
-        foreach (['ordered_at', 'status_observed_at', 'refresh_stopped_at', 'created_at', 'updated_at'] as $column) {
+        foreach (['ordered_at', 'status_observed_at', 'snapshot_observed_at', 'refresh_stopped_at', 'created_at', 'updated_at'] as $column) {
             $this->addSql(sprintf("COMMENT ON COLUMN ingest_orders.%s IS '(DC2Type:datetime_immutable)'", $column));
         }
 

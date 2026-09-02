@@ -81,6 +81,13 @@ class IngestOrder implements TenantOwnedInterface
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]
     private \DateTimeImmutable $statusObservedAt;
 
+    /**
+     * Когда наблюдался последний ПОЛНЫЙ снимок заказа. Отдельно от
+     * statusObservedAt — см. {@see acceptSnapshot()}.
+     */
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6, nullable: true)]
+    private ?\DateTimeImmutable $snapshotObservedAt = null;
+
     /** Указатель на raw, из которого получено последнее наблюдение. */
     #[ORM\Column(type: Types::GUID, nullable: true)]
     private ?string $lastRawRecordId = null;
@@ -171,6 +178,33 @@ class IngestOrder implements TenantOwnedInterface
         $this->statusObservedAt = $observedAt;
         $this->rawSubstatus = $rawSubstatus ?? $this->rawSubstatus;
         $this->lastRawRecordId = $rawRecordId ?? $this->lastRawRecordId;
+        $this->updatedAt = new \DateTimeImmutable();
+
+        return true;
+    }
+
+    /**
+     * Принять ПОЛНЫЙ снимок заказа.
+     *
+     * Свежесть снимка отделена от свежести статуса намеренно. Потоки приходят
+     * вперемешку: у WB частичное наблюдение из statistics может быть скачано
+     * позже, а разобрано раньше полного снимка из marketplace. Если бы состав
+     * и цена применялись по той же отметке, что и статус, более позднее
+     * частичное наблюдение навсегда закрыло бы дорогу авторитетному снимку —
+     * заказ остался бы без номера, валюты и с ценой другой семантики.
+     *
+     * Сравнение идёт с отметкой ПОСЛЕДНЕГО полного снимка, поэтому статус
+     * при этом назад не едет: за него отвечает {@see observeStatus()}.
+     *
+     * @return bool применять ли снимок
+     */
+    public function acceptSnapshot(\DateTimeImmutable $observedAt): bool
+    {
+        if (null !== $this->snapshotObservedAt && $observedAt < $this->snapshotObservedAt) {
+            return false;
+        }
+
+        $this->snapshotObservedAt = $observedAt;
         $this->updatedAt = new \DateTimeImmutable();
 
         return true;
@@ -269,6 +303,11 @@ class IngestOrder implements TenantOwnedInterface
     public function getLastRawRecordId(): ?string
     {
         return $this->lastRawRecordId;
+    }
+
+    public function getSnapshotObservedAt(): ?\DateTimeImmutable
+    {
+        return $this->snapshotObservedAt;
     }
 
     public function getRefreshStoppedAt(): ?\DateTimeImmutable

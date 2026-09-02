@@ -254,6 +254,10 @@ final readonly class NormalizeOrderRawRecordAction
                 lastRawRecordId: $rawRecord->getId(),
                 attributes: [] === $mapped->attributes ? null : $mapped->attributes,
             );
+            if ($mapped->itemsAuthoritative) {
+                $order->acceptSnapshot($observedAt);
+            }
+
             $this->orderRepository->save($order);
 
             $this->appendStatusEvent($order, $mapped->rawStatus, $status, null, $observedAt, $rawRecord->getId(), $seenObservations);
@@ -277,22 +281,33 @@ final readonly class NormalizeOrderRawRecordAction
             $this->appendStatusEvent($order, $mapped->rawStatus, $status, $previousStatus, $observedAt, $rawRecord->getId(), $seenObservations);
         }
 
-        // Снимок заказа обновляется ТОЛЬКО принятым наблюдением.
+        // Свежесть СТАТУСА и свежесть СНИМКА — разные вещи.
         //
         // observeStatus() возвращает false для устаревшего наблюдения и статус
-        // назад не двигает. Раньше результат игнорировался, и старое сырьё,
-        // не тронув статус, всё равно откатывало количество, цену, листинг и
-        // атрибуты: получался внутренне противоречивый заказ — новый статус с
-        // данными из старого ответа. Событие журнала при этом остаётся: оно
-        // фиксирует факт наблюдения, а не текущее состояние.
-        $accepted = $order->observeStatus($mapped->rawStatus, $status, $observedAt, $mapped->rawSubstatus, $rawRecord->getId());
-        if (!$accepted) {
-            return $order;
-        }
+        // назад не двигает: старое сырьё не должно откатывать состояние.
+        // Но привязывать к той же отметке состав и цену нельзя: потоки
+        // приходят вперемешку, и частичное наблюдение, скачанное позже, а
+        // разобранное раньше, навсегда закрыло бы дорогу авторитетному снимку
+        // — заказ остался бы без номера, валюты и с ценой другой семантики.
+        //
+        // Поэтому у снимка своя отметка. Событие журнала пишется в любом
+        // случае: оно фиксирует факт наблюдения, а не текущее состояние.
+        $order->observeStatus($mapped->rawStatus, $status, $observedAt, $mapped->rawSubstatus, $rawRecord->getId());
 
+        // Атрибуты дополняют, а не заменяют, поэтому сливаются всегда.
         $order->mergeAttributes($mapped->attributes);
+
+        // externalOrderId приходит только из авторитетного потока и не
+        // меняется во времени, поэтому порядок наблюдений ему безразличен.
         if (null !== $mapped->externalOrderId) {
             $order->setExternalOrderId($mapped->externalOrderId);
+        }
+
+        // Полный снимок применяется, если он новее ПОСЛЕДНЕГО полного снимка.
+        // Частичное наблюдение снимком не является: оно лишь дополняет состав
+        // и потому применяется всегда, ничего не переписывая.
+        if ($mapped->itemsAuthoritative && !$order->acceptSnapshot($observedAt)) {
+            return $order;
         }
 
         $applied = $this->applyItems(

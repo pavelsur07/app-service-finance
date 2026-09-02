@@ -312,6 +312,60 @@ final class WbOrdersConnectorTest extends TestCase
         $this->connector->pull($this->request(WbResourceType::ORDERS_MARKETPLACE, null));
     }
 
+    /**
+     * Регрессия: курсор ставился на «сейчас» ПОСЛЕДНЕГО вызова цепочки.
+     *
+     * Длинная пагинация с продолжениями идёт минутами: заказ, созданный в
+     * середине обхода и оказавшийся на уже пройденной позиции, не попадал ни в
+     * эту цепочку, ни в следующее окно — перекрытие в 15 минут такой разрыв не
+     * покрывает. Потолок замораживается на первой странице.
+     */
+    public function testMarketplaceCursorStopsAtTheFrozenCeiling(): void
+    {
+        $pages = [];
+        for ($i = 0; $i < WbOrdersConnector::MAX_PAGES_PER_PULL; ++$i) {
+            $pages[] = new WbOrdersPage([['id' => $i, 'rid' => 'r-'.$i]], true, ($i + 1) * 10);
+        }
+        $this->client->queueMarketplace(...$pages);
+
+        $first = $this->connector->pull($this->request(WbResourceType::ORDERS_MARKETPLACE, '{"since":"2026-09-01T11:00:00+00:00"}'));
+        $continuation = json_decode((string) $first->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertSame('2026-09-01T12:00:00+00:00', $continuation['ceiling']);
+
+        // Продолжение доигрывается спустя час.
+        $client = new FakeWbOrdersClient();
+        $client->queueMarketplace(new WbOrdersPage([], false, 999));
+        $later = new WbOrdersConnector($client, new MockClock('2026-09-01 13:00:00'));
+        $final = $later->pull($this->request(WbResourceType::ORDERS_MARKETPLACE, (string) $first->nextCursorValue));
+
+        $decoded = json_decode((string) $final->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertSame('2026-09-01T12:00:00+00:00', $decoded['since'], 'Курсор обязан встать на потолок, а не на время финального вызова.');
+    }
+
+    /**
+     * Регрессия: одна ошибочно будущая отметка становилась курсором навсегда.
+     * Следующее окно начиналось бы позже реальных изменений, а пустые ответы
+     * не смогли бы это исправить — курсор назад не едет.
+     */
+    public function testFutureLastChangeDateDoesNotPoisonTheWatermark(): void
+    {
+        $this->client->queueStatistics(new WbOrdersPage([
+            ['srid' => 's-1', 'lastChangeDate' => '2026-09-01T14:00:00'],
+            // 18:00 по Москве — это 15:00 UTC, на три часа впереди часов.
+            ['srid' => 's-2', 'lastChangeDate' => '2026-09-01T18:00:00'],
+        ], false));
+
+        $result = $this->connector->pull($this->request(WbResourceType::ORDERS_STATISTICS, '{"since":"2026-09-01T09:00:00+00:00"}'));
+
+        // 14:00 по Москве — это 11:00 UTC: берётся максимум среди НЕ будущих.
+        $decoded = json_decode((string) $result->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertSame('2026-09-01T11:00:00+00:00', $decoded['since']);
+
+        // Сама строка при этом не теряется.
+        self::assertNotNull($result->rawBatch);
+        self::assertCount(2, iterator_to_array($result->rawBatch->rows));
+    }
+
     private function request(string $resourceType, ?string $cursorValue): PullRequest
     {
         return new PullRequest(

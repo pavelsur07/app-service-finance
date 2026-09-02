@@ -133,12 +133,24 @@ final class WbOrderJoinTest extends IntegrationTestCase
     public function testOrderedAtDoesNotDependOnWhichFeedCreatedTheRecord(): void
     {
         $this->normalizeMarketplace(new \DateTimeImmutable('-2 hours'));
-        $fromMarketplace = $this->orders
+        $createdByMarketplace = $this->orders
             ->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID)
             ?->getOrderedAt();
 
-        self::assertNotNull($fromMarketplace);
-        self::assertSame('2026-08-30T19:18:04+00:00', $fromMarketplace->format(\DATE_ATOM));
+        // Тот же заказ у другой компании, но запись создаёт statistics.
+        $this->companyId = Uuid::uuid7()->toString();
+        $this->normalizeStatistics(new \DateTimeImmutable('-2 hours'));
+        $createdByStatistics = $this->orders
+            ->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID)
+            ?->getOrderedAt();
+
+        self::assertNotNull($createdByMarketplace);
+        self::assertNotNull($createdByStatistics);
+        self::assertSame('2026-08-30T19:18:04+00:00', $createdByMarketplace->format(\DATE_ATOM));
+        self::assertSame(
+            $createdByMarketplace->format(\DATE_ATOM),
+            $createdByStatistics->format(\DATE_ATOM),
+        );
     }
 
     /**
@@ -171,6 +183,69 @@ final class WbOrderJoinTest extends IntegrationTestCase
         $after = $this->items->findByOrderIndexedByLineKey($this->companyId, $order->getId());
         self::assertSame($priceFromMarketplace, $after[$lineKey]->getPriceMinor(), 'Цена marketplace не должна подменяться finishedPrice.');
         self::assertSame($currencyFromMarketplace, $after[$lineKey]->getCurrency(), 'Валюта marketplace не должна обнуляться.');
+    }
+
+    /**
+     * Регрессия: свежесть статуса и свежесть снимка были одной отметкой.
+     *
+     * Потоки приходят вперемешку: statistics могло быть скачано ПОЗЖЕ, а
+     * разобрано РАНЬШЕ полного снимка marketplace. Тогда marketplace
+     * отклонялся как устаревший целиком, и заказ навсегда оставался без
+     * номера, без валюты и с ценой другой семантики. Сценарий строго
+     * последовательный, гонки для него не нужно.
+     */
+    public function testOlderMarketplaceSnapshotStillFillsTheOrderAfterNewerStatistics(): void
+    {
+        // Сначала разбирается БОЛЕЕ СВЕЖЕЕ частичное наблюдение.
+        $this->normalizeStatistics(new \DateTimeImmutable('-1 hour'));
+
+        // Затем — более старый, но авторитетный снимок.
+        $this->normalizeMarketplace(new \DateTimeImmutable('-2 hours'));
+
+        $this->em->clear();
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
+        self::assertNotNull($order);
+
+        // Статус остаётся от более свежего наблюдения: назад он не едет.
+        self::assertSame('isCancel=false', $order->getRawStatus());
+
+        // Но авторитетные поля применились.
+        self::assertSame('5000000001', $order->getExternalOrderId());
+
+        $items = $this->items->findByOrderIndexedByLineKey($this->companyId, $order->getId());
+        $item = $items[array_key_first($items)];
+        self::assertSame('195700', $item->getPriceMinor(), 'Цена обязана быть из marketplace.');
+        self::assertSame('RUB', $item->getCurrency(), 'Валюта обязана быть из marketplace.');
+    }
+
+    /**
+     * Обратная сторона: устаревший полный снимок не должен переписывать более
+     * свежий полный снимок того же потока.
+     */
+    public function testOlderMarketplaceSnapshotDoesNotOverwriteNewerOne(): void
+    {
+        $this->normalizeMarketplace(new \DateTimeImmutable('-1 hour'));
+
+        $stale = $this->marketplaceRows();
+        foreach ($stale as $index => $row) {
+            if (self::SHARED_RID === ($row['rid'] ?? null)) {
+                $stale[$index]['price'] = 111100;
+            }
+        }
+        $rawId = $this->storeRaw(
+            WbResourceType::ORDERS_MARKETPLACE,
+            'marketplace-stale',
+            $stale,
+            new \DateTimeImmutable('-3 hours'),
+        );
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId));
+
+        $this->em->clear();
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
+        self::assertNotNull($order);
+
+        $items = $this->items->findByOrderIndexedByLineKey($this->companyId, $order->getId());
+        self::assertSame('195700', $items[array_key_first($items)]->getPriceMinor());
     }
 
     /**

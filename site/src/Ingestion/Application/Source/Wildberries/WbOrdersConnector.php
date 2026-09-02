@@ -100,10 +100,14 @@ final readonly class WbOrdersConnector implements SourceConnectorInterface
             $since = $cursorSince ?? $now->modify(sprintf('-%d hours', self::DEFAULT_LOOKBACK_HOURS));
             $next = $state['next'];
             $floor = $state['floor'];
+            // Потолок окна заморожен на первой странице и переносится через
+            // все продолжения.
+            $ceiling = $state['ceiling'] ?? $now;
         } else {
             $since = $this->resolveSince($request, $now, $cursorSince);
             $next = 0;
             $floor = $cursorSince;
+            $ceiling = $now;
         }
 
         $startNext = $next;
@@ -167,19 +171,29 @@ final readonly class WbOrdersConnector implements SourceConnectorInterface
                     'since' => $since->format(\DATE_ATOM),
                     'next' => $next,
                     'floor' => $floor?->format(\DATE_ATOM),
+                    'ceiling' => $ceiling->format(\DATE_ATOM),
                 ], static fn (mixed $v): bool => null !== $v), \JSON_THROW_ON_ERROR),
                 hasMore: true,
                 continuationDelaySeconds: 1,
             );
         }
 
-        // Окно дочитано до пустой страницы, значит всё, что WB создал к этому
-        // моменту, уже прочитано: курсор переезжает на время запроса. Назад он
-        // при этом не едет — пол монотонности переносится через продолжение.
+        // Окно дочитано, и курсор переезжает на ПОТОЛОК — время начала обхода,
+        // а не время его окончания.
+        //
+        // Длинная пагинация с продолжениями и ретраями идёт минутами, а то и
+        // дольше. Взять «сейчас» последнего вызова значило бы объявить
+        // прочитанным всё до этого момента, тогда как ранние страницы
+        // снимались раньше: заказ, созданный в середине обхода и оказавшийся
+        // на уже пройденной позиции, не попал бы ни в эту цепочку, ни в
+        // следующее окно. Перекрытие в 15 минут такой разрыв не покрывает.
+        //
+        // Перечитать данные новее потолка на следующем обходе дешевле, чем
+        // потерять их: апсерт заказа идемпотентен.
         return new PullResult(
             rawBatch: $batch,
             nextCursorValue: json_encode(
-                ['since' => max($now, $floor ?? $now)->format(\DATE_ATOM)],
+                ['since' => max($ceiling, $floor ?? $ceiling)->format(\DATE_ATOM)],
                 \JSON_THROW_ON_ERROR,
             ),
             hasMore: false,
@@ -223,7 +237,13 @@ final readonly class WbOrdersConnector implements SourceConnectorInterface
         //
         // Если новых строк нет, WB тем самым сказал, что после курсора
         // изменений не было, и курсор безопасно переезжает на время запроса.
-        $fresh = $this->maxLastChangeDateAfter($rows, $cursorSince);
+        // Верхняя граница — время запроса.
+        //
+        // Одна ошибочно будущая отметка (сдвиг часов у источника, аномальная
+        // строка) иначе становилась бы курсором навсегда: следующее окно
+        // начиналось бы позже реальных изменений, а пустые ответы не смогли бы
+        // это исправить, потому что курсор назад не едет.
+        $fresh = $this->maxLastChangeDateAfter($rows, $cursorSince, $now);
         $nextSince = max($fresh ?? $now, $cursorSince ?? $now);
 
         return new PullResult(
@@ -288,7 +308,7 @@ final readonly class WbOrdersConnector implements SourceConnectorInterface
      *
      * @param list<array<string, mixed>> $rows
      */
-    private function maxLastChangeDateAfter(array $rows, ?\DateTimeImmutable $after): ?\DateTimeImmutable
+    private function maxLastChangeDateAfter(array $rows, ?\DateTimeImmutable $after, \DateTimeImmutable $ceiling): ?\DateTimeImmutable
     {
         $max = null;
         foreach ($rows as $row) {
@@ -298,6 +318,12 @@ final readonly class WbOrdersConnector implements SourceConnectorInterface
             }
 
             if (null !== $after && $parsed <= $after) {
+                continue;
+            }
+
+            // Строка из будущего сама по себе сохраняется, но водяной знак ею
+            // не двигается: иначе одна аномалия отравила бы курсор.
+            if ($parsed > $ceiling) {
                 continue;
             }
 
@@ -324,11 +350,11 @@ final readonly class WbOrdersConnector implements SourceConnectorInterface
     }
 
     /**
-     * @return array{since: ?\DateTimeImmutable, next: ?int, floor: ?\DateTimeImmutable}
+     * @return array{since: ?\DateTimeImmutable, next: ?int, floor: ?\DateTimeImmutable, ceiling: ?\DateTimeImmutable}
      */
     private function decodeCursor(?string $cursorValue): array
     {
-        $empty = ['since' => null, 'next' => null, 'floor' => null];
+        $empty = ['since' => null, 'next' => null, 'floor' => null, 'ceiling' => null];
 
         if (null === $cursorValue || '' === trim($cursorValue)) {
             return $empty;
@@ -343,12 +369,13 @@ final readonly class WbOrdersConnector implements SourceConnectorInterface
             $since = new \DateTimeImmutable($payload['since']);
             $next = $payload['next'] ?? null;
             $floor = is_string($payload['floor'] ?? null) ? new \DateTimeImmutable($payload['floor']) : null;
+            $ceiling = is_string($payload['ceiling'] ?? null) ? new \DateTimeImmutable($payload['ceiling']) : null;
 
             if (!is_int($next) || $next < 0) {
-                return ['since' => $since, 'next' => null, 'floor' => null];
+                return ['since' => $since, 'next' => null, 'floor' => null, 'ceiling' => null];
             }
 
-            return ['since' => $since, 'next' => $next, 'floor' => $floor];
+            return ['since' => $since, 'next' => $next, 'floor' => $floor, 'ceiling' => $ceiling];
         } catch (\Throwable) {
             // Нечитаемый курсор не должен останавливать загрузку: считаем, что
             // позиции нет, и берём окно по умолчанию.
