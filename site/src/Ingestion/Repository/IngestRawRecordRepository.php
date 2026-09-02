@@ -9,6 +9,8 @@ use App\Ingestion\Entity\NormalizationIssue;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\RawNormalizationStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\LockMode;
+use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -156,6 +158,41 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
 
         return (int) $count;
+    }
+
+    /**
+     * Кандидаты под блокировкой записи, с принудительным перечитыванием.
+     *
+     * Между выборкой и удалением проходит время, и за него дедуп мог обновить
+     * `lastSeenAt`, а нормализация — завести проблему на эту запись. Удалить её
+     * после этого значило бы необратимо потерять свежее сырьё или единственное
+     * доказательство. `HINT_REFRESH` обязателен: без него вернутся значения,
+     * прочитанные ДО транзакции, и блокировка защитит строку в базе, оставив в
+     * памяти устаревшее состояние.
+     *
+     * @companyScopeExempt См. {@see findPrunable()}: политика хранения общая.
+     *
+     * @param list<string> $ids
+     *
+     * @return list<IngestRawRecord>
+     */
+    public function findManyPrunableForUpdate(array $ids, \DateTimeImmutable $notSeenSince): array
+    {
+        if ([] === $ids) {
+            return [];
+        }
+
+        /** @var list<IngestRawRecord> $records */
+        $records = $this->prunableQueryBuilder($notSeenSince)
+            ->andWhere('record.id IN (:ids)')
+            ->setParameter('ids', array_values(array_unique($ids)))
+            ->orderBy('record.id', 'ASC')
+            ->getQuery()
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getResult();
+
+        return $records;
     }
 
     public function remove(IngestRawRecord $record): void

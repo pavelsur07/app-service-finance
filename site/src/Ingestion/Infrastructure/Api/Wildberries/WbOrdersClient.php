@@ -127,6 +127,7 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
 
         $indexed = [];
         $rejected = 0;
+        $rejectedIds = [];
 
         foreach ($rows as $row) {
             // Повреждённая СТРОКА отбраковывается, а не роняет ответ.
@@ -135,15 +136,27 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
             // исключение на первой кривой строке навсегда блокировало бы
             // обновление всех остальных корректных заказов. Нарушение формы
             // всего ответа по-прежнему исключение: см. listOfObjects().
-            if (null === self::statusRow($row, $requested, $indexed)) {
+            $accepted = self::statusRow($row, $requested, $indexed);
+
+            if (null === $accepted) {
                 ++$rejected;
+
+                // Номер отбракованной строки, если он вообще пригоден:
+                // вызывающий обязан отличить «строка была, но кривая» от
+                // «заказа в ответе не оказалось». Иначе один и тот же заказ
+                // считался бы и как invalid, и как missing, а в аудит уходило
+                // бы ложное «маркетплейс заказ не вернул».
+                $rejectedId = $row['id'] ?? null;
+                if (is_int($rejectedId) && isset($requested[$rejectedId])) {
+                    $rejectedIds[] = $rejectedId;
+                }
 
                 continue;
             }
 
             /** @var int $id */
-            $id = $row['id'];
-            $indexed[$id] = $row;
+            $id = $accepted['id'];
+            $indexed[$id] = $accepted;
         }
 
         if ($rejected > 0) {
@@ -158,6 +171,7 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
         return new WbOrderStatusPage(
             statuses: $indexed,
             rejectedRows: $rejected,
+            rejectedIds: array_values(array_unique($rejectedIds)),
             evidence: $rejected > 0 ? $evidence : null,
         );
     }
@@ -189,7 +203,10 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
         // с пустыми осями — заказ получал бы UNKNOWN, ложное событие журнала и
         // статусную отметку, закрывающую дорогу настоящему статусу. Длина тоже
         // не мелочь: склейка осей уходит в `raw_status`, а это VARCHAR(255).
-        if (null === self::statusAxis($row['supplierStatus'] ?? null) || null === self::statusAxis($row['wbStatus'] ?? null)) {
+        $supplierStatus = self::statusAxis($row['supplierStatus'] ?? null);
+        $wbStatus = self::statusAxis($row['wbStatus'] ?? null);
+
+        if (null === $supplierStatus || null === $wbStatus) {
             return null;
         }
 
@@ -198,6 +215,14 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
         if (!is_bool($row['isCancellable'] ?? null)) {
             return null;
         }
+
+        // Возвращаются НОРМАЛИЗОВАННЫЕ оси, а не исходные. Проверять
+        // очищенное, а хранить исходное — значит пропустить `" complete "`,
+        // которое дальше не найдётся в словаре и станет UNKNOWN, и строку из
+        // токена с сотнями пробелов, которая переполнит колонку и откатит
+        // транзакцию всего подключения.
+        $row['supplierStatus'] = $supplierStatus;
+        $row['wbStatus'] = $wbStatus;
 
         return $row;
     }

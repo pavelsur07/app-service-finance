@@ -921,7 +921,7 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
             'wbStatus' => 'sorted',
             'isCancellable' => false,
         ]]);
-        $this->wb->rejectRows(1, ['orders' => [['id' => 5000000002, 'supplierStatus' => '']]]);
+        $this->wb->rejectRows(1, [], ['orders' => [['id' => 5000000002, 'supplierStatus' => '']]]);
 
         $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
 

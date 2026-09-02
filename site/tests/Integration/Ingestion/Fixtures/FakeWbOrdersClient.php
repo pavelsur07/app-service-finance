@@ -30,6 +30,9 @@ final class FakeWbOrdersClient implements WbOrdersClientInterface
 
     private int $rejectedRows = 0;
 
+    /** @var list<int> */
+    private array $rejectedIds = [];
+
     /** @var array<string, mixed>|null */
     private ?array $rejectedEvidence = null;
 
@@ -91,16 +94,19 @@ final class FakeWbOrdersClient implements WbOrdersClientInterface
         return new WbOrderStatusPage(
             statuses: $result,
             rejectedRows: $this->rejectedRows,
+            rejectedIds: $this->rejectedIds,
             evidence: $this->rejectedEvidence,
         );
     }
 
     /**
+     * @param list<int> $rejectedIds
      * @param array<string, mixed>|null $evidence
      */
-    public function rejectRows(int $rejected, ?array $evidence = null): void
+    public function rejectRows(int $rejected, array $rejectedIds = [], ?array $evidence = null): void
     {
         $this->rejectedRows = $rejected;
+        $this->rejectedIds = $rejectedIds;
         $this->rejectedEvidence = $evidence;
     }
 

@@ -72,9 +72,6 @@ final readonly class RefreshOrderStatusesAction
     /** Предел колонок `raw_status` и `raw_substatus`. */
     private const STATUS_TOKEN_MAX_LENGTH = 255;
 
-    /** Сколько конфликтующих номеров искать за прогон подключения. */
-    private const COLLISION_SCAN_LIMIT = 1000;
-
     public function __construct(
         private MarketplaceSyncFacade $marketplaceSyncFacade,
         private IngestOrderRepository $orderRepository,
@@ -227,11 +224,19 @@ final readonly class RefreshOrderStatusesAction
                 $companyId,
                 $connectionRef,
                 $orders,
-                // Коллизии ищутся по ВСЕМУ подключению, а не внутри страницы
-                // очереди: при малом лимите два заказа с одним номером попали
-                // бы в разные прогоны и оба получили бы статус одного и того
-                // же заказа маркетплейса.
-                $this->orderRepository->findDuplicateExternalOrderIds($companyId, $source, $connectionRef, self::COLLISION_SCAN_LIMIT),
+                // Спрашиваем про номера ЭТОЙ страницы, а считает их запрос по
+                // всему подключению: при малом лимите два заказа с одним
+                // номером попали бы в разные прогоны и оба получили бы статус
+                // одного и того же заказа маркетплейса.
+                $this->orderRepository->findDuplicateExternalOrderIds(
+                    $companyId,
+                    $source,
+                    $connectionRef,
+                    array_values(array_filter(array_map(
+                        static fn (IngestOrder $order): ?string => $order->getExternalOrderId(),
+                        $orders,
+                    ))),
+                ),
             );
 
         // Сбой одного подключения не отменяет уже полученного. Ответы, успевшие
@@ -446,6 +451,15 @@ final readonly class RefreshOrderStatusesAction
                 ++$invalid;
                 $attempts[$order->getId()] = $this->applicationTime();
 
+                // Доказательство забирается ПЕРВЫМ, до любого выхода из цикла.
+                // Иначе при неожиданном HTTP-коде тело, которое клиент
+                // специально приложил, выбрасывалось бы вместе с ветвлением, и
+                // именно у самого интересного ответа аудита не было бы вовсе.
+                $evidence = $exception->decodedPayload();
+                if (null !== $evidence) {
+                    $rows[] = $evidence;
+                }
+
                 // Нарушение формы относится к ОДНОМУ отправлению: прерывать
                 // из-за него цикл значило бы, что одно вечно кривое
                 // отправление каждый час останавливает обработку всех
@@ -461,11 +475,6 @@ final readonly class RefreshOrderStatusesAction
                 // Нарушивший контракт ответ — как раз то, ради чего аудит и
                 // нужен. В лог он не идёт: там разрешены идентификаторы и
                 // статусы, но не тела ответов внешних API.
-                $evidence = $exception->decodedPayload();
-                if (null !== $evidence) {
-                    $rows[] = $evidence;
-                }
-
                 $this->logger->warning('Ozon posting response was malformed.', [
                     'companyId' => $companyId,
                     'connectionRef' => $connectionRef,
@@ -746,16 +755,26 @@ final readonly class RefreshOrderStatusesAction
                 $attempts[$byWbId[$wbOrderId]->getId()] = $answeredAt;
             }
 
+            // Отбракованная строка — НЕ отсутствие заказа: она пришла, просто
+            // кривая. Считать её пропущенной значило бы посчитать один заказ
+            // дважды — и как invalid, и как missing — и записать в аудит
+            // ложное «маркетплейс заказ не вернул».
+            $rejectedIds = array_flip($page->rejectedIds);
+
             // Заказ, которого не оказалось в успешном ответе, — тоже промах,
             // и он тоже документируется: иначе доказательства нет ни у одной
             // стороны.
+            $notReturned = 0;
             foreach ($chunk as $wbOrderId) {
-                if (!isset($statuses[$wbOrderId])) {
-                    $rows[] = ['id' => $wbOrderId, '_ingestion_outcome' => 'not_found'];
+                if (isset($statuses[$wbOrderId]) || isset($rejectedIds[$wbOrderId])) {
+                    continue;
                 }
+
+                ++$notReturned;
+                $rows[] = ['id' => $wbOrderId, '_ingestion_outcome' => 'not_found'];
             }
 
-            $missing += count($chunk) - $answered;
+            $missing += $notReturned;
         }
 
         return [

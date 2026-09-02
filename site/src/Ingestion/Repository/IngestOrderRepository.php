@@ -327,8 +327,16 @@ final class IngestOrderRepository extends ServiceEntityRepository
      * никогда не встречаются, а значит оба получают статус одного и того же
      * заказа маркетплейса. Проверять нужно по всему подключению.
      *
-     * Ограничена той же областью, что и очередь: остановленные и терминальные
-     * заказы не опрашиваются, и конфликт между ними ни на что не влияет.
+     * Спрашивается ровно про номера ТЕКУЩЕЙ страницы очереди, а считаются они
+     * по всему подключению. Слепой потолок на число групп был бы хуже
+     * бесполезного: конфликт за его пределами выглядел бы безопасным, и один
+     * заказ молча заменил бы другой. Размер выборки при этом ограничен
+     * страницей очереди.
+     *
+     * Область та же, что у очереди: остановленные и терминальные заказы не
+     * опрашиваются, и конфликт между ними ни на что не влияет.
+     *
+     * @param list<string> $externalOrderIds номера заказов текущей страницы
      *
      * @return list<string>
      */
@@ -336,8 +344,12 @@ final class IngestOrderRepository extends ServiceEntityRepository
         string $companyId,
         IngestSource $source,
         string $connectionRef,
-        int $limit,
+        array $externalOrderIds,
     ): array {
+        if ([] === $externalOrderIds) {
+            return [];
+        }
+
         /** @var list<array{externalOrderId: string}> $rows */
         $rows = $this->createQueryBuilder('o')
             ->select('o.externalOrderId AS externalOrderId')
@@ -346,15 +358,15 @@ final class IngestOrderRepository extends ServiceEntityRepository
             ->andWhere('o.connectionRef = :connectionRef')
             ->andWhere('o.status IN (:statuses)')
             ->andWhere('o.refreshStoppedAt IS NULL')
-            ->andWhere('o.externalOrderId IS NOT NULL')
+            ->andWhere('o.externalOrderId IN (:externalOrderIds)')
             ->setParameter('companyId', $companyId)
             ->setParameter('source', $source->value)
             ->setParameter('connectionRef', $connectionRef)
             ->setParameter('statuses', self::nonTerminalStatuses())
+            ->setParameter('externalOrderIds', array_values(array_unique($externalOrderIds)))
             ->groupBy('o.externalOrderId')
             ->having('COUNT(o.id) > 1')
             ->orderBy('o.externalOrderId', 'ASC')
-            ->setMaxResults(max(1, min(1000, $limit)))
             ->getQuery()
             ->getResult();
 

@@ -14,6 +14,11 @@ use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Repository\IngestRawRecordRepository;
 use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Doctrine\DBAL\Connection;
+use Psr\Clock\ClockInterface;
+use Psr\Log\AbstractLogger;
+use Psr\Log\LogLevel;
+use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
 
 final class PruneRawRecordsActionTest extends IntegrationTestCase
@@ -169,8 +174,8 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
                 }
             },
             $this->em,
-            self::getContainer()->get(\Psr\Clock\ClockInterface::class),
-            new \Psr\Log\NullLogger(),
+            self::getContainer()->get(ClockInterface::class),
+            new NullLogger(),
         );
 
         $result = $action(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
@@ -183,6 +188,70 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
             $this->rawRecords->findByIdAndCompany($record['id'], $this->companyId),
             'Указатель не должен пережить объект — иначе чтение сырья падает.',
         );
+    }
+
+    /**
+     * Регрессия: кандидаты выбирались один раз, а удалялись позже и без
+     * перепроверки. За это время дедуп мог обновить отметку «видели», а
+     * нормализация — завести проблему; удаление после этого необратимо теряло
+     * свежее сырьё или единственное доказательство.
+     *
+     * Конкурент вносится ПОСЛЕ выборки: подставленный логгер срабатывает на
+     * предупреждении об удержанных записях, то есть ровно между выборкой
+     * кандидатов и их удалением.
+     */
+    public function testCandidateThatStoppedBeingPrunableIsNotDeleted(): void
+    {
+        $target = $this->seedRaw('page-1', new \DateTimeImmutable('-400 days'));
+
+        // Вторая запись с открытой проблемой: она удерживается, и именно её
+        // предупреждение даёт нам точку между выборкой и удалением.
+        $held = $this->seedRaw('page-2', new \DateTimeImmutable('-400 days'));
+        $this->em->persist(new NormalizationIssue(
+            $this->companyId,
+            $held['id'],
+            null,
+            NormalizationIssueKind::MAPPER_FAILURE,
+            [],
+        ));
+        $this->em->flush();
+
+        $action = new PruneRawRecordsAction(
+            $this->rawRecords,
+            $this->storage,
+            $this->em,
+            self::getContainer()->get(ClockInterface::class),
+            new class($this->connection, $target['id']) extends AbstractLogger {
+                public function __construct(
+                    private readonly Connection $connection,
+                    private readonly string $rawRecordId,
+                ) {
+                }
+
+                /**
+                 * @param mixed[] $context
+                 */
+                public function log($level, string|\Stringable $message, array $context = []): void
+                {
+                    if (LogLevel::WARNING !== $level) {
+                        return;
+                    }
+
+                    // Дедуп подтвердил запись, пока прогон шёл к её удалению.
+                    $this->connection->executeStatement(
+                        'UPDATE ingest_raw_records SET last_seen_at = :seen WHERE id = :id',
+                        ['seen' => (new \DateTimeImmutable())->format('Y-m-d H:i:s.u'), 'id' => $this->rawRecordId],
+                    );
+                }
+            },
+        );
+
+        $result = $action(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
+
+        self::assertSame(1, $result->candidates, 'Кандидат был выбран…');
+        self::assertSame(0, $result->deleted, '…но к моменту удаления перестал им быть.');
+        self::assertNotNull($this->rawRecords->findByIdAndCompany($target['id'], $this->companyId));
+        self::assertTrue($this->storage->exists($target['path']));
     }
 
     /**

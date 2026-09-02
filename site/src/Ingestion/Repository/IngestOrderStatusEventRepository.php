@@ -28,27 +28,36 @@ final class IngestOrderStatusEventRepository extends ServiceEntityRepository
      * сравнение, чтобы результат был воспроизводим.
      *
      * Лимит обязателен: журнал append-only и растёт, а списочная выборка без
-     * границы рано или поздно упирается в память.
+     * границы рано или поздно упирается в память. Возвращаются ПОСЛЕДНИЕ
+     * события в хронологическом порядке: лимит по возрастанию отдавал бы
+     * вечно одни и те же самые старые переходы, и текущее состояние заказа в
+     * доступной истории не появилось бы вовсе.
      *
      * @return list<IngestOrderStatusEvent>
      */
     public function findByOrder(string $companyId, string $orderId, int $limit = 200): array
     {
+        // Отбираются ПОСЛЕДНИЕ события, а порядок разворачивается уже здесь.
+        //
+        // Лимит на выборку по возрастанию отдавал бы вечно одни и те же самые
+        // старые переходы: после двухсотого читатель никогда не увидел бы ни
+        // одного нового, то есть ни текущего состояния заказа, ни того, как он
+        // до него дошёл.
         /** @var list<IngestOrderStatusEvent> $events */
         $events = $this->createQueryBuilder('e')
             ->andWhere('e.companyId = :companyId')
             ->andWhere('e.orderId = :orderId')
             ->setParameter('companyId', $companyId)
             ->setParameter('orderId', $orderId)
-            ->orderBy('e.observedAt', 'ASC')
-            ->addOrderBy('e.rawRecordId', 'ASC')
-            ->addOrderBy('e.occurrence', 'ASC')
-            ->addOrderBy('e.id', 'ASC')
+            ->orderBy('e.observedAt', 'DESC')
+            ->addOrderBy('e.rawRecordId', 'DESC')
+            ->addOrderBy('e.occurrence', 'DESC')
+            ->addOrderBy('e.id', 'DESC')
             ->setMaxResults(max(1, min(1000, $limit)))
             ->getQuery()
             ->getResult();
 
-        return $events;
+        return array_reverse($events);
     }
 
     public function countByOrder(string $companyId, string $orderId): int

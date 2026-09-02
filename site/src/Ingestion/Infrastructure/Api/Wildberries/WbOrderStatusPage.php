@@ -16,16 +16,23 @@ namespace App\Ingestion\Infrastructure\Api\Wildberries;
  * ничего. Отбракованные строки считаются и попадают в аудит вместе с
  * доказательством — молча их терять нельзя, иначе дефект интеграции выглядел
  * бы как отсутствие заказа у маркетплейса.
+ *
+ * `rejectedIds` нужен ровно для этого различения: заказ, чья строка пришла, но
+ * оказалась кривой, не «отсутствует в ответе». Без этого списка он считался бы
+ * и как `invalid`, и как `missing`, а в аудит уходило бы ложное утверждение,
+ * что маркетплейс его не вернул.
  */
 final readonly class WbOrderStatusPage
 {
     /**
      * @param array<int, array<string, mixed>> $statuses номер заказа => строка ответа
+     * @param list<int> $rejectedIds номера отбракованных строк, которые мы спрашивали
      * @param array<string, mixed>|null $evidence разобранный ответ целиком, если что-то отбраковано
      */
     public function __construct(
         public array $statuses = [],
         public int $rejectedRows = 0,
+        public array $rejectedIds = [],
         public ?array $evidence = null,
     ) {
     }

@@ -77,8 +77,10 @@ final readonly class PruneRawRecordsAction
             return $result;
         }
 
-        foreach (array_chunk($records, self::CHUNK) as $chunk) {
-            $result = $this->pruneChunk($result, $chunk);
+        $ids = array_map(static fn (IngestRawRecord $record): string => $record->getId(), $records);
+
+        foreach (array_chunk($ids, self::CHUNK) as $chunk) {
+            $result = $this->pruneChunk($result, $chunk, $notSeenSince);
         }
 
         $this->logger->info('Raw record prune finished.', $this->context($command, $notSeenSince, $result));
@@ -87,39 +89,58 @@ final readonly class PruneRawRecordsAction
     }
 
     /**
-     * @param list<IngestRawRecord> $chunk
+     * @param list<string> $chunk идентификаторы кандидатов
      */
-    private function pruneChunk(PruneRawRecordsResult $result, array $chunk): PruneRawRecordsResult
+    private function pruneChunk(PruneRawRecordsResult $result, array $chunk, \DateTimeImmutable $notSeenSince): PruneRawRecordsResult
     {
-        // Пути и объёмы снимаются ДО удаления: после detach сущности читать
-        // нечего, а именно путь нужен, чтобы убрать объект следом.
-        $paths = [];
-        $bytes = 0;
+        /** @var array<string, array{path: string, bytes: int}> $removed */
+        $removed = [];
 
-        foreach ($chunk as $record) {
-            $paths[$record->getId()] = $record->getStoragePath();
-            $bytes += $record->getByteSize();
-        }
+        // Кандидаты перечитываются под блокировкой И перепроверяются условием.
+        //
+        // Между выборкой и этим моментом дедуп мог обновить `lastSeenAt`, а
+        // нормализация — завести проблему на запись. Удалить её после этого
+        // значило бы необратимо потерять свежее сырьё или единственное
+        // доказательство, а восстановить его неоткуда.
+        $this->entityManager->wrapInTransaction(function () use ($chunk, $notSeenSince, &$removed): void {
+            foreach ($this->rawRecordRepository->findManyPrunableForUpdate($chunk, $notSeenSince) as $record) {
+                // Путь и размер снимаются ДО удаления: после него читать
+                // нечего, а именно путь нужен, чтобы убрать объект следом.
+                $removed[$record->getId()] = [
+                    'path' => $record->getStoragePath(),
+                    'bytes' => $record->getByteSize(),
+                ];
 
-        $this->entityManager->wrapInTransaction(function () use ($chunk): void {
-            foreach ($chunk as $record) {
                 $this->rawRecordRepository->remove($record);
             }
         });
 
-        $orphaned = 0;
+        $skipped = count($chunk) - count($removed);
+        if ($skipped > 0) {
+            // Не ошибка: запись перестала быть кандидатом, пока мы шли к ней.
+            // Но и не пустяк — молча пропущенное удаление выглядело бы как
+            // сделанное.
+            $this->logger->info('Raw records stopped being prunable between selection and deletion.', [
+                'records' => $skipped,
+            ]);
+        }
 
-        foreach ($paths as $rawRecordId => $path) {
+        $orphaned = 0;
+        $freed = 0;
+
+        foreach ($removed as $rawRecordId => $object) {
             try {
-                $this->objectStorage->delete($path);
+                $this->objectStorage->delete($object['path']);
+                $freed += $object['bytes'];
             } catch (\Throwable $exception) {
                 // Строка уже удалена, значит указатель не повис. Объект
                 // остался и занимает место — путь уходит в лог, чтобы его
-                // можно было убрать вручную.
+                // можно было убрать вручную. Его размер в освобождённые не
+                // идёт: место занято, и отчёт не должен утверждать обратное.
                 ++$orphaned;
                 $this->logger->error('Raw object left behind after its record was pruned.', [
                     'rawRecordId' => $rawRecordId,
-                    'storagePath' => $path,
+                    'storagePath' => $object['path'],
                     // Класс, а не сообщение: в тексте ошибок хранилища
                     // встречаются URL с учётными данными.
                     'exceptionClass' => $exception::class,
@@ -128,8 +149,8 @@ final readonly class PruneRawRecordsAction
         }
 
         return $result->with(
-            deleted: count($chunk),
-            bytesFreed: $bytes,
+            deleted: count($removed),
+            bytesFreed: $freed,
             orphanedObjects: $orphaned,
         );
     }

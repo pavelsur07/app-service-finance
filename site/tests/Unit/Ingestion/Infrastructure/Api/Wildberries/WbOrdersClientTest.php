@@ -306,6 +306,47 @@ final class WbOrdersClientTest extends TestCase
     }
 
     /**
+     * Оси нормализуются, а не только проверяются.
+     *
+     * Проверять очищенное, а хранить исходное — значит пропустить
+     * `" complete "`, которое дальше не найдётся в словаре и станет UNKNOWN, и
+     * строку из токена с сотнями пробелов, которая переполнит `raw_status` и
+     * откатит транзакцию всего подключения.
+     */
+    public function testStatusAxesAreStoredNormalised(): void
+    {
+        $payload = sprintf(
+            '{"orders":[{"id":5,"supplierStatus":"  complete  ","wbStatus":"%s","isCancellable":false}]}',
+            str_repeat(' ', 300).'sorted',
+        );
+
+        $page = $this->client(new MockHttpClient(new MockResponse($payload, ['http_code' => 200])))
+            ->fetchMarketplaceStatuses(self::COMPANY_ID, self::CONNECTION_REF, [5]);
+
+        self::assertSame('complete', $page->statuses[5]['supplierStatus']);
+        self::assertSame('sorted', $page->statuses[5]['wbStatus']);
+    }
+
+    /**
+     * Отбракованная строка запрошенного заказа — не «заказ не вернулся».
+     * Вызывающий обязан различать эти два состояния, иначе один заказ
+     * считается дважды, а в аудит уходит ложное «маркетплейс его не вернул».
+     */
+    public function testRejectedRowOfARequestedOrderIsReportedByItsId(): void
+    {
+        $client = $this->client(new MockHttpClient(new MockResponse(
+            '{"orders":[{"id":5,"supplierStatus":"","wbStatus":"waiting","isCancellable":true}]}',
+            ['http_code' => 200],
+        )));
+
+        $page = $client->fetchMarketplaceStatuses(self::COMPANY_ID, self::CONNECTION_REF, [5, 7]);
+
+        self::assertSame([], $page->statuses);
+        self::assertSame(1, $page->rejectedRows);
+        self::assertSame([5], $page->rejectedIds);
+    }
+
+    /**
      * Ось длиннее предела: склейка осей уходит в `raw_status`, а это
      * VARCHAR(255). Пропущенная сюда строка уронила бы финальный flush и
      * откатила аудит, события и отметки попыток всего подключения.
