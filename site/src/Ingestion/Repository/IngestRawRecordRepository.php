@@ -170,21 +170,31 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
      * восстановление снимало отметку, а retention следом удалял объект,
      * оставляя запись, которая утверждает, что нагрузка на месте.
      *
-     * `HINT_REFRESH` обязателен: иначе вернутся поля, прочитанные до
-     * блокировки.
+     * `HINT_REFRESH` нужен тем, кто принимает решение по прочитанным полям.
+     * Тем, кто уже правит сущность, он вреден: перечитывание затирает
+     * незафлашенные изменения. См. параметр `$refresh`.
      */
-    public function findOneForUpdate(string $companyId, string $rawRecordId): ?IngestRawRecord
+    public function findOneForUpdate(string $companyId, string $rawRecordId, bool $refresh = true): ?IngestRawRecord
     {
-        /** @var IngestRawRecord|null $record */
-        $record = $this->createQueryBuilder('record')
+        $query = $this->createQueryBuilder('record')
             ->andWhere('record.companyId = :companyId')
             ->andWhere('record.id = :rawRecordId')
             ->setParameter('companyId', $companyId)
             ->setParameter('rawRecordId', $rawRecordId)
             ->getQuery()
-            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
-            ->setHint(Query::HINT_REFRESH, true)
-            ->getOneOrNullResult();
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE);
+
+        // Перечитывание выключается там, где вызывающий УЖЕ правит эту
+        // сущность: `HINT_REFRESH` затирает незафлашенные изменения, и
+        // нормализация теряла бы отметку о завершении разбора. Блокировку это
+        // не ослабляет — сериализацию даёт `FOR UPDATE`, а не перечитывание;
+        // без него можно лишь увидеть чуть более старое значение полей.
+        if ($refresh) {
+            $query->setHint(Query::HINT_REFRESH, true);
+        }
+
+        /** @var IngestRawRecord|null $record */
+        $record = $query->getOneOrNullResult();
 
         return $record;
     }

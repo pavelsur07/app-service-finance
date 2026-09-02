@@ -34,16 +34,23 @@ final class Version20260902190000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
+        // Неудачное конкурентное построение оставляет INVALID-индекс.
+        // `IF NOT EXISTS` считал бы его существующим и молча пропустил: индекса
+        // фактически нет, а миграция числится применённой. Поэтому сначала
+        // снимаем невалидный, потом строим заново.
+        $this->dropInvalid('idx_ingest_raw_record_retention');
+        $this->dropInvalid('idx_ingest_raw_record_pending_deletion');
+
         // Кандидаты на решение: ещё не помеченные и давно не встречавшиеся.
         $this->addSql(
-            'CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_ingest_raw_record_retention
+            'CREATE INDEX CONCURRENTLY idx_ingest_raw_record_retention
              ON ingest_raw_records (last_seen_at)
              WHERE payload_pruned_at IS NULL'
         );
 
         // Незавершённая очистка: решение принято, объект ещё не удалён.
         $this->addSql(
-            'CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_ingest_raw_record_pending_deletion
+            'CREATE INDEX CONCURRENTLY idx_ingest_raw_record_pending_deletion
              ON ingest_raw_records (payload_pruned_at)
              WHERE payload_pruned_at IS NOT NULL AND payload_deleted_at IS NULL'
         );
@@ -53,5 +60,27 @@ final class Version20260902190000 extends AbstractMigration
     {
         $this->addSql('DROP INDEX CONCURRENTLY IF EXISTS idx_ingest_raw_record_pending_deletion');
         $this->addSql('DROP INDEX CONCURRENTLY IF EXISTS idx_ingest_raw_record_retention');
+    }
+
+    /**
+     * Снять индекс, если он существует и НЕВАЛИДЕН.
+     *
+     * Валидный не трогаем: повторный прогон миграции не должен ронять рабочий
+     * индекс и перестраивать его впустую.
+     */
+    private function dropInvalid(string $indexName): void
+    {
+        $invalid = (bool) $this->connection->fetchOne(
+            'SELECT EXISTS (
+                 SELECT 1 FROM pg_class c
+                 JOIN pg_index i ON i.indexrelid = c.oid
+                 WHERE c.relname = :name AND NOT i.indisvalid
+             )',
+            ['name' => $indexName],
+        );
+
+        if ($invalid) {
+            $this->addSql(sprintf('DROP INDEX CONCURRENTLY IF EXISTS %s', $indexName));
+        }
     }
 }

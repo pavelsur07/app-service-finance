@@ -216,16 +216,26 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
 
         // Путь — единственное, по чему сироту можно найти и убрать руками.
         // Без этой проверки его исчезновение из контекста прошло бы все тесты.
-        $errors = array_values(array_filter(
+        // Уровень WARNING, а не ERROR: состояние повторяемо и лечится
+        // следующим прогоном. Будить человека на самолечащемся сбое — ровно
+        // тот ложный алерт, который обесценивает канал; видимость даёт
+        // ненулевой код возврата команды.
+        $warnings = array_values(array_filter(
+            $logger->records,
+            static fn (array $entry): bool => LogLevel::WARNING === $entry['level']
+                && isset($entry['context']['storagePath']),
+        ));
+
+        self::assertSame([], array_filter(
             $logger->records,
             static fn (array $entry): bool => LogLevel::ERROR === $entry['level'],
         ));
 
-        self::assertCount(1, $errors);
-        self::assertSame($record['path'], $errors[0]['context']['storagePath']);
-        self::assertSame($record['id'], $errors[0]['context']['rawRecordId']);
-        self::assertSame(\RuntimeException::class, $errors[0]['context']['exceptionClass']);
-        self::assertArrayNotHasKey('exceptionMessage', $errors[0]['context'], 'Сообщения хранилища несут URL с учётными данными.');
+        self::assertCount(1, $warnings);
+        self::assertSame($record['path'], $warnings[0]['context']['storagePath']);
+        self::assertSame($record['id'], $warnings[0]['context']['rawRecordId']);
+        self::assertSame(\RuntimeException::class, $warnings[0]['context']['exceptionClass']);
+        self::assertArrayNotHasKey('exceptionMessage', $warnings[0]['context'], 'Сообщения хранилища несут URL с учётными данными.');
 
         self::assertTrue($this->storage->exists($record['path']), 'Объект остался — он и есть сирота.');
 
@@ -394,6 +404,74 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
         self::assertSame(0, $result->candidates, 'Помеченная запись кандидатом уже не считается…');
         self::assertGreaterThan(0, $result->bytesFreed, '…но её объект всё равно удаляется.');
         self::assertFalse($this->storage->exists($record['path']));
+    }
+
+    /**
+     * Удаление объекта идемпотентно: если его уже нет, запись всё равно
+     * доводится до конца.
+     *
+     * Такое состояние оставляет падение между успешным `delete()` и коммитом.
+     * Если бы отсутствие объекта считалось ошибкой, запись навсегда осталась
+     * бы недоделанной, и каждый прогон завершался бы сбоем — «хорошее»
+     * состояние было бы недостижимо.
+     */
+    public function testDeletingAnAlreadyMissingObjectFinishesTheRecord(): void
+    {
+        $record = $this->seedRaw('page-1', new \DateTimeImmutable('-400 days'));
+
+        $this->connection->executeStatement(
+            'UPDATE ingest_raw_records SET payload_pruned_at = now() WHERE id = :id',
+            ['id' => $record['id']],
+        );
+        $this->storage->delete($record['path']);
+        $this->em->clear();
+
+        $result = ($this->action)(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
+
+        self::assertSame(0, $result->orphanedObjects, 'Отсутствие объекта — не сбой.');
+
+        $this->em->clear();
+        $finished = $this->rawRecords->findByIdAndCompany($record['id'], $this->companyId);
+        self::assertNotNull($finished);
+        self::assertNotNull($finished->getPayloadDeletedAt(), 'Запись обязана перестать числиться недоделанной.');
+    }
+
+    /**
+     * Проблема, заведённая МЕЖДУ фазами, отменяет решение об очистке.
+     *
+     * Решение принимается в одной транзакции, а объект удаляется в другой;
+     * между ними проходит время, и проблема, появившаяся в этом промежутке,
+     * осталась бы без своей нагрузки.
+     */
+    public function testIssueRaisedBetweenPhasesCancelsThePruneDecision(): void
+    {
+        $record = $this->seedRaw('page-1', new \DateTimeImmutable('-400 days'));
+
+        // Решение уже принято прежним прогоном.
+        $this->connection->executeStatement(
+            'UPDATE ingest_raw_records SET payload_pruned_at = now() WHERE id = :id',
+            ['id' => $record['id']],
+        );
+
+        $this->em->persist(new NormalizationIssue(
+            $this->companyId,
+            $record['id'],
+            null,
+            NormalizationIssueKind::MAPPER_FAILURE,
+            [],
+        ));
+        $this->em->flush();
+        $this->em->clear();
+
+        $result = ($this->action)(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
+
+        self::assertSame(0, $result->bytesFreed);
+        self::assertTrue($this->storage->exists($record['path']), 'Доказательство обязано уцелеть.');
+
+        $this->em->clear();
+        $cancelled = $this->rawRecords->findByIdAndCompany($record['id'], $this->companyId);
+        self::assertNotNull($cancelled);
+        self::assertNull($cancelled->getPayloadPrunedAt(), 'Решение отменяется целиком, а не откладывается.');
     }
 
     /**

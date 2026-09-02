@@ -185,6 +185,38 @@ final readonly class PruneRawRecordsAction
                 return;
             }
 
+            // Удержание перепроверяется и ЗДЕСЬ, а не только при решении.
+            // Между фазами проходит время, и проблема, заведённая в этом
+            // промежутке, осталась бы без своей нагрузки. Решение по такой
+            // записи отменяется целиком: она снова становится обычной, и
+            // следующий прогон рассмотрит её заново, когда проблему разберут.
+            $held = array_flip($this->rawRecordRepository->filterHeldByUnresolvedIssues(
+                array_map(static fn (IngestRawRecord $record): string => $record->getId(), $locked),
+            ));
+
+            if ([] !== $held) {
+                $this->logger->warning('Prune decision cancelled: an issue now needs this payload as evidence.', [
+                    'records' => count($held),
+                ]);
+            }
+
+            $locked = array_values(array_filter(
+                $locked,
+                static function (IngestRawRecord $record) use ($held): bool {
+                    if (isset($held[$record->getId()])) {
+                        $record->markPayloadRestored();
+
+                        return false;
+                    }
+
+                    return true;
+                },
+            ));
+
+            if ([] === $locked) {
+                return;
+            }
+
             // Пути пишутся в лог ДО обращения к хранилищу: если процесс умрёт
             // посреди фазы, найти уже удалённые объекты можно будет только по
             // этой записи.
@@ -207,8 +239,14 @@ final readonly class PruneRawRecordsAction
                     // следующий прогон найдёт эту запись и повторит попытку.
                     // Объект пока занимает место, и его размер в освобождённые
                     // не идёт.
+                    //
+                    // Уровень WARNING, а не ERROR: состояние повторяемо и
+                    // лечится следующим прогоном, а будить человека на
+                    // самолечащемся сбое — ровно тот ложный алерт, который
+                    // обесценивает канал. Видимость даёт ненулевой код
+                    // возврата команды.
                     ++$orphaned;
-                    $this->logger->error('Raw object was not deleted; its payload stays marked as pruned.', [
+                    $this->logger->warning('Raw object was not deleted; its payload stays marked as pruned and will be retried.', [
                         'rawRecordId' => $record->getId(),
                         'storagePath' => $record->getStoragePath(),
                         // Класс, а не сообщение: в тексте ошибок хранилища
