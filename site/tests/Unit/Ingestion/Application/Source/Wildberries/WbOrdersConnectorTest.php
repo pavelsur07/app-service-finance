@@ -366,6 +366,35 @@ final class WbOrdersConnectorTest extends TestCase
         self::assertCount(2, iterator_to_array($result->rawBatch->rows));
     }
 
+    /**
+     * Регрессия: ключ чанка строился по «сейчас». Продолжение может быть
+     * обработано повторно (ретрай очереди), и тогда тот же логический чанк
+     * получал другой externalId: дедуп по версиям окна не срабатывал, а
+     * уникальность события журнала включает rawRecordId — одно и то же
+     * наблюдение давало лишнюю строку.
+     */
+    public function testContinuationChunkIdentityDoesNotDependOnRetryTime(): void
+    {
+        $cursor = json_encode([
+            'since' => '2026-09-01T10:45:00+00:00',
+            'next' => 500,
+            'ceiling' => '2026-09-01T12:00:00+00:00',
+        ], \JSON_THROW_ON_ERROR);
+
+        $this->client->queueMarketplace(new WbOrdersPage([['id' => 1, 'rid' => 'r-1']], false, 600));
+        $first = $this->connector->pull($this->request(WbResourceType::ORDERS_MARKETPLACE, $cursor));
+
+        // Тот же курсор, но повтор случился спустя час.
+        $client = new FakeWbOrdersClient();
+        $client->queueMarketplace(new WbOrdersPage([['id' => 1, 'rid' => 'r-1']], false, 600));
+        $retry = (new WbOrdersConnector($client, new MockClock('2026-09-01 13:00:00')))
+            ->pull($this->request(WbResourceType::ORDERS_MARKETPLACE, $cursor));
+
+        self::assertNotNull($first->rawBatch);
+        self::assertNotNull($retry->rawBatch);
+        self::assertSame($first->rawBatch->externalId, $retry->rawBatch->externalId);
+    }
+
     private function request(string $resourceType, ?string $cursorValue): PullRequest
     {
         return new PullRequest(

@@ -327,6 +327,43 @@ final class WbOrderJoinTest extends IntegrationTestCase
     }
 
     /**
+     * Регрессия: отклонённое по времени частичное наблюдение всё равно могло
+     * добавить позицию. Ключ позиции у WB зависит от артикула, поэтому старое
+     * наблюдение с изменившимся артикулом создавало вторую строку у того же
+     * заказа.
+     */
+    public function testStaleStatisticsObservationCannotAddAnItem(): void
+    {
+        $this->normalizeMarketplace(new \DateTimeImmutable('-1 hour'));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
+        self::assertNotNull($order);
+        self::assertCount(1, $this->items->findByOrderIndexedByLineKey($this->companyId, $order->getId()));
+
+        // Более старое наблюдение с другим артикулом — другой lineKey.
+        $rows = $this->statisticsRows();
+        foreach ($rows as $index => $row) {
+            if (self::SHARED_RID === ($row['srid'] ?? null)) {
+                $rows[$index]['supplierArticle'] = 'TEST-ART-RENAMED';
+            }
+        }
+        $rawId = $this->storeRaw(
+            WbResourceType::ORDERS_STATISTICS,
+            'statistics-stale-renamed',
+            $rows,
+            new \DateTimeImmutable('-3 hours'),
+        );
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId));
+
+        $this->em->clear();
+        self::assertCount(
+            1,
+            $this->items->findByOrderIndexedByLineKey($this->companyId, $order->getId()),
+            'Устаревшее наблюдение не должно менять состав заказа.',
+        );
+    }
+
+    /**
      * Полный снимок заказа не должен зависеть от порядка прихода потоков.
      */
     public function testCanonicalFieldsDoNotDependOnFeedOrder(): void

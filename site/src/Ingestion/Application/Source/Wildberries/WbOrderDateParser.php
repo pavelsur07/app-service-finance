@@ -43,6 +43,20 @@ final class WbOrderDateParser
     ];
 
     /**
+     * Отметка `dateFrom` для statistics-api.
+     *
+     * Прямое и обратное преобразование живут рядом намеренно: запрос и разбор
+     * ответа обязаны понимать время одинаково, а две копии зоны разошлись бы
+     * сдвигом окна на три часа.
+     */
+    public static function formatStatisticsDateFrom(\DateTimeImmutable $instant): string
+    {
+        return $instant
+            ->setTimezone(new \DateTimeZone(self::STATISTICS_TIMEZONE))
+            ->format('Y-m-d\TH:i:s');
+    }
+
+    /**
      * Момент из statistics-api, приведённый к UTC.
      */
     public static function parseStatisticsInstant(mixed $value): ?\DateTimeImmutable

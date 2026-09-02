@@ -158,10 +158,19 @@ final readonly class WbOrdersConnector implements SourceConnectorInterface
             shopRef: $request->shopRef,
             source: IngestSource::WILDBERRIES,
             resourceType: $request->resourceType,
-            externalId: $this->windowKey($request->resourceType, $since, $now, $startNext),
+            // Ключ чанка строится по ЗАМОРОЖЕННОМУ окну, а не по «сейчас».
+            //
+            // Продолжение может быть обработано повторно (ретрай очереди), и
+            // тогда $since и $startNext прежние, а $now другое: тот же
+            // логический чанк получил бы другой externalId, дедуп по версиям
+            // окна не сработал бы, а уникальность события журнала включает
+            // rawRecordId — то есть одно и то же наблюдение дало бы лишнюю
+            // строку в журнале. fetchedAt при этом остаётся настоящим
+            // временем скачивания: это момент наблюдения, а не идентичность.
+            externalId: $this->windowKey($request->resourceType, $since, $ceiling, $startNext),
             syncJobId: $request->syncJobId,
             fetchedAt: $now,
-            rows: [] === $rows ? [$this->emptyMarker($request->resourceType, $since, $now)] : $rows,
+            rows: [] === $rows ? [$this->emptyMarker($request->resourceType, $since, $ceiling)] : $rows,
         );
 
         if ($hasMorePages) {

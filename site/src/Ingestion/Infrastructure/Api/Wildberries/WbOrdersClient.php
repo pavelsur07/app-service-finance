@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Ingestion\Infrastructure\Api\Wildberries;
 
+use App\Ingestion\Application\Source\Wildberries\WbOrderDateParser;
 use App\Ingestion\Exception\ConnectorAuthException;
 use App\Ingestion\Exception\ConnectorRateLimitedException;
 use App\Ingestion\Exception\ConnectorTransientException;
@@ -40,17 +41,6 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
     private const STATISTICS_ORDERS_ENDPOINT = '/api/v1/supplier/orders';
     private const DEFAULT_RETRY_AFTER_SECONDS = 70;
     private const TIMEOUT_SECONDS = 120;
-
-    /**
-     * statistics-api работает в МОСКОВСКОМ времени, а не в UTC.
-     *
-     * Это не предположение: в снятой выгрузке один и тот же заказ
-     * (`rid = eTEST...0001`) имеет `createdAt = 2026-08-30T19:18:04Z` в
-     * marketplace-api и `date = 2026-08-30T22:18:04` без зоны в
-     * statistics-api — ровно +3 часа. Поэтому и `dateFrom` тоже обязан быть
-     * московским: отправленный UTC-момент сместил бы окно на три часа.
-     */
-    public const STATISTICS_TIMEZONE = 'Europe/Moscow';
 
     public function __construct(
         private HttpClientInterface $httpClient,
@@ -143,9 +133,10 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
         string $connectionRef,
         \DateTimeImmutable $since,
     ): WbOrdersPage {
-        $dateFrom = $since
-            ->setTimezone(new \DateTimeZone(self::STATISTICS_TIMEZONE))
-            ->format('Y-m-d\TH:i:s');
+        // Зона и формат живут в одном месте с разбором ответа: statistics-api
+        // работает в московском времени, и отправленный UTC-момент сместил бы
+        // окно на три часа.
+        $dateFrom = WbOrderDateParser::formatStatisticsDateFrom($since);
 
         $decoded = $this->request(
             'GET',
