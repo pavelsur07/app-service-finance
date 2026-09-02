@@ -151,6 +151,20 @@
 # Read-only контроль после rolling refresh и normalize workers: latest raw coverage vs canonical.
 45 6 * * * cd /app && php -d memory_limit=1G bin/console app:ingestion:ozon-accrual:verify-rolling-refresh --days-back=45 --limit=100 --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# Ежедневно в 05:35: удаление сырья, вышедшего за год горячего хранения.
+#
+# Удаляет ПАРУ — объект в хранилище и строку ingest_raw_records. Lifecycle-правило
+# провайдера здесь не годится: оно видит только объекты и оставило бы строки
+# висячими указателями, на которых ReadRawRecordAction падает.
+#
+# Возраст считается по «последний раз видели», а не по «скачали»: дедуп при
+# часовом опросе обновляет отметку, не создавая новую запись.
+#
+# Слот 35 5 выбран как свободный: :15 и :45 того же часа заняты accrual-задачами,
+# и здесь остаётся по 20 минут зазора в обе стороны. Лимит на прогон ограничивает
+# длительность; накопленное разбирается за несколько суток.
+35 5 * * * cd /app && php bin/console app:ingestion:raw:prune --execute --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Ежедневная загрузка Ozon Performance ingestion с начала месяца до вчерашнего дня.
 # Команда только планирует SyncJob/chunks; HTTP-загрузка выполняется async worker'ом.
 # Запуск вынесен после ночного marketplace/inventory/accrual окна.

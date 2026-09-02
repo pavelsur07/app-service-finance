@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Ingestion\Repository;
 
 use App\Ingestion\Entity\IngestRawRecord;
+use App\Ingestion\Entity\NormalizationIssue;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\RawNormalizationStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -97,5 +99,87 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * Сырьё, которое пора удалить: не встречалось дольше окна хранения и не
+     * служит доказательством ни для одной НЕРАЗОБРАННОЙ проблемы.
+     *
+     * Возраст считается по `lastSeenAt`, а не по `fetchedAt`. Дедуп при
+     * часовом опросе не создаёт новую запись, а обновляет отметку «видели»:
+     * запись, скачанную год назад, но подтверждаемую каждый час, удалять
+     * бессмысленно — следующий же прогон запишет её заново под новым
+     * идентификатором. Свежесть — это когда последний раз видели, а не когда
+     * впервые скачали.
+     *
+     * Сырьё открытой проблемы не удаляется: оно и есть то, с чего начинает
+     * разбирающий. Состояние не вечное — проблему можно закрыть, и тогда
+     * запись уйдёт следующим прогоном.
+     *
+     * @companyScopeExempt Обслуживание всего хранилища: политика хранения
+     * общая, а не покомпанейская, и ограничивать выборку одной компанией
+     * здесь нечем.
+     *
+     * @return list<IngestRawRecord>
+     */
+    public function findPrunable(\DateTimeImmutable $notSeenSince, int $limit): array
+    {
+        /** @var list<IngestRawRecord> $records */
+        $records = $this->prunableQueryBuilder($notSeenSince)
+            ->orderBy('record.lastSeenAt', 'ASC')
+            ->addOrderBy('record.id', 'ASC')
+            ->setMaxResults(max(1, min(1000, $limit)))
+            ->getQuery()
+            ->getResult();
+
+        return $records;
+    }
+
+    /**
+     * Сколько записей удержано открытыми проблемами.
+     *
+     * Считается отдельно, чтобы удержание было видно: иначе «нечего удалять» и
+     * «удалять нельзя» выглядели бы одинаково, а это разные состояния с разной
+     * реакцией.
+     *
+     * @companyScopeExempt См. {@see findPrunable()}.
+     */
+    public function countHeldByUnresolvedIssues(\DateTimeImmutable $notSeenSince): int
+    {
+        /** @var int|string $count */
+        $count = $this->createQueryBuilder('record')
+            ->select('COUNT(record.id)')
+            ->andWhere('record.lastSeenAt < :notSeenSince')
+            ->andWhere($this->unresolvedIssueExists())
+            ->setParameter('notSeenSince', $notSeenSince)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return (int) $count;
+    }
+
+    public function remove(IngestRawRecord $record): void
+    {
+        $this->getEntityManager()->remove($record);
+    }
+
+    private function prunableQueryBuilder(\DateTimeImmutable $notSeenSince): QueryBuilder
+    {
+        return $this->createQueryBuilder('record')
+            ->andWhere('record.lastSeenAt < :notSeenSince')
+            ->andWhere(sprintf('NOT (%s)', $this->unresolvedIssueExists()))
+            ->setParameter('notSeenSince', $notSeenSince);
+    }
+
+    private function unresolvedIssueExists(): string
+    {
+        $issues = $this->getEntityManager()->createQueryBuilder()
+            ->select('1')
+            ->from(NormalizationIssue::class, 'issue')
+            ->andWhere('issue.rawRecordId = record.id')
+            ->andWhere('issue.resolvedAt IS NULL')
+            ->getDQL();
+
+        return sprintf('EXISTS (%s)', $issues);
     }
 }
