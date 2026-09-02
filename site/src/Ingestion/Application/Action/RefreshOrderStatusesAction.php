@@ -69,6 +69,9 @@ final readonly class RefreshOrderStatusesAction
     /** Размер страницы реестра подключений при обходе всех компаний. */
     private const CONNECTION_PAGE_SIZE = 200;
 
+    /** Предел колонок `raw_status` и `raw_substatus`. */
+    private const STATUS_TOKEN_MAX_LENGTH = 255;
+
     public function __construct(
         private MarketplaceSyncFacade $marketplaceSyncFacade,
         private IngestOrderRepository $orderRepository,
@@ -251,20 +254,40 @@ final readonly class RefreshOrderStatusesAction
         // общая отметка приписала бы первому ответу время последнего.
         $storedAt = $this->applicationTime();
 
-        $rawRecordId = null;
-        if ([] !== $poll['rows']) {
-            // Ответ маркетплейса сохраняется в raw ради аудита: без него нечем
-            // объяснить, почему статус изменился именно так. Нормализация к
-            // этой записи не применяется — маппера у ресурса нет, и запись
-            // сразу помечается пропущенной, иначе она вечно висела бы в
-            // очереди.
-            $rawRecordId = $this->storeAudit($source, $companyId, $connectionRef, $poll['rows'], $storedAt);
-        }
+        // Сырьё, его пометка, блокировка заказов, события и отметки попыток —
+        // ОДНА транзакция.
+        //
+        // Раздельные коммиты оставляли окно, в котором сырьё уже помечено
+        // окончательно пропущенным, а наблюдений ещё нет: падение здесь
+        // теряло переход навсегда, потому что переразобрать такую запись
+        // некому. Сеть уже отработала, поэтому транзакция короткая.
+        $changed = 0;
+
+        $this->entityManager->wrapInTransaction(function () use (
+            $source,
+            $companyId,
+            $connectionRef,
+            $poll,
+            $storedAt,
+            &$changed,
+        ): void {
+            $rawRecordId = null;
+            if ([] !== $poll['rows']) {
+                // Ответ маркетплейса сохраняется в raw ради аудита: без него
+                // нечем объяснить, почему статус изменился именно так.
+                // Нормализация к этой записи не применяется — маппера у
+                // ресурса нет, и запись сразу помечается пропущенной, иначе
+                // она вечно висела бы в очереди.
+                $rawRecordId = $this->storeAudit($source, $companyId, $connectionRef, $poll['rows'], $storedAt);
+            }
+
+            $changed = $this->applyObservations($source, $companyId, $poll, $rawRecordId);
+        });
 
         return $result->with(
             requested: $poll['requested'],
             observed: count($poll['observations']),
-            changed: $this->applyObservations($source, $companyId, $poll, $rawRecordId),
+            changed: $changed,
         );
     }
 
@@ -294,74 +317,65 @@ final readonly class RefreshOrderStatusesAction
         $changed = 0;
         $occurrences = [];
 
-        $this->entityManager->wrapInTransaction(function () use (
-            $source,
-            $companyId,
-            $poll,
-            $rawRecordId,
-            &$changed,
-            &$occurrences,
-        ): void {
-            $locked = $this->orderRepository->findManyForUpdate($companyId, array_keys($poll['attempts']));
+        $locked = $this->orderRepository->findManyForUpdate($companyId, array_keys($poll['attempts']));
 
-            foreach ($poll['attempts'] as $orderId => $attemptedAt) {
-                if (isset($locked[$orderId])) {
-                    $locked[$orderId]->markRefreshAttempted($attemptedAt);
-                }
+        foreach ($poll['attempts'] as $orderId => $attemptedAt) {
+            if (isset($locked[$orderId])) {
+                $locked[$orderId]->markRefreshAttempted($attemptedAt);
+            }
+        }
+
+        foreach ($poll['observations'] as $observation) {
+            $order = $locked[$observation['orderId']] ?? null;
+            if (null === $order || null === $rawRecordId) {
+                continue;
             }
 
-            foreach ($poll['observations'] as $observation) {
-                $order = $locked[$observation['orderId']] ?? null;
-                if (null === $order || null === $rawRecordId) {
-                    continue;
-                }
+            $status = $this->statusMapper->map($source, $order->getScheme(), $observation['rawStatus']);
 
-                $status = $this->statusMapper->map($source, $order->getScheme(), $observation['rawStatus']);
+            $outcome = $this->statusJournal->observe(
+                $order,
+                $observation['rawStatus'],
+                $status,
+                $observation['observedAt'],
+                $observation['rawSubstatus'],
+                $rawRecordId,
+                $occurrences,
+            );
 
-                $outcome = $this->statusJournal->observe(
-                    $order,
-                    $observation['rawStatus'],
-                    $status,
-                    $observation['observedAt'],
-                    $observation['rawSubstatus'],
-                    $rawRecordId,
-                    $occurrences,
-                );
-
-                // Статусные атрибуты принадлежат статусной оси и идут только с
-                // принятым наблюдением — ровно как в нормализации. Без этого
-                // заказ показывал бы свежий статус рядом с устаревшими
-                // supplier_status и wb_status.
-                if ($outcome->accepted && [] !== $observation['statusAttributes']) {
-                    $order->mergeAttributes($observation['statusAttributes']);
-                }
-
-                // Незнакомый токен уходит в ту же видимую очередь, что и при
-                // нормализации, но ТОЛЬКО когда наблюдение действительно
-                // изменило состояние. Часовой опрос неизменного неизвестного
-                // статуса иначе плодил бы по проблеме в час — до 720 копий на
-                // заказ за окно опроса, и очередь на разбор превращалась бы в
-                // шум, в котором настоящие проблемы не найти.
-                if ($outcome->changed && IngestOrderStatus::UNKNOWN === $status) {
-                    ($this->recordIssueAction)(new RecordNormalizationIssueCommand(
-                        companyId: $companyId,
-                        rawRecordId: $rawRecordId,
-                        operationGroupId: null,
-                        kind: NormalizationIssueKind::UNKNOWN_ORDER_STATUS,
-                        details: [
-                            'source' => $source->value,
-                            'scheme' => $order->getScheme()->value,
-                            'rawStatus' => $observation['rawStatus'],
-                            'externalId' => $order->getExternalId(),
-                        ],
-                    ));
-                }
-
-                if ($outcome->changed) {
-                    ++$changed;
-                }
+            // Статусные атрибуты принадлежат статусной оси и идут только с
+            // принятым наблюдением — ровно как в нормализации. Без этого
+            // заказ показывал бы свежий статус рядом с устаревшими
+            // supplier_status и wb_status.
+            if ($outcome->accepted && [] !== $observation['statusAttributes']) {
+                $order->mergeAttributes($observation['statusAttributes']);
             }
-        });
+
+            // Незнакомый токен уходит в ту же видимую очередь, что и при
+            // нормализации, но ТОЛЬКО когда наблюдение действительно
+            // изменило состояние. Часовой опрос неизменного неизвестного
+            // статуса иначе плодил бы по проблеме в час — до 720 копий на
+            // заказ за окно опроса, и очередь на разбор превращалась бы в
+            // шум, в котором настоящие проблемы не найти.
+            if ($outcome->changed && IngestOrderStatus::UNKNOWN === $status) {
+                ($this->recordIssueAction)(new RecordNormalizationIssueCommand(
+                    companyId: $companyId,
+                    rawRecordId: $rawRecordId,
+                    operationGroupId: null,
+                    kind: NormalizationIssueKind::UNKNOWN_ORDER_STATUS,
+                    details: [
+                        'source' => $source->value,
+                        'scheme' => $order->getScheme()->value,
+                        'rawStatus' => $observation['rawStatus'],
+                        'externalId' => $order->getExternalId(),
+                    ],
+                ));
+            }
+
+            if ($outcome->changed) {
+                ++$changed;
+            }
+        }
 
         return $changed;
     }
@@ -477,12 +491,23 @@ final readonly class RefreshOrderStatusesAction
             // ровно ничего.
             $rows[] = $posting;
 
-            $rawStatus = $this->stringOrNull($posting['status'] ?? null);
-            if (null === $rawStatus) {
+            // Строгий разбор ДО формирования наблюдения.
+            //
+            // Число вместо строки — не статус: приняв его, мы записали бы
+            // заказу UNKNOWN и сдвинули отметку наблюдения, закрыв дорогу
+            // настоящему статусу. Слишком длинное значение не влезет в колонку
+            // и уронит транзакцию — то есть один кривой ответ утащил бы за
+            // собой все остальные заказы кабинета, вопреки правилу
+            // «испорчено одно отправление — прочие продолжаются».
+            $rawStatus = self::statusToken($posting['status'] ?? null);
+            $substatusValue = $posting['substatus'] ?? null;
+            $rawSubstatus = self::statusToken($substatusValue);
+
+            if (null === $rawStatus || (null !== $substatusValue && null === $rawSubstatus)) {
                 // Нарушение контракта, а не отсутствие заказа: считается
                 // отдельно от честного 404, иначе одно прячется за другим.
                 ++$invalid;
-                $this->logger->warning('Ozon posting has no status field.', [
+                $this->logger->warning('Ozon posting has no usable status token.', [
                     'companyId' => $companyId,
                     'connectionRef' => $connectionRef,
                     'externalId' => $order->getExternalId(),
@@ -494,7 +519,7 @@ final readonly class RefreshOrderStatusesAction
             $observations[] = [
                 'orderId' => $order->getId(),
                 'rawStatus' => $rawStatus,
-                'rawSubstatus' => $this->stringOrNull($posting['substatus'] ?? null),
+                'rawSubstatus' => $rawSubstatus,
                 'statusAttributes' => [],
                 'observedAt' => $answeredAt,
             ];
@@ -526,6 +551,11 @@ final readonly class RefreshOrderStatusesAction
         $attempts = [];
         $invalid = 0;
 
+        /** @var array<int, true> $collidingWbIds */
+        $collidingWbIds = [];
+        /** @var array<int, list<string>> $collidingExternalIds */
+        $collidingExternalIds = [];
+
         foreach ($orders as $order) {
             $externalOrderId = $order->getExternalOrderId();
 
@@ -554,26 +584,44 @@ final readonly class RefreshOrderStatusesAction
             // ни наблюдения, ни отметки попытки — то есть вечно возвращался бы
             // в начало очереди. Приписать один ответ двум разным заказам тоже
             // нельзя: доказательства, что это один и тот же заказ, нет.
+            // Номер, уже признанный конфликтным, обратно в опрос не
+            // возвращается: третий и следующий заказы с тем же номером иначе
+            // снова попали бы в выборку и один из них произвольно получил бы
+            // чужой статус.
+            if (isset($collidingWbIds[$wbOrderId])) {
+                ++$invalid;
+                $attempts[$order->getId()] = $this->applicationTime();
+                $collidingExternalIds[$wbOrderId][] = $order->getExternalId();
+
+                continue;
+            }
+
             if (isset($byWbId[$wbOrderId])) {
                 $collision = $byWbId[$wbOrderId];
                 unset($byWbId[$wbOrderId]);
+                $collidingWbIds[$wbOrderId] = true;
+                $collidingExternalIds[$wbOrderId] = [$collision->getExternalId(), $order->getExternalId()];
 
                 foreach ([$collision, $order] as $conflicting) {
                     ++$invalid;
                     $attempts[$conflicting->getId()] = $this->applicationTime();
                 }
 
-                $this->logger->warning('Wildberries orders share one marketplace id.', [
-                    'companyId' => $companyId,
-                    'connectionRef' => $connectionRef,
-                    'externalOrderId' => $externalOrderId,
-                    'externalIds' => [$collision->getExternalId(), $order->getExternalId()],
-                ]);
-
                 continue;
             }
 
             $byWbId[$wbOrderId] = $order;
+        }
+
+        // Один агрегированный warning на номер, а не по записи: конфликт
+        // описывается множеством заказов, а не отдельным.
+        foreach ($collidingExternalIds as $wbOrderId => $externalIds) {
+            $this->logger->warning('Wildberries orders share one marketplace id.', [
+                'companyId' => $companyId,
+                'connectionRef' => $connectionRef,
+                'externalOrderId' => (string) $wbOrderId,
+                'externalIds' => $externalIds,
+            ]);
         }
 
         if ([] === $byWbId) {
@@ -730,29 +778,25 @@ final readonly class RefreshOrderStatusesAction
         // нет, но поле обязательно, и подставлять чужой идентификатор нельзя.
         $runId = Uuid::uuid7()->toString();
 
-        // Вставка и пометка — одной транзакцией. store() делает собственный
-        // flush, и падение между ним и пометкой оставило бы запись в статусе
-        // PENDING: ресурс, для которого маппера не существует, вечно ждал бы
-        // нормализации.
-        $records = [];
+        // Собственной транзакции здесь нет: вызывающий держит одну на всю
+        // запись результатов опроса. store() делает свой flush, но внутри
+        // открытой транзакции он не коммитит — а раздельный коммит оставлял бы
+        // окно, в котором сырьё помечено пропущенным, а наблюдений ещё нет.
+        $records = $this->rawStorageFacade->store(new RawBatch(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            shopRef: $connectionRef,
+            source: $source,
+            resourceType: $resourceType,
+            externalId: sprintf('%s:run-%s', $resourceType, $runId),
+            syncJobId: $runId,
+            fetchedAt: $now,
+            rows: $rows,
+        ));
 
-        $this->entityManager->wrapInTransaction(function () use ($companyId, $connectionRef, $source, $resourceType, $runId, $rows, $now, &$records): void {
-            $records = $this->rawStorageFacade->store(new RawBatch(
-                companyId: $companyId,
-                connectionRef: $connectionRef,
-                shopRef: $connectionRef,
-                source: $source,
-                resourceType: $resourceType,
-                externalId: sprintf('%s:run-%s', $resourceType, $runId),
-                syncJobId: $runId,
-                fetchedAt: $now,
-                rows: $rows,
-            ));
-
-            foreach ($records as $record) {
-                $record->markNormalizationSkipped();
-            }
-        });
+        foreach ($records as $record) {
+            $record->markNormalizationSkipped();
+        }
 
         // Хранилище возвращает список, но на одну партию всегда отдаёт ровно
         // одну запись. Полагаться на это молча нельзя: если контракт когда-то
@@ -861,14 +905,27 @@ final readonly class RefreshOrderStatusesAction
             && $order->getOrderedAt() < $orderedBefore;
     }
 
-    private function stringOrNull(mixed $value): ?string
+    /**
+     * Токен статуса: строго строка, непустая и влезающая в колонку.
+     *
+     * Числа сюда не годятся. `"status": 123` — нарушение контракта, а не
+     * статус: приняв его, мы записали бы заказу UNKNOWN и сдвинули отметку
+     * наблюдения, закрыв дорогу настоящему статусу. Длина ограничена размером
+     * колонки: значение длиннее уронило бы транзакцию на записи и утащило за
+     * собой все остальные заказы подключения.
+     */
+    private static function statusToken(mixed $value): ?string
     {
-        if (!is_string($value) && !is_int($value)) {
+        if (!is_string($value)) {
             return null;
         }
 
-        $string = trim((string) $value);
+        $token = trim($value);
 
-        return '' === $string ? null : $string;
+        if ('' === $token || mb_strlen($token) > self::STATUS_TOKEN_MAX_LENGTH) {
+            return null;
+        }
+
+        return $token;
     }
 }

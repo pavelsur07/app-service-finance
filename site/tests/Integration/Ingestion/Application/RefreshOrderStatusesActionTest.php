@@ -23,6 +23,7 @@ use App\Tests\Builders\Ingestion\IngestOrderBuilder;
 use App\Tests\Integration\Ingestion\Fixtures\FakeOzonOrdersClient;
 use App\Tests\Integration\Ingestion\Fixtures\FakeWbOrdersClient;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Ramsey\Uuid\Uuid;
 
 final class RefreshOrderStatusesActionTest extends IntegrationTestCase
@@ -819,7 +820,10 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
     {
         $company = $this->seedCompanyWithConnection(MarketplaceType::WILDBERRIES);
 
-        foreach (['rid-a', 'rid-b'] as $externalId) {
+        // Три, а не два: обработка коллизии удаляла номер из выборки, и
+        // ТРЕТИЙ заказ с тем же номером попадал туда снова — один из
+        // конфликтующих произвольно получал чужой статус.
+        foreach (['rid-a', 'rid-b', 'rid-c'] as $externalId) {
             $this->seedOrder(
                 $company,
                 $externalId,
@@ -835,15 +839,51 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
 
         $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
 
-        self::assertSame(2, $result->invalid);
-        self::assertSame([], $this->wb->calls, 'Приписать один ответ двум заказам нельзя.');
+        self::assertSame(3, $result->invalid);
+        self::assertSame([], $this->wb->calls, 'Приписать один ответ нескольким заказам нельзя.');
 
         $this->em->clear();
-        foreach (['rid-a', 'rid-b'] as $externalId) {
+        foreach (['rid-a', 'rid-b', 'rid-c'] as $externalId) {
             $order = $this->orders->findByExternalId((string) $company->getId(), IngestSource::WILDBERRIES, self::CONNECTION_ID, $externalId);
             self::assertNotNull($order);
             self::assertNotNull($order->getStatusRefreshAttemptedAt(), $externalId.' обязан получить отметку попытки.');
         }
+    }
+
+    /**
+     * Число вместо строки — не статус. Приняв его, цикл записал бы заказу
+     * UNKNOWN и сдвинул отметку наблюдения, закрыв дорогу настоящему статусу.
+     */
+    #[DataProvider('unusableStatusTokenProvider')]
+    public function testUnusableStatusTokenIsInvalidRatherThanAnObservation(mixed $status): void
+    {
+        $company = $this->seedCompanyWithConnection();
+        $this->seedOrder($company, 'posting-1', IngestOrderStatus::SHIPPED, 'delivering');
+
+        $this->ozon->setPostings(['posting-1' => ['posting_number' => 'posting-1', 'status' => $status]]);
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        self::assertSame(0, $result->observed);
+        self::assertSame(1, $result->invalid);
+
+        $this->em->clear();
+        $order = $this->orders->findByExternalId((string) $company->getId(), IngestSource::OZON, self::CONNECTION_ID, 'posting-1');
+        self::assertNotNull($order);
+        self::assertSame(IngestOrderStatus::SHIPPED, $order->getStatus(), 'Статус остаётся прежним.');
+        self::assertNotNull($order->getStatusRefreshAttemptedAt(), 'Но попытка засчитана — очередь двигается.');
+    }
+
+    /**
+     * @return iterable<string, array{status: mixed}>
+     */
+    public static function unusableStatusTokenProvider(): iterable
+    {
+        yield 'numeric' => ['status' => 123];
+        // Длиннее колонки: запись уронила бы транзакцию и утащила за собой
+        // все остальные заказы подключения.
+        yield 'longer than the column' => ['status' => str_repeat('x', 256)];
+        yield 'blank' => ['status' => '   '];
     }
 
     private function deactivateConnections(Company $company): void

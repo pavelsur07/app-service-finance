@@ -197,6 +197,41 @@ final class NormalizeOrderRawRecordActionTest extends IntegrationTestCase
     }
 
     /**
+     * Регрессия: повтор размножал элементы видимой очереди.
+     *
+     * Флаг повтора подавлял только события журнала, а ветки MAPPER_FAILURE и
+     * UNKNOWN_ORDER_STATUS выполнялись снова. Уникального ключа у проблем нет,
+     * поэтому повторная доставка сообщения или forceReplay плодили копии, и
+     * очередь на разбор превращалась в шум.
+     */
+    public function testReplayDoesNotDuplicateNormalizationIssues(): void
+    {
+        $this->mapper->queue($this->order('teleported', 1));
+        $this->mapper->queueSkipped([['reason' => 'broken row', 'hint' => 'posting-2']]);
+
+        $rawId = $this->storeRaw('page-1', new \DateTimeImmutable('-1 hour'));
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId));
+
+        $countIssues = fn (): int => (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM ingest_normalization_issues WHERE company_id = :c',
+            ['c' => $this->companyId],
+        );
+
+        $afterFirstParse = $countIssues();
+        self::assertSame(2, $afterFirstParse, 'Незнакомый статус и неразобранная строка — по проблеме на каждую.');
+
+        $this->mapper->queue($this->order('teleported', 1));
+        $this->mapper->queueSkipped([['reason' => 'broken row', 'hint' => 'posting-2']]);
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId, forceReplay: true));
+
+        $this->mapper->queue($this->order('teleported', 1));
+        $this->mapper->queueSkipped([['reason' => 'broken row', 'hint' => 'posting-2']]);
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId, forceReplay: true));
+
+        self::assertSame($afterFirstParse, $countIssues(), 'Повтор проблем не заводит.');
+    }
+
+    /**
      * Регрессия: повтор создавал открывающее событие, если заказа не оказалось.
      *
      * Ветка создания заказа звала recordOpening() безусловно, а флаг повтора

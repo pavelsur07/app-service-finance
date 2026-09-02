@@ -206,7 +206,11 @@ final readonly class NormalizeOrderRawRecordAction
             // очередью. Курсор после нормализации уже уехал вперёд, поэтому
             // молчаливый пропуск — постоянная потеря, ничем не отличимая от
             // «заказов в окне не было».
-            foreach ($batch->skipped as $skipped) {
+            // Повтор проблем не заводит: они, как и события журнала, —
+            // наблюдения, случившиеся один раз. Иначе повторная доставка
+            // сообщения или forceReplay размножали бы одинаковые элементы
+            // видимой очереди, у которой уникального ключа нет.
+            foreach ($isReplay ? [] : $batch->skipped as $skipped) {
                 ($this->recordNormalizationIssueAction)(new RecordNormalizationIssueCommand(
                     companyId: $command->companyId,
                     rawRecordId: $rawRecord->getId(),
@@ -289,7 +293,7 @@ final readonly class NormalizeOrderRawRecordAction
         $companyId = $rawRecord->getCompanyId();
         $status = $this->statusMapper->map($rawRecord->getSource(), $mapped->scheme, $mapped->rawStatus);
 
-        if (IngestOrderStatus::UNKNOWN === $status) {
+        if (IngestOrderStatus::UNKNOWN === $status && !$isReplay) {
             // Видимая очередь на разбор вместо тихой потери: заказ сохраняется,
             // но незнакомый токен становится заметен в существующем UI issues.
             ($this->recordNormalizationIssueAction)(new RecordNormalizationIssueCommand(
