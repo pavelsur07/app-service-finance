@@ -438,6 +438,43 @@ final class WbOrderMapperTest extends TestCase
         yield 'минимум' => ['-9223372036854775808', '-9223372036854775808'];
     }
 
+    /**
+     * Границы проверяются и для РУБЛЁВОГО пути: у него своя конвертация, и
+     * off-by-one в ней прошёл бы мимо тестов копеечного пути.
+     */
+    #[DataProvider('bigintMajorBoundaryProvider')]
+    public function testMajorValuesOnTheBigintBoundary(string $finishedPrice, ?string $expected): void
+    {
+        $batch = (new WbOrderMapper())->map($this->rawRecord(WbResourceType::ORDERS_STATISTICS), [[
+            'srid' => 's-1',
+            'date' => '2026-08-30T22:18:04',
+            'isCancel' => false,
+            'nmId' => 1,
+            'finishedPrice' => $finishedPrice,
+        ]]);
+
+        if (null === $expected) {
+            self::assertSame([], $batch->orders);
+            self::assertSame('malformed_price', $batch->skipped[0]['reason']);
+
+            return;
+        }
+
+        self::assertSame([], $batch->skipped);
+        self::assertSame($expected, $batch->orders[0]->attributes['finished_price_minor']);
+    }
+
+    /**
+     * @return iterable<string, array{string, ?string}>
+     */
+    public static function bigintMajorBoundaryProvider(): iterable
+    {
+        yield 'максимум в рублях' => ['92233720368547758.07', '9223372036854775807'];
+        yield 'на копейку выше максимума' => ['92233720368547758.08', null];
+        yield 'минимум в рублях' => ['-92233720368547758.08', '-9223372036854775808'];
+        yield 'на копейку ниже минимума' => ['-92233720368547758.09', null];
+    }
+
     private function rawRecord(string $resourceType): IngestRawRecord
     {
         return new IngestRawRecord(
