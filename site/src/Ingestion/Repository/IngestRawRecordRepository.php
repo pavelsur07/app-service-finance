@@ -104,8 +104,9 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
     }
 
     /**
-     * Сырьё, которое пора удалить: не встречалось дольше окна хранения и не
-     * служит доказательством ни для одной НЕРАЗОБРАННОЙ проблемы.
+     * Сырьё, чью нагрузку пора удалить: не встречалось дольше окна хранения,
+     * ещё не очищено и не служит доказательством ни для одной НЕРАЗОБРАННОЙ
+     * проблемы.
      *
      * Возраст считается по `lastSeenAt`, а не по `fetchedAt`. Дедуп при
      * часовом опросе не создаёт новую запись, а обновляет отметку «видели»:
@@ -152,6 +153,7 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
         $count = $this->createQueryBuilder('record')
             ->select('COUNT(record.id)')
             ->andWhere('record.lastSeenAt < :notSeenSince')
+            ->andWhere('record.payloadPrunedAt IS NULL')
             ->andWhere($this->unresolvedIssueExists())
             ->setParameter('notSeenSince', $notSeenSince)
             ->getQuery()
@@ -193,6 +195,7 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
         /** @var list<IngestRawRecord> $records */
         $records = $this->createQueryBuilder('record')
             ->andWhere('record.lastSeenAt < :notSeenSince')
+            ->andWhere('record.payloadPrunedAt IS NULL')
             ->andWhere('record.id IN (:ids)')
             ->setParameter('notSeenSince', $notSeenSince)
             ->setParameter('ids', array_values(array_unique($ids)))
@@ -238,15 +241,11 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
         return array_map(static fn (array $row): string => $row['rawRecordId'], $rows);
     }
 
-    public function remove(IngestRawRecord $record): void
-    {
-        $this->getEntityManager()->remove($record);
-    }
-
     private function prunableQueryBuilder(\DateTimeImmutable $notSeenSince): QueryBuilder
     {
         return $this->createQueryBuilder('record')
             ->andWhere('record.lastSeenAt < :notSeenSince')
+            ->andWhere('record.payloadPrunedAt IS NULL')
             ->andWhere(sprintf('NOT (%s)', $this->unresolvedIssueExists()))
             ->setParameter('notSeenSince', $notSeenSince);
     }

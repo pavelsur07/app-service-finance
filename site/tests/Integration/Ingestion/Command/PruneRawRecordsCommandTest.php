@@ -21,7 +21,7 @@ final class PruneRawRecordsCommandTest extends IntegrationTestCase
 
         self::assertSame(Command::SUCCESS, $tester->execute(['--dry-run' => true]));
         self::assertStringContainsString('dry-run', $tester->getDisplay());
-        self::assertStringContainsString('Pruned 0 raw record(s)', $tester->getDisplay());
+        self::assertStringContainsString('Pruned payloads of 0 raw record(s)', $tester->getDisplay());
     }
 
     /**

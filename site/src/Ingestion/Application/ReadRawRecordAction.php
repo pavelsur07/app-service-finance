@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Ingestion\Application;
 
+use App\Ingestion\Exception\RawPayloadPrunedException;
 use App\Ingestion\Exception\RawRecordNotFoundException;
 use App\Ingestion\Infrastructure\Storage\RawNdjsonCodec;
 use App\Ingestion\Repository\IngestRawRecordRepository;
@@ -30,6 +31,15 @@ final readonly class ReadRawRecordAction
         $record = $this->rawRecordRepository->findOneByIdAndCompany($companyId, $rawRecordId);
         if (null === $record) {
             throw new RawRecordNotFoundException('Raw record not found for requested company.');
+        }
+
+        // Внятный отказ вместо сбоя хранилища. Запись пережила свою нагрузку
+        // намеренно: указатели на неё остаются разрешимыми, и вызывающий
+        // узнаёт, что данные вышли за окно хранения, а не что «что-то
+        // сломалось».
+        $prunedAt = $record->getPayloadPrunedAt();
+        if (null !== $prunedAt) {
+            throw new RawPayloadPrunedException(sprintf('Raw payload was pruned by the retention policy on %s.', $prunedAt->format(\DATE_ATOM)));
         }
 
         return $this->ndjsonCodec->decodeCompressedRows($this->objectStorage->read($record->getStoragePath()));

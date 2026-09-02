@@ -18,7 +18,6 @@ use Doctrine\DBAL\Connection;
 use Psr\Clock\ClockInterface;
 use Psr\Log\AbstractLogger;
 use Psr\Log\LogLevel;
-use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
 
 final class PruneRawRecordsActionTest extends IntegrationTestCase
@@ -41,10 +40,11 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
 
     /**
      * Ради этого удаление и живёт в приложении: lifecycle-правило хранилища
-     * видит только объекты и оставило бы строку висячим указателем, на котором
-     * ReadRawRecordAction падает.
+     * видит только объекты и оставило бы запись без всякого признака того, что
+     * нагрузка удалена намеренно — чтение падало бы невнятной ошибкой
+     * хранилища.
      */
-    public function testDeletesTheRecordAndItsObjectTogether(): void
+    public function testDeletesThePayloadAndMarksTheRecord(): void
     {
         $record = $this->seedRaw('page-1', new \DateTimeImmutable('-400 days'));
         $path = $record['path'];
@@ -54,12 +54,17 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
         $result = ($this->action)(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
 
         self::assertSame(1, $result->candidates);
-        self::assertSame(1, $result->deleted);
+        self::assertSame(1, $result->prunedPayloads);
         self::assertGreaterThan(0, $result->bytesFreed);
         self::assertSame(0, $result->orphanedObjects);
 
-        self::assertNull($this->rawRecords->findByIdAndCompany($record['id'], $this->companyId));
-        self::assertFalse($this->storage->exists($path), 'Объект обязан уйти вместе со строкой.');
+        // Строка ОСТАЁТСЯ: указатели на неё продолжают разрешаться, дедупу
+        // есть что обновлять, а чтение отвечает внятной ошибкой вместо сбоя
+        // хранилища.
+        $kept = $this->rawRecords->findByIdAndCompany($record['id'], $this->companyId);
+        self::assertNotNull($kept);
+        self::assertNotNull($kept->getPayloadPrunedAt(), 'Запись обязана знать, что нагрузки больше нет.');
+        self::assertFalse($this->storage->exists($path), 'Объект обязан уйти.');
     }
 
     public function testDryRunTouchesNothing(): void
@@ -69,7 +74,7 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
         $result = ($this->action)(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: false));
 
         self::assertSame(1, $result->candidates, 'Кандидат виден…');
-        self::assertSame(0, $result->deleted, '…но не тронут.');
+        self::assertSame(0, $result->prunedPayloads, '…но не тронут.');
 
         // Ради этого числа dry-run и запускается перед Production Gate:
         // решение включать удаление принимается по объёму, а не по числу строк.
@@ -100,7 +105,7 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
         $result = ($this->action)(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
 
         self::assertSame(0, $result->candidates);
-        self::assertSame(0, $result->deleted);
+        self::assertSame(0, $result->prunedPayloads);
     }
 
     /**
@@ -133,15 +138,15 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
 
         $released = ($this->action)(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
 
-        self::assertSame(1, $released->deleted);
+        self::assertSame(1, $released->prunedPayloads);
         self::assertSame(0, $released->heldByIssues);
         self::assertFalse($this->storage->exists($record['path']));
     }
 
     /**
-     * Упавшее удаление объекта не оставляет висячего указателя и не молчит:
-     * запись уходит, объект остаётся сиротой, счётчик это показывает, а путь
-     * уходит в лог.
+     * Упавшее удаление объекта не оставляет записи, которая утверждает, что
+     * нагрузка на месте, и не молчит: запись помечена, объект остаётся
+     * сиротой, счётчик это показывает, а путь уходит в лог.
      *
      * Тест проверяет именно ЭТО, а не порядок операций: при сбое удаления
      * объекта оба порядка дают одинаковый результат. Сам порядок (строка, потом
@@ -149,7 +154,7 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
      * только падение процесса МЕЖДУ двумя шагами, которое в наборе не
      * воспроизвести. Зафиксировано как ограничение проверки.
      */
-    public function testFailedObjectDeletionIsReportedAndLeavesNoRecordBehind(): void
+    public function testFailedObjectDeletionIsReportedAndTheRecordStopsClaimingThePayload(): void
     {
         $record = $this->seedRaw('page-1', new \DateTimeImmutable('-400 days'));
 
@@ -187,18 +192,47 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
             },
             $this->em,
             self::getContainer()->get(ClockInterface::class),
-            new NullLogger(),
+            $logger = new class extends AbstractLogger {
+                /** @var list<array{level: mixed, message: string, context: mixed[]}> */
+                public array $records = [];
+
+                /**
+                 * @param mixed[] $context
+                 */
+                public function log($level, string|\Stringable $message, array $context = []): void
+                {
+                    $this->records[] = ['level' => $level, 'message' => (string) $message, 'context' => $context];
+                }
+            },
         );
 
         $result = $action(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
 
-        self::assertSame(1, $result->deleted);
+        self::assertSame(1, $result->prunedPayloads);
         self::assertSame(1, $result->orphanedObjects);
+        self::assertSame(0, $result->bytesFreed, 'Место не освободилось — отчёт не должен утверждать обратное.');
+
+        // Путь — единственное, по чему сироту можно найти и убрать руками.
+        // Без этой проверки его исчезновение из контекста прошло бы все тесты.
+        $errors = array_values(array_filter(
+            $logger->records,
+            static fn (array $entry): bool => LogLevel::ERROR === $entry['level'],
+        ));
+
+        self::assertCount(1, $errors);
+        self::assertSame($record['path'], $errors[0]['context']['storagePath']);
+        self::assertSame($record['id'], $errors[0]['context']['rawRecordId']);
+        self::assertSame(\RuntimeException::class, $errors[0]['context']['exceptionClass']);
+        self::assertArrayNotHasKey('exceptionMessage', $errors[0]['context'], 'Сообщения хранилища несут URL с учётными данными.');
+
+        self::assertTrue($this->storage->exists($record['path']), 'Объект остался — он и есть сирота.');
 
         $this->em->clear();
-        self::assertNull(
-            $this->rawRecords->findByIdAndCompany($record['id'], $this->companyId),
-            'Указатель не должен пережить объект — иначе чтение сырья падает.',
+        $record = $this->rawRecords->findByIdAndCompany($record['id'], $this->companyId);
+        self::assertNotNull($record);
+        self::assertNotNull(
+            $record->getPayloadPrunedAt(),
+            'Запись не должна утверждать, что нагрузка на месте, если её удаляли.',
         );
     }
 
@@ -263,7 +297,7 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
 
         $result = $action(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
 
-        self::assertSame(0, $result->deleted, 'Свежая проблема удерживает своё доказательство.');
+        self::assertSame(0, $result->prunedPayloads, 'Свежая проблема удерживает своё доказательство.');
         self::assertNotNull($this->rawRecords->findByIdAndCompany($target['id'], $this->companyId));
         self::assertTrue($this->storage->exists($target['path']));
     }
@@ -327,9 +361,37 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
         $result = $action(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
 
         self::assertSame(1, $result->candidates, 'Кандидат был выбран…');
-        self::assertSame(0, $result->deleted, '…но к моменту удаления перестал им быть.');
+        self::assertSame(0, $result->prunedPayloads, '…но к моменту удаления перестал им быть.');
         self::assertNotNull($this->rawRecords->findByIdAndCompany($target['id'], $this->companyId));
         self::assertTrue($this->storage->exists($target['path']));
+    }
+
+    /**
+     * Та же выгрузка после очистки возвращает нагрузку и снимает отметку.
+     *
+     * Ради этого строка и остаётся. В прежней модели retention удалял её
+     * целиком, и дедуп при часовом опросе обновлял `lastSeenAt` у уже
+     * удалённой записи: свежая выгрузка терялась молча, потому что UPDATE
+     * задевал ноль строк. Теперь запись на месте, объект восстанавливается, и
+     * система лечит себя сама.
+     */
+    public function testSameBatchAfterPruningRestoresThePayload(): void
+    {
+        $record = $this->seedRaw('page-1', new \DateTimeImmutable('-400 days'));
+
+        ($this->action)(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
+        self::assertFalse($this->storage->exists($record['path']));
+
+        // Тот же самый батч приезжает снова — дедуп находит запись по хешу.
+        $again = $this->seedRaw('page-1', new \DateTimeImmutable('-400 days'));
+
+        self::assertSame($record['id'], $again['id'], 'Дедуп обязан попасть в ту же запись.');
+        self::assertTrue($this->storage->exists($record['path']), 'Нагрузка вернулась.');
+
+        $this->em->clear();
+        $restored = $this->rawRecords->findByIdAndCompany($record['id'], $this->companyId);
+        self::assertNotNull($restored);
+        self::assertNull($restored->getPayloadPrunedAt(), 'Отметка обязана сняться вместе с возвратом нагрузки.');
     }
 
     /**

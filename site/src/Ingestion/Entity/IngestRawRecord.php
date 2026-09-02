@@ -70,6 +70,18 @@ class IngestRawRecord implements TenantOwnedInterface
     #[ORM\Column(type: Types::STRING, length: 32, enumType: RawNormalizationStatus::class)]
     private RawNormalizationStatus $normalizationStatus = RawNormalizationStatus::PENDING;
 
+    /**
+     * Когда полезная нагрузка удалена по политике хранения.
+     *
+     * Строка при этом остаётся: дорого стоит объект в хранилище, а не сотня
+     * байт метаданных. Указатели на сырьё продолжают разрешаться, чтение
+     * отвечает внятной ошибкой вместо сбоя хранилища, а дедупу есть что
+     * обновлять. Если та же выгрузка приедет снова, объект восстановится и
+     * отметка снимется.
+     */
+    #[ORM\Column(type: 'datetime_immutable_us', nullable: true)]
+    private ?\DateTimeImmutable $payloadPrunedAt = null;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]
     private \DateTimeImmutable $createdAt;
 
@@ -202,6 +214,33 @@ class IngestRawRecord implements TenantOwnedInterface
     {
         $this->lastSeenAt = $seenAt ?? new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function markPayloadPruned(\DateTimeImmutable $at): void
+    {
+        $this->payloadPrunedAt = $at;
+        $this->updatedAt = $at;
+    }
+
+    /**
+     * Нагрузка вернулась — отметка снимается.
+     *
+     * Иначе запись утверждала бы, что объекта нет, тогда как он снова на
+     * месте, и чтение отвечало бы ошибкой на существующих данных.
+     */
+    public function markPayloadRestored(): void
+    {
+        if (null === $this->payloadPrunedAt) {
+            return;
+        }
+
+        $this->payloadPrunedAt = null;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function getPayloadPrunedAt(): ?\DateTimeImmutable
+    {
+        return $this->payloadPrunedAt;
     }
 
     public function markNormalizationDone(): void

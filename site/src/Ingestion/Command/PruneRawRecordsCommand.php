@@ -16,7 +16,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 #[AsCommand(
     name: 'app:ingestion:raw:prune',
-    description: 'Deletes raw records past the retention window together with their stored objects.',
+    description: 'Deletes stored payloads of raw records past the retention window, keeping their metadata rows.',
 )]
 final class PruneRawRecordsCommand extends Command
 {
@@ -77,7 +77,7 @@ final class PruneRawRecordsCommand extends Command
             ['olderThanDays', (string) $command->olderThanDays],
             ['candidates', (string) $result->candidates],
             ['candidateBytes', (string) $result->candidateBytes],
-            ['deleted', (string) $result->deleted],
+            ['prunedPayloads', (string) $result->prunedPayloads],
             ['bytesFreed', (string) $result->bytesFreed],
             ['heldByIssues', (string) $result->heldByIssues],
             ['orphanedObjects', (string) $result->orphanedObjects],
@@ -93,8 +93,8 @@ final class PruneRawRecordsCommand extends Command
         }
 
         $io->success(sprintf(
-            'Pruned %d raw record(s), freed %d byte(s).',
-            $result->deleted,
+            'Pruned payloads of %d raw record(s), freed %d byte(s).',
+            $result->prunedPayloads,
             $result->bytesFreed,
         ));
 

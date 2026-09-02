@@ -98,6 +98,12 @@ final readonly class StoreRawBatchAction
 
     private function repairMissingObject(IngestRawRecord $record, string $ndjson): void
     {
+        // Та же выгрузка приехала снова — нагрузка вернулась, и отметка
+        // retention снимается. Без этого запись утверждала бы, что объекта
+        // нет, тогда как он снова на месте, и чтение отвечало бы ошибкой на
+        // существующих данных.
+        $record->markPayloadRestored();
+
         if (!$this->objectStorage->exists($record->getStoragePath())) {
             $compressed = gzencode($ndjson, 6);
             if (false === $compressed) {

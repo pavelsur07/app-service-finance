@@ -14,18 +14,28 @@ use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Удаление сырья, вышедшего за окно хранения.
+ * Удаление ПОЛЕЗНОЙ НАГРУЗКИ сырья, вышедшего за окно хранения.
  *
  * Почему приложением, а не lifecycle-правилом провайдера. Правило хранилища
  * видит только объекты и снесёт их, оставив строки `ingest_raw_records`
- * нетронутыми. Такая строка — висячий указатель: `ReadRawRecordAction` найдёт
- * запись, пойдёт за объектом и упадёт. Удалять нужно ПАРУ, и делать это может
- * только тот, кто знает про обе половины.
+ * нетронутыми: `ReadRawRecordAction` найдёт запись, пойдёт за объектом и
+ * упадёт с невнятной ошибкой хранилища. Отметку о том, что нагрузка удалена
+ * намеренно, может поставить только приложение.
  *
- * Порядок удаления — строка, потом объект. Обратный порядок даёт ровно тот
- * висячий указатель, ради которого всё и затевалось: объекта уже нет, а
- * запись ещё есть. При падении между операциями остаётся осиротевший объект —
- * он занимает место, но ничего не ломает, и его путь уходит в лог.
+ * Почему строка ОСТАЁТСЯ. Удаление строки вместе с объектом порождало класс
+ * гонок, каждая из которых закрывалась правкой очередной подсистемы: запись
+ * исчезала между проверкой и созданием `NormalizationIssue`, а дедуп при
+ * часовом опросе обновлял `lastSeenAt` у уже удалённой строки, и свежая
+ * выгрузка терялась молча. Дорого стоит объект, а не сотня байт метаданных,
+ * поэтому удаляется объект, а строка получает отметку и живёт дальше:
+ * указатели разрешаются, дедупу есть что обновлять, а
+ * `StoreRawBatchAction::repairMissingObject()` вернёт нагрузку, если та же
+ * выгрузка приедет снова.
+ *
+ * Порядок — отметка, потом объект. Обратный оставил бы при падении запись,
+ * которая утверждает, что нагрузка на месте, тогда как её уже нет. При
+ * падении между шагами остаётся осиротевший объект: он занимает место, но
+ * ничего не ломает, и его путь уходит в лог ещё до коммита.
  */
 final readonly class PruneRawRecordsAction
 {
@@ -100,8 +110,8 @@ final readonly class PruneRawRecordsAction
      */
     private function pruneChunk(PruneRawRecordsResult $result, array $chunk, \DateTimeImmutable $notSeenSince): PruneRawRecordsResult
     {
-        /** @var array<string, array{path: string, bytes: int}> $removed */
-        $removed = [];
+        /** @var array<string, array{path: string, bytes: int}> $marked */
+        $marked = [];
 
         // Кандидаты перечитываются под блокировкой И перепроверяются условием.
         //
@@ -109,7 +119,9 @@ final readonly class PruneRawRecordsAction
         // нормализация — завести проблему на запись. Удалить её после этого
         // значило бы необратимо потерять свежее сырьё или единственное
         // доказательство, а восстановить его неоткуда.
-        $this->entityManager->wrapInTransaction(function () use ($chunk, $notSeenSince, &$removed): void {
+        $now = $this->clock->now()->setTimezone(new \DateTimeZone(date_default_timezone_get()));
+
+        $this->entityManager->wrapInTransaction(function () use ($chunk, $notSeenSince, $now, &$marked): void {
             $locked = $this->rawRecordRepository->findManyPrunableForUpdate($chunk, $notSeenSince);
 
             // Удержание перепроверяется УЖЕ ПОД блокировкой и отдельным
@@ -125,28 +137,26 @@ final readonly class PruneRawRecordsAction
                     continue;
                 }
 
-                // Путь и размер снимаются ДО удаления: после него читать
-                // нечего, а именно путь нужен, чтобы убрать объект следом.
-                $removed[$record->getId()] = [
+                $marked[$record->getId()] = [
                     'path' => $record->getStoragePath(),
                     'bytes' => $record->getByteSize(),
                 ];
 
-                $this->rawRecordRepository->remove($record);
+                $record->markPayloadPruned($now);
             }
 
             // Пути пишутся в лог ДО коммита. Если процесс умрёт между коммитом
             // и удалением объектов, обработчик ошибки не выполнится и путь
             // исчез бы вместе со строкой; в логе он остаётся, и осиротевший
             // объект можно найти и убрать.
-            if ([] !== $removed) {
-                $this->logger->info('Raw objects are about to be deleted with their records.', [
-                    'storagePaths' => array_column($removed, 'path'),
+            if ([] !== $marked) {
+                $this->logger->info('Raw objects are about to be deleted.', [
+                    'storagePaths' => array_column($marked, 'path'),
                 ]);
             }
         });
 
-        $skipped = count($chunk) - count($removed);
+        $skipped = count($chunk) - count($marked);
         if ($skipped > 0) {
             // Не ошибка: запись перестала быть кандидатом, пока мы шли к ней.
             // Но и не пустяк — молча пропущенное удаление выглядело бы как
@@ -159,17 +169,18 @@ final readonly class PruneRawRecordsAction
         $orphaned = 0;
         $freed = 0;
 
-        foreach ($removed as $rawRecordId => $object) {
+        foreach ($marked as $rawRecordId => $object) {
             try {
                 $this->objectStorage->delete($object['path']);
                 $freed += $object['bytes'];
             } catch (\Throwable $exception) {
-                // Строка уже удалена, значит указатель не повис. Объект
-                // остался и занимает место — путь уходит в лог, чтобы его
-                // можно было убрать вручную. Его размер в освобождённые не
-                // идёт: место занято, и отчёт не должен утверждать обратное.
+                // Запись уже помечена, значит она не утверждает, что нагрузка
+                // на месте. Объект остался и занимает место — путь уходит в
+                // лог, чтобы его можно было убрать вручную. Его размер в
+                // освобождённые не идёт: место занято, и отчёт не должен
+                // утверждать обратное.
                 ++$orphaned;
-                $this->logger->error('Raw object left behind after its record was pruned.', [
+                $this->logger->error('Raw object left behind after its payload was marked pruned.', [
                     'rawRecordId' => $rawRecordId,
                     'storagePath' => $object['path'],
                     // Класс, а не сообщение: в тексте ошибок хранилища
@@ -180,7 +191,7 @@ final readonly class PruneRawRecordsAction
         }
 
         return $result->with(
-            deleted: count($removed),
+            prunedPayloads: count($marked),
             bytesFreed: $freed,
             orphanedObjects: $orphaned,
         );
@@ -199,7 +210,7 @@ final readonly class PruneRawRecordsAction
             'olderThanDays' => $command->olderThanDays,
             'notSeenSince' => $notSeenSince->format(\DATE_ATOM),
             'candidates' => $result->candidates,
-            'deleted' => $result->deleted,
+            'prunedPayloads' => $result->prunedPayloads,
             'bytesFreed' => $result->bytesFreed,
             'heldByIssues' => $result->heldByIssues,
             'orphanedObjects' => $result->orphanedObjects,
