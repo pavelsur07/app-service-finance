@@ -346,6 +346,23 @@ final class OzonOrdersClientTest extends TestCase
     }
 
     /**
+     * Неожиданный HTTP-код с валидным телом: тело — доказательство, ради
+     * которого аудит и существует, и терять его нельзя. Разбор статуса шёл до
+     * json_decode(), поэтому исключение уходило без payload.
+     */
+    public function testUnexpectedHttpCodeCarriesTheResponseBody(): void
+    {
+        $client = $this->client(new MockResponse('{"code":13,"message":"unexpected"}', ['http_code' => 418]));
+
+        try {
+            $client->fetchPosting(self::COMPANY_ID, self::CONNECTION_ID, IngestOrderScheme::FBO, 'P-1');
+            self::fail('Unexpected HTTP code must be malformed.');
+        } catch (MalformedConnectorResponseException $exception) {
+            self::assertSame(['code' => 13, 'message' => 'unexpected'], $exception->decodedPayload());
+        }
+    }
+
+    /**
      * Схема выбирает эндпоинт исчерпывающе. Тернарное «FBS или иначе FBO»
      * отправляло бы заказ с неизвестной схемой в FBO, и тот получал бы ложный
      * 404 вместо честной ошибки вызывающего.

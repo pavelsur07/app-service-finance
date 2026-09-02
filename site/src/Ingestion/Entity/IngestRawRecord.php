@@ -8,6 +8,7 @@ use App\Ingestion\Domain\TenantOwnedInterface;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\RawNormalizationStatus;
 use App\Ingestion\Repository\IngestRawRecordRepository;
+use App\Shared\Infrastructure\Doctrine\MicrosecondDateTimeImmutableType;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
@@ -51,7 +52,13 @@ class IngestRawRecord implements TenantOwnedInterface
     #[ORM\Column(type: Types::INTEGER)]
     private int $byteSize;
 
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]
+    /**
+     * Момент СКАЧИВАНИЯ — он же момент наблюдения для нормализации, поэтому
+     * микросекунды здесь обязаны переживать запись: усечённые до секунды, они
+     * делают два наблюдения внутри одной секунды неразличимыми, и более
+     * старое побеждает более новое.
+     */
+    #[ORM\Column(type: MicrosecondDateTimeImmutableType::NAME)]
     private \DateTimeImmutable $fetchedAt;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]

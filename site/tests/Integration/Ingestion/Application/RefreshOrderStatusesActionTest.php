@@ -622,6 +622,132 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
         self::assertSame(0, $result->polled);
     }
 
+    /**
+     * «Не NULL» ещё не значит «номер». Нечисловой идентификатор спросить
+     * нельзя, и без отметки попытки такой заказ вечно занимал бы начало
+     * очереди — живые заказы кабинета не опрашивались бы никогда.
+     */
+    public function testWildberriesOrderWithNonNumericIdDoesNotConsumeTheLimit(): void
+    {
+        $company = $this->seedCompanyWithConnection(MarketplaceType::WILDBERRIES);
+
+        $this->seedOrder(
+            $company,
+            'broken-id',
+            IngestOrderStatus::ORDERED,
+            'supplierStatus=new;wbStatus=waiting',
+            null,
+            null,
+            IngestSource::WILDBERRIES,
+            null,
+            'not-a-number',
+        );
+
+        $this->seedOrder(
+            $company,
+            'rid-1',
+            IngestOrderStatus::ORDERED,
+            'supplierStatus=new;wbStatus=waiting',
+            null,
+            null,
+            IngestSource::WILDBERRIES,
+            null,
+            '5000000001',
+        );
+
+        $this->wb->setStatuses([5000000001 => [
+            'id' => 5000000001,
+            'supplierStatus' => 'complete',
+            'wbStatus' => 'sorted',
+            'isCancellable' => false,
+        ]]);
+
+        // Первый прогон с лимитом в один заказ достаётся нечисловому: он
+        // старше по отметке попытки (её нет вовсе).
+        ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 1));
+        $second = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 1));
+
+        self::assertSame(1, $second->polled, 'На втором прогоне очередь сдвинулась к спрашиваемому заказу.');
+    }
+
+    /**
+     * Ответ БЫЛ, он нарушает контракт. Это дефект интеграции, а не сбой
+     * подключения: постоянно кривая пачка иначе каждый час занимала бы начало
+     * очереди.
+     */
+    public function testMalformedWildberriesStatusResponseAdvancesTheQueue(): void
+    {
+        $company = $this->seedCompanyWithConnection(MarketplaceType::WILDBERRIES);
+        $this->seedOrder(
+            $company,
+            'rid-1',
+            IngestOrderStatus::ORDERED,
+            'supplierStatus=new;wbStatus=waiting',
+            null,
+            null,
+            IngestSource::WILDBERRIES,
+            null,
+            '5000000001',
+        );
+
+        $this->wb->failStatusesWith(new MalformedConnectorResponseException(
+            'bad shape',
+            decodedPayload: ['error' => 'unexpected'],
+        ));
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        self::assertSame(0, $result->failedConnections, 'Кривой ответ — не сбой подключения.');
+        self::assertSame(1, $result->invalid);
+        self::assertSame(1, (int) $this->connection->fetchOne(
+            "SELECT COUNT(*) FROM ingest_raw_records WHERE company_id = :c AND resource_type = 'wildberries_order_status_refresh'",
+            ['c' => (string) $company->getId()],
+        ));
+
+        $this->em->clear();
+        $order = $this->orders->findByExternalId((string) $company->getId(), IngestSource::WILDBERRIES, self::CONNECTION_ID, 'rid-1');
+        self::assertNotNull($order);
+        self::assertNotNull($order->getStatusRefreshAttemptedAt(), 'Пачку спросили — попытка засчитана.');
+    }
+
+    /**
+     * Заказ, который остановить нечем, не должен блокировать остановку
+     * остальных: он старейший, а выборка идёт по возрастанию даты заказа.
+     */
+    public function testOrphanStuckOrderDoesNotBlockTheStuckQueue(): void
+    {
+        $company = $this->seedCompanyWithConnection();
+
+        $orphan = IngestOrderBuilder::anOrder()
+            ->forCompany((string) $company->getId())
+            ->withConnectionRef(self::CONNECTION_ID)
+            ->withSource(IngestSource::OZON)
+            ->withScheme(IngestOrderScheme::FBO)
+            ->withExternalId('orphan')
+            ->withStatus(IngestOrderStatus::SHIPPED, 'delivering')
+            ->orderedAt(new \DateTimeImmutable('-200 days'))
+            ->withLastRawRecordId(null)
+            ->build();
+        $this->em->persist($orphan);
+
+        $this->seedOrder(
+            $company,
+            'ancient',
+            IngestOrderStatus::SHIPPED,
+            'delivering',
+            new \DateTimeImmutable('-90 days'),
+        );
+        $this->em->flush();
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 1));
+
+        self::assertSame(1, $result->stopped, 'Лимит достаётся заказу, который можно остановить.');
+        self::assertSame(1, (int) $this->connection->fetchOne(
+            "SELECT COUNT(*) FROM ingest_normalization_issues WHERE company_id = :c AND kind = 'stuck_order'",
+            ['c' => (string) $company->getId()],
+        ));
+    }
+
     private function deactivateConnections(Company $company): void
     {
         $this->connection->executeStatement(

@@ -413,19 +413,34 @@ final class WbOrderJoinTest extends IntegrationTestCase
      * Перечитывание из БД обязательно: без него сравнение шло бы по объекту в
      * памяти, где микросекунды ещё живы, и тест утверждал бы неправду.
      */
-    public function testObservationOrderingIsSecondGranular(): void
+    /**
+     * Регрессия: отметки хранились с точностью до секунды, потому что
+     * стандартный `datetime_immutable` форматирует значение как `Y-m-d H:i:s`
+     * независимо от объявленной точности колонки. Два наблюдения внутри одной
+     * секунды становились неразличимы, и наблюдение `10:00:00.500`,
+     * записанное как `10:00:00`, проигрывало более СТАРОМУ `10:00:00.499800`,
+     * обработанному позже: состояние ехало назад.
+     */
+    public function testObservationOrderingIsMicrosecondPrecise(): void
     {
         $base = new \DateTimeImmutable('2026-09-01T10:00:00.500000+00:00');
         $this->normalizeMarketplace($base);
         $this->em->clear();
 
-        // Внутри той же секунды — считается одновременным, побеждает поздний.
-        $this->applyPrice(111100, $base->modify('-200 microseconds'), 'sub-second');
-        self::assertSame('111100', $this->sharedItemPrice());
+        $original = $this->sharedItemPrice();
+        self::assertNotNull($original);
 
-        // На секунду раньше — уже строго устаревшее наблюдение.
+        // На 200 микросекунд раньше — строго устаревшее наблюдение.
+        $this->applyPrice(111100, $base->modify('-200 microseconds'), 'sub-second-older');
+        self::assertSame($original, $this->sharedItemPrice(), 'Микросекундой раньше — уже прошлое.');
+
+        // На 200 микросекунд позже — уже новое.
+        $this->applyPrice(333300, $base->modify('+200 microseconds'), 'sub-second-newer');
+        self::assertSame('333300', $this->sharedItemPrice());
+
+        // На секунду раньше — тем более устаревшее.
         $this->applyPrice(222200, $base->modify('-2 seconds'), 'older-second');
-        self::assertSame('111100', $this->sharedItemPrice());
+        self::assertSame('333300', $this->sharedItemPrice());
     }
 
     private function applyPrice(int $priceMinor, \DateTimeImmutable $fetchedAt, string $key): void

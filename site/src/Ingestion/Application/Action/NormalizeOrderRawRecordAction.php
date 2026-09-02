@@ -25,6 +25,7 @@ use App\Ingestion\Repository\IngestOrderItemRepository;
 use App\Ingestion\Repository\IngestOrderRepository;
 use App\Ingestion\Repository\IngestOrderStatusEventRepository;
 use App\Ingestion\Repository\IngestRawRecordRepository;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -61,12 +62,6 @@ final readonly class NormalizeOrderRawRecordAction
         if (null === $rawRecord) {
             throw new RawRecordNotFoundException('Raw record not found for requested company.');
         }
-
-        // Повтор определяется по самому сырью, а не по флагу команды: сюда
-        // приводит и осознанный forceReplay, и повторная доставка сообщения.
-        // Незавершённый первый разбор (запись не DONE) повтором не считается —
-        // иначе события, не успевшие записаться, потерялись бы навсегда.
-        $isReplay = RawNormalizationStatus::DONE === $rawRecord->getNormalizationStatus();
 
         $rows = iterator_to_array($this->rawStorageFacade->read($rawRecord->getId(), $command->companyId), false);
         $mapper = $this->orderMapperRegistry->get($rawRecord->getSource(), $rawRecord->getResourceType());
@@ -114,8 +109,22 @@ final readonly class NormalizeOrderRawRecordAction
             $batch,
             $orders,
             $observedAt,
-            $isReplay,
         ): void {
+            // Сырьё блокируется ПЕРВЫМ и перечитывается: две параллельные
+            // доставки одного сообщения иначе обе увидели бы статус не DONE,
+            // и вторая пошла бы разбирать как первый раз — дописав ложный
+            // обратный переход. Порядок блокировок один для всех
+            // нормализаторов: сначала запись сырья, потом заказы.
+            $this->entityManager->lock($rawRecord, LockMode::PESSIMISTIC_WRITE);
+            $this->entityManager->refresh($rawRecord);
+
+            // Повтор определяется по самому сырью, а не по флагу команды: сюда
+            // приводит и осознанный forceReplay, и повторная доставка
+            // сообщения. Незавершённый первый разбор (запись не DONE) повтором
+            // не считается — иначе события, не успевшие записаться, потерялись
+            // бы навсегда.
+            $isReplay = RawNormalizationStatus::DONE === $rawRecord->getNormalizationStatus();
+
             $known = $this->orderRepository->findManyByExternalIdsIndexed(
                 $command->companyId,
                 $rawRecord->getSource(),

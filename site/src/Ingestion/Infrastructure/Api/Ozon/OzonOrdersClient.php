@@ -222,7 +222,7 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
             return null;
         }
 
-        $this->classifyStatus($statusCode, $headers, $endpoint);
+        $this->classifyStatus($statusCode, $headers, $endpoint, $payload);
 
         try {
             $decoded = json_decode($payload, true, 512, \JSON_THROW_ON_ERROR);
@@ -253,6 +253,20 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
         }
 
         return $result;
+    }
+
+    /**
+     * Тело ответа как доказательство: объект — годится, всё остальное (список,
+     * строка, невалидный JSON) хранить нечем, и это не потеря — доказательства
+     * там и нет.
+     *
+     * @return array<string, mixed>|null
+     */
+    private static function decodeEvidence(string $payload): ?array
+    {
+        $decoded = json_decode($payload, true);
+
+        return is_array($decoded) && !array_is_list($decoded) ? $decoded : null;
     }
 
     /**
@@ -330,7 +344,7 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
      *
      * @param array<string, list<string>> $headers
      */
-    private function classifyStatus(int $statusCode, array $headers, string $endpoint): void
+    private function classifyStatus(int $statusCode, array $headers, string $endpoint, ?string $payload = null): void
     {
         if (401 === $statusCode || 403 === $statusCode) {
             throw new ConnectorAuthException(sprintf('Ozon orders auth failed for %s (HTTP %d).', $endpoint, $statusCode));
@@ -349,7 +363,10 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
         }
 
         if (200 !== $statusCode) {
-            throw new MalformedConnectorResponseException(sprintf('Ozon orders returned HTTP %d for %s.', $statusCode, $endpoint));
+            // Тело неожиданного ответа — доказательство, ради которого аудит и
+            // существует. В лог оно не идёт: там разрешены идентификаторы и
+            // статусы, но не тела ответов внешних API.
+            throw new MalformedConnectorResponseException(sprintf('Ozon orders returned HTTP %d for %s.', $statusCode, $endpoint), decodedPayload: null === $payload ? null : self::decodeEvidence($payload));
         }
     }
 

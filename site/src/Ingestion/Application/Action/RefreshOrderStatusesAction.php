@@ -476,39 +476,83 @@ final readonly class RefreshOrderStatusesAction
         // изменений statistics, спросить не у кого — эндпоинта «статус по
         // srid» у WB нет, и его отмену приносит сам поток изменений.
         $byWbId = [];
+        $attempts = [];
+        $invalid = 0;
+
         foreach ($orders as $order) {
             $externalOrderId = $order->getExternalOrderId();
-            if (null !== $externalOrderId && 1 === preg_match('/^\d+$/', $externalOrderId)) {
-                $byWbId[(int) $externalOrderId] = $order;
+
+            // Колонка отсеяна в SQL как NOT NULL, но «не NULL» ещё не значит
+            // «номер». Нечисловое или не влезающее в int значение спросить
+            // нельзя — и отметку попытки такой заказ обязан получить всё
+            // равно: без неё он вечно занимал бы начало очереди и живые
+            // заказы кабинета не опрашивались бы никогда.
+            if (null === $externalOrderId || 1 !== preg_match('/^\d{1,18}$/', $externalOrderId)) {
+                ++$invalid;
+                $attempts[$order->getId()] = $this->applicationTime();
+                $this->logger->warning('Wildberries order has no usable marketplace id.', [
+                    'companyId' => $companyId,
+                    'connectionRef' => $connectionRef,
+                    'externalId' => $order->getExternalId(),
+                ]);
+
+                continue;
             }
+
+            $byWbId[(int) $externalOrderId] = $order;
         }
 
         if ([] === $byWbId) {
             return [
                 'rows' => [],
                 'observations' => [],
-                'attempts' => [],
+                'attempts' => $attempts,
                 'missing' => 0,
-                'invalid' => 0,
+                'invalid' => $invalid,
                 'failure' => null,
             ];
         }
 
         $rows = [];
         $observations = [];
-        $attempts = [];
         $missing = 0;
         $failure = null;
 
         foreach (array_chunk(array_keys($byWbId), self::WB_STATUS_CHUNK) as $chunk) {
             try {
                 $statuses = $this->wbClient->fetchMarketplaceStatuses($companyId, $connectionRef, $chunk);
-            } catch (ConnectorAuthException|ConnectorRateLimitedException|ConnectorTransientException|MalformedConnectorResponseException $exception) {
+            } catch (ConnectorAuthException|ConnectorRateLimitedException|ConnectorTransientException $exception) {
                 // Ответа не было вовсе, поэтому заказы этого и следующих чанков
                 // не «неизвестны маркетплейсу» — их просто не спросили. Считать
                 // их missing значило бы объявить сбой сети свойством данных.
                 $failure = $exception;
                 break;
+            } catch (MalformedConnectorResponseException $exception) {
+                // Ответ БЫЛ, он нарушает контракт. Это дефект интеграции, а не
+                // сбой подключения: считаем чанк спрошенным и идём дальше —
+                // иначе постоянно кривая пачка каждый час занимала бы начало
+                // очереди и заказы за лимитом не опрашивались бы никогда.
+                ++$invalid;
+
+                $evidence = $exception->decodedPayload();
+                if (null !== $evidence) {
+                    $rows[] = $evidence;
+                }
+
+                $failedAt = $this->applicationTime();
+                foreach ($chunk as $wbOrderId) {
+                    $attempts[$byWbId[$wbOrderId]->getId()] = $failedAt;
+                }
+
+                $this->logger->warning('Wildberries status response was malformed.', [
+                    'companyId' => $companyId,
+                    'connectionRef' => $connectionRef,
+                    'chunkSize' => count($chunk),
+                    'exceptionClass' => $exception::class,
+                    'evidenceStored' => null !== $evidence,
+                ]);
+
+                continue;
             }
 
             // Отметка на чанк, а не на прогон: чанков может быть много, и
@@ -560,7 +604,7 @@ final readonly class RefreshOrderStatusesAction
             'observations' => $observations,
             'attempts' => $attempts,
             'missing' => $missing,
-            'invalid' => 0,
+            'invalid' => $invalid,
             'failure' => $failure,
         ];
     }
@@ -616,6 +660,16 @@ final readonly class RefreshOrderStatusesAction
         \DateTimeImmutable $orderedBefore,
         int $limit,
     ): RefreshOrderStatusesResult {
+        // Заказ без сырья остановить нечем — проблема привязывается к сырью, —
+        // но и молчать о нём нельзя: он выпал бы и из опроса, и из очереди на
+        // разбор. Один агрегированный warning со счётчиком, а не по записи.
+        $orphans = $this->orderRepository->countStuckWithoutRawRecord($orderedBefore);
+        if ($orphans > 0) {
+            $this->logger->warning('Stuck orders without a raw record cannot be queued for review.', [
+                'orders' => $orphans,
+            ]);
+        }
+
         $candidates = null === $companyId
             ? $this->orderRepository->findStuckAcrossCompanies($orderedBefore, $limit)
             : $this->orderRepository->findStuck($companyId, $orderedBefore, $limit);
@@ -647,14 +701,11 @@ final readonly class RefreshOrderStatusesAction
                 // сырьё почему-то потерялось, заказ НЕ останавливается: тихая
                 // остановка без видимой очереди хуже, чем заказ, который
                 // продолжают опрашивать.
+                // Заказ без сырья до этой выборки не доходит: он отсеян в
+                // запросе, иначе вечно занимал бы её начало. Проверка остаётся
+                // как утверждение о невозможном.
                 $lastRawRecordId = $order->getLastRawRecordId();
                 if (null === $lastRawRecordId) {
-                    $this->logger->warning('Stuck order kept in the queue: no raw record to attach the issue to.', [
-                        'companyId' => $order->getCompanyId(),
-                        'orderId' => $order->getId(),
-                        'externalId' => $order->getExternalId(),
-                    ]);
-
                     continue;
                 }
 

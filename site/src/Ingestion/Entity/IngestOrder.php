@@ -9,6 +9,7 @@ use App\Ingestion\Enum\IngestOrderScheme;
 use App\Ingestion\Enum\IngestOrderStatus;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Repository\IngestOrderRepository;
+use App\Shared\Infrastructure\Doctrine\MicrosecondDateTimeImmutableType;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
@@ -87,14 +88,14 @@ class IngestOrder implements TenantOwnedInterface
      * отметку такого наблюдения значило бы закрыть дорогу первому настоящему
      * статусу, если тот окажется старше по времени скачивания.
      */
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6, nullable: true)]
+    #[ORM\Column(type: MicrosecondDateTimeImmutableType::NAME, nullable: true)]
     private ?\DateTimeImmutable $statusObservedAt;
 
     /**
      * Когда наблюдался последний ПОЛНЫЙ снимок заказа. Отдельно от
      * statusObservedAt — см. {@see acceptSnapshot()}.
      */
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6, nullable: true)]
+    #[ORM\Column(type: MicrosecondDateTimeImmutableType::NAME, nullable: true)]
     private ?\DateTimeImmutable $snapshotObservedAt = null;
 
     /**
@@ -105,7 +106,7 @@ class IngestOrder implements TenantOwnedInterface
      * статусной отметке нельзя — частичное наблюдение статуса может не
      * нести вовсе, и тогда все его непротиворечивые данные терялись бы.
      */
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6, nullable: true)]
+    #[ORM\Column(type: MicrosecondDateTimeImmutableType::NAME, nullable: true)]
     private ?\DateTimeImmutable $partialObservedAt = null;
 
     /** Указатель на raw, из которого получено последнее наблюдение. */
@@ -129,7 +130,7 @@ class IngestOrder implements TenantOwnedInterface
      * занимали бы начало лимита и остальные заказы кабинета не опрашивались
      * бы никогда.
      */
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6, nullable: true)]
+    #[ORM\Column(type: MicrosecondDateTimeImmutableType::NAME, nullable: true)]
     private ?\DateTimeImmutable $statusRefreshAttemptedAt = null;
 
     /** @var array<string, mixed> */

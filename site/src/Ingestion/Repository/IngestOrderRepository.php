@@ -188,6 +188,12 @@ final class IngestOrderRepository extends ServiceEntityRepository
             ->andWhere('o.status IN (:statuses)')
             ->andWhere('o.orderedAt < :orderedBefore')
             ->andWhere('o.refreshStoppedAt IS NULL')
+            // Заказ без сырья остановить нечем: проблема привязывается к
+            // сырью, а остановка без видимой очереди — тихая потеря. Пропускать
+            // его уже ПОСЛЕ выборки нельзя: он остаётся с пустым
+            // refreshStoppedAt и вечно занимает начало следующей, блокируя
+            // остановку всех остальных.
+            ->andWhere('o.lastRawRecordId IS NOT NULL')
             ->setParameter('companyId', $companyId)
             ->setParameter('statuses', $nonTerminal)
             ->setParameter('orderedBefore', $orderedBefore)
@@ -265,6 +271,7 @@ final class IngestOrderRepository extends ServiceEntityRepository
             ->andWhere('o.status IN (:statuses)')
             ->andWhere('o.orderedAt < :orderedBefore')
             ->andWhere('o.refreshStoppedAt IS NULL')
+            ->andWhere('o.lastRawRecordId IS NOT NULL')
             ->setParameter('statuses', self::nonTerminalStatuses())
             ->setParameter('orderedBefore', $orderedBefore)
             ->orderBy('o.orderedAt', 'ASC')
@@ -274,6 +281,33 @@ final class IngestOrderRepository extends ServiceEntityRepository
             ->getResult();
 
         return $orders;
+    }
+
+    /**
+     * Сколько зависших заказов остановить нечем — у них нет сырья, к которому
+     * привязывается проблема.
+     *
+     * @companyScopeExempt Аномалия считается по всем компаниям тем же
+     * системным прогоном, что и остановка зависших. Состояние недостижимое —
+     * заказ всегда создаётся нормализацией, — но если оно всё же появится,
+     * молчать о нём нельзя: заказ выпал бы и из опроса, и из очереди на
+     * разбор.
+     */
+    public function countStuckWithoutRawRecord(\DateTimeImmutable $orderedBefore): int
+    {
+        /** @var int $count */
+        $count = $this->createQueryBuilder('o')
+            ->select('COUNT(o.id)')
+            ->andWhere('o.status IN (:statuses)')
+            ->andWhere('o.orderedAt < :orderedBefore')
+            ->andWhere('o.refreshStoppedAt IS NULL')
+            ->andWhere('o.lastRawRecordId IS NULL')
+            ->setParameter('statuses', self::nonTerminalStatuses())
+            ->setParameter('orderedBefore', $orderedBefore)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return (int) $count;
     }
 
     /**
