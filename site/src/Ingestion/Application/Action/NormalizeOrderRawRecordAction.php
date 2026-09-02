@@ -349,7 +349,16 @@ final readonly class NormalizeOrderRawRecordAction
 
             // Событие журнала — факт НАБЛЮДЕНИЯ статуса. Без наблюдения его
             // нет: выдуманная строка «статус UNKNOWN» ничего не фиксирует.
-            if ($mapped->statusObserved) {
+            //
+            // Повтор событий не создаёт и здесь. Заказ может появиться на
+            // повторе — например, его удалили, или маппер научился разбирать
+            // строку, которую раньше пропускал, — но наблюдение произошло один
+            // раз, тогда же оно и попало в журнал. Записать открывающее
+            // событие сейчас значило бы датировать наблюдение моментом
+            // повтора и получить журнал, в котором есть начало и нет ни одного
+            // из последующих переходов: те идут через reapply() и событий не
+            // пишут.
+            if ($mapped->statusObserved && !$isReplay) {
                 $this->statusJournal->recordOpening($order, $mapped->rawStatus, $status, $observedAt, $rawRecord->getId(), $occurrences);
             }
             $applied = $this->applyItems($order, $mapped, [], $resolutions, $orderIndex);

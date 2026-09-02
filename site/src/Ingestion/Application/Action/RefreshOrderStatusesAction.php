@@ -55,7 +55,15 @@ use Ramsey\Uuid\Uuid;
  */
 final readonly class RefreshOrderStatusesAction
 {
-    /** Максимум номеров заказов в одном запросе статусов WB. */
+    /**
+     * Максимум номеров заказов в одном запросе статусов WB.
+     *
+     * Это ограничение API, независимое от лимита очереди. Сейчас
+     * `findNonTerminalForRefresh()` отдаёт не больше 1000 заказов, поэтому
+     * разбиение фактически даёт одну итерацию; связывать два предела одной
+     * константой нельзя — они про разное, и лимит очереди может вырасти, а
+     * предел запроса останется прежним.
+     */
     private const WB_STATUS_CHUNK = 1000;
 
     /** Размер страницы реестра подключений при обходе всех компаний. */
@@ -538,7 +546,34 @@ final readonly class RefreshOrderStatusesAction
                 continue;
             }
 
-            $byWbId[(int) $externalOrderId] = $order;
+            $wbOrderId = (int) $externalOrderId;
+
+            // Два наших заказа с ОДНИМ номером маркетплейса — дефект данных:
+            // у WB `id` и `rid` соответствуют один к одному. Присвоение по
+            // ключу молча потеряло бы один из них, и потерянный не получил бы
+            // ни наблюдения, ни отметки попытки — то есть вечно возвращался бы
+            // в начало очереди. Приписать один ответ двум разным заказам тоже
+            // нельзя: доказательства, что это один и тот же заказ, нет.
+            if (isset($byWbId[$wbOrderId])) {
+                $collision = $byWbId[$wbOrderId];
+                unset($byWbId[$wbOrderId]);
+
+                foreach ([$collision, $order] as $conflicting) {
+                    ++$invalid;
+                    $attempts[$conflicting->getId()] = $this->applicationTime();
+                }
+
+                $this->logger->warning('Wildberries orders share one marketplace id.', [
+                    'companyId' => $companyId,
+                    'connectionRef' => $connectionRef,
+                    'externalOrderId' => $externalOrderId,
+                    'externalIds' => [$collision->getExternalId(), $order->getExternalId()],
+                ]);
+
+                continue;
+            }
+
+            $byWbId[$wbOrderId] = $order;
         }
 
         if ([] === $byWbId) {

@@ -197,6 +197,44 @@ final class NormalizeOrderRawRecordActionTest extends IntegrationTestCase
     }
 
     /**
+     * Регрессия: повтор создавал открывающее событие, если заказа не оказалось.
+     *
+     * Ветка создания заказа звала recordOpening() безусловно, а флаг повтора
+     * учитывался только ниже, для уже существующего заказа. Повтор
+     * разобранного сырья — например, после удаления заказа — датировал бы
+     * наблюдение моментом повтора и дал бы журнал, в котором есть начало и нет
+     * ни одного последующего перехода: те идут через reapply() и событий не
+     * пишут.
+     */
+    public function testReplayDoesNotOpenAJournalForAnOrderItRecreates(): void
+    {
+        $this->mapper->queue($this->order('delivering', 1));
+        $rawId = $this->storeRaw('page-1', new \DateTimeImmutable('-1 hour'));
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($order);
+        self::assertSame(1, $this->events->countByOrder($this->companyId, $order->getId()));
+
+        // Заказ исчез: события и позиции уходят вместе с ним.
+        $this->connection->executeStatement('DELETE FROM ingest_order_status_events WHERE order_id = :o', ['o' => $order->getId()]);
+        $this->connection->executeStatement('DELETE FROM ingest_order_items WHERE order_id = :o', ['o' => $order->getId()]);
+        $this->connection->executeStatement('DELETE FROM ingest_orders WHERE id = :o', ['o' => $order->getId()]);
+        $this->em->clear();
+
+        $this->mapper->queue($this->order('delivering', 1));
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId, forceReplay: true));
+
+        $recreated = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($recreated);
+        self::assertSame(
+            0,
+            $this->events->countByOrder($this->companyId, $recreated->getId()),
+            'Повтор событий не создаёт — ни переходов, ни открывающего.',
+        );
+    }
+
+    /**
      * Регрессия: повтор с РАВНОЙ отметкой времени затирал чужое наблюдение.
      *
      * `observeStatus()` отклоняет только строго более старое, поэтому при

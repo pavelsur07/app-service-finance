@@ -810,6 +810,42 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
         ));
     }
 
+    /**
+     * Два наших заказа с одним номером маркетплейса — дефект данных. Молча
+     * потерянный при индексации заказ не получал бы ни наблюдения, ни отметки
+     * попытки и вечно возвращался бы в начало очереди.
+     */
+    public function testOrdersSharingOneMarketplaceIdDoNotStarveTheQueue(): void
+    {
+        $company = $this->seedCompanyWithConnection(MarketplaceType::WILDBERRIES);
+
+        foreach (['rid-a', 'rid-b'] as $externalId) {
+            $this->seedOrder(
+                $company,
+                $externalId,
+                IngestOrderStatus::ORDERED,
+                'supplierStatus=new;wbStatus=waiting',
+                null,
+                null,
+                IngestSource::WILDBERRIES,
+                null,
+                '5000000001',
+            );
+        }
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        self::assertSame(2, $result->invalid);
+        self::assertSame([], $this->wb->calls, 'Приписать один ответ двум заказам нельзя.');
+
+        $this->em->clear();
+        foreach (['rid-a', 'rid-b'] as $externalId) {
+            $order = $this->orders->findByExternalId((string) $company->getId(), IngestSource::WILDBERRIES, self::CONNECTION_ID, $externalId);
+            self::assertNotNull($order);
+            self::assertNotNull($order->getStatusRefreshAttemptedAt(), $externalId.' обязан получить отметку попытки.');
+        }
+    }
+
     private function deactivateConnections(Company $company): void
     {
         $this->connection->executeStatement(

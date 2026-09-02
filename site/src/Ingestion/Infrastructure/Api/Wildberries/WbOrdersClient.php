@@ -151,6 +151,13 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
                 throw new MalformedConnectorResponseException(sprintf('WB %s returned a status row without a boolean isCancellable.', self::ORDERS_STATUS_ENDPOINT), decodedPayload: self::evidence($decoded['data']));
             }
 
+            // Повтор номера в одном ответе — нарушение контракта: строки с
+            // разными статусами молча затирали бы друг друга, и отброшенная
+            // не попала бы даже в аудит.
+            if (isset($indexed[$id])) {
+                throw new MalformedConnectorResponseException(sprintf('WB %s returned the same order id twice.', self::ORDERS_STATUS_ENDPOINT), decodedPayload: $evidence);
+            }
+
             $indexed[$id] = $row;
         }
 
