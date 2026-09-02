@@ -109,6 +109,14 @@ final readonly class RefreshOrderStatusesAction
             }
 
             $result = $this->refreshConnection($result, $source, $companyId, $connectionRef, $orders);
+
+            // Подключение обработано и сохранено — его сущности больше не
+            // нужны. Без очистки карта идентичности растёт как ОБЩЕЕ число
+            // обработанных заказов, а не как лимит на подключение, и
+            // межкомпанейский прогон упирается в память. Хуже того, после OOM
+            // следующий прогон снова начинается с первых подключений, поэтому
+            // последние голодали бы постоянно.
+            $this->entityManager->clear();
         }
 
         // Зависшие заказы ищутся ОТДЕЛЬНО от подключений. Зависание не зависит
@@ -245,7 +253,7 @@ final readonly class RefreshOrderStatusesAction
         }
 
         return $result->with(
-            requested: count($poll['attempts']),
+            requested: $poll['requested'],
             observed: count($poll['observations']),
             changed: $this->applyObservations($source, $companyId, $poll, $rawRecordId),
         );
@@ -266,7 +274,7 @@ final readonly class RefreshOrderStatusesAction
      * если наблюдения не случилось: 404 и ответ без статуса иначе не двигали бы
      * ничего, и такие заказы вечно занимали бы начало очереди.
      *
-     * @param array{rows: list<array<string, mixed>>, observations: list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>, observedAt: \DateTimeImmutable}>, attempts: array<string, \DateTimeImmutable>, missing: int, invalid: int, failure: \Throwable|null} $poll
+     * @param array{rows: list<array<string, mixed>>, observations: list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>, observedAt: \DateTimeImmutable}>, attempts: array<string, \DateTimeImmutable>, requested: int, missing: int, invalid: int, failure: \Throwable|null} $poll
      */
     private function applyObservations(
         IngestSource $source,
@@ -275,7 +283,7 @@ final readonly class RefreshOrderStatusesAction
         ?string $rawRecordId,
     ): int {
         $changed = 0;
-        $seenObservations = [];
+        $occurrences = [];
 
         $this->entityManager->wrapInTransaction(function () use (
             $source,
@@ -283,7 +291,7 @@ final readonly class RefreshOrderStatusesAction
             $poll,
             $rawRecordId,
             &$changed,
-            &$seenObservations,
+            &$occurrences,
         ): void {
             $locked = $this->orderRepository->findManyForUpdate($companyId, array_keys($poll['attempts']));
 
@@ -326,7 +334,7 @@ final readonly class RefreshOrderStatusesAction
                     $observation['observedAt'],
                     $observation['rawSubstatus'],
                     $rawRecordId,
-                    $seenObservations,
+                    $occurrences,
                 );
 
                 // Статусные атрибуты принадлежат статусной оси и идут только с
@@ -349,13 +357,14 @@ final readonly class RefreshOrderStatusesAction
     /**
      * @param list<IngestOrder> $orders
      *
-     * @return array{rows: list<array<string, mixed>>, observations: list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>, observedAt: \DateTimeImmutable}>, attempts: array<string, \DateTimeImmutable>, missing: int, invalid: int, failure: \Throwable|null}
+     * @return array{rows: list<array<string, mixed>>, observations: list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>, observedAt: \DateTimeImmutable}>, attempts: array<string, \DateTimeImmutable>, requested: int, missing: int, invalid: int, failure: \Throwable|null}
      */
     private function pollOzon(string $companyId, string $connectionRef, array $orders): array
     {
         $rows = [];
         $observations = [];
         $attempts = [];
+        $requested = 0;
         $missing = 0;
         $invalid = 0;
         $failure = null;
@@ -377,6 +386,8 @@ final readonly class RefreshOrderStatusesAction
                 continue;
             }
 
+            ++$requested;
+
             try {
                 $posting = $this->ozonClient->fetchPosting(
                     $companyId,
@@ -394,12 +405,20 @@ final readonly class RefreshOrderStatusesAction
                 $failure = $exception;
                 break;
             } catch (MalformedConnectorResponseException $exception) {
-                // Испорченный ответ относится к ОДНОМУ отправлению, а не к
-                // подключению. Прерывать из-за него цикл значило бы, что одно
-                // вечно кривое отправление каждый час останавливает обработку
-                // всех следующих заказов кабинета.
                 ++$invalid;
                 $attempts[$order->getId()] = $this->applicationTime();
+
+                // Нарушение формы относится к ОДНОМУ отправлению: прерывать
+                // из-за него цикл значило бы, что одно вечно кривое
+                // отправление каждый час останавливает обработку всех
+                // следующих заказов кабинета. Но неожиданный HTTP-код —
+                // свойство эндпоинта, и продолжать по заказам значило бы
+                // сделать сотни одинаковых запросов и завершить прогон
+                // успехом при сломанном API.
+                if ($exception->isEndpointWide()) {
+                    $failure = $exception;
+                    break;
+                }
 
                 // Нарушивший контракт ответ — как раз то, ради чего аудит и
                 // нужен. В лог он не идёт: там разрешены идентификаторы и
@@ -473,6 +492,7 @@ final readonly class RefreshOrderStatusesAction
             'rows' => $rows,
             'observations' => $observations,
             'attempts' => $attempts,
+            'requested' => $requested,
             'missing' => $missing,
             'invalid' => $invalid,
             'failure' => $failure,
@@ -482,7 +502,7 @@ final readonly class RefreshOrderStatusesAction
     /**
      * @param list<IngestOrder> $orders
      *
-     * @return array{rows: list<array<string, mixed>>, observations: list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>, observedAt: \DateTimeImmutable}>, attempts: array<string, \DateTimeImmutable>, missing: int, invalid: int, failure: \Throwable|null}
+     * @return array{rows: list<array<string, mixed>>, observations: list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>, observedAt: \DateTimeImmutable}>, attempts: array<string, \DateTimeImmutable>, requested: int, missing: int, invalid: int, failure: \Throwable|null}
      */
     private function pollWildberries(string $companyId, string $connectionRef, array $orders): array
     {
@@ -522,6 +542,7 @@ final readonly class RefreshOrderStatusesAction
                 'rows' => [],
                 'observations' => [],
                 'attempts' => $attempts,
+                'requested' => 0,
                 'missing' => 0,
                 'invalid' => $invalid,
                 'failure' => null,
@@ -530,10 +551,13 @@ final readonly class RefreshOrderStatusesAction
 
         $rows = [];
         $observations = [];
+        $requested = 0;
         $missing = 0;
         $failure = null;
 
         foreach (array_chunk(array_keys($byWbId), self::WB_STATUS_CHUNK) as $chunk) {
+            $requested += count($chunk);
+
             try {
                 $statuses = $this->wbClient->fetchMarketplaceStatuses($companyId, $connectionRef, $chunk);
             } catch (ConnectorAuthException|ConnectorRateLimitedException|ConnectorTransientException $exception) {
@@ -554,6 +578,8 @@ final readonly class RefreshOrderStatusesAction
                 // сбой подключения: считаем чанк спрошенным и идём дальше —
                 // иначе постоянно кривая пачка каждый час занимала бы начало
                 // очереди и заказы за лимитом не опрашивались бы никогда.
+                // Исключение — неожиданный HTTP-код: он свойство эндпоинта, и
+                // следующая пачка вернёт то же самое.
                 ++$invalid;
 
                 $evidence = $exception->decodedPayload();
@@ -572,7 +598,13 @@ final readonly class RefreshOrderStatusesAction
                     'chunkSize' => count($chunk),
                     'exceptionClass' => $exception::class,
                     'evidenceStored' => null !== $evidence,
+                    'endpointWide' => $exception->isEndpointWide(),
                 ]);
+
+                if ($exception->isEndpointWide()) {
+                    $failure = $exception;
+                    break;
+                }
 
                 continue;
             }
@@ -634,6 +666,7 @@ final readonly class RefreshOrderStatusesAction
             'rows' => $rows,
             'observations' => $observations,
             'attempts' => $attempts,
+            'requested' => $requested,
             'missing' => $missing,
             'invalid' => $invalid,
             'failure' => $failure,

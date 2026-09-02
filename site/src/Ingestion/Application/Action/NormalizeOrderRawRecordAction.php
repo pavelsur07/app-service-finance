@@ -136,14 +136,14 @@ final readonly class NormalizeOrderRawRecordAction
                 forUpdate: true,
             );
 
-            // Ключи уже записанных наблюдений — одним запросом на весь batch.
-            // Ключ ведётся локально и пополняется сразу при создании события:
+            // Номера уже записанных наблюдений — одним запросом на весь batch.
+            // Счётчик ведётся локально и растёт сразу при создании события:
             // Doctrine-запрос не видит непрофлашенные сущности, поэтому
-            // последовательность A → B → A внутри одного батча иначе создала бы
-            // два события A и уронила финальный flush на уникальном индексе.
-            $seenObservations = array_fill_keys(
-                $this->statusEventRepository->observationKeysForRawRecord($command->companyId, $rawRecord->getId()),
-                true,
+            // несколько наблюдений одного заказа внутри батча иначе получили бы
+            // один номер и уронили финальный flush на уникальном индексе.
+            $occurrences = $this->statusEventRepository->lastOccurrencesForRawRecord(
+                $command->companyId,
+                $rawRecord->getId(),
             );
 
             // Две карты, а не одна.
@@ -195,7 +195,7 @@ final readonly class NormalizeOrderRawRecordAction
                     $known,
                     $knownItems,
                     $currentItems,
-                    $seenObservations,
+                    $occurrences,
                     $resolutions,
                     $orderIndex,
                     $isReplay,
@@ -269,8 +269,8 @@ final readonly class NormalizeOrderRawRecordAction
      * @param array<string, array<string, IngestOrderItem>> $knownItems пул сущностей для
      *                                                                  переиспользования, не сжимается
      * @param array<string, array<string, IngestOrderItem>> $currentItems набор последнего снимка заказа
-     * @param array<string, true> $seenObservations ключи уже записанных наблюдений,
-     *                                              изменяется по ссылке
+     * @param array<string, int> $occurrences последний номер наблюдения на заказ,
+     *                                        изменяется по ссылке
      * @param array<array-key, ListingResolution|null> $resolutions «индекс заказа:индекс позиции»
      * @param bool $isReplay сырьё уже разбирали: наблюдений больше нет, есть пересчёт
      */
@@ -281,7 +281,7 @@ final readonly class NormalizeOrderRawRecordAction
         array $known,
         array &$knownItems,
         array &$currentItems,
-        array &$seenObservations,
+        array &$occurrences,
         array $resolutions,
         int $orderIndex,
         bool $isReplay,
@@ -350,7 +350,7 @@ final readonly class NormalizeOrderRawRecordAction
             // Событие журнала — факт НАБЛЮДЕНИЯ статуса. Без наблюдения его
             // нет: выдуманная строка «статус UNKNOWN» ничего не фиксирует.
             if ($mapped->statusObserved) {
-                $this->statusJournal->recordOpening($order, $mapped->rawStatus, $status, $observedAt, $rawRecord->getId(), $seenObservations);
+                $this->statusJournal->recordOpening($order, $mapped->rawStatus, $status, $observedAt, $rawRecord->getId(), $occurrences);
             }
             $applied = $this->applyItems($order, $mapped, [], $resolutions, $orderIndex);
             $knownItems[$order->getId()] = $applied;
@@ -395,7 +395,7 @@ final readonly class NormalizeOrderRawRecordAction
                     $observedAt,
                     $mapped->rawSubstatus,
                     $rawRecord->getId(),
-                    $seenObservations,
+                    $occurrences,
                 ))->accepted;
 
         // Полный снимок применяется, если он новее ПОСЛЕДНЕГО полного снимка.

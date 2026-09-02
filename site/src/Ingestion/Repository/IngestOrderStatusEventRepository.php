@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Ingestion\Repository;
 
 use App\Ingestion\Entity\IngestOrderStatusEvent;
-use App\Ingestion\Enum\IngestOrderStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -50,45 +49,35 @@ final class IngestOrderStatusEventRepository extends ServiceEntityRepository
     }
 
     /**
-     * Ключи наблюдений, уже записанных ИЗ ЭТОГО сырья.
+     * Последний использованный порядковый номер наблюдения на заказ в пределах
+     * одного сырья.
      *
-     * Одним запросом на весь batch: проверка на каждое событие давала бы до
-     * 20 000 COUNT'ов на одну страницу коннектора и всё равно не видела бы
-     * события, созданные в этом же прогоне, — Doctrine-запрос не видит
-     * непрофлашенные сущности UnitOfWork.
+     * Подстраховка на случай повторного разбора не завершившейся записи: сама
+     * нормализация пишет всё одной транзакцией, поэтому половины событий
+     * остаться не может, а успешно разобранное сырьё идёт по пути повтора и
+     * событий не создаёт вовсе.
      *
-     * @return list<string> «orderId\0rawStatus»
+     * @return array<string, int> orderId => максимальный номер
      */
-    public function observationKeysForRawRecord(string $companyId, string $rawRecordId): array
+    public function lastOccurrencesForRawRecord(string $companyId, string $rawRecordId): array
     {
-        /** @var list<array{orderId: string, rawStatus: string, previousStatus: ?IngestOrderStatus}> $rows */
+        /** @var list<array{orderId: string, maxOccurrence: int|string}> $rows */
         $rows = $this->createQueryBuilder('e')
-            ->select('e.orderId AS orderId', 'e.rawStatus AS rawStatus', 'e.previousStatus AS previousStatus')
+            ->select('e.orderId AS orderId', 'MAX(e.occurrence) AS maxOccurrence')
             ->andWhere('e.companyId = :companyId')
             ->andWhere('e.rawRecordId = :rawRecordId')
             ->setParameter('companyId', $companyId)
             ->setParameter('rawRecordId', $rawRecordId)
+            ->groupBy('e.orderId')
             ->getQuery()
             ->getResult();
 
-        return array_map(
-            static fn (array $row): string => self::observationKey(
-                $row['orderId'],
-                $row['rawStatus'],
-                $row['previousStatus'],
-            ),
-            $rows,
-        );
-    }
+        $indexed = [];
+        foreach ($rows as $row) {
+            $indexed[$row['orderId']] = (int) $row['maxOccurrence'];
+        }
 
-    /**
-     * Ключ дедупликации наблюдения — тот же набор колонок, что и в уникальном
-     * индексе. Два определения этого ключа неминуемо разошлись бы, и
-     * расхождение проявилось бы падением flush на проде.
-     */
-    public static function observationKey(string $orderId, string $rawStatus, ?IngestOrderStatus $previousStatus): string
-    {
-        return $orderId."\0".$rawStatus."\0".(null === $previousStatus ? '' : $previousStatus->value);
+        return $indexed;
     }
 
     public function save(IngestOrderStatusEvent $event): void

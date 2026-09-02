@@ -40,23 +40,31 @@ final readonly class MarketplaceSyncFacade
      * Через Facade, а не напрямую Query: `Infrastructure/` чужого модуля
      * закрыт, и без этой точки входа Ingestion пришлось бы нарушать границу.
      *
-     * Пагинации здесь нет и не нужно: у компании столько подключений, сколько
-     * у неё кабинетов продавца — единицы.
+     * Пагинации здесь нет: у компании столько подключений, сколько у неё
+     * кабинетов продавца — единицы. Но «единицы» это наблюдение, а не
+     * ограничение схемы, поэтому у выборки есть потолок, и его достижение —
+     * инцидент, а не молчаливое усечение.
      *
      * @return list<ActiveSellerConnectionDTO>
      */
     public function activeSellerConnections(string $companyId): array
     {
-        $connections = $this->toDtos($this->activeSellerConnectionsQuery->executeForCompany($companyId));
+        $cap = ActiveSellerConnectionsQuery::COMPANY_CONNECTIONS_LIMIT;
+        $connections = $this->toDtos($this->activeSellerConnectionsQuery->executeForCompany($companyId, $cap));
 
         // Потолок выборки — ограничение, а не обещание. Молча обрезанный
         // список выглядел бы как «у компании столько подключений и есть», и
         // необработанные кабинеты были бы неотличимы от несуществующих.
-        if (ActiveSellerConnectionsQuery::COMPANY_CONNECTIONS_LIMIT === count($connections)) {
+        //
+        // Запрос отдаёт на строку больше потолка: ровно `cap` подключений —
+        // законная граница, и алерт на ней был бы ложным.
+        if (count($connections) > $cap) {
             $this->connectionsLogger->error('Active seller connections hit the per-company cap; some cabinets are not processed.', [
                 'company_id' => $companyId,
-                'cap' => ActiveSellerConnectionsQuery::COMPANY_CONNECTIONS_LIMIT,
+                'cap' => $cap,
             ]);
+
+            return array_slice($connections, 0, $cap);
         }
 
         return $connections;

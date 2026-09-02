@@ -33,16 +33,17 @@ use Webmozart\Assert\Assert;
 // (company_id, raw_record_id): при порядке с order_id посередине B-tree не мог
 // бы использовать префикс, и каждая нормализация просматривала бы все события
 // компании. Кортеж уникальности от перестановки не меняется.
-// previous_status входит в ключ: одно сырьё может содержать наблюдения
-// A → B → A, и без него третье наблюдение подавлялось бы ключом первого —
-// заказ вернулся бы в A, а журнал закончился бы на B.
+// Ключ — ПОРЯДКОВЫЙ НОМЕР наблюдения, а не его содержание.
 //
-// PostgreSQL считает NULL различными, поэтому для записей с пустым
-// previous_status (открывающее событие, неприменённое наблюдение) этот индекс
-// — слабая подстраховка. Основная защита от дублей — ключи наблюдений,
-// поднятые из БД перед разбором, и блокировка самой записи сырья: два
-// нормализатора одного сырья сериализованы.
-#[ORM\UniqueConstraint(name: 'uniq_ingest_order_status_event_observation', columns: ['company_id', 'raw_record_id', 'order_id', 'raw_status', 'previous_status'])]
+// Любой содержательный ключ подавляет законный повтор: одно сырьё может
+// содержать A → B → A → B, и тогда второе наблюдение «A → B» совпадает с
+// первым. Заказ переход применяет, а журнал его теряет — состояние и история
+// расходятся. Номер различает наблюдения по факту появления.
+//
+// От повторной записи защищает не этот индекс, а транзакция разбора (всё
+// сырьё пишется одним коммитом, откат не оставляет половины) и отдельный путь
+// повтора OrderStatusJournal::reapply(), который событий не создаёт.
+#[ORM\UniqueConstraint(name: 'uniq_ingest_order_status_event_observation', columns: ['company_id', 'raw_record_id', 'order_id', 'occurrence'])]
 #[ORM\Index(name: 'idx_ingest_order_status_event_order', columns: ['order_id', 'observed_at'])]
 #[ORM\Index(name: 'idx_ingest_order_status_event_company', columns: ['company_id', 'observed_at'])]
 class IngestOrderStatusEvent implements TenantOwnedInterface
@@ -85,6 +86,15 @@ class IngestOrderStatusEvent implements TenantOwnedInterface
     #[ORM\Column(type: Types::BOOLEAN, nullable: true)]
     private ?bool $applied;
 
+    /**
+     * Порядковый номер наблюдения внутри пары (сырьё, заказ).
+     *
+     * Нужен, чтобы одно и то же наблюдение, законно встретившееся дважды,
+     * попало в журнал дважды: содержательный ключ одно из них потерял бы.
+     */
+    #[ORM\Column(type: Types::INTEGER, options: ['default' => 0])]
+    private int $occurrence;
+
     /** Указатель на сырьё-доказательство; после retention может стать неразрешимым. */
     #[ORM\Column(type: Types::GUID, nullable: true)]
     private ?string $rawRecordId = null;
@@ -101,6 +111,7 @@ class IngestOrderStatusEvent implements TenantOwnedInterface
         ?IngestOrderStatus $previousStatus = null,
         ?string $rawRecordId = null,
         bool $applied = true,
+        int $occurrence = 0,
     ) {
         Assert::uuid($companyId);
         Assert::uuid($orderId);
@@ -117,12 +128,18 @@ class IngestOrderStatusEvent implements TenantOwnedInterface
         // пуст, иначе запись читалась бы как переход, которого не было.
         $this->applied = $applied;
         $this->previousStatus = $applied ? $previousStatus : null;
+        $this->occurrence = $occurrence;
         $this->createdAt = new \DateTimeImmutable();
     }
 
     public function isApplied(): ?bool
     {
         return $this->applied;
+    }
+
+    public function getOccurrence(): int
+    {
+        return $this->occurrence;
     }
 
     public function getId(): string

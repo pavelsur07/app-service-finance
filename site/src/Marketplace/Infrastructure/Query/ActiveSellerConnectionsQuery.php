@@ -62,7 +62,9 @@ final class ActiveSellerConnectionsQuery
                AND mc.company_id = :companyId
              ORDER BY mc.company_id, mc.marketplace, mc.id
              LIMIT :limit',
-            ['type' => 'seller', 'companyId' => $companyId, 'limit' => max(1, min(1000, $limit))],
+            // На строку больше, чем нужно: ровно `limit` строк — это либо
+            // усечение, либо честная граница, и различить их иначе нечем.
+            ['type' => 'seller', 'companyId' => $companyId, 'limit' => max(1, min(1000, $limit)) + 1],
         ));
     }
 

@@ -24,9 +24,10 @@ use App\Ingestion\Repository\IngestOrderStatusEventRepository;
  * - устаревшее наблюдение другого статуса всё равно фиксируется — это факт,
  *   который был, — но текущее состояние заказа назад не двигает и переходом
  *   не считается: у такой записи `applied = false` и пустой `previousStatus`;
- * - одно наблюдение — одно событие: ключ дедупликации собирается из сырья и
- *   сырого статуса, потому что Doctrine-запрос не видит непрофлашенные
- *   сущности, и без локального ключа повтор в одном батче дал бы дубль.
+ * - события различаются ПОРЯДКОВЫМ НОМЕРОМ внутри пары (сырьё, заказ), а не
+ *   содержанием. Содержательный ключ подавлял бы законный повтор: одно сырьё
+ *   может нести A → B → A → B, и второе «A → B» совпало бы с первым — заказ
+ *   переход применил бы, а журнал потерял.
  *
  * Повторный прогон уже разобранного сырья наблюдением НЕ является и идёт
  * через {@see reapply()}: см. комментарий там.
@@ -40,7 +41,7 @@ final readonly class OrderStatusJournal
     /**
      * Открывающее событие только что созданного заказа.
      *
-     * @param array<string, true> $seenObservations изменяется по ссылке
+     * @param array<string, int> $occurrences последний номер на заказ, изменяется по ссылке
      */
     public function recordOpening(
         IngestOrder $order,
@@ -48,15 +49,15 @@ final readonly class OrderStatusJournal
         IngestOrderStatus $status,
         \DateTimeImmutable $observedAt,
         string $rawRecordId,
-        array &$seenObservations,
+        array &$occurrences,
     ): void {
-        $this->append($order, $rawStatus, $status, null, $observedAt, $rawRecordId, $seenObservations, true);
+        $this->append($order, $rawStatus, $status, null, $observedAt, $rawRecordId, $occurrences, true);
     }
 
     /**
      * Наблюдение статуса существующего заказа.
      *
-     * @param array<string, true> $seenObservations изменяется по ссылке
+     * @param array<string, int> $occurrences последний номер на заказ, изменяется по ссылке
      */
     public function observe(
         IngestOrder $order,
@@ -65,7 +66,7 @@ final readonly class OrderStatusJournal
         \DateTimeImmutable $observedAt,
         ?string $rawSubstatus,
         string $rawRecordId,
-        array &$seenObservations,
+        array &$occurrences,
     ): StatusObservationOutcome {
         $previousStatus = $order->getStatus();
         $differs = $previousStatus !== $status || $order->getRawStatus() !== $rawStatus;
@@ -78,7 +79,7 @@ final readonly class OrderStatusJournal
         $accepted = $order->observeStatus($rawStatus, $status, $observedAt, $rawSubstatus, $rawRecordId);
 
         if ($differs) {
-            $this->append($order, $rawStatus, $status, $previousStatus, $observedAt, $rawRecordId, $seenObservations, $accepted);
+            $this->append($order, $rawStatus, $status, $previousStatus, $observedAt, $rawRecordId, $occurrences, $accepted);
         }
 
         // «Принято» и «изменилось» — разные ответы. Принятым считается любое
@@ -94,11 +95,8 @@ final readonly class OrderStatusJournal
      *
      * Повтор — не наблюдение. Наблюдение произошло один раз, тогда же оно и
      * попало в журнал (или осознанно не попало, потому что ничего не меняло).
-     * Если бы повтор шёл общим путём, он вёл бы себя по-разному в зависимости
-     * от момента: сырьё, впервые разобранное при том же статусе, событий не
-     * дало, а после следующей смены статуса тот же повтор внезапно дописал бы
-     * событие с `previousStatus` из будущего — перевёрнутый переход,
-     * появившийся из ничего.
+     * Если бы повтор шёл общим путём, он дописывал бы копии событий при каждой
+     * повторной доставке сообщения.
      */
     public function reapply(
         IngestOrder $order,
@@ -115,7 +113,7 @@ final readonly class OrderStatusJournal
     }
 
     /**
-     * @param array<string, true> $seenObservations изменяется по ссылке
+     * @param array<string, int> $occurrences последний номер на заказ, изменяется по ссылке
      */
     private function append(
         IngestOrder $order,
@@ -124,15 +122,11 @@ final readonly class OrderStatusJournal
         ?IngestOrderStatus $previousStatus,
         \DateTimeImmutable $observedAt,
         string $rawRecordId,
-        array &$seenObservations,
+        array &$occurrences,
         bool $applied,
     ): void {
-        $key = IngestOrderStatusEventRepository::observationKey($order->getId(), $rawStatus, $applied ? $previousStatus : null);
-        if (isset($seenObservations[$key])) {
-            return;
-        }
-
-        $seenObservations[$key] = true;
+        $occurrence = ($occurrences[$order->getId()] ?? -1) + 1;
+        $occurrences[$order->getId()] = $occurrence;
 
         $this->eventRepository->save(new IngestOrderStatusEvent(
             companyId: $order->getCompanyId(),
@@ -143,6 +137,7 @@ final readonly class OrderStatusJournal
             previousStatus: $previousStatus,
             rawRecordId: $rawRecordId,
             applied: $applied,
+            occurrence: $occurrence,
         ));
     }
 }

@@ -18,6 +18,7 @@ use App\Ingestion\Repository\IngestOrderRepository;
 use App\Ingestion\Repository\IngestOrderStatusEventRepository;
 use App\Tests\Integration\Ingestion\Fixtures\FakeOrderMapper;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Ramsey\Uuid\Uuid;
 
 final class NormalizeOrderRawRecordActionTest extends IntegrationTestCase
@@ -285,45 +286,86 @@ final class NormalizeOrderRawRecordActionTest extends IntegrationTestCase
     /**
      * Журнал не должен расходиться с состоянием заказа.
      *
-     * Регрессия двойная. Сначала existsObservation() спрашивала БД на каждое
-     * событие, а Doctrine-запрос не видит непрофлашенные сущности:
-     * последовательность A → B → A внутри одного батча создавала два события A
-     * и роняла финальный flush на уникальном индексе. Затем ключ дедупликации
-     * стал `(сырьё, заказ, сырой статус)` — и подавил ЗАКОННЫЙ возврат в A:
-     * заказ оказывался в A, а журнал заканчивался на B. Ключ включает
-     * предыдущий статус, поэтому возврат пишется, а настоящий повтор — нет.
+     * Регрессия тройная, и каждая следующая — следствие предыдущей правки.
+     * Сначала existsObservation() спрашивала БД на каждое событие, а
+     * Doctrine-запрос не видит непрофлашенные сущности: A → B → A внутри
+     * одного батча создавала два события A и роняла flush на уникальном
+     * индексе. Потом ключ стал `(сырьё, заказ, сырой статус)` и подавил
+     * законный возврат в A: заказ в A, журнал заканчивается на B. Потом в ключ
+     * добавили предыдущий статус — и подавился второй переход `A → B`
+     * последовательности A → B → A → B: заказ в B, журнал заканчивается на A.
+     *
+     * Содержательного ключа, свободного от этого, не существует: наблюдения
+     * различаются фактом появления, а не содержанием. Отсюда порядковый номер.
+     *
+     * @param list<string> $statuses
      */
-    public function testJournalFollowsStatusBackAndForthWithoutDuplicates(): void
-    {
+    #[DataProvider('journalSequenceProvider')]
+    public function testJournalFollowsEveryAppliedTransition(
+        array $statuses,
+        IngestOrderStatus $expectedStatus,
+        string $expectedLastRawStatus,
+        int $expectedEvents,
+    ): void {
         $item = static fn (): MappedOrderItem => new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 1);
 
-        $this->mapper->queue(
-            $this->orderWithItems('delivering', [$item()]),
-            $this->orderWithItems('delivered', [$item()]),
-            $this->orderWithItems('delivering', [$item()]),
-            // Повторы уже записанных переходов новых строк не дают.
-            $this->orderWithItems('delivered', [$item()]),
-            $this->orderWithItems('delivering', [$item()]),
-        );
+        $this->mapper->queue(...array_map(
+            fn (string $status): MappedOrder => $this->orderWithItems($status, [$item()]),
+            $statuses,
+        ));
 
         ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-1'), $this->companyId));
 
         $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
         self::assertNotNull($order);
-        self::assertSame(IngestOrderStatus::SHIPPED, $order->getStatus());
-
-        // Открывающее delivering, переход в delivered и возврат в delivering.
-        self::assertSame(3, $this->events->countByOrder($this->companyId, $order->getId()));
+        self::assertSame($expectedStatus, $order->getStatus());
+        self::assertSame($expectedEvents, $this->events->countByOrder($this->companyId, $order->getId()));
 
         $last = $this->connection->fetchAssociative(
-            'SELECT raw_status, previous_status FROM ingest_order_status_events
-             WHERE company_id = :c AND order_id = :o ORDER BY created_at DESC, id DESC LIMIT 1',
+            'SELECT raw_status FROM ingest_order_status_events
+             WHERE company_id = :c AND order_id = :o ORDER BY occurrence DESC LIMIT 1',
             ['c' => $this->companyId, 'o' => $order->getId()],
         );
 
         self::assertIsArray($last);
-        self::assertSame('delivering', $last['raw_status'], 'Журнал заканчивается там же, где заказ.');
-        self::assertSame('delivered', $last['previous_status']);
+        self::assertSame($expectedLastRawStatus, $last['raw_status'], 'Журнал заканчивается там же, где заказ.');
+    }
+
+    /**
+     * @return iterable<string, array{statuses: list<string>, expectedStatus: IngestOrderStatus, expectedLastRawStatus: string, expectedEvents: int}>
+     */
+    public static function journalSequenceProvider(): iterable
+    {
+        yield 'single observation' => [
+            'statuses' => ['delivering'],
+            'expectedStatus' => IngestOrderStatus::SHIPPED,
+            'expectedLastRawStatus' => 'delivering',
+            'expectedEvents' => 1,
+        ];
+
+        // Подтверждение того же статуса события не даёт.
+        yield 'repeated identical status' => [
+            'statuses' => ['delivering', 'delivering', 'delivering'],
+            'expectedStatus' => IngestOrderStatus::SHIPPED,
+            'expectedLastRawStatus' => 'delivering',
+            'expectedEvents' => 1,
+        ];
+
+        yield 'there and back' => [
+            'statuses' => ['delivering', 'delivered', 'delivering'],
+            'expectedStatus' => IngestOrderStatus::SHIPPED,
+            'expectedLastRawStatus' => 'delivering',
+            'expectedEvents' => 3,
+        ];
+
+        // Именно эта последовательность теряла последний переход при ключе с
+        // предыдущим статусом: заказ оказывался в B, журнал — в A.
+        yield 'there and back and there again' => [
+            'statuses' => ['delivering', 'delivered', 'delivering', 'delivered'],
+            'expectedStatus' => IngestOrderStatus::DELIVERED,
+            'expectedLastRawStatus' => 'delivered',
+            'expectedEvents' => 4,
+        ];
     }
 
     /**

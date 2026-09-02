@@ -29,6 +29,16 @@ final class MalformedConnectorResponseException extends \RuntimeException
     private ?array $decodedPayload;
 
     /**
+     * Относится ли нарушение ко ВСЕМУ эндпоинту, а не к одному объекту.
+     *
+     * Неожиданный HTTP-код — свойство эндпоинта: следующий заказ вернёт ровно
+     * то же самое. Продолжать по заказам значило бы сделать сотни одинаковых
+     * запросов и завершить прогон успехом при сломанном API. Нарушение формы
+     * успешного ответа, наоборот, относится к конкретному объекту.
+     */
+    private bool $endpointWide;
+
+    /**
      * @param array<string, mixed>|null $decodedPayload
      */
     public function __construct(
@@ -36,10 +46,12 @@ final class MalformedConnectorResponseException extends \RuntimeException
         int $code = 0,
         ?\Throwable $previous = null,
         ?array $decodedPayload = null,
+        bool $endpointWide = false,
     ) {
         parent::__construct($message, $code, $previous);
 
         $this->decodedPayload = $decodedPayload;
+        $this->endpointWide = $endpointWide;
     }
 
     /**
@@ -48,5 +60,10 @@ final class MalformedConnectorResponseException extends \RuntimeException
     public function decodedPayload(): ?array
     {
         return $this->decodedPayload;
+    }
+
+    public function isEndpointWide(): bool
+    {
+        return $this->endpointWide;
     }
 }

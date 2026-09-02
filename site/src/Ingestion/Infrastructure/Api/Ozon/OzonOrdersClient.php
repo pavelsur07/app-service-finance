@@ -366,7 +366,7 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
             // Тело неожиданного ответа — доказательство, ради которого аудит и
             // существует. В лог оно не идёт: там разрешены идентификаторы и
             // статусы, но не тела ответов внешних API.
-            throw new MalformedConnectorResponseException(sprintf('Ozon orders returned HTTP %d for %s.', $statusCode, $endpoint), decodedPayload: null === $payload ? null : self::decodeEvidence($payload));
+            throw new MalformedConnectorResponseException(sprintf('Ozon orders returned HTTP %d for %s.', $statusCode, $endpoint), decodedPayload: null === $payload ? null : self::decodeEvidence($payload), /* Свойство эндпоинта, а не отправления: следующий заказ вернёт */ /* ровно то же. Продолжать по заказам значило бы сделать сотни */ /* одинаковых запросов и завершить прогон успехом. */ endpointWide: true);
         }
     }
 
