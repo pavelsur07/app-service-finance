@@ -30,6 +30,13 @@
 35 * * * * cd /app && php bin/console app:ingestion:run-incremental --resource=ozon_orders_fbo --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 37 * * * * cd /app && php bin/console app:ingestion:run-incremental --resource=ozon_orders_fbs --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# Почасовой обход заказов Wildberries. Потоков два, и оба нужны: marketplace
+# знает состав заказа, statistics приносит отмены и правки задним числом.
+# Разнесены по минутам, потому что у statistics-api лимит порядка одного
+# запроса в минуту, и одновременный старт съел бы его впустую.
+39 * * * * cd /app && php bin/console app:ingestion:run-incremental --resource=wildberries_orders_marketplace --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+41 * * * * cd /app && php bin/console app:ingestion:run-incremental --resource=wildberries_orders_statistics --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Освобождение ресурсов, заблокированных зависшими задачами синхронизации.
 # findLatestForResource() считает активной любую задачу в OPEN/RUNNING БЕЗ
 # ограничения по возрасту, поэтому воркер, убитый по SIGKILL или OOM, молча

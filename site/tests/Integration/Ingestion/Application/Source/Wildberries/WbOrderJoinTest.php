@@ -1,0 +1,239 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Integration\Ingestion\Application\Source\Wildberries;
+
+use App\Ingestion\Application\Action\NormalizeOrderRawRecordAction;
+use App\Ingestion\Application\Command\NormalizeRawRecordCommand;
+use App\Ingestion\Application\Source\Wildberries\WbResourceType;
+use App\Ingestion\DTO\RawBatch;
+use App\Ingestion\Enum\IngestOrderScheme;
+use App\Ingestion\Enum\IngestOrderStatus;
+use App\Ingestion\Enum\IngestSource;
+use App\Ingestion\Facade\RawStorageFacade;
+use App\Ingestion\Repository\IngestOrderItemRepository;
+use App\Ingestion\Repository\IngestOrderRepository;
+use App\Ingestion\Repository\IngestOrderStatusEventRepository;
+use App\Tests\Support\Kernel\IntegrationTestCase;
+use Ramsey\Uuid\Uuid;
+
+/**
+ * Сшивка двух потоков WB — главное свойство этой стадии, поэтому проверяется
+ * сквозняком через настоящий маппер и настоящую нормализацию, а не на фейке.
+ */
+final class WbOrderJoinTest extends IntegrationTestCase
+{
+    private const CONNECTION_REF = 'connection-1';
+    private const SHARED_RID = 'eTEST.i0000000000000000000000000000001.0.0';
+    private const STATISTICS_ONLY_SRID = 'eTEST.i9999999999999999999999999999999.0.0';
+
+    private string $companyId;
+    private NormalizeOrderRawRecordAction $action;
+    private IngestOrderRepository $orders;
+    private IngestOrderItemRepository $items;
+    private IngestOrderStatusEventRepository $events;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->companyId = Uuid::uuid7()->toString();
+        $this->action = self::getContainer()->get(NormalizeOrderRawRecordAction::class);
+        $this->orders = self::getContainer()->get(IngestOrderRepository::class);
+        $this->items = self::getContainer()->get(IngestOrderItemRepository::class);
+        $this->events = self::getContainer()->get(IngestOrderStatusEventRepository::class);
+    }
+
+    /**
+     * Заказ, пришедший из обоих потоков, обязан дать ОДНУ запись, а не две:
+     * ради этого `externalId` берётся из `rid` и `srid`, которые у WB
+     * совпадают.
+     */
+    public function testOrderFromBothFeedsBecomesASingleRecord(): void
+    {
+        $this->normalizeMarketplace(new \DateTimeImmutable('-2 hours'));
+        $this->normalizeStatistics(new \DateTimeImmutable('-1 hour'));
+
+        self::assertSame(1, $this->orderCount(self::SHARED_RID));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
+        self::assertNotNull($order);
+
+        // Позиция тоже одна: ключ позиции строится из той же пары
+        // идентификаторов, поэтому второй поток обновляет, а не дублирует.
+        self::assertCount(1, $this->items->findByOrderIndexedByLineKey($this->companyId, $order->getId()));
+    }
+
+    /**
+     * Порядок прихода потоков не должен менять результат: statistics может
+     * обогнать marketplace, потому что это поток изменений.
+     */
+    public function testJoinIsIndependentOfFeedOrder(): void
+    {
+        $this->normalizeStatistics(new \DateTimeImmutable('-2 hours'));
+        $this->normalizeMarketplace(new \DateTimeImmutable('-1 hour'));
+
+        self::assertSame(1, $this->orderCount(self::SHARED_RID));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
+        self::assertNotNull($order);
+
+        // Свежее наблюдение — marketplace, и статус взят из него.
+        self::assertSame(IngestOrderStatus::SHIPPED, $order->getStatus());
+        self::assertSame('supplierStatus=complete;wbStatus=sorted', $order->getRawStatus());
+    }
+
+    /**
+     * Заказ, которого в marketplace нет вовсе, всё равно должен появиться:
+     * ради этого statistics и нужен — он приносит отмены задним числом.
+     */
+    public function testStatisticsOnlyOrderIsStoredAsCancelled(): void
+    {
+        $this->normalizeMarketplace(new \DateTimeImmutable('-2 hours'));
+        $this->normalizeStatistics(new \DateTimeImmutable('-1 hour'));
+
+        $order = $this->orders->findByExternalId(
+            $this->companyId,
+            IngestSource::WILDBERRIES,
+            self::CONNECTION_REF,
+            self::STATISTICS_ONLY_SRID,
+        );
+
+        self::assertNotNull($order);
+        self::assertSame(IngestOrderStatus::CANCELLED, $order->getStatus());
+        // У этой строки выгрузки warehouseType = «Склад WB», то есть поставка
+        // со склада маркетплейса.
+        self::assertSame(IngestOrderScheme::FBO, $order->getScheme());
+    }
+
+    /**
+     * Отмена из statistics обязана перебить более раннее «отгружено» из
+     * marketplace: иначе выкуп считался бы по заказу, которого нет.
+     */
+    public function testLaterCancellationOverridesEarlierShippedStatus(): void
+    {
+        $this->normalizeMarketplace(new \DateTimeImmutable('-2 hours'));
+
+        // Тот же заказ, но statistics сообщает об отмене.
+        $this->normalizeStatistics(new \DateTimeImmutable('-1 hour'), cancelShared: true);
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
+        self::assertNotNull($order);
+        self::assertSame(IngestOrderStatus::CANCELLED, $order->getStatus());
+
+        // Смена статуса — вторая строка журнала, а не переписанная первая.
+        self::assertSame(2, $this->events->countByOrder($this->companyId, $order->getId()));
+    }
+
+    /**
+     * Оба потока обязаны дать заказу один и тот же момент времени: statistics
+     * отдаёт московское время без зоны, marketplace — UTC с Z. Расхождение
+     * означало бы, что заказ «создан» дважды с разницей в три часа.
+     */
+    public function testOrderedAtDoesNotDependOnWhichFeedCreatedTheRecord(): void
+    {
+        $this->normalizeMarketplace(new \DateTimeImmutable('-2 hours'));
+        $fromMarketplace = $this->orders
+            ->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID)
+            ?->getOrderedAt();
+
+        self::assertNotNull($fromMarketplace);
+        self::assertSame('2026-08-30T19:18:04+00:00', $fromMarketplace->format(\DATE_ATOM));
+    }
+
+    private function normalizeMarketplace(\DateTimeImmutable $fetchedAt): void
+    {
+        $rawId = $this->storeRaw(
+            WbResourceType::ORDERS_MARKETPLACE,
+            'marketplace-'.$fetchedAt->getTimestamp(),
+            $this->marketplaceRows(),
+            $fetchedAt,
+        );
+
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId));
+    }
+
+    private function normalizeStatistics(\DateTimeImmutable $fetchedAt, bool $cancelShared = false): void
+    {
+        $rows = $this->statisticsRows();
+        if ($cancelShared) {
+            foreach ($rows as $index => $row) {
+                if (self::SHARED_RID === ($row['srid'] ?? null)) {
+                    $rows[$index]['isCancel'] = true;
+                }
+            }
+        }
+
+        $rawId = $this->storeRaw(
+            WbResourceType::ORDERS_STATISTICS,
+            'statistics-'.$fetchedAt->getTimestamp().($cancelShared ? '-cancelled' : ''),
+            $rows,
+            $fetchedAt,
+        );
+
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId));
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     */
+    private function storeRaw(string $resourceType, string $externalId, array $rows, \DateTimeImmutable $fetchedAt): string
+    {
+        /** @var RawStorageFacade $facade */
+        $facade = self::getContainer()->get(RawStorageFacade::class);
+
+        return $facade->storeAndGetIds(new RawBatch(
+            companyId: $this->companyId,
+            connectionRef: self::CONNECTION_REF,
+            shopRef: 'shop-main',
+            source: IngestSource::WILDBERRIES,
+            resourceType: $resourceType,
+            externalId: $externalId,
+            syncJobId: Uuid::uuid7()->toString(),
+            fetchedAt: $fetchedAt,
+            rows: $rows,
+        ))[0];
+    }
+
+    private function orderCount(string $externalId): int
+    {
+        return (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM ingest_orders WHERE company_id = :c AND external_id = :e',
+            ['c' => $this->companyId, 'e' => $externalId],
+        );
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function marketplaceRows(): array
+    {
+        $base = \dirname(__DIR__, 5).'/Fixtures/Marketplace/Orders/';
+        $orders = json_decode((string) file_get_contents($base.'wb_marketplace_orders.json'), true, 512, \JSON_THROW_ON_ERROR)['orders'];
+
+        $statuses = [];
+        foreach (json_decode((string) file_get_contents($base.'wb_marketplace_orders_status.json'), true, 512, \JSON_THROW_ON_ERROR)['orders'] as $status) {
+            $statuses[$status['id']] = $status;
+        }
+
+        // Коннектор подмешивает статусы до записи в raw — воспроизводим это.
+        $rows = [];
+        foreach ($orders as $row) {
+            $rows[] = isset($statuses[$row['id']])
+                ? $row + ['_ingestion_status' => $statuses[$row['id']]]
+                : $row;
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function statisticsRows(): array
+    {
+        $path = \dirname(__DIR__, 5).'/Fixtures/Marketplace/Orders/wb_statistics_orders.json';
+
+        return json_decode((string) file_get_contents($path), true, 512, \JSON_THROW_ON_ERROR);
+    }
+}

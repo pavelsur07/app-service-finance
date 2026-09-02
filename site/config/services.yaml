@@ -236,6 +236,29 @@ services:
             $resourceType: 'ozon_orders_fbs'
         tags: ['app.ingestion.incremental_strategy']
 
+    # ─── Заказы Wildberries ───
+    App\Ingestion\Infrastructure\Api\Wildberries\WbOrdersClientInterface: '@App\Ingestion\Infrastructure\Api\Wildberries\WbOrdersClient'
+
+    App\Ingestion\Application\Source\Wildberries\WbOrdersConnector:
+        tags: ['app.ingestion.connector']
+
+    App\Ingestion\Application\Source\Wildberries\WbOrderMapper:
+        tags: ['app.ingestion.order_mapper']
+
+    # Два потока, две стратегии. Оба нужны: marketplace знает состав заказа,
+    # statistics приносит отмены и правки задним числом.
+    ingestion.strategy.wb_orders_marketplace:
+        class: App\Ingestion\Application\Service\WbOrdersIncrementalStrategy
+        arguments:
+            $resourceType: 'wildberries_orders_marketplace'
+        tags: ['app.ingestion.incremental_strategy']
+
+    ingestion.strategy.wb_orders_statistics:
+        class: App\Ingestion\Application\Service\WbOrdersIncrementalStrategy
+        arguments:
+            $resourceType: 'wildberries_orders_statistics'
+        tags: ['app.ingestion.incremental_strategy']
+
     App\Ingestion\Application\Service\ListingResolverRegistry:
         arguments:
             $resolvers: !tagged_iterator app.ingestion.listing_resolver

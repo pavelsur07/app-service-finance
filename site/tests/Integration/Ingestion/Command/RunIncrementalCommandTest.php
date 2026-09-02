@@ -197,6 +197,7 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
         $exit = $tester->execute([
             '--source' => 'wildberries',
             '--company-id' => $company->getId(),
+            '--resource' => WbResourceType::FINANCE_SALES_REPORT_DETAILED,
         ]);
 
         self::assertSame(Command::SUCCESS, $exit);
@@ -224,6 +225,7 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
         $exit = $tester->execute([
             '--source' => 'wildberries',
             '--company-id' => $company->getId(),
+            '--resource' => WbResourceType::FINANCE_SALES_REPORT_DETAILED,
         ]);
 
         $expectedSeed = (new \DateTimeImmutable('first day of this month'))->format('Y-m-d');
@@ -258,7 +260,10 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
         $transport->reset();
 
         $tester = $this->tester('app:ingestion:run-incremental');
-        $exit = $tester->execute(['--source' => 'wildberries']);
+        $exit = $tester->execute([
+            '--source' => 'wildberries',
+            '--resource' => WbResourceType::FINANCE_SALES_REPORT_DETAILED,
+        ]);
 
         self::assertSame(Command::SUCCESS, $exit);
         self::assertStringContainsString('not due: 1', $tester->getDisplay());
