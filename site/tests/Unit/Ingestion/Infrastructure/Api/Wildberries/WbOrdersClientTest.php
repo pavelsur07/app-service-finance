@@ -308,6 +308,34 @@ final class WbOrdersClientTest extends TestCase
         yield 'отрицательный курсор' => [1000, -1];
     }
 
+    /**
+     * Обе оси статуса обязательны. Строка без них становилась НАБЛЮДЕНИЕМ с
+     * пустыми осями: заказ получал UNKNOWN, ложное событие журнала и
+     * статусную отметку, закрывающую дорогу более старому, но настоящему
+     * статусу. Повреждённый ответ обязан вести к повтору, а не к записи
+     * выдуманного состояния.
+     */
+    #[DataProvider('brokenStatusRowProvider')]
+    public function testStatusRowWithoutBothAxesIsMalformed(string $payload): void
+    {
+        $client = $this->client(new MockHttpClient(new MockResponse($payload, ['http_code' => 200])));
+
+        $this->expectException(MalformedConnectorResponseException::class);
+        $client->fetchMarketplaceStatuses(self::COMPANY_ID, self::CONNECTION_REF, [5]);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function brokenStatusRowProvider(): iterable
+    {
+        yield 'только id' => ['{"orders":[{"id":5}]}'];
+        yield 'нет wbStatus' => ['{"orders":[{"id":5,"supplierStatus":"new"}]}'];
+        yield 'нет supplierStatus' => ['{"orders":[{"id":5,"wbStatus":"waiting"}]}'];
+        yield 'ось не строка' => ['{"orders":[{"id":5,"supplierStatus":"new","wbStatus":7}]}'];
+        yield 'isCancellable не bool' => ['{"orders":[{"id":5,"supplierStatus":"new","wbStatus":"waiting","isCancellable":"да"}]}'];
+    }
+
     private function client(MockHttpClient $http): WbOrdersClient
     {
         return new WbOrdersClient($http, $this->credentialProvider(), new NullLogger());

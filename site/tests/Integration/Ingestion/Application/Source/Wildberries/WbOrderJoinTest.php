@@ -211,8 +211,11 @@ final class WbOrderJoinTest extends IntegrationTestCase
         $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
         self::assertNotNull($order);
 
-        // Статус остаётся от более свежего наблюдения: назад он не едет.
-        self::assertSame('isCancel=false', $order->getRawStatus());
+        // Статус приходит из marketplace, хотя тот и старше: наблюдение
+        // statistics с isCancel=false статуса не несло вовсе, поэтому
+        // статусной отметки не поставило и дорогу первому настоящему статусу
+        // не закрыло.
+        self::assertSame('supplierStatus=complete;wbStatus=sorted', $order->getRawStatus());
 
         // Но авторитетные поля применились.
         self::assertSame('5000000001', $order->getExternalOrderId());
@@ -521,6 +524,80 @@ final class WbOrderJoinTest extends IntegrationTestCase
         $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::STATISTICS_ONLY_SRID);
         self::assertNotNull($order);
         self::assertSame(IngestOrderScheme::FBO, $order->getScheme());
+    }
+
+    /**
+     * Регрессия: частичное наблюдение без статуса отбрасывалось целиком.
+     *
+     * Оно привязывалось к статусной оси, а `isCancel = false` статуса не
+     * несёт — и все непротиворечивые данные потока (сумма, склад, уточнение
+     * схемы) терялись для уже существующего заказа навсегда. У частичного
+     * наблюдения своя отметка свежести.
+     */
+    public function testNonCancellingStatisticsStillUpdatesItsOwnAttributes(): void
+    {
+        $this->normalizeMarketplace(new \DateTimeImmutable('-2 hours'));
+        $this->normalizeStatistics(new \DateTimeImmutable('-1 hour'));
+
+        $this->em->clear();
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
+        self::assertNotNull($order);
+
+        $attributes = $order->getAttributes() ?? [];
+        self::assertSame('190000', $attributes['finished_price_minor'] ?? null);
+        self::assertSame('Тестовый склад', $attributes['warehouse_name'] ?? null);
+
+        // Статус при этом не тронут: отсутствие отмены статусом не является.
+        self::assertSame(IngestOrderStatus::SHIPPED, $order->getStatus());
+    }
+
+    /**
+     * Устаревшее частичное наблюдение своих данных не применяет.
+     */
+    public function testStalePartialObservationDoesNotOverwriteNewerOne(): void
+    {
+        $this->normalizeStatistics(new \DateTimeImmutable('-1 hour'), cancelShared: true);
+
+        $stale = $this->statisticsRows();
+        foreach ($stale as $index => $row) {
+            if (self::SHARED_RID === ($row['srid'] ?? null)) {
+                $stale[$index]['finishedPrice'] = 1;
+            }
+        }
+        $this->normalize($this->storeRaw(
+            WbResourceType::ORDERS_STATISTICS,
+            'statistics-stale-price',
+            $stale,
+            new \DateTimeImmutable('-3 hours'),
+        ));
+
+        $this->em->clear();
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
+        self::assertNotNull($order);
+        self::assertSame('190000', ($order->getAttributes() ?? [])['finished_price_minor'] ?? null);
+    }
+
+    /**
+     * Заказ, заведённый наблюдением без статуса, не должен получать ни
+     * выдуманного события журнала, ни статусной отметки: первое настоящее
+     * наблюдение обязано приниматься, даже если оно старше.
+     */
+    public function testOrderCreatedWithoutStatusRecordsNoEventAndStaysOpenToOlderStatus(): void
+    {
+        $this->normalizeStatistics(new \DateTimeImmutable('-1 hour'));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
+        self::assertNotNull($order);
+        self::assertSame(0, $this->events->countByOrder($this->companyId, $order->getId()));
+        self::assertNull($order->getStatusObservedAt());
+
+        $this->normalizeMarketplace(new \DateTimeImmutable('-3 hours'));
+
+        $this->em->clear();
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
+        self::assertNotNull($order);
+        self::assertSame(IngestOrderStatus::SHIPPED, $order->getStatus());
+        self::assertSame(1, $this->events->countByOrder($this->companyId, $order->getId()));
     }
 
     /**

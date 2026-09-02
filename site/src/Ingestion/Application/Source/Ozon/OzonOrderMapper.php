@@ -23,13 +23,15 @@ use App\Ingestion\Enum\IngestSource;
 final class OzonOrderMapper implements OrderMapperInterface
 {
     /**
-     * Влезает ли значение в колонку.
+     * Границы BIGINT, в котором хранится priceMinor.
      *
-     * priceMinor хранится в BIGINT. Значение длиннее просто не запишется, и
-     * узнать об этом на вставке — худший момент: raw к тому времени уже
-     * помечен обработанным. Отбраковываем как испорченную цену.
+     * Значение вне диапазона просто не запишется, и узнать об этом на вставке —
+     * худший момент: raw к тому времени уже помечен обработанным. Сравнение
+     * идёт по строке, потому что приведение к int здесь и есть источник
+     * искажения, от которого мы защищаемся.
      */
-    private const MAX_MINOR_DIGITS = 18;
+    private const BIGINT_MAX_DIGITS = '9223372036854775807';
+    private const BIGINT_MIN_DIGITS = '9223372036854775808';
 
     public function source(): IngestSource
     {
@@ -322,12 +324,30 @@ final class OzonOrderMapper implements OrderMapperInterface
         $fraction = str_pad($m[3] ?? '', 2, '0');
         $digits = ltrim($m[2].$fraction, '0');
 
-        if (mb_strlen($digits) > self::MAX_MINOR_DIGITS) {
+        if (!$this->fitsBigint($digits, '-' === $m[1])) {
             return null;
         }
 
         // Ноль канонизируем без знака: «-0» — то же число, но другая строка.
         return '' === $digits ? '0' : $m[1].$digits;
+    }
+
+    /**
+     * Помещается ли число в BIGINT. Сравнение по строке: длина, затем
+     * лексикографически, потому что модуль отрицательной границы на единицу
+     * больше положительной.
+     */
+    private function fitsBigint(string $digits, bool $isNegative): bool
+    {
+        $limit = $isNegative ? self::BIGINT_MIN_DIGITS : self::BIGINT_MAX_DIGITS;
+        $length = mb_strlen($digits);
+        $limitLength = mb_strlen($limit);
+
+        if ($length !== $limitLength) {
+            return $length < $limitLength;
+        }
+
+        return $digits <= $limit;
     }
 
     private function stringOrNull(mixed $value): ?string

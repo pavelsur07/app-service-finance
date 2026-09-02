@@ -98,7 +98,7 @@ final class WbOrderMapperTest extends TestCase
         $batch = (new WbOrderMapper())->map($this->rawRecord(WbResourceType::ORDERS_STATISTICS), $this->statisticsRows());
 
         self::assertNull($batch->orders[0]->items[0]->priceMinor);
-        self::assertSame('190000', $batch->orders[0]->statusAttributes['finished_price_minor']);
+        self::assertSame('190000', $batch->orders[0]->attributes['finished_price_minor']);
     }
 
     /**
@@ -333,7 +333,7 @@ final class WbOrderMapperTest extends TestCase
 
         $batch = (new WbOrderMapper())->map($this->rawRecord(WbResourceType::ORDERS_STATISTICS), $rows);
 
-        self::assertSame($expected, $batch->orders[0]->statusAttributes['finished_price_minor']);
+        self::assertSame($expected, $batch->orders[0]->attributes['finished_price_minor']);
     }
 
     /**

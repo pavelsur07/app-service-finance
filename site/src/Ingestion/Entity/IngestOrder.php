@@ -78,8 +78,17 @@ class IngestOrder implements TenantOwnedInterface
     #[ORM\Column(type: Types::STRING, length: 32, enumType: IngestOrderStatus::class)]
     private IngestOrderStatus $status;
 
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]
-    private \DateTimeImmutable $statusObservedAt;
+    /**
+     * Когда статус наблюдался в последний раз.
+     *
+     * NULL означает «статуса ещё никто не сообщал»: заказ мог быть заведён
+     * наблюдением, которое о статусе молчит (поток изменений WB без отмены,
+     * ответ `/api/v3/orders` без строки `/orders/status`). Ставить сюда
+     * отметку такого наблюдения значило бы закрыть дорогу первому настоящему
+     * статусу, если тот окажется старше по времени скачивания.
+     */
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6, nullable: true)]
+    private ?\DateTimeImmutable $statusObservedAt;
 
     /**
      * Когда наблюдался последний ПОЛНЫЙ снимок заказа. Отдельно от
@@ -87,6 +96,17 @@ class IngestOrder implements TenantOwnedInterface
      */
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6, nullable: true)]
     private ?\DateTimeImmutable $snapshotObservedAt = null;
+
+    /**
+     * Когда наблюдалось последнее ЧАСТИЧНОЕ наблюдение.
+     *
+     * Третья отметка нужна потому, что частичный поток обновляет своё:
+     * атрибуты, уточнение схемы, недостающие позиции. Привязать это к
+     * статусной отметке нельзя — частичное наблюдение статуса может не
+     * нести вовсе, и тогда все его непротиворечивые данные терялись бы.
+     */
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6, nullable: true)]
+    private ?\DateTimeImmutable $partialObservedAt = null;
 
     /** Указатель на raw, из которого получено последнее наблюдение. */
     #[ORM\Column(type: Types::GUID, nullable: true)]
@@ -122,7 +142,7 @@ class IngestOrder implements TenantOwnedInterface
         \DateTimeImmutable $orderedAt,
         string $rawStatus,
         IngestOrderStatus $status,
-        \DateTimeImmutable $statusObservedAt,
+        ?\DateTimeImmutable $statusObservedAt,
         ?string $externalOrderId = null,
         ?string $rawSubstatus = null,
         ?string $lastRawRecordId = null,
@@ -169,7 +189,9 @@ class IngestOrder implements TenantOwnedInterface
         ?string $rawSubstatus = null,
         ?string $rawRecordId = null,
     ): bool {
-        if ($observedAt < $this->statusObservedAt) {
+        // NULL — статуса ещё не было, поэтому первое настоящее наблюдение
+        // принимается независимо от того, насколько оно старое.
+        if (null !== $this->statusObservedAt && $observedAt < $this->statusObservedAt) {
             return false;
         }
 
@@ -236,6 +258,22 @@ class IngestOrder implements TenantOwnedInterface
 
         $this->scheme = $scheme;
         $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    /**
+     * Принять ЧАСТИЧНОЕ наблюдение: атрибуты, уточнение схемы, добавление
+     * недостающих позиций. Со статусом не связано — см. докблок поля.
+     */
+    public function acceptPartialObservation(\DateTimeImmutable $observedAt): bool
+    {
+        if (null !== $this->partialObservedAt && $observedAt < $this->partialObservedAt) {
+            return false;
+        }
+
+        $this->partialObservedAt = $observedAt;
+        $this->updatedAt = new \DateTimeImmutable();
+
+        return true;
     }
 
     public function stopRefreshing(\DateTimeImmutable $at): void
@@ -323,9 +361,14 @@ class IngestOrder implements TenantOwnedInterface
         return $this->status;
     }
 
-    public function getStatusObservedAt(): \DateTimeImmutable
+    public function getStatusObservedAt(): ?\DateTimeImmutable
     {
         return $this->statusObservedAt;
+    }
+
+    public function getPartialObservedAt(): ?\DateTimeImmutable
+    {
+        return $this->partialObservedAt;
     }
 
     public function getLastRawRecordId(): ?string

@@ -60,13 +60,15 @@ final readonly class WbOrderMapper implements OrderMapperInterface
     ];
 
     /**
-     * Влезает ли значение в колонку.
+     * Границы BIGINT, в котором хранится priceMinor.
      *
-     * priceMinor хранится в BIGINT. Значение длиннее просто не запишется, и
-     * узнать об этом на вставке — худший момент: raw к тому времени уже
-     * помечен обработанным. Отбраковываем как испорченную цену.
+     * Значение вне диапазона просто не запишется, и узнать об этом на вставке —
+     * худший момент: raw к тому времени уже помечен обработанным. Сравнение
+     * идёт по строке, потому что приведение к int здесь и есть источник
+     * искажения, от которого мы защищаемся.
      */
-    private const MAX_MINOR_DIGITS = 18;
+    private const BIGINT_MAX_DIGITS = '9223372036854775807';
+    private const BIGINT_MIN_DIGITS = '9223372036854775808';
 
     public function source(): IngestSource
     {
@@ -207,7 +209,10 @@ final readonly class WbOrderMapper implements OrderMapperInterface
                 rawSubstatus: null,
                 // У потока изменений снимочных атрибутов нет: он описывает
                 // не заказ, а его изменение.
-                statusAttributes: $this->statisticsAttributes($row),
+                // Описательное — по оси частичного наблюдения, отмена — по
+                // статусной: у них разная свежесть и разные владельцы.
+                attributes: $this->statisticsAttributes($row),
+                statusAttributes: $this->statisticsStatusAttributes($row),
                 // Поток изменений не отдаёт состава заказа: он вправе
                 // добавить недостающую позицию, но не переписывать и не
                 // удалять то, что видел marketplace.
@@ -398,15 +403,31 @@ final readonly class WbOrderMapper implements OrderMapperInterface
             'tech_size' => $this->stringOrNull($row['techSize'] ?? null),
         ], static fn (mixed $v): bool => null !== $v);
 
-        if (is_bool($row['isCancel'] ?? null)) {
-            $attributes['is_cancel'] = $row['isCancel'];
-        }
-
         // Сумма из statistics живёт под собственным именем: её семантика
         // (цена после всех скидок) отличается от цены позиции marketplace.
         $finishedPriceMinor = $this->minorFromMajor($row['finishedPrice'] ?? null);
         if (null !== $finishedPriceMinor) {
             $attributes['finished_price_minor'] = $finishedPriceMinor;
+        }
+
+        return $attributes;
+    }
+
+    /**
+     * Статусная ось потока изменений — только отмена. Всё остальное он
+     * сообщает независимо от того, менялся ли статус, поэтому живёт на оси
+     * частичного наблюдения.
+     *
+     * @param array<string, mixed> $row
+     *
+     * @return array<string, mixed>
+     */
+    private function statisticsStatusAttributes(array $row): array
+    {
+        $attributes = [];
+
+        if (is_bool($row['isCancel'] ?? null)) {
+            $attributes['is_cancel'] = $row['isCancel'];
         }
 
         $cancelledAt = WbOrderDateParser::parseStatisticsInstant($row['cancelDate'] ?? null);
@@ -433,7 +454,7 @@ final readonly class WbOrderMapper implements OrderMapperInterface
             // `0*(\d+)` гарантирует непустую группу: ведущие нули съедает
             // первая часть, «000» даёт «0».
             $digits = $m[2];
-            if (mb_strlen($digits) > self::MAX_MINOR_DIGITS) {
+            if (!$this->fitsBigint($digits, '-' === $m[1])) {
                 return null;
             }
 
@@ -469,7 +490,7 @@ final readonly class WbOrderMapper implements OrderMapperInterface
         $fraction = str_pad($m[3] ?? '', 2, '0');
         $digits = ltrim($m[2].$fraction, '0');
 
-        if (mb_strlen($digits) > self::MAX_MINOR_DIGITS) {
+        if (!$this->fitsBigint($digits, '-' === $m[1])) {
             return null;
         }
 
@@ -508,6 +529,24 @@ final readonly class WbOrderMapper implements OrderMapperInterface
     private function skip(string $reason, ?string $hint): array
     {
         return ['order' => null, 'error' => $reason, 'hint' => $hint];
+    }
+
+    /**
+     * Помещается ли число в BIGINT. Сравнение по строке: длина, затем
+     * лексикографически, потому что модуль отрицательной границы на единицу
+     * больше положительной.
+     */
+    private function fitsBigint(string $digits, bool $isNegative): bool
+    {
+        $limit = $isNegative ? self::BIGINT_MIN_DIGITS : self::BIGINT_MAX_DIGITS;
+        $length = mb_strlen($digits);
+        $limitLength = mb_strlen($limit);
+
+        if ($length !== $limitLength) {
+            return $length < $limitLength;
+        }
+
+        return $digits <= $limit;
     }
 
     private function stringOrNull(mixed $value): ?string

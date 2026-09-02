@@ -271,7 +271,10 @@ final readonly class NormalizeOrderRawRecordAction
                 orderedAt: $this->applicationTime($mapped->orderedAt),
                 rawStatus: $mapped->rawStatus,
                 status: $status,
-                statusObservedAt: $observedAt,
+                // Отметка ставится, только если статус реально наблюдался:
+                // иначе первое настоящее наблюдение, окажись оно старше по
+                // времени скачивания, было бы отвергнуто как устаревшее.
+                statusObservedAt: $mapped->statusObserved ? $observedAt : null,
                 externalOrderId: $mapped->externalOrderId,
                 rawSubstatus: $mapped->rawSubstatus,
                 lastRawRecordId: $rawRecord->getId(),
@@ -281,13 +284,21 @@ final readonly class NormalizeOrderRawRecordAction
                     ? null
                     : array_merge($mapped->attributes, $mapped->statusAttributes),
             );
+            // Отметка своей оси ставится и при создании — иначе следующее,
+            // более старое наблюдение того же вида прошло бы как первое.
             if ($mapped->itemsAuthoritative) {
                 $order->acceptSnapshot($observedAt);
+            } else {
+                $order->acceptPartialObservation($observedAt);
             }
 
             $this->orderRepository->save($order);
 
-            $this->appendStatusEvent($order, $mapped->rawStatus, $status, null, $observedAt, $rawRecord->getId(), $seenObservations);
+            // Событие журнала — факт НАБЛЮДЕНИЯ статуса. Без наблюдения его
+            // нет: выдуманная строка «статус UNKNOWN» ничего не фиксирует.
+            if ($mapped->statusObserved) {
+                $this->appendStatusEvent($order, $mapped->rawStatus, $status, null, $observedAt, $rawRecord->getId(), $seenObservations);
+            }
             $applied = $this->applyItems($order, $mapped, [], $resolutions, $orderIndex);
             $knownItems[$order->getId()] = $applied;
             if ($mapped->itemsAuthoritative) {
@@ -340,7 +351,7 @@ final readonly class NormalizeOrderRawRecordAction
             $order->mergeAttributes($mapped->statusAttributes);
         }
 
-        if ($snapshotAccepted || ($statusAccepted && !$mapped->itemsAuthoritative)) {
+        if ($snapshotAccepted) {
             $order->mergeAttributes($mapped->attributes);
         }
 
@@ -359,9 +370,20 @@ final readonly class NormalizeOrderRawRecordAction
             // наблюдение с изменившимся артикулом добавило бы вторую позицию
             // к тому же заказу. Отклонённое по времени сырьё состава касаться
             // не должно вовсе.
-            if (!$statusAccepted) {
+            // У частичного наблюдения СВОЯ отметка свежести.
+            //
+            // Привязать его к статусной нельзя: поток изменений WB при
+            // `isCancel = false` статуса не несёт вовсе, и тогда все его
+            // непротиворечивые данные — сумма, склад, уточнение схемы,
+            // недостающая позиция — терялись бы навсегда.
+            if (!$order->acceptPartialObservation($observedAt)) {
                 return $order;
             }
+
+            // Атрибуты частичного потока применяются по ЕГО отметке: они
+            // описывают то, что видит именно он. Статусные остаются за
+            // статусной осью — их пишет только принятое статусное наблюдение.
+            $order->mergeAttributes($mapped->attributes);
 
             // Схему частичное наблюдение уточняет, но не портит: заказ,
             // впервые пришедший с неизвестным типом склада, иначе навсегда
@@ -371,14 +393,25 @@ final readonly class NormalizeOrderRawRecordAction
                 $order->applyScheme($mapped->scheme);
             }
 
-            $applied = $this->applyItems(
-                $order,
-                $mapped,
-                $knownItems[$order->getId()] ?? [],
-                $resolutions,
-                $orderIndex,
-            );
-            $knownItems[$order->getId()] = $applied + ($knownItems[$order->getId()] ?? []);
+            // Позицию частичное наблюдение добавляет только если оно не
+            // старше последнего полного снимка.
+            //
+            // Снимок описывает состав заказа целиком, поэтому наблюдение,
+            // сделанное до него, не может знать о позиции, которой в снимке
+            // нет: у WB ключ позиции зависит от артикула, и переименование
+            // в старой строке иначе добавило бы к заказу фантомную вторую
+            // позицию.
+            $snapshotAt = $order->getSnapshotObservedAt();
+            if (null === $snapshotAt || $observedAt >= $snapshotAt) {
+                $applied = $this->applyItems(
+                    $order,
+                    $mapped,
+                    $knownItems[$order->getId()] ?? [],
+                    $resolutions,
+                    $orderIndex,
+                );
+                $knownItems[$order->getId()] = $applied + ($knownItems[$order->getId()] ?? []);
+            }
 
             return $order;
         }

@@ -122,6 +122,21 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
                 throw new MalformedConnectorResponseException(sprintf('WB %s returned a status row without an integer id.', self::ORDERS_STATUS_ENDPOINT));
             }
 
+            // Обе оси обязательны.
+            //
+            // Строка без них проходила бы дальше и становилась НАБЛЮДЕНИЕМ
+            // статуса с пустыми осями: заказ получал бы UNKNOWN, ложное
+            // событие журнала и статусную отметку, закрывающую дорогу более
+            // старому, но настоящему статусу. Повреждённый ответ обязан
+            // приводить к повтору, а не к записи выдуманного состояния.
+            if (!is_string($row['supplierStatus'] ?? null) || !is_string($row['wbStatus'] ?? null)) {
+                throw new MalformedConnectorResponseException(sprintf('WB %s returned a status row without both status axes.', self::ORDERS_STATUS_ENDPOINT));
+            }
+
+            if (array_key_exists('isCancellable', $row) && !is_bool($row['isCancellable'])) {
+                throw new MalformedConnectorResponseException(sprintf('WB %s returned a non-boolean isCancellable.', self::ORDERS_STATUS_ENDPOINT));
+            }
+
             $indexed[$id] = $row;
         }
 
