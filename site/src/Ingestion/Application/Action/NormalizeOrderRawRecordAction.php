@@ -252,7 +252,11 @@ final readonly class NormalizeOrderRawRecordAction
                 externalOrderId: $mapped->externalOrderId,
                 rawSubstatus: $mapped->rawSubstatus,
                 lastRawRecordId: $rawRecord->getId(),
-                attributes: [] === $mapped->attributes ? null : $mapped->attributes,
+                // При создании применяются оба набора: обе оси наблюдаются
+                // впервые, и делить их ещё не от чего.
+                attributes: [] === $mapped->attributes && [] === $mapped->statusAttributes
+                    ? null
+                    : array_merge($mapped->attributes, $mapped->statusAttributes),
             );
             if ($mapped->itemsAuthoritative) {
                 $order->acceptSnapshot($observedAt);
@@ -298,14 +302,18 @@ final readonly class NormalizeOrderRawRecordAction
         // Частичное наблюдение снимком не является: оно лишь дополняет состав.
         $snapshotAccepted = $mapped->itemsAuthoritative && $order->acceptSnapshot($observedAt);
 
-        // Атрибуты сливаются только из ПРИНЯТОГО наблюдения.
+        // Атрибуты сливаются ПО ВЛАДЕЛЬЦУ ОСИ.
         //
-        // Среди них есть изменяемые: is_cancel, supplier_status, wb_status,
-        // is_cancellable. Безусловное слияние означало бы, что устаревшее
-        // сырьё, не сдвинув статус, всё равно перепишет их — заказ остался бы
-        // CANCELLED с атрибутом is_cancel=false. Пропустить статичный атрибут
-        // из старой записи не так дорого, как показать неверный.
-        if ($statusAccepted || $snapshotAccepted) {
+        // Статусные меняются во времени, поэтому идут только с принятым
+        // статусом: иначе более старый, но первый полный снимок записал бы
+        // свои supplier_status и wb_status поверх свежей отмены — заказ
+        // показывал бы актуальный CANCELLED рядом с устаревшими осями.
+        // Снимочные описывают заказ как таковой и идут со снимком.
+        if ($statusAccepted) {
+            $order->mergeAttributes($mapped->statusAttributes);
+        }
+
+        if ($snapshotAccepted || ($statusAccepted && !$mapped->itemsAuthoritative)) {
             $order->mergeAttributes($mapped->attributes);
         }
 

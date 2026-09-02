@@ -43,6 +43,16 @@ final readonly class WbOrdersConnector implements SourceConnectorInterface
     /** Глубина посева, если курсора ещё нет. */
     private const DEFAULT_LOOKBACK_HOURS = 1;
 
+    /**
+     * Курсор сериализуется С микросекундами.
+     *
+     * DATE_ATOM их отбрасывает, и отметка `11:30:00.123456` сохранялась бы как
+     * `11:30:00`: на следующем обходе та же строка снова оказывалась строго
+     * новее курсора, и при отсутствии более поздних строк он вечно возвращался
+     * бы к той же секунде, перечитывая одно и то же окно.
+     */
+    private const CURSOR_FORMAT = 'Y-m-d\TH:i:s.uP';
+
     public function __construct(
         private WbOrdersClientInterface $client,
         private ClockInterface $clock,
@@ -177,10 +187,10 @@ final readonly class WbOrdersConnector implements SourceConnectorInterface
             return new PullResult(
                 rawBatch: $batch,
                 nextCursorValue: json_encode(array_filter([
-                    'since' => $since->format(\DATE_ATOM),
+                    'since' => $since->format(self::CURSOR_FORMAT),
                     'next' => $next,
-                    'floor' => $floor?->format(\DATE_ATOM),
-                    'ceiling' => $ceiling->format(\DATE_ATOM),
+                    'floor' => $floor?->format(self::CURSOR_FORMAT),
+                    'ceiling' => $ceiling->format(self::CURSOR_FORMAT),
                 ], static fn (mixed $v): bool => null !== $v), \JSON_THROW_ON_ERROR),
                 hasMore: true,
                 continuationDelaySeconds: 1,
@@ -202,7 +212,7 @@ final readonly class WbOrdersConnector implements SourceConnectorInterface
         return new PullResult(
             rawBatch: $batch,
             nextCursorValue: json_encode(
-                ['since' => max($ceiling, $floor ?? $ceiling)->format(\DATE_ATOM)],
+                ['since' => max($ceiling, $floor ?? $ceiling)->format(self::CURSOR_FORMAT)],
                 \JSON_THROW_ON_ERROR,
             ),
             hasMore: false,
@@ -252,6 +262,14 @@ final readonly class WbOrdersConnector implements SourceConnectorInterface
         // строка) иначе становилась бы курсором навсегда: следующее окно
         // начиналось бы позже реальных изменений, а пустые ответы не смогли бы
         // это исправить, потому что курсор назад не едет.
+        // Нижняя граница — прежний курсор, а на первом обходе начало окна.
+        //
+        // Без неё `$after` равнялся null, и знак мог уехать к отметке РАНЬШЕ
+        // фактически запрошенного окна: ответ statistics шире запроса, и одна
+        // старая строка отбросила бы курсор назад, заставив перечитывать
+        // историю.
+        $lowerBound = $cursorSince ?? $since;
+
         // Рассчитанный знак старше времени запроса и потому побеждает его.
         //
         // Через max() он не проходил бы на ПЕРВОМ обходе: без курсора второй
@@ -260,12 +278,12 @@ final readonly class WbOrdersConnector implements SourceConnectorInterface
         // между фактическим максимумом и ответом, терялись бы — ровно то, ради
         // чего знак и считается по данным. Монотонность сохраняется:
         // maxLastChangeDateAfter() отбирает строки строго позже курсора.
-        $fresh = $this->maxLastChangeDateAfter($rows, $cursorSince, $now);
-        $nextSince = $fresh ?? max($now, $cursorSince ?? $now);
+        $fresh = $this->maxLastChangeDateAfter($rows, $lowerBound, $now, $request->resourceType);
+        $nextSince = $fresh ?? max($now, $lowerBound);
 
         return new PullResult(
             rawBatch: $batch,
-            nextCursorValue: json_encode(['since' => $nextSince->format(\DATE_ATOM)], \JSON_THROW_ON_ERROR),
+            nextCursorValue: json_encode(['since' => $nextSince->format(self::CURSOR_FORMAT)], \JSON_THROW_ON_ERROR),
             hasMore: false,
             continuationDelaySeconds: null,
         );
@@ -325,16 +343,30 @@ final readonly class WbOrdersConnector implements SourceConnectorInterface
      *
      * @param list<array<string, mixed>> $rows
      */
-    private function maxLastChangeDateAfter(array $rows, ?\DateTimeImmutable $after, \DateTimeImmutable $ceiling): ?\DateTimeImmutable
-    {
+    private function maxLastChangeDateAfter(
+        array $rows,
+        \DateTimeImmutable $after,
+        \DateTimeImmutable $ceiling,
+        string $resourceType,
+    ): ?\DateTimeImmutable {
         $max = null;
         foreach ($rows as $row) {
-            $parsed = WbOrderDateParser::parseStatisticsInstant($row['lastChangeDate'] ?? null);
-            if (null === $parsed) {
+            if (true === ($row['_ingestion_empty'] ?? null)) {
                 continue;
             }
 
-            if (null !== $after && $parsed <= $after) {
+            // lastChangeDate — часть протокола, а не необязательное поле.
+            //
+            // Молчаливый пропуск повреждённой отметки означал бы, что
+            // непустой испорченный ответ считается доказанным «изменений
+            // нет»: курсор уехал бы на время запроса и закрыл непрочитанный
+            // участок окна навсегда.
+            $parsed = WbOrderDateParser::parseStatisticsInstant($row['lastChangeDate'] ?? null);
+            if (null === $parsed) {
+                throw new MalformedConnectorResponseException(sprintf('WB %s row has no parsable lastChangeDate.', $resourceType));
+            }
+
+            if ($parsed <= $after) {
                 continue;
             }
 

@@ -98,7 +98,7 @@ final class WbOrderMapperTest extends TestCase
         $batch = (new WbOrderMapper())->map($this->rawRecord(WbResourceType::ORDERS_STATISTICS), $this->statisticsRows());
 
         self::assertNull($batch->orders[0]->items[0]->priceMinor);
-        self::assertSame('190000', $batch->orders[0]->attributes['finished_price_minor']);
+        self::assertSame('190000', $batch->orders[0]->statusAttributes['finished_price_minor']);
     }
 
     /**
@@ -177,8 +177,8 @@ final class WbOrderMapperTest extends TestCase
         $batch = (new WbOrderMapper())->map($this->rawRecord(WbResourceType::ORDERS_STATISTICS), $this->statisticsRows());
         $notCancelled = $this->orderByExternalId($batch->orders, 'eTEST.i0000000000000000000000000000001.0.0');
 
-        self::assertArrayNotHasKey('cancelled_at', $notCancelled->attributes);
-        self::assertFalse($notCancelled->attributes['is_cancel']);
+        self::assertArrayNotHasKey('cancelled_at', $notCancelled->statusAttributes);
+        self::assertFalse($notCancelled->statusAttributes['is_cancel']);
     }
 
     public function testRealCancelDateIsKept(): void
@@ -186,7 +186,7 @@ final class WbOrderMapperTest extends TestCase
         $batch = (new WbOrderMapper())->map($this->rawRecord(WbResourceType::ORDERS_STATISTICS), $this->statisticsRows());
         $cancelled = $this->orderByExternalId($batch->orders, 'eTEST.i9999999999999999999999999999999.0.0');
 
-        self::assertSame('2026-08-29T21:00:00+00:00', $cancelled->attributes['cancelled_at']);
+        self::assertSame('2026-08-29T21:00:00+00:00', $cancelled->statusAttributes['cancelled_at']);
     }
 
     /**
@@ -326,7 +326,7 @@ final class WbOrderMapperTest extends TestCase
 
         $batch = (new WbOrderMapper())->map($this->rawRecord(WbResourceType::ORDERS_STATISTICS), $rows);
 
-        self::assertSame($expected, $batch->orders[0]->attributes['finished_price_minor']);
+        self::assertSame($expected, $batch->orders[0]->statusAttributes['finished_price_minor']);
     }
 
     /**

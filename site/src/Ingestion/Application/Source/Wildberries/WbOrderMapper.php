@@ -139,7 +139,8 @@ final readonly class WbOrderMapper implements OrderMapperInterface
                 items: [$item],
                 externalOrderId: $this->stringOrNull($row['id'] ?? null),
                 rawSubstatus: null,
-                attributes: $this->marketplaceAttributes($row, $status),
+                attributes: $this->marketplaceAttributes($row),
+                statusAttributes: $this->marketplaceStatusAttributes($status),
             ),
             'error' => null,
             'hint' => null,
@@ -191,7 +192,9 @@ final readonly class WbOrderMapper implements OrderMapperInterface
                 // поток пришёл последним.
                 externalOrderId: null,
                 rawSubstatus: null,
-                attributes: $this->statisticsAttributes($row),
+                // У потока изменений снимочных атрибутов нет: он описывает
+                // не заказ, а его изменение.
+                statusAttributes: $this->statisticsAttributes($row),
                 // Поток изменений не отдаёт состава заказа: он вправе
                 // добавить недостающую позицию, но не переписывать и не
                 // удалять то, что видел marketplace.
@@ -323,9 +326,9 @@ final readonly class WbOrderMapper implements OrderMapperInterface
      *
      * @return array<string, mixed>
      */
-    private function marketplaceAttributes(array $row, mixed $status): array
+    private function marketplaceAttributes(array $row): array
     {
-        $attributes = array_filter([
+        return array_filter([
             'wb_order_id' => $this->stringOrNull($row['id'] ?? null),
             'order_uid' => $this->stringOrNull($row['orderUid'] ?? null),
             'supply_id' => $this->stringOrNull($row['supplyId'] ?? null),
@@ -333,15 +336,28 @@ final readonly class WbOrderMapper implements OrderMapperInterface
             'delivery_type' => $this->stringOrNull($row['deliveryType'] ?? null),
             'chrt_id' => $this->stringOrNull($row['chrtId'] ?? null),
         ], static fn (mixed $v): bool => null !== $v);
+    }
 
-        if (is_array($status)) {
-            // Обе оси сохраняются дословно рядом с нормализованным статусом:
-            // supplierStatus в нормализации не участвует, но объясняет её.
-            $attributes['supplier_status'] = $this->stringOrNull($status['supplierStatus'] ?? null);
-            $attributes['wb_status'] = $this->stringOrNull($status['wbStatus'] ?? null);
-            if (is_bool($status['isCancellable'] ?? null)) {
-                $attributes['is_cancellable'] = $status['isCancellable'];
-            }
+    /**
+     * Обе оси сохраняются дословно рядом с нормализованным статусом:
+     * supplierStatus в нормализации не участвует, но объясняет её. Это
+     * статусная ось, и она меняется во времени.
+     *
+     * @return array<string, mixed>
+     */
+    private function marketplaceStatusAttributes(mixed $status): array
+    {
+        if (!is_array($status)) {
+            return [];
+        }
+
+        $attributes = [
+            'supplier_status' => $this->stringOrNull($status['supplierStatus'] ?? null),
+            'wb_status' => $this->stringOrNull($status['wbStatus'] ?? null),
+        ];
+
+        if (is_bool($status['isCancellable'] ?? null)) {
+            $attributes['is_cancellable'] = $status['isCancellable'];
         }
 
         return array_filter($attributes, static fn (mixed $v): bool => null !== $v);

@@ -364,6 +364,37 @@ final class WbOrderJoinTest extends IntegrationTestCase
     }
 
     /**
+     * Регрессия: снимочные и статусные атрибуты сливались одним условием.
+     *
+     * В сценарии «свежая отмена из statistics, затем более старый ПЕРВЫЙ
+     * полный снимок marketplace» статус отклонялся как устаревший, но снимок
+     * принимался — и его статусные оси всё равно записывались. Заказ показывал
+     * актуальный CANCELLED рядом с устаревшими supplier_status и wb_status.
+     */
+    public function testOlderSnapshotDoesNotWriteItsStaleStatusAxes(): void
+    {
+        $this->normalizeStatistics(new \DateTimeImmutable('-1 hour'), cancelShared: true);
+        $this->normalizeMarketplace(new \DateTimeImmutable('-2 hours'));
+
+        $this->em->clear();
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
+        self::assertNotNull($order);
+
+        $attributes = $order->getAttributes() ?? [];
+
+        // Статус остался от свежей отмены.
+        self::assertSame(IngestOrderStatus::CANCELLED, $order->getStatus());
+        self::assertTrue($attributes['is_cancel'] ?? null);
+
+        // Устаревшие оси статуса из старого снимка не записались.
+        self::assertArrayNotHasKey('wb_status', $attributes);
+        self::assertArrayNotHasKey('supplier_status', $attributes);
+
+        // Снимочные атрибуты при этом применились: они не про статус.
+        self::assertSame('WB-GI-271305969', $attributes['supply_id'] ?? null);
+    }
+
+    /**
      * Полный снимок заказа не должен зависеть от порядка прихода потоков.
      */
     public function testCanonicalFieldsDoNotDependOnFeedOrder(): void

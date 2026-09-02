@@ -14,6 +14,12 @@ use Webmozart\Assert\Assert;
  * и operationGroupId, потому что описывает денежную проводку. Заказ — не
  * проводка: у него позиции, количества, статус и своя жизнь во времени.
  *
+ * Атрибуты разделены по владельцу оси. Снимочные описывают заказ как таковой и
+ * применяются вместе со снимком; статусные (`supplier_status`, `wb_status`,
+ * `is_cancellable`, `is_cancel`) меняются во времени и применяются только
+ * вместе с принятым статусом — иначе устаревшее сырьё показало бы актуальный
+ * CANCELLED рядом с устаревшими осями статуса.
+ *
  * `itemsAuthoritative` разделяет два вида наблюдений. Полный снимок (Ozon,
  * marketplace-api WB) заменяет состав заказа целиком, включая удаление
  * исчезнувших позиций. Частичное наблюдение (statistics-api WB) знает о
@@ -25,7 +31,8 @@ final readonly class MappedOrder
 {
     /**
      * @param list<MappedOrderItem> $items
-     * @param array<string, mixed> $attributes
+     * @param array<string, mixed> $attributes атрибуты снимка: описывают заказ как таковой
+     * @param array<string, mixed> $statusAttributes атрибуты статусной оси: меняются во времени
      * @param bool $itemsAuthoritative несёт ли наблюдение ПОЛНЫЙ состав заказа
      */
     public function __construct(
@@ -37,6 +44,7 @@ final readonly class MappedOrder
         public ?string $externalOrderId = null,
         public ?string $rawSubstatus = null,
         public array $attributes = [],
+        public array $statusAttributes = [],
         public bool $itemsAuthoritative = true,
     ) {
         Assert::notEmpty($externalId);
