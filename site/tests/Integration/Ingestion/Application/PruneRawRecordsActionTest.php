@@ -87,7 +87,15 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
      */
     public function testRecordStillSeenRecentlyIsKept(): void
     {
-        $this->seedRaw('page-1', new \DateTimeImmutable('-2 days'));
+        // Скачано давно, но подтверждается до сих пор. Отметки РАЗНЫЕ
+        // намеренно: с одинаковыми тест остался бы зелёным и в том случае,
+        // если бы возраст считался по `fetchedAt` — то есть не защищал бы
+        // правило, ради которого написан.
+        $this->seedRaw(
+            'page-1',
+            new \DateTimeImmutable('-2 days'),
+            new \DateTimeImmutable('-400 days'),
+        );
 
         $result = ($this->action)(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
 
@@ -327,7 +335,7 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
     /**
      * @return array{id: string, path: string}
      */
-    private function seedRaw(string $externalId, \DateTimeImmutable $lastSeenAt): array
+    private function seedRaw(string $externalId, \DateTimeImmutable $lastSeenAt, ?\DateTimeImmutable $fetchedAt = null): array
     {
         /** @var RawStorageFacade $facade */
         $facade = self::getContainer()->get(RawStorageFacade::class);
@@ -340,7 +348,7 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
             resourceType: 'prune_fixture',
             externalId: $externalId,
             syncJobId: Uuid::uuid7()->toString(),
-            fetchedAt: $lastSeenAt,
+            fetchedAt: $fetchedAt ?? $lastSeenAt,
             rows: [['posting_number' => 'posting-1']],
         ));
 
