@@ -8,7 +8,6 @@ use App\Ingestion\Domain\TenantOwnedInterface;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\RawNormalizationStatus;
 use App\Ingestion\Repository\IngestRawRecordRepository;
-use App\Shared\Infrastructure\Doctrine\MicrosecondDateTimeImmutableType;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
@@ -58,7 +57,8 @@ class IngestRawRecord implements TenantOwnedInterface
      * делают два наблюдения внутри одной секунды неразличимыми, и более
      * старое побеждает более новое.
      */
-    #[ORM\Column(type: MicrosecondDateTimeImmutableType::NAME)]
+    // Имя типа, а не класс: см. IngestOrder. Регистрация — doctrine.yaml.
+    #[ORM\Column(type: 'datetime_immutable_us')]
     private \DateTimeImmutable $fetchedAt;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]

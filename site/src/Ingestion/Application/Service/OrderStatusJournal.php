@@ -22,7 +22,8 @@ use App\Ingestion\Repository\IngestOrderStatusEventRepository;
  * - событие пишется только при ОТЛИЧИИ от текущего статуса; иначе часовой
  *   опрос дал бы 24 одинаковые строки в сутки на каждый заказ;
  * - устаревшее наблюдение другого статуса всё равно фиксируется — это факт,
- *   который был, — но текущее состояние заказа назад не двигает;
+ *   который был, — но текущее состояние заказа назад не двигает и переходом
+ *   не считается: у такой записи `applied = false` и пустой `previousStatus`;
  * - одно наблюдение — одно событие: ключ дедупликации собирается из сырья и
  *   сырого статуса, потому что Doctrine-запрос не видит непрофлашенные
  *   сущности, и без локального ключа повтор в одном батче дал бы дубль.
@@ -49,7 +50,7 @@ final readonly class OrderStatusJournal
         string $rawRecordId,
         array &$seenObservations,
     ): void {
-        $this->append($order, $rawStatus, $status, null, $observedAt, $rawRecordId, $seenObservations);
+        $this->append($order, $rawStatus, $status, null, $observedAt, $rawRecordId, $seenObservations, true);
     }
 
     /**
@@ -69,13 +70,16 @@ final readonly class OrderStatusJournal
         $previousStatus = $order->getStatus();
         $differs = $previousStatus !== $status || $order->getRawStatus() !== $rawStatus;
 
-        if ($differs) {
-            // Событие пишется ДО observeStatus(): иначе previousStatus уже
-            // равнялся бы новому и запись теряла бы переход.
-            $this->append($order, $rawStatus, $status, $previousStatus, $observedAt, $rawRecordId, $seenObservations);
-        }
-
+        // Свежесть выясняется ДО записи события: устаревшее наблюдение — тоже
+        // факт и фиксируется, но переходом не является. Записанное как переход
+        // (`previousStatus = DELIVERED`, `status = SHIPPED`), оно утверждало бы
+        // движение заказа, которого не было; признак `applied` разделяет эти
+        // два смысла, а previousStatus у неприменённого наблюдения пуст.
         $accepted = $order->observeStatus($rawStatus, $status, $observedAt, $rawSubstatus, $rawRecordId);
+
+        if ($differs) {
+            $this->append($order, $rawStatus, $status, $previousStatus, $observedAt, $rawRecordId, $seenObservations, $accepted);
+        }
 
         // «Принято» и «изменилось» — разные ответы. Принятым считается любое
         // наблюдение не старше текущей отметки, включая повторяющее тот же
@@ -121,6 +125,7 @@ final readonly class OrderStatusJournal
         \DateTimeImmutable $observedAt,
         string $rawRecordId,
         array &$seenObservations,
+        bool $applied,
     ): void {
         $key = $order->getId()."\0".$rawStatus;
         if (isset($seenObservations[$key])) {
@@ -137,6 +142,7 @@ final readonly class OrderStatusJournal
             observedAt: $observedAt,
             previousStatus: $previousStatus,
             rawRecordId: $rawRecordId,
+            applied: $applied,
         ));
     }
 }

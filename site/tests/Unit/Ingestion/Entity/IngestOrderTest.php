@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Ingestion\Entity;
 
+use App\Ingestion\Entity\IngestOrder;
 use App\Ingestion\Entity\IngestOrderStatusEvent;
+use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Enum\IngestOrderStatus;
+use App\Shared\Infrastructure\Doctrine\MicrosecondDateTimeImmutableType;
 use App\Tests\Builders\Ingestion\IngestOrderBuilder;
+use Doctrine\ORM\Mapping\Column;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class IngestOrderTest extends TestCase
@@ -45,6 +50,41 @@ final class IngestOrderTest extends TestCase
     }
 
     /**
+     * Сущности ссылаются на микросекундный тип СТРОКОЙ: класс живёт в
+     * Shared\Infrastructure, а `Infrastructure/` чужого модуля закрыт. Строка
+     * и зарегистрированное имя типа разъехаться молча не должны — тогда
+     * Doctrine вернулась бы к секундной точности, и наблюдения внутри одной
+     * секунды снова стали бы неразличимы.
+     *
+     * @param class-string $entity
+     */
+    #[DataProvider('microsecondColumnProvider')]
+    public function testObservationColumnsUseTheRegisteredMicrosecondType(string $entity, string $property): void
+    {
+        $attributes = (new \ReflectionProperty($entity, $property))->getAttributes(Column::class);
+        self::assertCount(1, $attributes);
+
+        self::assertSame(
+            MicrosecondDateTimeImmutableType::NAME,
+            $attributes[0]->newInstance()->type,
+            sprintf('%s::$%s обязана храниться с микросекундами.', $entity, $property),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{entity: class-string, property: string}>
+     */
+    public static function microsecondColumnProvider(): iterable
+    {
+        yield 'order status watermark' => ['entity' => IngestOrder::class, 'property' => 'statusObservedAt'];
+        yield 'order snapshot watermark' => ['entity' => IngestOrder::class, 'property' => 'snapshotObservedAt'];
+        yield 'order partial watermark' => ['entity' => IngestOrder::class, 'property' => 'partialObservedAt'];
+        yield 'order refresh attempt' => ['entity' => IngestOrder::class, 'property' => 'statusRefreshAttemptedAt'];
+        yield 'journal observation' => ['entity' => IngestOrderStatusEvent::class, 'property' => 'observedAt'];
+        yield 'raw record fetch time' => ['entity' => IngestRawRecord::class, 'property' => 'fetchedAt'];
+    }
+
+    /**
      * Журнал переходов правится только добавлением строк. Держать это на
      * договорённости нельзя — проверяем машинно.
      */
@@ -57,7 +97,9 @@ final class IngestOrderTest extends TestCase
             if ($method->isConstructor()) {
                 continue;
             }
-            if (str_starts_with($method->getName(), 'get')) {
+            // `get*` и `is*` — чтение. Проверка именно на мутаторы: append-only
+            // запрещает изменение записи, а не булев геттер.
+            if (str_starts_with($method->getName(), 'get') || str_starts_with($method->getName(), 'is')) {
                 continue;
             }
             $mutators[] = $method->getName();

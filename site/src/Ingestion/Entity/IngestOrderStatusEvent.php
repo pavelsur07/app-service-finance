@@ -7,7 +7,6 @@ namespace App\Ingestion\Entity;
 use App\Ingestion\Domain\TenantOwnedInterface;
 use App\Ingestion\Enum\IngestOrderStatus;
 use App\Ingestion\Repository\IngestOrderStatusEventRepository;
-use App\Shared\Infrastructure\Doctrine\MicrosecondDateTimeImmutableType;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
@@ -58,8 +57,20 @@ class IngestOrderStatusEvent implements TenantOwnedInterface
     #[ORM\Column(type: Types::STRING, length: 32, enumType: IngestOrderStatus::class, nullable: true)]
     private ?IngestOrderStatus $previousStatus = null;
 
-    #[ORM\Column(type: MicrosecondDateTimeImmutableType::NAME)]
+    // Имя типа, а не класс: см. IngestOrder. Регистрация — doctrine.yaml.
+    #[ORM\Column(type: 'datetime_immutable_us')]
     private \DateTimeImmutable $observedAt;
+
+    /**
+     * Сдвинуло ли это наблюдение состояние заказа.
+     *
+     * Наблюдение фиксируется как факт даже когда оно устарело — сырьё пришло
+     * позже, чем более свежее. Но переходом такое наблюдение не является: у
+     * записи с `applied = false` `previousStatus` пуст, потому что читать её
+     * как «заказ перешёл из DELIVERED в SHIPPED» было бы прямой ложью.
+     */
+    #[ORM\Column(type: Types::BOOLEAN, options: ['default' => true])]
+    private bool $applied = true;
 
     /** Указатель на сырьё-доказательство; после retention может стать неразрешимым. */
     #[ORM\Column(type: Types::GUID, nullable: true)]
@@ -76,6 +87,7 @@ class IngestOrderStatusEvent implements TenantOwnedInterface
         \DateTimeImmutable $observedAt,
         ?IngestOrderStatus $previousStatus = null,
         ?string $rawRecordId = null,
+        bool $applied = true,
     ) {
         Assert::uuid($companyId);
         Assert::uuid($orderId);
@@ -87,9 +99,17 @@ class IngestOrderStatusEvent implements TenantOwnedInterface
         $this->rawStatus = $rawStatus;
         $this->status = $status;
         $this->observedAt = $observedAt;
-        $this->previousStatus = $previousStatus;
         $this->rawRecordId = $rawRecordId;
+        // Устаревшее наблюдение переходом не является: previousStatus у него
+        // пуст, иначе запись читалась бы как переход, которого не было.
+        $this->applied = $applied;
+        $this->previousStatus = $applied ? $previousStatus : null;
         $this->createdAt = new \DateTimeImmutable();
+    }
+
+    public function isApplied(): bool
+    {
+        return $this->applied;
     }
 
     public function getId(): string

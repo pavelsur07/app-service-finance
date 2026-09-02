@@ -748,6 +748,44 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
         ));
     }
 
+    /**
+     * Проверка ПЕРЕЧИТЫВАНИЯ под блокировкой.
+     *
+     * Заказы выбираются до внешних HTTP-запросов, и за время опроса
+     * нормализатор мог записать более свежее наблюдение. Doctrine считает
+     * изменения от значений, прочитанных ДО опроса, поэтому без
+     * `HINT_REFRESH` блокировка защитила бы строку в базе, оставив в памяти
+     * устаревшее состояние — и финальный flush откатил бы статус назад.
+     *
+     * Конкурентная запись эмулируется прямым UPDATE мимо Doctrine: сущность
+     * уже в карте идентичности, и это ровно то расхождение, которое возникает
+     * между двумя процессами.
+     */
+    public function testConcurrentNewerObservationIsNotOverwritten(): void
+    {
+        $company = $this->seedCompanyWithConnection();
+        $order = $this->seedOrder($company, 'posting-1', IngestOrderStatus::SHIPPED, 'delivering');
+
+        // «Нормализатор» записал наблюдение из будущего и закоммитил его.
+        $this->connection->executeStatement(
+            'UPDATE ingest_orders SET status_observed_at = :observedAt WHERE id = :id',
+            ['observedAt' => (new \DateTimeImmutable('+1 day'))->format('Y-m-d H:i:s.u'), 'id' => $order->getId()],
+        );
+
+        $this->ozon->setPostings(['posting-1' => ['posting_number' => 'posting-1', 'status' => 'delivered']]);
+
+        ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        $this->em->clear();
+        $refreshed = $this->orders->findByExternalId((string) $company->getId(), IngestSource::OZON, self::CONNECTION_ID, 'posting-1');
+        self::assertNotNull($refreshed);
+        self::assertSame(
+            IngestOrderStatus::SHIPPED,
+            $refreshed->getStatus(),
+            'Наблюдение старше уже записанного не двигает статус.',
+        );
+    }
+
     private function deactivateConnections(Company $company): void
     {
         $this->connection->executeStatement(

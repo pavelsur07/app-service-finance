@@ -109,6 +109,18 @@ final class NormalizeOrderRawRecordActionTest extends IntegrationTestCase
         self::assertNotNull($order);
         self::assertSame(IngestOrderStatus::DELIVERED, $order->getStatus(), 'Статус не должен ехать назад.');
         self::assertSame(2, $this->events->countByOrder($this->companyId, $order->getId()), 'Наблюдение — факт, оно фиксируется.');
+
+        // ...но переходом оно не является. Запись с previousStatus = DELIVERED
+        // и status = SHIPPED утверждала бы движение заказа, которого не было.
+        $stale = $this->connection->fetchAssociative(
+            'SELECT applied, previous_status FROM ingest_order_status_events
+             WHERE company_id = :c AND order_id = :o AND raw_status = :s',
+            ['c' => $this->companyId, 'o' => $order->getId(), 's' => 'delivering'],
+        );
+
+        self::assertIsArray($stale);
+        self::assertFalse((bool) $stale['applied'], 'Устаревшее наблюдение состояние не сдвинуло.');
+        self::assertNull($stale['previous_status'], 'У неприменённого наблюдения перехода нет.');
     }
 
     /**

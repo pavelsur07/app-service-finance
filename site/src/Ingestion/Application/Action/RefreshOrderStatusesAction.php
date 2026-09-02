@@ -423,6 +423,15 @@ final readonly class RefreshOrderStatusesAction
 
             if (null === $posting) {
                 ++$missing;
+                // Аудит нужен и для промаха: «спросили — Ozon такого
+                // отправления не знает» это утверждение о данных, и через
+                // месяц его нечем будет подтвердить. Тела у 404 нет, поэтому
+                // строка синтетическая и помечена как таковая.
+                $rows[] = [
+                    'posting_number' => $order->getExternalId(),
+                    '_ingestion_outcome' => 'not_found',
+                ];
+
                 continue;
             }
 
@@ -594,6 +603,15 @@ final readonly class RefreshOrderStatusesAction
             // отметки он вечно занимал бы начало очереди.
             foreach ($chunk as $wbOrderId) {
                 $attempts[$byWbId[$wbOrderId]->getId()] = $answeredAt;
+            }
+
+            // Заказ, которого не оказалось в успешном ответе, — тоже промах,
+            // и он тоже документируется: иначе доказательства нет ни у одной
+            // стороны.
+            foreach ($chunk as $wbOrderId) {
+                if (!isset($statuses[$wbOrderId])) {
+                    $rows[] = ['id' => $wbOrderId, '_ingestion_outcome' => 'not_found'];
+                }
             }
 
             $missing += count($chunk) - $answered;
