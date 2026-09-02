@@ -15,6 +15,7 @@ use App\Ingestion\Entity\IngestOrder;
 use App\Ingestion\Entity\IngestOrderItem;
 use App\Ingestion\Entity\IngestOrderStatusEvent;
 use App\Ingestion\Entity\IngestRawRecord;
+use App\Ingestion\Enum\IngestOrderScheme;
 use App\Ingestion\Enum\IngestOrderStatus;
 use App\Ingestion\Enum\NormalizationIssueKind;
 use App\Ingestion\Exception\RawRecordNotFoundException;
@@ -78,7 +79,7 @@ final readonly class NormalizeOrderRawRecordAction
         // приложение живёт в своей зоне; сравнение сохранённой отметки со
         // свежей давало бы разницу в три часа, и устаревшее наблюдение
         // проходило бы как новое.
-        $observedAt = $rawRecord->getFetchedAt()->setTimezone(new \DateTimeZone(date_default_timezone_get()));
+        $observedAt = $this->applicationTime($rawRecord->getFetchedAt());
 
         // Заказы поднимаются ОДНИМ запросом, а не по одному на строку.
         //
@@ -207,6 +208,14 @@ final readonly class NormalizeOrderRawRecordAction
     }
 
     /**
+     * Момент в зоне приложения — то соглашение, в котором живёт схема.
+     */
+    private function applicationTime(\DateTimeImmutable $instant): \DateTimeImmutable
+    {
+        return $instant->setTimezone(new \DateTimeZone(date_default_timezone_get()));
+    }
+
+    /**
      * @param array<string, IngestOrder> $known externalId => заказ
      * @param array<string, array<string, IngestOrderItem>> $knownItems пул сущностей для
      *                                                                  переиспользования, не сжимается
@@ -256,7 +265,10 @@ final readonly class NormalizeOrderRawRecordAction
                 source: $rawRecord->getSource(),
                 scheme: $mapped->scheme,
                 externalId: $mapped->externalId,
-                orderedAt: $mapped->orderedAt,
+                // Дата заказа тоже приводится к зоне приложения: парсер
+                // отдаёт UTC, а колонка без зоны вернула бы тот же
+                // циферблат в зоне PHP, сдвинув абсолютный момент.
+                orderedAt: $this->applicationTime($mapped->orderedAt),
                 rawStatus: $mapped->rawStatus,
                 status: $status,
                 statusObservedAt: $observedAt,
@@ -286,7 +298,8 @@ final readonly class NormalizeOrderRawRecordAction
         }
 
         $previousStatus = $order->getStatus();
-        $statusChanged = $previousStatus !== $status || $order->getRawStatus() !== $mapped->rawStatus;
+        $statusChanged = $mapped->statusObserved
+            && ($previousStatus !== $status || $order->getRawStatus() !== $mapped->rawStatus);
 
         // Наблюдение фиксируется, если статус ОТЛИЧАЕТСЯ от текущего — иначе
         // часовой опрос дал бы 24 одинаковые строки в сутки на заказ. При этом
@@ -307,7 +320,10 @@ final readonly class NormalizeOrderRawRecordAction
         //
         // Поэтому у снимка своя отметка. Событие журнала пишется в любом
         // случае: оно фиксирует факт наблюдения, а не текущее состояние.
-        $statusAccepted = $order->observeStatus($mapped->rawStatus, $status, $observedAt, $mapped->rawSubstatus, $rawRecord->getId());
+        // Наблюдение без статуса статуса не двигает и события не пишет:
+        // отсутствие статуса — не статус.
+        $statusAccepted = $mapped->statusObserved
+            && $order->observeStatus($mapped->rawStatus, $status, $observedAt, $mapped->rawSubstatus, $rawRecord->getId());
 
         // Полный снимок применяется, если он новее ПОСЛЕДНЕГО полного снимка.
         // Частичное наблюдение снимком не является: оно лишь дополняет состав.
@@ -347,6 +363,14 @@ final readonly class NormalizeOrderRawRecordAction
                 return $order;
             }
 
+            // Схему частичное наблюдение уточняет, но не портит: заказ,
+            // впервые пришедший с неизвестным типом склада, иначе навсегда
+            // остался бы UNKNOWN — авторитетного снимка для него может не
+            // быть вовсе (заказы FBO в marketplace-поток не попадают).
+            if (IngestOrderScheme::UNKNOWN !== $mapped->scheme && IngestOrderScheme::UNKNOWN === $order->getScheme()) {
+                $order->applyScheme($mapped->scheme);
+            }
+
             $applied = $this->applyItems(
                 $order,
                 $mapped,
@@ -363,9 +387,11 @@ final readonly class NormalizeOrderRawRecordAction
             return $order;
         }
 
-        // Схему задаёт только принятый авторитетный снимок: заказ мог быть
-        // создан частичным наблюдением, которое схемы не знало.
-        $order->applyScheme($mapped->scheme);
+        // Схему задаёт принятый авторитетный снимок — но UNKNOWN не затирает
+        // уже известное значение: «не знаю» не является уточнением.
+        if (IngestOrderScheme::UNKNOWN !== $mapped->scheme || IngestOrderScheme::UNKNOWN === $order->getScheme()) {
+            $order->applyScheme($mapped->scheme);
+        }
 
         $applied = $this->applyItems(
             $order,

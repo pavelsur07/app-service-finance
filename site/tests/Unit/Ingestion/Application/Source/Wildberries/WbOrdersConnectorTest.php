@@ -143,9 +143,9 @@ final class WbOrdersConnectorTest extends TestCase
 
         self::assertTrue($result->hasMore);
         $decoded = json_decode((string) $result->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame('2026-09-01T10:45:00.000000+00:00', $decoded['since']);
         self::assertSame(WbOrdersConnector::MAX_PAGES_PER_PULL * 10, $decoded['next']);
-        self::assertSame('2026-09-01T11:00:00.000000+00:00', $decoded['floor']);
+        $this->assertCursorInstant('2026-09-01T10:45:00+00:00', $result->nextCursorValue);
+        $this->assertCursorInstant('2026-09-01T11:00:00+00:00', $result->nextCursorValue, 'floor');
     }
 
     public function testMarketplaceContinuationResumesFromStoredNextToken(): void
@@ -176,8 +176,7 @@ final class WbOrdersConnectorTest extends TestCase
             'floor' => '2026-09-01T18:00:00+00:00',
         ], \JSON_THROW_ON_ERROR)));
 
-        $decoded = json_decode((string) $result->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame('2026-09-01T18:00:00.000000+00:00', $decoded['since']);
+        $this->assertCursorInstant('2026-09-01T18:00:00+00:00', $result->nextCursorValue);
     }
 
     /**
@@ -196,8 +195,7 @@ final class WbOrdersConnectorTest extends TestCase
         $result = $this->connector->pull($this->request(WbResourceType::ORDERS_STATISTICS, '{"since":"2026-09-01T09:00:00+00:00"}'));
 
         // 14:30 по Москве — это 11:30 UTC.
-        $decoded = json_decode((string) $result->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame('2026-09-01T11:30:00.000000+00:00', $decoded['since']);
+        $this->assertCursorInstant('2026-09-01T11:30:00+00:00', $result->nextCursorValue);
     }
 
     /**
@@ -208,8 +206,7 @@ final class WbOrdersConnectorTest extends TestCase
     {
         $result = $this->connector->pull($this->request(WbResourceType::ORDERS_STATISTICS, '{"since":"2026-09-01T09:00:00+00:00"}'));
 
-        $decoded = json_decode((string) $result->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame('2026-09-01T12:00:00.000000+00:00', $decoded['since']);
+        $this->assertCursorInstant('2026-09-01T12:00:00+00:00', $result->nextCursorValue);
     }
 
     /**
@@ -228,8 +225,8 @@ final class WbOrdersConnectorTest extends TestCase
         // Курсор 09:00 UTC = 12:00 по Москве: обе строки внутри перекрытия.
         $result = $this->connector->pull($this->request(WbResourceType::ORDERS_STATISTICS, '{"since":"2026-09-01T09:00:00+00:00"}'));
 
-        $decoded = json_decode((string) $result->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame('2026-09-01T12:00:00.000000+00:00', $decoded['since'], 'Новых изменений нет — курсор идёт к времени запроса.');
+        // Новых изменений нет — курсор идёт к времени запроса.
+        $this->assertCursorInstant('2026-09-01T12:00:00+00:00', $result->nextCursorValue);
     }
 
     /**
@@ -330,8 +327,7 @@ final class WbOrdersConnectorTest extends TestCase
         $this->client->queueMarketplace(...$pages);
 
         $first = $this->connector->pull($this->request(WbResourceType::ORDERS_MARKETPLACE, '{"since":"2026-09-01T11:00:00+00:00"}'));
-        $continuation = json_decode((string) $first->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame('2026-09-01T12:00:00.000000+00:00', $continuation['ceiling']);
+        $this->assertCursorInstant('2026-09-01T12:00:00+00:00', $first->nextCursorValue, 'ceiling');
 
         // Продолжение доигрывается спустя час.
         $client = new FakeWbOrdersClient();
@@ -339,8 +335,7 @@ final class WbOrdersConnectorTest extends TestCase
         $later = new WbOrdersConnector($client, new MockClock('2026-09-01 13:00:00'));
         $final = $later->pull($this->request(WbResourceType::ORDERS_MARKETPLACE, (string) $first->nextCursorValue));
 
-        $decoded = json_decode((string) $final->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame('2026-09-01T12:00:00.000000+00:00', $decoded['since'], 'Курсор обязан встать на потолок, а не на время финального вызова.');
+        $this->assertCursorInstant('2026-09-01T12:00:00+00:00', $final->nextCursorValue);
     }
 
     /**
@@ -414,8 +409,7 @@ final class WbOrdersConnectorTest extends TestCase
         $result = $this->connector->pull($this->request(WbResourceType::ORDERS_STATISTICS, null));
 
         // 14:30 по Москве — это 11:30 UTC, заметно раньше часов 12:00.
-        $decoded = json_decode((string) $result->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame('2026-09-01T11:30:00.000000+00:00', $decoded['since']);
+        $this->assertCursorInstant('2026-09-01T11:30:00+00:00', $result->nextCursorValue);
     }
 
     /**
@@ -433,8 +427,7 @@ final class WbOrdersConnectorTest extends TestCase
 
         $result = $this->connector->pull($this->request(WbResourceType::ORDERS_STATISTICS, null));
 
-        $decoded = json_decode((string) $result->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame('2026-09-01T12:00:00.000000+00:00', $decoded['since']);
+        $this->assertCursorInstant('2026-09-01T12:00:00+00:00', $result->nextCursorValue);
     }
 
     /**
@@ -448,8 +441,7 @@ final class WbOrdersConnectorTest extends TestCase
         ], false));
 
         $first = $this->connector->pull($this->request(WbResourceType::ORDERS_STATISTICS, null));
-        $decoded = json_decode((string) $first->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame('2026-09-01T11:30:00.123456+00:00', $decoded['since']);
+        $this->assertCursorInstant('2026-09-01T11:30:00.123456+00:00', $first->nextCursorValue);
 
         // Второй обход видит ту же строку — она больше не свежая.
         $this->client->queueStatistics(new WbOrdersPage([
@@ -457,8 +449,7 @@ final class WbOrdersConnectorTest extends TestCase
         ], false));
         $second = $this->connector->pull($this->request(WbResourceType::ORDERS_STATISTICS, (string) $first->nextCursorValue));
 
-        $decoded = json_decode((string) $second->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame('2026-09-01T12:00:00.000000+00:00', $decoded['since'], 'Курсор обязан уйти вперёд, а не застрять на той же секунде.');
+        $this->assertCursorInstant('2026-09-01T12:00:00+00:00', $second->nextCursorValue);
     }
 
     /**
@@ -486,6 +477,25 @@ final class WbOrdersConnectorTest extends TestCase
         yield 'отметка не строка' => [['srid' => 's-1', 'lastChangeDate' => 123]];
         yield 'отметка не разбирается' => [['srid' => 's-1', 'lastChangeDate' => 'вчера']];
         yield 'нулевая заглушка' => [['srid' => 's-1', 'lastChangeDate' => '0001-01-01T00:00:00']];
+    }
+
+    /**
+     * Сравнение по АБСОЛЮТНОМУ моменту, а не по строке.
+     *
+     * Курсор пишется в зоне приложения, поэтому `15:00+03:00` и `12:00Z` —
+     * одно и то же время. Сравнение строк проверяло бы соглашение о записи, а
+     * не корректность позиции.
+     */
+    private function assertCursorInstant(string $expected, ?string $cursorValue, string $key = 'since'): void
+    {
+        self::assertNotNull($cursorValue);
+        $decoded = json_decode($cursorValue, true, 512, \JSON_THROW_ON_ERROR);
+
+        self::assertArrayHasKey($key, $decoded);
+        self::assertSame(
+            (new \DateTimeImmutable($expected))->getTimestamp(),
+            (new \DateTimeImmutable($decoded[$key]))->getTimestamp(),
+        );
     }
 
     private function request(string $resourceType, ?string $cursorValue): PullRequest

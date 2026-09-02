@@ -22,6 +22,15 @@ use App\Ingestion\Enum\IngestSource;
  */
 final class OzonOrderMapper implements OrderMapperInterface
 {
+    /**
+     * Влезает ли значение в колонку.
+     *
+     * priceMinor хранится в BIGINT. Значение длиннее просто не запишется, и
+     * узнать об этом на вставке — худший момент: raw к тому времени уже
+     * помечен обработанным. Отбраковываем как испорченную цену.
+     */
+    private const MAX_MINOR_DIGITS = 18;
+
     public function source(): IngestSource
     {
         return IngestSource::OZON;
@@ -313,8 +322,11 @@ final class OzonOrderMapper implements OrderMapperInterface
         $fraction = str_pad($m[3] ?? '', 2, '0');
         $digits = ltrim($m[2].$fraction, '0');
 
-        // Ноль канонизируем без знака: "-0" — то же самое число, но другая
-        // строка, и сравнение денежных значений на нём разъезжается.
+        if (mb_strlen($digits) > self::MAX_MINOR_DIGITS) {
+            return null;
+        }
+
+        // Ноль канонизируем без знака: «-0» — то же число, но другая строка.
         return '' === $digits ? '0' : $m[1].$digits;
     }
 

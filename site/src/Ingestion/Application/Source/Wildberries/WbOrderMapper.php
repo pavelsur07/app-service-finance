@@ -59,6 +59,15 @@ final readonly class WbOrderMapper implements OrderMapperInterface
         'Склад WB' => IngestOrderScheme::FBO,
     ];
 
+    /**
+     * Влезает ли значение в колонку.
+     *
+     * priceMinor хранится в BIGINT. Значение длиннее просто не запишется, и
+     * узнать об этом на вставке — худший момент: raw к тому времени уже
+     * помечен обработанным. Отбраковываем как испорченную цену.
+     */
+    private const MAX_MINOR_DIGITS = 18;
+
     public function source(): IngestSource
     {
         return IngestSource::WILDBERRIES;
@@ -124,8 +133,9 @@ final readonly class WbOrderMapper implements OrderMapperInterface
         // теряется — обе оси уходят пустыми, статус деградирует в UNKNOWN и
         // попадает в видимую очередь на разбор.
         $status = $row['_ingestion_status'] ?? null;
-        $supplierStatus = is_array($status) ? (string) ($status['supplierStatus'] ?? '') : '';
-        $wbStatus = is_array($status) ? (string) ($status['wbStatus'] ?? '') : '';
+        $hasStatus = is_array($status);
+        $supplierStatus = $hasStatus ? (string) ($status['supplierStatus'] ?? '') : '';
+        $wbStatus = $hasStatus ? (string) ($status['wbStatus'] ?? '') : '';
 
         return [
             'order' => new MappedOrder(
@@ -141,6 +151,9 @@ final readonly class WbOrderMapper implements OrderMapperInterface
                 rawSubstatus: null,
                 attributes: $this->marketplaceAttributes($row),
                 statusAttributes: $this->marketplaceStatusAttributes($status),
+                // Ответ без строки статуса ничего о статусе не говорит: он не
+                // должен превращать известный этап жизни заказа в UNKNOWN.
+                statusObserved: $hasStatus,
             ),
             'error' => null,
             'hint' => null,
@@ -199,6 +212,12 @@ final readonly class WbOrderMapper implements OrderMapperInterface
                 // добавить недостающую позицию, но не переписывать и не
                 // удалять то, что видел marketplace.
                 itemsAuthoritative: false,
+                // Статусом является только ОТМЕНА. `isCancel = false` говорит
+                // «отмены не было» и о движении товара не сообщает ничего;
+                // принять это за наблюдение значило бы затирать SHIPPED или
+                // DELIVERED, тем более что крон ставит statistics после
+                // marketplace — затирало бы почти всегда.
+                statusObserved: $isCancel,
             ),
             'error' => null,
             'hint' => null,
@@ -407,8 +426,18 @@ final readonly class WbOrderMapper implements OrderMapperInterface
             return (string) $value;
         }
 
-        if (is_string($value) && 1 === preg_match('/^-?\d+$/', trim($value))) {
-            return (string) (int) trim($value);
+        if (is_string($value) && 1 === preg_match('/^(-?)0*(\d+)$/', trim($value), $m)) {
+            // Канонизация БЕЗ приведения к int: строка длиннее PHP_INT_MAX
+            // молча превратилась бы в предельное целое, то есть сохранила бы
+            // другую денежную величину без единого признака ошибки.
+            // `0*(\d+)` гарантирует непустую группу: ведущие нули съедает
+            // первая часть, «000» даёт «0».
+            $digits = $m[2];
+            if (mb_strlen($digits) > self::MAX_MINOR_DIGITS) {
+                return null;
+            }
+
+            return '0' === $digits ? '0' : $m[1].$digits;
         }
 
         return null;
@@ -439,6 +468,10 @@ final readonly class WbOrderMapper implements OrderMapperInterface
 
         $fraction = str_pad($m[3] ?? '', 2, '0');
         $digits = ltrim($m[2].$fraction, '0');
+
+        if (mb_strlen($digits) > self::MAX_MINOR_DIGITS) {
+            return null;
+        }
 
         // Ноль канонизируем без знака: «-0» — то же число, но другая строка.
         return '' === $digits ? '0' : $m[1].$digits;

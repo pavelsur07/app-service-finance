@@ -146,11 +146,16 @@ final class WbOrderJoinTest extends IntegrationTestCase
 
         self::assertNotNull($createdByMarketplace);
         self::assertNotNull($createdByStatistics);
-        self::assertSame('2026-08-30T19:18:04+00:00', $createdByMarketplace->format(\DATE_ATOM));
+
+        // Сравниваем АБСОЛЮТНЫЙ момент, а не подпись зоны: хранилище
+        // безразлично к зоне, и `22:18:04+03:00` — тот же момент, что и
+        // `19:18:04Z`. Сравнение форматированных строк проверяло бы
+        // соглашение о записи, а не корректность данных.
         self::assertSame(
-            $createdByMarketplace->format(\DATE_ATOM),
-            $createdByStatistics->format(\DATE_ATOM),
+            (new \DateTimeImmutable('2026-08-30T19:18:04+00:00'))->getTimestamp(),
+            $createdByMarketplace->getTimestamp(),
         );
+        self::assertSame($createdByMarketplace->getTimestamp(), $createdByStatistics->getTimestamp());
     }
 
     /**
@@ -238,7 +243,7 @@ final class WbOrderJoinTest extends IntegrationTestCase
             $stale,
             new \DateTimeImmutable('-3 hours'),
         );
-        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId));
+        $this->normalize($rawId);
 
         $this->em->clear();
         $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
@@ -288,7 +293,7 @@ final class WbOrderJoinTest extends IntegrationTestCase
             $rows,
             new \DateTimeImmutable('-3 hours'),
         );
-        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId));
+        $this->normalize($rawId);
 
         $this->em->clear();
         $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
@@ -353,7 +358,7 @@ final class WbOrderJoinTest extends IntegrationTestCase
             $rows,
             new \DateTimeImmutable('-3 hours'),
         );
-        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId));
+        $this->normalize($rawId);
 
         $this->em->clear();
         self::assertCount(
@@ -429,10 +434,7 @@ final class WbOrderJoinTest extends IntegrationTestCase
             }
         }
 
-        ($this->action)(new NormalizeRawRecordCommand(
-            $this->storeRaw(WbResourceType::ORDERS_MARKETPLACE, 'marketplace-'.$key, $rows, $fetchedAt),
-            $this->companyId,
-        ));
+        $this->normalize($this->storeRaw(WbResourceType::ORDERS_MARKETPLACE, 'marketplace-'.$key, $rows, $fetchedAt));
         $this->em->clear();
     }
 
@@ -444,6 +446,81 @@ final class WbOrderJoinTest extends IntegrationTestCase
         $items = $this->items->findByOrderIndexedByLineKey($this->companyId, $order->getId());
 
         return $items[array_key_first($items)]->getPriceMinor();
+    }
+
+    /**
+     * Регрессия: `isCancel = false` считался статусным наблюдением.
+     *
+     * Крон ставит statistics ПОСЛЕ marketplace, поэтому оно почти всегда
+     * новее — и «отмены не было» затирало бы реальный этап жизни заказа.
+     * Отсутствие статуса статусом не является.
+     */
+    public function testNonCancellingStatisticsDoesNotOverwriteLifecycleStatus(): void
+    {
+        $this->normalizeMarketplace(new \DateTimeImmutable('-2 hours'));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
+        self::assertNotNull($order);
+        self::assertSame(IngestOrderStatus::SHIPPED, $order->getStatus());
+
+        // Более свежее наблюдение из statistics, но отмены в нём нет.
+        $this->normalizeStatistics(new \DateTimeImmutable('-1 hour'));
+
+        $this->em->clear();
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
+        self::assertNotNull($order);
+        self::assertSame(IngestOrderStatus::SHIPPED, $order->getStatus(), 'Отсутствие отмены не является статусом.');
+
+        // И журнал не растёт на пустом наблюдении.
+        self::assertSame(1, $this->events->countByOrder($this->companyId, $order->getId()));
+    }
+
+    /**
+     * Отмена — единственное, что statistics действительно сообщает о статусе,
+     * и она обязана применяться.
+     */
+    public function testCancellingStatisticsStillOverridesLifecycleStatus(): void
+    {
+        $this->normalizeMarketplace(new \DateTimeImmutable('-2 hours'));
+        $this->normalizeStatistics(new \DateTimeImmutable('-1 hour'), cancelShared: true);
+
+        $this->em->clear();
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
+        self::assertNotNull($order);
+        self::assertSame(IngestOrderStatus::CANCELLED, $order->getStatus());
+    }
+
+    /**
+     * Регрессия: схема заказа, созданного statistics с неизвестным типом
+     * склада, оставалась UNKNOWN навсегда. Авторитетного снимка для него может
+     * не быть вовсе — заказы FBO в marketplace-поток не попадают.
+     */
+    public function testLaterStatisticsRefinesUnknownScheme(): void
+    {
+        $rows = $this->statisticsRows();
+        foreach ($rows as $index => $row) {
+            if (self::STATISTICS_ONLY_SRID === ($row['srid'] ?? null)) {
+                $rows[$index]['warehouseType'] = 'Склад будущего';
+            }
+        }
+        $this->normalize($this->storeRaw(
+            WbResourceType::ORDERS_STATISTICS,
+            'statistics-unknown-scheme',
+            $rows,
+            new \DateTimeImmutable('-2 hours'),
+        ));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::STATISTICS_ONLY_SRID);
+        self::assertNotNull($order);
+        self::assertSame(IngestOrderScheme::UNKNOWN, $order->getScheme());
+
+        // Следующий приём того же потока уже знает тип склада.
+        $this->normalizeStatistics(new \DateTimeImmutable('-1 hour'), cancelShared: true);
+
+        $this->em->clear();
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::STATISTICS_ONLY_SRID);
+        self::assertNotNull($order);
+        self::assertSame(IngestOrderScheme::FBO, $order->getScheme());
     }
 
     /**
@@ -478,8 +555,8 @@ final class WbOrderJoinTest extends IntegrationTestCase
             $fetchedAt,
         );
 
-        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId));
-        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId, forceReplay: true));
+        $this->normalize($rawId);
+        $this->normalize($rawId);
 
         $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
         self::assertNotNull($order);
@@ -526,7 +603,7 @@ final class WbOrderJoinTest extends IntegrationTestCase
             $fetchedAt,
         );
 
-        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId));
+        $this->normalize($rawId);
     }
 
     private function normalizeStatistics(\DateTimeImmutable $fetchedAt, bool $cancelShared = false): void
@@ -547,7 +624,7 @@ final class WbOrderJoinTest extends IntegrationTestCase
             $fetchedAt,
         );
 
-        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId));
+        $this->normalize($rawId);
     }
 
     /**
@@ -569,6 +646,23 @@ final class WbOrderJoinTest extends IntegrationTestCase
             fetchedAt: $fetchedAt,
             rows: $rows,
         ))[0];
+    }
+
+    /**
+     * Нормализация ВСЕГДА идёт после сброса EntityManager.
+     *
+     * В проде сырьё сохраняет один процесс, а разбирает отдельный обработчик
+     * Messenger, который читает запись из БД по идентификатору. Тест, зовущий
+     * Action сразу после storeRaw(), получал бы управляемый объект из памяти —
+     * с исходной зоной и микросекундами — и маскировал бы то, что после
+     * реального round-trip отметка меняется.
+     */
+    private function normalize(string $rawId): void
+    {
+        $this->em->flush();
+        $this->em->clear();
+
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId));
     }
 
     private function orderCount(string $externalId): int

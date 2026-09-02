@@ -81,8 +81,8 @@ final class OzonOrdersConnectorTest extends TestCase
     {
         $this->connector->pull($this->request('{"since":"2026-09-01T11:00:00+00:00"}'));
 
-        self::assertSame('2026-09-01T10:45:00+00:00', $this->client->calls[0]['since']);
-        self::assertSame('2026-09-01T12:00:00+00:00', $this->client->calls[0]['to']);
+        $this->assertSameInstant('2026-09-01T10:45:00+00:00', $this->client->calls[0]['since']);
+        $this->assertSameInstant('2026-09-01T12:00:00+00:00', $this->client->calls[0]['to']);
     }
 
     /**
@@ -162,8 +162,8 @@ final class OzonOrdersConnectorTest extends TestCase
         $decoded = json_decode($result->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
 
         // Окно заморожено целиком, а не сведено к одной точке.
-        self::assertSame('2026-09-01T09:45:00+00:00', $decoded['since']);
-        self::assertSame('2026-09-01T12:00:00+00:00', $decoded['to']);
+        $this->assertSameInstant('2026-09-01T09:45:00+00:00', $decoded['since']);
+        $this->assertSameInstant('2026-09-01T12:00:00+00:00', $decoded['to']);
         self::assertSame(
             OzonOrdersConnector::MAX_PAGES_PER_PULL * OzonOrdersConnector::PAGE_LIMIT,
             $decoded['offset'],
@@ -182,8 +182,8 @@ final class OzonOrdersConnectorTest extends TestCase
 
         // Окно то же самое, перекрытие повторно НЕ вычитается, чтение
         // продолжается с сохранённого смещения.
-        self::assertSame('2026-09-01T09:45:00+00:00', $this->client->calls[0]['since']);
-        self::assertSame('2026-09-01T12:00:00+00:00', $this->client->calls[0]['to']);
+        $this->assertSameInstant('2026-09-01T09:45:00+00:00', $this->client->calls[0]['since']);
+        $this->assertSameInstant('2026-09-01T12:00:00+00:00', $this->client->calls[0]['to']);
         self::assertSame(20000, $this->client->calls[0]['offset']);
 
         // Чанк — отдельная логическая запись: под общим externalId он выглядел
@@ -194,7 +194,7 @@ final class OzonOrdersConnectorTest extends TestCase
         // Окно дочитано — курсор наконец уезжает на его конец.
         self::assertFalse($result->hasMore);
         $decoded = json_decode((string) $result->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame('2026-09-01T12:00:00+00:00', $decoded['since']);
+        $this->assertSameInstant('2026-09-01T12:00:00+00:00', $decoded['since']);
         self::assertArrayNotHasKey('to', $decoded);
     }
 
@@ -212,7 +212,7 @@ final class OzonOrdersConnectorTest extends TestCase
         ], \JSON_THROW_ON_ERROR)));
 
         self::assertSame(0, $this->client->calls[0]['offset']);
-        self::assertSame('2026-09-01T09:45:00+00:00', $this->client->calls[0]['since']);
+        $this->assertSameInstant('2026-09-01T09:45:00+00:00', $this->client->calls[0]['since']);
     }
 
     /**
@@ -241,7 +241,7 @@ final class OzonOrdersConnectorTest extends TestCase
         $final = $this->connector->pull($this->request((string) $first->nextCursorValue));
 
         $decoded = json_decode((string) $final->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame('2026-09-01T12:10:00+00:00', $decoded['since']);
+        $this->assertSameInstant('2026-09-01T12:10:00+00:00', $decoded['since']);
     }
 
     /**
@@ -259,7 +259,7 @@ final class OzonOrdersConnectorTest extends TestCase
 
         // Курсор сохраняется полом монотонности и назад не едет.
         $decoded = json_decode((string) $result->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame('2026-09-01T18:00:00+00:00', $decoded['since']);
+        $this->assertSameInstant('2026-09-01T18:00:00+00:00', $decoded['since']);
         self::assertFalse($result->hasMore);
 
         // Факт «за это окно ничего не было» всё равно фиксируется в raw.
@@ -278,6 +278,20 @@ final class OzonOrdersConnectorTest extends TestCase
         }
 
         return $rows;
+    }
+
+    /**
+     * Сравнение по АБСОЛЮТНОМУ моменту, а не по строке: окно и курсор пишутся
+     * в зоне приложения, поэтому `15:00+03:00` и `12:00Z` — одно и то же
+     * время. Сравнение строк проверяло бы соглашение о записи, а не позицию.
+     */
+    private function assertSameInstant(string $expected, ?string $actual): void
+    {
+        self::assertNotNull($actual);
+        self::assertSame(
+            (new \DateTimeImmutable($expected))->getTimestamp(),
+            (new \DateTimeImmutable($actual))->getTimestamp(),
+        );
     }
 
     private function request(?string $cursorValue): PullRequest

@@ -98,7 +98,15 @@ final readonly class WbOrdersConnector implements SourceConnectorInterface
 
     private function pullMarketplace(PullRequest $request): PullResult
     {
-        $now = $this->clock->now();
+        // Время приводится к зоне приложения ДО записи.
+        //
+        // Колонки времени в схеме — без зоны: Doctrine пишет отметку в её
+        // собственной зоне и читает обратно в зоне PHP. Проверено, что
+        // `2026-09-01T10:00:00+00:00` уходит в базу как `10:00:00`, а
+        // возвращается как `10:00:00+03:00` — сдвиг 10800 секунд. Часы отдают
+        // UTC, поэтому без приведения сохранённый момент переставал совпадать
+        // с самим собой, а сравнение отметок наблюдения — работать.
+        $now = $this->applicationTime($this->clock->now());
         $state = $this->decodeCursor($request->cursorValue);
         $cursorSince = $state['since'];
 
@@ -222,7 +230,15 @@ final readonly class WbOrdersConnector implements SourceConnectorInterface
 
     private function pullStatistics(PullRequest $request): PullResult
     {
-        $now = $this->clock->now();
+        // Время приводится к зоне приложения ДО записи.
+        //
+        // Колонки времени в схеме — без зоны: Doctrine пишет отметку в её
+        // собственной зоне и читает обратно в зоне PHP. Проверено, что
+        // `2026-09-01T10:00:00+00:00` уходит в базу как `10:00:00`, а
+        // возвращается как `10:00:00+03:00` — сдвиг 10800 секунд. Часы отдают
+        // UTC, поэтому без приведения сохранённый момент переставал совпадать
+        // с самим собой, а сравнение отметок наблюдения — работать.
+        $now = $this->applicationTime($this->clock->now());
         $state = $this->decodeCursor($request->cursorValue);
         $cursorSince = $state['since'];
         $since = $this->resolveSince($request, $now, $cursorSince);
@@ -382,6 +398,14 @@ final readonly class WbOrdersConnector implements SourceConnectorInterface
         }
 
         return $max;
+    }
+
+    /**
+     * Момент в зоне приложения — то соглашение, в котором живёт схема.
+     */
+    private function applicationTime(\DateTimeImmutable $instant): \DateTimeImmutable
+    {
+        return $instant->setTimezone(new \DateTimeZone(date_default_timezone_get()));
     }
 
     private function resolveSince(

@@ -268,6 +268,13 @@ final class WbOrderMapperTest extends TestCase
             ['srid' => 's-1', 'date' => '2026-08-30T22:18:04', 'isCancel' => false, 'nmId' => 1, 'finishedPrice' => '10.999'],
             'malformed_price',
         ];
+        // Строка длиннее PHP_INT_MAX при приведении к int молча превращалась
+        // бы в предельное целое, то есть в другую денежную величину.
+        yield 'цена в копейках выше PHP_INT_MAX' => [
+            WbResourceType::ORDERS_MARKETPLACE,
+            ['rid' => 'r-1', 'createdAt' => '2026-08-30T19:18:04Z', 'nmId' => 1, 'price' => '99999999999999999999999'],
+            'malformed_price',
+        ];
         yield 'нецелая цена в копейках' => [
             WbResourceType::ORDERS_MARKETPLACE,
             ['rid' => 'r-1', 'createdAt' => '2026-08-30T19:18:04Z', 'nmId' => 1, 'price' => '19.57'],

@@ -14,6 +14,14 @@ use Webmozart\Assert\Assert;
  * и operationGroupId, потому что описывает денежную проводку. Заказ — не
  * проводка: у него позиции, количества, статус и своя жизнь во времени.
  *
+ * `statusObserved` отвечает на другой вопрос: сообщил ли источник статус
+ * ВООБЩЕ. Отсутствие статуса — не статус: поток изменений WB при
+ * `isCancel = false` говорит лишь «отмены не было», а `/api/v3/orders` без
+ * ответа `/orders/status` не говорит ничего. Принять это за наблюдение
+ * значило бы затирать реальный этап жизни заказа тем, что выведено из
+ * отсутствия отмены, — а крон ставит statistics ПОСЛЕ marketplace, так что
+ * затирало бы почти всегда.
+ *
  * Атрибуты разделены по владельцу оси. Снимочные описывают заказ как таковой и
  * применяются вместе со снимком; статусные (`supplier_status`, `wb_status`,
  * `is_cancellable`, `is_cancel`) меняются во времени и применяются только
@@ -34,6 +42,7 @@ final readonly class MappedOrder
      * @param array<string, mixed> $attributes атрибуты снимка: описывают заказ как таковой
      * @param array<string, mixed> $statusAttributes атрибуты статусной оси: меняются во времени
      * @param bool $itemsAuthoritative несёт ли наблюдение ПОЛНЫЙ состав заказа
+     * @param bool $statusObserved сообщил ли источник статус вообще
      */
     public function __construct(
         public string $externalId,
@@ -46,6 +55,7 @@ final readonly class MappedOrder
         public array $attributes = [],
         public array $statusAttributes = [],
         public bool $itemsAuthoritative = true,
+        public bool $statusObserved = true,
     ) {
         Assert::notEmpty($externalId);
         Assert::notEmpty($rawStatus);
