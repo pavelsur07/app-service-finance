@@ -99,113 +99,132 @@ final readonly class NormalizeOrderRawRecordAction
         // восстановил бы пропущенное событие. Теперь запись целиком —
         // заказ, событие, позиции и markNormalizationDone — уходит одним
         // flush в конце.
-        $known = $this->orderRepository->findManyByExternalIdsIndexed(
-            $command->companyId,
-            $rawRecord->getSource(),
-            $rawRecord->getConnectionRef(),
-            array_values(array_unique(array_map(
-                static fn (MappedOrder $order): string => $order->externalId,
-                $orders,
-            ))),
-        );
-
-        // Ключи уже записанных наблюдений — одним запросом на весь batch.
-        // Ключ ведётся локально и пополняется сразу при создании события:
-        // Doctrine-запрос не видит непрофлашенные сущности, поэтому
-        // последовательность A → B → A внутри одного батча иначе создала бы
-        // два события A и уронила финальный flush на уникальном индексе.
-        $seenObservations = array_fill_keys(
-            $this->statusEventRepository->observationKeysForRawRecord($command->companyId, $rawRecord->getId()),
-            true,
-        );
-
-        // Две карты, а не одна.
+        // Выборка, применение и flush идут ОДНОЙ транзакцией с блокировкой на
+        // запись.
         //
-        // knownItems — пул сущностей для переиспользования, он не сжимается.
-        // currentItems — набор ПОСЛЕДНЕГО снимка каждого заказа. Удаление
-        // применяется один раз после всего батча: если удалять внутри цикла,
-        // а тот же заказ встретится в батче ещё раз со снимком {A,B} после
-        // {A}, Doctrine выполнит INSERT раньше DELETE и уникальный индекс
-        // уронит общий flush.
-        $currentItems = [];
-        $knownItems = $this->itemRepository->findByOrdersIndexedByLineKey(
-            $command->companyId,
-            array_values(array_map(
-                static fn (IngestOrder $order): string => $order->getId(),
-                $known,
-            )),
-        );
-
-        // Резолв листингов — ОДИН вызов на всё сырьё, а не на каждый заказ.
-        //
-        // Пакетная загрузка заказов и позиций убрала N+1 на них, но резолвер
-        // оставался внутри цикла: страница коннектора несёт до 20 000 заказов,
-        // и это были бы 20 000 обращений. Ключ — «индекс заказа:индекс
-        // позиции», resolveMany() сохраняет ключи.
-        $sourceDataRows = [];
-        foreach ($orders as $orderIndex => $mappedOrder) {
-            foreach ($mappedOrder->items as $itemIndex => $mappedItem) {
-                $sourceDataRows[$orderIndex.':'.$itemIndex] = $mappedItem->sourceData;
-            }
-        }
-
-        $resolutions = [] === $sourceDataRows
-            ? []
-            : $this->listingResolverRegistry->resolveMany(
-                $rawRecord->getSource(),
+        // Путей записи статуса два — нормализация и почасовой перепрос, — и
+        // блокировка только на стороне перепроса ничего не давала бы: writer,
+        // прочитавший строку раньше, всё равно перезаписал бы её отложенным
+        // UPDATE, а блокировка лишь задержала бы его. Между выборкой и flush
+        // здесь идёт только локальная работа: сырьё уже прочитано из хранилища
+        // и разобрано выше, сетевых вызовов внутри блокировки нет.
+        $this->entityManager->wrapInTransaction(function () use (
+            $command,
+            $rawRecord,
+            $batch,
+            $orders,
+            $observedAt,
+            $isReplay,
+        ): void {
+            $known = $this->orderRepository->findManyByExternalIdsIndexed(
                 $command->companyId,
-                $sourceDataRows,
+                $rawRecord->getSource(),
+                $rawRecord->getConnectionRef(),
+                array_values(array_unique(array_map(
+                    static fn (MappedOrder $order): string => $order->externalId,
+                    $orders,
+                ))),
+                forUpdate: true,
             );
 
-        foreach ($orders as $orderIndex => $mappedOrder) {
-            // Один и тот же externalId может встретиться в батче дважды:
-            // второй раз он обязан попасть в уже созданную запись, а не
-            // создать вторую и упереться в уникальный индекс.
-            $known[$mappedOrder->externalId] = $this->applyOrder(
-                $rawRecord,
-                $mappedOrder,
-                $observedAt,
-                $known,
-                $knownItems,
-                $currentItems,
-                $seenObservations,
-                $resolutions,
-                $orderIndex,
-                $isReplay,
+            // Ключи уже записанных наблюдений — одним запросом на весь batch.
+            // Ключ ведётся локально и пополняется сразу при создании события:
+            // Doctrine-запрос не видит непрофлашенные сущности, поэтому
+            // последовательность A → B → A внутри одного батча иначе создала бы
+            // два события A и уронила финальный flush на уникальном индексе.
+            $seenObservations = array_fill_keys(
+                $this->statusEventRepository->observationKeysForRawRecord($command->companyId, $rawRecord->getId()),
+                true,
             );
-        }
 
-        // Строка, которую маппер не смог разобрать, обязана стать видимой
-        // очередью. Курсор после нормализации уже уехал вперёд, поэтому
-        // молчаливый пропуск — постоянная потеря, ничем не отличимая от
-        // «заказов в окне не было».
-        foreach ($batch->skipped as $skipped) {
-            ($this->recordNormalizationIssueAction)(new RecordNormalizationIssueCommand(
-                companyId: $command->companyId,
-                rawRecordId: $rawRecord->getId(),
-                operationGroupId: null,
-                kind: NormalizationIssueKind::MAPPER_FAILURE,
-                details: [
-                    'source' => $rawRecord->getSource()->value,
-                    'resourceType' => $rawRecord->getResourceType(),
-                    'reason' => $skipped['reason'],
-                    'externalId' => $skipped['hint'],
-                ],
-            ));
-        }
+            // Две карты, а не одна.
+            //
+            // knownItems — пул сущностей для переиспользования, он не сжимается.
+            // currentItems — набор ПОСЛЕДНЕГО снимка каждого заказа. Удаление
+            // применяется один раз после всего батча: если удалять внутри цикла,
+            // а тот же заказ встретится в батче ещё раз со снимком {A,B} после
+            // {A}, Doctrine выполнит INSERT раньше DELETE и уникальный индекс
+            // уронит общий flush.
+            $currentItems = [];
+            $knownItems = $this->itemRepository->findByOrdersIndexedByLineKey(
+                $command->companyId,
+                array_values(array_map(
+                    static fn (IngestOrder $order): string => $order->getId(),
+                    $known,
+                )),
+            );
 
-        // Позиции, исчезнувшие из последнего снимка заказа, удаляются: строка,
-        // которой в заказе уже нет, завышала бы и сумму, и агрегаты по выкупу.
-        foreach ($currentItems as $orderId => $applied) {
-            foreach ($knownItems[$orderId] ?? [] as $lineKey => $item) {
-                if (!isset($applied[$lineKey])) {
-                    $this->itemRepository->remove($item);
+            // Резолв листингов — ОДИН вызов на всё сырьё, а не на каждый заказ.
+            //
+            // Пакетная загрузка заказов и позиций убрала N+1 на них, но резолвер
+            // оставался внутри цикла: страница коннектора несёт до 20 000 заказов,
+            // и это были бы 20 000 обращений. Ключ — «индекс заказа:индекс
+            // позиции», resolveMany() сохраняет ключи.
+            $sourceDataRows = [];
+            foreach ($orders as $orderIndex => $mappedOrder) {
+                foreach ($mappedOrder->items as $itemIndex => $mappedItem) {
+                    $sourceDataRows[$orderIndex.':'.$itemIndex] = $mappedItem->sourceData;
                 }
             }
-        }
 
-        $rawRecord->markNormalizationDone();
-        $this->entityManager->flush();
+            $resolutions = [] === $sourceDataRows
+                ? []
+                : $this->listingResolverRegistry->resolveMany(
+                    $rawRecord->getSource(),
+                    $command->companyId,
+                    $sourceDataRows,
+                );
+
+            foreach ($orders as $orderIndex => $mappedOrder) {
+                // Один и тот же externalId может встретиться в батче дважды:
+                // второй раз он обязан попасть в уже созданную запись, а не
+                // создать вторую и упереться в уникальный индекс.
+                $known[$mappedOrder->externalId] = $this->applyOrder(
+                    $rawRecord,
+                    $mappedOrder,
+                    $observedAt,
+                    $known,
+                    $knownItems,
+                    $currentItems,
+                    $seenObservations,
+                    $resolutions,
+                    $orderIndex,
+                    $isReplay,
+                );
+            }
+
+            // Строка, которую маппер не смог разобрать, обязана стать видимой
+            // очередью. Курсор после нормализации уже уехал вперёд, поэтому
+            // молчаливый пропуск — постоянная потеря, ничем не отличимая от
+            // «заказов в окне не было».
+            foreach ($batch->skipped as $skipped) {
+                ($this->recordNormalizationIssueAction)(new RecordNormalizationIssueCommand(
+                    companyId: $command->companyId,
+                    rawRecordId: $rawRecord->getId(),
+                    operationGroupId: null,
+                    kind: NormalizationIssueKind::MAPPER_FAILURE,
+                    details: [
+                        'source' => $rawRecord->getSource()->value,
+                        'resourceType' => $rawRecord->getResourceType(),
+                        'reason' => $skipped['reason'],
+                        'externalId' => $skipped['hint'],
+                    ],
+                ));
+            }
+
+            // Позиции, исчезнувшие из последнего снимка заказа, удаляются: строка,
+            // которой в заказе уже нет, завышала бы и сумму, и агрегаты по выкупу.
+            foreach ($currentItems as $orderId => $applied) {
+                foreach ($knownItems[$orderId] ?? [] as $lineKey => $item) {
+                    if (!isset($applied[$lineKey])) {
+                        $this->itemRepository->remove($item);
+                    }
+                }
+            }
+
+            $rawRecord->markNormalizationDone();
+            $this->entityManager->flush();
+        });
 
         $this->logger->info('Ingestion order raw record normalized.', [
             'companyId' => $command->companyId,

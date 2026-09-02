@@ -538,6 +538,90 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
         self::assertNull($reloaded->getRefreshStoppedAt(), 'Заказ остаётся в очереди, а не исчезает молча.');
     }
 
+    /**
+     * Регрессия: одна отметка на всё подключение. Ozon опрашивается по одному
+     * отправлению, до тысячи последовательных запросов, и общая отметка
+     * приписывала первому ответу время последнего — тогда наблюдение,
+     * пришедшее раньше конкурентной нормализации, выигрывало бы у неё.
+     */
+    public function testEachResponseCarriesItsOwnObservationTime(): void
+    {
+        $company = $this->seedCompanyWithConnection();
+        $this->seedOrder($company, 'posting-1', IngestOrderStatus::SHIPPED, 'delivering', null, null, IngestSource::OZON, null, null, new \DateTimeImmutable('-3 hours'));
+        $this->seedOrder($company, 'posting-2', IngestOrderStatus::SHIPPED, 'delivering', null, null, IngestSource::OZON, null, null, new \DateTimeImmutable('-2 hours'));
+
+        $this->ozon->setPostings([
+            'posting-1' => ['posting_number' => 'posting-1', 'status' => 'delivered'],
+            'posting-2' => ['posting_number' => 'posting-2', 'status' => 'delivered'],
+        ]);
+
+        ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        $this->em->clear();
+        $first = $this->orders->findByExternalId((string) $company->getId(), IngestSource::OZON, self::CONNECTION_ID, 'posting-1');
+        $second = $this->orders->findByExternalId((string) $company->getId(), IngestSource::OZON, self::CONNECTION_ID, 'posting-2');
+
+        self::assertNotNull($first);
+        self::assertNotNull($second);
+        self::assertNotNull($first->getStatusObservedAt());
+        self::assertNotNull($second->getStatusObservedAt());
+        self::assertGreaterThan(
+            $first->getStatusObservedAt()->getTimestamp(),
+            $second->getStatusObservedAt()->getTimestamp(),
+            'Ответ, пришедший позже, обязан нести более позднюю отметку.',
+        );
+    }
+
+    /**
+     * Испорченный, но разобранный ответ — как раз то, ради чего аудит и нужен.
+     * Выброшенный, он не объясняет ничего.
+     */
+    public function testMalformedPostingResponseIsStoredAsEvidence(): void
+    {
+        $company = $this->seedCompanyWithConnection();
+        $this->seedOrder($company, 'broken', IngestOrderStatus::SHIPPED, 'delivering');
+
+        $this->ozon->setPostingFailures(['broken' => new MalformedConnectorResponseException(
+            'no result object',
+            decodedPayload: ['result' => [], 'message' => 'nothing here'],
+        )]);
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        self::assertSame(1, $result->invalid);
+        self::assertSame(1, (int) $this->connection->fetchOne(
+            "SELECT COUNT(*) FROM ingest_raw_records WHERE company_id = :c AND resource_type = 'ozon_order_status_refresh'",
+            ['c' => (string) $company->getId()],
+        ));
+    }
+
+    /**
+     * Схема выбирает эндпоинт. Заказ с неизвестной схемой спросить нечем:
+     * отправив его в FBO «по умолчанию», мы получили бы ложный 404 и молча
+     * оставили заказ без обновлений до STUCK_ORDER.
+     */
+    public function testOrderWithUnknownSchemeIsNotPolled(): void
+    {
+        $company = $this->seedCompanyWithConnection();
+        $order = IngestOrderBuilder::anOrder()
+            ->forCompany((string) $company->getId())
+            ->withConnectionRef(self::CONNECTION_ID)
+            ->withSource(IngestSource::OZON)
+            ->withScheme(IngestOrderScheme::UNKNOWN)
+            ->withExternalId('schemeless')
+            ->withStatus(IngestOrderStatus::SHIPPED, 'delivering')
+            ->orderedAt(new \DateTimeImmutable('-2 days'))
+            ->build();
+        $this->em->persist($order);
+        $this->em->flush();
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        self::assertSame([], $this->ozon->calls, 'Без схемы запрос не отправляется.');
+        self::assertSame(1, $result->invalid);
+        self::assertSame(0, $result->polled);
+    }
+
     private function deactivateConnections(Company $company): void
     {
         $this->connection->executeStatement(

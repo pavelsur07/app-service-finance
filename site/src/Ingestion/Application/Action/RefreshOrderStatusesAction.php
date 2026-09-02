@@ -13,6 +13,7 @@ use App\Ingestion\Application\Source\Wildberries\WbResourceType;
 use App\Ingestion\Domain\Service\IngestOrderStatusMapper;
 use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Entity\IngestOrder;
+use App\Ingestion\Enum\IngestOrderScheme;
 use App\Ingestion\Enum\IngestOrderStatus;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\NormalizationIssueKind;
@@ -45,9 +46,11 @@ use Ramsey\Uuid\Uuid;
  * состоянием, а не окном времени. Заводить ради этого задачу синхронизации
  * значило бы упереться в ActiveBackfillExistsException на каждом втором часе.
  *
- * Порядок опроса — сначала ни разу не наблюдённые, затем по возрастанию
- * времени последнего наблюдения, поэтому при исчерпании лимита первыми
- * опрашиваются самые давно не проверенные заказы.
+ * Порядок опроса — по отметке ПОПЫТКИ (`statusRefreshAttemptedAt`): сначала
+ * ни разу не спрошенные (NULL), затем по возрастанию отметки, затем по `id`.
+ * Не по отметке наблюдения: попытка бывает без наблюдения (404, ответ без
+ * поля статуса, отсутствие заказа в успешном ответе WB), и такие заказы
+ * занимали бы начало лимита вечно.
  */
 final readonly class RefreshOrderStatusesAction
 {
@@ -214,20 +217,21 @@ final readonly class RefreshOrderStatusesAction
                 // Класс, а не сообщение: в тексте транспортных исключений
                 // встречаются DSN с учётными данными.
                 'exceptionClass' => $poll['failure']::class,
-                'attemptedBeforeFailure' => count($poll['attemptedOrderIds']),
+                'attemptedBeforeFailure' => count($poll['attempts']),
             ]);
         }
 
         $result = $result->with(missing: $poll['missing'], invalid: $poll['invalid']);
 
-        if ([] === $poll['attemptedOrderIds']) {
+        if ([] === $poll['attempts']) {
             return $result;
         }
 
-        // Момент наблюдения читается ЗДЕСЬ, после сети: между началом прогона и
-        // ответом проходят минуты, и отметка из прошлого проиграла бы
-        // наблюдению, которое на самом деле старше.
-        $observedAt = $this->applicationTime();
+        // Время сырья — момент, когда прогон по подключению закончился. У
+        // каждого наблюдения при этом СВОЯ отметка, снятая сразу после его
+        // ответа: подключение — это до тысячи последовательных запросов, и
+        // общая отметка приписала бы первому ответу время последнего.
+        $storedAt = $this->applicationTime();
 
         $rawRecordId = null;
         if ([] !== $poll['rows']) {
@@ -236,12 +240,12 @@ final readonly class RefreshOrderStatusesAction
             // этой записи не применяется — маппера у ресурса нет, и запись
             // сразу помечается пропущенной, иначе она вечно висела бы в
             // очереди.
-            $rawRecordId = $this->storeAudit($source, $companyId, $connectionRef, $poll['rows'], $observedAt);
+            $rawRecordId = $this->storeAudit($source, $companyId, $connectionRef, $poll['rows'], $storedAt);
         }
 
         return $result->with(
             polled: count($poll['observations']),
-            changed: $this->applyObservations($source, $companyId, $poll, $rawRecordId, $observedAt),
+            changed: $this->applyObservations($source, $companyId, $poll, $rawRecordId),
         );
     }
 
@@ -260,14 +264,13 @@ final readonly class RefreshOrderStatusesAction
      * если наблюдения не случилось: 404 и ответ без статуса иначе не двигали бы
      * ничего, и такие заказы вечно занимали бы начало очереди.
      *
-     * @param array{rows: list<array<string, mixed>>, observations: list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>}>, attemptedOrderIds: list<string>, missing: int, invalid: int, failure: \Throwable|null} $poll
+     * @param array{rows: list<array<string, mixed>>, observations: list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>, observedAt: \DateTimeImmutable}>, attempts: array<string, \DateTimeImmutable>, missing: int, invalid: int, failure: \Throwable|null} $poll
      */
     private function applyObservations(
         IngestSource $source,
         string $companyId,
         array $poll,
         ?string $rawRecordId,
-        \DateTimeImmutable $observedAt,
     ): int {
         $changed = 0;
         $seenObservations = [];
@@ -277,15 +280,14 @@ final readonly class RefreshOrderStatusesAction
             $companyId,
             $poll,
             $rawRecordId,
-            $observedAt,
             &$changed,
             &$seenObservations,
         ): void {
-            $locked = $this->orderRepository->findManyForUpdate($companyId, $poll['attemptedOrderIds']);
+            $locked = $this->orderRepository->findManyForUpdate($companyId, array_keys($poll['attempts']));
 
-            foreach ($poll['attemptedOrderIds'] as $orderId) {
+            foreach ($poll['attempts'] as $orderId => $attemptedAt) {
                 if (isset($locked[$orderId])) {
-                    $locked[$orderId]->markRefreshAttempted($observedAt);
+                    $locked[$orderId]->markRefreshAttempted($attemptedAt);
                 }
             }
 
@@ -319,7 +321,7 @@ final readonly class RefreshOrderStatusesAction
                     $order,
                     $observation['rawStatus'],
                     $status,
-                    $observedAt,
+                    $observation['observedAt'],
                     $observation['rawSubstatus'],
                     $rawRecordId,
                     $seenObservations,
@@ -345,18 +347,34 @@ final readonly class RefreshOrderStatusesAction
     /**
      * @param list<IngestOrder> $orders
      *
-     * @return array{rows: list<array<string, mixed>>, observations: list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>}>, attemptedOrderIds: list<string>, missing: int, invalid: int, failure: \Throwable|null}
+     * @return array{rows: list<array<string, mixed>>, observations: list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>, observedAt: \DateTimeImmutable}>, attempts: array<string, \DateTimeImmutable>, missing: int, invalid: int, failure: \Throwable|null}
      */
     private function pollOzon(string $companyId, string $connectionRef, array $orders): array
     {
         $rows = [];
         $observations = [];
-        $attempted = [];
+        $attempts = [];
         $missing = 0;
         $invalid = 0;
         $failure = null;
 
         foreach ($orders as $order) {
+            // Схема нужна, чтобы выбрать эндпоинт. Заказ с неизвестной схемой
+            // спросить нечем: отправив его в FBO «по умолчанию», мы получили
+            // бы ложный 404 и молча оставили заказ без обновлений.
+            if (IngestOrderScheme::FBO !== $order->getScheme() && IngestOrderScheme::FBS !== $order->getScheme()) {
+                ++$invalid;
+                $attempts[$order->getId()] = $this->applicationTime();
+                $this->logger->warning('Ozon order has no usable scheme to poll.', [
+                    'companyId' => $companyId,
+                    'connectionRef' => $connectionRef,
+                    'externalId' => $order->getExternalId(),
+                    'scheme' => $order->getScheme()->value,
+                ]);
+
+                continue;
+            }
+
             try {
                 $posting = $this->ozonClient->fetchPosting(
                     $companyId,
@@ -375,18 +393,33 @@ final readonly class RefreshOrderStatusesAction
                 // вечно кривое отправление каждый час останавливает обработку
                 // всех следующих заказов кабинета.
                 ++$invalid;
-                $attempted[] = $order->getId();
+                $attempts[$order->getId()] = $this->applicationTime();
+
+                // Нарушивший контракт ответ — как раз то, ради чего аудит и
+                // нужен. В лог он не идёт: там разрешены идентификаторы и
+                // статусы, но не тела ответов внешних API.
+                $evidence = $exception->decodedPayload();
+                if (null !== $evidence) {
+                    $rows[] = $evidence;
+                }
+
                 $this->logger->warning('Ozon posting response was malformed.', [
                     'companyId' => $companyId,
                     'connectionRef' => $connectionRef,
                     'externalId' => $order->getExternalId(),
                     'exceptionClass' => $exception::class,
+                    'evidenceStored' => null !== $evidence,
                 ]);
 
                 continue;
             }
 
-            $attempted[] = $order->getId();
+            // Отметка снимается СРАЗУ после ответа, а не в конце прогона: до
+            // тысячи последовательных запросов растягиваются на минуты, и
+            // общая отметка приписала бы первому ответу время последнего —
+            // тогда устаревшее наблюдение выигрывало бы у свежего.
+            $answeredAt = $this->applicationTime();
+            $attempts[$order->getId()] = $answeredAt;
 
             if (null === $posting) {
                 ++$missing;
@@ -417,13 +450,14 @@ final readonly class RefreshOrderStatusesAction
                 'rawStatus' => $rawStatus,
                 'rawSubstatus' => $this->stringOrNull($posting['substatus'] ?? null),
                 'statusAttributes' => [],
+                'observedAt' => $answeredAt,
             ];
         }
 
         return [
             'rows' => $rows,
             'observations' => $observations,
-            'attemptedOrderIds' => $attempted,
+            'attempts' => $attempts,
             'missing' => $missing,
             'invalid' => $invalid,
             'failure' => $failure,
@@ -433,7 +467,7 @@ final readonly class RefreshOrderStatusesAction
     /**
      * @param list<IngestOrder> $orders
      *
-     * @return array{rows: list<array<string, mixed>>, observations: list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>}>, attemptedOrderIds: list<string>, missing: int, invalid: int, failure: \Throwable|null}
+     * @return array{rows: list<array<string, mixed>>, observations: list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>, observedAt: \DateTimeImmutable}>, attempts: array<string, \DateTimeImmutable>, missing: int, invalid: int, failure: \Throwable|null}
      */
     private function pollWildberries(string $companyId, string $connectionRef, array $orders): array
     {
@@ -453,7 +487,7 @@ final readonly class RefreshOrderStatusesAction
             return [
                 'rows' => [],
                 'observations' => [],
-                'attemptedOrderIds' => [],
+                'attempts' => [],
                 'missing' => 0,
                 'invalid' => 0,
                 'failure' => null,
@@ -462,7 +496,7 @@ final readonly class RefreshOrderStatusesAction
 
         $rows = [];
         $observations = [];
-        $attempted = [];
+        $attempts = [];
         $missing = 0;
         $failure = null;
 
@@ -477,7 +511,11 @@ final readonly class RefreshOrderStatusesAction
                 break;
             }
 
+            // Отметка на чанк, а не на прогон: чанков может быть много, и
+            // между первым и последним проходят минуты.
+            $answeredAt = $this->applicationTime();
             $answered = 0;
+
             foreach ($statuses as $wbOrderId => $row) {
                 $order = $byWbId[$wbOrderId] ?? null;
                 if (null === $order) {
@@ -503,6 +541,7 @@ final readonly class RefreshOrderStatusesAction
                     'rawStatus' => IngestOrderStatusMapper::encodeWbStatus($supplierStatus, $wbStatus),
                     'rawSubstatus' => null,
                     'statusAttributes' => $statusAttributes,
+                    'observedAt' => $answeredAt,
                 ];
             }
 
@@ -510,7 +549,7 @@ final readonly class RefreshOrderStatusesAction
             // заказ, которого в ответе не оказалось, спрашивали — и без
             // отметки он вечно занимал бы начало очереди.
             foreach ($chunk as $wbOrderId) {
-                $attempted[] = $byWbId[$wbOrderId]->getId();
+                $attempts[$byWbId[$wbOrderId]->getId()] = $answeredAt;
             }
 
             $missing += count($chunk) - $answered;
@@ -519,7 +558,7 @@ final readonly class RefreshOrderStatusesAction
         return [
             'rows' => $rows,
             'observations' => $observations,
-            'attemptedOrderIds' => $attempted,
+            'attempts' => $attempts,
             'missing' => $missing,
             'invalid' => 0,
             'failure' => $failure,
@@ -585,58 +624,55 @@ final readonly class RefreshOrderStatusesAction
             return $result;
         }
 
-        // Кандидаты могут принадлежать разным компаниям: блокировка берётся
-        // по компаниям, потому что запрос обязан оставаться company-scoped.
-        $byCompany = [];
-        foreach ($candidates as $candidate) {
-            $byCompany[$candidate->getCompanyId()][] = $candidate->getId();
-        }
+        $candidateIds = array_map(static fn (IngestOrder $order): string => $order->getId(), $candidates);
 
         $stopped = 0;
 
-        $this->entityManager->wrapInTransaction(function () use ($byCompany, $orderedBefore, &$stopped): void {
+        $this->entityManager->wrapInTransaction(function () use ($candidateIds, $orderedBefore, &$stopped): void {
             $now = $this->applicationTime();
 
-            foreach ($byCompany as $companyId => $orderIds) {
-                foreach ($this->orderRepository->findManyForUpdate($companyId, $orderIds) as $order) {
-                    if (!$this->isStillStuck($order, $orderedBefore)) {
-                        continue;
-                    }
-
-                    // Проблема привязывается к сырью, из которого заказ
-                    // наблюдался в последний раз: у самой остановки своего
-                    // payload нет, а разбирающему нужно с чего-то начать.
-                    // Заказ без сырья не существует — он всегда создаётся
-                    // нормализацией. Но если сырьё почему-то потерялось,
-                    // заказ НЕ останавливается: тихая остановка без видимой
-                    // очереди хуже, чем заказ, который продолжают опрашивать.
-                    $lastRawRecordId = $order->getLastRawRecordId();
-                    if (null === $lastRawRecordId) {
-                        $this->logger->warning('Stuck order kept in the queue: no raw record to attach the issue to.', [
-                            'companyId' => $order->getCompanyId(),
-                            'orderId' => $order->getId(),
-                            'externalId' => $order->getExternalId(),
-                        ]);
-
-                        continue;
-                    }
-
-                    ($this->recordIssueAction)(new RecordNormalizationIssueCommand(
-                        companyId: $order->getCompanyId(),
-                        rawRecordId: $lastRawRecordId,
-                        operationGroupId: null,
-                        kind: NormalizationIssueKind::STUCK_ORDER,
-                        details: [
-                            'source' => $order->getSource()->value,
-                            'externalId' => $order->getExternalId(),
-                            'status' => $order->getStatus()->value,
-                            'orderedAt' => $order->getOrderedAt()->format(\DATE_ATOM),
-                        ],
-                    ));
-
-                    $order->stopRefreshing($now);
-                    ++$stopped;
+            // Одна блокирующая выборка на всех кандидатов. Разбивать её по
+            // компаниям значило бы выполнить запрос на компанию — прямой N+1 в
+            // часовом cron-пути. Компания берётся у каждого заказа своя, там
+            // где создаётся проблема.
+            foreach ($this->orderRepository->findManyForUpdateAcrossCompanies($candidateIds) as $order) {
+                if (!$this->isStillStuck($order, $orderedBefore)) {
+                    continue;
                 }
+
+                // Проблема привязывается к сырью, из которого заказ наблюдался
+                // в последний раз: у самой остановки своего payload нет, а
+                // разбирающему нужно с чего-то начать. Заказ без сырья не
+                // существует — он всегда создаётся нормализацией. Но если
+                // сырьё почему-то потерялось, заказ НЕ останавливается: тихая
+                // остановка без видимой очереди хуже, чем заказ, который
+                // продолжают опрашивать.
+                $lastRawRecordId = $order->getLastRawRecordId();
+                if (null === $lastRawRecordId) {
+                    $this->logger->warning('Stuck order kept in the queue: no raw record to attach the issue to.', [
+                        'companyId' => $order->getCompanyId(),
+                        'orderId' => $order->getId(),
+                        'externalId' => $order->getExternalId(),
+                    ]);
+
+                    continue;
+                }
+
+                ($this->recordIssueAction)(new RecordNormalizationIssueCommand(
+                    companyId: $order->getCompanyId(),
+                    rawRecordId: $lastRawRecordId,
+                    operationGroupId: null,
+                    kind: NormalizationIssueKind::STUCK_ORDER,
+                    details: [
+                        'source' => $order->getSource()->value,
+                        'externalId' => $order->getExternalId(),
+                        'status' => $order->getStatus()->value,
+                        'orderedAt' => $order->getOrderedAt()->format(\DATE_ATOM),
+                    ],
+                ));
+
+                $order->stopRefreshing($now);
+                ++$stopped;
             }
         });
 

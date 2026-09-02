@@ -314,6 +314,51 @@ final class OzonOrdersClientTest extends TestCase
     }
 
     /**
+     * Нарушивший контракт ответ едет вместе с исключением: именно он и нужен
+     * вызывающему как доказательство для аудита.
+     */
+    public function testMalformedResponseCarriesTheDecodedPayload(): void
+    {
+        $client = $this->client(new MockResponse('{"result":[],"message":"nothing"}'));
+
+        try {
+            $client->fetchPosting(self::COMPANY_ID, self::CONNECTION_ID, IngestOrderScheme::FBO, 'P-1');
+            self::fail('Response without a result object must be malformed.');
+        } catch (MalformedConnectorResponseException $exception) {
+            self::assertSame(['result' => [], 'message' => 'nothing'], $exception->decodedPayload());
+        }
+    }
+
+    /**
+     * Невалидный JSON — единственный случай, когда доказательства нет: разбирать
+     * нечего, и класть в сырьё тоже нечего.
+     */
+    public function testInvalidJsonHasNoDecodedPayload(): void
+    {
+        $client = $this->client(new MockResponse('not json at all'));
+
+        try {
+            $client->fetchPosting(self::COMPANY_ID, self::CONNECTION_ID, IngestOrderScheme::FBO, 'P-1');
+            self::fail('Invalid JSON must be malformed.');
+        } catch (MalformedConnectorResponseException $exception) {
+            self::assertNull($exception->decodedPayload());
+        }
+    }
+
+    /**
+     * Схема выбирает эндпоинт исчерпывающе. Тернарное «FBS или иначе FBO»
+     * отправляло бы заказ с неизвестной схемой в FBO, и тот получал бы ложный
+     * 404 вместо честной ошибки вызывающего.
+     */
+    public function testUnknownSchemeIsRejectedInsteadOfDefaultingToFbo(): void
+    {
+        $client = $this->client(new MockResponse('{"result":{"posting_number":"P-1","status":"delivered"}}'));
+
+        $this->expectException(\InvalidArgumentException::class);
+        $client->fetchPosting(self::COMPANY_ID, self::CONNECTION_ID, IngestOrderScheme::UNKNOWN, 'P-1');
+    }
+
+    /**
      * Отсутствующие учётные данные — отказ авторизации, а не внутренняя
      * ошибка: цикл перепроса обязан пропустить подключение и продолжить
      * остальные. WB-клиент так делает давно, Ozon пропускал исключение мимо.

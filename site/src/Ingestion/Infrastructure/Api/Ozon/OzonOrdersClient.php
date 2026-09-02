@@ -52,7 +52,7 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
         int $offset,
     ): OzonRawPage {
         $credentials = $this->credentials($companyId, $connectionRef);
-        $endpoint = IngestOrderScheme::FBS === $scheme ? self::FBS_ENDPOINT : self::FBO_ENDPOINT;
+        $endpoint = self::listEndpoint($scheme);
 
         $body = [
             'dir' => 'ASC',
@@ -178,7 +178,7 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
         }
 
         $credentials = $this->credentials($companyId, $connectionRef);
-        $endpoint = IngestOrderScheme::FBS === $scheme ? self::FBS_GET_ENDPOINT : self::FBO_GET_ENDPOINT;
+        $endpoint = self::postingEndpoint($scheme);
 
         // Никаких дополнительных блоков (`analytics_data`, `financial_data`):
         // перепросу нужен только статус, а ответ целиком ложится в raw. Просить
@@ -227,15 +227,21 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
         try {
             $decoded = json_decode($payload, true, 512, \JSON_THROW_ON_ERROR);
         } catch (\JsonException $exception) {
+            // Разбирать нечего: в сырьё положить нечего, и это единственный
+            // случай, когда испорченный ответ не сохраняется.
             throw new MalformedConnectorResponseException(sprintf('Ozon posting returned invalid JSON for %s.', $endpoint), 0, $exception);
         }
+
+        // Нарушивший контракт ответ едет вместе с исключением: именно он и
+        // нужен как доказательство, а выброшенный он не объясняет ничего.
+        $evidence = is_array($decoded) && !array_is_list($decoded) ? $decoded : null;
 
         $result = is_array($decoded) ? ($decoded['result'] ?? null) : null;
 
         // Отправление обязано быть непустым объектом: список или пустышка —
         // испорченный ответ, а не отсутствующий заказ.
         if (!is_array($result) || [] === $result || array_is_list($result)) {
-            throw new MalformedConnectorResponseException(sprintf('Ozon posting response has no result object for %s.', $endpoint));
+            throw new MalformedConnectorResponseException(sprintf('Ozon posting response has no result object for %s.', $endpoint), decodedPayload: $evidence);
         }
 
         // Номер в ответе обязан совпасть с запрошенным. Иначе статус чужого
@@ -243,10 +249,36 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
         // не проявило бы: статус выглядит правдоподобно всегда.
         $returnedNumber = $result['posting_number'] ?? null;
         if (!is_string($returnedNumber) || $returnedNumber !== $postingNumber) {
-            throw new MalformedConnectorResponseException(sprintf('Ozon posting response number does not match the request for %s.', $endpoint));
+            throw new MalformedConnectorResponseException(sprintf('Ozon posting response number does not match the request for %s.', $endpoint), decodedPayload: $result);
         }
 
         return $result;
+    }
+
+    /**
+     * Схема выбирает эндпоинт исчерпывающе.
+     *
+     * Тернарное «FBS или иначе FBO» отправляло бы заказ с НЕИЗВЕСТНОЙ схемой в
+     * FBO: он получал бы ложный 404 и оставался без обновлений до
+     * STUCK_ORDER. Спрашивать Ozon, не зная схемы, нечем — это ошибка
+     * вызывающего, а не ответ маркетплейса.
+     */
+    private static function listEndpoint(IngestOrderScheme $scheme): string
+    {
+        return match ($scheme) {
+            IngestOrderScheme::FBO => self::FBO_ENDPOINT,
+            IngestOrderScheme::FBS => self::FBS_ENDPOINT,
+            IngestOrderScheme::UNKNOWN => throw new \InvalidArgumentException('Ozon orders cannot be listed for an unknown scheme.'),
+        };
+    }
+
+    private static function postingEndpoint(IngestOrderScheme $scheme): string
+    {
+        return match ($scheme) {
+            IngestOrderScheme::FBO => self::FBO_GET_ENDPOINT,
+            IngestOrderScheme::FBS => self::FBS_GET_ENDPOINT,
+            IngestOrderScheme::UNKNOWN => throw new \InvalidArgumentException('Ozon posting cannot be fetched for an unknown scheme.'),
+        };
     }
 
     /**

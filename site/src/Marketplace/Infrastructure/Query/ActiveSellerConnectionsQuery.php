@@ -15,6 +15,16 @@ use Doctrine\DBAL\Connection;
  */
 final class ActiveSellerConnectionsQuery
 {
+    /**
+     * Потолок выборки подключений одной компании.
+     *
+     * «Их всегда единицы» — наблюдение, а не ограничение: схема столько
+     * кабинетов не запрещает, и накопившийся мусор дал бы неограниченную
+     * выборку. Значение с большим запасом относительно любого реального числа
+     * кабинетов.
+     */
+    public const COMPANY_CONNECTIONS_LIMIT = 200;
+
     public function __construct(
         private readonly Connection $connection,
     ) {
@@ -42,7 +52,7 @@ final class ActiveSellerConnectionsQuery
      *
      * @return list<array{id: string, company_id: string, marketplace: string}>
      */
-    public function executeForCompany(string $companyId): array
+    public function executeForCompany(string $companyId, int $limit = self::COMPANY_CONNECTIONS_LIMIT): array
     {
         return self::shape($this->connection->fetchAllAssociative(
             'SELECT mc.id, mc.company_id, mc.marketplace
@@ -50,8 +60,9 @@ final class ActiveSellerConnectionsQuery
              WHERE mc.is_active = true
                AND mc.connection_type = :type
                AND mc.company_id = :companyId
-             ORDER BY mc.company_id, mc.marketplace',
-            ['type' => 'seller', 'companyId' => $companyId],
+             ORDER BY mc.company_id, mc.marketplace
+             LIMIT :limit',
+            ['type' => 'seller', 'companyId' => $companyId, 'limit' => max(1, min(1000, $limit))],
         ));
     }
 

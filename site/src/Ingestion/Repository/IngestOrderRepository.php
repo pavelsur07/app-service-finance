@@ -47,6 +47,16 @@ final class IngestOrderRepository extends ServiceEntityRepository
     }
 
     /**
+     * Заказы батча по внешним идентификаторам.
+     *
+     * `$forUpdate` включает `SELECT ... FOR UPDATE` с принудительным
+     * перечитыванием: путей записи статуса два — нормализация и перепрос, — и
+     * односторонняя блокировка не защищает. Writer, прочитавший строку до
+     * блокировки, всё равно перезапишет её своим отложенным UPDATE, а
+     * блокировка лишь задержит его. Порядок по `id` задаёт единый порядок
+     * захвата: без него два батча с пересекающимися заказами встали бы во
+     * взаимную блокировку.
+     *
      * @param list<string> $externalIds
      *
      * @return array<string, IngestOrder> externalId => заказ
@@ -56,13 +66,13 @@ final class IngestOrderRepository extends ServiceEntityRepository
         IngestSource $source,
         string $connectionRef,
         array $externalIds,
+        bool $forUpdate = false,
     ): array {
         if ([] === $externalIds) {
             return [];
         }
 
-        /** @var list<IngestOrder> $orders */
-        $orders = $this->createQueryBuilder('o')
+        $query = $this->createQueryBuilder('o')
             ->andWhere('o.companyId = :companyId')
             ->andWhere('o.source = :source')
             ->andWhere('o.connectionRef = :connectionRef')
@@ -71,8 +81,15 @@ final class IngestOrderRepository extends ServiceEntityRepository
             ->setParameter('source', $source->value)
             ->setParameter('connectionRef', $connectionRef)
             ->setParameter('externalIds', $externalIds)
-            ->getQuery()
-            ->getResult();
+            ->orderBy('o.id', 'ASC')
+            ->getQuery();
+
+        if ($forUpdate) {
+            $query->setLockMode(LockMode::PESSIMISTIC_WRITE)->setHint(Query::HINT_REFRESH, true);
+        }
+
+        /** @var list<IngestOrder> $orders */
+        $orders = $query->getResult();
 
         $indexed = [];
         foreach ($orders as $order) {
@@ -254,6 +271,39 @@ final class IngestOrderRepository extends ServiceEntityRepository
             ->addOrderBy('o.id', 'ASC')
             ->setMaxResults(max(1, min(1000, $limit)))
             ->getQuery()
+            ->getResult();
+
+        return $orders;
+    }
+
+    /**
+     * Заказы ВСЕХ компаний под блокировкой записи — для системного прохода по
+     * зависшим.
+     *
+     * @companyScopeExempt Кандидаты уже отобраны `findStuckAcrossCompanies()`,
+     * который проходит по всем компаниям: зависание не зависит от того, живо
+     * ли ещё подключение. Разбивать блокировку по компаниям значило бы
+     * выполнить запрос на компанию — прямой N+1 в часовом cron-пути. Компания
+     * проверяется там, где создаётся проблема: у каждой берётся своя.
+     *
+     * @param list<string> $orderIds
+     *
+     * @return list<IngestOrder>
+     */
+    public function findManyForUpdateAcrossCompanies(array $orderIds): array
+    {
+        if ([] === $orderIds) {
+            return [];
+        }
+
+        /** @var list<IngestOrder> $orders */
+        $orders = $this->createQueryBuilder('o')
+            ->andWhere('o.id IN (:orderIds)')
+            ->setParameter('orderIds', array_values(array_unique($orderIds)))
+            ->orderBy('o.id', 'ASC')
+            ->getQuery()
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+            ->setHint(Query::HINT_REFRESH, true)
             ->getResult();
 
         return $orders;

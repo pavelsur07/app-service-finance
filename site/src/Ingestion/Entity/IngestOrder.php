@@ -295,7 +295,11 @@ class IngestOrder implements TenantOwnedInterface
     public function markRefreshAttempted(\DateTimeImmutable $at): void
     {
         $this->statusRefreshAttemptedAt = $at;
-        $this->updatedAt = new \DateTimeImmutable();
+        // Одна операция — одни часы. Отметка попытки И есть «сейчас» этой
+        // записи, и читать рядом системное время значило бы завести вторую
+        // шкалу: при замороженных часах в тестах или сдвиге системного времени
+        // updatedAt разошёлся бы с фактическим временем попытки.
+        $this->updatedAt = $at;
     }
 
     public function getStatusRefreshAttemptedAt(): ?\DateTimeImmutable

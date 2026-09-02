@@ -31,6 +31,15 @@ services:
     App\Tests\Integration\Ingestion\Fixtures\FakeWbOrdersClient:
         public: true
 
+    # Часы перепроса двигаются на секунду за обращение: иначе момент снятия
+    # отметки не проверить — одна общая отметка на всё подключение выглядит
+    # ровно как отметка, снятая после каждого ответа.
+    App\Tests\Integration\Ingestion\Fixtures\AdvancingClock: ~
+
+    App\Ingestion\Application\Action\RefreshOrderStatusesAction:
+        arguments:
+            $clock: '@App\Tests\Integration\Ingestion\Fixtures\AdvancingClock'
+
     App\Ingestion\Infrastructure\Api\Ozon\OzonOrdersClientInterface: '@App\Tests\Integration\Ingestion\Fixtures\FakeOzonOrdersClient'
     App\Ingestion\Infrastructure\Api\Wildberries\WbOrdersClientInterface: '@App\Tests\Integration\Ingestion\Fixtures\FakeWbOrdersClient'
 
