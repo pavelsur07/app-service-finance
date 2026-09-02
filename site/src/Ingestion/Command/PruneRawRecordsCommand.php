@@ -76,6 +76,7 @@ final class PruneRawRecordsCommand extends Command
             ['mode', $command->execute ? 'execute' : 'dry-run'],
             ['olderThanDays', (string) $command->olderThanDays],
             ['candidates', (string) $result->candidates],
+            ['candidateBytes', (string) $result->candidateBytes],
             ['deleted', (string) $result->deleted],
             ['bytesFreed', (string) $result->bytesFreed],
             ['heldByIssues', (string) $result->heldByIssues],

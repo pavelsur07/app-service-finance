@@ -58,6 +58,13 @@ final readonly class PruneRawRecordsAction
 
         $result = new PruneRawRecordsResult(
             candidates: count($records),
+            // Объём считается ВСЕГДА, в том числе на dry-run: ради этого числа
+            // он и запускается перед Production Gate — решение принимается по
+            // освобождаемому месту, а не по числу строк.
+            candidateBytes: array_sum(array_map(
+                static fn (IngestRawRecord $record): int => $record->getByteSize(),
+                $records,
+            )),
             heldByIssues: $held,
         );
 
@@ -103,7 +110,21 @@ final readonly class PruneRawRecordsAction
         // значило бы необратимо потерять свежее сырьё или единственное
         // доказательство, а восстановить его неоткуда.
         $this->entityManager->wrapInTransaction(function () use ($chunk, $notSeenSince, &$removed): void {
-            foreach ($this->rawRecordRepository->findManyPrunableForUpdate($chunk, $notSeenSince) as $record) {
+            $locked = $this->rawRecordRepository->findManyPrunableForUpdate($chunk, $notSeenSince);
+
+            // Удержание перепроверяется УЖЕ ПОД блокировкой и отдельным
+            // запросом: `FOR UPDATE` защищает строку сырья, но не отсутствие
+            // строки в таблице проблем, и условие внутри блокирующей выборки
+            // осталось бы снимком её собственного момента.
+            $held = array_flip($this->rawRecordRepository->filterHeldByUnresolvedIssues(
+                array_map(static fn (IngestRawRecord $record): string => $record->getId(), $locked),
+            ));
+
+            foreach ($locked as $record) {
+                if (isset($held[$record->getId()])) {
+                    continue;
+                }
+
                 // Путь и размер снимаются ДО удаления: после него читать
                 // нечего, а именно путь нужен, чтобы убрать объект следом.
                 $removed[$record->getId()] = [
@@ -112,6 +133,16 @@ final readonly class PruneRawRecordsAction
                 ];
 
                 $this->rawRecordRepository->remove($record);
+            }
+
+            // Пути пишутся в лог ДО коммита. Если процесс умрёт между коммитом
+            // и удалением объектов, обработчик ошибки не выполнится и путь
+            // исчез бы вместе со строкой; в логе он остаётся, и осиротевший
+            // объект можно найти и убрать.
+            if ([] !== $removed) {
+                $this->logger->info('Raw objects are about to be deleted with their records.', [
+                    'storagePaths' => array_column($removed, 'path'),
+                ]);
             }
         });
 

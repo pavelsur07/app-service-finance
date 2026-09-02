@@ -71,6 +71,10 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
         self::assertSame(1, $result->candidates, 'Кандидат виден…');
         self::assertSame(0, $result->deleted, '…но не тронут.');
 
+        // Ради этого числа dry-run и запускается перед Production Gate:
+        // решение включать удаление принимается по объёму, а не по числу строк.
+        self::assertGreaterThan(0, $result->candidateBytes, 'Объём обязан быть виден до удаления.');
+
         self::assertNotNull($this->rawRecords->findByIdAndCompany($record['id'], $this->companyId));
         self::assertTrue($this->storage->exists($record['path']));
     }
@@ -188,6 +192,72 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
             $this->rawRecords->findByIdAndCompany($record['id'], $this->companyId),
             'Указатель не должен пережить объект — иначе чтение сырья падает.',
         );
+    }
+
+    /**
+     * Проблема, заведённая ПОСЛЕ выборки кандидатов, обязана удержать сырьё.
+     *
+     * `FOR UPDATE` блокирует строку сырья, но не отсутствие строки в таблице
+     * проблем: условие внутри блокирующей выборки осталось бы снимком её
+     * собственного момента, и доказательство свежей проблемы было бы удалено.
+     */
+    public function testIssueCreatedAfterSelectionStillHoldsTheRecord(): void
+    {
+        $target = $this->seedRaw('page-1', new \DateTimeImmutable('-400 days'));
+
+        // Вторая запись с открытой проблемой даёт предупреждение — точку между
+        // выборкой кандидатов и их удалением.
+        $held = $this->seedRaw('page-2', new \DateTimeImmutable('-400 days'));
+        $this->em->persist(new NormalizationIssue(
+            $this->companyId,
+            $held['id'],
+            null,
+            NormalizationIssueKind::MAPPER_FAILURE,
+            [],
+        ));
+        $this->em->flush();
+
+        $action = new PruneRawRecordsAction(
+            $this->rawRecords,
+            $this->storage,
+            $this->em,
+            self::getContainer()->get(ClockInterface::class),
+            new class($this->connection, $this->companyId, $target['id']) extends AbstractLogger {
+                public function __construct(
+                    private readonly Connection $connection,
+                    private readonly string $companyId,
+                    private readonly string $rawRecordId,
+                ) {
+                }
+
+                /**
+                 * @param mixed[] $context
+                 */
+                public function log($level, string|\Stringable $message, array $context = []): void
+                {
+                    if (LogLevel::WARNING !== $level) {
+                        return;
+                    }
+
+                    $this->connection->executeStatement(
+                        'INSERT INTO ingest_normalization_issues (id, company_id, raw_record_id, kind, details, created_at)
+                         VALUES (gen_random_uuid(), :company, :raw, :kind, :details, now())',
+                        [
+                            'company' => $this->companyId,
+                            'raw' => $this->rawRecordId,
+                            'kind' => 'mapper_failure',
+                            'details' => '{}',
+                        ],
+                    );
+                }
+            },
+        );
+
+        $result = $action(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
+
+        self::assertSame(0, $result->deleted, 'Свежая проблема удерживает своё доказательство.');
+        self::assertNotNull($this->rawRecords->findByIdAndCompany($target['id'], $this->companyId));
+        self::assertTrue($this->storage->exists($target['path']));
     }
 
     /**

@@ -182,9 +182,19 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
             return [];
         }
 
+        // Условие про открытые проблемы здесь НЕ проверяется — намеренно.
+        //
+        // `FOR UPDATE` блокирует строку сырья, но не отсутствие строки в
+        // таблице проблем: при READ COMMITTED подзапрос `NOT EXISTS` остаётся
+        // снимком, и конкурент, вставивший проблему сразу после проверки,
+        // остался бы незамеченным. Поэтому блокировка берётся по свежести, а
+        // удержание перепроверяется отдельным запросом УЖЕ ПОД блокировкой —
+        // см. {@see filterHeldByUnresolvedIssues()}.
         /** @var list<IngestRawRecord> $records */
-        $records = $this->prunableQueryBuilder($notSeenSince)
+        $records = $this->createQueryBuilder('record')
+            ->andWhere('record.lastSeenAt < :notSeenSince')
             ->andWhere('record.id IN (:ids)')
+            ->setParameter('notSeenSince', $notSeenSince)
             ->setParameter('ids', array_values(array_unique($ids)))
             ->orderBy('record.id', 'ASC')
             ->getQuery()
@@ -193,6 +203,39 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
             ->getResult();
 
         return $records;
+    }
+
+    /**
+     * Какие из этих записей удерживаются НЕРАЗОБРАННОЙ проблемой.
+     *
+     * Спрашивается уже под блокировкой строк сырья и отдельным запросом:
+     * `READ COMMITTED` видит здесь всё, что успело закоммититься к началу
+     * ЭТОГО запроса, тогда как условие внутри блокирующей выборки осталось бы
+     * снимком её собственного момента.
+     *
+     * @companyScopeExempt См. {@see findPrunable()}: политика хранения общая.
+     *
+     * @param list<string> $ids
+     *
+     * @return list<string>
+     */
+    public function filterHeldByUnresolvedIssues(array $ids): array
+    {
+        if ([] === $ids) {
+            return [];
+        }
+
+        /** @var list<array{rawRecordId: string}> $rows */
+        $rows = $this->getEntityManager()->createQueryBuilder()
+            ->select('DISTINCT issue.rawRecordId AS rawRecordId')
+            ->from(NormalizationIssue::class, 'issue')
+            ->andWhere('issue.rawRecordId IN (:ids)')
+            ->andWhere('issue.resolvedAt IS NULL')
+            ->setParameter('ids', array_values(array_unique($ids)))
+            ->getQuery()
+            ->getResult();
+
+        return array_map(static fn (array $row): string => $row['rawRecordId'], $rows);
     }
 
     public function remove(IngestRawRecord $record): void
