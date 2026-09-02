@@ -9,7 +9,9 @@ use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\ProcessRawDocumentAction;
 use App\Marketplace\Application\Service\WbFinancialReportSyncPlanner;
 use App\Marketplace\Command\WbFinancialReportsSyncCommand;
+use App\Marketplace\DTO\ActiveSellerConnectionDTO;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Query\ActiveSellerConnectionsQuery;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -20,11 +22,35 @@ final readonly class MarketplaceSyncFacade
     private const WB_FINANCIAL_REPORTS_SYNC_COMMAND = 'app:marketplace:wb-financial-reports:sync';
 
     public function __construct(
+        private ActiveSellerConnectionsQuery $activeSellerConnectionsQuery,
         private ProcessRawDocumentAction $processRawDocumentAction,
         private MessageBusInterface $messageBus,
         #[Autowire(service: 'monolog.logger.legacy_wb_sync')]
         private LoggerInterface $logger,
     ) {
+    }
+
+    /**
+     * Активные SELLER-подключения для модулей, которым нужно пройти по всем
+     * парам (компания, маркетплейс).
+     *
+     * Через Facade, а не напрямую Query: `Infrastructure/` чужого модуля
+     * закрыт, и без этой точки входа Ingestion пришлось бы нарушать границу.
+     *
+     * @return list<ActiveSellerConnectionDTO>
+     */
+    public function activeSellerConnections(): array
+    {
+        $connections = [];
+        foreach ($this->activeSellerConnectionsQuery->execute() as $row) {
+            $connections[] = new ActiveSellerConnectionDTO(
+                connectionRef: (string) $row['id'],
+                companyId: (string) $row['company_id'],
+                marketplace: (string) $row['marketplace'],
+            );
+        }
+
+        return $connections;
     }
 
     public function syncSales(

@@ -37,6 +37,13 @@
 39 * * * * cd /app && php bin/console app:ingestion:run-incremental --resource=wildberries_orders_marketplace --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 41 * * * * cd /app && php bin/console app:ingestion:run-incremental --resource=wildberries_orders_statistics --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# Почасовой перепрос статусов нетерминальных заказов.
+#
+# Потоки заказов фильтруются по времени СОЗДАНИЯ, поэтому заказ попадает в них
+# один раз и его дальнейшие смены статуса не увидит никто. Отдельная строка
+# после загрузок: сначала появляются новые заказы, затем опрашиваются старые.
+47 * * * * cd /app && php bin/console app:ingestion:orders:refresh-statuses --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Освобождение ресурсов, заблокированных зависшими задачами синхронизации.
 # findLatestForResource() считает активной любую задачу в OPEN/RUNNING БЕЗ
 # ограничения по возрасту, поэтому воркер, убитый по SIGKILL или OOM, молча

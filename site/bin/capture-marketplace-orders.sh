@@ -97,6 +97,36 @@ if [[ "$DO_OZON" -eq 1 ]]; then
         '{dir:"ASC", filter:{since:$since, to:$to}, limit:$limit, offset:0, translit:true,
           with:{analytics_data:true, financial_data:true}}')" \
         "$OUT_DIR/ozon-posting-fbo-list.json"
+
+    # Перечитывание ОДНОГО отправления по номеру — механика часового перепроса
+    # статусов. Список фильтруется по времени СОЗДАНИЯ и заказ отдаёт один раз,
+    # поэтому дальнейшие смены статуса видны только через эти эндпоинты.
+    #
+    # Номер берётся из уже снятого списка: отдельного ввода не требуется, а на
+    # пустом окне шаг просто пропускается.
+    for scheme in fbs fbo; do
+        list_file="$OUT_DIR/ozon-posting-${scheme}-list.json"
+        [[ -s "$list_file" ]] || continue
+
+        if [[ "$scheme" == "fbs" ]]; then
+            posting="$(jq -r '.result.postings[0].posting_number // empty' "$list_file" 2>/dev/null || true)"
+            get_endpoint=/v3/posting/fbs/get
+            body_extra='{}'
+        else
+            posting="$(jq -r '.result[0].posting_number // empty' "$list_file" 2>/dev/null || true)"
+            get_endpoint=/v2/posting/fbo/get
+            body_extra='{translit:true}'
+        fi
+
+        if [[ -z "$posting" ]]; then
+            echo "   — ${get_endpoint} пропущен: в списке ${scheme} нет отправлений"
+            continue
+        fi
+
+        ozon_post "$get_endpoint" "$(jq -nc --arg pn "$posting" \
+            "{posting_number:\$pn, with:{analytics_data:true, financial_data:true}} + ${body_extra}")" \
+            "$OUT_DIR/ozon-posting-${scheme}-get.json"
+    done
     echo
 fi
 

@@ -15,6 +15,7 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Facade\MarketplaceSyncFacade;
 use App\Marketplace\Infrastructure\Api\MarketplaceFetcherRegistry;
 use App\Marketplace\Infrastructure\Api\Wildberries\WbFetcher;
+use App\Marketplace\Infrastructure\Query\ActiveSellerConnectionsQuery;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -57,7 +58,7 @@ final class LegacyWbSyncDisabledTest extends TestCase
 
         $command = new MarketplaceSyncCommand(
             self::uninitialized(MarketplaceConnectionRepository::class),
-            new MarketplaceSyncFacade(self::uninitialized(ProcessRawDocumentAction::class), $bus, $facadeLogger),
+            new MarketplaceSyncFacade(self::uninitialized(ActiveSellerConnectionsQuery::class), self::uninitialized(ProcessRawDocumentAction::class), $bus, $facadeLogger),
             self::uninitialized(CompanyFacade::class),
             $commandLogger,
         );
@@ -97,7 +98,7 @@ final class LegacyWbSyncDisabledTest extends TestCase
                 }),
             );
 
-        $facade = new MarketplaceSyncFacade(self::uninitialized(ProcessRawDocumentAction::class), $bus, $logger);
+        $facade = new MarketplaceSyncFacade(self::uninitialized(ActiveSellerConnectionsQuery::class), self::uninitialized(ProcessRawDocumentAction::class), $bus, $logger);
 
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('Legacy WB sync отключён');
@@ -149,7 +150,7 @@ final class LegacyWbSyncDisabledTest extends TestCase
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects(self::never())->method('error');
 
-        $facade = new MarketplaceSyncFacade(self::uninitialized(ProcessRawDocumentAction::class), $bus, $logger);
+        $facade = new MarketplaceSyncFacade(self::uninitialized(ActiveSellerConnectionsQuery::class), self::uninitialized(ProcessRawDocumentAction::class), $bus, $logger);
 
         self::assertSame(0, $facade->{$methodName}('company-id', $marketplace, $fromDate, $toDate));
     }

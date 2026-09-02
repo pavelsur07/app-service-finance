@@ -18,6 +18,13 @@ final class OzonResourceType
     public const ORDERS_FBO = 'ozon_orders_fbo';
     public const ORDERS_FBS = 'ozon_orders_fbs';
 
+    /**
+     * Сырьё почасового перепроса статусов. Отдельный тип, потому что это не
+     * поток заказов: маппера у него нет и нормализация к нему не применяется —
+     * запись существует ради аудита ответа маркетплейса.
+     */
+    public const ORDER_STATUS_REFRESH = 'ozon_order_status_refresh';
+
     public const PERFORMANCE_CAMPAIGNS = 'ozon_performance_campaigns';
     public const PERFORMANCE_SKU_CAMPAIGN_OBJECTS = 'ozon_performance_sku_campaign_objects';
     public const PERFORMANCE_SEARCH_PROMO_PRODUCTS = 'ozon_performance_search_promo_products';

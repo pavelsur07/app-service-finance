@@ -29,6 +29,8 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
     private const BASE_URL = 'https://api-seller.ozon.ru';
     private const FBO_ENDPOINT = '/v2/posting/fbo/list';
     private const FBS_ENDPOINT = '/v3/posting/fbs/list';
+    private const FBO_GET_ENDPOINT = '/v2/posting/fbo/get';
+    private const FBS_GET_ENDPOINT = '/v3/posting/fbs/get';
     private const TIMEOUT_SECONDS = 60;
     private const DEFAULT_RETRY_AFTER_SECONDS = 60;
 
@@ -101,22 +103,7 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
             'offset' => $offset,
         ]);
 
-        if (401 === $statusCode || 403 === $statusCode) {
-            throw new ConnectorAuthException(sprintf('Ozon orders auth failed for %s (HTTP %d).', $endpoint, $statusCode));
-        }
-        if (429 === $statusCode) {
-            throw new ConnectorRateLimitedException(sprintf('Ozon orders rate limited for %s.', $endpoint), $this->retryAfterSeconds($headers));
-        }
-        // 408 и 425 — временные по смыслу: истёкший таймаут запроса и
-        // «слишком рано» подлежат повтору ровно так же, как 5xx. Без этой
-        // ветки они попадали в общий разбор и становились неповторяемым
-        // malformed response, то есть таймаут шлюза убивал прогон.
-        if ($statusCode >= 500 || 408 === $statusCode || 425 === $statusCode) {
-            throw new ConnectorTransientException(sprintf('Ozon orders server error for %s (HTTP %d).', $endpoint, $statusCode));
-        }
-        if (200 !== $statusCode) {
-            throw new MalformedConnectorResponseException(sprintf('Ozon orders returned HTTP %d for %s.', $statusCode, $endpoint));
-        }
+        $this->classifyStatus($statusCode, $headers, $endpoint);
 
         try {
             $decoded = json_decode($payload, true, 512, \JSON_THROW_ON_ERROR);
@@ -178,6 +165,81 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
         return new OzonRawPage($rows, count($rows) >= $limit, null, []);
     }
 
+    public function fetchPosting(
+        string $companyId,
+        string $connectionRef,
+        IngestOrderScheme $scheme,
+        string $postingNumber,
+    ): ?array {
+        $postingNumber = trim($postingNumber);
+        if ('' === $postingNumber) {
+            throw new \InvalidArgumentException('Ozon posting number cannot be empty.');
+        }
+
+        $credentials = $this->credentialProvider->read($companyId, $connectionRef);
+        $endpoint = IngestOrderScheme::FBS === $scheme ? self::FBS_GET_ENDPOINT : self::FBO_GET_ENDPOINT;
+
+        // Никаких дополнительных блоков (`analytics_data`, `financial_data`):
+        // перепросу нужен только статус, а ответ целиком ложится в raw. Просить
+        // адреса и финансы, которые никто не читает, значит хранить лишние
+        // персональные данные ровно год.
+        $body = ['posting_number' => $postingNumber];
+
+        $startedAt = microtime(true);
+
+        try {
+            $response = $this->httpClient->request('POST', self::BASE_URL.$endpoint, [
+                'headers' => [
+                    'Client-Id' => (string) $credentials['client_id'],
+                    'Api-Key' => $credentials['api_key'],
+                    'Content-Type' => 'application/json',
+                ],
+                'json' => $body,
+                'timeout' => self::TIMEOUT_SECONDS,
+            ]);
+
+            $statusCode = $response->getStatusCode();
+            $headers = $response->getHeaders(false);
+            $payload = $response->getContent(false);
+        } catch (TransportExceptionInterface $exception) {
+            throw new ConnectorTransientException(sprintf('Ozon posting transport error for %s (%s).', $endpoint, $exception::class));
+        }
+
+        $this->logger->info('Ozon posting fetched.', [
+            'companyId' => $companyId,
+            'connectionRef' => $connectionRef,
+            'method' => 'POST',
+            'endpoint' => $endpoint,
+            'statusCode' => $statusCode,
+            'durationMs' => (int) round((microtime(true) - $startedAt) * 1000),
+        ]);
+
+        // Ozon отвечает 404 на неизвестный номер. Это не сбой цикла: заказ мог
+        // быть удалён или номер устареть, и ронять из-за него перепрос всех
+        // остальных заказов нельзя.
+        if (404 === $statusCode) {
+            return null;
+        }
+
+        $this->classifyStatus($statusCode, $headers, $endpoint);
+
+        try {
+            $decoded = json_decode($payload, true, 512, \JSON_THROW_ON_ERROR);
+        } catch (\JsonException $exception) {
+            throw new MalformedConnectorResponseException(sprintf('Ozon posting returned invalid JSON for %s.', $endpoint), 0, $exception);
+        }
+
+        $result = is_array($decoded) ? ($decoded['result'] ?? null) : null;
+
+        // Отправление обязано быть непустым объектом: список или пустышка —
+        // испорченный ответ, а не отсутствующий заказ.
+        if (!is_array($result) || [] === $result || array_is_list($result)) {
+            throw new MalformedConnectorResponseException(sprintf('Ozon posting response has no result object for %s.', $endpoint));
+        }
+
+        return $result;
+    }
+
     /**
      * @param array<array-key, mixed> $rows
      *
@@ -201,6 +263,37 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
         }
 
         return $result;
+    }
+
+    /**
+     * Разбор HTTP-статуса, общий для списка и для одиночного отправления.
+     *
+     * Одно место намеренно: два перечня кодов рано или поздно разошлись бы, и
+     * тот же таймаут в одном пути повторялся бы, а в другом убивал прогон.
+     *
+     * @param array<string, list<string>> $headers
+     */
+    private function classifyStatus(int $statusCode, array $headers, string $endpoint): void
+    {
+        if (401 === $statusCode || 403 === $statusCode) {
+            throw new ConnectorAuthException(sprintf('Ozon orders auth failed for %s (HTTP %d).', $endpoint, $statusCode));
+        }
+
+        if (429 === $statusCode) {
+            throw new ConnectorRateLimitedException(sprintf('Ozon orders rate limited for %s.', $endpoint), $this->retryAfterSeconds($headers));
+        }
+
+        // 408 и 425 — временные по смыслу: истёкший таймаут запроса и
+        // «слишком рано» подлежат повтору ровно так же, как 5xx. Без этой
+        // ветки они становились неповторяемым malformed response, то есть
+        // таймаут шлюза убивал прогон.
+        if ($statusCode >= 500 || 408 === $statusCode || 425 === $statusCode) {
+            throw new ConnectorTransientException(sprintf('Ozon orders server error for %s (HTTP %d).', $endpoint, $statusCode));
+        }
+
+        if (200 !== $statusCode) {
+            throw new MalformedConnectorResponseException(sprintf('Ozon orders returned HTTP %d for %s.', $statusCode, $endpoint));
+        }
     }
 
     /**

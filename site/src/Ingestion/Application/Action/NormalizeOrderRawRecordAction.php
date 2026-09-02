@@ -9,11 +9,11 @@ use App\Ingestion\Application\Command\RecordNormalizationIssueCommand;
 use App\Ingestion\Application\DTO\ListingResolution;
 use App\Ingestion\Application\DTO\MappedOrder;
 use App\Ingestion\Application\Service\ListingResolverRegistry;
+use App\Ingestion\Application\Service\OrderStatusJournal;
 use App\Ingestion\Domain\Service\IngestOrderStatusMapper;
 use App\Ingestion\Domain\Service\OrderMapperRegistry;
 use App\Ingestion\Entity\IngestOrder;
 use App\Ingestion\Entity\IngestOrderItem;
-use App\Ingestion\Entity\IngestOrderStatusEvent;
 use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Enum\IngestOrderScheme;
 use App\Ingestion\Enum\IngestOrderStatus;
@@ -46,6 +46,7 @@ final readonly class NormalizeOrderRawRecordAction
         private ListingResolverRegistry $listingResolverRegistry,
         private IngestOrderRepository $orderRepository,
         private IngestOrderItemRepository $itemRepository,
+        private OrderStatusJournal $statusJournal,
         private IngestOrderStatusEventRepository $statusEventRepository,
         private RecordNormalizationIssueAction $recordNormalizationIssueAction,
         private EntityManagerInterface $entityManager,
@@ -311,7 +312,7 @@ final readonly class NormalizeOrderRawRecordAction
             // Событие журнала — факт НАБЛЮДЕНИЯ статуса. Без наблюдения его
             // нет: выдуманная строка «статус UNKNOWN» ничего не фиксирует.
             if ($mapped->statusObserved) {
-                $this->appendStatusEvent($order, $mapped->rawStatus, $status, null, $observedAt, $rawRecord->getId(), $seenObservations);
+                $this->statusJournal->recordOpening($order, $mapped->rawStatus, $status, $observedAt, $rawRecord->getId(), $seenObservations);
             }
             $applied = $this->applyItems($order, $mapped, [], $resolutions, $orderIndex);
             $knownItems[$order->getId()] = $applied;
@@ -320,18 +321,6 @@ final readonly class NormalizeOrderRawRecordAction
             }
 
             return $order;
-        }
-
-        $previousStatus = $order->getStatus();
-        $statusChanged = $mapped->statusObserved
-            && ($previousStatus !== $status || $order->getRawStatus() !== $mapped->rawStatus);
-
-        // Наблюдение фиксируется, если статус ОТЛИЧАЕТСЯ от текущего — иначе
-        // часовой опрос дал бы 24 одинаковые строки в сутки на заказ. При этом
-        // устаревшее наблюдение другого статуса всё равно записывается: это
-        // факт, который был.
-        if ($statusChanged) {
-            $this->appendStatusEvent($order, $mapped->rawStatus, $status, $previousStatus, $observedAt, $rawRecord->getId(), $seenObservations);
         }
 
         // Свежесть СТАТУСА и свежесть СНИМКА — разные вещи.
@@ -348,7 +337,15 @@ final readonly class NormalizeOrderRawRecordAction
         // Наблюдение без статуса статуса не двигает и события не пишет:
         // отсутствие статуса — не статус.
         $statusAccepted = $mapped->statusObserved
-            && $order->observeStatus($mapped->rawStatus, $status, $observedAt, $mapped->rawSubstatus, $rawRecord->getId());
+            && $this->statusJournal->observe(
+                $order,
+                $mapped->rawStatus,
+                $status,
+                $observedAt,
+                $mapped->rawSubstatus,
+                $rawRecord->getId(),
+                $seenObservations,
+            );
 
         // Полный снимок применяется, если он новее ПОСЛЕДНЕГО полного снимка.
         // Частичное наблюдение снимком не является: оно лишь дополняет состав.
@@ -458,40 +455,6 @@ final readonly class NormalizeOrderRawRecordAction
         $currentItems[$order->getId()] = $applied;
 
         return $order;
-    }
-
-    /**
-     * @param array<string, true> $seenObservations изменяется по ссылке
-     */
-    private function appendStatusEvent(
-        IngestOrder $order,
-        string $rawStatus,
-        IngestOrderStatus $status,
-        ?IngestOrderStatus $previousStatus,
-        \DateTimeImmutable $observedAt,
-        string $rawRecordId,
-        array &$seenObservations,
-    ): void {
-        // Одно наблюдение — одно событие. Устаревшее наблюдение не двигает
-        // статус заказа, поэтому «статус отличается» остаётся истиной навсегда,
-        // и без этой проверки каждый повторный прогон того же сырья дописывал
-        // бы ещё одну копию.
-        $key = $order->getId()."\0".$rawStatus;
-        if (isset($seenObservations[$key])) {
-            return;
-        }
-
-        $seenObservations[$key] = true;
-
-        $this->statusEventRepository->save(new IngestOrderStatusEvent(
-            companyId: $order->getCompanyId(),
-            orderId: $order->getId(),
-            rawStatus: $rawStatus,
-            status: $status,
-            observedAt: $observedAt,
-            previousStatus: $previousStatus,
-            rawRecordId: $rawRecordId,
-        ));
     }
 
     /**

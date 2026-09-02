@@ -83,6 +83,10 @@ final class IngestOrderRepository extends ServiceEntityRepository
     /**
      * Заказы, которые ещё имеет смысл перепрашивать.
      *
+     * connectionRef обязателен: заказы разных кабинетов одной компании
+     * опрашиваются разными ключами, и спросить Ozon о чужом отправлении
+     * значило бы получить 404 на живом заказе.
+     *
      * Терминальность спрашивается у enum'а, а не выражается списком статусов
      * здесь: иначе определение «терминального» разошлось бы между выборкой,
      * монитором и апсертом.
@@ -92,6 +96,7 @@ final class IngestOrderRepository extends ServiceEntityRepository
     public function findNonTerminalForRefresh(
         string $companyId,
         IngestSource $source,
+        string $connectionRef,
         \DateTimeImmutable $orderedAfter,
         int $limit,
     ): array {
@@ -105,16 +110,28 @@ final class IngestOrderRepository extends ServiceEntityRepository
 
         /** @var list<IngestOrder> $orders */
         $orders = $this->createQueryBuilder('o')
+            // Заказы БЕЗ статуса идут первыми: им статус нужнее всего, а
+            // PostgreSQL при ASC ставит NULL в конец и они опрашивались бы
+            // последними — то есть при исчерпании лимита никогда.
+            ->addSelect('CASE WHEN o.statusObservedAt IS NULL THEN 0 ELSE 1 END AS HIDDEN observedRank')
             ->andWhere('o.companyId = :companyId')
             ->andWhere('o.source = :source')
+            ->andWhere('o.connectionRef = :connectionRef')
             ->andWhere('o.status IN (:statuses)')
             ->andWhere('o.orderedAt >= :orderedAfter')
             ->andWhere('o.refreshStoppedAt IS NULL')
             ->setParameter('companyId', $companyId)
             ->setParameter('source', $source->value)
+            ->setParameter('connectionRef', $connectionRef)
             ->setParameter('statuses', $nonTerminal)
             ->setParameter('orderedAfter', $orderedAfter)
-            ->orderBy('o.statusObservedAt', 'ASC')
+            ->orderBy('observedRank', 'ASC')
+            ->addOrderBy('o.statusObservedAt', 'ASC')
+            // Устойчивый третий ключ: без него заказы с одинаковым временем
+            // наблюдения (а у не опрошенных оно одинаково всегда — NULL)
+            // возвращались бы в произвольном порядке, и при исчерпании лимита
+            // часть из них не опрашивалась бы никогда.
+            ->addOrderBy('o.id', 'ASC')
             ->setMaxResults(max(1, min(1000, $limit)))
             ->getQuery()
             ->getResult();

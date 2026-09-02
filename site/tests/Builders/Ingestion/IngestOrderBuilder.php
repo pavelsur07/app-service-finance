@@ -23,8 +23,18 @@ final class IngestOrderBuilder
     private IngestOrderStatus $status = IngestOrderStatus::SHIPPED;
     private \DateTimeImmutable $statusObservedAt;
 
+    /** @var array<string, mixed>|null */
+    private ?array $attributes = null;
+
+    /**
+     * Заказ без сырья не существует: он всегда создаётся нормализацией.
+     * Билдер повторяет это, иначе тесты проверяли бы недостижимое состояние.
+     */
+    private string $lastRawRecordId;
+
     private function __construct()
     {
+        $this->lastRawRecordId = Uuid::uuid7()->toString();
         $this->companyId = Uuid::uuid7()->toString();
         $this->orderedAt = new \DateTimeImmutable('-2 days');
         $this->statusObservedAt = new \DateTimeImmutable('-1 hour');
@@ -100,6 +110,25 @@ final class IngestOrderBuilder
         return $clone;
     }
 
+    public function withLastRawRecordId(string $rawRecordId): self
+    {
+        $clone = clone $this;
+        $clone->lastRawRecordId = $rawRecordId;
+
+        return $clone;
+    }
+
+    /**
+     * @param array<string, mixed> $attributes
+     */
+    public function withAttributes(array $attributes): self
+    {
+        $clone = clone $this;
+        $clone->attributes = $attributes;
+
+        return $clone;
+    }
+
     public function build(): IngestOrder
     {
         return new IngestOrder(
@@ -113,6 +142,8 @@ final class IngestOrderBuilder
             rawStatus: $this->rawStatus,
             status: $this->status,
             statusObservedAt: $this->statusObservedAt,
+            attributes: $this->attributes,
+            lastRawRecordId: $this->lastRawRecordId,
         );
     }
 }

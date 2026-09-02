@@ -20,4 +20,19 @@ interface OzonOrdersClientInterface
         int $limit,
         int $offset,
     ): OzonRawPage;
+
+    /**
+     * Одно отправление по номеру — для перепроса статуса.
+     *
+     * Возвращает `null`, если Ozon отправления не знает: заказ мог быть удалён
+     * или номер устарел, и это не повод ронять весь цикл перепроса.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function fetchPosting(
+        string $companyId,
+        string $connectionRef,
+        IngestOrderScheme $scheme,
+        string $postingNumber,
+    ): ?array;
 }

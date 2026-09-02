@@ -83,6 +83,7 @@ final class IngestOrderRepositoryTest extends IntegrationTestCase
         $candidates = $this->repository->findNonTerminalForRefresh(
             $companyId,
             IngestSource::OZON,
+            'connection-1',
             new \DateTimeImmutable('-30 days'),
             100,
         );
@@ -108,6 +109,7 @@ final class IngestOrderRepositoryTest extends IntegrationTestCase
         $candidates = $this->repository->findNonTerminalForRefresh(
             $companyId,
             IngestSource::OZON,
+            'connection-1',
             new \DateTimeImmutable('-30 days'),
             100,
         );

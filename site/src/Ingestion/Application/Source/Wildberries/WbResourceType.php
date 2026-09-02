@@ -21,4 +21,9 @@ final class WbResourceType
      * правки задним числом, которых в marketplace-потоке уже не увидеть.
      */
     public const ORDERS_STATISTICS = 'wildberries_orders_statistics';
+
+    /**
+     * Сырьё почасового перепроса статусов — только для аудита, маппера нет.
+     */
+    public const ORDER_STATUS_REFRESH = 'wildberries_order_status_refresh';
 }

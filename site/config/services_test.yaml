@@ -23,6 +23,17 @@ services:
 
     App\Ingestion\Infrastructure\Api\Ozon\OzonAccrualClientInterface: '@App\Tests\Integration\Ingestion\Fixtures\FakeOzonAccrualClient'
 
+    # Клиенты заказов подменяются целиком: цикл перепроса ходит во внешние API,
+    # и проверять его на настоящих HTTP-вызовах нечем.
+    App\Tests\Integration\Ingestion\Fixtures\FakeOzonOrdersClient:
+        public: true
+
+    App\Tests\Integration\Ingestion\Fixtures\FakeWbOrdersClient:
+        public: true
+
+    App\Ingestion\Infrastructure\Api\Ozon\OzonOrdersClientInterface: '@App\Tests\Integration\Ingestion\Fixtures\FakeOzonOrdersClient'
+    App\Ingestion\Infrastructure\Api\Wildberries\WbOrdersClientInterface: '@App\Tests\Integration\Ingestion\Fixtures\FakeWbOrdersClient'
+
     test.ingestion_lock_store:
         class: Symfony\Component\Lock\Store\InMemoryStore
 

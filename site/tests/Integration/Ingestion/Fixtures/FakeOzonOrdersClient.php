@@ -11,7 +11,10 @@ use App\Ingestion\Infrastructure\Api\Ozon\OzonRawPage;
 final class FakeOzonOrdersClient implements OzonOrdersClientInterface
 {
     /**
-     * @var list<array{scheme: string, since: string, to: string, limit: int, offset: int}>
+     * Вызовы обоих эндпоинтов: у списка и у одиночного отправления разный
+     * набор ключей, поэтому тип общий.
+     *
+     * @var list<array<string, mixed>>
      */
     public array $calls = [];
 
@@ -20,9 +23,31 @@ final class FakeOzonOrdersClient implements OzonOrdersClientInterface
      */
     private array $queued = [];
 
+    /** @var array<string, array<string, mixed>|null> */
+    private array $postings = [];
+
     public function queue(OzonRawPage|\Throwable ...$pages): void
     {
         $this->queued = array_values($pages);
+    }
+
+    /**
+     * @param array<string, array<string, mixed>|null> $postings номер => отправление
+     */
+    public function setPostings(array $postings): void
+    {
+        $this->postings = $postings;
+    }
+
+    public function fetchPosting(
+        string $companyId,
+        string $connectionRef,
+        IngestOrderScheme $scheme,
+        string $postingNumber,
+    ): ?array {
+        $this->calls[] = ['endpoint' => 'posting_get', 'postingNumber' => $postingNumber];
+
+        return $this->postings[$postingNumber] ?? null;
     }
 
     public function fetchPostings(
