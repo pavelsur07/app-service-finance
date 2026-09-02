@@ -13,11 +13,13 @@ use App\Ingestion\Application\Source\Wildberries\WbResourceType;
 use App\Ingestion\Domain\Service\IngestOrderStatusMapper;
 use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Entity\IngestOrder;
+use App\Ingestion\Enum\IngestOrderStatus;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\NormalizationIssueKind;
 use App\Ingestion\Exception\ConnectorAuthException;
 use App\Ingestion\Exception\ConnectorRateLimitedException;
 use App\Ingestion\Exception\ConnectorTransientException;
+use App\Ingestion\Exception\MalformedConnectorResponseException;
 use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonOrdersClientInterface;
 use App\Ingestion\Infrastructure\Api\Wildberries\WbOrdersClientInterface;
@@ -42,8 +44,9 @@ use Ramsey\Uuid\Uuid;
  * состоянием, а не окном времени. Заводить ради этого задачу синхронизации
  * значило бы упереться в ActiveBackfillExistsException на каждом втором часе.
  *
- * Порядок опроса — по возрастанию времени последнего наблюдения, поэтому при
- * исчерпании лимита первыми опрашиваются самые давно не проверенные заказы.
+ * Порядок опроса — сначала ни разу не наблюдённые, затем по возрастанию
+ * времени последнего наблюдения, поэтому при исчерпании лимита первыми
+ * опрашиваются самые давно не проверенные заказы.
  */
 final readonly class RefreshOrderStatusesAction
 {
@@ -74,59 +77,44 @@ final readonly class RefreshOrderStatusesAction
 
         $result = new RefreshOrderStatusesResult();
 
-        /** @var array<string, true> $companies */
-        $companies = [];
-
         // Подключения берутся через Facade: `Infrastructure/` чужого модуля
-        // закрыт, и прямой запрос был бы нарушением границы модулей.
-        foreach ($this->marketplaceSyncFacade->activeSellerConnections() as $connection) {
-            $companyId = $connection->companyId;
-            if (null !== $command->companyId && $companyId !== $command->companyId) {
-                continue;
-            }
-
+        // закрыт, и прямой запрос был бы нарушением границы модулей. Отбор по
+        // компании делает БД, а не цикл.
+        foreach ($this->marketplaceSyncFacade->activeSellerConnections($command->companyId) as $connection) {
             $source = IngestSource::tryFrom($connection->marketplace);
             if (null === $source) {
                 continue;
             }
 
-            $companies[$companyId] = true;
-
+            $companyId = $connection->companyId;
             $connectionRef = $connection->connectionRef;
+
             $orders = $this->orderRepository->findNonTerminalForRefresh(
                 $companyId,
                 $source,
                 $connectionRef,
                 $orderedAfter,
                 $command->limitPerConnection,
+                // У WB спросить можно только заказ с номером marketplace-api.
+                // Отсев обязан идти до лимита: иначе заказы, известные лишь из
+                // потока изменений, съедали бы его целиком — у них
+                // statusObservedAt навсегда NULL, то есть они вечно первые.
+                requireExternalOrderId: IngestSource::WILDBERRIES === $source,
             );
 
-            if ([] !== $orders) {
-                try {
-                    $result = $this->refreshConnection($result, $source, $companyId, $connectionRef, $orders, $now);
-                } catch (ConnectorAuthException|ConnectorRateLimitedException|ConnectorTransientException $exception) {
-                    // Сбой одного подключения не должен останавливать остальные:
-                    // ключ мог протухнуть у одного продавца, а лимит — сработать
-                    // у другого. Оба случая ожидаемы и лечатся сами.
-                    $result = $result->with(failedConnections: 1);
-                    $this->logger->warning('Order status refresh skipped a connection.', [
-                        'companyId' => $companyId,
-                        'connectionRef' => $connectionRef,
-                        'source' => $source->value,
-                        'exceptionClass' => $exception::class,
-                    ]);
-                }
+            if ([] === $orders) {
+                continue;
             }
+
+            $result = $this->refreshConnection($result, $source, $companyId, $connectionRef, $orders, $now);
         }
 
-        // Зависшие заказы ищутся ПО КОМПАНИИ, а не по подключению, поэтому
-        // проход вынесен из цикла: у компании с двумя кабинетами тот же запрос
-        // выполнился бы дважды и — так как отметка ещё не сброшена в базу —
-        // вернул бы те же заказы, дав второй экземпляр проблемы и удвоенный
-        // счётчик.
-        foreach (array_keys($companies) as $companyId) {
-            $result = $this->stopStuckOrders($result, $companyId, $orderedAfter, $command->limitPerConnection, $now);
-        }
+        // Зависшие заказы ищутся ОТДЕЛЬНО от подключений. Зависание не зависит
+        // от того, живо ли ещё подключение: отключённый кабинет иначе оставлял
+        // бы свои заказы вечно нетерминальными и невидимыми. Проход также
+        // вынесен из цикла кабинетов — у компании с двумя подключениями он
+        // заводил бы вторую проблему на тот же заказ.
+        $result = $this->stopStuckOrders($result, $command->companyId, $orderedAfter, $command->limitPerConnection, $now);
 
         $this->entityManager->flush();
 
@@ -136,9 +124,21 @@ final readonly class RefreshOrderStatusesAction
             'polled' => $result->polled,
             'changed' => $result->changed,
             'missing' => $result->missing,
+            'invalid' => $result->invalid,
             'stopped' => $result->stopped,
             'failedConnections' => $result->failedConnections,
+            'authFailedConnections' => $result->authFailedConnections,
         ]);
+
+        // Протухший ключ сам не лечится: пока человек его не заменит,
+        // подключение не получает обновлений вообще. Это инцидент, а не
+        // ожидаемая помеха, поэтому один агрегированный error со счётчиком —
+        // не по подключению, чтобы не устраивать веер алертов.
+        if ($result->authFailedConnections > 0) {
+            $this->logger->error('Order status refresh could not authenticate against marketplaces.', [
+                'authFailedConnections' => $result->authFailedConnections,
+            ]);
+        }
 
         return $result;
     }
@@ -154,142 +154,277 @@ final readonly class RefreshOrderStatusesAction
         array $orders,
         \DateTimeImmutable $now,
     ): RefreshOrderStatusesResult {
-        $observations = IngestSource::OZON === $source
+        $poll = IngestSource::OZON === $source
             ? $this->pollOzon($companyId, $connectionRef, $orders)
             : $this->pollWildberries($companyId, $connectionRef, $orders);
 
-        if ([] === $observations['rows']) {
-            return $result->with(missing: $observations['missing']);
+        // Сбой одного подключения не отменяет уже полученного. Ответы, успевшие
+        // приехать до 429 или таймаута, применяются: иначе поздняя ошибка
+        // каждый час обнуляла бы весь прогресс подключения и заказы в его
+        // конце не обновлялись бы никогда.
+        if (null !== $poll['failure']) {
+            $result = $poll['failure'] instanceof ConnectorAuthException
+                ? $result->with(authFailedConnections: 1)
+                : $result->with(failedConnections: 1);
+
+            $this->logger->warning('Order status refresh could not finish a connection.', [
+                'companyId' => $companyId,
+                'connectionRef' => $connectionRef,
+                'source' => $source->value,
+                // Класс, а не сообщение: в тексте транспортных исключений
+                // встречаются DSN с учётными данными.
+                'exceptionClass' => $poll['failure']::class,
+                'polledBeforeFailure' => count($poll['observations']),
+            ]);
+        }
+
+        $result = $result->with(missing: $poll['missing'], invalid: $poll['invalid']);
+
+        if ([] === $poll['rows']) {
+            return $result;
         }
 
         // Ответ маркетплейса сохраняется в raw ради аудита: без него нечем
         // объяснить, почему статус изменился именно так. Нормализация к этой
         // записи не применяется — маппера у ресурса нет, и запись сразу
         // помечается пропущенной, иначе она вечно висела бы в очереди.
-        $rawRecordId = $this->storeAudit($source, $companyId, $connectionRef, $observations['rows'], $now);
+        $rawRecordId = $this->storeAudit($source, $companyId, $connectionRef, $poll['rows'], $now);
 
-        $seenObservations = [];
-        $changed = 0;
-
-        foreach ($observations['statuses'] as $orderId => $observation) {
-            $order = $observations['orders'][$orderId];
-            $status = $this->statusMapper->map($source, $order->getScheme(), $observation['rawStatus']);
-
-            if ($this->statusJournal->observe(
-                $order,
-                $observation['rawStatus'],
-                $status,
-                $now,
-                $observation['rawSubstatus'],
-                $rawRecordId,
-                $seenObservations,
-            )) {
-                ++$changed;
-            }
+        if ([] === $poll['observations']) {
+            return $result;
         }
 
         return $result->with(
-            polled: count($observations['statuses']),
-            changed: $changed,
-            missing: $observations['missing'],
+            polled: count($poll['observations']),
+            changed: $this->applyObservations($source, $companyId, $poll['observations'], $rawRecordId, $now),
         );
+    }
+
+    /**
+     * Применение наблюдений — короткая транзакция с перечитыванием заказа под
+     * блокировкой.
+     *
+     * Между выборкой заказов и этим моментом прошли внешние HTTP-запросы, то
+     * есть секунды или минуты. За это время нормализатор мог записать более
+     * свежее наблюдение, а загруженная сущность об этом не знает: Doctrine
+     * считает изменения от значений, прочитанных ДО опроса, и финальный flush
+     * откатил бы статус назад. Блокировка берётся ПОСЛЕ сети и только на время
+     * записи — держать её во время HTTP значило бы держать её минутами.
+     *
+     * @param list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>}> $observations
+     */
+    private function applyObservations(
+        IngestSource $source,
+        string $companyId,
+        array $observations,
+        string $rawRecordId,
+        \DateTimeImmutable $now,
+    ): int {
+        $changed = 0;
+        $seenObservations = [];
+
+        $this->entityManager->wrapInTransaction(function () use (
+            $source,
+            $companyId,
+            $observations,
+            $rawRecordId,
+            $now,
+            &$changed,
+            &$seenObservations,
+        ): void {
+            foreach ($observations as $observation) {
+                $order = $this->orderRepository->findOneForUpdate($companyId, $observation['orderId']);
+                if (null === $order) {
+                    continue;
+                }
+
+                $status = $this->statusMapper->map($source, $order->getScheme(), $observation['rawStatus']);
+
+                if (IngestOrderStatus::UNKNOWN === $status) {
+                    // Тот же механизм, что и в нормализации: незнакомый токен
+                    // становится видимой очередью на разбор, а не тихо ждёт
+                    // общего STUCK_ORDER через месяц.
+                    ($this->recordIssueAction)(new RecordNormalizationIssueCommand(
+                        companyId: $companyId,
+                        rawRecordId: $rawRecordId,
+                        operationGroupId: null,
+                        kind: NormalizationIssueKind::UNKNOWN_ORDER_STATUS,
+                        details: [
+                            'source' => $source->value,
+                            'scheme' => $order->getScheme()->value,
+                            'rawStatus' => $observation['rawStatus'],
+                            'externalId' => $order->getExternalId(),
+                        ],
+                    ));
+                }
+
+                $outcome = $this->statusJournal->observe(
+                    $order,
+                    $observation['rawStatus'],
+                    $status,
+                    $now,
+                    $observation['rawSubstatus'],
+                    $rawRecordId,
+                    $seenObservations,
+                );
+
+                // Статусные атрибуты принадлежат статусной оси и идут только с
+                // принятым наблюдением — ровно как в нормализации. Без этого
+                // заказ показывал бы свежий статус рядом с устаревшими
+                // supplier_status и wb_status.
+                if ($outcome->accepted && [] !== $observation['statusAttributes']) {
+                    $order->mergeAttributes($observation['statusAttributes']);
+                }
+
+                if ($outcome->changed) {
+                    ++$changed;
+                }
+            }
+        });
+
+        return $changed;
     }
 
     /**
      * @param list<IngestOrder> $orders
      *
-     * @return array{rows: list<array<string, mixed>>, statuses: array<string, array{rawStatus: string, rawSubstatus: ?string}>, orders: array<string, IngestOrder>, missing: int}
+     * @return array{rows: list<array<string, mixed>>, observations: list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>}>, missing: int, invalid: int, failure: \Throwable|null}
      */
     private function pollOzon(string $companyId, string $connectionRef, array $orders): array
     {
         $rows = [];
-        $statuses = [];
-        $byId = [];
+        $observations = [];
         $missing = 0;
+        $invalid = 0;
+        $failure = null;
 
         foreach ($orders as $order) {
-            $posting = $this->ozonClient->fetchPosting(
-                $companyId,
-                $connectionRef,
-                $order->getScheme(),
-                $order->getExternalId(),
-            );
+            try {
+                $posting = $this->ozonClient->fetchPosting(
+                    $companyId,
+                    $connectionRef,
+                    $order->getScheme(),
+                    $order->getExternalId(),
+                );
+            } catch (ConnectorAuthException|ConnectorRateLimitedException|ConnectorTransientException|MalformedConnectorResponseException $exception) {
+                // Дальше идти незачем — ключ, лимит и сбой шлюза относятся ко
+                // всему подключению, — но уже полученное сохраняется.
+                $failure = $exception;
+                break;
+            }
 
             if (null === $posting) {
                 ++$missing;
                 continue;
             }
 
+            // Ответ кладётся в сырьё ДО разбора статуса: именно испорченный
+            // ответ и нужен как доказательство, а выброшенный он объясняет
+            // ровно ничего.
+            $rows[] = $posting;
+
             $rawStatus = $this->stringOrNull($posting['status'] ?? null);
             if (null === $rawStatus) {
-                // Отправление без статуса — испорченный ответ, но ронять из-за
-                // него остальные заказы незачем: считаем непрочитанным.
-                ++$missing;
+                // Нарушение контракта, а не отсутствие заказа: считается
+                // отдельно от честного 404, иначе одно прячется за другим.
+                ++$invalid;
+                $this->logger->warning('Ozon posting has no status field.', [
+                    'companyId' => $companyId,
+                    'connectionRef' => $connectionRef,
+                    'externalId' => $order->getExternalId(),
+                ]);
+
                 continue;
             }
 
-            $rows[] = $posting;
-            $statuses[$order->getId()] = [
+            $observations[] = [
+                'orderId' => $order->getId(),
                 'rawStatus' => $rawStatus,
                 'rawSubstatus' => $this->stringOrNull($posting['substatus'] ?? null),
+                'statusAttributes' => [],
             ];
-            $byId[$order->getId()] = $order;
         }
 
-        return ['rows' => $rows, 'statuses' => $statuses, 'orders' => $byId, 'missing' => $missing];
+        return [
+            'rows' => $rows,
+            'observations' => $observations,
+            'missing' => $missing,
+            'invalid' => $invalid,
+            'failure' => $failure,
+        ];
     }
 
     /**
      * @param list<IngestOrder> $orders
      *
-     * @return array{rows: list<array<string, mixed>>, statuses: array<string, array{rawStatus: string, rawSubstatus: ?string}>, orders: array<string, IngestOrder>, missing: int}
+     * @return array{rows: list<array<string, mixed>>, observations: list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>}>, missing: int, invalid: int, failure: \Throwable|null}
      */
     private function pollWildberries(string $companyId, string $connectionRef, array $orders): array
     {
-        // Опрашиваются только заказы, у которых есть номер marketplace-api.
-        // Заказ, известный лишь из потока изменений statistics, спросить не у
-        // кого: эндпоинта «статус по srid» у WB нет, и его отмену приносит
-        // сам поток изменений.
+        // Номер marketplace-api живёт в собственной колонке, а не в JSON:
+        // по ней же идёт отсев в запросе. Заказ, известный лишь из потока
+        // изменений statistics, спросить не у кого — эндпоинта «статус по
+        // srid» у WB нет, и его отмену приносит сам поток изменений.
         $byWbId = [];
         foreach ($orders as $order) {
-            $wbOrderId = ($order->getAttributes() ?? [])['wb_order_id'] ?? null;
-            if (is_string($wbOrderId) && 1 === preg_match('/^\d+$/', $wbOrderId)) {
-                $byWbId[(int) $wbOrderId] = $order;
+            $externalOrderId = $order->getExternalOrderId();
+            if (null !== $externalOrderId && 1 === preg_match('/^\d+$/', $externalOrderId)) {
+                $byWbId[(int) $externalOrderId] = $order;
             }
         }
 
         if ([] === $byWbId) {
-            return ['rows' => [], 'statuses' => [], 'orders' => [], 'missing' => 0];
+            return ['rows' => [], 'observations' => [], 'missing' => 0, 'invalid' => 0, 'failure' => null];
         }
 
         $rows = [];
-        $statuses = [];
-        $byId = [];
+        $observations = [];
+        $answered = 0;
+        $failure = null;
 
         foreach (array_chunk(array_keys($byWbId), self::WB_STATUS_CHUNK) as $chunk) {
-            foreach ($this->wbClient->fetchMarketplaceStatuses($companyId, $connectionRef, $chunk) as $wbOrderId => $row) {
+            try {
+                $statuses = $this->wbClient->fetchMarketplaceStatuses($companyId, $connectionRef, $chunk);
+            } catch (ConnectorAuthException|ConnectorRateLimitedException|ConnectorTransientException|MalformedConnectorResponseException $exception) {
+                $failure = $exception;
+                break;
+            }
+
+            foreach ($statuses as $wbOrderId => $row) {
                 $order = $byWbId[$wbOrderId] ?? null;
                 if (null === $order) {
                     continue;
                 }
 
+                ++$answered;
                 $rows[] = $row;
-                $statuses[$order->getId()] = [
-                    'rawStatus' => IngestOrderStatusMapper::encodeWbStatus(
-                        (string) $row['supplierStatus'],
-                        (string) $row['wbStatus'],
-                    ),
-                    'rawSubstatus' => null,
+
+                $supplierStatus = (string) $row['supplierStatus'];
+                $wbStatus = (string) $row['wbStatus'];
+
+                $statusAttributes = [
+                    'supplier_status' => $supplierStatus,
+                    'wb_status' => $wbStatus,
                 ];
-                $byId[$order->getId()] = $order;
+                if (is_bool($row['isCancellable'] ?? null)) {
+                    $statusAttributes['is_cancellable'] = $row['isCancellable'];
+                }
+
+                $observations[] = [
+                    'orderId' => $order->getId(),
+                    'rawStatus' => IngestOrderStatusMapper::encodeWbStatus($supplierStatus, $wbStatus),
+                    'rawSubstatus' => null,
+                    'statusAttributes' => $statusAttributes,
+                ];
             }
         }
 
         return [
             'rows' => $rows,
-            'statuses' => $statuses,
-            'orders' => $byId,
-            'missing' => count($byWbId) - count($statuses),
+            'observations' => $observations,
+            'missing' => count($byWbId) - $answered,
+            'invalid' => 0,
+            'failure' => $failure,
         ];
     }
 
@@ -332,12 +467,15 @@ final readonly class RefreshOrderStatusesAction
 
     private function stopStuckOrders(
         RefreshOrderStatusesResult $result,
-        string $companyId,
+        ?string $companyId,
         \DateTimeImmutable $orderedBefore,
         int $limit,
         \DateTimeImmutable $now,
     ): RefreshOrderStatusesResult {
-        $stuck = $this->orderRepository->findStuck($companyId, $orderedBefore, $limit);
+        $stuck = null === $companyId
+            ? $this->orderRepository->findStuckAcrossCompanies($orderedBefore, $limit)
+            : $this->orderRepository->findStuck($companyId, $orderedBefore, $limit);
+
         if ([] === $stuck) {
             return $result;
         }
@@ -358,7 +496,7 @@ final readonly class RefreshOrderStatusesAction
             $lastRawRecordId = $order->getLastRawRecordId();
             if (null === $lastRawRecordId) {
                 $this->logger->warning('Stuck order has no raw record to attach the issue to.', [
-                    'companyId' => $companyId,
+                    'companyId' => $order->getCompanyId(),
                     'orderId' => $order->getId(),
                     'externalId' => $order->getExternalId(),
                 ]);
@@ -367,7 +505,7 @@ final readonly class RefreshOrderStatusesAction
             }
 
             ($this->recordIssueAction)(new RecordNormalizationIssueCommand(
-                companyId: $companyId,
+                companyId: $order->getCompanyId(),
                 rawRecordId: $lastRawRecordId,
                 operationGroupId: null,
                 kind: NormalizationIssueKind::STUCK_ORDER,

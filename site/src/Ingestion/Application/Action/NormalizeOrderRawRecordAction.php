@@ -18,6 +18,7 @@ use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Enum\IngestOrderScheme;
 use App\Ingestion\Enum\IngestOrderStatus;
 use App\Ingestion\Enum\NormalizationIssueKind;
+use App\Ingestion\Enum\RawNormalizationStatus;
 use App\Ingestion\Exception\RawRecordNotFoundException;
 use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Repository\IngestOrderItemRepository;
@@ -60,6 +61,12 @@ final readonly class NormalizeOrderRawRecordAction
         if (null === $rawRecord) {
             throw new RawRecordNotFoundException('Raw record not found for requested company.');
         }
+
+        // Повтор определяется по самому сырью, а не по флагу команды: сюда
+        // приводит и осознанный forceReplay, и повторная доставка сообщения.
+        // Незавершённый первый разбор (запись не DONE) повтором не считается —
+        // иначе события, не успевшие записаться, потерялись бы навсегда.
+        $isReplay = RawNormalizationStatus::DONE === $rawRecord->getNormalizationStatus();
 
         $rows = iterator_to_array($this->rawStorageFacade->read($rawRecord->getId(), $command->companyId), false);
         $mapper = $this->orderMapperRegistry->get($rawRecord->getSource(), $rawRecord->getResourceType());
@@ -164,6 +171,7 @@ final readonly class NormalizeOrderRawRecordAction
                 $seenObservations,
                 $resolutions,
                 $orderIndex,
+                $isReplay,
             );
         }
 
@@ -236,6 +244,7 @@ final readonly class NormalizeOrderRawRecordAction
      * @param array<string, true> $seenObservations ключи уже записанных наблюдений,
      *                                              изменяется по ссылке
      * @param array<array-key, ListingResolution|null> $resolutions «индекс заказа:индекс позиции»
+     * @param bool $isReplay сырьё уже разбирали: наблюдений больше нет, есть пересчёт
      */
     private function applyOrder(
         IngestRawRecord $rawRecord,
@@ -247,6 +256,7 @@ final readonly class NormalizeOrderRawRecordAction
         array &$seenObservations,
         array $resolutions,
         int $orderIndex,
+        bool $isReplay,
     ): IngestOrder {
         $companyId = $rawRecord->getCompanyId();
         $status = $this->statusMapper->map($rawRecord->getSource(), $mapped->scheme, $mapped->rawStatus);
@@ -332,20 +342,33 @@ final readonly class NormalizeOrderRawRecordAction
         // разобранное раньше, навсегда закрыло бы дорогу авторитетному снимку
         // — заказ остался бы без номера, валюты и с ценой другой семантики.
         //
-        // Поэтому у снимка своя отметка. Событие журнала пишется в любом
-        // случае: оно фиксирует факт наблюдения, а не текущее состояние.
+        // Поэтому у снимка своя отметка. Событие журнала пишется при первом
+        // разборе: оно фиксирует факт наблюдения, а не текущее состояние.
         // Наблюдение без статуса статуса не двигает и события не пишет:
         // отсутствие статуса — не статус.
+        //
+        // Повтор уже разобранного сырья наблюдением не является и идёт через
+        // reapply(): иначе он вёл бы себя по-разному в зависимости от момента
+        // повтора — см. комментарий в OrderStatusJournal.
         $statusAccepted = $mapped->statusObserved
-            && $this->statusJournal->observe(
-                $order,
-                $mapped->rawStatus,
-                $status,
-                $observedAt,
-                $mapped->rawSubstatus,
-                $rawRecord->getId(),
-                $seenObservations,
-            );
+            && ($isReplay
+                ? $this->statusJournal->reapply(
+                    $order,
+                    $mapped->rawStatus,
+                    $status,
+                    $observedAt,
+                    $mapped->rawSubstatus,
+                    $rawRecord->getId(),
+                )
+                : $this->statusJournal->observe(
+                    $order,
+                    $mapped->rawStatus,
+                    $status,
+                    $observedAt,
+                    $mapped->rawSubstatus,
+                    $rawRecord->getId(),
+                    $seenObservations,
+                ))->accepted;
 
         // Полный снимок применяется, если он новее ПОСЛЕДНЕГО полного снимка.
         // Частичное наблюдение снимком не является: оно лишь дополняет состав.

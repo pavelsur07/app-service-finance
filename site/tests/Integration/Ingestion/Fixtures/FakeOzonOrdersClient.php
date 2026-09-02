@@ -26,6 +26,14 @@ final class FakeOzonOrdersClient implements OzonOrdersClientInterface
     /** @var array<string, array<string, mixed>|null> */
     private array $postings = [];
 
+    /**
+     * Сбой на конкретном номере отправления: так проверяется, что уже
+     * полученные ответы не выбрасываются вместе с ошибкой.
+     *
+     * @var array<string, \Throwable>
+     */
+    private array $postingFailures = [];
+
     public function queue(OzonRawPage|\Throwable ...$pages): void
     {
         $this->queued = array_values($pages);
@@ -39,6 +47,14 @@ final class FakeOzonOrdersClient implements OzonOrdersClientInterface
         $this->postings = $postings;
     }
 
+    /**
+     * @param array<string, \Throwable> $failures номер => исключение
+     */
+    public function setPostingFailures(array $failures): void
+    {
+        $this->postingFailures = $failures;
+    }
+
     public function fetchPosting(
         string $companyId,
         string $connectionRef,
@@ -46,6 +62,10 @@ final class FakeOzonOrdersClient implements OzonOrdersClientInterface
         string $postingNumber,
     ): ?array {
         $this->calls[] = ['endpoint' => 'posting_get', 'postingNumber' => $postingNumber];
+
+        if (isset($this->postingFailures[$postingNumber])) {
+            throw $this->postingFailures[$postingNumber];
+        }
 
         return $this->postings[$postingNumber] ?? null;
     }

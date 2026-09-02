@@ -21,17 +21,29 @@ final class ActiveSellerConnectionsQuery
     }
 
     /**
+     * @param string|null $companyId ограничить одной компанией
+     *
      * @return array<int, array{id: string, company_id: string, marketplace: string}>
      */
-    public function execute(): array
+    public function execute(?string $companyId = null): array
     {
-        return $this->connection->fetchAllAssociative(
-            'SELECT mc.id, mc.company_id, mc.marketplace
+        // Фильтр по компании выполняет БД, а не вызывающий: отбор после
+        // выборки означал бы читать реестр подключений всех компаний ради
+        // одной.
+        $sql = 'SELECT mc.id, mc.company_id, mc.marketplace
              FROM marketplace_connections mc
              WHERE mc.is_active = true
-               AND mc.connection_type = :type
-             ORDER BY mc.company_id, mc.marketplace',
-            ['type' => 'seller'],
+               AND mc.connection_type = :type';
+        $params = ['type' => 'seller'];
+
+        if (null !== $companyId) {
+            $sql .= ' AND mc.company_id = :companyId';
+            $params['companyId'] = $companyId;
+        }
+
+        return $this->connection->fetchAllAssociative(
+            $sql.' ORDER BY mc.company_id, mc.marketplace',
+            $params,
         );
     }
 }

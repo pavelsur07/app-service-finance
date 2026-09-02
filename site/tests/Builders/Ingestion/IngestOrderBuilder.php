@@ -26,6 +26,8 @@ final class IngestOrderBuilder
     /** @var array<string, mixed>|null */
     private ?array $attributes = null;
 
+    private ?string $externalOrderId = null;
+
     /**
      * Заказ без сырья не существует: он всегда создаётся нормализацией.
      * Билдер повторяет это, иначе тесты проверяли бы недостижимое состояние.
@@ -110,6 +112,14 @@ final class IngestOrderBuilder
         return $clone;
     }
 
+    public function withExternalOrderId(?string $externalOrderId): self
+    {
+        $clone = clone $this;
+        $clone->externalOrderId = $externalOrderId;
+
+        return $clone;
+    }
+
     public function withLastRawRecordId(string $rawRecordId): self
     {
         $clone = clone $this;
@@ -144,6 +154,7 @@ final class IngestOrderBuilder
             statusObservedAt: $this->statusObservedAt,
             attributes: $this->attributes,
             lastRawRecordId: $this->lastRawRecordId,
+            externalOrderId: $this->externalOrderId,
         );
     }
 }

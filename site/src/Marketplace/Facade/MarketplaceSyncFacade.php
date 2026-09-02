@@ -37,12 +37,17 @@ final readonly class MarketplaceSyncFacade
      * Через Facade, а не напрямую Query: `Infrastructure/` чужого модуля
      * закрыт, и без этой точки входа Ingestion пришлось бы нарушать границу.
      *
+     * Без пагинации сознательно: это реестр подключений (по одному на кабинет
+     * продавца), а не список документов. Его размер ограничен числом кабинетов
+     * и не растёт со временем, в отличие от проводок или заказов. Отбор по
+     * компании отдан БД — параметр `$companyId`.
+     *
      * @return list<ActiveSellerConnectionDTO>
      */
-    public function activeSellerConnections(): array
+    public function activeSellerConnections(?string $companyId = null): array
     {
         $connections = [];
-        foreach ($this->activeSellerConnectionsQuery->execute() as $row) {
+        foreach ($this->activeSellerConnectionsQuery->execute($companyId) as $row) {
             $connections[] = new ActiveSellerConnectionDTO(
                 connectionRef: (string) $row['id'],
                 companyId: (string) $row['company_id'],

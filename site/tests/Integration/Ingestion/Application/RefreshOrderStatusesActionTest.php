@@ -11,6 +11,8 @@ use App\Ingestion\Application\Command\RefreshOrderStatusesCommand;
 use App\Ingestion\Enum\IngestOrderScheme;
 use App\Ingestion\Enum\IngestOrderStatus;
 use App\Ingestion\Enum\IngestSource;
+use App\Ingestion\Exception\ConnectorAuthException;
+use App\Ingestion\Exception\ConnectorRateLimitedException;
 use App\Ingestion\Repository\IngestOrderRepository;
 use App\Ingestion\Repository\IngestOrderStatusEventRepository;
 use App\Marketplace\Entity\MarketplaceConnection;
@@ -82,9 +84,15 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
         $this->ozon->setPostings(['posting-1' => ['posting_number' => 'posting-1', 'status' => 'delivering']]);
 
         ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
-        ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+        $second = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
 
         self::assertSame(0, $this->events->countByOrder((string) $company->getId(), $order->getId()));
+
+        // «Опрошено» и «изменилось» — разные вопросы. Если успешный опрос
+        // считать изменением, счётчик не сможет заметить именно то, ради чего
+        // заведён: опрос идёт, а статусы стоят.
+        self::assertSame(1, $second->polled);
+        self::assertSame(0, $second->changed);
     }
 
     /**
@@ -236,7 +244,8 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
             null,
             null,
             IngestSource::WILDBERRIES,
-            ['wb_order_id' => '5000000001'],
+            ['supplier_status' => 'new', 'wb_status' => 'waiting', 'is_cancellable' => true],
+            '5000000001',
         );
 
         $this->wb->setStatuses([5000000001 => [
@@ -255,6 +264,175 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
         self::assertNotNull($order);
         self::assertSame(IngestOrderStatus::SHIPPED, $order->getStatus());
         self::assertSame('supplierStatus=complete;wbStatus=sorted', $order->getRawStatus());
+
+        // Статусные атрибуты обязаны ехать вместе со статусом: иначе заказ
+        // показывал бы свежий статус рядом с прошлогодними осями.
+        self::assertSame([
+            'supplier_status' => 'complete',
+            'wb_status' => 'sorted',
+            'is_cancellable' => false,
+        ], $order->getAttributes());
+    }
+
+    /**
+     * Заказы, которые спросить не у кого, обязаны отсеиваться ДО лимита.
+     * Иначе они, вечно первые в очереди (у них `statusObservedAt` навсегда
+     * NULL), съедали бы лимит целиком, и пригодный заказ не опрашивался бы
+     * никогда.
+     */
+    public function testWildberriesOrdersWithoutMarketplaceIdDoNotConsumeTheLimit(): void
+    {
+        $company = $this->seedCompanyWithConnection(MarketplaceType::WILDBERRIES);
+
+        $this->seedOrder(
+            $company,
+            'srid-only',
+            IngestOrderStatus::ORDERED,
+            'isCancel=false',
+            null,
+            null,
+            IngestSource::WILDBERRIES,
+        );
+
+        $this->seedOrder(
+            $company,
+            'rid-1',
+            IngestOrderStatus::ORDERED,
+            'supplierStatus=new;wbStatus=waiting',
+            null,
+            null,
+            IngestSource::WILDBERRIES,
+            null,
+            '5000000001',
+        );
+
+        $this->wb->setStatuses([5000000001 => [
+            'id' => 5000000001,
+            'supplierStatus' => 'complete',
+            'wbStatus' => 'sorted',
+            'isCancellable' => false,
+        ]]);
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 1));
+
+        self::assertSame(1, $result->polled, 'Лимит достаётся заказу, который можно спросить.');
+    }
+
+    /**
+     * Поздний 429 не должен обнулять уже полученные ответы: иначе каждый час
+     * терялся бы весь прогресс подключения, а заказы в конце очереди не
+     * обновлялись бы никогда.
+     */
+    public function testAlreadyFetchedPostingsSurviveAConnectionFailure(): void
+    {
+        $company = $this->seedCompanyWithConnection();
+        $first = $this->seedOrder($company, 'posting-1', IngestOrderStatus::SHIPPED, 'delivering', null, null, IngestSource::OZON, null, null, new \DateTimeImmutable('-3 hours'));
+        $this->seedOrder($company, 'posting-2', IngestOrderStatus::SHIPPED, 'delivering', null, null, IngestSource::OZON, null, null, new \DateTimeImmutable('-1 hour'));
+
+        $this->ozon->setPostings(['posting-1' => ['posting_number' => 'posting-1', 'status' => 'delivered']]);
+        $this->ozon->setPostingFailures(['posting-2' => new ConnectorRateLimitedException('rate limited', 60)]);
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        self::assertSame(1, $result->failedConnections);
+        self::assertSame(1, $result->polled, 'Ответ, приехавший до сбоя, применяется.');
+
+        $this->em->clear();
+        $refreshed = $this->orders->findByExternalId((string) $company->getId(), IngestSource::OZON, self::CONNECTION_ID, 'posting-1');
+        self::assertNotNull($refreshed);
+        self::assertSame(IngestOrderStatus::DELIVERED, $refreshed->getStatus());
+        self::assertSame(1, $this->events->countByOrder((string) $company->getId(), $first->getId()));
+    }
+
+    /**
+     * Протухший ключ сам не пройдёт: он ждёт человека, а не следующего часа.
+     * Поэтому он считается отдельно от 429 и таймаутов и даёт ненулевой
+     * счётчик, по которому поднимается алерт.
+     */
+    public function testAuthFailureIsCountedApartFromRetryableOnes(): void
+    {
+        $company = $this->seedCompanyWithConnection();
+        $this->seedOrder($company, 'posting-1', IngestOrderStatus::SHIPPED, 'delivering');
+
+        $this->ozon->setPostingFailures(['posting-1' => new ConnectorAuthException('expired key')]);
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        self::assertSame(1, $result->authFailedConnections);
+        self::assertSame(0, $result->failedConnections);
+    }
+
+    /**
+     * Испорченный ответ — это не отсутствующий заказ. Его нужно и сохранить
+     * как доказательство, и посчитать отдельно от честного 404.
+     */
+    public function testPostingWithoutStatusIsStoredAsRawAndCountedInvalid(): void
+    {
+        $company = $this->seedCompanyWithConnection();
+        $this->seedOrder($company, 'posting-1', IngestOrderStatus::SHIPPED, 'delivering');
+
+        $this->ozon->setPostings(['posting-1' => ['posting_number' => 'posting-1']]);
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        self::assertSame(0, $result->polled);
+        self::assertSame(0, $result->missing);
+        self::assertSame(1, $result->invalid);
+
+        self::assertSame(1, (int) $this->connection->fetchOne(
+            "SELECT COUNT(*) FROM ingest_raw_records WHERE company_id = :c AND resource_type = 'ozon_order_status_refresh'",
+            ['c' => (string) $company->getId()],
+        ));
+    }
+
+    /**
+     * Незнакомый токен статуса уходит в ту же видимую очередь, что и при
+     * нормализации: одно доменное понятие — одно определение.
+     */
+    public function testUnknownStatusRaisesTheSameIssueAsNormalization(): void
+    {
+        $company = $this->seedCompanyWithConnection();
+        $this->seedOrder($company, 'posting-1', IngestOrderStatus::SHIPPED, 'delivering');
+
+        $this->ozon->setPostings(['posting-1' => ['posting_number' => 'posting-1', 'status' => 'teleported']]);
+
+        ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        self::assertSame(1, (int) $this->connection->fetchOne(
+            "SELECT COUNT(*) FROM ingest_normalization_issues WHERE company_id = :c AND kind = 'unknown_order_status'",
+            ['c' => (string) $company->getId()],
+        ));
+    }
+
+    /**
+     * Зависание не зависит от того, живо ли ещё подключение. Иначе
+     * отключённый кабинет оставлял бы свои заказы вечно нетерминальными и
+     * невидимыми: опрашивать их уже некому, пометить — тоже.
+     */
+    public function testStuckOrderOfAnInactiveConnectionIsStillStopped(): void
+    {
+        $company = $this->seedCompanyWithConnection();
+        $this->deactivateConnections($company);
+
+        $this->seedOrder(
+            $company,
+            'ancient',
+            IngestOrderStatus::SHIPPED,
+            'delivering',
+            new \DateTimeImmutable('-90 days'),
+        );
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        self::assertSame(1, $result->stopped);
+    }
+
+    private function deactivateConnections(Company $company): void
+    {
+        $this->connection->executeStatement(
+            'UPDATE marketplace_connections SET is_active = false WHERE company_id = :c',
+            ['c' => (string) $company->getId()],
+        );
     }
 
     /**
@@ -340,6 +518,8 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
         ?string $connectionRef = null,
         IngestSource $source = IngestSource::OZON,
         ?array $attributes = null,
+        ?string $externalOrderId = null,
+        ?\DateTimeImmutable $statusObservedAt = null,
     ): \App\Ingestion\Entity\IngestOrder {
         $builder = IngestOrderBuilder::anOrder()
             ->forCompany((string) $company->getId())
@@ -347,8 +527,13 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
             ->withSource($source)
             ->withScheme(IngestOrderScheme::FBO)
             ->withExternalId($externalId)
+            ->withExternalOrderId($externalOrderId)
             ->withStatus($status, $rawStatus)
             ->orderedAt($orderedAt ?? new \DateTimeImmutable('-2 days'));
+
+        if (null !== $statusObservedAt) {
+            $builder = $builder->statusObservedAt($statusObservedAt);
+        }
 
         if (null !== $attributes) {
             $builder = $builder->withAttributes($attributes);

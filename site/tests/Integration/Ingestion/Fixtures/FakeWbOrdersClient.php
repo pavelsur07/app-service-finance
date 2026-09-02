@@ -21,6 +21,12 @@ final class FakeWbOrdersClient implements WbOrdersClientInterface
     /** @var array<int, array<string, mixed>> */
     private array $statuses = [];
 
+    /**
+     * Сбой, который клиент бросит вместо ответа на статусы. Без этого тесты
+     * частичного сбоя проверяли бы не поведение, а фейк.
+     */
+    private ?\Throwable $statusFailure = null;
+
     public function queueMarketplace(WbOrdersPage ...$pages): void
     {
         $this->marketplacePages = array_values($pages);
@@ -56,9 +62,18 @@ final class FakeWbOrdersClient implements WbOrdersClientInterface
         return array_shift($this->marketplacePages) ?? new WbOrdersPage([], false, $next);
     }
 
+    public function failStatusesWith(\Throwable $failure): void
+    {
+        $this->statusFailure = $failure;
+    }
+
     public function fetchMarketplaceStatuses(string $companyId, string $connectionRef, array $orderIds): array
     {
         $this->calls[] = ['endpoint' => 'status', 'ids' => $orderIds];
+
+        if (null !== $this->statusFailure) {
+            throw $this->statusFailure;
+        }
 
         $result = [];
         foreach ($orderIds as $id) {

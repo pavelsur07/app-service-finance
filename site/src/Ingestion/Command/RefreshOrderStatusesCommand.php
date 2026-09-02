@@ -71,13 +71,22 @@ final class RefreshOrderStatusesCommand extends Command
         }
 
         $io->success(sprintf(
-            'Polled %d orders (changed: %d, not returned: %d, stopped: %d, failed connections: %d).',
+            'Polled %d orders (changed: %d, not returned: %d, invalid: %d, stopped: %d, failed connections: %d, auth failures: %d).',
             $result->polled,
             $result->changed,
             $result->missing,
+            $result->invalid,
             $result->stopped,
             $result->failedConnections,
+            $result->authFailedConnections,
         ));
+
+        // Отказ авторизации сам не пройдёт: пока ключ не заменят, подключение
+        // не обновляется вовсе. Ненулевой код возврата делает это видимым в
+        // выводе cron, а не только в логах.
+        if ($result->authFailedConnections > 0) {
+            return Command::FAILURE;
+        }
 
         return Command::SUCCESS;
     }

@@ -8,6 +8,7 @@ use App\Ingestion\Enum\IngestOrderScheme;
 use App\Ingestion\Exception\ConnectorAuthException;
 use App\Ingestion\Exception\ConnectorRateLimitedException;
 use App\Ingestion\Exception\ConnectorTransientException;
+use App\Ingestion\Exception\CredentialNotFoundException;
 use App\Ingestion\Exception\MalformedConnectorResponseException;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
@@ -50,7 +51,7 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
         int $limit,
         int $offset,
     ): OzonRawPage {
-        $credentials = $this->credentialProvider->read($companyId, $connectionRef);
+        $credentials = $this->credentials($companyId, $connectionRef);
         $endpoint = IngestOrderScheme::FBS === $scheme ? self::FBS_ENDPOINT : self::FBO_ENDPOINT;
 
         $body = [
@@ -176,7 +177,7 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
             throw new \InvalidArgumentException('Ozon posting number cannot be empty.');
         }
 
-        $credentials = $this->credentialProvider->read($companyId, $connectionRef);
+        $credentials = $this->credentials($companyId, $connectionRef);
         $endpoint = IngestOrderScheme::FBS === $scheme ? self::FBS_GET_ENDPOINT : self::FBO_GET_ENDPOINT;
 
         // Никаких дополнительных блоков (`analytics_data`, `financial_data`):
@@ -237,7 +238,31 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
             throw new MalformedConnectorResponseException(sprintf('Ozon posting response has no result object for %s.', $endpoint));
         }
 
+        // Номер в ответе обязан совпасть с запрошенным. Иначе статус чужого
+        // отправления был бы записан этому заказу, и расхождение никак себя
+        // не проявило бы: статус выглядит правдоподобно всегда.
+        $returnedNumber = $result['posting_number'] ?? null;
+        if (!is_string($returnedNumber) || $returnedNumber !== $postingNumber) {
+            throw new MalformedConnectorResponseException(sprintf('Ozon posting response number does not match the request for %s.', $endpoint));
+        }
+
         return $result;
+    }
+
+    /**
+     * Отсутствующие учётные данные — это отказ авторизации, а не внутренняя
+     * ошибка: цикл перепроса обязан пропустить такое подключение и продолжить
+     * остальные, а не упасть целиком.
+     *
+     * @return array{api_key: string, client_id: ?string}
+     */
+    private function credentials(string $companyId, string $connectionRef): array
+    {
+        try {
+            return $this->credentialProvider->read($companyId, $connectionRef);
+        } catch (CredentialNotFoundException $exception) {
+            throw new ConnectorAuthException('Ozon orders credentials were not found.', 0, $exception);
+        }
     }
 
     /**

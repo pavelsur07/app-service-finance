@@ -135,6 +135,55 @@ final class NormalizeOrderRawRecordActionTest extends IntegrationTestCase
     }
 
     /**
+     * Регрессия: повтор вёл себя по-разному в зависимости от момента.
+     *
+     * Сырьё, впервые разобранное при том же статусе, события не давало —
+     * записывать было нечего. Но ключ подавления брался из уже записанных
+     * событий, поэтому после следующей смены статуса тот же повтор внезапно
+     * находил отличие, ключа не находил и дописывал событие с
+     * `previousStatus` из будущего: перевёрнутый переход, появившийся из
+     * ничего. На старом коде журнал рос от каждого повтора.
+     */
+    public function testReplayOfRawSeenAtTheSameStatusStaysSilentAfterStatusMoves(): void
+    {
+        // Заказ создан первым сырьём — у него есть открывающее событие.
+        $this->mapper->queue($this->order('delivering', 1));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-1', new \DateTimeImmutable('-3 hours')), $this->companyId));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($order);
+
+        // Второе сырьё подтверждает ТОТ ЖЕ статус: событий не появляется, и
+        // ключа подавления для этого сырья тоже не остаётся — именно здесь
+        // старый код и ломался.
+        $this->mapper->queue($this->order('delivering', 1));
+        $confirmingRawId = $this->storeRaw('page-2', new \DateTimeImmutable('-2 hours'));
+        ($this->action)(new NormalizeRawRecordCommand($confirmingRawId, $this->companyId));
+
+        $afterConfirmation = $this->events->countByOrder($this->companyId, $order->getId());
+        self::assertSame(1, $afterConfirmation, 'Подтверждение того же статуса события не даёт.');
+
+        // Статус уехал вперёд.
+        $this->mapper->queue($this->order('delivered', 1));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-3', new \DateTimeImmutable('-1 hour')), $this->companyId));
+
+        self::assertSame(2, $this->events->countByOrder($this->companyId, $order->getId()));
+
+        // Повтор подтверждающего сырья наблюдением не является. На старом коде
+        // он находил отличие, ключа не находил и дописывал событие
+        // `DELIVERED → DELIVERING`: перевёрнутый переход из ничего.
+        $this->mapper->queue($this->order('delivering', 1));
+        ($this->action)(new NormalizeRawRecordCommand($confirmingRawId, $this->companyId, forceReplay: true));
+
+        self::assertSame(2, $this->events->countByOrder($this->companyId, $order->getId()));
+
+        $this->em->clear();
+        $reloaded = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($reloaded);
+        self::assertSame(IngestOrderStatus::DELIVERED, $reloaded->getStatus(), 'Повтор старого сырья не откатывает статус.');
+    }
+
+    /**
      * Регрессия: идентичность позиции была позиционной. Источник вправе
      * прислать те же товары в другом порядке — на старом коде строка 0
      * сохраняла прежние externalSku/offerId, но получала количество, цену и

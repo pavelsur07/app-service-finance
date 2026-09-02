@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Ingestion\Application\Service;
 
+use App\Ingestion\Application\DTO\StatusObservationOutcome;
 use App\Ingestion\Entity\IngestOrder;
 use App\Ingestion\Entity\IngestOrderStatusEvent;
 use App\Ingestion\Enum\IngestOrderStatus;
@@ -25,6 +26,9 @@ use App\Ingestion\Repository\IngestOrderStatusEventRepository;
  * - одно наблюдение — одно событие: ключ дедупликации собирается из сырья и
  *   сырого статуса, потому что Doctrine-запрос не видит непрофлашенные
  *   сущности, и без локального ключа повтор в одном батче дал бы дубль.
+ *
+ * Повторный прогон уже разобранного сырья наблюдением НЕ является и идёт
+ * через {@see reapply()}: см. комментарий там.
  */
 final readonly class OrderStatusJournal
 {
@@ -52,8 +56,6 @@ final readonly class OrderStatusJournal
      * Наблюдение статуса существующего заказа.
      *
      * @param array<string, true> $seenObservations изменяется по ссылке
-     *
-     * @return bool сдвинулся ли статус заказа
      */
     public function observe(
         IngestOrder $order,
@@ -63,16 +65,49 @@ final readonly class OrderStatusJournal
         ?string $rawSubstatus,
         string $rawRecordId,
         array &$seenObservations,
-    ): bool {
+    ): StatusObservationOutcome {
         $previousStatus = $order->getStatus();
+        $differs = $previousStatus !== $status || $order->getRawStatus() !== $rawStatus;
 
-        if ($previousStatus !== $status || $order->getRawStatus() !== $rawStatus) {
+        if ($differs) {
             // Событие пишется ДО observeStatus(): иначе previousStatus уже
             // равнялся бы новому и запись теряла бы переход.
             $this->append($order, $rawStatus, $status, $previousStatus, $observedAt, $rawRecordId, $seenObservations);
         }
 
-        return $order->observeStatus($rawStatus, $status, $observedAt, $rawSubstatus, $rawRecordId);
+        $accepted = $order->observeStatus($rawStatus, $status, $observedAt, $rawSubstatus, $rawRecordId);
+
+        // «Принято» и «изменилось» — разные ответы. Принятым считается любое
+        // наблюдение не старше текущей отметки, включая повторяющее тот же
+        // статус; изменением — только то, которое статус действительно
+        // сдвинуло.
+        return new StatusObservationOutcome(accepted: $accepted, changed: $accepted && $differs);
+    }
+
+    /**
+     * Повторный разбор УЖЕ обработанного сырья: состояние заказа
+     * пересчитывается, событий не появляется.
+     *
+     * Повтор — не наблюдение. Наблюдение произошло один раз, тогда же оно и
+     * попало в журнал (или осознанно не попало, потому что ничего не меняло).
+     * Если бы повтор шёл общим путём, он вёл бы себя по-разному в зависимости
+     * от момента: сырьё, впервые разобранное при том же статусе, событий не
+     * дало, а после следующей смены статуса тот же повтор внезапно дописал бы
+     * событие с `previousStatus` из будущего — перевёрнутый переход,
+     * появившийся из ничего.
+     */
+    public function reapply(
+        IngestOrder $order,
+        string $rawStatus,
+        IngestOrderStatus $status,
+        \DateTimeImmutable $observedAt,
+        ?string $rawSubstatus,
+        string $rawRecordId,
+    ): StatusObservationOutcome {
+        $differs = $order->getStatus() !== $status || $order->getRawStatus() !== $rawStatus;
+        $accepted = $order->observeStatus($rawStatus, $status, $observedAt, $rawSubstatus, $rawRecordId);
+
+        return new StatusObservationOutcome(accepted: $accepted, changed: $accepted && $differs);
     }
 
     /**

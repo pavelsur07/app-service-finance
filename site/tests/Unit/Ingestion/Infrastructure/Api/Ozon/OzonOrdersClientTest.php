@@ -8,6 +8,7 @@ use App\Ingestion\Enum\IngestOrderScheme;
 use App\Ingestion\Exception\ConnectorAuthException;
 use App\Ingestion\Exception\ConnectorRateLimitedException;
 use App\Ingestion\Exception\ConnectorTransientException;
+use App\Ingestion\Exception\CredentialNotFoundException;
 use App\Ingestion\Exception\MalformedConnectorResponseException;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonCredentialProviderInterface;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonOrdersClient;
@@ -19,6 +20,9 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 
 final class OzonOrdersClientTest extends TestCase
 {
+    private const COMPANY_ID = '0192f0c2-0000-7000-8000-000000000001';
+    private const CONNECTION_ID = '0192f0c2-0000-7000-8000-000000000002';
+
     /**
      * Регрессия: конструктор ConnectorRateLimitedException требует
      * retryAfterSeconds, а вызывался с одним аргументом. На старом коде 429 от
@@ -218,6 +222,115 @@ final class OzonOrdersClientTest extends TestCase
 
         $this->expectException(MalformedConnectorResponseException::class);
         $this->fetch($client, IngestOrderScheme::FBS);
+    }
+
+    /**
+     * Перепрос статуса ходит в другой эндпоинт, чем список. Схема выбирает
+     * пару: FBS и FBO — разные версии API.
+     */
+    #[DataProvider('postingEndpointProvider')]
+    public function testPostingRequestGoesToTheSchemeEndpointWithOnlyTheNumber(
+        IngestOrderScheme $scheme,
+        string $expectedUrl,
+    ): void {
+        $seen = null;
+        $httpClient = new MockHttpClient(static function (string $method, string $url, array $options) use (&$seen): MockResponse {
+            $seen = ['method' => $method, 'url' => $url, 'body' => $options['body'] ?? ''];
+
+            return new MockResponse('{"result":{"posting_number":"P-1","status":"delivered"}}');
+        });
+
+        $client = new OzonOrdersClient($httpClient, $this->credentialProvider(), new NullLogger());
+        $client->fetchPosting(self::COMPANY_ID, self::CONNECTION_ID, $scheme, 'P-1');
+
+        self::assertIsArray($seen);
+        self::assertSame('POST', $seen['method']);
+        self::assertSame($expectedUrl, $seen['url']);
+
+        // Дополнительные блоки не запрашиваются: ответ целиком ложится в raw
+        // и хранится год, а перепросу нужен только статус.
+        self::assertSame(['posting_number' => 'P-1'], json_decode((string) $seen['body'], true));
+    }
+
+    /**
+     * @return iterable<string, array{scheme: IngestOrderScheme, expectedUrl: string}>
+     */
+    public static function postingEndpointProvider(): iterable
+    {
+        yield 'fbo' => [
+            'scheme' => IngestOrderScheme::FBO,
+            'expectedUrl' => 'https://api-seller.ozon.ru/v2/posting/fbo/get',
+        ];
+        yield 'fbs' => [
+            'scheme' => IngestOrderScheme::FBS,
+            'expectedUrl' => 'https://api-seller.ozon.ru/v3/posting/fbs/get',
+        ];
+    }
+
+    /**
+     * 404 — «Ozon такого отправления не знает». Заказ мог быть удалён или
+     * номер устареть; ронять из-за него перепрос остальных нельзя.
+     */
+    public function testUnknownPostingReturnsNullInsteadOfThrowing(): void
+    {
+        $client = $this->client(new MockResponse('{"code":404}', ['http_code' => 404]));
+
+        self::assertNull($client->fetchPosting(self::COMPANY_ID, self::CONNECTION_ID, IngestOrderScheme::FBO, 'P-1'));
+    }
+
+    /**
+     * Ответ с чужим номером записал бы статус одного отправления другому, и
+     * подмена никак себя не проявила бы: статус выглядит правдоподобно всегда.
+     */
+    public function testPostingNumberMismatchIsMalformed(): void
+    {
+        $client = $this->client(new MockResponse('{"result":{"posting_number":"OTHER","status":"delivered"}}'));
+
+        $this->expectException(MalformedConnectorResponseException::class);
+        $client->fetchPosting(self::COMPANY_ID, self::CONNECTION_ID, IngestOrderScheme::FBO, 'P-1');
+    }
+
+    /**
+     * @param class-string<\Throwable> $expected
+     */
+    #[DataProvider('postingFailureProvider')]
+    public function testPostingHttpFailuresAreClassifiedLikeTheList(int $statusCode, string $expected): void
+    {
+        $client = $this->client(new MockResponse('{"error":"x"}', ['http_code' => $statusCode]));
+
+        $this->expectException($expected);
+        $client->fetchPosting(self::COMPANY_ID, self::CONNECTION_ID, IngestOrderScheme::FBO, 'P-1');
+    }
+
+    /**
+     * @return iterable<string, array{statusCode: int, expected: class-string<\Throwable>}>
+     */
+    public static function postingFailureProvider(): iterable
+    {
+        yield 'unauthorized' => ['statusCode' => 401, 'expected' => ConnectorAuthException::class];
+        yield 'rate limited' => ['statusCode' => 429, 'expected' => ConnectorRateLimitedException::class];
+        yield 'gateway timeout' => ['statusCode' => 504, 'expected' => ConnectorTransientException::class];
+        yield 'teapot' => ['statusCode' => 418, 'expected' => MalformedConnectorResponseException::class];
+    }
+
+    /**
+     * Отсутствующие учётные данные — отказ авторизации, а не внутренняя
+     * ошибка: цикл перепроса обязан пропустить подключение и продолжить
+     * остальные. WB-клиент так делает давно, Ozon пропускал исключение мимо.
+     */
+    public function testMissingCredentialsBecomeAuthFailure(): void
+    {
+        $provider = new class implements OzonCredentialProviderInterface {
+            public function read(string $companyId, string $connectionRef): array
+            {
+                throw new CredentialNotFoundException('no credentials');
+            }
+        };
+
+        $client = new OzonOrdersClient(new MockHttpClient(new MockResponse('{}')), $provider, new NullLogger());
+
+        $this->expectException(ConnectorAuthException::class);
+        $client->fetchPosting(self::COMPANY_ID, self::CONNECTION_ID, IngestOrderScheme::FBO, 'P-1');
     }
 
     private function fetch(OzonOrdersClient $client, IngestOrderScheme $scheme = IngestOrderScheme::FBO): void
